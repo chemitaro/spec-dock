@@ -81,6 +81,47 @@ def _install_skill(target_root: Path, *, force: bool) -> None:
         _copy_file(src_skill, dest_skill)
 
 
+def _install_github_workflows(target_root: Path, *, force: bool) -> None:
+    with _assets_dir() as assets_dir:
+        src_workflow = assets_dir / "github" / "workflows" / "spec-dock-close.yml"
+        if not src_workflow.exists():
+            raise RuntimeError(f"Missing asset file: {src_workflow}")
+
+        workflows_dir = target_root / ".github" / "workflows"
+        dest_workflow = workflows_dir / "spec-dock-close.yml"
+        legacy_workflow = workflows_dir / "planning-develop-guard.yml"
+
+        if force and legacy_workflow.exists():
+            try:
+                legacy_text = legacy_workflow.read_text(encoding="utf-8")
+            except OSError:
+                legacy_text = ""
+
+            is_legacy_managed = (
+                ".spec-dock/scripts/spec-dock-close.sh" in legacy_text
+                and ("Spec Dock Guard" in legacy_text or "spec-dock-close-guard" in legacy_text)
+            )
+            if is_legacy_managed:
+                legacy_workflow.unlink()
+                print(
+                    f"spec-dock: removed legacy workflow: {legacy_workflow}",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"spec-dock: legacy workflow exists (not removed): {legacy_workflow}",
+                    file=sys.stderr,
+                )
+
+        if dest_workflow.exists() and not force:
+            print(
+                f"spec-dock: workflow already exists (skipped): {dest_workflow} (use --force to overwrite)",
+                file=sys.stderr,
+            )
+            return
+        _copy_file(src_workflow, dest_workflow)
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="spec-dock")
     parser.add_argument("--version", action="version", version=f"spec-dock {__version__}")
@@ -134,11 +175,13 @@ def main(argv: list[str] | None = None) -> int:
             _install_spec_dock(target_root, force=bool(ns.force), reset_current=ns.reset_current)
             if not ns.no_skill:
                 _install_skill(target_root, force=bool(ns.force))
+            _install_github_workflows(target_root, force=bool(ns.force))
         elif ns.command == "update":
             # Update is effectively a managed overwrite.
             _install_spec_dock(target_root, force=True, reset_current=ns.reset_current)
             if not ns.no_skill:
                 _install_skill(target_root, force=True)
+            _install_github_workflows(target_root, force=True)
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:

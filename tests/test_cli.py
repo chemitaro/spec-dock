@@ -39,6 +39,14 @@ class TestCli(unittest.TestCase):
                     / "SKILL.md"
                 ).is_file()
             )
+            self.assertTrue(
+                (
+                    target
+                    / ".github"
+                    / "workflows"
+                    / "spec-dock-close.yml"
+                ).is_file()
+            )
 
     def test_init_no_skill_skips_skill_install(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -55,6 +63,14 @@ class TestCli(unittest.TestCase):
                     / "spec-driven-tdd-workflow"
                     / "SKILL.md"
                 ).exists()
+            )
+            self.assertTrue(
+                (
+                    target
+                    / ".github"
+                    / "workflows"
+                    / "spec-dock-close.yml"
+                ).is_file()
             )
 
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:

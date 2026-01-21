@@ -37,6 +37,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update --reset-c
   - `current/` (initialized from templates)
   - `completed/` (empty directory)
 - `.codex/skills/spec-driven-tdd-workflow/` (Codex skill)
+- `.github/workflows/spec-dock-close.yml` (GitHub Actions workflow; runs on `main`/`master`)
 
 ## Testing
 
