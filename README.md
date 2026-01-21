@@ -10,22 +10,22 @@ required at runtime.
 
 ```bash
 # Install into the current directory
-uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init
+uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init
 
 # Install into a target path
-uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init /path/to/project
+uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/project
 
 # Overwrite managed files if '.spec-dock' already exists
-uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init --force
+uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
 
 # Skip installing the Codex skill (optional)
-uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init --no-skill
+uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --no-skill
 
 # Update managed files (docs/templates/scripts/skill) without touching .spec-dock/current by default
-uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update
+uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
 
 # Reset '.spec-dock/current' from templates (optional)
-uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update --reset-current
+uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update --reset-current
 ```
 
 ## What it creates
