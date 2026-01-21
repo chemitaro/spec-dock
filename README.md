@@ -15,19 +15,19 @@ uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init
 # Install into a target path
 uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init /path/to/project
 
-# Overwrite managed files if '.specdoc' already exists
+# Overwrite managed files if '.spec-dock' already exists
 uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init --force
 
-# Update managed files (docs/templates/scripts/skill) without touching .specdoc/current by default
+# Update managed files (docs/templates/scripts/skill) without touching .spec-dock/current by default
 uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update
 
-# Reset '.specdoc/current' from templates (optional)
+# Reset '.spec-dock/current' from templates (optional)
 uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update --reset-current
 ```
 
 ## What it creates
 
-- `.specdoc/`
+- `.spec-dock/`
   - `docs/` (guide)
   - `templates/` (requirement/design/plan/report)
   - `scripts/` (helper scripts)
@@ -39,7 +39,7 @@ uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update --reset-current
 
 ## 日本語（概要）
 
-`spec-dock` は、既存リポジトリに `.specdoc/`（仕様書駆動開発のためのドキュメント一式）と
+`spec-dock` は、既存リポジトリに `.spec-dock/`（仕様書駆動開発のためのドキュメント一式）と
 Codex Skill を生成するためのスキャフォルディングツールです。
 
 実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。

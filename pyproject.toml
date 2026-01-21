@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spec-dock"
-version = "0.1.0"
-description = "Scaffold a spec-driven planning workspace (.specdoc) for coding agents"
+version = "0.2.0"
+description = "Scaffold a spec-driven planning workspace (.spec-dock) for coding agents"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -24,4 +24,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 spec_dock = ["assets/**/*"]
-

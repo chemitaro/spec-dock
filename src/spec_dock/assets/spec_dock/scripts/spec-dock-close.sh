@@ -27,7 +27,7 @@ emit_kv() {
 
 on_error() {
     local exit_code=$?
-    log_error "SpecDoc close failed (exit code: ${exit_code})"
+    log_error "spec-dock close failed (exit code: ${exit_code})"
     emit_kv "PLANNING_CLOSE_STATUS" "FAILED"
     emit_kv "PLANNING_CLOSE_MESSAGE" "unexpected error"
     emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
@@ -48,7 +48,7 @@ fi
 cd "$repo_root"
 
 # 0. 前提条件チェック
-echo "🔄 Starting specdoc close process..."
+echo "🔄 Starting spec-dock close process..."
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     log_error "Error: Not in a git repository"
@@ -58,10 +58,10 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 1
 fi
 
-mkdir -p .specdoc/completed
+mkdir -p .spec-dock/completed
 
-readonly CURRENT_DIR=".specdoc/current"
-readonly TEMPLATE_DIR=".specdoc/templates"
+readonly CURRENT_DIR=".spec-dock/current"
+readonly TEMPLATE_DIR=".spec-dock/templates"
 
 if [[ ! -d "$TEMPLATE_DIR" ]]; then
     log_error "Error: templates directory not found"
@@ -73,7 +73,7 @@ fi
 
 if [[ -d "$CURRENT_DIR" ]]; then
     if diff -qr "$CURRENT_DIR" "$TEMPLATE_DIR" >/dev/null 2>&1; then
-        log_warn ".specdoc/current matches templates. Skipping archive/copy."
+        log_warn ".spec-dock/current matches templates. Skipping archive/copy."
         emit_kv "PLANNING_CLOSE_STATUS" "SKIPPED"
         emit_kv "PLANNING_CLOSE_MESSAGE" "current matches template"
         emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
@@ -99,7 +99,7 @@ fi
 branch_name=$(echo "$branch_raw" | tr '/' '_' | tr -cs 'A-Za-z0-9._-' '_' | sed 's/_\+/_/g; s/^_//; s/_$//')
 
 timestamp=$(date +%Y%m%d_%H%M%S)
-archive_dir=".specdoc/completed/${timestamp}_${branch_name}"
+archive_dir=".spec-dock/completed/${timestamp}_${branch_name}"
 
 if [[ -d "$archive_dir" ]]; then
     counter=2
@@ -117,9 +117,9 @@ else
 fi
 
 cp -r "$TEMPLATE_DIR" "$CURRENT_DIR"
-log_info "Templates copied to .specdoc/current"
+log_info "Templates copied to .spec-dock/current"
 
-log_info "SpecDoc close completed successfully"
+log_info "spec-dock close completed successfully"
 emit_kv "PLANNING_CLOSE_STATUS" "ARCHIVED"
 emit_kv "PLANNING_CLOSE_MESSAGE" "archived current and restored templates"
 emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "$archive_dir"

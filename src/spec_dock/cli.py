@@ -27,38 +27,38 @@ def _copy_file(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
-def _install_specdoc(
+def _install_spec_dock(
     target_root: Path,
     *,
     force: bool,
     reset_current: bool,
 ) -> None:
-    specdoc_dir = target_root / ".specdoc"
-    if specdoc_dir.exists() and not force:
+    specdock_dir = target_root / ".spec-dock"
+    if specdock_dir.exists() and not force:
         raise RuntimeError(
-            "'.specdoc' already exists. Use 'spec-dock update' or re-run with '--force'."
+            "'.spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'."
         )
 
     with _assets_dir() as assets_dir:
-        src_specdoc = assets_dir / "specdoc"
+        src_spec_dock = assets_dir / "spec_dock"
 
-        specdoc_dir.mkdir(parents=True, exist_ok=True)
+        specdock_dir.mkdir(parents=True, exist_ok=True)
 
         for name in ("docs", "templates", "scripts"):
-            src = src_specdoc / name
-            dest = specdoc_dir / name
+            src = src_spec_dock / name
+            dest = specdock_dir / name
             if not src.exists():
                 raise RuntimeError(f"Missing asset directory: {src}")
             _sync_tree(src, dest) if (dest.exists() or force) else shutil.copytree(src, dest)
 
         # Ensure empty directories exist.
-        (specdoc_dir / "completed").mkdir(parents=True, exist_ok=True)
+        (specdock_dir / "completed").mkdir(parents=True, exist_ok=True)
 
-        current_dir = specdoc_dir / "current"
+        current_dir = specdock_dir / "current"
         if reset_current or not current_dir.exists():
             if current_dir.exists():
                 shutil.rmtree(current_dir)
-            shutil.copytree(specdoc_dir / "templates", current_dir)
+            shutil.copytree(specdock_dir / "templates", current_dir)
 
 
 def _install_skill(target_root: Path, *, force: bool) -> None:
@@ -89,7 +89,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         p.add_argument(
             "--reset-current",
             action="store_true",
-            help="Reset '.specdoc/current' from templates",
+            help="Reset '.spec-dock/current' from templates",
         )
         p.add_argument(
             "--no-skill",
@@ -97,12 +97,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
             help="Do not install the Codex skill into '.codex/skills/'",
         )
 
-    p_init = sub.add_parser("init", help="Scaffold .specdoc into a project")
+    p_init = sub.add_parser("init", help="Scaffold .spec-dock into a project")
     add_common(p_init)
     p_init.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite managed files if '.specdoc' already exists",
+        help="Overwrite managed files if '.spec-dock' already exists",
     )
 
     p_update = sub.add_parser(
@@ -124,12 +124,12 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if ns.command == "init":
-            _install_specdoc(target_root, force=bool(ns.force), reset_current=ns.reset_current)
+            _install_spec_dock(target_root, force=bool(ns.force), reset_current=ns.reset_current)
             if not ns.no_skill:
                 _install_skill(target_root, force=bool(ns.force))
         elif ns.command == "update":
             # Update is effectively a managed overwrite.
-            _install_specdoc(target_root, force=True, reset_current=ns.reset_current)
+            _install_spec_dock(target_root, force=True, reset_current=ns.reset_current)
             if not ns.no_skill:
                 _install_skill(target_root, force=True)
         else:
