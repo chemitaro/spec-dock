@@ -90,36 +90,47 @@ if [[ -d "$CURRENT_DIR" ]]; then
     fi
 fi
 
-branch_raw=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
-if [[ -z "$branch_raw" ]] || [[ "$branch_raw" == "HEAD" ]]; then
-    branch_raw=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-    log_warn "Detached HEAD detected, using commit hash: $branch_raw"
-fi
-
-branch_name=$(echo "$branch_raw" | tr '/' '_' | tr -cs 'A-Za-z0-9._-' '_' | sed 's/_\+/_/g; s/^_//; s/_$//')
-
-timestamp=$(date +%Y%m%d_%H%M%S)
-archive_dir=".spec-dock/completed/${timestamp}_${branch_name}"
-
-if [[ -d "$archive_dir" ]]; then
-    counter=2
-    while [[ -d "${archive_dir}_${counter}" ]]; do
-        ((counter++))
-    done
-    archive_dir="${archive_dir}_${counter}"
-fi
+archived=0
+archive_dir="-"
 
 if [[ -d "$CURRENT_DIR" ]]; then
+    branch_raw=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+    if [[ -z "$branch_raw" ]] || [[ "$branch_raw" == "HEAD" ]]; then
+        branch_raw=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        log_warn "Detached HEAD detected, using commit hash: $branch_raw"
+    fi
+
+    branch_name=$(echo "$branch_raw" | tr '/' '_' | tr -cs 'A-Za-z0-9._-' '_' | sed 's/_\+/_/g; s/^_//; s/_$//')
+
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    archive_dir=".spec-dock/completed/${timestamp}_${branch_name}"
+
+    if [[ -d "$archive_dir" ]]; then
+        counter=2
+        while [[ -d "${archive_dir}_${counter}" ]]; do
+            ((counter++))
+        done
+        archive_dir="${archive_dir}_${counter}"
+    fi
+
     mv "$CURRENT_DIR" "$archive_dir"
+    archived=1
     log_info "Archived to: $archive_dir"
 else
-    log_warn "No current directory to archive"
+    log_warn "No current directory to archive (will create current from templates)"
 fi
 
 cp -r "$TEMPLATE_DIR" "$CURRENT_DIR"
 log_info "Templates copied to .spec-dock/current"
 
-log_info "spec-dock close completed successfully"
-emit_kv "PLANNING_CLOSE_STATUS" "ARCHIVED"
-emit_kv "PLANNING_CLOSE_MESSAGE" "archived current and restored templates"
-emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "$archive_dir"
+if [[ $archived -eq 1 ]]; then
+    log_info "spec-dock close completed successfully (archived)"
+    emit_kv "PLANNING_CLOSE_STATUS" "ARCHIVED"
+    emit_kv "PLANNING_CLOSE_MESSAGE" "archived current and restored templates"
+    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "$archive_dir"
+else
+    log_info "spec-dock close completed successfully (created)"
+    emit_kv "PLANNING_CLOSE_STATUS" "CREATED"
+    emit_kv "PLANNING_CLOSE_MESSAGE" "created current from templates"
+    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+fi

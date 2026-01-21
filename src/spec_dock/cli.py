@@ -71,6 +71,10 @@ def _install_skill(target_root: Path, *, force: bool) -> None:
             target_root / ".codex" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
         )
         if dest_skill.exists() and not force:
+            print(
+                f"spec-dock: skill already exists (skipped): {dest_skill} (use --force to overwrite)",
+                file=sys.stderr,
+            )
             return
         _copy_file(src_skill, dest_skill)
 

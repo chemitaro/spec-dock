@@ -18,6 +18,9 @@ uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init /path/to/project
 # Overwrite managed files if '.spec-dock' already exists
 uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init --force
 
+# Skip installing the Codex skill (optional)
+uvx --from git+https://github.com/<ORG>/<REPO> spec-dock init --no-skill
+
 # Update managed files (docs/templates/scripts/skill) without touching .spec-dock/current by default
 uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update
 
