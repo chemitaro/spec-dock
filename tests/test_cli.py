@@ -35,6 +35,31 @@ class TestCli(unittest.TestCase):
                 ).is_file()
             )
 
+    def test_init_no_skill_skips_skill_install(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            exit_code = main(["init", "--no-skill", str(target)])
+            self.assertEqual(exit_code, 0)
+
+            self.assertFalse(
+                (
+                    target
+                    / ".codex"
+                    / "skills"
+                    / "spec-driven-tdd-workflow"
+                    / "SKILL.md"
+                ).exists()
+            )
+
+    def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Second init without --force should fail.
+            self.assertNotEqual(main(["init", str(target)]), 0)
+
     def test_update_keeps_current_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -56,4 +81,3 @@ class TestCli(unittest.TestCase):
 
             self.assertEqual(main(["update", "--reset-current", str(target)]), 0)
             self.assertFalse(requirement.read_text(encoding="utf-8").rstrip().endswith("MOD"))
-

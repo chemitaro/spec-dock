@@ -8,6 +8,8 @@ from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Iterator
 
+from spec_dock import __version__
+
 
 @contextmanager
 def _assets_dir() -> Iterator[Path]:
@@ -81,6 +83,7 @@ def _install_skill(target_root: Path, *, force: bool) -> None:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="spec-dock")
+    parser.add_argument("--version", action="version", version=f"spec-dock {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_common(p: argparse.ArgumentParser) -> None:
