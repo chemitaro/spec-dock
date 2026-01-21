@@ -38,6 +38,12 @@ uvx --from git+https://github.com/<ORG>/<REPO> spec-dock update --reset-current
   - `completed/` (empty directory)
 - `.codex/skills/spec-driven-tdd-workflow/` (Codex skill)
 
+## Testing
+
+```bash
+python -m unittest discover -v
+```
+
 ---
 
 ## 日本語（概要）
