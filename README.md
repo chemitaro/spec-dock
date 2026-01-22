@@ -32,9 +32,9 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update --reset-c
 
 - `.spec-dock/`
   - `docs/` (guide)
-  - `templates/` (requirement/design/plan/report)
+  - `templates/` (requirement/design/plan/report + discussions/)
   - `scripts/` (helper scripts)
-  - `current/` (initialized from templates)
+  - `current/` (initialized from templates; includes `discussions/`)
   - `completed/` (empty directory)
 - `.codex/skills/spec-driven-tdd-workflow/` (Codex skill)
 - `.github/workflows/spec-dock-close.yml` (GitHub Actions workflow; runs on `main`/`master`)

@@ -62,6 +62,10 @@ def _install_spec_dock(
                 shutil.rmtree(current_dir)
             shutil.copytree(specdock_dir / "templates", current_dir)
 
+        # Notes:
+        # - `current/` is only created/reset by copying from `templates/`.
+        # - `update` should not touch an existing `current/` by default (use --reset-current or close workflow).
+
 
 def _install_skill(target_root: Path, *, force: bool) -> None:
     with _assets_dir() as assets_dir:
