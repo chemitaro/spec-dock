@@ -31,6 +31,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update --reset-c
 ## What it creates
 
 - `.spec-dock/`
+  - `spec-dock.version` (installed spec-dock version)
   - `docs/` (guide)
   - `templates/` (requirement/design/plan/report + discussions/)
   - `scripts/` (helper scripts)

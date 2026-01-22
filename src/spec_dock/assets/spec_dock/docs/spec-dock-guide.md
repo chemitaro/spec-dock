@@ -23,6 +23,8 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 
 ## 成果物とディレクトリ
 
+- `.spec-dock/spec-dock.version`
+  - 導入/更新した spec-dock のバージョン（1行）
 - `.spec-dock/current/`
   - 作業中の一時ディレクトリ（1つの作業単位を前提。混在させない）
   - `requirement.md`: 要件定義（WHAT/WHY）

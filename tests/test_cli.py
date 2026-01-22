@@ -1,7 +1,9 @@
+import re
 import sys
 import shutil
 import tempfile
 import unittest
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 try:
@@ -11,13 +13,33 @@ except ModuleNotFoundError:
     from spec_dock.cli import main
 
 
+def _expected_spec_dock_version() -> str:
+    try:
+        return version("spec-dock")
+    except PackageNotFoundError:
+        text = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
+        if not match:
+            raise AssertionError("failed to read version from pyproject.toml")
+        return match.group(1)
+
+
 class TestCli(unittest.TestCase):
+    def _assert_version_file(self, target: Path) -> None:
+        version_file = target / ".spec-dock" / "spec-dock.version"
+        self.assertTrue(version_file.is_file())
+        self.assertEqual(version_file.read_text(encoding="utf-8").strip(), _expected_spec_dock_version())
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
 
             exit_code = main(["init", str(target)])
             self.assertEqual(exit_code, 0)
+
+            self._assert_version_file(target)
 
             self.assertTrue((target / ".spec-dock" / "docs").is_dir())
             self.assertTrue((target / ".spec-dock" / "templates").is_dir())
@@ -63,6 +85,8 @@ class TestCli(unittest.TestCase):
 
             exit_code = main(["init", "--no-skill", str(target)])
             self.assertEqual(exit_code, 0)
+
+            self._assert_version_file(target)
 
             self.assertFalse(
                 (
@@ -112,6 +136,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(main(["update", str(target)]), 0)
             self.assertTrue(requirement.read_text(encoding="utf-8").rstrip().endswith("MOD"))
             self.assertTrue(note.is_file())
+            self._assert_version_file(target)
 
     def test_update_reset_current_overwrites_current(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -130,6 +155,7 @@ class TestCli(unittest.TestCase):
             self.assertTrue(
                 (target / ".spec-dock" / "current" / "discussions" / "_template.md").is_file()
             )
+            self._assert_version_file(target)
 
     def test_update_does_not_create_discussions_without_reset(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -146,3 +172,4 @@ class TestCli(unittest.TestCase):
             self.assertTrue(
                 (target / ".spec-dock" / "templates" / "discussions" / "_template.md").is_file()
             )
+            self._assert_version_file(target)

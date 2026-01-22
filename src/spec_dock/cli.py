@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 from contextlib import contextmanager
@@ -27,6 +28,21 @@ def _sync_tree(src: Path, dest: Path) -> None:
 def _copy_file(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
+
+
+def _tool_version() -> str:
+    if __version__ and __version__ != "0.0.0+unknown":
+        return __version__
+
+    # Fallback for dev usage when `spec-dock` isn't installed as a package.
+    try:
+        pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        text = pyproject.read_text(encoding="utf-8")
+    except OSError:
+        return __version__
+
+    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
+    return match.group(1) if match else __version__
 
 
 def _install_spec_dock(
@@ -61,6 +77,8 @@ def _install_spec_dock(
             if current_dir.exists():
                 shutil.rmtree(current_dir)
             shutil.copytree(specdock_dir / "templates", current_dir)
+
+        (specdock_dir / "spec-dock.version").write_text(f"{_tool_version()}\n", encoding="utf-8")
 
         # Notes:
         # - `current/` is only created/reset by copying from `templates/`.
