@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - master
+      - develop
   workflow_dispatch:
 
 concurrency:
@@ -50,9 +51,9 @@ jobs:
           chmod +x .spec-dock/scripts/spec-dock-close.sh
           set -o pipefail
           ./.spec-dock/scripts/spec-dock-close.sh | tee /tmp/spec-dock-close.log
-          status=$(grep -F 'PLANNING_CLOSE_STATUS=' /tmp/spec-dock-close.log | tail -n1 | cut -d= -f2-)
-          message=$(grep -F 'PLANNING_CLOSE_MESSAGE=' /tmp/spec-dock-close.log | tail -n1 | cut -d= -f2-)
-          archive_dir=$(grep -F 'PLANNING_CLOSE_ARCHIVE_DIR=' /tmp/spec-dock-close.log | tail -n1 | cut -d= -f2-)
+          status=$(grep -F 'SPEC_DOCK_CLOSE_STATUS=' /tmp/spec-dock-close.log | tail -n1 | cut -d= -f2-)
+          message=$(grep -F 'SPEC_DOCK_CLOSE_MESSAGE=' /tmp/spec-dock-close.log | tail -n1 | cut -d= -f2-)
+          archive_dir=$(grep -F 'SPEC_DOCK_CLOSE_ARCHIVE_DIR=' /tmp/spec-dock-close.log | tail -n1 | cut -d= -f2-)
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "message=$message" >> "$GITHUB_OUTPUT"
           echo "archive_dir=$archive_dir" >> "$GITHUB_OUTPUT"
