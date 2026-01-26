@@ -28,9 +28,9 @@ emit_kv() {
 on_error() {
     local exit_code=$?
     log_error "spec-dock close failed (exit code: ${exit_code})"
-    emit_kv "PLANNING_CLOSE_STATUS" "FAILED"
-    emit_kv "PLANNING_CLOSE_MESSAGE" "unexpected error"
-    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+    emit_kv "SPEC_DOCK_CLOSE_STATUS" "FAILED"
+    emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "unexpected error"
+    emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
     exit $exit_code
 }
 trap on_error ERR
@@ -40,9 +40,9 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || true)
 if [[ -z "$repo_root" ]]; then
     log_error "Error: Not in a git repository"
-    emit_kv "PLANNING_CLOSE_STATUS" "FAILED"
-    emit_kv "PLANNING_CLOSE_MESSAGE" "not in git repo"
-    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+    emit_kv "SPEC_DOCK_CLOSE_STATUS" "FAILED"
+    emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "not in git repo"
+    emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
     exit 1
 fi
 cd "$repo_root"
@@ -52,9 +52,9 @@ echo "🔄 Starting spec-dock close process..."
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     log_error "Error: Not in a git repository"
-    emit_kv "PLANNING_CLOSE_STATUS" "FAILED"
-    emit_kv "PLANNING_CLOSE_MESSAGE" "not in git repo"
-    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+    emit_kv "SPEC_DOCK_CLOSE_STATUS" "FAILED"
+    emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "not in git repo"
+    emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
     exit 1
 fi
 
@@ -65,26 +65,26 @@ readonly TEMPLATE_DIR=".spec-dock/templates"
 
 if [[ ! -d "$TEMPLATE_DIR" ]]; then
     log_error "Error: templates directory not found"
-    emit_kv "PLANNING_CLOSE_STATUS" "FAILED"
-    emit_kv "PLANNING_CLOSE_MESSAGE" "templates directory missing"
-    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+    emit_kv "SPEC_DOCK_CLOSE_STATUS" "FAILED"
+    emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "templates directory missing"
+    emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
     exit 1
 fi
 
 if [[ -d "$CURRENT_DIR" ]]; then
     if diff -qr "$CURRENT_DIR" "$TEMPLATE_DIR" >/dev/null 2>&1; then
         log_warn ".spec-dock/current matches templates. Skipping archive/copy."
-        emit_kv "PLANNING_CLOSE_STATUS" "SKIPPED"
-        emit_kv "PLANNING_CLOSE_MESSAGE" "current matches template"
-        emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+        emit_kv "SPEC_DOCK_CLOSE_STATUS" "SKIPPED"
+        emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "current matches template"
+        emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
         exit 0
     else
         diff_status=$?
         if [[ $diff_status -ne 1 ]]; then
             log_error "Error: diff command failed"
-            emit_kv "PLANNING_CLOSE_STATUS" "FAILED"
-            emit_kv "PLANNING_CLOSE_MESSAGE" "diff command failed"
-            emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+            emit_kv "SPEC_DOCK_CLOSE_STATUS" "FAILED"
+            emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "diff command failed"
+            emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
             exit $diff_status
         fi
     fi
@@ -125,12 +125,12 @@ log_info "Templates copied to .spec-dock/current"
 
 if [[ $archived -eq 1 ]]; then
     log_info "spec-dock close completed successfully (archived)"
-    emit_kv "PLANNING_CLOSE_STATUS" "ARCHIVED"
-    emit_kv "PLANNING_CLOSE_MESSAGE" "archived current and restored templates"
-    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "$archive_dir"
+    emit_kv "SPEC_DOCK_CLOSE_STATUS" "ARCHIVED"
+    emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "archived current and restored templates"
+    emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "$archive_dir"
 else
     log_info "spec-dock close completed successfully (created)"
-    emit_kv "PLANNING_CLOSE_STATUS" "CREATED"
-    emit_kv "PLANNING_CLOSE_MESSAGE" "created current from templates"
-    emit_kv "PLANNING_CLOSE_ARCHIVE_DIR" "-"
+    emit_kv "SPEC_DOCK_CLOSE_STATUS" "CREATED"
+    emit_kv "SPEC_DOCK_CLOSE_MESSAGE" "created current from templates"
+    emit_kv "SPEC_DOCK_CLOSE_ARCHIVE_DIR" "-"
 fi
