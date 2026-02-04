@@ -1,6 +1,6 @@
 import re
+import os
 import sys
-import shutil
 import tempfile
 import unittest
 from importlib.metadata import PackageNotFoundError, version
@@ -44,22 +44,16 @@ class TestCli(unittest.TestCase):
             self.assertTrue((target / ".spec-dock" / "docs").is_dir())
             self.assertTrue((target / ".spec-dock" / "templates").is_dir())
             self.assertTrue((target / ".spec-dock" / "scripts").is_dir())
-            self.assertTrue((target / ".spec-dock" / "current").is_dir())
-            self.assertTrue((target / ".spec-dock" / "completed").is_dir())
-            self.assertTrue((target / ".spec-dock" / "templates" / "discussions").is_dir())
-            self.assertTrue((target / ".spec-dock" / "current" / "discussions").is_dir())
-            self.assertTrue(
-                (target / ".spec-dock" / "templates" / "discussions" / "_template.md").is_file()
-            )
-            self.assertTrue(
-                (target / ".spec-dock" / "current" / "discussions" / "_template.md").is_file()
-            )
+            self.assertTrue((target / ".spec-dock" / "initiatives").is_dir())
+            self.assertTrue((target / ".spec-dock" / "active").is_dir())
+            self.assertTrue((target / ".spec-dock" / ".work").is_dir())
+            self.assertTrue((target / ".spec-dock" / ".gitignore").is_file())
+            gitignore = (target / ".spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn(".work/", gitignore)
+            self.assertIn("active/", gitignore)
 
             self.assertTrue(
                 (target / ".spec-dock" / "docs" / "spec-dock-guide.md").is_file()
-            )
-            self.assertTrue(
-                (target / ".spec-dock" / "scripts" / "spec-dock-close.sh").is_file()
             )
             self.assertTrue(
                 (
@@ -70,13 +64,8 @@ class TestCli(unittest.TestCase):
                     / "SKILL.md"
                 ).is_file()
             )
-            self.assertTrue(
-                (
-                    target
-                    / ".github"
-                    / "workflows"
-                    / "spec-dock-close.yml"
-                ).is_file()
+            self.assertFalse(
+                (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
 
     def test_init_no_skill_skips_skill_install(self) -> None:
@@ -97,22 +86,7 @@ class TestCli(unittest.TestCase):
                     / "SKILL.md"
                 ).exists()
             )
-            self.assertTrue(
-                (
-                    target
-                    / ".github"
-                    / "workflows"
-                    / "spec-dock-close.yml"
-                ).is_file()
-            )
-            self.assertTrue((target / ".spec-dock" / "templates" / "discussions").is_dir())
-            self.assertTrue((target / ".spec-dock" / "current" / "discussions").is_dir())
-            self.assertTrue(
-                (target / ".spec-dock" / "templates" / "discussions" / "_template.md").is_file()
-            )
-            self.assertTrue(
-                (target / ".spec-dock" / "current" / "discussions" / "_template.md").is_file()
-            )
+            self.assertFalse((target / ".github" / "workflows" / "spec-dock-close.yml").exists())
 
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,54 +96,82 @@ class TestCli(unittest.TestCase):
             # Second init without --force should fail.
             self.assertNotEqual(main(["init", str(target)]), 0)
 
-    def test_update_keeps_current_by_default(self) -> None:
+    def test_update_keeps_initiatives_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            requirement = target / ".spec-dock" / "current" / "requirement.md"
-            requirement.write_text(requirement.read_text(encoding="utf-8") + "\nMOD\n", encoding="utf-8")
-
-            note = target / ".spec-dock" / "current" / "discussions" / "note.md"
-            note.write_text("# Note\n", encoding="utf-8")
+            marker = target / ".spec-dock" / "initiatives" / "marker.txt"
+            marker.write_text("keep\n", encoding="utf-8")
 
             self.assertEqual(main(["update", str(target)]), 0)
-            self.assertTrue(requirement.read_text(encoding="utf-8").rstrip().endswith("MOD"))
-            self.assertTrue(note.is_file())
+            self.assertTrue(marker.is_file())
             self._assert_version_file(target)
 
-    def test_update_reset_current_overwrites_current(self) -> None:
+    def test_new_and_active_and_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            requirement = target / ".spec-dock" / "current" / "requirement.md"
-            requirement.write_text(requirement.read_text(encoding="utf-8") + "\nMOD\n", encoding="utf-8")
-
-            note = target / ".spec-dock" / "current" / "discussions" / "note.md"
-            note.write_text("# Note\n", encoding="utf-8")
-
-            self.assertEqual(main(["update", "--reset-current", str(target)]), 0)
-            self.assertFalse(requirement.read_text(encoding="utf-8").rstrip().endswith("MOD"))
-            self.assertFalse(note.exists())
-            self.assertTrue(
-                (target / ".spec-dock" / "current" / "discussions" / "_template.md").is_file()
+            self.assertEqual(
+                main(["new", "initiative", "--path", str(target), "--title", "Auth platform"]),
+                0,
             )
-            self._assert_version_file(target)
-
-    def test_update_does_not_create_discussions_without_reset(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-
-            shutil.rmtree(target / ".spec-dock" / "current" / "discussions")
-            self.assertFalse((target / ".spec-dock" / "current" / "discussions").exists())
-
-            self.assertEqual(main(["update", str(target)]), 0)
-
-            # update should not touch an existing current by default.
-            self.assertFalse((target / ".spec-dock" / "current" / "discussions").exists())
-            self.assertTrue(
-                (target / ".spec-dock" / "templates" / "discussions" / "_template.md").is_file()
+            self.assertEqual(
+                main(
+                    [
+                        "new",
+                        "epic",
+                        "--path",
+                        str(target),
+                        "--initiative",
+                        "init-0001",
+                        "--title",
+                        "JWT auth",
+                    ]
+                ),
+                0,
             )
-            self._assert_version_file(target)
+            self.assertEqual(
+                main(
+                    [
+                        "new",
+                        "issue",
+                        "--path",
+                        str(target),
+                        "--epic",
+                        "epic-0001",
+                        "--title",
+                        "Add refresh token",
+                    ]
+                ),
+                0,
+            )
+
+            issue_dir = (
+                target
+                / ".spec-dock"
+                / "initiatives"
+                / "init-0001-auth-platform"
+                / "epics"
+                / "epic-0001-jwt-auth"
+                / "issues"
+                / "iss-0001-add-refresh-token"
+            )
+            self.assertTrue((issue_dir / "requirement.md").is_file())
+            self.assertTrue((issue_dir / "design.md").is_file())
+            self.assertTrue((issue_dir / "plan.md").is_file())
+            self.assertTrue((issue_dir / "report.md").is_file())
+
+            if os.name != "nt":
+                self.assertEqual(
+                    main(["active", "set", "--path", str(target), "--issue", "iss-0001"]),
+                    0,
+                )
+                self.assertTrue((target / ".spec-dock" / ".work" / "current.json").is_file())
+                self.assertTrue((target / ".spec-dock" / "active" / "issue").exists())
+                self.assertTrue((target / ".spec-dock" / "active" / "context-pack.md").is_file())
+
+            self.assertEqual(main(["sync", "--path", str(target)]), 0)
+            self.assertTrue((target / ".spec-dock" / ".work" / "state.json").is_file())
+            self.assertEqual(main(["validate", "--path", str(target)]), 0)

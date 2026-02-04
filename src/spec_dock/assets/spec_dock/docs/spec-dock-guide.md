@@ -25,27 +25,27 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 
 - `.spec-dock/spec-dock.version`
   - 導入/更新した spec-dock のバージョン（1行）
-- `.spec-dock/current/`
-  - 作業中の一時ディレクトリ（1つの作業単位を前提。混在させない）
-  - `requirement.md`: 要件定義（WHAT/WHY）
-  - `design.md`: 設計（HOW）
-  - `plan.md`: 実装計画（TDD で回せる粒度）
-  - `report.md`: 実装ログ（再現できる事実）
-  - `discussions/`: 議論/調査/ヒアリング等の補助資料置き場（原則Markdown。図はPlantUML。サブディレクトリ作成も含め自由）
+- `.spec-dock/initiatives/`
+  - **仕様ツリー本体**（常置。ファイル移動で状態を表現しない）
+  - 例: `initiatives/init-0001-.../epics/epic-0001-.../issues/iss-0001-.../`
 - `.spec-dock/templates/`
-  - テンプレート（新規タスク開始時の雛形）
-  - `discussions/`: 議論/調査/ヒアリング資料の雛形置き場（例: `discussions/_template.md`。必要に応じて増やしてよい）
-- `.spec-dock/completed/`
-  - 完了した成果物のアーカイブ
+  - `spec-dock new ...` が参照するテンプレート群（initiative/epic/issue/adr）
+- `.spec-dock/active/`（gitignore）
+  - **生成物**: 現在取り組む initiative/epic/issue への固定入口（symlink 等）
+  - `context-pack.md`: エージェントが最初に読む 1 枚（生成）
+- `.spec-dock/.work/`（gitignore）
+  - **生成物**: `current.json`（SSOT）/ `state.json`（集計）など
+- `.spec-dock/.gitignore`
+  - `active/` と `.work/` を誤コミットしないための ignore
 
 ## テンプレート方針
-- `.spec-dock/templates/requirement.md` / `design.md` / `plan.md` / `report.md` は「最終的に残る仕様/ログ」の雛形とし、原則として本文に運用ルールや作成手順を書かない（ルールはこの `spec-dock-guide.md` に集約する）。
-- `discussions/_template.md` は「議論/調査/ヒアリング」資料の雛形。運用ルールはこのガイドを正としつつ、テンプレ内に最低限の説明を書いてよい。
+- `.spec-dock/templates/**` は「最終的に残る仕様/ログ」の雛形とし、原則として本文に運用ルールや作成手順を書かない（ルールはこの `spec-dock-guide.md` に集約する）。
+- `issue/discussions/_template.md` は「議論/調査/ヒアリング」資料の雛形。運用ルールはこのガイドを正としつつ、テンプレ内に最低限の説明を書いてよい。
 - テンプレートは **参考**。見出し/順番/粒度はタスクに合わせて自由に追加/削除/並び替えしてよい（“空欄を埋めるための推測”は禁止）。承認可否はこのガイドのチェックリストで判定する。
-- テンプレ見出しの末尾に `(必須)` / `(任意)` を付ける。`(必須)` は成果物（`.spec-dock/current/*.md`）から削除しない（該当しない場合は `該当なし` を明記）。`(任意)` は削除/追加してよい。
+- テンプレ見出しの末尾に `(必須)` / `(任意)` を付ける。`(必須)` は成果物（各 Initiative/Epic/Issue の `*.md`）から削除しない（該当しない場合は `該当なし` を明記）。`(任意)` は削除/追加してよい。
   - 付与対象: 主に `##` 見出し。必要に応じて `###`/`####` 見出しにも付けてよい（例: `plan.md` の各ステップ内の `update_plan` / `期待する振る舞い` / `ステップ末尾`）。
 - 例外: `plan.md` は実装時に省略されやすい `update_plan` / テスト / `report.md` 記録 / コミットのチェックを **各ステップ内に必ず残す**（実装フェーズの抜け漏れ防止のため）。
-- 実装フェーズでは `.spec-dock/current/{requirement,design,plan}.md` を仕様として読み、運用確認が必要な時だけこのガイドを参照する。
+- 実装フェーズでは `.spec-dock/active/context-pack.md` を入口にし、対象 Issue ディレクトリの `{requirement,design,plan}.md` を仕様として読み、運用確認が必要な時だけこのガイドを参照する。
 
 ## 用語・状態・役割分担
 
@@ -58,8 +58,8 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 - ID運用
   - `AC-xxx / EC-xxx / API-xxx / IF-xxx / MODEL-xxx / R-xxx / Q-xxx / Sxx` は承認後に再採番/リネームしない（追加は末尾に足す）。
 - Git 運用
-  - 実装フェーズのコミット（`git commit`）は **エージェントが実施** する。
-  - コミットは原則「`plan.md` の各ステップ末尾（品質ゲート通過後）」でのみ実施する（むやみにコミットしない）。例外が必要なら `report.md` に理由を残す。
+  - コミット/PR/マージは、プロジェクトの運用ルールに従う（本ガイドは「必ずコミットせよ」を強制しない）。
+  - コミットする場合は、原則「`plan.md` の各ステップ末尾（品質ゲート通過後）」のタイミングで行い、`report.md` に根拠（コマンド/結果/変更）を残す。
   - 破壊的・不可逆になり得る Git/GitHub 操作（例: 履歴書き換え、強制更新、削除、権限/設定変更など）は、実行前に「何を・どこに・なぜ」を説明し、ユーザーの明示的確認を取る。
 
 ## ルール集約（テンプレに書かない）
@@ -148,27 +148,31 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 - [ ] 対象ステップ（Sxx）と AC/EC がある
 - [ ] 実行コマンドと結果（失敗も含む）がある
 - [ ] 変更ファイルが列挙されている
-- [ ] コミット（hash/message）がある
+- [ ] （コミットした場合）コミット（hash/message）がある
 - [ ] 「省略/例外メモ」が `該当なし` または理由/影響範囲つきで記載されている
 
 ## ワークフロー
 
 ### 計画フェーズ（Planning Phase）
 
-1. **要件定義（`.spec-dock/current/requirement.md`）**
+0. **active を設定（必須）**
+   - `spec-dock active set --issue iss-xxxx` で、現在の Issue を固定する
+   - `.spec-dock/active/context-pack.md` が生成されることを確認する
+
+1. **要件定義（対象 Issue の `requirement.md`）**
    - AC/EC を観測可能（テスト可能）な形に落とす
    - MUST/MUST NOT/OUT OF SCOPE を明文化してスコープ境界を固定する
    - As-Is は観測結果（再現手順/観測点/実際の出力）と根拠（コード/ログ等）を残す
    - **承認ゲート（必須）**: ユーザー/レビュアーに提出し、承認（`approved`）を得るまで設計へ進まない
 
-2. **設計（`.spec-dock/current/design.md`）**
+2. **設計（対象 Issue の `design.md`）**
    - 変更計画（パス単位）/固定する IF / 影響範囲 / テスト戦略を具体化する
    - コーディング規約と同レイヤー既存実装を調査し、スタイルやパターン（命名/責務/例外処理など）を設計に反映する
    - UML 図は PlantUML で記述する（Markdown のコードブロック言語は `plantuml`）
    - UML 図は必要最小限（成果物では、適した図だけ残し、不要な図は削除）
    - **承認ゲート（必須）**: ユーザー/レビュアーに提出し、承認（`approved`）を得るまで実装計画へ進まない
 
-3. **実装計画（`.spec-dock/current/plan.md`）**
+3. **実装計画（対象 Issue の `plan.md`）**
    - 1ステップ=1つの観測可能な振る舞い（テストで観測できる）で分割する
    - 各ステップで Red/Green/Refactor を回せる粒度にする
    - 各ステップに「達成する振る舞い（= テストケース）」を言語化して定義する
@@ -187,7 +191,7 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
    - フォーマット/静的解析/テスト（必要なもの）を実行し、成功させる
    - コーディング規約（プロジェクト全体 + 対象レイヤー別）を参照してセルフレビューする
    - `plan.md` / `report.md` を更新する（実行コマンド/結果/変更ファイル/判断の経緯も含める）
-   - **エージェントが `git commit` する**（原則: ステップ末尾。pre-commit 等で拒否された場合は原因を解消してコミットが通るまで繰り返す）
+   - （必要な場合）コミットする（運用ルールに従う）
 
 4. 実装中に知見や仕様変更が発生した場合は、`requirement.md` → `design.md` → `plan.md` → `report.md` の順で差分を反映し、矛盾を残さない
 
