@@ -1,5 +1,7 @@
 # .spec-dock ディレクトリガイド
 
+> まずは `.spec-dock/docs/README.md` を開き、このガイド群の構成（何をどこから読むか）を確認してください。
+
 ## 目的（Codex CLI が迷わない状態）
 このガイドは、AI エージェント（Codex CLI）が「推測で進めない」「詰まらない」状態を作るための運用ルールです。
 
@@ -25,6 +27,12 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 
 - `.spec-dock/spec-dock.version`
   - 導入/更新した spec-dock のバージョン（1行）
+- `.spec-dock/docs/README.md`
+  - ドキュメントの入口（GitHub 連携の重要事項を含む）
+- `.spec-dock/docs/github.md`
+  - GitHub 連携（`gh` 必須、対象リポジトリの解決、`--no-github`、ID ルール）
+- `.spec-dock/docs/sync.md`
+  - `sync`（状態集計）の仕組み（ローカル集計 + 任意で GitHub enrich）
 - `.spec-dock/initiatives/`
   - **仕様ツリー本体**（常置。ファイル移動で状態を表現しない）
   - 例: `initiatives/init-0123-.../epics/epic-0124-.../issues/iss-0125-.../`（GitHub） / `initiatives/init-local-0001-.../`（--no-github）
