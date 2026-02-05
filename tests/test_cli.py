@@ -2,6 +2,7 @@ import re
 import os
 import sys
 import tempfile
+import subprocess
 import unittest
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -27,6 +28,24 @@ def _expected_spec_dock_version() -> str:
 
 
 class TestCli(unittest.TestCase):
+    def _run_runtime(self, target: Path, args: list[str]) -> None:
+        script = target / ".spec-dock" / "scripts" / "spec-dock"
+        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+
+        p = subprocess.run(
+            [sys.executable, str(script), *args],
+            cwd=str(target),
+            capture_output=True,
+            text=True,
+        )
+        if p.returncode != 0:
+            raise AssertionError(
+                "runtime command failed:\n"
+                f"- cmd: {args}\n"
+                f"- stdout:\n{p.stdout}\n"
+                f"- stderr:\n{p.stderr}\n"
+            )
+
     def _assert_version_file(self, target: Path) -> None:
         version_file = target / ".spec-dock" / "spec-dock.version"
         self.assertTrue(version_file.is_file())
@@ -113,40 +132,9 @@ class TestCli(unittest.TestCase):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self.assertEqual(
-                main(["new", "initiative", "--path", str(target), "--title", "Auth platform"]),
-                0,
-            )
-            self.assertEqual(
-                main(
-                    [
-                        "new",
-                        "epic",
-                        "--path",
-                        str(target),
-                        "--initiative",
-                        "init-0001",
-                        "--title",
-                        "JWT auth",
-                    ]
-                ),
-                0,
-            )
-            self.assertEqual(
-                main(
-                    [
-                        "new",
-                        "issue",
-                        "--path",
-                        str(target),
-                        "--epic",
-                        "epic-0001",
-                        "--title",
-                        "Add refresh token",
-                    ]
-                ),
-                0,
-            )
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "init-0001", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "epic-0001", "--title", "Add refresh token"])
 
             issue_dir = (
                 target
@@ -163,15 +151,14 @@ class TestCli(unittest.TestCase):
             self.assertTrue((issue_dir / "plan.md").is_file())
             self.assertTrue((issue_dir / "report.md").is_file())
 
-            if os.name != "nt":
-                self.assertEqual(
-                    main(["active", "set", "--path", str(target), "--issue", "iss-0001"]),
-                    0,
-                )
-                self.assertTrue((target / ".spec-dock" / ".work" / "current.json").is_file())
-                self.assertTrue((target / ".spec-dock" / "active" / "issue").exists())
-                self.assertTrue((target / ".spec-dock" / "active" / "context-pack.md").is_file())
+            self._run_runtime(target, ["active", "set", "--issue", "iss-0001"])
+            self.assertTrue((target / ".spec-dock" / ".work" / "current.json").is_file())
+            self.assertTrue(
+                (target / ".spec-dock" / "active" / "issue").exists()
+                or (target / ".spec-dock" / "active" / "issue.path").is_file()
+            )
+            self.assertTrue((target / ".spec-dock" / "active" / "context-pack.md").is_file())
 
-            self.assertEqual(main(["sync", "--path", str(target)]), 0)
+            self._run_runtime(target, ["sync"])
             self.assertTrue((target / ".spec-dock" / ".work" / "state.json").is_file())
-            self.assertEqual(main(["validate", "--path", str(target)]), 0)
+            self._run_runtime(target, ["validate"])

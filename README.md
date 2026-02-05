@@ -23,22 +23,29 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --no-skill
 
 # Update managed files (docs/templates/scripts/skill)
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
+```
 
+## Usage (local scripts)
+
+After `init`, day-to-day operations are done via the runtime script installed into your repo:
+`./.spec-dock/scripts/spec-dock`.
+
+```bash
 # Create nodes (all-lowercase ids; e.g. init-0001, epic-0001, iss-0001)
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock new initiative --title "Auth platform"
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock new epic --initiative init-0001 --title "JWT auth"
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock new issue --epic epic-0001 --title "Add refresh token" --github-issue 123
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
+./.spec-dock/scripts/spec-dock new initiative --title "Auth platform"
+./.spec-dock/scripts/spec-dock new epic --initiative init-0001 --title "JWT auth"
+./.spec-dock/scripts/spec-dock new issue --epic epic-0001 --title "Add refresh token" --github-issue 123
+./.spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
 
 # Set active issue pointers (symlinks) and generate context-pack
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock active set --issue iss-0123
+./.spec-dock/scripts/spec-dock active set --issue iss-0123
 
 # Generate state.json (local scan; optionally enrich from GitHub via gh)
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock sync
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock sync --github
+./.spec-dock/scripts/spec-dock sync
+./.spec-dock/scripts/spec-dock sync --github
 
 # Validate the spec tree structure
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock validate
+./.spec-dock/scripts/spec-dock validate
 ```
 
 ## What it creates
@@ -47,7 +54,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock validate
   - `spec-dock.version` (installed spec-dock version)
   - `docs/` (guide)
   - `templates/` (initiative/epic/issue/adr templates)
-  - `scripts/` (helper scripts; optional)
+  - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
   - `active/` (generated pointers; gitignored)
   - `.work/` (generated state; gitignored)
@@ -71,4 +78,4 @@ Codex Skill を生成するためのスキャフォルディングツールで�
 
 v2 では `.spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
 `.spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
-状態の集計は `.spec-dock/.work/state.json` を `spec-dock sync` で自動生成します（Git 管理しません）。
+状態の集計は `.spec-dock/.work/state.json` を `./.spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。

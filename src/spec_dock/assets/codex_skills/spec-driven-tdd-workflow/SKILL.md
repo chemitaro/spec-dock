@@ -6,7 +6,7 @@ description: A workflow that drives development from requirements refined into o
 # Spec-driven TDD Workflow
 
 - Open `.spec-dock/docs/spec-dock-guide.md` first, and follow it for the rest of the workflow.
-- Open `.spec-dock/active/context-pack.md` next. If it doesn't exist, ask the user to run `spec-dock active set --issue iss-xxxx` (or provide the target issue path/ID).
+- Open `.spec-dock/active/context-pack.md` next. If it doesn't exist, ask the user to run `./.spec-dock/scripts/spec-dock active set --issue iss-xxxx` (or provide the target issue path/ID).
 - Create/update the active issue docs (`requirement.md`, `design.md`, `plan.md`, `report.md`) to maintain traceability from requirements → design → plan → implementation.
 - Put investigation/interview materials in the active issue `discussions/` directory (prefer Markdown; embed diagrams with PlantUML; organize freely).
 - Keep user interviews/questions short and prioritized. For each question, include answer candidates (options) and your recommended choice based on analysis/simulation to reduce cognitive load.

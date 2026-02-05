@@ -29,7 +29,7 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
   - **仕様ツリー本体**（常置。ファイル移動で状態を表現しない）
   - 例: `initiatives/init-0001-.../epics/epic-0001-.../issues/iss-0001-.../`
 - `.spec-dock/templates/`
-  - `spec-dock new ...` が参照するテンプレート群（initiative/epic/issue/adr）
+  - `./.spec-dock/scripts/spec-dock new ...` が参照するテンプレート群（initiative/epic/issue/adr）
 - `.spec-dock/active/`（gitignore）
   - **生成物**: 現在取り組む initiative/epic/issue への固定入口（symlink 等）
   - `context-pack.md`: エージェントが最初に読む 1 枚（生成）
@@ -156,7 +156,7 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 ### 計画フェーズ（Planning Phase）
 
 0. **active を設定（必須）**
-   - `spec-dock active set --issue iss-xxxx` で、現在の Issue を固定する
+   - `./.spec-dock/scripts/spec-dock active set --issue iss-xxxx` で、現在の Issue を固定する
    - `.spec-dock/active/context-pack.md` が生成されることを確認する
 
 1. **要件定義（対象 Issue の `requirement.md`）**

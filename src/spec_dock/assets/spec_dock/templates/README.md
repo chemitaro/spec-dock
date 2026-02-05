@@ -1,6 +1,7 @@
 # .spec-dock/templates
 
-このディレクトリは、`spec-dock new ...` が新規ノードを作成する際に参照するテンプレート群です。
+このディレクトリは、ローカルスクリプト `./.spec-dock/scripts/spec-dock new ...` が
+新規ノードを作成する際に参照するテンプレート群です。
 
 - `initiative/` → `initiatives/init-xxxx-<slug>/`
 - `epic/` → `.../epics/epic-xxxx-<slug>/`
@@ -10,4 +11,3 @@
 注意:
 - 生成後のファイルは自由に編集して構いません（テンプレは雛形）。
 - 命名規則は **全て小文字**（macOS のケース非区別FS対策）。
-
