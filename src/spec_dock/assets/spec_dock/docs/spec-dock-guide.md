@@ -41,10 +41,10 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 - `.spec-dock/active/`（gitignore）
   - **生成物**: 現在取り組む initiative/epic/issue への固定入口（symlink 等）
   - `context-pack.md`: エージェントが最初に読む 1 枚（生成）
-- `.spec-dock/.work/`（gitignore）
-  - **生成物**: `current.json`（SSOT）/ `state.json`（index）/ `tree.json`（tree）など
+- `.spec-dock/.agent/`（gitignore）
+  - **生成物**: `active.json`（SSOT）/ `index.json`（index）/ `tree.json`（tree）など
 - `.spec-dock/.gitignore`
-  - `active/` と `.work/` を誤コミットしないための ignore
+  - `active/` と `.agent/`（および legacy `.work/`）を誤コミットしないための ignore
 
 ## テンプレート方針
 - `.spec-dock/templates/**` は「最終的に残る仕様/ログ」の雛形とし、原則として本文に運用ルールや作成手順を書かない（ルールはこの `spec-dock-guide.md` に集約する）。

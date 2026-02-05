@@ -70,10 +70,10 @@ class TestCli(unittest.TestCase):
             self.assertTrue((target / ".spec-dock" / "scripts").is_dir())
             self.assertTrue((target / ".spec-dock" / "initiatives").is_dir())
             self.assertTrue((target / ".spec-dock" / "active").is_dir())
-            self.assertTrue((target / ".spec-dock" / ".work").is_dir())
+            self.assertTrue((target / ".spec-dock" / ".agent").is_dir())
             self.assertTrue((target / ".spec-dock" / ".gitignore").is_file())
             gitignore = (target / ".spec-dock" / ".gitignore").read_text(encoding="utf-8")
-            self.assertIn(".work/", gitignore)
+            self.assertIn(".agent/", gitignore)
             self.assertIn("active/", gitignore)
 
             self.assertTrue(
@@ -194,7 +194,7 @@ class TestCli(unittest.TestCase):
 
             # Active issue id also accepts shorthand numeric form.
             self._run_runtime(target, ["active", "set", "--issue", "1"])
-            self.assertTrue((target / ".spec-dock" / ".work" / "current.json").is_file())
+            self.assertTrue((target / ".spec-dock" / ".agent" / "active.json").is_file())
             self.assertTrue(
                 (target / ".spec-dock" / "active" / "issue").exists()
                 or (target / ".spec-dock" / "active" / "issue.path").is_file()
@@ -202,16 +202,16 @@ class TestCli(unittest.TestCase):
             self.assertTrue((target / ".spec-dock" / "active" / "context-pack.md").is_file())
 
             self._run_runtime(target, ["sync"])
-            self.assertTrue((target / ".spec-dock" / ".work" / "state.json").is_file())
-            self.assertTrue((target / ".spec-dock" / ".work" / "tree.json").is_file())
+            self.assertTrue((target / ".spec-dock" / ".agent" / "index.json").is_file())
+            self.assertTrue((target / ".spec-dock" / ".agent" / "tree.json").is_file())
 
             # Index: flat nodes (agent-friendly).
-            state = (target / ".spec-dock" / ".work" / "state.json").read_text(encoding="utf-8")
+            state = (target / ".spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8")
             self.assertIn("\"nodes\"", state)
             self.assertNotIn("\"tree\"", state)
 
             # Tree: nested layer view (human-friendly).
-            tree = (target / ".spec-dock" / ".work" / "tree.json").read_text(encoding="utf-8")
+            tree = (target / ".spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
             self.assertIn("\"tree\"", tree)
             self.assertIn("\"id\": \"init-local-0001\"", tree)
             self.assertIn("\"id\": \"epic-local-0001\"", tree)

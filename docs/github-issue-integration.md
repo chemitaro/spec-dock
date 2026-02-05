@@ -203,8 +203,7 @@ GH --> API : create/list issues
 
 - `argparse`: CLI パース（`new/active/sync/validate`）
 - `pathlib.Path`: パス/ディレクトリ操作
-- `json`: `meta.json`, `.work/current.json`, `.work/state.json`
-- `json`: `meta.json`, `.work/current.json`, `.work/state.json`, `.work/tree.json`
+- `json`: `meta.json`, `.agent/active.json`, `.agent/index.json`, `.agent/tree.json`
 - `subprocess`: `gh` の実行
 - `re`: ID パース、`gh` 出力から Issue 番号抽出
 - `shutil`, `os`: コピー、symlink、存在確認等

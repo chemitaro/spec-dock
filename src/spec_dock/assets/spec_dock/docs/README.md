@@ -44,8 +44,8 @@
   仕様ツリー本体（常置。移動で状態を表現しません）
 - `.spec-dock/active/`（git 管理しない）  
   現在の initiative/epic/issue への固定入口（symlink 等） + `context-pack.md`
-- `.spec-dock/.work/`（git 管理しない）  
-  `current.json`（SSOT）/ `state.json`（index）/ `tree.json`（tree）などの生成物
+- `.spec-dock/.agent/`（git 管理しない）  
+  `active.json`（SSOT）/ `index.json`（index）/ `tree.json`（tree）などの生成物
 
 ## ドキュメント構成（どれを読めばいい？）
 

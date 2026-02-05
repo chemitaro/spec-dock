@@ -32,7 +32,7 @@ v2 では仕様ツリー本体が常置されるため、`current` は “編集
 
 ### 原則A: Single Source of Truth（SSOT）を 1 つにする
 symlink を真実にすると、切れたり、環境差で壊れたり、差し替えミスが起きます。  
-よって、真実は **manifest（例: `current.json` / `current.yml`）** に寄せるのが安全です。
+よって、真実は **manifest（例: `active.json` / `active.yml`）** に寄せるのが安全です。
 
 ### 原則B: “入口1枚” を固定パスで提供する
 エージェントは毎回探索させると迷います。  
@@ -116,13 +116,14 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 
 ## 4. 設計案（候補）: “何を SSOT にするか”
 
-### SSOT案1: `current.json`（gitignore） + symlink 生成（推奨）
+### SSOT案1: `active.json`（gitignore） + symlink 生成（推奨）
 
 ```
 .spec-dock/
-  .work/               (gitignore)
-    current.json       (SSOT)
-    state.json         (generated)
+  .agent/              (gitignore)
+    active.json        (SSOT)
+    index.json         (generated)
+    tree.json          (generated)
   focus/               (gitignore, generated)
     issue -> ...
     context-pack.md
@@ -187,7 +188,7 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 @startuml
 skinparam componentStyle rectangle
 
-artifact "SSOT\n.spec-dock/.work/current.json" as ssot
+artifact "SSOT\n.spec-dock/.agent/active.json" as ssot
 folder "Generated pointers\n.spec-dock/focus/" as focus
 artifact "Generated entry\ncontext-pack.md" as cp
 folder "Specs tree\n(initiatives/...)" as tree
@@ -205,7 +206,7 @@ cp --> tree : links to
 
 必要になる CLI/ロジック（最小）:
 - `spec-dock current set --issue ISS-0123`
-  - SSOT（`current.json`）更新
+  - SSOT（`active.json`）更新
   - ポインタ（symlink or fallback）生成
   - `context-pack.md` 生成
 - `spec-dock current show`
@@ -249,6 +250,6 @@ cp --> tree : links to
 ## 9. 結論（決まったら記入）
 
 - 固定入口ディレクトリ: `.spec-dock/active/`（案B）
-- SSOT（manifest）: `.spec-dock/.work/current.json`
+- SSOT（manifest）: `.spec-dock/.agent/active.json`
 - pointers.mode（デフォルト）: `symlink`（mac/linux 前提、symlink 不可事情なし）
 - current 切替の事故対策（worktree/セッション/確認）: **基本は worktree / 別作業ディレクトリで分離**（同一作業ディレクトリでの頻繁切替はしない）

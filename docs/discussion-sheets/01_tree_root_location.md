@@ -46,7 +46,7 @@ v2 は「大量の Issue を含む階層ツリー」を **常置**し、ファ�
 3) **“隠す/見せる”のバランス**: `.spec-dock` に隠して良いのか、`docs/` に見せたいのか  
 4) **リポジトリ汚染リスク**: 既存の `docs/` / `spec/` と衝突しないか  
 5) **移行コスト**: v1 既存ユーザーをどのくらい守るか  
-6) **将来拡張**: 生成物（dashboards/state.json 等）と混ざらないか
+6) **将来拡張**: 生成物（dashboards/index.json 等）と混ざらないか
 
 ---
 
@@ -95,7 +95,7 @@ v2 は「大量の Issue を含む階層ツリー」を **常置**し、ファ�
 
 **Pros**
 - `.spec-dock` の下でも「これは仕様ツリー本体」という区別がつく
-- `.spec-dock/current`（ポインタ）や `.spec-dock/.work`（生成物）と衝突しにくい
+- `.spec-dock/current`（ポインタ）や `.spec-dock/.agent`（生成物）と衝突しにくい
 
 **Cons**
 - ディレクトリが1段深くなり、パスが長くなる
@@ -141,7 +141,7 @@ docs/
 
 そのため、命名の原則として:
 - 仕様ツリー本体: `initiatives/`（または `specs/initiatives/`）
-- ワークスペース状態: `.work/`（または `.runtime/`, `.cache/`）
+- ワークスペース状態: `.agent/`（または `.runtime/`, `.cache/`）
 のように **用途語**を分けるのが安定します。
 
 ---
@@ -161,7 +161,7 @@ package "Repository root" {
 
 folder "v1 assets\n(templates/scripts/docs)" as v1
 folder "v2 specs tree\n(Initiatives/Epics/Issues/ADRs)" as v2
-folder "runtime state\n(current pointers, state.json)" as runtime
+folder "runtime state\n(active pointers, index.json)" as runtime
 
 specdock --> v1 : v1
 specdock --> runtime : v2

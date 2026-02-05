@@ -18,7 +18,7 @@
 ### 入力（ローカル）
 - `.spec-dock/initiatives/**/meta.json`
   - initiative/epic/issue ノードの **永続メタ**（ID/親/所属など）
-- `.spec-dock/.work/current.json`（存在すれば）
+- `.spec-dock/.agent/active.json`（存在すれば）
   - active（今作業中）の SSOT（Single Source of Truth）
 
 ### 入力（GitHub, 任意）
@@ -26,10 +26,10 @@
   - issue の state（OPEN/CLOSED）, labels, updatedAt, url など
 
 ### 出力（生成物 / git 管理しない）
-- `.spec-dock/.work/state.json`
+- `.spec-dock/.agent/index.json`
   - 全ノードのフラットな索引 + 親子関係 + initiative/epic の進捗集計 + active（current）を含む
-- `.spec-dock/.work/tree.json`
-  - initiative→epic→issue のネスト表示（軽量。`state.json` の全情報は重複させない）
+- `.spec-dock/.agent/tree.json`
+  - initiative→epic→issue のネスト表示（軽量。`index.json` の全情報は重複させない）
 
 ## 2. 集計の前提データ（meta.json の役割）
 
@@ -51,7 +51,7 @@
 ### Step 1: ローカルツリーを走査してノード辞書を作る（必須）
 1. `.spec-dock/initiatives/` 配下を再帰走査して `meta.json` を全取得
 2. `id -> node` の辞書（インメモリ）を構築
-3. `parent_id` を元に、`親 -> 子ID一覧` の索引も作る（state.json の `children` 用）
+3. `parent_id` を元に、`親 -> 子ID一覧` の索引も作る（index.json の `children` 用）
 
 この時点で「initiative/epic/issue が何個あるか」「親子がどう繋がるか」は確定します。  
 つまり **sync の骨格はローカルだけで完結**します。
@@ -85,14 +85,14 @@
 - `open`: GitHub で OPEN と判定できた数
 - `unknown`: GitHub で状態が取れなかった数（`--github` なし/紐づけ無し/limit 漏れ等）
 
-### Step 4: state.json（index）と tree.json（tree）を生成して書き出す
-最後に `.spec-dock/.work/state.json`（index）と `.spec-dock/.work/tree.json`（tree）を生成します。
+### Step 4: index.json（index）と tree.json（tree）を生成して書き出す
+最後に `.spec-dock/.agent/index.json`（index）と `.spec-dock/.agent/tree.json`（tree）を生成します。
 
 含まれるもの:
 - `generated_at`: 生成時刻
 - `root`: ツリーのルート（`.spec-dock/initiatives`）
-- `active`: `.spec-dock/.work/current.json` があればその内容
-- `nodes`（state.json）: 全ノードの辞書
+- `active`: `.spec-dock/.agent/active.json` があればその内容
+- `nodes`（index.json）: 全ノードの辞書
   - `children`: 子ノードIDの配列（親子参照を簡単にするため）
   - `progress`: initiative/epic にだけ付与
   - `github`: `github.issue_number` がある場合のみ。`--github` 時は enrich 追加
@@ -109,8 +109,8 @@ actor User
 participant "runtime script\n(.spec-dock/scripts/spec-dock)" as Script
 participant "Local FS\n(.spec-dock/initiatives/**)" as FS
 participant "gh CLI" as GH
-database "state.json\n(.spec-dock/.work/state.json)" as State
-database "tree.json\n(.spec-dock/.work/tree.json)" as Tree
+database "index.json\n(.spec-dock/.agent/index.json)" as State
+database "tree.json\n(.spec-dock/.agent/tree.json)" as Tree
 
 User -> Script: sync [--github]
 
@@ -126,7 +126,7 @@ else local-only
 end
 
 Script -> Script: aggregate progress\n(epic/initiative)
-Script -> State: write state.json
+Script -> State: write index.json
 Script -> Tree: write tree.json
 deactivate Script
 
@@ -220,7 +220,7 @@ Epic 配下に issue が 3 つあるとして:
 `./.spec-dock/scripts/spec-dock link --issue iss-local-0001 --github-issue 123` のような
 「連携だけ行うコマンド」を追加するのが自然です（現状は未実装）。
 
-## 6. state.json（index）の最小イメージ
+## 6. index.json（index）の最小イメージ
 
 ```json
 {

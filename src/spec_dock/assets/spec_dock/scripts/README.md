@@ -49,5 +49,5 @@ v2 では、日常運用（initiative/epic/issue/adr の作成、active 切り�
   - 既存ノードに `init-0123` と `init-local-0123` の両方がある場合は曖昧になるため、完全な ID を指定してください。
 
 注:
-- `.spec-dock/.work/` と `.spec-dock/active/` は生成物です（git 管理しません）。
+- `.spec-dock/.agent/` と `.spec-dock/active/` は生成物です（git 管理しません）。
 - 導入/更新（`.spec-dock/{docs,templates,scripts}` の配置）は `uvx spec-dock init/update` を使います。

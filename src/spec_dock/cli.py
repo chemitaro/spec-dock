@@ -161,7 +161,7 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         # Spec tree root + generated directories.
         (specdock_dir / "initiatives").mkdir(parents=True, exist_ok=True)
         (specdock_dir / "active").mkdir(parents=True, exist_ok=True)
-        (specdock_dir / ".work").mkdir(parents=True, exist_ok=True)
+        (specdock_dir / ".agent").mkdir(parents=True, exist_ok=True)
 
         _prune_legacy_scaffold(specdock_dir)
 

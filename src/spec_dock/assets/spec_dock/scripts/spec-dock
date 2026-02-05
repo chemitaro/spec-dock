@@ -9,7 +9,7 @@ This script is installed into a repository by `uvx spec-dock init/update` as:
 It performs day-to-day operations without requiring `uvx` at runtime:
 - Create nodes: initiative / epic / issue / adr
 - Manage the active pointers (symlinks + context-pack)
-- Generate derived state (`.spec-dock/.work/state.json`)
+- Generate derived state (`.spec-dock/.agent/index.json`, `.spec-dock/.agent/tree.json`)
 - Validate the spec tree structure
 
 Design goals:
@@ -36,7 +36,8 @@ _SPEC_DOCK_DIRNAME = ".spec-dock"
 
 _INITIATIVES_DIRNAME = "initiatives"
 _ACTIVE_DIRNAME = "active"
-_WORK_DIRNAME = ".work"
+_AGENT_DIRNAME = ".agent"
+_LEGACY_WORK_DIRNAME = ".work"
 
 _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<num>[0-9]+)$")
 _NUM_RE = re.compile(r"^[0-9]+$")
@@ -693,7 +694,7 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
     """Set the active issue and generate pointers + a context-pack.
 
     Side effects:
-    - Writes SSOT: `.spec-dock/.work/current.json`
+    - Writes SSOT: `.spec-dock/.agent/active.json` (fallback read: legacy `.spec-dock/.work/*`)
     - Updates pointers: `.spec-dock/active/{initiative,epic,issue}`
       - Uses symlinks when possible
       - Falls back to `.path` files when symlinks are not supported
@@ -715,12 +716,14 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         raise RuntimeError(f"Initiative not found: {issue.initiative_id}")
 
     repo_root = specdock_dir.parent
-    work_dir = specdock_dir / _WORK_DIRNAME
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     active_dir = specdock_dir / _ACTIVE_DIRNAME
-    work_dir.mkdir(parents=True, exist_ok=True)
+    agent_dir.mkdir(parents=True, exist_ok=True)
     active_dir.mkdir(parents=True, exist_ok=True)
 
     def rel(p: Path) -> str:
+        """Return `p` as a repo-root-relative POSIX path string."""
         return p.relative_to(repo_root).as_posix()
 
     # SSOT manifest: other generated artifacts should be derivable from this.
@@ -731,13 +734,18 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         "epic": {"id": epic.id, "path": rel(epic.path)},
         "issue": {"id": issue.id, "path": rel(issue.path)},
     }
-    _write_json(work_dir / "current.json", current)
+    _write_json(agent_dir / "active.json", current)
+
+    # Prune legacy SSOT files to avoid duplicate manifests in older directories.
+    (legacy_work_dir / "active.json").unlink(missing_ok=True)
+    (legacy_work_dir / "current.json").unlink(missing_ok=True)
 
     # Remove existing pointers (symlink or fallback pathfiles).
     for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
         _unlink_any(active_dir / name)
 
     def symlink(name: str, target: Path) -> None:
+        """Create an active pointer under `.spec-dock/active/` (symlink or fallback)."""
         link = active_dir / name
         rel_target = os.path.relpath(target, start=active_dir)
         try:
@@ -759,8 +767,8 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         f"- epic: {epic.id}\n"
         f"- issue: {issue.id}\n\n"
         "## Generated state\n"
-        "- index: `.spec-dock/.work/state.json`\n"
-        "- tree: `.spec-dock/.work/tree.json`\n\n"
+        "- index: `.spec-dock/.agent/index.json`\n"
+        "- tree: `.spec-dock/.agent/tree.json`\n\n"
         "## Read order\n"
         "- `.spec-dock/active/initiative/README.md`\n"
         "- `.spec-dock/active/epic/README.md`\n"
@@ -776,13 +784,29 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
 
 
 def _active_show(specdock_dir: Path) -> None:
-    """Print the current active pointers from `.spec-dock/.work/current.json`."""
-    current_path = specdock_dir / _WORK_DIRNAME / "current.json"
-    if not current_path.exists():
+    """Print the current active pointers from `.spec-dock/.agent/active.json`."""
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    active_path = agent_dir / "active.json"
+    legacy_active_path = legacy_work_dir / "active.json"
+    legacy_current_path = legacy_work_dir / "current.json"
+    if not active_path.exists() and not legacy_active_path.exists() and not legacy_current_path.exists():
         print("spec-dock: active: (not set)")
         return
 
-    current = _load_json(current_path)
+    if active_path.exists():
+        current = _load_json(active_path)
+    elif legacy_active_path.exists():
+        current = _load_json(legacy_active_path)
+    else:
+        current = _load_json(legacy_current_path)
+
+    # Best-effort migration: if this run used legacy files, write the new SSOT.
+    if not active_path.exists():
+        _write_json(active_path, current)
+        legacy_active_path.unlink(missing_ok=True)
+        legacy_current_path.unlink(missing_ok=True)
+
     print(f"initiative: {current.get('initiative', {}).get('id')} ({current.get('initiative', {}).get('path')})")
     print(f"epic: {current.get('epic', {}).get('id')} ({current.get('epic', {}).get('path')})")
     print(f"issue: {current.get('issue', {}).get('id')} ({current.get('issue', {}).get('path')})")
@@ -790,9 +814,12 @@ def _active_show(specdock_dir: Path) -> None:
 
 def _active_clear(specdock_dir: Path) -> None:
     """Clear SSOT active manifest and remove generated pointers."""
-    current_path = specdock_dir / _WORK_DIRNAME / "current.json"
-    if current_path.exists():
-        current_path.unlink()
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+
+    (agent_dir / "active.json").unlink(missing_ok=True)
+    (legacy_work_dir / "active.json").unlink(missing_ok=True)
+    (legacy_work_dir / "current.json").unlink(missing_ok=True)
 
     active_dir = specdock_dir / _ACTIVE_DIRNAME
     for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
@@ -860,7 +887,7 @@ def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
 
 
 def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
-    """Generate derived state files under `.spec-dock/.work/` from the local tree (and optionally GitHub)."""
+    """Generate derived state files under `.spec-dock/.agent/` from the local tree (and optionally GitHub)."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
@@ -906,10 +933,28 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
             progress[parent]["total"] += 1
             progress[parent][status] += 1
 
-    state_index_path = specdock_dir / _WORK_DIRNAME / "state.json"
-    tree_path = specdock_dir / _WORK_DIRNAME / "tree.json"
-    current_path = specdock_dir / _WORK_DIRNAME / "current.json"
-    current = _load_json(current_path) if current_path.exists() else None
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    agent_dir.mkdir(parents=True, exist_ok=True)
+
+    state_index_path = agent_dir / "index.json"
+    tree_path = agent_dir / "tree.json"
+    active_path = agent_dir / "active.json"
+    legacy_active_path = legacy_work_dir / "active.json"
+    legacy_current_path = legacy_work_dir / "current.json"
+
+    if active_path.exists():
+        current = _load_json(active_path)
+    elif legacy_active_path.exists():
+        current = _load_json(legacy_active_path)
+        _write_json(active_path, current)
+        legacy_active_path.unlink(missing_ok=True)
+    elif legacy_current_path.exists():
+        current = _load_json(legacy_current_path)
+        _write_json(active_path, current)
+        legacy_current_path.unlink(missing_ok=True)
+    else:
+        current = None
 
     # Flatten nodes so tools/agents can query by id without traversing the FS again.
     out_nodes: dict[str, Any] = {}
@@ -948,6 +993,7 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
     # Human-friendly tree view: keep the layer structure as nested lists.
     # Keep it intentionally minimal to reduce size and avoid duplicating the full index.
     def tree_item(node: _Node) -> dict[str, Any]:
+        """Return a minimal tree node item (no redundant index fields)."""
         item: dict[str, Any] = {"id": node.id, "title": node.title}
 
         if node.id in progress:
@@ -1003,6 +1049,11 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
     }
     _write_json(state_index_path, state_index)
     _write_json(tree_path, state_tree)
+
+    # Prune legacy v2 directory/file names to avoid duplicates.
+    (legacy_work_dir / "state.json").unlink(missing_ok=True)
+    (legacy_work_dir / "index.json").unlink(missing_ok=True)
+    (legacy_work_dir / "tree.json").unlink(missing_ok=True)
 
 
 def _validate(specdock_dir: Path) -> None:
@@ -1094,7 +1145,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     active_sub.add_parser("show", help="Show current active pointers")
     active_sub.add_parser("clear", help="Clear active pointers")
 
-    p_sync = sub.add_parser("sync", help="Generate state.json (optionally enrich from GitHub)")
+    p_sync = sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)")
     p_sync.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
     p_sync.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
 

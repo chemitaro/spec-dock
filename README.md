@@ -50,7 +50,7 @@ uvx --from ~/src/spec-dock spec-dock update
 
 Troubleshooting:
 - If `.spec-dock/initiative/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
-  v2 generates `.spec-dock/initiatives/`, `.spec-dock/active/`, and `.spec-dock/.work/`.
+  v2 generates `.spec-dock/initiatives/`, `.spec-dock/active/`, and `.spec-dock/.agent/`.
 - If your local clone contains the v2 files but `uvx` still behaves like v1, try one of:
   - Avoid the shared cache for a single run: `uvx --no-cache --from ~/src/spec-dock spec-dock init`
   - Use a dedicated cache directory: `uvx --cache-dir /tmp/uv-cache-spec-dock --from ~/src/spec-dock spec-dock init`
@@ -81,7 +81,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 # Set active issue pointers (symlinks) and generate context-pack
 ./.spec-dock/scripts/spec-dock active set --issue 0123  # also accepts iss-0123
 
-# Generate state.json (local scan; optionally enrich from GitHub via gh)
+# Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
 ./.spec-dock/scripts/spec-dock sync
 ./.spec-dock/scripts/spec-dock sync --github
 
@@ -89,7 +89,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ./.spec-dock/scripts/spec-dock validate
 ```
 
-See `docs/sync-aggregation.md` for how `sync` aggregates local + GitHub state.
+See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
 
 ## What it creates
 
@@ -100,8 +100,8 @@ See `docs/sync-aggregation.md` for how `sync` aggregates local + GitHub state.
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
   - `active/` (generated pointers; gitignored)
-  - `.work/` (generated state; gitignored)
-  - `.gitignore` (ignores `active/` and `.work/`)
+  - `.agent/` (generated agent state; gitignored)
+  - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))
 - `.codex/skills/spec-driven-tdd-workflow/` (Codex skill)
 
 ## Testing
@@ -121,4 +121,4 @@ Codex Skill を生成するためのスキャフォルディングツールで�
 
 v2 では `.spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
 `.spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
-状態の集計は `.spec-dock/.work/state.json` を `./.spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
+状態の集計は `.spec-dock/.agent/index.json` と `.spec-dock/.agent/tree.json` を `./.spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
