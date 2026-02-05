@@ -991,42 +991,39 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
         out_nodes[node.id] = item
 
     # Human-friendly tree view: keep the layer structure as nested lists.
-    # Keep it intentionally minimal to reduce size and avoid duplicating the full index.
-    def tree_item(node: _Node) -> dict[str, Any]:
-        """Return a minimal tree node item (no redundant index fields)."""
-        item: dict[str, Any] = {"id": node.id, "title": node.title}
-
-        if node.id in progress:
-            item["progress"] = progress[node.id]
-
-        if node.github_issue_number is not None:
-            item["github"] = {"issue_number": node.github_issue_number}
-            if github:
-                gh = issue_index.get(node.github_issue_number)
-                if gh:
-                    item["github"].update({"state": gh.get("state"), "url": gh.get("url")})
-
-        return item
+    #
+    # Unlike `index.json`, this representation is nested as:
+    # initiative -> epics[] -> issues[]
+    #
+    # Note:
+    # - Each node item is the same shape as `index.json`'s `nodes[<id>]`.
+    #   This intentionally duplicates fields between files, but avoids forcing
+    #   tools/agents to join `tree.json` with `index.json` at runtime.
+    def tree_item(node_id: str) -> dict[str, Any]:
+        """Return a full node item for `tree.json` (same schema as index nodes)."""
+        base = out_nodes.get(node_id)
+        if not isinstance(base, dict):
+            raise RuntimeError(f"Internal error: missing node in index: {node_id}")
+        # Shallow copy so we can add nested arrays without mutating the index view.
+        return dict(base)
 
     initiative_ids = [node_id for node_id, node in nodes.items() if node.type == "initiative"]
     initiative_ids.sort(key=sort_key)
 
     tree: list[dict[str, Any]] = []
     for init_id in initiative_ids:
-        init_node = nodes[init_id]
-        init_item = tree_item(init_node)
+        init_item = tree_item(init_id)
 
         epic_ids = [cid for cid in children.get(init_id, []) if nodes.get(cid) and nodes[cid].type == "epic"]
         epic_ids.sort(key=sort_key)
         epics: list[dict[str, Any]] = []
 
         for epic_id in epic_ids:
-            epic_node = nodes[epic_id]
-            epic_item = tree_item(epic_node)
+            epic_item = tree_item(epic_id)
 
             issue_ids = [cid for cid in children.get(epic_id, []) if nodes.get(cid) and nodes[cid].type == "issue"]
             issue_ids.sort(key=sort_key)
-            epic_item["issues"] = [tree_item(nodes[cid]) for cid in issue_ids]
+            epic_item["issues"] = [tree_item(cid) for cid in issue_ids]
 
             epics.append(epic_item)
 

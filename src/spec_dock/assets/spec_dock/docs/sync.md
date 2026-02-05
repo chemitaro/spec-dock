@@ -34,7 +34,7 @@
   - initiative/epic の progress（配下 issue の集計）
   - active（active.json の内容）
 - `.spec-dock/.agent/tree.json`（tree）
-  - initiative→epic→issue のネスト表示（軽量・最小フィールド）
+  - initiative→epic→issue のネスト表示（各ノードは `index.json` と同じスキーマ）
   - active（active.json の内容）
 
 ## 2. PlantUML（処理フロー）

@@ -23,6 +23,14 @@ from spec_dock import __version__
 
 _SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts")
+_DEFAULT_SPEC_DOCK_GITIGNORE = (
+    "# spec-dock runtime (generated)\n"
+    "# v2 generated state for agents (SSOT + derived views)\n"
+    ".agent/\n"
+    "# legacy v2 name (kept ignored for safe upgrades)\n"
+    ".work/\n"
+    "active/\n"
+)
 
 
 @contextmanager
@@ -157,6 +165,10 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         src_gitignore = src_spec_dock / ".gitignore"
         if src_gitignore.exists():
             _copy_file(src_gitignore, specdock_dir / ".gitignore")
+        else:
+            # Fallback: dotfiles may be missing in some packaged builds if glob patterns
+            # exclude them. Keep `.spec-dock/active/` and `.spec-dock/.agent/` out of git.
+            (specdock_dir / ".gitignore").write_text(_DEFAULT_SPEC_DOCK_GITIGNORE, encoding="utf-8")
 
         # Spec tree root + generated directories.
         (specdock_dir / "initiatives").mkdir(parents=True, exist_ok=True)

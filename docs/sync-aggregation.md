@@ -29,7 +29,7 @@
 - `.spec-dock/.agent/index.json`
   - 全ノードのフラットな索引 + 親子関係 + initiative/epic の進捗集計 + active（current）を含む
 - `.spec-dock/.agent/tree.json`
-  - initiative→epic→issue のネスト表示（軽量。`index.json` の全情報は重複させない）
+  - initiative→epic→issue のネスト表示（`index.json` と同じノードスキーマを持つ）
 
 ## 2. 集計の前提データ（meta.json の役割）
 
@@ -96,7 +96,7 @@
   - `children`: 子ノードIDの配列（親子参照を簡単にするため）
   - `progress`: initiative/epic にだけ付与
   - `github`: `github.issue_number` がある場合のみ。`--github` 時は enrich 追加
-- `tree`（tree.json）: 人間向けに initiative→epic→issue のネストを保持したツリー表示（最小フィールド）
+- `tree`（tree.json）: initiative→epic→issue のネストを保持したツリー表示（各ノードは `index.json` と同じスキーマ）
 
 ## 4. PlantUML（内部処理の流れ）
 
@@ -250,7 +250,7 @@ Epic 配下に issue が 3 つあるとして:
 }
 ```
 
-## 7. tree.json（tree）の最小イメージ
+## 7. tree.json（tree）のイメージ
 
 ```json
 {
@@ -260,17 +260,30 @@ Epic 配下に issue が 3 つあるとして:
   "active": { "...": "..." },
   "tree": [
     {
+      "type": "initiative",
       "id": "init-0123",
       "title": "Auth platform",
+      "path": ".spec-dock/initiatives/init-0123-auth-platform",
+      "children": ["epic-0124"],
       "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
       "epics": [
         {
+          "type": "epic",
           "id": "epic-0124",
           "title": "JWT auth",
+          "path": ".spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth",
+          "children": ["iss-0125", "iss-local-0001"],
           "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
           "issues": [
-            { "id": "iss-0125", "title": "Add refresh token", "github": { "issue_number": 123, "state": "OPEN" } },
-            { "id": "iss-local-0001", "title": "..." }
+            {
+              "type": "issue",
+              "id": "iss-0125",
+              "title": "Add refresh token",
+              "path": ".spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth/issues/iss-0125-add-refresh-token",
+              "children": [],
+              "github": { "issue_number": 123, "state": "OPEN" }
+            },
+            { "type": "issue", "id": "iss-local-0001", "title": "...", "path": "...", "children": [] }
           ]
         }
       ]

@@ -4,6 +4,7 @@ import sys
 import tempfile
 import subprocess
 import unittest
+import json
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -211,11 +212,29 @@ class TestCli(unittest.TestCase):
             self.assertNotIn("\"tree\"", state)
 
             # Tree: nested layer view (human-friendly).
-            tree = (target / ".spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
-            self.assertIn("\"tree\"", tree)
-            self.assertIn("\"id\": \"init-local-0001\"", tree)
-            self.assertIn("\"id\": \"epic-local-0001\"", tree)
-            self.assertIn("\"id\": \"iss-local-0001\"", tree)
+            tree_text = (target / ".spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
+            tree = json.loads(tree_text)
+            self.assertIn("tree", tree)
+
+            index = json.loads((target / ".spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            index_nodes = index["nodes"]
+
+            init_item = tree["tree"][0]
+            self.assertEqual(init_item["id"], "init-local-0001")
+            self.assertEqual(init_item["type"], "initiative")
+            self.assertIn("epics", init_item)
+
+            epic_item = init_item["epics"][0]
+            self.assertEqual(epic_item["id"], "epic-local-0001")
+            self.assertEqual(epic_item["type"], "epic")
+            self.assertIn("issues", epic_item)
+
+            issue_item = epic_item["issues"][0]
+            self.assertEqual(issue_item["id"], "iss-local-0001")
+            self.assertEqual(issue_item["type"], "issue")
+
+            # `tree.json` nodes match the same node schema as `index.json` nodes.
+            self.assertEqual(issue_item, index_nodes["iss-local-0001"])
             self._run_runtime(target, ["validate"])
 
     def test_new_no_github_does_not_invoke_gh(self) -> None:
