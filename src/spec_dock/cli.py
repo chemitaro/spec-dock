@@ -85,6 +85,50 @@ def _make_executable(path: Path) -> None:
         return
 
 
+def _prune_legacy_scaffold(specdock_dir: Path) -> None:
+    """Remove known legacy (v1) artifacts from generated scaffolding.
+
+    Why this exists:
+    - Some local clones may contain a stale `build/` directory from older versions.
+    - When building a wheel, setuptools can accidentally carry those stale files into the package.
+    - This makes `spec-dock init/update` resilient by removing legacy artifacts after copying.
+
+    Scope:
+    - Only touches generated scaffolding files (legacy scripts/templates/workflow/symlinks).
+    - Never deletes user-authored specs under `.spec-dock/initiatives/**`.
+    """
+    scripts_dir = specdock_dir / "scripts"
+    for p in scripts_dir.glob("spec-dock-close*.sh"):
+        p.unlink(missing_ok=True)
+
+    templates_dir = specdock_dir / "templates"
+
+    # v1 used top-level templates/*.md; v2 uses templates/{initiative,epic,issue}/.
+    for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (templates_dir / name).unlink(missing_ok=True)
+
+    # v1 used nested `current/` and `completed/` directories under templates.
+    for dirname in ("current", "completed"):
+        for d in sorted(templates_dir.rglob(dirname), key=lambda x: len(str(x)), reverse=True):
+            if d.is_dir():
+                shutil.rmtree(d, ignore_errors=True)
+
+    # v2 doesn't use a top-level templates/discussions directory.
+    discussions_dir = templates_dir / "discussions"
+    if discussions_dir.exists():
+        shutil.rmtree(discussions_dir, ignore_errors=True)
+
+    # v1 installed a workflow that moved `current/` -> `completed/` on issue close.
+    legacy_workflow = specdock_dir.parent / ".github" / "workflows" / "spec-dock-close.yml"
+    legacy_workflow.unlink(missing_ok=True)
+
+    # v1 also created root-level symlinks as shortcuts. They're safe to remove if they are symlinks.
+    for name in ("current-initiative", "current-epic", "current-issue"):
+        p = specdock_dir / name
+        if p.is_symlink():
+            p.unlink(missing_ok=True)
+
+
 def _install_spec_dock(target_root: Path, *, force: bool) -> None:
     """Install/update `.spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
@@ -113,6 +157,8 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         (specdock_dir / "initiatives").mkdir(parents=True, exist_ok=True)
         (specdock_dir / "active").mkdir(parents=True, exist_ok=True)
         (specdock_dir / ".work").mkdir(parents=True, exist_ok=True)
+
+        _prune_legacy_scaffold(specdock_dir)
 
         # Ensure runtime script is executable (best-effort).
         runtime_script = specdock_dir / "scripts" / "spec-dock"

@@ -25,6 +25,38 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --no-skill
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
 ```
 
+## Usage (uvx from a local clone)
+
+If you want to try `spec-dock` without fetching from GitHub each time, clone this repository and
+point `uvx --from` to the local directory.
+
+Note: `--from` must point to the repository root that contains `pyproject.toml`
+(do not point it at `src/spec_dock/`).
+
+```bash
+# Clone spec-dock somewhere on your machine
+git clone https://github.com/chemitaro/spec-dock ~/src/spec-dock
+
+# Install into your target project (current directory)
+cd /path/to/your/project
+uvx --from ~/src/spec-dock spec-dock init
+
+# Or: specify the target path explicitly
+uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
+
+# Update managed files later
+uvx --from ~/src/spec-dock spec-dock update
+```
+
+Troubleshooting:
+- If `.spec-dock/initiative/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
+  v2 generates `.spec-dock/initiatives/`, `.spec-dock/active/`, and `.spec-dock/.work/`.
+- If your local clone contains the v2 files but `uvx` still behaves like v1, try one of:
+  - Avoid the shared cache for a single run: `uvx --no-cache --from ~/src/spec-dock spec-dock init`
+  - Use a dedicated cache directory: `uvx --cache-dir /tmp/uv-cache-spec-dock --from ~/src/spec-dock spec-dock init`
+  - Remove stale build outputs in the tool repo (this often causes mixed v1/v2 assets): `rm -rf ~/src/spec-dock/build`
+  - (If possible) clear the cache: `uv cache clean`
+
 ## Usage (local scripts)
 
 After `init`, day-to-day operations are done via the runtime script installed into your repo:
@@ -47,6 +79,8 @@ After `init`, day-to-day operations are done via the runtime script installed in
 # Validate the spec tree structure
 ./.spec-dock/scripts/spec-dock validate
 ```
+
+See `docs/sync-aggregation.md` for how `sync` aggregates local + GitHub state.
 
 ## What it creates
 

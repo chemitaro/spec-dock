@@ -74,6 +74,19 @@ class TestCli(unittest.TestCase):
             self.assertTrue(
                 (target / ".spec-dock" / "docs" / "spec-dock-guide.md").is_file()
             )
+
+            # Runtime script exists; legacy close scripts must not be present.
+            scripts_dir = target / ".spec-dock" / "scripts"
+            self.assertTrue((scripts_dir / "spec-dock").is_file())
+            self.assertEqual(list(scripts_dir.glob("spec-dock-close*.sh")), [])
+
+            # Legacy (v1) templates should not be installed.
+            templates_dir = target / ".spec-dock" / "templates"
+            for legacy in ("requirement.md", "design.md", "plan.md", "report.md"):
+                self.assertFalse((templates_dir / legacy).exists(), f"legacy template leaked: {legacy}")
+            self.assertEqual(list(templates_dir.rglob("current")), [])
+            self.assertEqual(list(templates_dir.rglob("completed")), [])
+
             self.assertTrue(
                 (
                     target
@@ -123,9 +136,26 @@ class TestCli(unittest.TestCase):
             marker = target / ".spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
+            # Simulate legacy (v1) leftovers that v2 should prune on update.
+            legacy_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
+            legacy_workflow.parent.mkdir(parents=True, exist_ok=True)
+            legacy_workflow.write_text("legacy\n", encoding="utf-8")
+
+            legacy_symlink = target / ".spec-dock" / "current-initiative"
+            created_symlink = False
+            try:
+                os.symlink("initiatives", legacy_symlink)
+                created_symlink = True
+            except OSError:
+                # Some environments may restrict symlinks; workflow pruning is still validated.
+                created_symlink = False
+
             self.assertEqual(main(["update", str(target)]), 0)
             self.assertTrue(marker.is_file())
             self._assert_version_file(target)
+            self.assertFalse(legacy_workflow.exists())
+            if created_symlink:
+                self.assertFalse(legacy_symlink.is_symlink())
 
     def test_new_and_active_and_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

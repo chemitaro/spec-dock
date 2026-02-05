@@ -24,3 +24,19 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 spec_dock = ["assets/**/*"]
+
+[tool.setuptools.exclude-package-data]
+# Defensive exclusions:
+# - Prevent legacy (v1) scaffolding artifacts from being packaged if they remain in build outputs.
+# - This protects `uvx --from <local path> ...` users who may have a stale `build/` directory.
+spec_dock = [
+  "assets/spec_dock/scripts/spec-dock-close*.sh",
+  "assets/github/workflows/spec-dock-close.yml",
+  "assets/spec_dock/templates/**/current/**",
+  "assets/spec_dock/templates/**/completed/**",
+  "assets/spec_dock/templates/design.md",
+  "assets/spec_dock/templates/plan.md",
+  "assets/spec_dock/templates/report.md",
+  "assets/spec_dock/templates/requirement.md",
+  "assets/spec_dock/templates/discussions/**",
+]
