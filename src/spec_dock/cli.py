@@ -122,11 +122,16 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
     legacy_workflow = specdock_dir.parent / ".github" / "workflows" / "spec-dock-close.yml"
     legacy_workflow.unlink(missing_ok=True)
 
-    # v1 also created root-level symlinks as shortcuts. They're safe to remove if they are symlinks.
+    # v1 created root-level symlinks as shortcuts. v2 uses `.spec-dock/active/`,
+    # so these are always safe to remove when they are symlinks (never delete real dirs).
     for name in ("current-initiative", "current-epic", "current-issue"):
         p = specdock_dir / name
         if p.is_symlink():
             p.unlink(missing_ok=True)
+
+    # v2 used a `.path` fallback briefly during development; prune if present.
+    for name in ("current-initiative.path", "current-epic.path", "current-issue.path"):
+        (specdock_dir / name).unlink(missing_ok=True)
 
 
 def _install_spec_dock(target_root: Path, *, force: bool) -> None:

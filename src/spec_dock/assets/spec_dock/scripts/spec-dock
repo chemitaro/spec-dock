@@ -38,6 +38,7 @@ _ACTIVE_DIRNAME = "active"
 _WORK_DIRNAME = ".work"
 
 _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)-(?P<num>[0-9]+)$")
+_NUM_RE = re.compile(r"^[0-9]+$")
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,31 @@ def _validate_lowercase(value: str, *, field: str) -> str:
     if value != value.lower():
         raise RuntimeError(f"{field} must be lowercase: {value}")
     return value
+
+
+def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
+    """Normalize an id argument into the canonical `<prefix>-NNNN` form.
+
+    Accepted inputs:
+    - Canonical form: `init-0001`, `epic-0001`, `iss-0001`, `adr-0001`
+    - Shorthand numeric: `1` or `0001` (prefix is inferred from the argument context)
+
+    This lets callers type less while keeping the on-disk ids consistent and lowercase.
+    """
+    raw = value.strip()
+    if not raw:
+        raise RuntimeError(f"{field} is required")
+
+    # Be forgiving on input case, but always canonicalize to lowercase.
+    raw = raw.lower()
+
+    if _NUM_RE.fullmatch(raw):
+        return _format_id(prefix, int(raw))
+
+    parsed_prefix, num = _parse_id(raw)
+    if parsed_prefix != prefix:
+        raise RuntimeError(f"{field} must be '{prefix}-NNNN' or 'NNNN': {value}")
+    return _format_id(prefix, num)
 
 
 def _slugify(title: str) -> str:
@@ -322,8 +348,8 @@ def _new_initiative(
 
     if node_id is None:
         node_id = _next_id(specdock_dir, "init")
-    node_id = _validate_lowercase(node_id.strip(), field="id")
-    _parse_id(node_id)
+    else:
+        node_id = _normalize_id_input(str(node_id), prefix="init", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -356,8 +382,7 @@ def _new_epic(
     github_issue_number: int | None,
 ) -> None:
     """Create a new epic node under a given initiative."""
-    initiative_id = _validate_lowercase(initiative_id.strip(), field="initiative")
-    _parse_id(initiative_id)
+    initiative_id = _normalize_id_input(initiative_id, prefix="init", field="initiative")
 
     nodes = _scan_nodes(specdock_dir)
     initiative = nodes.get(initiative_id)
@@ -370,8 +395,8 @@ def _new_epic(
 
     if node_id is None:
         node_id = _next_id(specdock_dir, "epic")
-    node_id = _validate_lowercase(node_id.strip(), field="id")
-    _parse_id(node_id)
+    else:
+        node_id = _normalize_id_input(str(node_id), prefix="epic", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -413,8 +438,7 @@ def _new_issue(
     github_issue_number: int | None,
 ) -> None:
     """Create a new issue node under a given epic."""
-    epic_id = _validate_lowercase(epic_id.strip(), field="epic")
-    _parse_id(epic_id)
+    epic_id = _normalize_id_input(epic_id, prefix="epic", field="epic")
 
     nodes = _scan_nodes(specdock_dir)
     epic = nodes.get(epic_id)
@@ -432,8 +456,8 @@ def _new_issue(
             node_id = f"iss-{github_issue_number:04d}" if github_issue_number < 10000 else f"iss-{github_issue_number}"
         else:
             node_id = _next_id(specdock_dir, "iss")
-    node_id = _validate_lowercase(node_id.strip(), field="id")
-    _parse_id(node_id)
+    else:
+        node_id = _normalize_id_input(str(node_id), prefix="iss", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -474,10 +498,10 @@ def _new_adr(
     title: str,
     slug: str | None,
     node_id: str | None,
+    scope_prefix: str,
 ) -> None:
     """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
-    scope_id = _validate_lowercase(scope_id.strip(), field="scope")
-    _parse_id(scope_id)
+    scope_id = _normalize_id_input(scope_id, prefix=scope_prefix, field="scope")
 
     nodes = _scan_nodes(specdock_dir)
     scope = nodes.get(scope_id)
@@ -490,8 +514,8 @@ def _new_adr(
 
     if node_id is None:
         node_id = _next_id(specdock_dir, "adr")
-    node_id = _validate_lowercase(node_id.strip(), field="id")
-    _parse_id(node_id)
+    else:
+        node_id = _normalize_id_input(str(node_id), prefix="adr", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -546,8 +570,7 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
       - Falls back to `.path` files when symlinks are not supported
     - Generates: `.spec-dock/active/context-pack.md`
     """
-    issue_id = _validate_lowercase(issue_id.strip(), field="issue")
-    _parse_id(issue_id)
+    issue_id = _normalize_id_input(issue_id, prefix="iss", field="issue")
 
     nodes = _scan_nodes(specdock_dir)
     issue = nodes.get(issue_id)
@@ -823,14 +846,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_new_init.add_argument("--github-issue", type=int)
 
     p_new_epic = new_sub.add_parser("epic", help="Create a new epic under an initiative")
-    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative id (e.g. init-0001)")
+    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. init-0001 or 0001)")
     p_new_epic.add_argument("--title", required=True)
     p_new_epic.add_argument("--slug")
     p_new_epic.add_argument("--id")
     p_new_epic.add_argument("--github-issue", type=int)
 
     p_new_issue = new_sub.add_parser("issue", help="Create a new issue under an epic")
-    p_new_issue.add_argument("--epic", required=True, help="Parent epic id (e.g. epic-0001)")
+    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. epic-0001 or 0001)")
     p_new_issue.add_argument("--title", required=True)
     p_new_issue.add_argument("--slug")
     p_new_issue.add_argument("--id")
@@ -838,9 +861,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
     p_new_adr = new_sub.add_parser("adr", help="Create a new ADR under a scope (initiative/epic/issue)")
     scope = p_new_adr.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--initiative", help="Scope initiative id (e.g. init-0001)")
-    scope.add_argument("--epic", help="Scope epic id (e.g. epic-0001)")
-    scope.add_argument("--issue", help="Scope issue id (e.g. iss-0001)")
+    scope.add_argument("--initiative", help="Scope initiative (e.g. init-0001 or 0001)")
+    scope.add_argument("--epic", help="Scope epic (e.g. epic-0001 or 0001)")
+    scope.add_argument("--issue", help="Scope issue (e.g. iss-0001 or 0001)")
     p_new_adr.add_argument("--title", required=True)
     p_new_adr.add_argument("--slug")
     p_new_adr.add_argument("--id")
@@ -849,7 +872,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
 
     p_active_set = active_sub.add_parser("set", help="Set the active issue")
-    p_active_set.add_argument("--issue", required=True, help="Issue id (e.g. iss-0001)")
+    p_active_set.add_argument("--issue", required=True, help="Issue (e.g. iss-0001 or 0001)")
 
     active_sub.add_parser("show", help="Show current active pointers")
     active_sub.add_parser("clear", help="Clear active pointers")
@@ -898,13 +921,16 @@ def main(argv: list[str] | None = None) -> int:
                     github_issue_number=getattr(ns, "github_issue", None),
                 )
             elif ns.new_kind == "adr":
+                # The scope flag determines the prefix, so we can accept shorthand numeric ids.
                 scope_id = getattr(ns, "initiative", None) or getattr(ns, "epic", None) or getattr(ns, "issue", None)
+                scope_prefix = "init" if getattr(ns, "initiative", None) is not None else ("epic" if getattr(ns, "epic", None) is not None else "iss")
                 _new_adr(
                     specdock_dir,
                     scope_id=str(scope_id),
                     title=str(ns.title),
                     slug=getattr(ns, "slug", None),
                     node_id=getattr(ns, "id", None),
+                    scope_prefix=scope_prefix,
                 )
             else:
                 raise RuntimeError(f"Unknown new kind: {ns.new_kind}")

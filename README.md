@@ -65,12 +65,12 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ```bash
 # Create nodes (all-lowercase ids; e.g. init-0001, epic-0001, iss-0001)
 ./.spec-dock/scripts/spec-dock new initiative --title "Auth platform"
-./.spec-dock/scripts/spec-dock new epic --initiative init-0001 --title "JWT auth"
-./.spec-dock/scripts/spec-dock new issue --epic epic-0001 --title "Add refresh token" --github-issue 123
+./.spec-dock/scripts/spec-dock new epic --initiative 0001 --title "JWT auth"   # also accepts init-0001
+./.spec-dock/scripts/spec-dock new issue --epic 0001 --title "Add refresh token" --github-issue 123  # also accepts epic-0001
 ./.spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
 
 # Set active issue pointers (symlinks) and generate context-pack
-./.spec-dock/scripts/spec-dock active set --issue iss-0123
+./.spec-dock/scripts/spec-dock active set --issue 0123  # also accepts iss-0123
 
 # Generate state.json (local scan; optionally enrich from GitHub via gh)
 ./.spec-dock/scripts/spec-dock sync

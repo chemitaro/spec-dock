@@ -144,7 +144,8 @@ class TestCli(unittest.TestCase):
             legacy_symlink = target / ".spec-dock" / "current-initiative"
             created_symlink = False
             try:
-                os.symlink("initiatives", legacy_symlink)
+                # v1 style link target (so v2 can safely prune without deleting v2-generated shortcuts).
+                os.symlink("initiative/current", legacy_symlink)
                 created_symlink = True
             except OSError:
                 # Some environments may restrict symlinks; workflow pruning is still validated.
@@ -163,8 +164,9 @@ class TestCli(unittest.TestCase):
             self.assertEqual(main(["init", str(target)]), 0)
 
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--initiative", "init-0001", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "epic-0001", "--title", "Add refresh token"])
+            # Parent ids accept shorthand numeric forms (e.g. `1` -> `init-0001` / `epic-0001`).
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token"])
 
             issue_dir = (
                 target
@@ -181,7 +183,8 @@ class TestCli(unittest.TestCase):
             self.assertTrue((issue_dir / "plan.md").is_file())
             self.assertTrue((issue_dir / "report.md").is_file())
 
-            self._run_runtime(target, ["active", "set", "--issue", "iss-0001"])
+            # Active issue id also accepts shorthand numeric form.
+            self._run_runtime(target, ["active", "set", "--issue", "1"])
             self.assertTrue((target / ".spec-dock" / ".work" / "current.json").is_file())
             self.assertTrue(
                 (target / ".spec-dock" / "active" / "issue").exists()
