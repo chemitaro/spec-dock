@@ -758,6 +758,9 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         f"- initiative: {initiative.id}\n"
         f"- epic: {epic.id}\n"
         f"- issue: {issue.id}\n\n"
+        "## Generated state\n"
+        "- index: `.spec-dock/.work/state.json`\n"
+        "- tree: `.spec-dock/.work/tree.json`\n\n"
         "## Read order\n"
         "- `.spec-dock/active/initiative/README.md`\n"
         "- `.spec-dock/active/epic/README.md`\n"
@@ -857,7 +860,7 @@ def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
 
 
 def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
-    """Generate `.spec-dock/.work/state.json` from the local tree (and optionally GitHub)."""
+    """Generate derived state files under `.spec-dock/.work/` from the local tree (and optionally GitHub)."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
@@ -867,6 +870,11 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
     issue_index: dict[int, dict[str, Any]] = {}
     if github:
         issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+
+    def sort_key(node_id: str) -> tuple[int, int, str]:
+        """Deterministic sort key for ids (GitHub ids first, then local)."""
+        _, is_local, num = _parse_id(node_id)
+        return (1 if is_local else 0, num, node_id)
 
     # Build a lightweight parent→children index so callers can traverse the tree.
     children: dict[str, list[str]] = {node_id: [] for node_id in nodes}
@@ -898,13 +906,15 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
             progress[parent]["total"] += 1
             progress[parent][status] += 1
 
-    state_path = specdock_dir / _WORK_DIRNAME / "state.json"
+    state_index_path = specdock_dir / _WORK_DIRNAME / "state.json"
+    tree_path = specdock_dir / _WORK_DIRNAME / "tree.json"
     current_path = specdock_dir / _WORK_DIRNAME / "current.json"
     current = _load_json(current_path) if current_path.exists() else None
 
     # Flatten nodes so tools/agents can query by id without traversing the FS again.
     out_nodes: dict[str, Any] = {}
-    for node in nodes.values():
+    for node_id in sorted(nodes.keys(), key=sort_key):
+        node = nodes[node_id]
         item: dict[str, Any] = {
             "type": node.type,
             "id": node.id,
@@ -913,7 +923,7 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
             "parent_id": node.parent_id,
             "initiative_id": node.initiative_id,
             "epic_id": node.epic_id,
-            "children": sorted(children.get(node.id, [])),
+            "children": sorted(children.get(node.id, []), key=sort_key),
         }
 
         if node.github_issue_number is not None:
@@ -935,14 +945,64 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
 
         out_nodes[node.id] = item
 
-    state = {
+    # Human-friendly tree view: keep the layer structure as nested lists.
+    # Keep it intentionally minimal to reduce size and avoid duplicating the full index.
+    def tree_item(node: _Node) -> dict[str, Any]:
+        item: dict[str, Any] = {"id": node.id, "title": node.title}
+
+        if node.id in progress:
+            item["progress"] = progress[node.id]
+
+        if node.github_issue_number is not None:
+            item["github"] = {"issue_number": node.github_issue_number}
+            if github:
+                gh = issue_index.get(node.github_issue_number)
+                if gh:
+                    item["github"].update({"state": gh.get("state"), "url": gh.get("url")})
+
+        return item
+
+    initiative_ids = [node_id for node_id, node in nodes.items() if node.type == "initiative"]
+    initiative_ids.sort(key=sort_key)
+
+    tree: list[dict[str, Any]] = []
+    for init_id in initiative_ids:
+        init_node = nodes[init_id]
+        init_item = tree_item(init_node)
+
+        epic_ids = [cid for cid in children.get(init_id, []) if nodes.get(cid) and nodes[cid].type == "epic"]
+        epic_ids.sort(key=sort_key)
+        epics: list[dict[str, Any]] = []
+
+        for epic_id in epic_ids:
+            epic_node = nodes[epic_id]
+            epic_item = tree_item(epic_node)
+
+            issue_ids = [cid for cid in children.get(epic_id, []) if nodes.get(cid) and nodes[cid].type == "issue"]
+            issue_ids.sort(key=sort_key)
+            epic_item["issues"] = [tree_item(nodes[cid]) for cid in issue_ids]
+
+            epics.append(epic_item)
+
+        init_item["epics"] = epics
+        tree.append(init_item)
+
+    state_index = {
         "schema_version": 1,
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
         "nodes": out_nodes,
     }
-    _write_json(state_path, state)
+    state_tree = {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
+        "active": current,
+        "tree": tree,
+    }
+    _write_json(state_index_path, state_index)
+    _write_json(tree_path, state_tree)
 
 
 def _validate(specdock_dir: Path) -> None:

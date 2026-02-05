@@ -65,7 +65,8 @@
 - ツリー走査（Initiative/Epic/Issue/ADR の存在）
 - 永続メタ読み込み（`meta.*`）
 生成:
-- `.spec-dock/.work/state.json`（ツリー構造 + 集計 “不明/未取得” を含む）
+- `.spec-dock/.work/state.json`（index: フラット索引 + 集計 “不明/未取得” を含む）
+- `.spec-dock/.work/tree.json`（tree: initiative→epic→issue のネスト表示）
 
 用途:
 - オフラインでも `status` / `validate` が動く
@@ -120,13 +121,15 @@ actor User
 participant "spec-dock CLI" as CLI
 database "Local specs tree" as TREE
 database "GitHub" as GH
-database "Generated state\n.spec-dock/.work/state.json" as STATE
+database "Generated index\n.spec-dock/.work/state.json" as STATE
+database "Generated tree\n.spec-dock/.work/tree.json" as TREE_JSON
 
 User -> CLI : spec-dock sync --github
 CLI -> TREE : scan nodes\nread meta
 CLI -> GH : fetch issues\n(by issue_number)
 GH --> CLI : issue states/labels/updatedAt
-CLI -> STATE : write aggregated state
+CLI -> STATE : write aggregated index
+CLI -> TREE_JSON : write nested tree
 CLI --> User : summary (status/dashboard)
 @enduml
 ```
@@ -137,6 +140,7 @@ CLI --> User : summary (status/dashboard)
 
 ### 7.1 生成物（gitignore）
 - `.spec-dock/.work/state.json`（機械可読）
+- `.spec-dock/.work/tree.json`（ネスト表示）
 - `.spec-dock/.work/dashboard.md`（人間向け、任意）
 - `.spec-dock/.work/cache/`（GitHub 結果キャッシュ、任意）
 
@@ -177,5 +181,5 @@ CLI --> User : summary (status/dashboard)
 ## 9. 結論（決まったら記入）
 
 - 状態の正（SSOT）: **ハイブリッド（段階導入）**（GitHub Issue を正として enrich する）
-- `sync` のデフォルト挙動: ローカルスキャンで `state.json` を生成（`--github` で GitHub Issue 状態を付与）
+- `sync` のデフォルト挙動: ローカルスキャンで `state.json`（index）と `tree.json`（tree）を生成（`--github` で GitHub Issue 状態を付与）
 - GitHub 取得（手段/必須度）: `gh` CLI 前提（認証必須でも良い）。Projects は未使用/未定のため対象外

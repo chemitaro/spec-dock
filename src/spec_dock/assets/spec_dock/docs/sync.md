@@ -15,7 +15,8 @@
 - `sync --github`: ローカル集計 + GitHub enrich（`github.issue_number` があるものだけ判定可能）
 
 出力:
-- `.spec-dock/.work/state.json`（生成物 / git 管理しない）
+- `.spec-dock/.work/state.json`（生成物 / git 管理しない, フラット索引）
+- `.spec-dock/.work/tree.json`（生成物 / git 管理しない, ネスト表示）
 
 ## 1. 何を入力として、何を出力するか
 
@@ -27,10 +28,13 @@
 - `gh issue list ...` の結果（`--github` の時だけ）
 
 ### 出力（生成物）
-- `.spec-dock/.work/state.json`
+- `.spec-dock/.work/state.json`（index）
   - ノード索引（id→情報）
   - 親子関係（children）
   - initiative/epic の progress（配下 issue の集計）
+  - active（current.json の内容）
+- `.spec-dock/.work/tree.json`（tree）
+  - initiative→epic→issue のネスト表示（軽量・最小フィールド）
   - active（current.json の内容）
 
 ## 2. PlantUML（処理フロー）
@@ -45,6 +49,7 @@ participant "runtime script\n(.spec-dock/scripts/spec-dock)" as Script
 participant "Local FS\n(.spec-dock/initiatives/**)" as FS
 participant "gh CLI" as GH
 database "state.json\n(.spec-dock/.work/state.json)" as State
+database "tree.json\n(.spec-dock/.work/tree.json)" as Tree
 
 User -> Script: sync [--github]
 activate Script
@@ -61,6 +66,7 @@ end
 
 Script -> Script: aggregate progress\n(initiative/epic)
 Script -> State: write state.json
+Script -> Tree: write tree.json
 
 deactivate Script
 @enduml
@@ -71,4 +77,3 @@ deactivate Script
 - `--github` は **読み取りのみ**です（GitHub に Issue を作成/更新しません）。
 - `github.issue_number` が無いノード（例: `iss-local-0001`）は、`--github` を付けても状態は `unknown` のままです。
 - `--gh-limit` が小さいと一覧に載らず `unknown` になります（古い Issue がある場合は上げてください）。
-

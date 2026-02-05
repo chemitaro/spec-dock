@@ -203,6 +203,19 @@ class TestCli(unittest.TestCase):
 
             self._run_runtime(target, ["sync"])
             self.assertTrue((target / ".spec-dock" / ".work" / "state.json").is_file())
+            self.assertTrue((target / ".spec-dock" / ".work" / "tree.json").is_file())
+
+            # Index: flat nodes (agent-friendly).
+            state = (target / ".spec-dock" / ".work" / "state.json").read_text(encoding="utf-8")
+            self.assertIn("\"nodes\"", state)
+            self.assertNotIn("\"tree\"", state)
+
+            # Tree: nested layer view (human-friendly).
+            tree = (target / ".spec-dock" / ".work" / "tree.json").read_text(encoding="utf-8")
+            self.assertIn("\"tree\"", tree)
+            self.assertIn("\"id\": \"init-local-0001\"", tree)
+            self.assertIn("\"id\": \"epic-local-0001\"", tree)
+            self.assertIn("\"id\": \"iss-local-0001\"", tree)
             self._run_runtime(target, ["validate"])
 
     def test_new_no_github_does_not_invoke_gh(self) -> None:

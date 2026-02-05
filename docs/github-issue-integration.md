@@ -204,6 +204,7 @@ GH --> API : create/list issues
 - `argparse`: CLI パース（`new/active/sync/validate`）
 - `pathlib.Path`: パス/ディレクトリ操作
 - `json`: `meta.json`, `.work/current.json`, `.work/state.json`
+- `json`: `meta.json`, `.work/current.json`, `.work/state.json`, `.work/tree.json`
 - `subprocess`: `gh` の実行
 - `re`: ID パース、`gh` 出力から Issue 番号抽出
 - `shutil`, `os`: コピー、symlink、存在確認等
@@ -250,4 +251,3 @@ GH --> API : create/list issues
 - `new ... --repo owner/repo` を追加し、`gh --repo ... issue create` で明示指定できるようにする
 - `link` コマンドを追加し、`iss-local-0001` を後から `iss-0123` に連携（または GitHub issue number を meta.json に追記）できるようにする
   - ただし ID/ディレクトリ名の変更が入るので、履歴/リンク/active の扱いは設計が必要
-

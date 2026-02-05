@@ -45,7 +45,7 @@
 - `.spec-dock/active/`（git 管理しない）  
   現在の initiative/epic/issue への固定入口（symlink 等） + `context-pack.md`
 - `.spec-dock/.work/`（git 管理しない）  
-  `current.json`（SSOT）/ `state.json`（集計）などの生成物
+  `current.json`（SSOT）/ `state.json`（index）/ `tree.json`（tree）などの生成物
 
 ## ドキュメント構成（どれを読めばいい？）
 
@@ -55,4 +55,3 @@
   GitHub 連携（`gh` 必須・対象リポジトリの決まり方・`--no-github`・ID ルール）
 - `sync.md`  
   `sync`（状態集計）の仕組み（ローカル集計 + 任意で GitHub enrich）
-

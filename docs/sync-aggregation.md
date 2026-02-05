@@ -28,6 +28,8 @@
 ### 出力（生成物 / git 管理しない）
 - `.spec-dock/.work/state.json`
   - 全ノードのフラットな索引 + 親子関係 + initiative/epic の進捗集計 + active（current）を含む
+- `.spec-dock/.work/tree.json`
+  - initiative→epic→issue のネスト表示（軽量。`state.json` の全情報は重複させない）
 
 ## 2. 集計の前提データ（meta.json の役割）
 
@@ -83,17 +85,18 @@
 - `open`: GitHub で OPEN と判定できた数
 - `unknown`: GitHub で状態が取れなかった数（`--github` なし/紐づけ無し/limit 漏れ等）
 
-### Step 4: state.json を生成して書き出す
-最後に `.spec-dock/.work/state.json` を生成します。
+### Step 4: state.json（index）と tree.json（tree）を生成して書き出す
+最後に `.spec-dock/.work/state.json`（index）と `.spec-dock/.work/tree.json`（tree）を生成します。
 
 含まれるもの:
 - `generated_at`: 生成時刻
 - `root`: ツリーのルート（`.spec-dock/initiatives`）
 - `active`: `.spec-dock/.work/current.json` があればその内容
-- `nodes`: 全ノードの辞書
+- `nodes`（state.json）: 全ノードの辞書
   - `children`: 子ノードIDの配列（親子参照を簡単にするため）
   - `progress`: initiative/epic にだけ付与
-  - `github`: issue に `github.issue_number` がある場合のみ。`--github` 時は enrich 追加
+  - `github`: `github.issue_number` がある場合のみ。`--github` 時は enrich 追加
+- `tree`（tree.json）: 人間向けに initiative→epic→issue のネストを保持したツリー表示（最小フィールド）
 
 ## 4. PlantUML（内部処理の流れ）
 
@@ -107,6 +110,7 @@ participant "runtime script\n(.spec-dock/scripts/spec-dock)" as Script
 participant "Local FS\n(.spec-dock/initiatives/**)" as FS
 participant "gh CLI" as GH
 database "state.json\n(.spec-dock/.work/state.json)" as State
+database "tree.json\n(.spec-dock/.work/tree.json)" as Tree
 
 User -> Script: sync [--github]
 
@@ -123,6 +127,7 @@ end
 
 Script -> Script: aggregate progress\n(epic/initiative)
 Script -> State: write state.json
+Script -> Tree: write tree.json
 deactivate Script
 
 @enduml
@@ -215,7 +220,7 @@ Epic 配下に issue が 3 つあるとして:
 `./.spec-dock/scripts/spec-dock link --issue iss-local-0001 --github-issue 123` のような
 「連携だけ行うコマンド」を追加するのが自然です（現状は未実装）。
 
-## 6. state.json の最小イメージ
+## 6. state.json（index）の最小イメージ
 
 ```json
 {
@@ -242,5 +247,34 @@ Epic 配下に issue が 3 つあるとして:
       "type": "issue"
     }
   }
+}
+```
+
+## 7. tree.json（tree）の最小イメージ
+
+```json
+{
+  "schema_version": 1,
+  "generated_at": "2026-02-05T12:34:56+09:00",
+  "root": ".spec-dock/initiatives",
+  "active": { "...": "..." },
+  "tree": [
+    {
+      "id": "init-0123",
+      "title": "Auth platform",
+      "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
+      "epics": [
+        {
+          "id": "epic-0124",
+          "title": "JWT auth",
+          "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
+          "issues": [
+            { "id": "iss-0125", "title": "Add refresh token", "github": { "issue_number": 123, "state": "OPEN" } },
+            { "id": "iss-local-0001", "title": "..." }
+          ]
+        }
+      ]
+    }
+  ]
 }
 ```

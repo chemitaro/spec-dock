@@ -42,7 +42,7 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
   - **生成物**: 現在取り組む initiative/epic/issue への固定入口（symlink 等）
   - `context-pack.md`: エージェントが最初に読む 1 枚（生成）
 - `.spec-dock/.work/`（gitignore）
-  - **生成物**: `current.json`（SSOT）/ `state.json`（集計）など
+  - **生成物**: `current.json`（SSOT）/ `state.json`（index）/ `tree.json`（tree）など
 - `.spec-dock/.gitignore`
   - `active/` と `.work/` を誤コミットしないための ignore
 
