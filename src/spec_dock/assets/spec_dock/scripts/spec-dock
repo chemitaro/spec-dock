@@ -1,4 +1,21 @@
 #!/usr/bin/env python3
+"""
+spec-dock runtime script (repo-local).
+
+This script is installed into a repository by `uvx spec-dock init/update` as:
+
+  `.spec-dock/scripts/spec-dock`
+
+It performs day-to-day operations without requiring `uvx` at runtime:
+- Create nodes: initiative / epic / issue / adr
+- Manage the active pointers (symlinks + context-pack)
+- Generate derived state (`.spec-dock/.work/state.json`)
+- Validate the spec tree structure
+
+Design goals:
+- Keep dependencies minimal (stdlib only).
+- Work offline by default (GitHub enrichment is optional via `gh`).
+"""
 from __future__ import annotations
 
 import argparse
@@ -25,6 +42,8 @@ _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)-(?P<num>[0-9]+)$")
 
 @dataclass(frozen=True)
 class _Node:
+    """In-memory representation of a spec node loaded from `meta.json`."""
+
     type: str
     id: str
     title: str
@@ -37,14 +56,17 @@ class _Node:
 
 
 def _now_iso() -> str:
+    """Return current local time in ISO-8601 (timezone-aware, seconds precision)."""
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _today() -> str:
+    """Return today's date as `YYYY-MM-DD`."""
     return datetime.now().date().isoformat()
 
 
 def _load_json(path: Path) -> Any:
+    """Read and parse JSON from `path` with user-friendly errors."""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
@@ -54,19 +76,29 @@ def _load_json(path: Path) -> Any:
 
 
 def _write_json(path: Path, data: Any) -> None:
+    """Write `data` as pretty-printed JSON into `path` (UTF-8)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _validate_lowercase(value: str, *, field: str) -> str:
+    """Ensure `value` is lowercase (macOS case-insensitive FS safety)."""
     if value != value.lower():
         raise RuntimeError(f"{field} must be lowercase: {value}")
     return value
 
 
 def _slugify(title: str) -> str:
+    """Convert an arbitrary title into a filesystem-safe slug (lowercase).
+
+    Notes:
+    - Keeps alnum and `-_.` and replaces other chars with `-`.
+    - Normalizes Unicode (NFKC) to reduce surprises across inputs.
+    - Avoids reserved names like `.` / `..` and empty output.
+    """
     s = unicodedata.normalize("NFKC", title).strip().lower()
 
+    # Normalize separators and whitespace early so later processing is simpler.
     s = re.sub(r"[\\/]+", "-", s)
     s = re.sub(r"\s+", "-", s)
 
@@ -89,6 +121,7 @@ def _slugify(title: str) -> str:
 
 
 def _parse_id(value: str) -> tuple[str, int]:
+    """Parse a node id like `init-0001` into (`prefix`, number)."""
     m = _ID_RE.match(value)
     if not m:
         raise RuntimeError(f"Invalid id: {value} (expected e.g. init-0001)")
@@ -96,10 +129,17 @@ def _parse_id(value: str) -> tuple[str, int]:
 
 
 def _format_id(prefix: str, num: int, *, width: int = 4) -> str:
+    """Format an id using a fixed width, e.g. `iss-0001`."""
     return f"{prefix}-{num:0{width}d}"
 
 
 def _find_specdock_dir() -> Path:
+    """Locate the `.spec-dock/` directory for the current repository.
+
+    Strategy:
+    1) Prefer the script location: `<repo>/.spec-dock/scripts/spec-dock`
+    2) Fallback to walking parents from the current working directory.
+    """
     # Prefer script location: <repo>/.spec-dock/scripts/spec-dock
     script_path = Path(__file__).resolve()
     candidate = script_path.parent.parent
@@ -108,6 +148,7 @@ def _find_specdock_dir() -> Path:
 
     # Fallback: search from cwd upwards.
     cur = Path.cwd().resolve()
+    # Keep a hard cap to avoid pathological loops if something goes wrong.
     for _ in range(50):
         sd = cur / _SPEC_DOCK_DIRNAME
         if sd.is_dir():
@@ -120,15 +161,18 @@ def _find_specdock_dir() -> Path:
 
 
 def _initiatives_root(specdock_dir: Path) -> Path:
+    """Return the spec tree root directory (`.spec-dock/initiatives/`)."""
     return specdock_dir / _INITIATIVES_DIRNAME
 
 
 def _next_id(specdock_dir: Path, prefix: str) -> str:
+    """Compute the next available id for a prefix by scanning existing nodes."""
     initiatives_root = _initiatives_root(specdock_dir)
     if not initiatives_root.exists():
         return _format_id(prefix, 1)
 
     max_num = 0
+    # Scan all meta.json (initiative/epic/issue) and compute max for the prefix.
     for meta_path in initiatives_root.rglob("meta.json"):
         try:
             meta = _load_json(meta_path)
@@ -143,6 +187,7 @@ def _next_id(specdock_dir: Path, prefix: str) -> str:
         max_num = max(max_num, int(m.group("num")))
 
     if prefix == "adr":
+        # ADRs are files, not nodes with meta.json. Scan filenames as a fallback.
         for adr_path in initiatives_root.rglob("adrs/adr-*.md"):
             m = re.search(r"\b(adr-[0-9]+)\b", adr_path.stem)
             if not m:
@@ -157,12 +202,14 @@ def _next_id(specdock_dir: Path, prefix: str) -> str:
 
 
 def _render_text(text: str, replacements: dict[str, str]) -> str:
+    """Apply simple placeholder replacements to text."""
     for k, v in replacements.items():
         text = text.replace(k, v)
     return text
 
 
 def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str, str]) -> None:
+    """Copy a template directory into `dest_dir` and apply text replacements."""
     if not src_dir.exists() or not src_dir.is_dir():
         raise RuntimeError(f"Missing template directory: {src_dir}")
     if dest_dir.exists():
@@ -179,12 +226,14 @@ def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str
         try:
             raw = src_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
+            # If the template is binary, just copy it as-is.
             shutil.copy2(src_path, dest_path)
             continue
         dest_path.write_text(_render_text(raw, replacements), encoding="utf-8")
 
 
 def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
+    """Scan `.spec-dock/initiatives/**/meta.json` into an id→node map."""
     initiatives_root = _initiatives_root(specdock_dir)
     nodes: dict[str, _Node] = {}
     if not initiatives_root.exists():
@@ -213,6 +262,7 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
             except (TypeError, ValueError) as e:
                 raise RuntimeError(f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}") from e
 
+        # Note: `path` points to the directory that contains this node's `meta.json`.
         nodes[node_id] = _Node(
             type=node_type,
             id=node_id,
@@ -239,6 +289,7 @@ def _write_meta(
     epic_id: str | None = None,
     github_issue_number: int | None = None,
 ) -> None:
+    """Create a minimal, durable `meta.json` for a node."""
     meta: dict[str, Any] = {
         "schema_version": 1,
         "type": node_type,
@@ -264,6 +315,7 @@ def _new_initiative(
     node_id: str | None,
     github_issue_number: int | None,
 ) -> None:
+    """Create a new initiative node under `.spec-dock/initiatives/`."""
     title = title.strip()
     if not title:
         raise RuntimeError("--title is required")
@@ -303,6 +355,7 @@ def _new_epic(
     node_id: str | None,
     github_issue_number: int | None,
 ) -> None:
+    """Create a new epic node under a given initiative."""
     initiative_id = _validate_lowercase(initiative_id.strip(), field="initiative")
     _parse_id(initiative_id)
 
@@ -359,6 +412,7 @@ def _new_issue(
     node_id: str | None,
     github_issue_number: int | None,
 ) -> None:
+    """Create a new issue node under a given epic."""
     epic_id = _validate_lowercase(epic_id.strip(), field="epic")
     _parse_id(epic_id)
 
@@ -421,6 +475,7 @@ def _new_adr(
     slug: str | None,
     node_id: str | None,
 ) -> None:
+    """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
     scope_id = _validate_lowercase(scope_id.strip(), field="scope")
     _parse_id(scope_id)
 
@@ -466,6 +521,7 @@ def _new_adr(
 
 
 def _unlink_any(path: Path) -> None:
+    """Delete a file/symlink/directory if it exists (best-effort)."""
     if path.is_symlink() or path.is_file():
         path.unlink(missing_ok=True)
         return
@@ -474,12 +530,22 @@ def _unlink_any(path: Path) -> None:
 
 
 def _write_pathfile(active_dir: Path, name: str, target: Path) -> None:
+    """Write a `.path` fallback file when symlinks are not available."""
     pathfile = active_dir / f"{name}.path"
     rel_target = os.path.relpath(target, start=active_dir)
     pathfile.write_text(rel_target + "\n", encoding="utf-8")
 
 
 def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
+    """Set the active issue and generate pointers + a context-pack.
+
+    Side effects:
+    - Writes SSOT: `.spec-dock/.work/current.json`
+    - Updates pointers: `.spec-dock/active/{initiative,epic,issue}`
+      - Uses symlinks when possible
+      - Falls back to `.path` files when symlinks are not supported
+    - Generates: `.spec-dock/active/context-pack.md`
+    """
     issue_id = _validate_lowercase(issue_id.strip(), field="issue")
     _parse_id(issue_id)
 
@@ -506,6 +572,7 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
     def rel(p: Path) -> str:
         return p.relative_to(repo_root).as_posix()
 
+    # SSOT manifest: other generated artifacts should be derivable from this.
     current = {
         "schema_version": 1,
         "updated_at": _now_iso(),
@@ -523,14 +590,17 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         link = active_dir / name
         rel_target = os.path.relpath(target, start=active_dir)
         try:
+            # Prefer symlinks: fixed entry points for both humans and agents.
             os.symlink(rel_target, link)
         except OSError:
+            # Fallback: keep it readable even in environments where symlinks are restricted.
             _write_pathfile(active_dir, name, target)
 
     symlink("initiative", initiative.path)
     symlink("epic", epic.path)
     symlink("issue", issue.path)
 
+    # Generated entrypoint for agents: a single file that tells what to read and run first.
     ctx = (
         "# Context Pack (generated)\n\n"
         "## Active\n"
@@ -552,6 +622,7 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
 
 
 def _active_show(specdock_dir: Path) -> None:
+    """Print the current active pointers from `.spec-dock/.work/current.json`."""
     current_path = specdock_dir / _WORK_DIRNAME / "current.json"
     if not current_path.exists():
         print("spec-dock: active: (not set)")
@@ -564,6 +635,7 @@ def _active_show(specdock_dir: Path) -> None:
 
 
 def _active_clear(specdock_dir: Path) -> None:
+    """Clear SSOT active manifest and remove generated pointers."""
     current_path = specdock_dir / _WORK_DIRNAME / "current.json"
     if current_path.exists():
         current_path.unlink()
@@ -574,11 +646,13 @@ def _active_clear(specdock_dir: Path) -> None:
 
 
 def _ensure_gh_available() -> None:
+    """Raise if GitHub CLI (`gh`) is not available in PATH."""
     if shutil.which("gh") is None:
         raise RuntimeError("'gh' CLI not found. Install GitHub CLI (gh) or run without '--github'.")
 
 
 def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]:
+    """Fetch GitHub issues via `gh` and index them by issue number."""
     _ensure_gh_available()
     cmd = [
         "gh",
@@ -598,6 +672,7 @@ def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]
 
     data = json.loads(p.stdout)
     index: dict[int, dict[str, Any]] = {}
+    # Normalize to {number: issue_json}.
     for item in data:
         try:
             number = int(item.get("number"))
@@ -608,6 +683,7 @@ def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]
 
 
 def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
+    """Generate `.spec-dock/.work/state.json` from the local tree (and optionally GitHub)."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
@@ -618,11 +694,13 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
     if github:
         issue_index = _gh_issue_index(repo_root, limit=gh_limit)
 
+    # Build a lightweight parent→children index so callers can traverse the tree.
     children: dict[str, list[str]] = {node_id: [] for node_id in nodes}
     for node in nodes.values():
         if node.parent_id and node.parent_id in children:
             children[node.parent_id].append(node.id)
 
+    # Progress is derived data: initiative/epic aggregate counts of their descendant issues.
     progress: dict[str, dict[str, int]] = {}
     for node in nodes.values():
         if node.type in ("initiative", "epic"):
@@ -632,6 +710,8 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
         if node.type != "issue":
             continue
 
+        # When GitHub enrichment is enabled, map GH state to done/open.
+        # Otherwise, keep the status as unknown (local-only mode).
         status = "unknown"
         if github and node.github_issue_number is not None:
             gh = issue_index.get(node.github_issue_number)
@@ -648,6 +728,7 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
     current_path = specdock_dir / _WORK_DIRNAME / "current.json"
     current = _load_json(current_path) if current_path.exists() else None
 
+    # Flatten nodes so tools/agents can query by id without traversing the FS again.
     out_nodes: dict[str, Any] = {}
     for node in nodes.values():
         item: dict[str, Any] = {
@@ -691,6 +772,7 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
 
 
 def _validate(specdock_dir: Path) -> None:
+    """Validate basic structural integrity of the tree based on `meta.json`."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found.")
@@ -727,6 +809,7 @@ def _validate(specdock_dir: Path) -> None:
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
+    """Parse CLI arguments for the repo-local runtime script."""
     parser = argparse.ArgumentParser(prog=".spec-dock/scripts/spec-dock")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -781,6 +864,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Entry point. Returns a process exit code (0=success)."""
     ns = _parse_args(sys.argv[1:] if argv is None else argv)
 
     try:
@@ -848,4 +932,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

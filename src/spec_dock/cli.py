@@ -1,3 +1,13 @@
+"""spec-dock installer CLI (uvx entrypoint).
+
+This module is intentionally minimal:
+- `spec-dock init` scaffolds `.spec-dock/` into a target repository
+- `spec-dock update` refreshes managed assets (docs/templates/scripts/skill)
+
+Day-to-day operations (creating nodes, switching active issue, syncing state, etc.)
+are handled by the repo-local runtime script installed at:
+  `.spec-dock/scripts/spec-dock`
+"""
 from __future__ import annotations
 
 import argparse
@@ -17,12 +27,14 @@ _MANAGED_DIRS = ("docs", "templates", "scripts")
 
 @contextmanager
 def _assets_dir() -> Iterator[Path]:
+    """Yield the package assets directory as a real filesystem path."""
     assets = files("spec_dock") / "assets"
     with as_file(assets) as p:
         yield Path(p)
 
 
 def _tool_version() -> str:
+    """Return the installed package version (fallback to pyproject in dev)."""
     if __version__ and __version__ != "0.0.0+unknown":
         return __version__
 
@@ -38,10 +50,12 @@ def _tool_version() -> str:
 
 
 def _specdock_dir(target_root: Path) -> Path:
+    """Return the `.spec-dock/` path under the target root."""
     return target_root / _SPEC_DOCK_DIRNAME
 
 
 def _require_specdock(target_root: Path) -> Path:
+    """Ensure `.spec-dock/` exists under `target_root` and return it."""
     specdock_dir = _specdock_dir(target_root)
     if not specdock_dir.exists():
         raise RuntimeError("'.spec-dock' not found. Run 'spec-dock init' first.")
@@ -49,17 +63,20 @@ def _require_specdock(target_root: Path) -> Path:
 
 
 def _copy_file(src: Path, dest: Path) -> None:
+    """Copy a file while creating parent directories."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
 
 
 def _sync_tree(src: Path, dest: Path) -> None:
+    """Replace `dest` directory with a full copy of `src`."""
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(src, dest)
 
 
 def _make_executable(path: Path) -> None:
+    """Best-effort: add executable bits to a file."""
     try:
         mode = path.stat().st_mode
         path.chmod(mode | 0o111)
@@ -69,6 +86,7 @@ def _make_executable(path: Path) -> None:
 
 
 def _install_spec_dock(target_root: Path, *, force: bool) -> None:
+    """Install/update `.spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
     if specdock_dir.exists() and not force:
         raise RuntimeError("'.spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
@@ -77,6 +95,9 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         src_spec_dock = assets_dir / "spec_dock"
         specdock_dir.mkdir(parents=True, exist_ok=True)
 
+        # Managed directories are owned by the installer and can be replaced on update.
+        # The actual spec tree (`.spec-dock/initiatives/**`) must be persistent and is
+        # never removed by this installer.
         for name in _MANAGED_DIRS:
             src = src_spec_dock / name
             dest = specdock_dir / name
@@ -102,6 +123,7 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
 
 
 def _install_skill(target_root: Path, *, force: bool) -> None:
+    """Install/update the bundled Codex skill into `.codex/skills/`."""
     with _assets_dir() as assets_dir:
         src_skill = assets_dir / "codex_skills" / "spec-driven-tdd-workflow" / "SKILL.md"
         if not src_skill.exists():
@@ -118,6 +140,7 @@ def _install_skill(target_root: Path, *, force: bool) -> None:
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
+    """Parse CLI arguments (installer commands only)."""
     parser = argparse.ArgumentParser(prog="spec-dock")
     parser.add_argument("--version", action="version", version=f"spec-dock {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -137,6 +160,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Installer entrypoint. Returns a process exit code (0=success)."""
     ns = _parse_args(sys.argv[1:] if argv is None else argv)
 
     target_root = Path(getattr(ns, "path", ".")).expanduser().resolve()
@@ -166,4 +190,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
