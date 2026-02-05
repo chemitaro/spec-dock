@@ -36,7 +36,7 @@
 
 重要なフィールド（概念）:
 
-- `id`: `init-0001`, `epic-0001`, `iss-0001` のような小文字 ID
+- `id`: `init-0123`（GitHub #123）/ `init-local-0001`（`--no-github`）のような小文字 ID
 - `type`: `initiative | epic | issue`
 - `parent_id`: 親ノード（epic→initiative / issue→epic）
 - `initiative_id`, `epic_id`: issue が所属する上位（集計に使用）
@@ -174,7 +174,7 @@ stop
 “OPEN/CLOSED” の二値で `open/done` を集計します（単純で壊れにくい代わりに情報は粗い）。
 
 ### 5.4 ローカルに issue はあるが、GitHub Issue を作成していない場合
-ローカルの issue ディレクトリ（例: `.../issues/iss-0007-.../`）が存在しても、
+ローカルの issue ディレクトリ（例: `.../issues/iss-local-0007-.../`）が存在しても、
 その `meta.json` に `github.issue_number` が無い場合は **GitHub 側と未連携**です。
 
 このときの挙動は以下です:
@@ -191,16 +191,16 @@ stop
 #### 例（progress の見え方）
 Epic 配下に issue が 3 つあるとして:
 
-- `iss-0001`（GitHub #101 に連携済み / OPEN）
-- `iss-0002`（GitHub 未作成 / 未連携）
-- `iss-0003`（GitHub #102 に連携済み / CLOSED）
+- `iss-0101`（GitHub #101 に連携済み / OPEN）
+- `iss-local-0001`（GitHub 未作成 / 未連携）
+- `iss-0102`（GitHub #102 に連携済み / CLOSED）
 
 `sync --github` の結果、epic の progress は概ねこうなります:
 
 - `total=3`
 - `open=1`
 - `done=1`
-- `unknown=1`（= 未連携の `iss-0002`）
+- `unknown=1`（= 未連携の `iss-local-0001`）
 
 ### 5.5 後から GitHub Issue を作った場合（どうやって反映されるか）
 後から GitHub Issue を作った場合、`meta.json` に `github.issue_number` を追加しない限り、
@@ -212,7 +212,7 @@ Epic 配下に issue が 3 つあるとして:
 - 先に GitHub issue を作って番号を確定し、ローカル issue を作る時点で `--github-issue` を渡す
 
 （補足）将来的に “手編集を減らす” なら、
-`./.spec-dock/scripts/spec-dock link --issue iss-0002 --github-issue 123` のような
+`./.spec-dock/scripts/spec-dock link --issue iss-local-0001 --github-issue 123` のような
 「連携だけ行うコマンド」を追加するのが自然です（現状は未実装）。
 
 ## 6. state.json の最小イメージ
@@ -224,21 +224,23 @@ Epic 配下に issue が 3 つあるとして:
   "root": ".spec-dock/initiatives",
   "active": { "...": "..." },
   "nodes": {
-    "init-0001": {
+    "init-0123": {
       "type": "initiative",
-      "children": ["epic-0001"],
-      "progress": { "total": 10, "done": 3, "open": 6, "unknown": 1 }
+      "children": ["epic-0124"],
+      "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 }
     },
-    "epic-0001": {
+    "epic-0124": {
       "type": "epic",
-      "children": ["iss-0001", "iss-0002"],
-      "progress": { "total": 2, "done": 1, "open": 1, "unknown": 0 }
+      "children": ["iss-0125", "iss-local-0001"],
+      "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 }
     },
-    "iss-0001": {
+    "iss-0125": {
       "type": "issue",
       "github": { "issue_number": 123, "state": "OPEN", "labels": ["bug"] }
+    },
+    "iss-local-0001": {
+      "type": "issue"
     }
   }
 }
 ```
-

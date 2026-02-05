@@ -27,7 +27,7 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
   - 導入/更新した spec-dock のバージョン（1行）
 - `.spec-dock/initiatives/`
   - **仕様ツリー本体**（常置。ファイル移動で状態を表現しない）
-  - 例: `initiatives/init-0001-.../epics/epic-0001-.../issues/iss-0001-.../`
+  - 例: `initiatives/init-0123-.../epics/epic-0124-.../issues/iss-0125-.../`（GitHub） / `initiatives/init-local-0001-.../`（--no-github）
 - `.spec-dock/templates/`
   - `./.spec-dock/scripts/spec-dock new ...` が参照するテンプレート群（initiative/epic/issue/adr）
 - `.spec-dock/active/`（gitignore）

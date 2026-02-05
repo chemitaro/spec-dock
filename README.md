@@ -63,10 +63,19 @@ After `init`, day-to-day operations are done via the runtime script installed in
 `./.spec-dock/scripts/spec-dock`.
 
 ```bash
-# Create nodes (all-lowercase ids; e.g. init-0001, epic-0001, iss-0001)
-./.spec-dock/scripts/spec-dock new initiative --title "Auth platform"
-./.spec-dock/scripts/spec-dock new epic --initiative 0001 --title "JWT auth"   # also accepts init-0001
-./.spec-dock/scripts/spec-dock new issue --epic 0001 --title "Add refresh token" --github-issue 123  # also accepts epic-0001
+# Create nodes (default: create GitHub issues; ids follow GitHub issue numbers)
+# Requires: GitHub CLI `gh` and a GitHub repository.
+./.spec-dock/scripts/spec-dock new initiative --title "Auth platform"          # creates GH issue, id=init-0123
+./.spec-dock/scripts/spec-dock new epic --initiative 123 --title "JWT auth"    # creates GH issue, id=epic-0124
+./.spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token"  # creates GH issue, id=iss-0125
+
+# Local-only (no GitHub): ids are created under the collision-proof `*-local-*` namespace.
+./.spec-dock/scripts/spec-dock new initiative --no-github --title "Auth platform"          # id=init-local-0001
+./.spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "JWT auth"      # id=epic-local-0001
+./.spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"  # id=iss-local-0001
+
+# Or: link to an existing GitHub issue number (without creating a new one)
+./.spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-0123
 ./.spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
 
 # Set active issue pointers (symlinks) and generate context-pack

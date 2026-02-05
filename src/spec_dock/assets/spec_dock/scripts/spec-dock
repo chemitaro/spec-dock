@@ -14,7 +14,8 @@ It performs day-to-day operations without requiring `uvx` at runtime:
 
 Design goals:
 - Keep dependencies minimal (stdlib only).
-- Work offline by default (GitHub enrichment is optional via `gh`).
+- Use GitHub issues by default for `new` (requires `gh`); opt out with `--no-github`.
+- Keep `sync --github` optional (GitHub state enrichment only when requested).
 """
 from __future__ import annotations
 
@@ -37,8 +38,9 @@ _INITIATIVES_DIRNAME = "initiatives"
 _ACTIVE_DIRNAME = "active"
 _WORK_DIRNAME = ".work"
 
-_ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)-(?P<num>[0-9]+)$")
+_ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<num>[0-9]+)$")
 _NUM_RE = re.compile(r"^[0-9]+$")
+_GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,7 @@ def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
 
     Accepted inputs:
     - Canonical form: `init-0001`, `epic-0001`, `iss-0001`, `adr-0001`
+    - Local form: `init-local-0001`, `epic-local-0001`, `iss-local-0001`
     - Shorthand numeric: `1` or `0001` (prefix is inferred from the argument context)
 
     This lets callers type less while keeping the on-disk ids consistent and lowercase.
@@ -106,12 +109,74 @@ def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
     raw = raw.lower()
 
     if _NUM_RE.fullmatch(raw):
-        return _format_id(prefix, int(raw))
+        return _format_id(prefix, int(raw), local=False)
 
-    parsed_prefix, num = _parse_id(raw)
+    parsed_prefix, is_local, num = _parse_id(raw)
     if parsed_prefix != prefix:
         raise RuntimeError(f"{field} must be '{prefix}-NNNN' or 'NNNN': {value}")
-    return _format_id(prefix, num)
+    return _format_id(prefix, num, local=is_local)
+
+
+def _normalize_local_id_input(value: str, *, prefix: str, field: str) -> str:
+    """Normalize an id into the canonical local form: `<prefix>-local-NNNN`.
+
+    This is used for `--no-github` mode to avoid collisions with GitHub issue numbers.
+
+    Accepted inputs:
+    - Local canonical: `iss-local-0001`
+    - Shorthand numeric: `1` or `0001` (interpreted as local)
+    """
+    raw = value.strip()
+    if not raw:
+        raise RuntimeError(f"{field} is required")
+
+    raw = raw.lower()
+    if _NUM_RE.fullmatch(raw):
+        return _format_id(prefix, int(raw), local=True)
+
+    parsed_prefix, is_local, num = _parse_id(raw)
+    if parsed_prefix != prefix:
+        raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' or 'NNNN' when using --no-github: {value}")
+    if not is_local:
+        raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' (not '{prefix}-NNNN') when using --no-github: {value}")
+    return _format_id(prefix, num, local=True)
+
+
+def _resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, "_Node"] | None = None) -> str:
+    """Resolve an id argument that may be numeric shorthand.
+
+    Behavior:
+    - If `value` is numeric, return:
+      - `<prefix>-NNNN` when it exists (preferred) or when nothing exists yet.
+      - `<prefix>-local-NNNN` when only the local variant exists.
+      - error when both exist (ambiguous).
+    - If `value` is already an id, normalize it to the canonical form (lowercase, padded).
+    """
+    raw = value.strip()
+    if not raw:
+        raise RuntimeError(f"{field} is required")
+
+    raw = raw.lower()
+    if _NUM_RE.fullmatch(raw):
+        num = int(raw)
+        normal = _format_id(prefix, num, local=False)
+        local_id = _format_id(prefix, num, local=True)
+        if nodes is None:
+            return normal
+        has_normal = normal in nodes
+        has_local = local_id in nodes
+        if has_normal and not has_local:
+            return normal
+        if has_local and not has_normal:
+            return local_id
+        if has_local and has_normal:
+            raise RuntimeError(f"{field} is ambiguous: both '{normal}' and '{local_id}' exist; specify the full id")
+        return normal
+
+    parsed_prefix, is_local, num = _parse_id(raw)
+    if parsed_prefix != prefix:
+        raise RuntimeError(f"{field} must be '{prefix}-NNNN' / '{prefix}-local-NNNN' or 'NNNN': {value}")
+    return _format_id(prefix, num, local=is_local)
 
 
 def _slugify(title: str) -> str:
@@ -146,17 +211,18 @@ def _slugify(title: str) -> str:
     return s
 
 
-def _parse_id(value: str) -> tuple[str, int]:
-    """Parse a node id like `init-0001` into (`prefix`, number)."""
+def _parse_id(value: str) -> tuple[str, bool, int]:
+    """Parse a node id like `init-0001` into (`prefix`, is_local, number)."""
     m = _ID_RE.match(value)
     if not m:
-        raise RuntimeError(f"Invalid id: {value} (expected e.g. init-0001)")
-    return (m.group("prefix"), int(m.group("num")))
+        raise RuntimeError(f"Invalid id: {value} (expected e.g. init-0001 or init-local-0001)")
+    return (m.group("prefix"), m.group("local") is not None, int(m.group("num")))
 
 
-def _format_id(prefix: str, num: int, *, width: int = 4) -> str:
-    """Format an id using a fixed width, e.g. `iss-0001`."""
-    return f"{prefix}-{num:0{width}d}"
+def _format_id(prefix: str, num: int, *, width: int = 4, local: bool = False) -> str:
+    """Format an id using a fixed width, e.g. `iss-0001` or `iss-local-0001`."""
+    marker = "-local" if local else ""
+    return f"{prefix}{marker}-{num:0{width}d}"
 
 
 def _find_specdock_dir() -> Path:
@@ -191,11 +257,16 @@ def _initiatives_root(specdock_dir: Path) -> Path:
     return specdock_dir / _INITIATIVES_DIRNAME
 
 
-def _next_id(specdock_dir: Path, prefix: str) -> str:
-    """Compute the next available id for a prefix by scanning existing nodes."""
+def _next_id(specdock_dir: Path, prefix: str, *, local: bool = False) -> str:
+    """Compute the next available id for a prefix by scanning existing nodes.
+
+    Notes:
+    - When `local=True`, only ids in the `*-local-*` namespace are considered.
+    - When `local=False`, only ids without `-local-` are considered.
+    """
     initiatives_root = _initiatives_root(specdock_dir)
     if not initiatives_root.exists():
-        return _format_id(prefix, 1)
+        return _format_id(prefix, 1, local=local)
 
     max_num = 0
     # Scan all meta.json (initiative/epic/issue) and compute max for the prefix.
@@ -205,26 +276,31 @@ def _next_id(specdock_dir: Path, prefix: str) -> str:
         except RuntimeError:
             continue
         node_id = str(meta.get("id", ""))
-        m = _ID_RE.match(node_id)
-        if not m:
+        try:
+            parsed_prefix, is_local, num = _parse_id(node_id)
+        except RuntimeError:
             continue
-        if m.group("prefix") != prefix:
+        if parsed_prefix != prefix:
             continue
-        max_num = max(max_num, int(m.group("num")))
+        if is_local != local:
+            continue
+        max_num = max(max_num, num)
 
     if prefix == "adr":
         # ADRs are files, not nodes with meta.json. Scan filenames as a fallback.
         for adr_path in initiatives_root.rglob("adrs/adr-*.md"):
-            m = re.search(r"\b(adr-[0-9]+)\b", adr_path.stem)
+            m = re.search(r"\b(adr(?:-local)?-[0-9]+)\b", adr_path.stem)
             if not m:
                 continue
             try:
-                _, num = _parse_id(m.group(1))
+                _, is_local, num = _parse_id(m.group(1))
             except RuntimeError:
+                continue
+            if is_local != local:
                 continue
             max_num = max(max_num, num)
 
-    return _format_id(prefix, max_num + 1)
+    return _format_id(prefix, max_num + 1, local=local)
 
 
 def _render_text(text: str, replacements: dict[str, str]) -> str:
@@ -340,16 +416,33 @@ def _new_initiative(
     slug: str | None,
     node_id: str | None,
     github_issue_number: int | None,
+    no_github: bool,
 ) -> None:
     """Create a new initiative node under `.spec-dock/initiatives/`."""
     title = title.strip()
     if not title:
         raise RuntimeError("--title is required")
 
-    if node_id is None:
-        node_id = _next_id(specdock_dir, "init")
+    if not no_github:
+        # Default: require GitHub and derive id from the GitHub issue number.
+        if node_id is not None:
+            raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is None:
+            repo_root = specdock_dir.parent
+            github_issue_number = _gh_issue_create(
+                repo_root,
+                title=title,
+                body="Created by spec-dock.\n\nType: initiative\nLocal specs are stored under `.spec-dock/initiatives/`.\n",
+            )
+        node_id = _format_id("init", int(github_issue_number), local=False)
     else:
-        node_id = _normalize_id_input(str(node_id), prefix="init", field="id")
+        # Local-only mode: avoid collisions with GitHub issue numbers.
+        if github_issue_number is not None:
+            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
+        if node_id is None:
+            node_id = _next_id(specdock_dir, "init", local=True)
+        else:
+            node_id = _normalize_local_id_input(str(node_id), prefix="init", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -380,11 +473,11 @@ def _new_epic(
     slug: str | None,
     node_id: str | None,
     github_issue_number: int | None,
+    no_github: bool,
 ) -> None:
     """Create a new epic node under a given initiative."""
-    initiative_id = _normalize_id_input(initiative_id, prefix="init", field="initiative")
-
     nodes = _scan_nodes(specdock_dir)
+    initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
     initiative = nodes.get(initiative_id)
     if not initiative or initiative.type != "initiative":
         raise RuntimeError(f"Initiative not found: {initiative_id}")
@@ -393,10 +486,29 @@ def _new_epic(
     if not title:
         raise RuntimeError("--title is required")
 
-    if node_id is None:
-        node_id = _next_id(specdock_dir, "epic")
+    if not no_github:
+        if node_id is not None:
+            raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is None:
+            repo_root = specdock_dir.parent
+            github_issue_number = _gh_issue_create(
+                repo_root,
+                title=title,
+                body=(
+                    "Created by spec-dock.\n\n"
+                    "Type: epic\n"
+                    f"Initiative: {initiative.id}\n\n"
+                    "Local specs are stored under `.spec-dock/initiatives/`.\n"
+                ),
+            )
+        node_id = _format_id("epic", int(github_issue_number), local=False)
     else:
-        node_id = _normalize_id_input(str(node_id), prefix="epic", field="id")
+        if github_issue_number is not None:
+            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
+        if node_id is None:
+            node_id = _next_id(specdock_dir, "epic", local=True)
+        else:
+            node_id = _normalize_local_id_input(str(node_id), prefix="epic", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -436,11 +548,11 @@ def _new_issue(
     slug: str | None,
     node_id: str | None,
     github_issue_number: int | None,
+    no_github: bool,
 ) -> None:
     """Create a new issue node under a given epic."""
-    epic_id = _normalize_id_input(epic_id, prefix="epic", field="epic")
-
     nodes = _scan_nodes(specdock_dir)
+    epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
     epic = nodes.get(epic_id)
     if not epic or epic.type != "epic":
         raise RuntimeError(f"Epic not found: {epic_id}")
@@ -451,13 +563,31 @@ def _new_issue(
     if not title:
         raise RuntimeError("--title is required")
 
-    if node_id is None:
-        if github_issue_number is not None:
-            node_id = f"iss-{github_issue_number:04d}" if github_issue_number < 10000 else f"iss-{github_issue_number}"
-        else:
-            node_id = _next_id(specdock_dir, "iss")
+    if not no_github:
+        # Default: require GitHub and derive id from the GitHub issue number.
+        if node_id is not None:
+            raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is None:
+            repo_root = specdock_dir.parent
+            github_issue_number = _gh_issue_create(
+                repo_root,
+                title=title,
+                body=(
+                    "Created by spec-dock.\n\n"
+                    "Type: issue\n"
+                    f"Epic: {epic.id}\n"
+                    f"Initiative: {epic.initiative_id}\n\n"
+                    "Local specs are stored under `.spec-dock/initiatives/`.\n"
+                ),
+            )
+        node_id = _format_id("iss", int(github_issue_number), local=False)
     else:
-        node_id = _normalize_id_input(str(node_id), prefix="iss", field="id")
+        if github_issue_number is not None:
+            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
+        if node_id is None:
+            node_id = _next_id(specdock_dir, "iss", local=True)
+        else:
+            node_id = _normalize_local_id_input(str(node_id), prefix="iss", field="id")
 
     if slug is None:
         slug = _slugify(title)
@@ -501,9 +631,8 @@ def _new_adr(
     scope_prefix: str,
 ) -> None:
     """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
-    scope_id = _normalize_id_input(scope_id, prefix=scope_prefix, field="scope")
-
     nodes = _scan_nodes(specdock_dir)
+    scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)
     scope = nodes.get(scope_id)
     if not scope:
         raise RuntimeError(f"Scope node not found: {scope_id}")
@@ -570,9 +699,8 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
       - Falls back to `.path` files when symlinks are not supported
     - Generates: `.spec-dock/active/context-pack.md`
     """
-    issue_id = _normalize_id_input(issue_id, prefix="iss", field="issue")
-
     nodes = _scan_nodes(specdock_dir)
+    issue_id = _resolve_id_input(issue_id, prefix="iss", field="issue", nodes=nodes)
     issue = nodes.get(issue_id)
     if not issue or issue.type != "issue":
         raise RuntimeError(f"Issue not found: {issue_id}")
@@ -671,7 +799,9 @@ def _active_clear(specdock_dir: Path) -> None:
 def _ensure_gh_available() -> None:
     """Raise if GitHub CLI (`gh`) is not available in PATH."""
     if shutil.which("gh") is None:
-        raise RuntimeError("'gh' CLI not found. Install GitHub CLI (gh) or run without '--github'.")
+        raise RuntimeError(
+            "'gh' CLI not found. Install GitHub CLI (gh), or use '--no-github' for 'new', or omit '--github' for 'sync'."
+        )
 
 
 def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]:
@@ -703,6 +833,27 @@ def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]
             continue
         index[number] = item
     return index
+
+
+def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
+    """Create a GitHub issue via `gh` and return its issue number.
+
+    Notes:
+    - This function is intentionally non-interactive; it always supplies `--title` and `--body`.
+    - `gh issue create` prints the created issue URL on success; we parse the number from it.
+    """
+    _ensure_gh_available()
+    cmd = ["gh", "issue", "create", "--title", title, "--body", body]
+    try:
+        p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+
+    out = f"{(p.stdout or '').strip()}\n{(p.stderr or '').strip()}".strip()
+    m = _GH_ISSUE_URL_RE.search(out)
+    if not m:
+        raise RuntimeError(f"Failed to parse issue number from gh output:\n{out}")
+    return int(m.group("num"))
 
 
 def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
@@ -843,27 +994,33 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_new_init.add_argument("--title", required=True)
     p_new_init.add_argument("--slug")
     p_new_init.add_argument("--id")
-    p_new_init.add_argument("--github-issue", type=int)
+    gh_init = p_new_init.add_mutually_exclusive_group()
+    gh_init.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes init-NNNN)")
+    gh_init.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes init-local-NNNN)")
 
     p_new_epic = new_sub.add_parser("epic", help="Create a new epic under an initiative")
-    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. init-0001 or 0001)")
+    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. 123 / init-0123 / init-local-0001)")
     p_new_epic.add_argument("--title", required=True)
     p_new_epic.add_argument("--slug")
     p_new_epic.add_argument("--id")
-    p_new_epic.add_argument("--github-issue", type=int)
+    gh_epic = p_new_epic.add_mutually_exclusive_group()
+    gh_epic.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes epic-NNNN)")
+    gh_epic.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes epic-local-NNNN)")
 
     p_new_issue = new_sub.add_parser("issue", help="Create a new issue under an epic")
-    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. epic-0001 or 0001)")
+    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. 123 / epic-0123 / epic-local-0001)")
     p_new_issue.add_argument("--title", required=True)
     p_new_issue.add_argument("--slug")
     p_new_issue.add_argument("--id")
-    p_new_issue.add_argument("--github-issue", type=int)
+    gh_issue = p_new_issue.add_mutually_exclusive_group()
+    gh_issue.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes iss-NNNN)")
+    gh_issue.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes iss-local-NNNN)")
 
     p_new_adr = new_sub.add_parser("adr", help="Create a new ADR under a scope (initiative/epic/issue)")
     scope = p_new_adr.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--initiative", help="Scope initiative (e.g. init-0001 or 0001)")
-    scope.add_argument("--epic", help="Scope epic (e.g. epic-0001 or 0001)")
-    scope.add_argument("--issue", help="Scope issue (e.g. iss-0001 or 0001)")
+    scope.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-0123 / init-local-0001)")
+    scope.add_argument("--epic", help="Scope epic (e.g. 123 / epic-0123 / epic-local-0001)")
+    scope.add_argument("--issue", help="Scope issue (e.g. 123 / iss-0123 / iss-local-0001)")
     p_new_adr.add_argument("--title", required=True)
     p_new_adr.add_argument("--slug")
     p_new_adr.add_argument("--id")
@@ -872,7 +1029,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
 
     p_active_set = active_sub.add_parser("set", help="Set the active issue")
-    p_active_set.add_argument("--issue", required=True, help="Issue (e.g. iss-0001 or 0001)")
+    p_active_set.add_argument("--issue", required=True, help="Issue (e.g. 123 / iss-0123 / iss-local-0001)")
 
     active_sub.add_parser("show", help="Show current active pointers")
     active_sub.add_parser("clear", help="Clear active pointers")
@@ -901,6 +1058,7 @@ def main(argv: list[str] | None = None) -> int:
                     slug=getattr(ns, "slug", None),
                     node_id=getattr(ns, "id", None),
                     github_issue_number=getattr(ns, "github_issue", None),
+                    no_github=bool(getattr(ns, "no_github", False)),
                 )
             elif ns.new_kind == "epic":
                 _new_epic(
@@ -910,6 +1068,7 @@ def main(argv: list[str] | None = None) -> int:
                     slug=getattr(ns, "slug", None),
                     node_id=getattr(ns, "id", None),
                     github_issue_number=getattr(ns, "github_issue", None),
+                    no_github=bool(getattr(ns, "no_github", False)),
                 )
             elif ns.new_kind == "issue":
                 _new_issue(
@@ -919,6 +1078,7 @@ def main(argv: list[str] | None = None) -> int:
                     slug=getattr(ns, "slug", None),
                     node_id=getattr(ns, "id", None),
                     github_issue_number=getattr(ns, "github_issue", None),
+                    no_github=bool(getattr(ns, "no_github", False)),
                 )
             elif ns.new_kind == "adr":
                 # The scope flag determines the prefix, so we can accept shorthand numeric ids.
