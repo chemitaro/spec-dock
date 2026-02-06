@@ -16,4 +16,3 @@
 - 親Epic: `<EPIC_ID>`
 - 親Initiative: `<INIT_ID>`
 - GitHub: `<GITHUB_ISSUE_NUMBER_OR_URL>`
-

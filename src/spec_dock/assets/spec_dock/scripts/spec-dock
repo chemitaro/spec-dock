@@ -602,8 +602,14 @@ def _new_issue(
     replacements = {
         "<ISS_ID>": node_id,
         "<ISS_TITLE>": title,
+        # Compatibility: some user-custom templates may use feature-style placeholders.
+        "<FEATURE_ID>": node_id,
+        "<FEATURE_NAME>": title,
         "<EPIC_ID>": epic.id,
         "<INIT_ID>": epic.initiative_id,
+        # Compatibility: some templates may use a generic issue link placeholder.
+        "<ISSUE_NUMBER_OR_URL>": f"#{github_issue_number}" if github_issue_number else "",
+        # Backward-compatible placeholder name (kept so older templates still render).
         "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{github_issue_number}" if github_issue_number else "",
         "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
         "YYYY-MM-DD": _today(),

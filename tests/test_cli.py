@@ -96,6 +96,22 @@ class TestCli(unittest.TestCase):
             self.assertEqual(list(templates_dir.rglob("current")), [])
             self.assertEqual(list(templates_dir.rglob("completed")), [])
 
+            # Issue templates should be sufficiently detailed (regression guard).
+            issue_templates_dir = templates_dir / "issue"
+            req_text = (issue_templates_dir / "requirement.md").read_text(encoding="utf-8")
+            self.assertIn("## 対象ユーザー / 利用シナリオ", req_text)
+            self.assertIn("## 用語（ドメイン語彙）", req_text)
+
+            design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
+            self.assertIn("## UML図（PlantUML）", design_text)
+
+            plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
+            self.assertIn("#### update_plan（着手時に登録）", plan_text)
+            self.assertIn("./.spec-dock/active/issue/report.md", plan_text)
+
+            report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
+            self.assertIn("## 遭遇した問題と解決", report_text)
+
             self.assertTrue(
                 (
                     target
@@ -192,6 +208,12 @@ class TestCli(unittest.TestCase):
             self.assertTrue((issue_dir / "design.md").is_file())
             self.assertTrue((issue_dir / "plan.md").is_file())
             self.assertTrue((issue_dir / "report.md").is_file())
+
+            # Placeholders should be rendered in generated files.
+            requirement = (issue_dir / "requirement.md").read_text(encoding="utf-8")
+            self.assertNotIn("<ISS_ID>", requirement)
+            self.assertNotIn("<ISS_TITLE>", requirement)
+            self.assertIn("iss-local-0001", requirement)
 
             # Active issue id also accepts shorthand numeric form.
             self._run_runtime(target, ["active", "set", "--issue", "1"])
