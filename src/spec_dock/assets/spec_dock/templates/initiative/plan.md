@@ -33,6 +33,13 @@ ID: "<INIT_ID>"
 - 並行できるもの / できないもの:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## 計測計画（Metrics plan） (必須)
 - 計測開始（いつから）:
   - ...

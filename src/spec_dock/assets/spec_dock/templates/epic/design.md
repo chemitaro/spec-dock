@@ -20,6 +20,13 @@ ID: "<EPIC_ID>"
 - 影響範囲（FE/BE/DB/ジョブ/外部連携）:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## 契約（API/イベント/データ境界） (必須)
 ### API（ある場合）
 - API-001: `<METHOD> <PATH>`
@@ -55,6 +62,13 @@ ID: "<EPIC_ID>"
 - バリデーション/不変条件（Invariant）:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## 主要フロー（高レベル） (必須)
 - Flow A（E-AC-001）:
   1) ...
@@ -62,6 +76,13 @@ ID: "<EPIC_ID>"
   3) ...
 - Flow B（E-AC-002）:
   - ...
+
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
 
 ## 失敗設計（Error handling / Retry / Idempotency） (必須)
 - 想定故障モード:
@@ -125,20 +146,6 @@ ID: "<EPIC_ID>"
     - ...
   - 影響範囲:
     - API / EVT / データモデル / 移行 / 観測性 / テスト / ...
-
-## UML図（必要なら） (任意)
-```plantuml
-@startuml
-actor User
-component "Client" as Client
-component "Service" as Service
-database "DB" as DB
-
-User --> Client
-Client --> Service
-Service --> DB
-@enduml
-```
 
 ## 省略/例外メモ (必須)
 - 該当なし

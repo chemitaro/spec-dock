@@ -22,10 +22,17 @@ ID: "<INIT_ID>"
   - ...
 
 ## 目指す姿（To-Be） (必須)
-- To-Be 概要（文章でOK。図は必要なら UML セクションに）:
+- To-Be 概要（文章でOK。図は必要なら各セクション内の UML 小項目に）:
   - ...
 - 境界（モジュール/責務/データ境界の方針）:
   - ...
+
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
 
 ## システム境界 / 依存（Context） (必須)
 - 対象範囲（in scope のシステム/モジュール）:
@@ -34,6 +41,13 @@ ID: "<INIT_ID>"
   - ...
 - 互換性の方針（後方互換/段階移行/破壊的変更の扱い）:
   - ...
+
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
 
 ## ガードレール（Must-follow constraints） (必須)
 - 互換性（API/データ）:
@@ -95,20 +109,6 @@ ID: "<INIT_ID>"
     - ...
   - 影響範囲:
     - ガードレール / 互換性 / 移行 / 観測性 / ...
-
-## UML図（必要なら） (任意)
-```plantuml
-@startuml
-actor User
-component "Client" as Client
-component "Service" as Service
-database "DB" as DB
-
-User --> Client
-Client --> Service
-Service --> DB
-@enduml
-```
 
 ## 省略/例外メモ (必須)
 - 該当なし

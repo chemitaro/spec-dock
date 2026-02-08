@@ -103,7 +103,9 @@ class TestCli(unittest.TestCase):
             self.assertIn("## 用語（ドメイン語彙）", req_text)
 
             design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
-            self.assertIn("## UML図（PlantUML）", design_text)
+            # UML is embedded as small subsections (not a single block at the end).
+            self.assertIn("```plantuml", design_text)
+            self.assertIn("### UML（", design_text)
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             self.assertIn("#### update_plan（着手時に登録）", plan_text)

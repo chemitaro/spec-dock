@@ -28,6 +28,13 @@ ID: "<INIT_ID>"
 - 情報源（ヒアリング/ログ/コード/ドキュメント等の根拠）:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## 成功指標（Success metrics） (必須)
 - Metric 1:
   - Baseline（現状値）:

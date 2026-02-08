@@ -44,11 +44,25 @@ ID: "<ISS_ID>"
   2) ...
   3) ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## データ・バリデーション（必要最小限） (任意)
 - MODEL-001: <Entity/DTO/Table名>
   - Fields: ...
   - Constraints/Validation: ...
 - ...
+
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: ...
@@ -70,6 +84,13 @@ ID: "<ISS_ID>"
   - Output: ...
   - Errors/Exceptions: ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ### クラス/インターフェース詳細設計（主要なもの） (任意)
 > この Issue を “単独の作業単位” として完結させるために、必要な範囲だけ詳細化する。
 
@@ -87,6 +108,13 @@ ID: "<ISS_ID>"
     - ...
   - 実装候補:
     - `<ImplClass>`
+
+#### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
 
 ### 例外/エラー契約（重要なものだけ） (任意)
 - ERR-001: <エラー名/コード>
@@ -174,117 +202,6 @@ ID: "<ISS_ID>"
 │       ├── <path/to/obsolete_file>   # Delete
 │       ├── <from>                    # Move/Rename (from)
 │       └── <to>                      # Move/Rename (to)
-```
-
-## UML図（PlantUML） (任意)
-### コンポーネント図（境界/責務/依存の俯瞰）
-```plantuml
-@startuml
-actor User
-component "Web UI" as FE
-component "Backend API" as API
-database "DB" as DB
-cloud "External" as Ext
-
-User --> FE
-FE --> API : HTTP
-API --> DB : SQL
-API --> Ext : call
-@enduml
-```
-
-### シーケンス図（時系列・IFのやり取り）
-```plantuml
-@startuml
-actor User
-participant "Web UI" as FE
-participant "Backend API" as API
-database "DB" as DB
-
-User -> FE : 操作
-FE -> API : POST /...
-API -> DB : write
-API --> FE : 200 OK
-@enduml
-```
-
-### クラス図（主要ドメイン概念・責務）
-```plantuml
-@startuml
-class AggregateRoot
-class Entity
-class ValueObject
-AggregateRoot "1" o-- "*" Entity : contains
-AggregateRoot "1" o-- "*" ValueObject : owns
-@enduml
-```
-
-### アクティビティ図（主要フロー）
-```plantuml
-@startuml
-start
-:入力検証;
-if (OK?) then (yes)
-  :ユースケース実行;
-  :永続化/外部連携;
-  :成功応答;
-  stop
-else (no)
-  :エラー応答;
-  stop
-endif
-@enduml
-```
-
-### 状態マシン図（状態を持つドメインがある場合）
-```plantuml
-@startuml
-[*] --> Draft
-Draft --> Active : 確定
-Active --> Archived : 完了
-Archived --> [*]
-@enduml
-```
-
-### 配置図（デプロイ/ノード構成）
-```plantuml
-@startuml
-node "Client" as Client
-node "App Server" as App
-database "DB" as DB
-
-Client --> App
-App --> DB
-@enduml
-```
-
-### ユースケース図（機能境界とアクター）
-```plantuml
-@startuml
-left to right direction
-actor User
-rectangle System {
-  usecase "機能A" as UC1
-  usecase "機能B" as UC2
-}
-User --> UC1
-User --> UC2
-@enduml
-```
-
-### ER図（テーブル関係）
-```plantuml
-@startuml
-entity Tenant {
-  * id : uuid <<PK>>
-}
-entity LeaseContract {
-  * id : uuid <<PK>>
-  --
-  tenant_id : uuid <<FK>>
-}
-Tenant ||--o{ LeaseContract
-@enduml
 ```
 
 ## 省略/例外メモ (必須)

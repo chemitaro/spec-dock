@@ -23,6 +23,13 @@ ID: "<EPIC_ID>"
 - 例外/運用シナリオ:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## 要求（Epic-level requirements） (必須)
 > “Issueに分割して実装される前提の、E2E要求” を列挙する。
 

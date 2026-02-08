@@ -33,6 +33,13 @@ ID: "<EPIC_ID>"
 - iss-xxxx-...:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## 品質ゲート（Epic） (必須)
 - [ ] 各 Issue が AC/EC を満たす自動テストを持つ（例外は理由がある）
 - [ ] Epic の統合観点（E-AC）が確認できる（自動/半自動/手順のいずれか）
