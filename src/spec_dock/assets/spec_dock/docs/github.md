@@ -20,7 +20,7 @@ gh issue create --title "<title>" --body "<body>"
 - `--title` と `--body` を必ず渡す（非対話）
 - `cwd` は導入先リポジトリ root
 - `gh` の出力に含まれる URL から `/issues/<num>` を抽出し、`<num>` を ID に使用
-  - 例: GitHub #123 → `iss-0123` / `epic-0123` / `init-0123`
+  - 例: GitHub #123 → `iss-00123` / `epic-00123` / `init-00123`
 
 ### 1.2 既存 Issue への紐づけ（作成しない）
 
@@ -49,7 +49,7 @@ gh issue checkout 123
 - 仕様ツリー内に `github.issue_number == 123` のノードが存在しない場合もエラーになります
 
 補足:
-- `active set iss-0123` のようにノードIDで直接指定した場合でも、そのノードが GitHub Issue に紐づいていれば checkout します（initiative/epic/issue 共通）。
+- `active set iss-00123` のようにノードIDで直接指定した場合でも、そのノードが GitHub Issue に紐づいていれば checkout します（initiative/epic/issue 共通）。
 
 ## 2) 「どのリポジトリに作るか」はどう決まるか
 
@@ -68,7 +68,7 @@ GitHub が使えない場合（GitHub リポジトリが無い、`gh` 未導入�
 
 - `gh` は実行しません
 - ID は衝突回避のため `*-local-*` 名前空間になります
-  - `init-local-0001` / `epic-local-0001` / `iss-local-0001`
+  - `init-local-00001` / `epic-local-00001` / `iss-local-00001`
 
 ## 4) PlantUML（内部処理のイメージ）
 
@@ -95,7 +95,7 @@ alt default (GitHub)
   deactivate GH
   Script -> Script: parse <num>\n-> id=iss-<num>
 else --no-github
-  Script -> Script: next local id\n-> iss-local-0001
+  Script -> Script: next local id\n-> iss-local-00001
 end
 
 Script -> FS: write docs + meta.json

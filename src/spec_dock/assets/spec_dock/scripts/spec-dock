@@ -39,12 +39,14 @@ _ACTIVE_DIRNAME = "active"
 _AGENT_DIRNAME = ".agent"
 _LEGACY_WORK_DIRNAME = ".work"
 
+_DEFAULT_ID_WIDTH = 5  # minimum width for zero-padded ids (e.g. `iss-00123`)
+
 _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<num>[0-9]+)$")
 _NUM_RE = re.compile(r"^[0-9]+$")
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 
 # Branch name parsing helpers (best-effort):
-# - Prefer explicit ids embedded in branch names (e.g. `feature/iss-0123-foo`).
+# - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
 # - Fallback to GitHub issue numbers embedded in branch names (e.g. `123-foo`, `issue-123-foo`, `#123`).
 _ID_IN_TEXT_RE = re.compile(r"(?<![a-z0-9])(?P<id>(?:init|epic|iss)(?:-local)?-[0-9]+)(?![a-z0-9])")
 _HASH_ISSUE_IN_TEXT_RE = re.compile(r"#(?P<num>[0-9]+)\b")
@@ -104,8 +106,8 @@ def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
     """Normalize an id argument into the canonical `<prefix>-NNNN` form.
 
     Accepted inputs:
-    - Canonical form: `init-0001`, `epic-0001`, `iss-0001`, `adr-0001`
-    - Local form: `init-local-0001`, `epic-local-0001`, `iss-local-0001`
+    - Canonical form: `init-00001`, `epic-00001`, `iss-00001`, `adr-00001`
+    - Local form: `init-local-00001`, `epic-local-00001`, `iss-local-00001`
     - Shorthand numeric: `1` or `0001` (prefix is inferred from the argument context)
 
     This lets callers type less while keeping the on-disk ids consistent and lowercase.
@@ -127,12 +129,12 @@ def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
 
 
 def _normalize_local_id_input(value: str, *, prefix: str, field: str) -> str:
-    """Normalize an id into the canonical local form: `<prefix>-local-NNNN`.
+    """Normalize an id into the canonical local form: `<prefix>-local-NNNNN`.
 
     This is used for `--no-github` mode to avoid collisions with GitHub issue numbers.
 
     Accepted inputs:
-    - Local canonical: `iss-local-0001`
+    - Local canonical: `iss-local-00001`
     - Shorthand numeric: `1` or `0001` (interpreted as local)
     """
     raw = value.strip()
@@ -149,6 +151,33 @@ def _normalize_local_id_input(value: str, *, prefix: str, field: str) -> str:
     if not is_local:
         raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' (not '{prefix}-NNNN') when using --no-github: {value}")
     return _format_id(prefix, num, local=True)
+
+
+def _find_existing_id_by_num(nodes: dict[str, "_Node"], *, prefix: str, num: int, local: bool) -> str | None:
+    """Find an existing node id by its numeric suffix (width-agnostic).
+
+    This intentionally ignores the zero-padding width so that:
+    - callers can accept `iss-0123` and `iss-00123` interchangeably, and
+    - the tool remains robust if the id width changes in the future.
+    """
+    matches: list[str] = []
+    for node_id in nodes.keys():
+        try:
+            p, is_local, n = _parse_id(str(node_id))
+        except RuntimeError:
+            continue
+        if p == prefix and is_local == local and n == num:
+            matches.append(str(node_id))
+
+    matches = sorted(set(matches))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        marker = "-local" if local else ""
+        raise RuntimeError(
+            f"Ambiguous id: {prefix}{marker}-{num} matches multiple node ids: {', '.join(matches)}"
+        )
+    return matches[0]
 
 
 def _resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, "_Node"] | None = None) -> str:
@@ -172,19 +201,25 @@ def _resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, "
         local_id = _format_id(prefix, num, local=True)
         if nodes is None:
             return normal
-        has_normal = normal in nodes
-        has_local = local_id in nodes
-        if has_normal and not has_local:
-            return normal
-        if has_local and not has_normal:
-            return local_id
-        if has_local and has_normal:
-            raise RuntimeError(f"{field} is ambiguous: both '{normal}' and '{local_id}' exist; specify the full id")
+        existing_normal = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=False)
+        existing_local = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=True)
+        if existing_normal and not existing_local:
+            return existing_normal
+        if existing_local and not existing_normal:
+            return existing_local
+        if existing_normal and existing_local:
+            raise RuntimeError(
+                f"{field} is ambiguous: both '{existing_normal}' and '{existing_local}' exist; specify the full id"
+            )
         return normal
 
     parsed_prefix, is_local, num = _parse_id(raw)
     if parsed_prefix != prefix:
         raise RuntimeError(f"{field} must be '{prefix}-NNNN' / '{prefix}-local-NNNN' or 'NNNN': {value}")
+    if nodes is not None:
+        existing = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+        if existing:
+            return existing
     return _format_id(prefix, num, local=is_local)
 
 
@@ -221,15 +256,15 @@ def _slugify(title: str) -> str:
 
 
 def _parse_id(value: str) -> tuple[str, bool, int]:
-    """Parse a node id like `init-0001` into (`prefix`, is_local, number)."""
+    """Parse a node id like `init-00001` into (`prefix`, is_local, number)."""
     m = _ID_RE.match(value)
     if not m:
-        raise RuntimeError(f"Invalid id: {value} (expected e.g. init-0001 or init-local-0001)")
+        raise RuntimeError(f"Invalid id: {value} (expected e.g. init-00001 or init-local-00001)")
     return (m.group("prefix"), m.group("local") is not None, int(m.group("num")))
 
 
-def _format_id(prefix: str, num: int, *, width: int = 4, local: bool = False) -> str:
-    """Format an id using a fixed width, e.g. `iss-0001` or `iss-local-0001`."""
+def _format_id(prefix: str, num: int, *, width: int = _DEFAULT_ID_WIDTH, local: bool = False) -> str:
+    """Format an id using a minimum width, e.g. `iss-00001` or `iss-local-00001`."""
     marker = "-local" if local else ""
     return f"{prefix}{marker}-{num:0{width}d}"
 
@@ -975,7 +1010,7 @@ def _parse_active_set_target(target: str) -> tuple[str, int | str]:
     - GitHub issue number: `123`
     - GitHub issue number: `#123`
     - GitHub issue URL: `https://github.com/<owner>/<repo>/issues/123`
-    - Node id (or anything containing it): `iss-0123`, `iss-0123-foo`, `path/to/iss-0123-foo`
+    - Node id (or anything containing it): `iss-00123`, `iss-00123-foo`, `path/to/iss-00123-foo`
     """
     raw = target.strip()
     if not raw:
@@ -1000,10 +1035,10 @@ def _parse_active_set_target(target: str) -> tuple[str, int | str]:
     matches = [m.group("id") for m in _ID_IN_TEXT_RE.finditer(lowered)]
     unique = sorted(set(matches))
     if len(unique) == 1:
-        prefix, is_local, num = _parse_id(unique[0])
+        prefix, _, _ = _parse_id(unique[0])
         if prefix not in ("init", "epic", "iss"):
             raise RuntimeError(f"Unsupported id prefix for active set: {prefix}")
-        return ("node_id", _format_id(prefix, num, local=is_local))
+        return ("node_id", unique[0])
     if len(unique) > 1:
         # Practical disambiguation:
         # When users pass a path/branch name, it may contain multiple ids
@@ -1017,15 +1052,15 @@ def _parse_active_set_target(target: str) -> tuple[str, int | str]:
 
         for p in ("iss", "epic", "init"):
             if len(by_prefix[p]) == 1:
-                parsed_prefix, is_local, num = _parse_id(by_prefix[p][0])
-                return ("node_id", _format_id(parsed_prefix, num, local=is_local))
+                _parse_id(by_prefix[p][0])
+                return ("node_id", by_prefix[p][0])
             if len(by_prefix[p]) > 1:
                 raise RuntimeError(f"Ambiguous target: multiple {p} ids found: {', '.join(sorted(by_prefix[p]))}")
 
         raise RuntimeError(f"Ambiguous target: multiple ids found: {', '.join(unique)}")
 
     raise RuntimeError(
-        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL) or a node id (e.g. iss-0123)."
+        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL) or a node id (e.g. iss-00123)."
     )
 
 
@@ -1059,7 +1094,11 @@ def _active_set(
     if kind != "node_id":
         raise RuntimeError("Internal error: invalid active target kind")
 
-    resolved = str(value)
+    raw_id = str(value).lower()
+    prefix, is_local, num = _parse_id(raw_id)
+    resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local) or _format_id(
+        prefix, num, local=is_local
+    )
     node = nodes.get(resolved)
     if not node or node.type not in ("initiative", "epic", "issue"):
         raise RuntimeError(f"Node not found: {resolved}")
@@ -1202,13 +1241,31 @@ def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> t
             prefix, is_local, num = _parse_id(raw)
         except RuntimeError:
             continue
-        canonical = _format_id(prefix, num, local=is_local)
-        if canonical in nodes:
-            id_candidates.append(canonical)
+        existing = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+        if existing:
+            id_candidates.append(existing)
     id_candidates = sorted(set(id_candidates))
     if len(id_candidates) == 1:
         return (nodes[id_candidates[0]], f"matched id in branch: {id_candidates[0]}")
     if len(id_candidates) > 1:
+        # Practical disambiguation:
+        # If the branch embeds multiple ids (init → epic → iss), prefer the most specific.
+        by_prefix: dict[str, list[str]] = {"iss": [], "epic": [], "init": []}
+        for item in id_candidates:
+            try:
+                p, _, _ = _parse_id(item)
+            except RuntimeError:
+                continue
+            if p in by_prefix:
+                by_prefix[p].append(item)
+
+        for p in ("iss", "epic", "init"):
+            if len(by_prefix[p]) == 1:
+                chosen = by_prefix[p][0]
+                return (nodes[chosen], f"matched id in branch: {chosen} (picked most specific)")
+            if len(by_prefix[p]) > 1:
+                return (None, f"ambiguous {p} ids in branch: {', '.join(sorted(by_prefix[p]))}")
+
         return (None, f"ambiguous ids in branch: {', '.join(id_candidates)}")
 
     # 2) Fallback: GitHub issue number embedded in the branch name.
@@ -1464,12 +1521,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                 hint = (
                     "\n\nHint:\n"
                     "  'active set' is now: active set <target>\n"
-                    "  - target: GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-0123)\n"
+                    "  - target: GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-00123)\n"
                     "\n"
                     "Examples:\n"
                     "  spec-dock/scripts/spec-dock active set 123\n"
-                    "  spec-dock/scripts/spec-dock active set iss-0123\n"
-                    "  spec-dock/scripts/spec-dock active set iss-local-0001\n"
+                    "  spec-dock/scripts/spec-dock active set iss-00123\n"
+                    "  spec-dock/scripts/spec-dock active set iss-local-00001\n"
                 )
             super().error(message + hint)
 
@@ -1488,7 +1545,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     gh_init.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes init-local-NNNN)")
 
     p_new_epic = new_sub.add_parser("epic", help="Create a new epic under an initiative")
-    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. 123 / init-0123 / init-local-0001)")
+    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. 123 / init-00123 / init-local-00001)")
     p_new_epic.add_argument("--title", required=True)
     p_new_epic.add_argument("--slug")
     p_new_epic.add_argument("--id")
@@ -1497,7 +1554,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     gh_epic.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes epic-local-NNNN)")
 
     p_new_issue = new_sub.add_parser("issue", help="Create a new issue under an epic")
-    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. 123 / epic-0123 / epic-local-0001)")
+    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001)")
     p_new_issue.add_argument("--title", required=True)
     p_new_issue.add_argument("--slug")
     p_new_issue.add_argument("--id")
@@ -1507,9 +1564,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
     p_new_adr = new_sub.add_parser("adr", help="Create a new ADR under a scope (initiative/epic/issue)")
     scope = p_new_adr.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-0123 / init-local-0001)")
-    scope.add_argument("--epic", help="Scope epic (e.g. 123 / epic-0123 / epic-local-0001)")
-    scope.add_argument("--issue", help="Scope issue (e.g. 123 / iss-0123 / iss-local-0001)")
+    scope.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-00123 / init-local-00001)")
+    scope.add_argument("--epic", help="Scope epic (e.g. 123 / epic-00123 / epic-local-00001)")
+    scope.add_argument("--issue", help="Scope issue (e.g. 123 / iss-00123 / iss-local-00001)")
     p_new_adr.add_argument("--title", required=True)
     p_new_adr.add_argument("--slug")
     p_new_adr.add_argument("--id")
@@ -1520,7 +1577,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_active_set = active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)")
     p_active_set.add_argument(
         "target",
-        help="GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-0123 / epic-local-0001)",
+        help="GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
     )
 
     active_sub.add_parser("show", help="Show current active pointers")

@@ -31,7 +31,7 @@
 ```
 
 - `new {initiative,epic,issue}` はデフォルトで `gh` を呼びます（詳細: `github.md`）。
-- 親IDは `123` のような省略形、`init-0123` / `epic-0124` のような完全形を受け付けます。
+- 親IDは `123` のような省略形、`init-00123` / `epic-00124` のような完全形を受け付けます。
 
 ### 1.2 ローカルのみ（GitHub を使わない）
 
@@ -106,9 +106,9 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 ```bash
 ./spec-dock/scripts/spec-dock active show
 ./spec-dock/scripts/spec-dock active set 123          # GitHub issue number（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-0123     # node id（issue）
-./spec-dock/scripts/spec-dock active set epic-0123    # node id（epic）
-./spec-dock/scripts/spec-dock active set init-0123    # node id（initiative）
+./spec-dock/scripts/spec-dock active set iss-00123     # node id（issue）
+./spec-dock/scripts/spec-dock active set epic-00123    # node id（epic）
+./spec-dock/scripts/spec-dock active set init-00123    # node id（initiative）
 ./spec-dock/scripts/spec-dock active clear
 ```
 

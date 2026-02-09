@@ -35,8 +35,8 @@ gh issue create --title "<title>" --body "<body>"
 - `cwd`（実行ディレクトリ）は **導入先リポジトリの root**（`<repo>/spec-dock/..`）に固定
 - `gh` の出力（stdout/stderr）に含まれる URL から `/issues/<number>` を正規表現で抽出して Issue 番号を得る
 - 得られた番号をそのまま ID に使う
-  - 例: GitHub #123 → `iss-0123`
-  - initiative/epic も同様に #123 → `init-0123` / `epic-0123`
+  - 例: GitHub #123 → `iss-00123`
+  - initiative/epic も同様に #123 → `init-00123` / `epic-00123`
 
 ### 1.2 sync の GitHub enrich（任意）
 
@@ -90,14 +90,14 @@ GitHub を使わない場合は `--no-github` を明示します。
 このモードでは:
 - `gh` は一切呼びません（GitHub が無い/オフライン/権限無しでも動く）
 - ID は衝突回避のため `*-local-*` 名前空間になります
-  - `iss-local-0001` / `epic-local-0001` / `init-local-0001`
+  - `iss-local-00001` / `epic-local-00001` / `init-local-00001`
 - ローカル連番は `spec-dock/initiatives/**/meta.json` を走査し、
   - 同じ prefix（iss/epic/init）の
   - `*-local-*` の最大値 + 1
   を採番します
 
 理由:
-- GitHub の Issue 番号（`iss-0123`）とローカル連番（`iss-0001`）が混ざると、後から GitHub と連携したときに **番号衝突**が起こり得るため
+- GitHub の Issue 番号（`iss-00123`）とローカル連番（`iss-00001`）が混ざると、後から GitHub と連携したときに **番号衝突**が起こり得るため
 - `*-local-*` なら GitHub 番号と構文上明確に区別でき、衝突しません
 
 ---
@@ -165,7 +165,7 @@ Script -> Script: resolve epic id\n(_resolve_id_input)
 Script -> Script: validate epic exists
 
 Script -> Script: next local id\n(_next_id(prefix=iss, local=true))
-Script -> Script: id = iss-local-0001
+Script -> Script: id = iss-local-00001
 
 Script -> FS: copy templates -> dest\n(_copy_template_tree)
 Script -> FS: write meta.json\n(_write_meta, no github)
@@ -248,5 +248,5 @@ GH --> API : create/list issues
 要望次第で、次の拡張が自然です:
 
 - `new ... --repo owner/repo` を追加し、`gh --repo ... issue create` で明示指定できるようにする
-- `link` コマンドを追加し、`iss-local-0001` を後から `iss-0123` に連携（または GitHub issue number を meta.json に追記）できるようにする
+- `link` コマンドを追加し、`iss-local-00001` を後から `iss-00123` に連携（または GitHub issue number を meta.json に追記）できるようにする
   - ただし ID/ディレクトリ名の変更が入るので、履歴/リンク/active の扱いは設計が必要

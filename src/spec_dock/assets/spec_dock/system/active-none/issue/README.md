@@ -8,7 +8,7 @@
 
 ```bash
 ./spec-dock/scripts/spec-dock active set 123       # GitHub issue number（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-0123  # node id（checkout + active + sync）
+./spec-dock/scripts/spec-dock active set iss-00123  # node id（checkout + active + sync）
 ```
 
 （Epic/Initiative のみアクティブな場合、Issue は（なし）のままになることがあります）

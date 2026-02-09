@@ -249,13 +249,18 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
 
 
 def _install_skill(target_root: Path, *, force: bool) -> None:
-    """Install/update the bundled Codex skill into `.codex/skills/`."""
+    """Install/update the bundled agent skill into `.agents/skills/`.
+
+    Notes:
+    - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
+    - Other agents may adopt the same convention (Agent Skills open standard).
+    """
     with _assets_dir() as assets_dir:
         src_skill = assets_dir / "codex_skills" / "spec-driven-tdd-workflow" / "SKILL.md"
         if not src_skill.exists():
             raise RuntimeError(f"Missing asset file: {src_skill}")
 
-        dest_skill = target_root / ".codex" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
+        dest_skill = target_root / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
         if dest_skill.exists() and not force:
             print(
                 f"spec-dock: skill already exists (skipped): {dest_skill} (use --force to overwrite)",
@@ -273,7 +278,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
     def add_init_update_common(p: argparse.ArgumentParser) -> None:
         p.add_argument("path", nargs="?", default=".", help="Target project path (default: current directory)")
-        p.add_argument("--no-skill", action="store_true", help="Do not install the Codex skill into '.codex/skills/'")
+        p.add_argument(
+            "--no-skill",
+            action="store_true",
+            help="Do not install the agent skill into '.agents/skills/'",
+        )
 
     p_init = sub.add_parser("init", help="Scaffold spec-dock into a project")
     add_init_update_common(p_init)

@@ -14,7 +14,7 @@
 - `sync`（デフォルト）: ローカル集計のみ（open/done は `unknown`）
 - `sync --github`: ローカル集計 + GitHub enrich（`github.issue_number` があるものだけ判定可能）
 - `sync`（デフォルト）: さらに、**現在ブランチ名から active を推定して更新**します（best-effort）
-  - ブランチ名に `iss-0123` のような id、または `123-foo` / `issue-123-foo` / `#123` のような番号が含まれ、
+  - ブランチ名に `iss-00123` のような id、または `123-foo` / `issue-123-foo` / `#123` のような番号が含まれ、
     それが仕様ツリー内のノードに **一意に対応**する場合のみ更新します
   - 解決できない場合は active を変更しません（警告のみ / もしくは黙って維持）
 - `sync --no-update-active`: ブランチ名からの active 更新を行いません（index/tree 生成のみ）
@@ -91,7 +91,7 @@ deactivate Script
 ## 3. 重要な注意点
 
 - `--github` は **読み取りのみ**です（GitHub に Issue を作成/更新しません）。
-- `github.issue_number` が無いノード（例: `iss-local-0001`）は、`--github` を付けても状態は `unknown` のままです。
+- `github.issue_number` が無いノード（例: `iss-local-00001`）は、`--github` を付けても状態は `unknown` のままです。
 - `--gh-limit` が小さいと一覧に載らず `unknown` になります（古い Issue がある場合は上げてください）。
  - `spec-dock/active/`（active pointers）
    - `spec-dock/active/{initiative,epic,issue}`（symlink または `.path`）

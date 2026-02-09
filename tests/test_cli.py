@@ -207,7 +207,7 @@ class TestCli(unittest.TestCase):
             self.assertTrue(
                 (
                     target
-                    / ".codex"
+                    / ".agents"
                     / "skills"
                     / "spec-driven-tdd-workflow"
                     / "SKILL.md"
@@ -229,7 +229,7 @@ class TestCli(unittest.TestCase):
             self.assertFalse(
                 (
                     target
-                    / ".codex"
+                    / ".agents"
                     / "skills"
                     / "spec-driven-tdd-workflow"
                     / "SKILL.md"
@@ -282,7 +282,7 @@ class TestCli(unittest.TestCase):
 
             # Create nodes without touching GitHub.
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            # Parent ids accept shorthand numeric forms (e.g. `1` -> `init-local-0001` / `epic-local-0001`).
+            # Parent ids accept shorthand numeric forms (e.g. `1` -> `init-local-00001` / `epic-local-00001`).
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
@@ -290,11 +290,11 @@ class TestCli(unittest.TestCase):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-0001-auth-platform"
+                / "init-local-00001-auth-platform"
                 / "epics"
-                / "epic-local-0001-jwt-auth"
+                / "epic-local-00001-jwt-auth"
                 / "issues"
-                / "iss-local-0001-add-refresh-token"
+                / "iss-local-00001-add-refresh-token"
             )
             self.assertTrue((issue_dir / "requirement.md").is_file())
             self.assertTrue((issue_dir / "design.md").is_file())
@@ -305,10 +305,10 @@ class TestCli(unittest.TestCase):
             requirement = (issue_dir / "requirement.md").read_text(encoding="utf-8")
             self.assertNotIn("<ISS_ID>", requirement)
             self.assertNotIn("<ISS_TITLE>", requirement)
-            self.assertIn("iss-local-0001", requirement)
+            self.assertIn("iss-local-00001", requirement)
 
             # Active pointers are set by a single target argument (node id or GitHub issue number).
-            self._run_runtime(target, ["active", "set", "iss-local-0001"])
+            self._run_runtime(target, ["active", "set", "iss-local-00001"])
             self.assertTrue((target / "spec-dock" / ".agent" / "active.json").is_file())
             self.assertTrue(
                 (target / "spec-dock" / "active" / "issue").exists()
@@ -334,21 +334,21 @@ class TestCli(unittest.TestCase):
             index_nodes = index["nodes"]
 
             init_item = tree["tree"][0]
-            self.assertEqual(init_item["id"], "init-local-0001")
+            self.assertEqual(init_item["id"], "init-local-00001")
             self.assertEqual(init_item["type"], "initiative")
             self.assertIn("epics", init_item)
 
             epic_item = init_item["epics"][0]
-            self.assertEqual(epic_item["id"], "epic-local-0001")
+            self.assertEqual(epic_item["id"], "epic-local-00001")
             self.assertEqual(epic_item["type"], "epic")
             self.assertIn("issues", epic_item)
 
             issue_item = epic_item["issues"][0]
-            self.assertEqual(issue_item["id"], "iss-local-0001")
+            self.assertEqual(issue_item["id"], "iss-local-00001")
             self.assertEqual(issue_item["type"], "issue")
 
             # `tree.json` nodes match the same node schema as `index.json` nodes.
-            self.assertEqual(issue_item, index_nodes["iss-local-0001"])
+            self.assertEqual(issue_item, index_nodes["iss-local-00001"])
             self._run_runtime(target, ["validate"])
 
     def test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder(self) -> None:
@@ -362,22 +362,22 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             # Initiative-only active: epic/issue are placeholders.
-            self._run_runtime(target, ["active", "set", "init-local-0001"])
+            self._run_runtime(target, ["active", "set", "init-local-00001"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsNone(active.get("epic"))
             self.assertIsNone(active.get("issue"))
-            self.assertIn("init-local-0001", self._read_active_pointer_text(target, "initiative", "README.md"))
+            self.assertIn("init-local-00001", self._read_active_pointer_text(target, "initiative", "README.md"))
             self.assertIn("Active Epic: （なし）", self._read_active_pointer_text(target, "epic", "README.md"))
             self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
 
             # Epic-only active: issue is a placeholder.
-            self._run_runtime(target, ["active", "set", "epic-local-0001"])
+            self._run_runtime(target, ["active", "set", "epic-local-00001"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsInstance(active.get("epic"), dict)
             self.assertIsNone(active.get("issue"))
-            self.assertIn("epic-local-0001", self._read_active_pointer_text(target, "epic", "README.md"))
+            self.assertIn("epic-local-00001", self._read_active_pointer_text(target, "epic", "README.md"))
             self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
 
             # Clear: all placeholders.
@@ -415,9 +415,9 @@ class TestCli(unittest.TestCase):
 
             self._run_runtime(target, ["sync"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["initiative"]["id"], "init-local-0001")
-            self.assertEqual(active["epic"]["id"], "epic-local-0001")
-            self.assertEqual(active["issue"]["id"], "iss-local-0001")
+            self.assertEqual(active["initiative"]["id"], "init-local-00001")
+            self.assertEqual(active["epic"]["id"], "epic-local-00001")
+            self.assertEqual(active["issue"]["id"], "iss-local-00001")
 
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -477,7 +477,7 @@ class TestCli(unittest.TestCase):
 
                 self._run_runtime(target, ["active", "set", "123"], env=test_env)
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-0123")
+            self.assertEqual(active["issue"]["id"], "iss-00123")
 
     def test_active_set_parses_hash_and_url_targets(self) -> None:
         if os.name == "nt":
@@ -540,7 +540,7 @@ class TestCli(unittest.TestCase):
                 self.assertEqual(counter.read_text(encoding="utf-8").strip(), "2")
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-0123")
+            self.assertEqual(active["issue"]["id"], "iss-00123")
 
     def test_active_set_github_issue_number_requires_linked_node(self) -> None:
         if os.name == "nt":
@@ -660,7 +660,7 @@ class TestCli(unittest.TestCase):
                 self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-0123")
+            self.assertEqual(active["issue"]["id"], "iss-00123")
 
     def test_active_set_github_issue_checkout_refuses_dirty_working_tree(self) -> None:
         if os.name == "nt":
@@ -766,9 +766,9 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "epic", "--initiative", "123", "--title", "JWT auth"], env=test_env)
             self._run_runtime(target, ["new", "issue", "--epic", "124", "--title", "Add refresh token"], env=test_env)
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-0123-auth-platform"
-            epic_dir = init_dir / "epics" / "epic-0124-jwt-auth"
-            issue_dir = epic_dir / "issues" / "iss-0125-add-refresh-token"
+            init_dir = target / "spec-dock" / "initiatives" / "init-00123-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-00124-jwt-auth"
+            issue_dir = epic_dir / "issues" / "iss-00125-add-refresh-token"
             self.assertTrue(init_dir.is_dir())
             self.assertTrue(epic_dir.is_dir())
             self.assertTrue(issue_dir.is_dir())
@@ -776,11 +776,11 @@ class TestCli(unittest.TestCase):
             init_meta = (init_dir / "meta.json").read_text(encoding="utf-8")
             epic_meta = (epic_dir / "meta.json").read_text(encoding="utf-8")
             issue_meta = (issue_dir / "meta.json").read_text(encoding="utf-8")
-            self.assertIn('\"id\": \"init-0123\"', init_meta)
+            self.assertIn('\"id\": \"init-00123\"', init_meta)
             self.assertIn('\"issue_number\": 123', init_meta)
-            self.assertIn('\"id\": \"epic-0124\"', epic_meta)
+            self.assertIn('\"id\": \"epic-00124\"', epic_meta)
             self.assertIn('\"issue_number\": 124', epic_meta)
-            self.assertIn('\"id\": \"iss-0125\"', issue_meta)
+            self.assertIn('\"id\": \"iss-00125\"', issue_meta)
             self.assertIn('\"issue_number\": 125', issue_meta)
 
     def test_new_issue_can_create_github_issue_and_use_its_number(self) -> None:
@@ -823,13 +823,13 @@ class TestCli(unittest.TestCase):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-0001-auth-platform"
+                / "init-local-00001-auth-platform"
                 / "epics"
-                / "epic-local-0001-jwt-auth"
+                / "epic-local-00001-jwt-auth"
                 / "issues"
-                / "iss-0123-add-refresh-token"
+                / "iss-00123-add-refresh-token"
             )
             self.assertTrue(issue_dir.is_dir())
             meta = (issue_dir / "meta.json").read_text(encoding="utf-8")
-            self.assertIn('\"id\": \"iss-0123\"', meta)
+            self.assertIn('\"id\": \"iss-00123\"', meta)
             self.assertIn('\"issue_number\": 123', meta)

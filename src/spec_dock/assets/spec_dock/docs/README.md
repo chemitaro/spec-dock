@@ -10,32 +10,32 @@
   - 対象リポジトリは `gh` の解釈で決まります（spec-dock は owner/repo を推測しません）
   - `gh` が使えない / GitHub リポジトリでない場合は **エラー**になります
 - GitHub を使わない場合は、必ず `--no-github` を付けてください
-  - その場合、ID は衝突回避のため `*-local-*` 名前空間になります（例: `iss-local-0001`）
+  - その場合、ID は衝突回避のため `*-local-*` 名前空間になります（例: `iss-local-00001`）
 
 ## クイックスタート
 
 ### 1) ノード作成（デフォルト: GitHub）
 
 ```bash
-./spec new initiative --title "Auth platform"          # init-0123（GH #123）
-./spec new epic --initiative 123 --title "JWT auth"    # epic-0124（GH #124）
-./spec new issue --epic 124 --title "Add refresh token"  # iss-0125（GH #125）
+./spec new initiative --title "Auth platform"          # init-00123（GH #123）
+./spec new epic --initiative 123 --title "JWT auth"    # epic-00124（GH #124）
+./spec new issue --epic 124 --title "Add refresh token"  # iss-00125（GH #125）
 ```
 
 ### 2) ノード作成（ローカルのみ: `--no-github`）
 
 ```bash
-./spec new initiative --no-github --title "Auth platform"          # init-local-0001
-./spec new epic --no-github --initiative 1 --title "JWT auth"      # epic-local-0001
-./spec new issue --no-github --epic 1 --title "Add refresh token"  # iss-local-0001
+./spec new initiative --no-github --title "Auth platform"          # init-local-00001
+./spec new epic --no-github --initiative 1 --title "JWT auth"      # epic-local-00001
+./spec new issue --no-github --epic 1 --title "Add refresh token"  # iss-local-00001
 ```
 
 ### 3) active（現在作業中）を設定
 
 ```bash
 ./spec active set 125            # GitHub issue number（checkout + active + sync）
-./spec active set iss-0125       # node id（checkout + active + sync）
-./spec active set iss-local-0001 # local node id（checkout しない）
+./spec active set iss-00125       # node id（checkout + active + sync）
+./spec active set iss-local-00001 # local node id（checkout しない）
 ```
 
 注意:

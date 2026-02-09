@@ -38,7 +38,7 @@
 
 重要なフィールド（概念）:
 
-- `id`: `init-0123`（GitHub #123）/ `init-local-0001`（`--no-github`）のような小文字 ID
+- `id`: `init-00123`（GitHub #123）/ `init-local-00001`（`--no-github`）のような小文字 ID
 - `type`: `initiative | epic | issue`
 - `parent_id`: 親ノード（epic→initiative / issue→epic）
 - `initiative_id`, `epic_id`: issue が所属する上位（集計に使用）
@@ -179,7 +179,7 @@ stop
 “OPEN/CLOSED” の二値で `open/done` を集計します（単純で壊れにくい代わりに情報は粗い）。
 
 ### 5.4 ローカルに issue はあるが、GitHub Issue を作成していない場合
-ローカルの issue ディレクトリ（例: `.../issues/iss-local-0007-.../`）が存在しても、
+ローカルの issue ディレクトリ（例: `.../issues/iss-local-00007-.../`）が存在しても、
 その `meta.json` に `github.issue_number` が無い場合は **GitHub 側と未連携**です。
 
 このときの挙動は以下です:
@@ -196,16 +196,16 @@ stop
 #### 例（progress の見え方）
 Epic 配下に issue が 3 つあるとして:
 
-- `iss-0101`（GitHub #101 に連携済み / OPEN）
-- `iss-local-0001`（GitHub 未作成 / 未連携）
-- `iss-0102`（GitHub #102 に連携済み / CLOSED）
+- `iss-00101`（GitHub #101 に連携済み / OPEN）
+- `iss-local-00001`（GitHub 未作成 / 未連携）
+- `iss-00102`（GitHub #102 に連携済み / CLOSED）
 
 `sync --github` の結果、epic の progress は概ねこうなります:
 
 - `total=3`
 - `open=1`
 - `done=1`
-- `unknown=1`（= 未連携の `iss-local-0001`）
+- `unknown=1`（= 未連携の `iss-local-00001`）
 
 ### 5.5 後から GitHub Issue を作った場合（どうやって反映されるか）
 後から GitHub Issue を作った場合、`meta.json` に `github.issue_number` を追加しない限り、
@@ -217,7 +217,7 @@ Epic 配下に issue が 3 つあるとして:
 - 先に GitHub issue を作って番号を確定し、ローカル issue を作る時点で `--github-issue` を渡す
 
 （補足）将来的に “手編集を減らす” なら、
-`./spec-dock/scripts/spec-dock link --issue iss-local-0001 --github-issue 123` のような
+`./spec-dock/scripts/spec-dock link --issue iss-local-00001 --github-issue 123` のような
 「連携だけ行うコマンド」を追加するのが自然です（現状は未実装）。
 
 ## 6. index.json（index）の最小イメージ
@@ -229,21 +229,21 @@ Epic 配下に issue が 3 つあるとして:
   "root": "spec-dock/initiatives",
   "active": { "...": "..." },
   "nodes": {
-    "init-0123": {
+    "init-00123": {
       "type": "initiative",
-      "children": ["epic-0124"],
+      "children": ["epic-00124"],
       "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 }
     },
-    "epic-0124": {
+    "epic-00124": {
       "type": "epic",
-      "children": ["iss-0125", "iss-local-0001"],
+      "children": ["iss-00125", "iss-local-00001"],
       "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 }
     },
-    "iss-0125": {
+    "iss-00125": {
       "type": "issue",
       "github": { "issue_number": 123, "state": "OPEN", "labels": ["bug"] }
     },
-    "iss-local-0001": {
+    "iss-local-00001": {
       "type": "issue"
     }
   }
@@ -261,29 +261,29 @@ Epic 配下に issue が 3 つあるとして:
   "tree": [
     {
       "type": "initiative",
-      "id": "init-0123",
+      "id": "init-00123",
       "title": "Auth platform",
-      "path": "spec-dock/initiatives/init-0123-auth-platform",
-      "children": ["epic-0124"],
+      "path": "spec-dock/initiatives/init-00123-auth-platform",
+      "children": ["epic-00124"],
       "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
       "epics": [
         {
           "type": "epic",
-          "id": "epic-0124",
+          "id": "epic-00124",
           "title": "JWT auth",
-          "path": "spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth",
-          "children": ["iss-0125", "iss-local-0001"],
+          "path": "spec-dock/initiatives/init-00123-auth-platform/epics/epic-00124-jwt-auth",
+          "children": ["iss-00125", "iss-local-00001"],
           "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
           "issues": [
             {
               "type": "issue",
-              "id": "iss-0125",
+              "id": "iss-00125",
               "title": "Add refresh token",
-              "path": "spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth/issues/iss-0125-add-refresh-token",
+              "path": "spec-dock/initiatives/init-00123-auth-platform/epics/epic-00124-jwt-auth/issues/iss-00125-add-refresh-token",
               "children": [],
               "github": { "issue_number": 123, "state": "OPEN" }
             },
-            { "type": "issue", "id": "iss-local-0001", "title": "...", "path": "...", "children": [] }
+            { "type": "issue", "id": "iss-local-00001", "title": "...", "path": "...", "children": [] }
           ]
         }
       ]

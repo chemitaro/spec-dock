@@ -17,8 +17,8 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 ```bash
 ./spec-dock/scripts/spec-dock active show
 ./spec-dock/scripts/spec-dock active set 123         # GitHub issue number（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-0123    # node id（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-local-0001  # local node id（checkout しない）
+./spec-dock/scripts/spec-dock active set iss-00123    # node id（checkout + active + sync）
+./spec-dock/scripts/spec-dock active set iss-local-00001  # local node id（checkout しない）
 ```
 
 補足:
