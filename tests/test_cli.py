@@ -30,6 +30,27 @@ def _expected_spec_dock_version() -> str:
 
 
 class TestCli(unittest.TestCase):
+    def _can_create_symlink(self, target: Path) -> bool:
+        if not hasattr(os, "symlink"):
+            return False
+        if os.name == "nt":
+            return False
+        try:
+            tmp = target / ".symlink-test"
+            tmp.mkdir(parents=True, exist_ok=True)
+            src = tmp / "src.txt"
+            dst = tmp / "dst.txt"
+            src.write_text("x\n", encoding="utf-8")
+            os.symlink("src.txt", dst)
+            return dst.is_symlink()
+        except OSError:
+            return False
+        finally:
+            try:
+                shutil.rmtree(tmp)
+            except Exception:
+                pass
+
     def _run_runtime(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
         script = target / "spec-dock" / "scripts" / "spec-dock"
         self.assertTrue(script.is_file(), f"runtime script missing: {script}")
@@ -117,6 +138,10 @@ class TestCli(unittest.TestCase):
             self.assertEqual(exit_code, 0)
 
             self._assert_version_file(target)
+
+            # Repo-root shortcut (best-effort; only assert when symlinks are supported).
+            if self._can_create_symlink(target):
+                self.assertTrue((target / "spec").is_symlink(), "repo-root shortcut missing: spec")
 
             self.assertTrue((target / "spec-dock" / "docs").is_dir())
             self.assertTrue((target / "spec-dock" / "templates").is_dir())

@@ -125,6 +125,23 @@ def _make_readonly_tree(path: Path) -> None:
             continue
 
 
+def _install_repo_root_shortcut(target_root: Path) -> None:
+    """Best-effort: create a repo-root `./spec` shortcut to the runtime script.
+
+    This intentionally does not overwrite existing files (safety-first).
+    """
+    dest = target_root / "spec"
+    if dest.exists() or dest.is_symlink():
+        print(f"spec-dock: (warn) repo-root shortcut already exists (skipped): {dest}", file=sys.stderr)
+        return
+
+    target = f"{_SPEC_DOCK_DIRNAME}/scripts/spec-dock"
+    try:
+        os.symlink(target, dest)
+    except OSError as e:
+        print(f"spec-dock: (warn) failed to create repo-root shortcut symlink: {dest}: {e}", file=sys.stderr)
+
+
 def _prune_legacy_scaffold(specdock_dir: Path) -> None:
     """Remove known legacy (v1) artifacts from generated scaffolding.
 
@@ -226,6 +243,9 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         _make_readonly_tree(specdock_dir / "system" / "active-none")
 
         (specdock_dir / "spec-dock.version").write_text(f"{_tool_version()}\n", encoding="utf-8")
+
+        # Best-effort: provide `./spec` at repo root for convenience.
+        _install_repo_root_shortcut(target_root)
 
 
 def _install_skill(target_root: Path, *, force: bool) -> None:

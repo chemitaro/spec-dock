@@ -17,25 +17,25 @@
 ### 1) ノード作成（デフォルト: GitHub）
 
 ```bash
-./spec-dock/scripts/spec-dock new initiative --title "Auth platform"          # init-0123（GH #123）
-./spec-dock/scripts/spec-dock new epic --initiative 123 --title "JWT auth"    # epic-0124（GH #124）
-./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token"  # iss-0125（GH #125）
+./spec new initiative --title "Auth platform"          # init-0123（GH #123）
+./spec new epic --initiative 123 --title "JWT auth"    # epic-0124（GH #124）
+./spec new issue --epic 124 --title "Add refresh token"  # iss-0125（GH #125）
 ```
 
 ### 2) ノード作成（ローカルのみ: `--no-github`）
 
 ```bash
-./spec-dock/scripts/spec-dock new initiative --no-github --title "Auth platform"          # init-local-0001
-./spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "JWT auth"      # epic-local-0001
-./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"  # iss-local-0001
+./spec new initiative --no-github --title "Auth platform"          # init-local-0001
+./spec new epic --no-github --initiative 1 --title "JWT auth"      # epic-local-0001
+./spec new issue --no-github --epic 1 --title "Add refresh token"  # iss-local-0001
 ```
 
 ### 3) active（現在作業中）を設定
 
 ```bash
-./spec-dock/scripts/spec-dock active set --issue 125   # iss-0125 / iss-local-0001 も可
+./spec active set --issue 125   # iss-0125 / iss-local-0001 も可
 # GitHub Issue番号から「checkout + active + sync」まで一括で行う場合:
-./spec-dock/scripts/spec-dock active set --github-issue 125
+./spec active set --github-issue 125
 ```
 
 注意:
@@ -43,6 +43,10 @@
 - ローカルのみ（`*-local-*`）のノードは checkout しません。
 
 すると `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
+
+補足:
+- `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカットです（symlink）。
+- 作成に失敗した場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
 
 ## 生成物（重要）
 
