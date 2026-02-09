@@ -11,6 +11,8 @@
   - `gh` が使えない / GitHub リポジトリでない場合は **エラー**になります
 - GitHub を使わない場合は、必ず `--no-github` を付けてください
   - その場合、ID は衝突回避のため `*-local-*` 名前空間になります（例: `iss-local-00001`）
+- `--slug` は **安全な文字のみ**許可します（空白や `!` などはエラー）
+  - 許可: Unicode の英数字 + `-` `_` `.`
 
 ## クイックスタート
 
@@ -42,6 +44,7 @@
 - `active set 125` は、仕様ツリー内に `github.issue_number == 125` のノードが存在する必要があります（存在しない場合はエラー）。
 - GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set` した場合、`active set` は **必ずブランチのcheckoutも行います**。
 - ローカルのみ（`*-local-*`）のノードは checkout しません。
+- `active set 125` のような **数字のみ**は GitHub Issue 番号として解釈します（ローカルは `iss-local-00001` のように node id を指定してください）。
 
 すると `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
 

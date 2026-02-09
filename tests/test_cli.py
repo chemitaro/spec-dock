@@ -351,6 +351,108 @@ class TestCli(unittest.TestCase):
             self.assertEqual(issue_item, index_nodes["iss-local-00001"])
             self._run_runtime(target, ["validate"])
 
+    def test_new_rejects_duplicate_id_with_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            # Explicit --id must not allow creating a duplicated node id.
+            self._run_runtime_expect_fail(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--no-github",
+                    "--epic",
+                    "1",
+                    "--id",
+                    "iss-local-00001",
+                    "--title",
+                    "Duplicate ID",
+                ],
+            )
+
+    def test_new_rejects_unsafe_slug(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            # User-provided --slug must be safe for filesystem paths.
+            self._run_runtime_expect_fail(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--no-github",
+                    "--epic",
+                    "1",
+                    "--title",
+                    "Custom slug test",
+                    "--slug",
+                    "bad slug!!",
+                ],
+            )
+
+    def test_validate_detects_broken_parent_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["parent_id"] = "epic-local-99999"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self._run_runtime_expect_fail(target, ["validate"])
+
+    def test_new_adr_increments_id_within_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision two"])
+
+            adrs_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "adrs"
+            )
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertNotEqual(sorted(adrs_dir.glob("adr-00001-*.md")), [])
+            self.assertNotEqual(sorted(adrs_dir.glob("adr-00002-*.md")), [])
+
     def test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

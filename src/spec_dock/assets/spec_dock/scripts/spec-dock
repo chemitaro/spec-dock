@@ -102,6 +102,38 @@ def _validate_lowercase(value: str, *, field: str) -> str:
     return value
 
 
+def _validate_slug(value: str, *, field: str = "slug") -> str:
+    """Validate a slug used in filesystem paths.
+
+    Rules:
+    - Must be lowercase.
+    - Must not contain whitespace or path separators.
+    - Allowed characters are:
+      - Unicode letters/digits (via `str.isalnum()`), and
+      - `-`, `_`, `.`
+    """
+    slug = value.strip()
+    if not slug:
+        raise RuntimeError(f"{field} is required")
+
+    slug = _validate_lowercase(slug, field=field)
+    if slug in (".", ".."):
+        raise RuntimeError(f"{field} must not be '{slug}'")
+
+    if "/" in slug or "\\" in slug:
+        raise RuntimeError(f"{field} must not contain path separators: {slug}")
+
+    for ch in slug:
+        if ch.isalnum() or ch in ("-", "_", "."):
+            continue
+        raise RuntimeError(
+            f"{field} contains unsupported character: {ch!r} (slug={slug!r}). "
+            "Use only letters/digits (Unicode ok) and '-', '_', '.'."
+        )
+
+    return slug
+
+
 def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
     """Normalize an id argument into the canonical `<prefix>-NNNN` form.
 
@@ -463,6 +495,8 @@ def _new_initiative(
     no_github: bool,
 ) -> None:
     """Create a new initiative node under `spec-dock/initiatives/`."""
+    nodes = _scan_nodes(specdock_dir)
+
     title = title.strip()
     if not title:
         raise RuntimeError("--title is required")
@@ -473,6 +507,11 @@ def _new_initiative(
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
         if github_issue_number is None:
             repo_root = specdock_dir.parent
+            print(
+                "spec-dock: (info) creating GitHub issue via gh "
+                "(pass '--no-github' to avoid GitHub side effects)",
+                file=sys.stderr,
+            )
             github_issue_number = _gh_issue_create(
                 repo_root,
                 title=title,
@@ -488,11 +527,15 @@ def _new_initiative(
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="init", field="id")
 
+    if node_id in nodes:
+        existing = nodes[node_id]
+        raise RuntimeError(f"id already exists: {node_id} ({existing.path / 'meta.json'})")
+
     if slug is None:
         slug = _slugify(title)
     if not slug:
         raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_lowercase(slug.strip(), field="slug")
+    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "initiative"
     initiatives_root = _initiatives_root(specdock_dir)
@@ -507,6 +550,9 @@ def _new_initiative(
     }
     _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
     _write_meta(dest_dir, node_type="initiative", node_id=node_id, title=title, slug=slug, github_issue_number=github_issue_number)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    gh = f" github=#{github_issue_number}" if github_issue_number is not None else ""
+    print(f"spec-dock: ok (new initiative) id={node_id} path={rel}{gh}")
 
 
 def _new_epic(
@@ -535,6 +581,11 @@ def _new_epic(
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
         if github_issue_number is None:
             repo_root = specdock_dir.parent
+            print(
+                "spec-dock: (info) creating GitHub issue via gh "
+                "(pass '--no-github' to avoid GitHub side effects)",
+                file=sys.stderr,
+            )
             github_issue_number = _gh_issue_create(
                 repo_root,
                 title=title,
@@ -554,11 +605,15 @@ def _new_epic(
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="epic", field="id")
 
+    if node_id in nodes:
+        existing = nodes[node_id]
+        raise RuntimeError(f"id already exists: {node_id} ({existing.path / 'meta.json'})")
+
     if slug is None:
         slug = _slugify(title)
     if not slug:
         raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_lowercase(slug.strip(), field="slug")
+    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "epic"
     dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
@@ -582,6 +637,9 @@ def _new_epic(
         initiative_id=initiative.id,
         github_issue_number=github_issue_number,
     )
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    gh = f" github=#{github_issue_number}" if github_issue_number is not None else ""
+    print(f"spec-dock: ok (new epic) id={node_id} initiative={initiative.id} path={rel}{gh}")
 
 
 def _new_issue(
@@ -613,6 +671,11 @@ def _new_issue(
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
         if github_issue_number is None:
             repo_root = specdock_dir.parent
+            print(
+                "spec-dock: (info) creating GitHub issue via gh "
+                "(pass '--no-github' to avoid GitHub side effects)",
+                file=sys.stderr,
+            )
             github_issue_number = _gh_issue_create(
                 repo_root,
                 title=title,
@@ -633,11 +696,15 @@ def _new_issue(
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="iss", field="id")
 
+    if node_id in nodes:
+        existing = nodes[node_id]
+        raise RuntimeError(f"id already exists: {node_id} ({existing.path / 'meta.json'})")
+
     if slug is None:
         slug = _slugify(title)
     if not slug:
         raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_lowercase(slug.strip(), field="slug")
+    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "issue"
     dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
@@ -669,6 +736,11 @@ def _new_issue(
         epic_id=epic.id,
         github_issue_number=github_issue_number,
     )
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    gh = f" github=#{github_issue_number}" if github_issue_number is not None else ""
+    print(
+        f"spec-dock: ok (new issue) id={node_id} epic={epic.id} initiative={epic.initiative_id} path={rel}{gh}"
+    )
 
 
 def _new_adr(
@@ -691,8 +763,27 @@ def _new_adr(
     if not title:
         raise RuntimeError("--title is required")
 
+    template_path = specdock_dir / "templates" / "adr.md"
+    if not template_path.exists():
+        raise RuntimeError(f"Missing ADR template: {template_path}")
+
+    adrs_dir = scope.path / "adrs"
+    adrs_dir.mkdir(parents=True, exist_ok=True)
+
     if node_id is None:
-        node_id = _next_id(specdock_dir, "adr")
+        # ADR ids are scoped to `adrs/` (they are not stored in meta.json).
+        max_num = 0
+        for p in adrs_dir.glob("adr-*.md"):
+            stem = p.stem
+            m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", stem)
+            if not m:
+                continue
+            try:
+                _, _, n = _parse_id(m.group(1))
+            except RuntimeError:
+                continue
+            max_num = max(max_num, n)
+        node_id = _format_id("adr", max_num + 1, local=False)
     else:
         node_id = _normalize_id_input(str(node_id), prefix="adr", field="id")
 
@@ -700,14 +791,13 @@ def _new_adr(
         slug = _slugify(title)
     if not slug:
         raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_lowercase(slug.strip(), field="slug")
+    slug = _validate_slug(slug, field="slug")
 
-    template_path = specdock_dir / "templates" / "adr.md"
-    if not template_path.exists():
-        raise RuntimeError(f"Missing ADR template: {template_path}")
+    # Prevent duplicated ADR ids within the same scope (even with a different slug).
+    existing_same_id = sorted(adrs_dir.glob(f"{node_id}-*.md"))
+    if existing_same_id:
+        raise RuntimeError(f"ADR id already exists under scope {scope.id}: {node_id}")
 
-    adrs_dir = scope.path / "adrs"
-    adrs_dir.mkdir(parents=True, exist_ok=True)
     dest_path = adrs_dir / f"{node_id}-{slug}.md"
     if dest_path.exists():
         raise RuntimeError(f"ADR already exists: {dest_path}")
@@ -721,6 +811,8 @@ def _new_adr(
         "YYYY-MM-DD": _today(),
     }
     dest_path.write_text(_render_text(raw, replacements), encoding="utf-8")
+    rel = dest_path.relative_to(specdock_dir.parent).as_posix()
+    print(f"spec-dock: ok (new adr) id={node_id} scope={scope.id} path={rel}")
 
 
 def _unlink_any(path: Path) -> None:
@@ -1077,7 +1169,16 @@ def _active_set(
     # If a GitHub issue number is specified, checkout first (branch may change the local spec tree).
     if kind == "github_issue":
         issue_number = int(value)  # type: ignore[arg-type]
-        _gh_issue_checkout(repo_root, issue_number=issue_number)
+        try:
+            _gh_issue_checkout(repo_root, issue_number=issue_number)
+        except RuntimeError as e:
+            msg = str(e)
+            if msg.startswith("Working tree is not clean"):
+                raise RuntimeError(
+                    msg
+                    + "\n\nHint: if you intended to select a local node, pass its node id (e.g. iss-local-00001)."
+                ) from e
+            raise
         nodes = _scan_nodes(specdock_dir)
         node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
         initiative, epic, issue = _select_active_from_node(nodes, node)
@@ -1085,6 +1186,10 @@ def _active_set(
         _apply_active_pointers(specdock_dir, current)
         # Keep derived state in sync, but do not override explicit selection by branch inference.
         _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+        ini = initiative.id if initiative else "(none)"
+        ep = epic.id if epic else "(none)"
+        iss = issue.id if issue else "(none)"
+        print(f"spec-dock: ok (active set) target=github#{issue_number} initiative={ini} epic={ep} issue={iss}")
         return
 
     nodes = _scan_nodes(specdock_dir)
@@ -1106,7 +1211,17 @@ def _active_set(
     # Default behavior:
     # - If the target node is linked to a GitHub issue number, always checkout its branch first.
     if node.github_issue_number is not None:
-        _gh_issue_checkout(repo_root, issue_number=int(node.github_issue_number))
+        try:
+            _gh_issue_checkout(repo_root, issue_number=int(node.github_issue_number))
+        except RuntimeError as e:
+            msg = str(e)
+            if msg.startswith("Working tree is not clean"):
+                raise RuntimeError(
+                    msg
+                    + "\n\nHint: this node is linked to GitHub; commit/stash before checkout, "
+                    "or select a local-only node (iss-local-...)."
+                ) from e
+            raise
         # Re-scan after checkout to reflect branch-specific spec trees.
         nodes = _scan_nodes(specdock_dir)
         node = nodes.get(node.id)
@@ -1117,6 +1232,10 @@ def _active_set(
     current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
     _apply_active_pointers(specdock_dir, current)
     _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    ini = initiative.id if initiative else "(none)"
+    ep = epic.id if epic else "(none)"
+    iss = issue.id if issue else "(none)"
+    print(f"spec-dock: ok (active set) target={node.id} initiative={ini} epic={ep} issue={iss}")
 
 
 def _active_show(specdock_dir: Path) -> None:
@@ -1146,6 +1265,7 @@ def _active_clear(specdock_dir: Path) -> None:
     """Clear active pointers (set all layers to placeholder)."""
     current = _write_active_manifest(specdock_dir, initiative=None, epic=None, issue=None)
     _apply_active_pointers(specdock_dir, current)
+    print("spec-dock: ok (active clear)")
 
 
 def _ensure_gh_available() -> None:
@@ -1360,6 +1480,7 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: boo
     state_index_path = agent_dir / "index.json"
     tree_path = agent_dir / "tree.json"
     current = _load_active_manifest(specdock_dir)
+    before = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
 
     # Default behavior: infer active target from current git branch (best-effort).
     if update_active:
@@ -1369,6 +1490,8 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: boo
             if inferred:
                 initiative, epic, issue = _select_active_from_node(nodes, inferred)
                 current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
+                if reason:
+                    print(f"spec-dock: sync: active updated ({reason})", file=sys.stderr)
             else:
                 # Keep the existing active selection unchanged (warning only).
                 if reason:
@@ -1467,6 +1590,12 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: boo
     }
     _write_json(state_index_path, state_index)
     _write_json(tree_path, state_tree)
+    rel_index = state_index_path.relative_to(repo_root).as_posix()
+    rel_tree = tree_path.relative_to(repo_root).as_posix()
+    mode = "github" if github else "local"
+    after = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
+    changed = " active=updated" if (before is not None and after is not None and before != after) else ""
+    print(f"spec-dock: ok (sync) mode={mode} wrote={rel_index},{rel_tree}{changed}")
 
     # Prune legacy v2 directory/file names to avoid duplicates.
     (legacy_work_dir / "state.json").unlink(missing_ok=True)
@@ -1485,30 +1614,55 @@ def _validate(specdock_dir: Path) -> None:
         _parse_id(node_id)
         if not node.title:
             raise RuntimeError(f"Missing title in meta.json: {node.path / 'meta.json'}")
+        if not node.slug:
+            raise RuntimeError(f"Missing slug in meta.json: {node.path / 'meta.json'}")
+        _validate_slug(node.slug, field="slug")
 
         if node.type == "initiative":
+            if node.parent_id is not None:
+                raise RuntimeError(f"initiative parent_id must be null: {node.id}")
+            if node.initiative_id is not None or node.epic_id is not None:
+                raise RuntimeError(f"initiative must not have initiative_id/epic_id: {node.id}")
             continue
 
         if node.type == "epic":
+            if not node.parent_id:
+                raise RuntimeError(f"epic missing parent_id: {node.path / 'meta.json'}")
             if not node.initiative_id:
                 raise RuntimeError(f"epic missing initiative_id: {node.path / 'meta.json'}")
-            parent = nodes.get(node.initiative_id)
+            if node.parent_id != node.initiative_id:
+                raise RuntimeError(
+                    f"epic parent_id mismatch: {node.id} parent_id={node.parent_id} initiative_id={node.initiative_id}"
+                )
+            parent = nodes.get(node.parent_id)
             if not parent or parent.type != "initiative":
-                raise RuntimeError(f"epic points to invalid initiative_id: {node.initiative_id}")
+                raise RuntimeError(f"epic points to invalid parent initiative: {node.parent_id}")
             continue
 
         if node.type == "issue":
+            if not node.parent_id:
+                raise RuntimeError(f"issue missing parent_id: {node.path / 'meta.json'}")
             if not node.initiative_id or not node.epic_id:
                 raise RuntimeError(f"issue missing initiative_id/epic_id: {node.path / 'meta.json'}")
+            if node.parent_id != node.epic_id:
+                raise RuntimeError(
+                    f"issue parent_id mismatch: {node.id} parent_id={node.parent_id} epic_id={node.epic_id}"
+                )
             epic = nodes.get(node.epic_id)
             if not epic or epic.type != "epic":
                 raise RuntimeError(f"issue points to invalid epic_id: {node.epic_id}")
             initiative = nodes.get(node.initiative_id)
             if not initiative or initiative.type != "initiative":
                 raise RuntimeError(f"issue points to invalid initiative_id: {node.initiative_id}")
+            if epic.initiative_id and epic.initiative_id != node.initiative_id:
+                raise RuntimeError(
+                    f"issue initiative_id mismatch: {node.id} initiative_id={node.initiative_id} but epic {epic.id} initiative_id={epic.initiative_id}"
+                )
             continue
 
         raise RuntimeError(f"Unknown node type: {node.type} ({node.path / 'meta.json'})")
+
+    print(f"spec-dock: ok (validate) nodes={len(nodes)}")
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -1577,7 +1731,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_active_set = active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)")
     p_active_set.add_argument(
         "target",
-        help="GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
+        help="GitHub issue number (digits only: 123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
     )
 
     active_sub.add_parser("show", help="Show current active pointers")
