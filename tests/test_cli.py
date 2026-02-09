@@ -307,8 +307,8 @@ class TestCli(unittest.TestCase):
             self.assertNotIn("<ISS_TITLE>", requirement)
             self.assertIn("iss-local-0001", requirement)
 
-            # Active issue id also accepts shorthand numeric form.
-            self._run_runtime(target, ["active", "set", "--issue", "1"])
+            # Active pointers are set by a single target argument (node id or GitHub issue number).
+            self._run_runtime(target, ["active", "set", "iss-local-0001"])
             self.assertTrue((target / "spec-dock" / ".agent" / "active.json").is_file())
             self.assertTrue(
                 (target / "spec-dock" / "active" / "issue").exists()
@@ -362,7 +362,7 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             # Initiative-only active: epic/issue are placeholders.
-            self._run_runtime(target, ["active", "set", "--initiative", "1"])
+            self._run_runtime(target, ["active", "set", "init-local-0001"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsNone(active.get("epic"))
@@ -372,7 +372,7 @@ class TestCli(unittest.TestCase):
             self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
 
             # Epic-only active: issue is a placeholder.
-            self._run_runtime(target, ["active", "set", "--epic", "1"])
+            self._run_runtime(target, ["active", "set", "epic-local-0001"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsInstance(active.get("epic"), dict)
@@ -418,6 +418,14 @@ class TestCli(unittest.TestCase):
             self.assertEqual(active["initiative"]["id"], "init-local-0001")
             self.assertEqual(active["epic"]["id"], "epic-local-0001")
             self.assertEqual(active["issue"]["id"], "iss-local-0001")
+
+    def test_active_set_rejects_legacy_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Legacy flags were removed in favor of a single `target` argument.
+            self._run_runtime_expect_fail(target, ["active", "set", "--issue", "1"])
 
     def test_active_set_github_issue_checkout_sets_active(self) -> None:
         if os.name == "nt":
@@ -467,9 +475,67 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                self._run_runtime(target, ["active", "set", "--github-issue", "123"], env=test_env)
+                self._run_runtime(target, ["active", "set", "123"], env=test_env)
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-0123")
+
+    def test_active_set_github_issue_number_requires_linked_node(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create a spec tree locally (no GitHub links).
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            # Make the working tree clean so checkout is allowed.
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                counter = bin_dir / "counter.txt"
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    f"counter_file='{counter.as_posix()}'\n"
+                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                # GitHub issue number requires a linked node; checkout runs, then the command errors.
+                self._run_runtime_expect_fail(target, ["active", "set", "999"], env=test_env)
+                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
 
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":
@@ -526,8 +592,8 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                # By default, activating a GitHub-linked issue also triggers checkout.
-                self._run_runtime(target, ["active", "set", "--issue", "123"], env=test_env)
+                # Activating a GitHub-linked node id also triggers checkout.
+                self._run_runtime(target, ["active", "set", "iss-0123"], env=test_env)
                 self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -568,7 +634,7 @@ class TestCli(unittest.TestCase):
             gh_path.chmod(0o755)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            self._run_runtime_expect_fail(target, ["active", "set", "--github-issue", "123"], env=test_env)
+            self._run_runtime_expect_fail(target, ["active", "set", "123"], env=test_env)
 
     def test_new_no_github_does_not_invoke_gh(self) -> None:
         if os.name == "nt":

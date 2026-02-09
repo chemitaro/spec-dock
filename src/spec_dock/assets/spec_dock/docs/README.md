@@ -33,13 +33,14 @@
 ### 3) active（現在作業中）を設定
 
 ```bash
-./spec active set --issue 125   # iss-0125 / iss-local-0001 も可
-# GitHub Issue番号から「checkout + active + sync」まで一括で行う場合:
-./spec active set --github-issue 125
+./spec active set 125            # GitHub issue number（checkout + active + sync）
+./spec active set iss-0125       # node id（checkout + active + sync）
+./spec active set iss-local-0001 # local node id（checkout しない）
 ```
 
 注意:
-- `--issue` で指定したノードが GitHub Issue に紐づいている場合（`github.issue_number` がある場合）、`active set` は **ブランチのcheckoutも行います**。
+- `active set 125` は、仕様ツリー内に `github.issue_number == 125` のノードが存在する必要があります（存在しない場合はエラー）。
+- GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set` した場合、`active set` は **必ずブランチのcheckoutも行います**。
 - ローカルのみ（`*-local-*`）のノードは checkout しません。
 
 すると `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。

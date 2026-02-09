@@ -968,24 +968,67 @@ def _find_node_by_github_issue_number(nodes: dict[str, _Node], *, issue_number: 
     return matches[0]
 
 
+def _parse_active_set_target(target: str) -> tuple[str, int | str]:
+    """Parse `active set <target>` into either a GitHub issue number or a node id.
+
+    Accepted inputs:
+    - GitHub issue number: `123`
+    - GitHub issue number: `#123`
+    - GitHub issue URL: `https://github.com/<owner>/<repo>/issues/123`
+    - Node id (or anything containing it): `iss-0123`, `iss-0123-foo`, `path/to/iss-0123-foo`
+    """
+    raw = target.strip()
+    if not raw:
+        raise RuntimeError("target is required")
+
+    # 1) GitHub issue URL.
+    m = _GH_ISSUE_URL_RE.search(raw)
+    if m:
+        return ("github_issue", int(m.group("num")))
+
+    # 2) `#123`
+    s = raw.strip()
+    if s.startswith("#") and _NUM_RE.fullmatch(s[1:]):
+        return ("github_issue", int(s[1:]))
+
+    # 3) `123`
+    if _NUM_RE.fullmatch(s):
+        return ("github_issue", int(s))
+
+    # 4) Node id embedded in text (ids are lowercase on disk; accept mixed-case input).
+    lowered = raw.lower()
+    matches = [m.group("id") for m in _ID_IN_TEXT_RE.finditer(lowered)]
+    unique = sorted(set(matches))
+    if len(unique) == 1:
+        prefix, is_local, num = _parse_id(unique[0])
+        if prefix not in ("init", "epic", "iss"):
+            raise RuntimeError(f"Unsupported id prefix for active set: {prefix}")
+        return ("node_id", _format_id(prefix, num, local=is_local))
+    if len(unique) > 1:
+        raise RuntimeError(f"Ambiguous target: multiple ids found: {', '.join(unique)}")
+
+    raise RuntimeError(
+        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL) or a node id (e.g. iss-0123)."
+    )
+
+
 def _active_set(
     specdock_dir: Path,
     *,
-    initiative_id: str | None,
-    epic_id: str | None,
-    issue_id: str | None,
-    github_issue_number: int | None,
-    checkout: bool,
+    target: str,
 ) -> None:
-    """Set active pointers (initiative/epic/issue), optionally checkout via GitHub issue."""
+    """Set active pointers (initiative/epic/issue) from a single target."""
     repo_root = specdock_dir.parent
 
-    # If `--github-issue` is specified, checkout first (branch may change the local spec tree).
-    if github_issue_number is not None:
-        _gh_issue_checkout(repo_root, issue_number=int(github_issue_number))
+    kind, value = _parse_active_set_target(target)
+
+    # If a GitHub issue number is specified, checkout first (branch may change the local spec tree).
+    if kind == "github_issue":
+        issue_number = int(value)  # type: ignore[arg-type]
+        _gh_issue_checkout(repo_root, issue_number=issue_number)
         nodes = _scan_nodes(specdock_dir)
-        target = _find_node_by_github_issue_number(nodes, issue_number=int(github_issue_number))
-        initiative, epic, issue = _select_active_from_node(nodes, target)
+        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+        initiative, epic, issue = _select_active_from_node(nodes, node)
         current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
         _apply_active_pointers(specdock_dir, current)
         # Keep derived state in sync, but do not override explicit selection by branch inference.
@@ -996,31 +1039,17 @@ def _active_set(
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
 
-    if issue_id is not None:
-        resolved = _resolve_id_input(issue_id, prefix="iss", field="issue", nodes=nodes)
-        node = nodes.get(resolved)
-        if not node or node.type != "issue":
-            raise RuntimeError(f"Issue not found: {resolved}")
-    elif epic_id is not None:
-        resolved = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
-        node = nodes.get(resolved)
-        if not node or node.type != "epic":
-            raise RuntimeError(f"Epic not found: {resolved}")
-    elif initiative_id is not None:
-        resolved = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
-        node = nodes.get(resolved)
-        if not node or node.type != "initiative":
-            raise RuntimeError(f"Initiative not found: {resolved}")
-    else:
-        raise RuntimeError("Internal error: missing active target")
+    if kind != "node_id":
+        raise RuntimeError("Internal error: invalid active target kind")
+
+    resolved = str(value)
+    node = nodes.get(resolved)
+    if not node or node.type not in ("initiative", "epic", "issue"):
+        raise RuntimeError(f"Node not found: {resolved}")
 
     # Default behavior:
-    # - When activating an Issue that is linked to a GitHub issue number, also checkout its branch.
-    # - For initiative/epic, checkout is opt-in via `--checkout`.
-    should_checkout = checkout or (node.type == "issue" and node.github_issue_number is not None)
-    if should_checkout:
-        if node.github_issue_number is None:
-            raise RuntimeError(f"checkout requires github.issue_number: {node.type}:{node.id}")
+    # - If the target node is linked to a GitHub issue number, always checkout its branch first.
+    if node.github_issue_number is not None:
         _gh_issue_checkout(repo_root, issue_number=int(node.github_issue_number))
         # Re-scan after checkout to reflect branch-specific spec trees.
         nodes = _scan_nodes(specdock_dir)
@@ -1455,15 +1484,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
 
     p_active_set = active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)")
-    active_target = p_active_set.add_mutually_exclusive_group(required=True)
-    active_target.add_argument("--initiative", help="Initiative (e.g. 123 / init-0123 / init-local-0001)")
-    active_target.add_argument("--epic", help="Epic (e.g. 123 / epic-0123 / epic-local-0001)")
-    active_target.add_argument("--issue", help="Issue (e.g. 123 / iss-0123 / iss-local-0001)")
-    active_target.add_argument("--github-issue", type=int, help="GitHub issue number to checkout + activate")
     p_active_set.add_argument(
-        "--checkout",
-        action="store_true",
-        help="Checkout via gh before activating (initiative/epic only; issue is checked out by default when linked)",
+        "target",
+        help="GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-0123 / epic-local-0001)",
     )
 
     active_sub.add_parser("show", help="Show current active pointers")
@@ -1538,11 +1561,7 @@ def main(argv: list[str] | None = None) -> int:
             if ns.active_cmd == "set":
                 _active_set(
                     specdock_dir,
-                    initiative_id=str(ns.initiative) if getattr(ns, "initiative", None) is not None else None,
-                    epic_id=str(ns.epic) if getattr(ns, "epic", None) is not None else None,
-                    issue_id=str(ns.issue) if getattr(ns, "issue", None) is not None else None,
-                    github_issue_number=getattr(ns, "github_issue", None),
-                    checkout=bool(getattr(ns, "checkout", False)),
+                    target=str(ns.target),
                 )
             elif ns.active_cmd == "show":
                 _active_show(specdock_dir)

@@ -22,15 +22,17 @@ v2 では、日常運用（initiative/epic/issue/adr の作成、active 切り�
 ./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"    # id=iss-local-0001
 
 # 既存の GitHub Issue 番号に紐づける（新規作成しない）
-./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-0123
-./spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation"
+	./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-0123
+	./spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation"
 
-# active（現在作業中）を設定
-./spec-dock/scripts/spec-dock active set --issue 0123  # also accepts iss-0123
+	# active（現在作業中）を設定
+	./spec-dock/scripts/spec-dock active set 123          # GitHub issue number（checkout + active + sync）
+	./spec-dock/scripts/spec-dock active set iss-0123     # node id（checkout + active + sync）
+	./spec-dock/scripts/spec-dock active set iss-local-0001  # local node id（checkout しない）
 
-# 状態集計を生成
-./spec-dock/scripts/spec-dock sync
-./spec-dock/scripts/spec-dock sync --github  # 追加で GitHub の状態を enrich（gh が必要）
+	# 状態集計を生成
+	./spec-dock/scripts/spec-dock sync
+	./spec-dock/scripts/spec-dock sync --github  # 追加で GitHub の状態を enrich（gh が必要）
 
 # 構造チェック
 ./spec-dock/scripts/spec-dock validate

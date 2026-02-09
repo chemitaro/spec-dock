@@ -8,7 +8,7 @@ description: A workflow that drives development from requirements refined into o
 - Open `spec-dock/docs/README.md` first.
 - Open `spec-dock/docs/workflow-issue.md` next (Issue workflow). If the task is multi-issue or re-architecture, also consult `spec-dock/docs/workflow-tree.md` and `spec-dock/docs/workflow-adr.md`.
 - Check active pointers: run `./spec-dock/scripts/spec-dock active show`.
-  - If active is not set, ask the user to run `./spec-dock/scripts/spec-dock active set --issue iss-xxxx` (or provide the target issue path/ID).
+  - If active is not set, ask the user to run `./spec-dock/scripts/spec-dock active set iss-xxxx` (or provide the GitHub issue number / issue URL).
   - Then open `spec-dock/active/context-pack.md`.
 - Read the active Issue specs and keep them as the source of truth:
   - `spec-dock/active/issue/requirement.md` → `spec-dock/active/issue/design.md` → `spec-dock/active/issue/plan.md`
