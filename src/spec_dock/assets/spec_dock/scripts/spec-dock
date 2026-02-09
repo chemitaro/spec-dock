@@ -43,6 +43,14 @@ _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<n
 _NUM_RE = re.compile(r"^[0-9]+$")
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 
+# Branch name parsing helpers (best-effort):
+# - Prefer explicit ids embedded in branch names (e.g. `feature/iss-0123-foo`).
+# - Fallback to GitHub issue numbers embedded in branch names (e.g. `123-foo`, `issue-123-foo`, `#123`).
+_ID_IN_TEXT_RE = re.compile(r"(?<![a-z0-9])(?P<id>(?:init|epic|iss)(?:-local)?-[0-9]+)(?![a-z0-9])")
+_HASH_ISSUE_IN_TEXT_RE = re.compile(r"#(?P<num>[0-9]+)\b")
+_KEYWORD_ISSUE_IN_TEXT_RE = re.compile(r"(?i)(?:issue|gh)[-_]?(?P<num>[0-9]+)\b")
+_LEADING_NUMBER_IN_TEXT_RE = re.compile(r"^(?P<num>[0-9]+)[-_].+")
+
 
 @dataclass(frozen=True)
 class _Node:
@@ -696,59 +704,155 @@ def _write_pathfile(active_dir: Path, name: str, target: Path) -> None:
     pathfile.write_text(rel_target + "\n", encoding="utf-8")
 
 
-def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
-    """Set the active issue and generate pointers + a context-pack.
+def _load_active_manifest(specdock_dir: Path) -> dict[str, Any] | None:
+    """Load SSOT active manifest (best-effort migrate legacy `.work/*`)."""
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    active_path = agent_dir / "active.json"
+    legacy_active_path = legacy_work_dir / "active.json"
+    legacy_current_path = legacy_work_dir / "current.json"
 
-    Side effects:
-    - Writes SSOT: `spec-dock/.agent/active.json` (fallback read: legacy `spec-dock/.work/*`)
-    - Updates pointers: `spec-dock/active/{initiative,epic,issue}`
-      - Uses symlinks when possible
-      - Falls back to `.path` files when symlinks are not supported
-    - Generates: `spec-dock/active/context-pack.md`
-    """
-    nodes = _scan_nodes(specdock_dir)
-    issue_id = _resolve_id_input(issue_id, prefix="iss", field="issue", nodes=nodes)
-    issue = nodes.get(issue_id)
-    if not issue or issue.type != "issue":
-        raise RuntimeError(f"Issue not found: {issue_id}")
-    if not issue.epic_id or not issue.initiative_id:
-        raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {issue_id}")
+    if active_path.exists():
+        current = _load_json(active_path)
+        return current if isinstance(current, dict) else None
 
-    epic = nodes.get(issue.epic_id)
-    initiative = nodes.get(issue.initiative_id)
-    if not epic or epic.type != "epic":
-        raise RuntimeError(f"Epic not found: {issue.epic_id}")
-    if not initiative or initiative.type != "initiative":
-        raise RuntimeError(f"Initiative not found: {issue.initiative_id}")
+    if legacy_active_path.exists():
+        current = _load_json(legacy_active_path)
+        if isinstance(current, dict):
+            _write_json(active_path, current)
+        legacy_active_path.unlink(missing_ok=True)
+        return current if isinstance(current, dict) else None
 
+    if legacy_current_path.exists():
+        current = _load_json(legacy_current_path)
+        if isinstance(current, dict):
+            _write_json(active_path, current)
+        legacy_current_path.unlink(missing_ok=True)
+        return current if isinstance(current, dict) else None
+
+    return None
+
+
+def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
+    """Return the placeholder directory for `layer` (initiative/epic/issue)."""
+    p = specdock_dir / "system" / "active-none" / layer
+    if not p.exists():
+        raise RuntimeError(f"Missing placeholder directory: {p} (run 'spec-dock update')")
+    return p
+
+
+def _active_entry(repo_root: Path, node: _Node | None) -> dict[str, str] | None:
+    """Return an `{id,path}` entry for an active manifest, or None."""
+    if node is None:
+        return None
+    return {"id": node.id, "path": node.path.relative_to(repo_root).as_posix()}
+
+
+def _write_active_manifest(specdock_dir: Path, *, initiative: _Node | None, epic: _Node | None, issue: _Node | None) -> dict[str, Any]:
+    """Write SSOT active manifest (schema v2) and prune legacy files."""
     repo_root = specdock_dir.parent
     agent_dir = specdock_dir / _AGENT_DIRNAME
     legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
-    active_dir = specdock_dir / _ACTIVE_DIRNAME
     agent_dir.mkdir(parents=True, exist_ok=True)
-    active_dir.mkdir(parents=True, exist_ok=True)
 
-    def rel(p: Path) -> str:
-        """Return `p` as a repo-root-relative POSIX path string."""
-        return p.relative_to(repo_root).as_posix()
-
-    # SSOT manifest: other generated artifacts should be derivable from this.
     current = {
-        "schema_version": 1,
+        "schema_version": 2,
         "updated_at": _now_iso(),
-        "initiative": {"id": initiative.id, "path": rel(initiative.path)},
-        "epic": {"id": epic.id, "path": rel(epic.path)},
-        "issue": {"id": issue.id, "path": rel(issue.path)},
+        "initiative": _active_entry(repo_root, initiative),
+        "epic": _active_entry(repo_root, epic),
+        "issue": _active_entry(repo_root, issue),
     }
     _write_json(agent_dir / "active.json", current)
 
     # Prune legacy SSOT files to avoid duplicate manifests in older directories.
     (legacy_work_dir / "active.json").unlink(missing_ok=True)
     (legacy_work_dir / "current.json").unlink(missing_ok=True)
+    return current
+
+
+def _active_entry_id(entry: Any) -> str | None:
+    if isinstance(entry, dict):
+        v = entry.get("id")
+        return str(v) if isinstance(v, str) and v.strip() else None
+    return None
+
+
+def _active_entry_path(repo_root: Path, entry: Any) -> Path | None:
+    if isinstance(entry, dict):
+        v = entry.get("path")
+        if isinstance(v, str) and v.strip():
+            p = repo_root / v
+            if p.exists():
+                return p
+    return None
+
+
+def _render_context_pack(current: dict[str, Any] | None) -> str:
+    """Render `spec-dock/active/context-pack.md` based on `current`."""
+    init_entry = current.get("initiative") if isinstance(current, dict) else None
+    epic_entry = current.get("epic") if isinstance(current, dict) else None
+    issue_entry = current.get("issue") if isinstance(current, dict) else None
+
+    init_id = _active_entry_id(init_entry) or "(none)"
+    epic_id = _active_entry_id(epic_entry) or "(none)"
+    issue_id = _active_entry_id(issue_entry) or "(none)"
+
+    has_init = isinstance(init_entry, dict)
+    has_epic = isinstance(epic_entry, dict)
+    has_issue = isinstance(issue_entry, dict)
+
+    lines: list[str] = []
+    lines.append("# Context Pack (generated)")
+    lines.append("")
+    lines.append("## Active")
+    lines.append(f"- initiative: {init_id}")
+    lines.append(f"- epic: {epic_id}")
+    lines.append(f"- issue: {issue_id}")
+    lines.append("")
+    lines.append("## Generated state")
+    lines.append("- index: `spec-dock/.agent/index.json`")
+    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("")
+    lines.append("## Read order")
+    lines.append("- `spec-dock/active/initiative/README.md`")
+    if has_init:
+        lines.append("- `spec-dock/active/initiative/requirement.md`")
+        lines.append("- `spec-dock/active/initiative/design.md`")
+        lines.append("- `spec-dock/active/initiative/plan.md`")
+    lines.append("- `spec-dock/active/epic/README.md`")
+    if has_epic:
+        lines.append("- `spec-dock/active/epic/requirement.md`")
+        lines.append("- `spec-dock/active/epic/design.md`")
+        lines.append("- `spec-dock/active/epic/plan.md`")
+    lines.append("- `spec-dock/active/issue/README.md`")
+    if has_issue:
+        lines.append("- `spec-dock/active/issue/requirement.md`")
+        lines.append("- `spec-dock/active/issue/design.md`")
+        lines.append("- `spec-dock/active/issue/plan.md`")
+        lines.append("- `spec-dock/active/issue/report.md`")
+    lines.append("")
+    lines.append("## Commands")
+    lines.append("- state (local): `./spec-dock/scripts/spec-dock sync`")
+    lines.append("- state (github): `./spec-dock/scripts/spec-dock sync --github`")
+    lines.append("- validate: `./spec-dock/scripts/spec-dock validate`")
+    lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+def _apply_active_pointers(specdock_dir: Path, current: dict[str, Any] | None) -> None:
+    """Update `spec-dock/active/*` pointers (symlink or `.path`) and context-pack."""
+    repo_root = specdock_dir.parent
+    active_dir = specdock_dir / _ACTIVE_DIRNAME
+    active_dir.mkdir(parents=True, exist_ok=True)
 
     # Remove existing pointers (symlink or fallback pathfiles).
     for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
         _unlink_any(active_dir / name)
+
+    def target_dir(layer: str) -> Path:
+        entry = current.get(layer) if isinstance(current, dict) else None
+        return _active_entry_path(repo_root, entry) or _active_placeholder_dir(specdock_dir, layer)
 
     def symlink(name: str, target: Path) -> None:
         """Create an active pointer under `spec-dock/active/` (symlink or fallback)."""
@@ -761,75 +865,202 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
             # Fallback: keep it readable even in environments where symlinks are restricted.
             _write_pathfile(active_dir, name, target)
 
-    symlink("initiative", initiative.path)
-    symlink("epic", epic.path)
-    symlink("issue", issue.path)
+    symlink("initiative", target_dir("initiative"))
+    symlink("epic", target_dir("epic"))
+    symlink("issue", target_dir("issue"))
 
-    # Generated entrypoint for agents: a single file that tells what to read and run first.
-    ctx = (
-        "# Context Pack (generated)\n\n"
-        "## Active\n"
-        f"- initiative: {initiative.id}\n"
-        f"- epic: {epic.id}\n"
-        f"- issue: {issue.id}\n\n"
-        "## Generated state\n"
-        "- index: `spec-dock/.agent/index.json`\n"
-        "- tree: `spec-dock/.agent/tree.json`\n\n"
-        "## Read order\n"
-        "- `spec-dock/active/initiative/README.md`\n"
-        "- `spec-dock/active/epic/README.md`\n"
-        "- `spec-dock/active/issue/README.md`\n"
-        "- `spec-dock/active/issue/requirement.md`\n"
-        "- `spec-dock/active/issue/design.md`\n"
-        "- `spec-dock/active/issue/plan.md`\n\n"
-        "## Commands\n"
-        "- state (local): `./spec-dock/scripts/spec-dock sync`\n"
-        "- state (github): `./spec-dock/scripts/spec-dock sync --github`\n"
-    )
-    (active_dir / "context-pack.md").write_text(ctx, encoding="utf-8")
+    (active_dir / "context-pack.md").write_text(_render_context_pack(current), encoding="utf-8")
+
+
+def _ensure_git_available() -> None:
+    """Raise if `git` is not available in PATH."""
+    if shutil.which("git") is None:
+        raise RuntimeError("'git' CLI not found. Install Git, or disable git-dependent operations.")
+
+
+def _require_clean_working_tree(repo_root: Path) -> None:
+    """Raise if there are uncommitted/untracked changes (safety-first)."""
+    _ensure_git_available()
+    try:
+        p = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: git status --porcelain\n{(e.stderr or '').strip()}") from e
+
+    out = (p.stdout or "").strip()
+    if out:
+        head = "\n".join(out.splitlines()[:20])
+        more = "" if len(out.splitlines()) <= 20 else "\n..."
+        raise RuntimeError(
+            "Working tree is not clean; aborting checkout for safety.\n"
+            "Please commit/stash your changes first.\n\n"
+            f"{head}{more}"
+        )
+
+
+def _gh_issue_checkout(repo_root: Path, *, issue_number: int) -> None:
+    """Create/switch to the branch for the given GitHub issue number via `gh`."""
+    _ensure_gh_available()
+    _require_clean_working_tree(repo_root)
+
+    cmd1 = ["gh", "issue", "checkout", str(issue_number)]
+    try:
+        subprocess.run(cmd1, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        return
+    except subprocess.CalledProcessError as e1:
+        # Fallback: some `gh` versions support `issue develop`.
+        cmd2 = ["gh", "issue", "develop", str(issue_number), "--checkout"]
+        try:
+            subprocess.run(cmd2, cwd=str(repo_root), capture_output=True, text=True, check=True)
+            return
+        except subprocess.CalledProcessError as e2:
+            raise RuntimeError(
+                "Failed to checkout issue branch via gh.\n"
+                f"- tried: {' '.join(cmd1)}\n"
+                f"  stderr: {(e1.stderr or '').strip()}\n"
+                f"- tried: {' '.join(cmd2)}\n"
+                f"  stderr: {(e2.stderr or '').strip()}"
+            ) from e2
+
+
+def _select_active_from_node(nodes: dict[str, _Node], node: _Node) -> tuple[_Node | None, _Node | None, _Node | None]:
+    """Return (initiative, epic, issue) selection derived from a node."""
+    if node.type == "initiative":
+        return (node, None, None)
+    if node.type == "epic":
+        if not node.initiative_id:
+            raise RuntimeError(f"Epic meta missing initiative_id: {node.id}")
+        initiative = nodes.get(node.initiative_id)
+        if not initiative or initiative.type != "initiative":
+            raise RuntimeError(f"Initiative not found: {node.initiative_id}")
+        return (initiative, node, None)
+    if node.type == "issue":
+        if not node.epic_id or not node.initiative_id:
+            raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {node.id}")
+        epic = nodes.get(node.epic_id)
+        initiative = nodes.get(node.initiative_id)
+        if not epic or epic.type != "epic":
+            raise RuntimeError(f"Epic not found: {node.epic_id}")
+        if not initiative or initiative.type != "initiative":
+            raise RuntimeError(f"Initiative not found: {node.initiative_id}")
+        return (initiative, epic, node)
+
+    raise RuntimeError(f"Unsupported node type for active: {node.type} ({node.id})")
+
+
+def _find_node_by_github_issue_number(nodes: dict[str, _Node], *, issue_number: int) -> _Node:
+    """Find a unique node (initiative/epic/issue) by `github.issue_number`."""
+    matches = [
+        n
+        for n in nodes.values()
+        if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    if not matches:
+        raise RuntimeError(f"No node found for github.issue_number={issue_number}. Create/link the node first.")
+    if len(matches) > 1:
+        ids = ", ".join(sorted(f"{m.type}:{m.id}" for m in matches))
+        raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
+    return matches[0]
+
+
+def _active_set(
+    specdock_dir: Path,
+    *,
+    initiative_id: str | None,
+    epic_id: str | None,
+    issue_id: str | None,
+    github_issue_number: int | None,
+    checkout: bool,
+) -> None:
+    """Set active pointers (initiative/epic/issue), optionally checkout via GitHub issue."""
+    repo_root = specdock_dir.parent
+
+    # If `--github-issue` is specified, checkout first (branch may change the local spec tree).
+    if github_issue_number is not None:
+        _gh_issue_checkout(repo_root, issue_number=int(github_issue_number))
+        nodes = _scan_nodes(specdock_dir)
+        target = _find_node_by_github_issue_number(nodes, issue_number=int(github_issue_number))
+        initiative, epic, issue = _select_active_from_node(nodes, target)
+        current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
+        _apply_active_pointers(specdock_dir, current)
+        # Keep derived state in sync, but do not override explicit selection by branch inference.
+        _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+        return
+
+    nodes = _scan_nodes(specdock_dir)
+    if not nodes:
+        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
+
+    if issue_id is not None:
+        resolved = _resolve_id_input(issue_id, prefix="iss", field="issue", nodes=nodes)
+        node = nodes.get(resolved)
+        if not node or node.type != "issue":
+            raise RuntimeError(f"Issue not found: {resolved}")
+    elif epic_id is not None:
+        resolved = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
+        node = nodes.get(resolved)
+        if not node or node.type != "epic":
+            raise RuntimeError(f"Epic not found: {resolved}")
+    elif initiative_id is not None:
+        resolved = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
+        node = nodes.get(resolved)
+        if not node or node.type != "initiative":
+            raise RuntimeError(f"Initiative not found: {resolved}")
+    else:
+        raise RuntimeError("Internal error: missing active target")
+
+    # Default behavior:
+    # - When activating an Issue that is linked to a GitHub issue number, also checkout its branch.
+    # - For initiative/epic, checkout is opt-in via `--checkout`.
+    should_checkout = checkout or (node.type == "issue" and node.github_issue_number is not None)
+    if should_checkout:
+        if node.github_issue_number is None:
+            raise RuntimeError(f"checkout requires github.issue_number: {node.type}:{node.id}")
+        _gh_issue_checkout(repo_root, issue_number=int(node.github_issue_number))
+        # Re-scan after checkout to reflect branch-specific spec trees.
+        nodes = _scan_nodes(specdock_dir)
+        node = nodes.get(node.id)
+        if not node:
+            raise RuntimeError(f"Node not found after checkout (did the branch change the spec tree?): {resolved}")
+
+    initiative, epic, issue = _select_active_from_node(nodes, node)
+    current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
+    _apply_active_pointers(specdock_dir, current)
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
 
 
 def _active_show(specdock_dir: Path) -> None:
     """Print the current active pointers from `spec-dock/.agent/active.json`."""
-    agent_dir = specdock_dir / _AGENT_DIRNAME
-    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
-    active_path = agent_dir / "active.json"
-    legacy_active_path = legacy_work_dir / "active.json"
-    legacy_current_path = legacy_work_dir / "current.json"
-    if not active_path.exists() and not legacy_active_path.exists() and not legacy_current_path.exists():
+    current = _load_active_manifest(specdock_dir)
+    if not current:
         print("spec-dock: active: (not set)")
         return
 
-    if active_path.exists():
-        current = _load_json(active_path)
-    elif legacy_active_path.exists():
-        current = _load_json(legacy_active_path)
-    else:
-        current = _load_json(legacy_current_path)
+    def fmt(entry: Any) -> str:
+        if not isinstance(entry, dict):
+            return "(none)"
+        node_id = entry.get("id") if isinstance(entry.get("id"), str) else None
+        node_path = entry.get("path") if isinstance(entry.get("path"), str) else None
+        if node_id and node_path:
+            return f"{node_id} ({node_path})"
+        if node_id:
+            return str(node_id)
+        return "(none)"
 
-    # Best-effort migration: if this run used legacy files, write the new SSOT.
-    if not active_path.exists():
-        _write_json(active_path, current)
-        legacy_active_path.unlink(missing_ok=True)
-        legacy_current_path.unlink(missing_ok=True)
-
-    print(f"initiative: {current.get('initiative', {}).get('id')} ({current.get('initiative', {}).get('path')})")
-    print(f"epic: {current.get('epic', {}).get('id')} ({current.get('epic', {}).get('path')})")
-    print(f"issue: {current.get('issue', {}).get('id')} ({current.get('issue', {}).get('path')})")
+    print(f"initiative: {fmt(current.get('initiative'))}")
+    print(f"epic: {fmt(current.get('epic'))}")
+    print(f"issue: {fmt(current.get('issue'))}")
 
 
 def _active_clear(specdock_dir: Path) -> None:
-    """Clear SSOT active manifest and remove generated pointers."""
-    agent_dir = specdock_dir / _AGENT_DIRNAME
-    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
-
-    (agent_dir / "active.json").unlink(missing_ok=True)
-    (legacy_work_dir / "active.json").unlink(missing_ok=True)
-    (legacy_work_dir / "current.json").unlink(missing_ok=True)
-
-    active_dir = specdock_dir / _ACTIVE_DIRNAME
-    for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
-        _unlink_any(active_dir / name)
+    """Clear active pointers (set all layers to placeholder)."""
+    current = _write_active_manifest(specdock_dir, initiative=None, epic=None, issue=None)
+    _apply_active_pointers(specdock_dir, current)
 
 
 def _ensure_gh_available() -> None:
@@ -891,8 +1122,88 @@ def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
         raise RuntimeError(f"Failed to parse issue number from gh output:\n{out}")
     return int(m.group("num"))
 
+def _git_current_branch(repo_root: Path) -> str | None:
+    """Return the current branch name, or None if unavailable/detached."""
+    if shutil.which("git") is None:
+        return None
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+    branch = (p.stdout or "").strip()
+    if not branch or branch == "HEAD":
+        return None
+    return branch
 
-def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
+
+def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> tuple[_Node | None, str | None]:
+    """Infer a unique node from a branch name (best-effort)."""
+    s = branch.strip().lower()
+    if not s:
+        return (None, None)
+
+    # 1) Prefer explicit node ids embedded in the branch name.
+    id_candidates: list[str] = []
+    for m in _ID_IN_TEXT_RE.finditer(s):
+        raw = m.group("id")
+        try:
+            prefix, is_local, num = _parse_id(raw)
+        except RuntimeError:
+            continue
+        canonical = _format_id(prefix, num, local=is_local)
+        if canonical in nodes:
+            id_candidates.append(canonical)
+    id_candidates = sorted(set(id_candidates))
+    if len(id_candidates) == 1:
+        return (nodes[id_candidates[0]], f"matched id in branch: {id_candidates[0]}")
+    if len(id_candidates) > 1:
+        return (None, f"ambiguous ids in branch: {', '.join(id_candidates)}")
+
+    # 2) Fallback: GitHub issue number embedded in the branch name.
+    leaf = s.split("/")[-1]
+    nums: set[int] = set()
+    for m in _HASH_ISSUE_IN_TEXT_RE.finditer(s):
+        try:
+            nums.add(int(m.group("num")))
+        except (TypeError, ValueError):
+            continue
+    for m in _KEYWORD_ISSUE_IN_TEXT_RE.finditer(s):
+        try:
+            nums.add(int(m.group("num")))
+        except (TypeError, ValueError):
+            continue
+    m = _LEADING_NUMBER_IN_TEXT_RE.match(leaf)
+    if m:
+        try:
+            nums.add(int(m.group("num")))
+        except (TypeError, ValueError):
+            pass
+
+    if not nums:
+        # No signal: keep active unchanged silently (common on `main`, `develop`, etc.).
+        return (None, None)
+
+    matches = [
+        n
+        for n in nodes.values()
+        if n.github_issue_number in nums and n.type in ("initiative", "epic", "issue")
+    ]
+    if len(matches) == 1:
+        n = matches[0]
+        return (n, f"matched github.issue_number={n.github_issue_number} from branch")
+    if not matches:
+        return (None, f"no node matches github issue numbers {sorted(nums)}")
+    ids = ", ".join(sorted(f"{m.type}:{m.id}" for m in matches))
+    return (None, f"ambiguous github issue numbers {sorted(nums)}: {ids}")
+
+
+def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: bool) -> None:
     """Generate derived state files under `spec-dock/.agent/` from the local tree (and optionally GitHub)."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
@@ -945,22 +1256,23 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
 
     state_index_path = agent_dir / "index.json"
     tree_path = agent_dir / "tree.json"
-    active_path = agent_dir / "active.json"
-    legacy_active_path = legacy_work_dir / "active.json"
-    legacy_current_path = legacy_work_dir / "current.json"
+    current = _load_active_manifest(specdock_dir)
 
-    if active_path.exists():
-        current = _load_json(active_path)
-    elif legacy_active_path.exists():
-        current = _load_json(legacy_active_path)
-        _write_json(active_path, current)
-        legacy_active_path.unlink(missing_ok=True)
-    elif legacy_current_path.exists():
-        current = _load_json(legacy_current_path)
-        _write_json(active_path, current)
-        legacy_current_path.unlink(missing_ok=True)
-    else:
-        current = None
+    # Default behavior: infer active target from current git branch (best-effort).
+    if update_active:
+        branch = _git_current_branch(repo_root)
+        if branch:
+            inferred, reason = _infer_active_node_from_branch(nodes, branch=branch)
+            if inferred:
+                initiative, epic, issue = _select_active_from_node(nodes, inferred)
+                current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
+            else:
+                # Keep the existing active selection unchanged (warning only).
+                if reason:
+                    print(f"spec-dock: sync: active unchanged ({reason})", file=sys.stderr)
+
+    # Keep `spec-dock/active/*` always usable (placeholder when unset).
+    _apply_active_pointers(specdock_dir, current if isinstance(current, dict) else None)
 
     # Flatten nodes so tools/agents can query by id without traversing the FS again.
     out_nodes: dict[str, Any] = {}
@@ -1037,14 +1349,14 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
         tree.append(init_item)
 
     state_index = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
         "nodes": out_nodes,
     }
     state_tree = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
@@ -1142,8 +1454,17 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_active = sub.add_parser("active", help="Manage the active pointers")
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
 
-    p_active_set = active_sub.add_parser("set", help="Set the active issue")
-    p_active_set.add_argument("--issue", required=True, help="Issue (e.g. 123 / iss-0123 / iss-local-0001)")
+    p_active_set = active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)")
+    active_target = p_active_set.add_mutually_exclusive_group(required=True)
+    active_target.add_argument("--initiative", help="Initiative (e.g. 123 / init-0123 / init-local-0001)")
+    active_target.add_argument("--epic", help="Epic (e.g. 123 / epic-0123 / epic-local-0001)")
+    active_target.add_argument("--issue", help="Issue (e.g. 123 / iss-0123 / iss-local-0001)")
+    active_target.add_argument("--github-issue", type=int, help="GitHub issue number to checkout + activate")
+    p_active_set.add_argument(
+        "--checkout",
+        action="store_true",
+        help="Checkout via gh before activating (initiative/epic only; issue is checked out by default when linked)",
+    )
 
     active_sub.add_parser("show", help="Show current active pointers")
     active_sub.add_parser("clear", help="Clear active pointers")
@@ -1151,6 +1472,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_sync = sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)")
     p_sync.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
     p_sync.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
+    p_sync.add_argument(
+        "--no-update-active",
+        action="store_true",
+        help="Do not update active pointers from current git branch (index/tree generation only)",
+    )
 
     sub.add_parser("validate", help="Validate the spec tree structure")
 
@@ -1210,7 +1536,14 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError(f"Unknown new kind: {ns.new_kind}")
         elif ns.command == "active":
             if ns.active_cmd == "set":
-                _active_set(specdock_dir, issue_id=str(ns.issue))
+                _active_set(
+                    specdock_dir,
+                    initiative_id=str(ns.initiative) if getattr(ns, "initiative", None) is not None else None,
+                    epic_id=str(ns.epic) if getattr(ns, "epic", None) is not None else None,
+                    issue_id=str(ns.issue) if getattr(ns, "issue", None) is not None else None,
+                    github_issue_number=getattr(ns, "github_issue", None),
+                    checkout=bool(getattr(ns, "checkout", False)),
+                )
             elif ns.active_cmd == "show":
                 _active_show(specdock_dir)
             elif ns.active_cmd == "clear":
@@ -1218,7 +1551,12 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 raise RuntimeError(f"Unknown active command: {ns.active_cmd}")
         elif ns.command == "sync":
-            _sync(specdock_dir, github=bool(ns.github), gh_limit=int(ns.gh_limit))
+            _sync(
+                specdock_dir,
+                github=bool(ns.github),
+                gh_limit=int(ns.gh_limit),
+                update_active=not bool(getattr(ns, "no_update_active", False)),
+            )
         elif ns.command == "validate":
             _validate(specdock_dir)
         else:

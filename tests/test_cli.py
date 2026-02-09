@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import subprocess
+import shutil
 import unittest
 import json
 from importlib.metadata import PackageNotFoundError, version
@@ -52,6 +53,57 @@ class TestCli(unittest.TestCase):
                 f"- stderr:\n{p.stderr}\n"
             )
 
+    def _run_runtime_expect_fail(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+
+        merged_env = os.environ.copy()
+        if env:
+            merged_env.update(env)
+
+        p = subprocess.run(
+            [sys.executable, str(script), *args],
+            cwd=str(target),
+            env=merged_env,
+            capture_output=True,
+            text=True,
+        )
+        if p.returncode == 0:
+            raise AssertionError(
+                "runtime command unexpectedly succeeded:\n"
+                f"- cmd: {args}\n"
+                f"- stdout:\n{p.stdout}\n"
+                f"- stderr:\n{p.stderr}\n"
+            )
+
+    def _read_active_pointer_text(self, target: Path, pointer: str, rel_file: str) -> str:
+        active_dir = target / "spec-dock" / "active"
+        direct = active_dir / pointer
+        if direct.exists():
+            return (direct / rel_file).read_text(encoding="utf-8")
+
+        pathfile = active_dir / f"{pointer}.path"
+        self.assertTrue(pathfile.is_file(), f"missing pointer: {pointer} or {pointer}.path")
+        rel = pathfile.read_text(encoding="utf-8").strip()
+        resolved = (active_dir / rel).resolve()
+        return (resolved / rel_file).read_text(encoding="utf-8")
+
+    def _run_git(self, target: Path, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        p = subprocess.run(
+            ["git", *args],
+            cwd=str(target),
+            capture_output=True,
+            text=True,
+        )
+        if check and p.returncode != 0:
+            raise AssertionError(
+                "git command failed:\n"
+                f"- cmd: {args}\n"
+                f"- stdout:\n{p.stdout}\n"
+                f"- stderr:\n{p.stderr}\n"
+            )
+        return p
+
     def _assert_version_file(self, target: Path) -> None:
         version_file = target / "spec-dock" / "spec-dock.version"
         self.assertTrue(version_file.is_file())
@@ -69,6 +121,7 @@ class TestCli(unittest.TestCase):
             self.assertTrue((target / "spec-dock" / "docs").is_dir())
             self.assertTrue((target / "spec-dock" / "templates").is_dir())
             self.assertTrue((target / "spec-dock" / "scripts").is_dir())
+            self.assertTrue((target / "spec-dock" / "system").is_dir())
             self.assertTrue((target / "spec-dock" / "initiatives").is_dir())
             self.assertTrue((target / "spec-dock" / "active").is_dir())
             self.assertTrue((target / "spec-dock" / ".agent").is_dir())
@@ -94,6 +147,12 @@ class TestCli(unittest.TestCase):
             scripts_dir = target / "spec-dock" / "scripts"
             self.assertTrue((scripts_dir / "spec-dock").is_file())
             self.assertEqual(list(scripts_dir.glob("spec-dock-close*.sh")), [])
+
+            # Placeholders exist (active pointers must never be broken).
+            placeholder_root = target / "spec-dock" / "system" / "active-none"
+            self.assertTrue((placeholder_root / "initiative" / "README.md").is_file())
+            self.assertTrue((placeholder_root / "epic" / "README.md").is_file())
+            self.assertTrue((placeholder_root / "issue" / "README.md").is_file())
 
             # Legacy (v1) templates should not be installed.
             templates_dir = target / "spec-dock" / "templates"
@@ -266,6 +325,225 @@ class TestCli(unittest.TestCase):
             # `tree.json` nodes match the same node schema as `index.json` nodes.
             self.assertEqual(issue_item, index_nodes["iss-local-0001"])
             self._run_runtime(target, ["validate"])
+
+    def test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Create a minimal local tree.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            # Initiative-only active: epic/issue are placeholders.
+            self._run_runtime(target, ["active", "set", "--initiative", "1"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertIsInstance(active.get("initiative"), dict)
+            self.assertIsNone(active.get("epic"))
+            self.assertIsNone(active.get("issue"))
+            self.assertIn("init-local-0001", self._read_active_pointer_text(target, "initiative", "README.md"))
+            self.assertIn("Active Epic: （なし）", self._read_active_pointer_text(target, "epic", "README.md"))
+            self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
+
+            # Epic-only active: issue is a placeholder.
+            self._run_runtime(target, ["active", "set", "--epic", "1"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertIsInstance(active.get("initiative"), dict)
+            self.assertIsInstance(active.get("epic"), dict)
+            self.assertIsNone(active.get("issue"))
+            self.assertIn("epic-local-0001", self._read_active_pointer_text(target, "epic", "README.md"))
+            self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
+
+            # Clear: all placeholders.
+            self._run_runtime(target, ["active", "clear"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertIsNone(active.get("initiative"))
+            self.assertIsNone(active.get("epic"))
+            self.assertIsNone(active.get("issue"))
+            self.assertIn("Active Initiative: （なし）", self._read_active_pointer_text(target, "initiative", "README.md"))
+            self.assertIn("Active Epic: （なし）", self._read_active_pointer_text(target, "epic", "README.md"))
+            self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
+
+    def test_sync_updates_active_from_branch_id(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Prepare a minimal git repository so `sync` can read the current branch name.
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create nodes (local-only).
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            # Branch name includes the node id.
+            self._run_git(target, ["checkout", "-b", "feature/iss-local-0001-test"])
+
+            self._run_runtime(target, ["sync"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["initiative"]["id"], "init-local-0001")
+            self.assertEqual(active["epic"]["id"], "epic-local-0001")
+            self.assertEqual(active["issue"]["id"], "iss-local-0001")
+
+    def test_active_set_github_issue_checkout_sets_active(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create parent nodes locally, but link the issue to an existing GitHub issue number.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            # Make the working tree clean so checkout is allowed.
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            # Provide a fake `gh` binary outside the git repo (keep working tree clean).
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                self._run_runtime(target, ["active", "set", "--github-issue", "123"], env=test_env)
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-0123")
+
+    def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create parent nodes locally, but link the issue to an existing GitHub issue number.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            # Make the working tree clean so checkout is allowed.
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            # Provide a fake `gh` binary that records invocations and checks out a branch.
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                counter = bin_dir / "counter.txt"
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    f"counter_file='{counter.as_posix()}'\n"
+                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                # By default, activating a GitHub-linked issue also triggers checkout.
+                self._run_runtime(target, ["active", "set", "--issue", "123"], env=test_env)
+                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-0123")
+
+    def test_active_set_github_issue_checkout_refuses_dirty_working_tree(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create a node linked to GH #123, but keep the working tree dirty (uncommitted).
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            # Provide a fake `gh` binary (should not be invoked due to dirty tree).
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "echo \"gh should not be invoked when working tree is dirty\" >&2\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            self._run_runtime_expect_fail(target, ["active", "set", "--github-issue", "123"], env=test_env)
 
     def test_new_no_github_does_not_invoke_gh(self) -> None:
         if os.name == "nt":

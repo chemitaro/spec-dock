@@ -11,6 +11,7 @@ are handled by the repo-local runtime script installed at:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import sys
@@ -23,7 +24,7 @@ from spec_dock import __version__
 
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
-_MANAGED_DIRS = ("docs", "templates", "scripts")
+_MANAGED_DIRS = ("docs", "templates", "scripts", "system")
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "# spec-dock runtime (generated)\n"
     "# v2 generated state for agents (SSOT + derived views)\n"
@@ -98,6 +99,30 @@ def _make_executable(path: Path) -> None:
     except OSError:
         # Best-effort only.
         return
+
+
+def _make_readonly_tree(path: Path) -> None:
+    """Best-effort: remove write bits from files under `path`.
+
+    Notes:
+    - This is best-effort only; permissions vary by OS/FS.
+    - On Windows, making files read-only can interfere with later removal on update,
+      so we skip it there.
+    """
+    if os.name == "nt":
+        return
+    if not path.exists():
+        return
+
+    for p in path.rglob("*"):
+        if not p.is_file():
+            continue
+        try:
+            mode = p.stat().st_mode
+            p.chmod(mode & ~0o222)
+        except OSError:
+            # Best-effort only.
+            continue
 
 
 def _prune_legacy_scaffold(specdock_dir: Path) -> None:
@@ -196,6 +221,9 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         runtime_script = specdock_dir / "scripts" / "spec-dock"
         if runtime_script.exists():
             _make_executable(runtime_script)
+
+        # Best-effort: placeholders are not user-authored specs; discourage edits.
+        _make_readonly_tree(specdock_dir / "system" / "active-none")
 
         (specdock_dir / "spec-dock.version").write_text(f"{_tool_version()}\n", encoding="utf-8")
 

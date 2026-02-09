@@ -17,7 +17,13 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 ```bash
 ./spec-dock/scripts/spec-dock active show
 ./spec-dock/scripts/spec-dock active set --issue 123   # iss-0123 / iss-local-0001 も可
+# GitHub Issue番号から「checkout + active + sync」まで一括で行う場合:
+./spec-dock/scripts/spec-dock active set --github-issue 123
 ```
+
+補足:
+- `--issue` で指定したノードが GitHub Issue に紐づいている場合、`active set` は checkout も行います。
+- ローカルのみ（`*-local-*`）のノードは checkout しません。
 
 `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
 

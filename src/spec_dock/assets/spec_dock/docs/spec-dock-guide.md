@@ -57,6 +57,8 @@
 
 - `spec-dock/initiatives/`（Git管理する）
   - 仕様ツリー本体（Initiative/Epic/Issue/ADR が常置）
+- `spec-dock/system/`（Git管理する / ツール管理領域）
+  - placeholder 等の **ツール都合で常設するファイル**（編集対象外。`spec-dock update` で上書きされうる）
 - `spec-dock/active/`（生成物 / gitignore）
   - 現在作業中の initiative/epic/issue への固定入口（symlink または `.path`）
   - `context-pack.md`（エージェントの入口）

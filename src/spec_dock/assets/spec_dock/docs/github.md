@@ -30,6 +30,27 @@ gh issue create --title "<title>" --body "<body>"
 ./spec-dock/scripts/spec-dock new issue --epic 124 --title "..." --github-issue 123
 ```
 
+### 1.3 Issue ブランチ checkout（`active set --github-issue`）
+
+GitHub Issue 番号から **ブランチ作成/checkout → active 設定 → sync** まで一括で行えます。
+
+```bash
+./spec-dock/scripts/spec-dock active set --github-issue 123
+```
+
+内部的に実行されるコマンド（概要）:
+
+```bash
+gh issue checkout 123
+```
+
+注意:
+- 安全のため、**未コミット/未追跡の変更がある場合はエラーで中断**します（作業を保護するため）
+- 仕様ツリー内に `github.issue_number == 123` のノードが存在しない場合もエラーになります
+
+補足:
+- `active set --issue 123` のように Issue を直接指定した場合でも、そのノードが GitHub Issue に紐づいていれば checkout します。
+
 ## 2) 「どのリポジトリに作るか」はどう決まるか
 
 spec-dock は `--repo owner/repo` を指定しません。  
