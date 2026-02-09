@@ -49,8 +49,16 @@
 
 ## ドキュメント構成（どれを読めばいい？）
 
+- `workflow-tree.md`  
+  Initiative → Epic → Issue を複数ネスト/複数同時に扱う **ツリー運用ワークフロー**
+- `workflow-issue.md`  
+  active issue を入口に、Issueを単独完結させる **実装ワークフロー**（要件→設計→計画→TDD→報告）
+- `workflow-adr.md`  
+  ADR を「議題が上がった時点で叩き台として作る」 **意思決定ワークフロー**
 - `spec-dock-guide.md`  
-  仕様書駆動 + TDD の **ワークフロー**（要件→設計→計画→実装→レポート）
+  共通原則（99.9%理解/SSOT/承認ゲート）と **チェックリスト**（品質ゲート）の正
+- `spec-dock-guide-old.md`  
+  旧版ガイド（参考。現行運用の正ではない）
 - `github.md`  
   GitHub 連携（`gh` 必須・対象リポジトリの決まり方・`--no-github`・ID ルール）
 - `sync.md`  

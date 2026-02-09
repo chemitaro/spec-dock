@@ -80,9 +80,15 @@ class TestCli(unittest.TestCase):
             self.assertTrue(
                 (target / ".spec-dock" / "docs" / "spec-dock-guide.md").is_file()
             )
+            self.assertTrue(
+                (target / ".spec-dock" / "docs" / "spec-dock-guide-old.md").is_file()
+            )
             self.assertTrue((target / ".spec-dock" / "docs" / "README.md").is_file())
             self.assertTrue((target / ".spec-dock" / "docs" / "github.md").is_file())
             self.assertTrue((target / ".spec-dock" / "docs" / "sync.md").is_file())
+            self.assertTrue((target / ".spec-dock" / "docs" / "workflow-tree.md").is_file())
+            self.assertTrue((target / ".spec-dock" / "docs" / "workflow-issue.md").is_file())
+            self.assertTrue((target / ".spec-dock" / "docs" / "workflow-adr.md").is_file())
 
             # Runtime script exists; legacy close scripts must not be present.
             scripts_dir = target / ".spec-dock" / "scripts"
