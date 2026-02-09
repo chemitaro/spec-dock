@@ -3,7 +3,7 @@
 対象コマンド:
 
 ```bash
-./spec-dock/scripts/spec-dock sync [--github] [--gh-limit N] [--no-update-active]
+./spec-dock/scripts/spec-dock sync [--github] [--gh-limit N] [--no-update-active] [--force]
 ```
 
 ## 0. 結論
@@ -18,6 +18,8 @@
     それが仕様ツリー内のノードに **一意に対応**する場合のみ更新します
   - 解決できない場合は active を変更しません（警告のみ / もしくは黙って維持）
 - `sync --no-update-active`: ブランチ名からの active 更新を行いません（index/tree 生成のみ）
+- `sync` は実行前に **preflight validate** を行い、致命的不整合がある場合は失敗します
+  - `sync --force`: validate NG でも警告して継続します（ただし active の自動更新は行いません）
 
 出力:
 - `spec-dock/.agent/index.json`（生成物 / git 管理しない, フラット索引）
@@ -60,11 +62,13 @@ database "active.json\n(spec-dock/.agent/active.json)" as Active
 database "index.json\n(spec-dock/.agent/index.json)" as State
 database "tree.json\n(spec-dock/.agent/tree.json)" as Tree
 
-User -> Script: sync [--github]
+User -> Script: sync [--github] [--force]
 activate Script
 
 Script -> FS: scan meta.json\n(_scan_nodes)
 FS --> Script: nodes{id->node}
+
+Script -> Script: preflight validate\n(fail unless --force)
 
 alt default (update active)
   Script -> Git: git rev-parse --abbrev-ref HEAD
@@ -93,6 +97,7 @@ deactivate Script
 - `--github` は **読み取りのみ**です（GitHub に Issue を作成/更新しません）。
 - `github.issue_number` が無いノード（例: `iss-local-00001`）は、`--github` を付けても状態は `unknown` のままです。
 - `--gh-limit` が小さいと一覧に載らず `unknown` になります（古い Issue がある場合は上げてください）。
+- `sync` が preflight validate で失敗した場合は、先に `validate` を実行して修正してください（`--force` はデバッグ用途のみ推奨）。
  - `spec-dock/active/`（active pointers）
    - `spec-dock/active/{initiative,epic,issue}`（symlink または `.path`）
    - `spec-dock/active/context-pack.md`（エージェント入口）

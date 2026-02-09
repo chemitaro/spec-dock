@@ -511,6 +511,60 @@ class TestCli(unittest.TestCase):
 
             self._run_runtime_expect_fail(target, ["validate"])
 
+    def test_sync_fails_when_tree_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["parent_id"] = "epic-local-99999"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self._run_runtime_expect_fail(target, ["sync", "--no-update-active"])
+
+    def test_sync_force_continues_when_tree_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["parent_id"] = "epic-local-99999"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self._run_runtime(target, ["sync", "--no-update-active", "--force"])
+            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
+            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+
     def test_new_adr_increments_id_within_scope(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
