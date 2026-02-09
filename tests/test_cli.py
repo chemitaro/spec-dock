@@ -376,6 +376,46 @@ class TestCli(unittest.TestCase):
                 ],
             )
 
+    def test_new_rejects_duplicate_id_width_agnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["id"] = "iss-local-1"  # old-style width (should conflict with iss-local-00001)
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            # Even if the string differs, the numeric suffix must be treated as duplicated.
+            self._run_runtime_expect_fail(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--no-github",
+                    "--epic",
+                    "1",
+                    "--id",
+                    "iss-local-00001",
+                    "--title",
+                    "Duplicate by numeric id",
+                ],
+            )
+
     def test_new_rejects_unsafe_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -397,6 +437,24 @@ class TestCli(unittest.TestCase):
                     "Custom slug test",
                     "--slug",
                     "bad slug!!",
+                ],
+            )
+
+    def test_new_rejects_uppercase_slug(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime_expect_fail(
+                target,
+                [
+                    "new",
+                    "initiative",
+                    "--no-github",
+                    "--title",
+                    "Auth platform",
+                    "--slug",
+                    "Bad-Slug",
                 ],
             )
 
@@ -422,6 +480,33 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self._run_runtime_expect_fail(target, ["validate"])
+
+    def test_validate_detects_issue_initiative_id_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Payments platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["initiative_id"] = "init-local-00002"
             issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             self._run_runtime_expect_fail(target, ["validate"])

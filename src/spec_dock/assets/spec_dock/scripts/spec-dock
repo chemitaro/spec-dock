@@ -527,9 +527,11 @@ def _new_initiative(
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="init", field="id")
 
-    if node_id in nodes:
-        existing = nodes[node_id]
-        raise RuntimeError(f"id already exists: {node_id} ({existing.path / 'meta.json'})")
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
 
     if slug is None:
         slug = _slugify(title)
@@ -605,9 +607,11 @@ def _new_epic(
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="epic", field="id")
 
-    if node_id in nodes:
-        existing = nodes[node_id]
-        raise RuntimeError(f"id already exists: {node_id} ({existing.path / 'meta.json'})")
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
 
     if slug is None:
         slug = _slugify(title)
@@ -696,9 +700,11 @@ def _new_issue(
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="iss", field="id")
 
-    if node_id in nodes:
-        existing = nodes[node_id]
-        raise RuntimeError(f"id already exists: {node_id} ({existing.path / 'meta.json'})")
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
 
     if slug is None:
         slug = _slugify(title)
@@ -794,9 +800,17 @@ def _new_adr(
     slug = _validate_slug(slug, field="slug")
 
     # Prevent duplicated ADR ids within the same scope (even with a different slug).
-    existing_same_id = sorted(adrs_dir.glob(f"{node_id}-*.md"))
-    if existing_same_id:
-        raise RuntimeError(f"ADR id already exists under scope {scope.id}: {node_id}")
+    want_prefix, want_local, want_num = _parse_id(node_id)
+    for p in sorted(adrs_dir.glob("adr-*.md")):
+        m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", p.stem)
+        if not m:
+            continue
+        try:
+            p_prefix, p_local, p_num = _parse_id(m.group(1))
+        except RuntimeError:
+            continue
+        if p_prefix == want_prefix and p_local == want_local and p_num == want_num:
+            raise RuntimeError(f"ADR id already exists under scope {scope.id}: {node_id} ({p})")
 
     dest_path = adrs_dir / f"{node_id}-{slug}.md"
     if dest_path.exists():
@@ -1608,6 +1622,19 @@ def _validate(specdock_dir: Path) -> None:
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found.")
+
+    numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
+    for node_id in nodes.keys():
+        prefix, is_local, num = _parse_id(str(node_id))
+        numeric_ids.setdefault((prefix, is_local, num), []).append(str(node_id))
+
+    for (prefix, is_local, num), ids in sorted(numeric_ids.items()):
+        uniq = sorted(set(ids))
+        if len(uniq) > 1:
+            marker = "-local" if is_local else ""
+            raise RuntimeError(
+                f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
+            )
 
     for node_id, node in nodes.items():
         _validate_lowercase(node_id, field="id")
