@@ -55,7 +55,7 @@ def _tool_version() -> str:
     except OSError:
         return __version__
 
-    match = re.search(r'(?m)^version\\s*=\\s*"([^"]+)"\\s*$', text)
+    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
     return match.group(1) if match else __version__
 
 

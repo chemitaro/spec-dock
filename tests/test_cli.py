@@ -217,6 +217,23 @@ class TestCli(unittest.TestCase):
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
 
+    def test_tool_version_fallback_reads_pyproject(self) -> None:
+        import spec_dock.cli as cli
+
+        expected = _expected_spec_dock_version()
+        old_version = getattr(cli, "__version__", None)
+        old_file = getattr(cli, "__file__", None)
+        try:
+            cli.__version__ = "0.0.0+unknown"
+            repo_root = Path(__file__).resolve().parents[1]
+            cli.__file__ = str(repo_root / "src" / "spec_dock" / "cli.py")
+            self.assertEqual(cli._tool_version(), expected)
+        finally:
+            if old_version is not None:
+                cli.__version__ = old_version
+            if old_file is not None:
+                cli.__file__ = old_file
+
     def test_init_no_skill_skips_skill_install(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
