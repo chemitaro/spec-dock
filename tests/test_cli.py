@@ -30,7 +30,7 @@ def _expected_spec_dock_version() -> str:
 
 class TestCli(unittest.TestCase):
     def _run_runtime(self, target: Path, args: list[str], *, env: dict[str, str] | None = None) -> None:
-        script = target / ".spec-dock" / "scripts" / "spec-dock"
+        script = target / "spec-dock" / "scripts" / "spec-dock"
         self.assertTrue(script.is_file(), f"runtime script missing: {script}")
 
         merged_env = os.environ.copy()
@@ -53,7 +53,7 @@ class TestCli(unittest.TestCase):
             )
 
     def _assert_version_file(self, target: Path) -> None:
-        version_file = target / ".spec-dock" / "spec-dock.version"
+        version_file = target / "spec-dock" / "spec-dock.version"
         self.assertTrue(version_file.is_file())
         self.assertEqual(version_file.read_text(encoding="utf-8").strip(), _expected_spec_dock_version())
 
@@ -66,37 +66,37 @@ class TestCli(unittest.TestCase):
 
             self._assert_version_file(target)
 
-            self.assertTrue((target / ".spec-dock" / "docs").is_dir())
-            self.assertTrue((target / ".spec-dock" / "templates").is_dir())
-            self.assertTrue((target / ".spec-dock" / "scripts").is_dir())
-            self.assertTrue((target / ".spec-dock" / "initiatives").is_dir())
-            self.assertTrue((target / ".spec-dock" / "active").is_dir())
-            self.assertTrue((target / ".spec-dock" / ".agent").is_dir())
-            self.assertTrue((target / ".spec-dock" / ".gitignore").is_file())
-            gitignore = (target / ".spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            self.assertTrue((target / "spec-dock" / "docs").is_dir())
+            self.assertTrue((target / "spec-dock" / "templates").is_dir())
+            self.assertTrue((target / "spec-dock" / "scripts").is_dir())
+            self.assertTrue((target / "spec-dock" / "initiatives").is_dir())
+            self.assertTrue((target / "spec-dock" / "active").is_dir())
+            self.assertTrue((target / "spec-dock" / ".agent").is_dir())
+            self.assertTrue((target / "spec-dock" / ".gitignore").is_file())
+            gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
             self.assertIn(".agent/", gitignore)
             self.assertIn("active/", gitignore)
 
             self.assertTrue(
-                (target / ".spec-dock" / "docs" / "spec-dock-guide.md").is_file()
+                (target / "spec-dock" / "docs" / "spec-dock-guide.md").is_file()
             )
             self.assertTrue(
-                (target / ".spec-dock" / "docs" / "spec-dock-guide-old.md").is_file()
+                (target / "spec-dock" / "docs" / "spec-dock-guide-old.md").is_file()
             )
-            self.assertTrue((target / ".spec-dock" / "docs" / "README.md").is_file())
-            self.assertTrue((target / ".spec-dock" / "docs" / "github.md").is_file())
-            self.assertTrue((target / ".spec-dock" / "docs" / "sync.md").is_file())
-            self.assertTrue((target / ".spec-dock" / "docs" / "workflow-tree.md").is_file())
-            self.assertTrue((target / ".spec-dock" / "docs" / "workflow-issue.md").is_file())
-            self.assertTrue((target / ".spec-dock" / "docs" / "workflow-adr.md").is_file())
+            self.assertTrue((target / "spec-dock" / "docs" / "README.md").is_file())
+            self.assertTrue((target / "spec-dock" / "docs" / "github.md").is_file())
+            self.assertTrue((target / "spec-dock" / "docs" / "sync.md").is_file())
+            self.assertTrue((target / "spec-dock" / "docs" / "workflow-tree.md").is_file())
+            self.assertTrue((target / "spec-dock" / "docs" / "workflow-issue.md").is_file())
+            self.assertTrue((target / "spec-dock" / "docs" / "workflow-adr.md").is_file())
 
             # Runtime script exists; legacy close scripts must not be present.
-            scripts_dir = target / ".spec-dock" / "scripts"
+            scripts_dir = target / "spec-dock" / "scripts"
             self.assertTrue((scripts_dir / "spec-dock").is_file())
             self.assertEqual(list(scripts_dir.glob("spec-dock-close*.sh")), [])
 
             # Legacy (v1) templates should not be installed.
-            templates_dir = target / ".spec-dock" / "templates"
+            templates_dir = target / "spec-dock" / "templates"
             for legacy in ("requirement.md", "design.md", "plan.md", "report.md"):
                 self.assertFalse((templates_dir / legacy).exists(), f"legacy template leaked: {legacy}")
             self.assertEqual(list(templates_dir.rglob("current")), [])
@@ -115,7 +115,7 @@ class TestCli(unittest.TestCase):
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             self.assertIn("#### update_plan（着手時に登録）", plan_text)
-            self.assertIn("./.spec-dock/active/issue/report.md", plan_text)
+            self.assertIn("./spec-dock/active/issue/report.md", plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
@@ -166,7 +166,7 @@ class TestCli(unittest.TestCase):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            marker = target / ".spec-dock" / "initiatives" / "marker.txt"
+            marker = target / "spec-dock" / "initiatives" / "marker.txt"
             marker.write_text("keep\n", encoding="utf-8")
 
             # Simulate legacy (v1) leftovers that v2 should prune on update.
@@ -174,7 +174,7 @@ class TestCli(unittest.TestCase):
             legacy_workflow.parent.mkdir(parents=True, exist_ok=True)
             legacy_workflow.write_text("legacy\n", encoding="utf-8")
 
-            legacy_symlink = target / ".spec-dock" / "current-initiative"
+            legacy_symlink = target / "spec-dock" / "current-initiative"
             created_symlink = False
             try:
                 # v1 style link target (so v2 can safely prune without deleting v2-generated shortcuts).
@@ -204,7 +204,7 @@ class TestCli(unittest.TestCase):
 
             issue_dir = (
                 target
-                / ".spec-dock"
+                / "spec-dock"
                 / "initiatives"
                 / "init-local-0001-auth-platform"
                 / "epics"
@@ -225,28 +225,28 @@ class TestCli(unittest.TestCase):
 
             # Active issue id also accepts shorthand numeric form.
             self._run_runtime(target, ["active", "set", "--issue", "1"])
-            self.assertTrue((target / ".spec-dock" / ".agent" / "active.json").is_file())
+            self.assertTrue((target / "spec-dock" / ".agent" / "active.json").is_file())
             self.assertTrue(
-                (target / ".spec-dock" / "active" / "issue").exists()
-                or (target / ".spec-dock" / "active" / "issue.path").is_file()
+                (target / "spec-dock" / "active" / "issue").exists()
+                or (target / "spec-dock" / "active" / "issue.path").is_file()
             )
-            self.assertTrue((target / ".spec-dock" / "active" / "context-pack.md").is_file())
+            self.assertTrue((target / "spec-dock" / "active" / "context-pack.md").is_file())
 
             self._run_runtime(target, ["sync"])
-            self.assertTrue((target / ".spec-dock" / ".agent" / "index.json").is_file())
-            self.assertTrue((target / ".spec-dock" / ".agent" / "tree.json").is_file())
+            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
+            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
 
             # Index: flat nodes (agent-friendly).
-            state = (target / ".spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8")
+            state = (target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8")
             self.assertIn("\"nodes\"", state)
             self.assertNotIn("\"tree\"", state)
 
             # Tree: nested layer view (human-friendly).
-            tree_text = (target / ".spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
+            tree_text = (target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8")
             tree = json.loads(tree_text)
             self.assertIn("tree", tree)
 
-            index = json.loads((target / ".spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             index_nodes = index["nodes"]
 
             init_item = tree["tree"][0]
@@ -334,7 +334,7 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "epic", "--initiative", "123", "--title", "JWT auth"], env=test_env)
             self._run_runtime(target, ["new", "issue", "--epic", "124", "--title", "Add refresh token"], env=test_env)
 
-            init_dir = target / ".spec-dock" / "initiatives" / "init-0123-auth-platform"
+            init_dir = target / "spec-dock" / "initiatives" / "init-0123-auth-platform"
             epic_dir = init_dir / "epics" / "epic-0124-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-0125-add-refresh-token"
             self.assertTrue(init_dir.is_dir())
@@ -389,7 +389,7 @@ class TestCli(unittest.TestCase):
 
             issue_dir = (
                 target
-                / ".spec-dock"
+                / "spec-dock"
                 / "initiatives"
                 / "init-local-0001-auth-platform"
                 / "epics"

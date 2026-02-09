@@ -54,7 +54,7 @@ ID: "<ISS_ID>"
   - （Green）最小実装
   - （Refactor）整理
   - （品質ゲート）format/lint/test
-  - （報告）`./.spec-dock/active/issue/report.md` 更新
+  - （報告）`./spec-dock/active/issue/report.md` 更新
   - （コミット）このステップの区切りでコミット
 
 #### 期待する振る舞い（テストケース） (必須)
@@ -85,7 +85,7 @@ ID: "<ISS_ID>"
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] 期待するテスト（必要ならフォーマット/リンタ）を実行し、成功した
-- [ ] `./.spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
 - [ ] コミットした（エージェント）
 

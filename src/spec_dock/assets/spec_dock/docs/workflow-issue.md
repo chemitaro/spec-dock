@@ -15,29 +15,29 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 ### 0.1 active を確認/設定
 
 ```bash
-./.spec-dock/scripts/spec-dock active show
-./.spec-dock/scripts/spec-dock active set --issue 123   # iss-0123 / iss-local-0001 も可
+./spec-dock/scripts/spec-dock active show
+./spec-dock/scripts/spec-dock active set --issue 123   # iss-0123 / iss-local-0001 も可
 ```
 
-`.spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
+`spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
 
 ### 0.2 読む順番（推奨）
 
-1. `.spec-dock/docs/README.md`
-2. `.spec-dock/active/context-pack.md`
+1. `spec-dock/docs/README.md`
+2. `spec-dock/active/context-pack.md`
 3. 対象 Issue の仕様（active配下）
-   - `.spec-dock/active/issue/requirement.md`
-   - `.spec-dock/active/issue/design.md`
-   - `.spec-dock/active/issue/plan.md`
+   - `spec-dock/active/issue/requirement.md`
+   - `spec-dock/active/issue/design.md`
+   - `spec-dock/active/issue/plan.md`
 4. 親の仕様（必要に応じて。重複を書かないため）
-   - `.spec-dock/active/epic/requirement.md`
-   - `.spec-dock/active/epic/design.md`
-   - `.spec-dock/active/epic/plan.md`
-   - `.spec-dock/active/initiative/requirement.md`
-   - `.spec-dock/active/initiative/design.md`
-   - `.spec-dock/active/initiative/plan.md`
+   - `spec-dock/active/epic/requirement.md`
+   - `spec-dock/active/epic/design.md`
+   - `spec-dock/active/epic/plan.md`
+   - `spec-dock/active/initiative/requirement.md`
+   - `spec-dock/active/initiative/design.md`
+   - `spec-dock/active/initiative/plan.md`
 5. ADR（必要に応じて）
-   - `.spec-dock/active/**/adrs/*.md`
+   - `spec-dock/active/**/adrs/*.md`
 
 ---
 
@@ -47,7 +47,7 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 
 ### 1.1 要件定義（Issue requirement）
 
-対象: `.spec-dock/active/issue/requirement.md`
+対象: `spec-dock/active/issue/requirement.md`
 
 - AC/EC を **観測可能（テスト可能）** に落とす
 - スコープ境界（MUST/MUST NOT/OUT OF SCOPE / Always/Ask/Never）を固定する
@@ -59,7 +59,7 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 
 ### 1.2 設計（Issue design）
 
-対象: `.spec-dock/active/issue/design.md`
+対象: `spec-dock/active/issue/design.md`
 
 - 変更計画（ファイルパス単位）を具体化する
 - 固定する IF 契約（API/関数/クラス境界）を明文化する
@@ -95,7 +95,7 @@ ADR（必要なとき）:
 
 ### 1.3 実装計画（Issue plan）
 
-対象: `.spec-dock/active/issue/plan.md`
+対象: `spec-dock/active/issue/plan.md`
 
 - 1ステップ = 1つの観測可能な振る舞い
 - 各ステップで Red/Green/Refactor が回せる粒度
@@ -111,14 +111,14 @@ ADR（必要なとき）:
 
 ## 2. 実装フェーズ（Implementation: TDD）
 
-対象: `.spec-dock/active/issue/plan.md`
+対象: `spec-dock/active/issue/plan.md`
 
 1. 着手ステップ（Sxx）を選ぶ
 2. `update_plan` に作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録
 3. TDD（Red → Green → Refactor）で実装
 4. ステップ末尾で必ず行う
    - テスト（必要なら lint/format/typecheck）
-   - `.spec-dock/active/issue/report.md` へ実行コマンド/結果/変更ファイルを記録
+   - `spec-dock/active/issue/report.md` へ実行コマンド/結果/変更ファイルを記録
    - `update_plan` を更新
 
 重要:
@@ -129,11 +129,11 @@ ADR（必要なとき）:
 
 ## 3. クローズ/振り返り（Report と親への反映）
 
-対象: `.spec-dock/active/issue/report.md`
+対象: `spec-dock/active/issue/report.md`
 
 - セッション単位で事実を残す（コマンド/結果/変更ファイル/判断の経緯）
 - 既知の問題とフォローアップ（別Issue化）を残す
 
 必要に応じて:
 - Epic/Initiative の `report.md` に「完了Issue/決定事項/差分/フォローアップ」を反映する
-- `sync` を実行して `.agent/tree.json` を更新する（詳細: `sync.md`）
+- `sync` を実行して `spec-dock/.agent/tree.json` を更新する（詳細: `sync.md`）

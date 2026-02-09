@@ -1,12 +1,12 @@
 """spec-dock installer CLI (uvx entrypoint).
 
 This module is intentionally minimal:
-- `spec-dock init` scaffolds `.spec-dock/` into a target repository
+- `spec-dock init` scaffolds `spec-dock/` into a target repository
 - `spec-dock update` refreshes managed assets (docs/templates/scripts/skill)
 
 Day-to-day operations (creating nodes, switching active issue, syncing state, etc.)
 are handled by the repo-local runtime script installed at:
-  `.spec-dock/scripts/spec-dock`
+  `spec-dock/scripts/spec-dock`
 """
 from __future__ import annotations
 
@@ -21,7 +21,8 @@ from typing import Iterator
 
 from spec_dock import __version__
 
-_SPEC_DOCK_DIRNAME = ".spec-dock"
+_SPEC_DOCK_DIRNAME = "spec-dock"
+_LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts")
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "# spec-dock runtime (generated)\n"
@@ -58,15 +59,21 @@ def _tool_version() -> str:
 
 
 def _specdock_dir(target_root: Path) -> Path:
-    """Return the `.spec-dock/` path under the target root."""
+    """Return the `spec-dock/` path under the target root."""
     return target_root / _SPEC_DOCK_DIRNAME
 
 
 def _require_specdock(target_root: Path) -> Path:
-    """Ensure `.spec-dock/` exists under `target_root` and return it."""
+    """Ensure `spec-dock/` exists under `target_root` and return it."""
     specdock_dir = _specdock_dir(target_root)
     if not specdock_dir.exists():
-        raise RuntimeError("'.spec-dock' not found. Run 'spec-dock init' first.")
+        legacy = target_root / _LEGACY_SPEC_DOCK_DIRNAME
+        if legacy.exists():
+            raise RuntimeError(
+                f"'{_SPEC_DOCK_DIRNAME}' not found, but legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists. "
+                f"Please rename it: mv {_LEGACY_SPEC_DOCK_DIRNAME} {_SPEC_DOCK_DIRNAME}"
+            )
+        raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' not found. Run 'spec-dock init' first.")
     return specdock_dir
 
 
@@ -103,7 +110,7 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 
     Scope:
     - Only touches generated scaffolding files (legacy scripts/templates/workflow/symlinks).
-    - Never deletes user-authored specs under `.spec-dock/initiatives/**`.
+    - Never deletes user-authored specs under `spec-dock/initiatives/**`.
     """
     scripts_dir = specdock_dir / "scripts"
     for p in scripts_dir.glob("spec-dock-close*.sh"):
@@ -130,7 +137,7 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
     legacy_workflow = specdock_dir.parent / ".github" / "workflows" / "spec-dock-close.yml"
     legacy_workflow.unlink(missing_ok=True)
 
-    # v1 created root-level symlinks as shortcuts. v2 uses `.spec-dock/active/`,
+    # v1 created root-level symlinks as shortcuts. v2 uses `spec-dock/active/`,
     # so these are always safe to remove when they are symlinks (never delete real dirs).
     for name in ("current-initiative", "current-epic", "current-issue"):
         p = specdock_dir / name
@@ -143,17 +150,25 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 
 
 def _install_spec_dock(target_root: Path, *, force: bool) -> None:
-    """Install/update `.spec-dock/` scaffold into the target repository."""
+    """Install/update `spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
+    legacy_specdock_dir = target_root / _LEGACY_SPEC_DOCK_DIRNAME
+    if legacy_specdock_dir.exists() and legacy_specdock_dir.is_dir() and not specdock_dir.exists():
+        raise RuntimeError(
+            f"legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists. Please rename it before installing: "
+            f"mv {_LEGACY_SPEC_DOCK_DIRNAME} {_SPEC_DOCK_DIRNAME}"
+        )
     if specdock_dir.exists() and not force:
-        raise RuntimeError("'.spec-dock' already exists. Use 'spec-dock update' or re-run with '--force'.")
+        raise RuntimeError(
+            f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'."
+        )
 
     with _assets_dir() as assets_dir:
         src_spec_dock = assets_dir / "spec_dock"
         specdock_dir.mkdir(parents=True, exist_ok=True)
 
         # Managed directories are owned by the installer and can be replaced on update.
-        # The actual spec tree (`.spec-dock/initiatives/**`) must be persistent and is
+        # The actual spec tree (`spec-dock/initiatives/**`) must be persistent and is
         # never removed by this installer.
         for name in _MANAGED_DIRS:
             src = src_spec_dock / name
@@ -167,7 +182,7 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
             _copy_file(src_gitignore, specdock_dir / ".gitignore")
         else:
             # Fallback: dotfiles may be missing in some packaged builds if glob patterns
-            # exclude them. Keep `.spec-dock/active/` and `.spec-dock/.agent/` out of git.
+            # exclude them. Keep `spec-dock/active/` and `spec-dock/.agent/` out of git.
             (specdock_dir / ".gitignore").write_text(_DEFAULT_SPEC_DOCK_GITIGNORE, encoding="utf-8")
 
         # Spec tree root + generated directories.
@@ -212,9 +227,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         p.add_argument("path", nargs="?", default=".", help="Target project path (default: current directory)")
         p.add_argument("--no-skill", action="store_true", help="Do not install the Codex skill into '.codex/skills/'")
 
-    p_init = sub.add_parser("init", help="Scaffold .spec-dock into a project")
+    p_init = sub.add_parser("init", help="Scaffold spec-dock into a project")
     add_init_update_common(p_init)
-    p_init.add_argument("--force", action="store_true", help="Overwrite managed files if '.spec-dock' already exists")
+    p_init.add_argument("--force", action="store_true", help="Overwrite managed files if 'spec-dock' already exists")
 
     p_update = sub.add_parser("update", help="Update managed files (docs/templates/scripts/skill) in an existing project")
     add_init_update_common(p_update)

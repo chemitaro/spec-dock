@@ -1,6 +1,6 @@
-# .spec-dock/templates
+# spec-dock/templates
 
-このディレクトリは、ローカルスクリプト `./.spec-dock/scripts/spec-dock new ...` が
+このディレクトリは、ローカルスクリプト `./spec-dock/scripts/spec-dock new ...` が
 新規ノードを作成する際に参照するテンプレート群です。
 
 - `initiative/` → `initiatives/init-xxxx-<slug>/`

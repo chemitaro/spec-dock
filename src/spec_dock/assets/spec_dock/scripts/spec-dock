@@ -4,12 +4,12 @@ spec-dock runtime script (repo-local).
 
 This script is installed into a repository by `uvx spec-dock init/update` as:
 
-  `.spec-dock/scripts/spec-dock`
+  `spec-dock/scripts/spec-dock`
 
 It performs day-to-day operations without requiring `uvx` at runtime:
 - Create nodes: initiative / epic / issue / adr
 - Manage the active pointers (symlinks + context-pack)
-- Generate derived state (`.spec-dock/.agent/index.json`, `.spec-dock/.agent/tree.json`)
+- Generate derived state (`spec-dock/.agent/index.json`, `spec-dock/.agent/tree.json`)
 - Validate the spec tree structure
 
 Design goals:
@@ -32,7 +32,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-_SPEC_DOCK_DIRNAME = ".spec-dock"
+_SPEC_DOCK_DIRNAME = "spec-dock"
 
 _INITIATIVES_DIRNAME = "initiatives"
 _ACTIVE_DIRNAME = "active"
@@ -227,13 +227,13 @@ def _format_id(prefix: str, num: int, *, width: int = 4, local: bool = False) ->
 
 
 def _find_specdock_dir() -> Path:
-    """Locate the `.spec-dock/` directory for the current repository.
+    """Locate the `spec-dock/` directory for the current repository.
 
     Strategy:
-    1) Prefer the script location: `<repo>/.spec-dock/scripts/spec-dock`
+    1) Prefer the script location: `<repo>/spec-dock/scripts/spec-dock`
     2) Fallback to walking parents from the current working directory.
     """
-    # Prefer script location: <repo>/.spec-dock/scripts/spec-dock
+    # Prefer script location: <repo>/spec-dock/scripts/spec-dock
     script_path = Path(__file__).resolve()
     candidate = script_path.parent.parent
     if candidate.is_dir() and candidate.name == _SPEC_DOCK_DIRNAME:
@@ -254,7 +254,7 @@ def _find_specdock_dir() -> Path:
 
 
 def _initiatives_root(specdock_dir: Path) -> Path:
-    """Return the spec tree root directory (`.spec-dock/initiatives/`)."""
+    """Return the spec tree root directory (`spec-dock/initiatives/`)."""
     return specdock_dir / _INITIATIVES_DIRNAME
 
 
@@ -336,7 +336,7 @@ def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str
 
 
 def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
-    """Scan `.spec-dock/initiatives/**/meta.json` into an id→node map."""
+    """Scan `spec-dock/initiatives/**/meta.json` into an id→node map."""
     initiatives_root = _initiatives_root(specdock_dir)
     nodes: dict[str, _Node] = {}
     if not initiatives_root.exists():
@@ -419,7 +419,7 @@ def _new_initiative(
     github_issue_number: int | None,
     no_github: bool,
 ) -> None:
-    """Create a new initiative node under `.spec-dock/initiatives/`."""
+    """Create a new initiative node under `spec-dock/initiatives/`."""
     title = title.strip()
     if not title:
         raise RuntimeError("--title is required")
@@ -433,7 +433,7 @@ def _new_initiative(
             github_issue_number = _gh_issue_create(
                 repo_root,
                 title=title,
-                body="Created by spec-dock.\n\nType: initiative\nLocal specs are stored under `.spec-dock/initiatives/`.\n",
+                body="Created by spec-dock.\n\nType: initiative\nLocal specs are stored under `spec-dock/initiatives/`.\n",
             )
         node_id = _format_id("init", int(github_issue_number), local=False)
     else:
@@ -499,7 +499,7 @@ def _new_epic(
                     "Created by spec-dock.\n\n"
                     "Type: epic\n"
                     f"Initiative: {initiative.id}\n\n"
-                    "Local specs are stored under `.spec-dock/initiatives/`.\n"
+                    "Local specs are stored under `spec-dock/initiatives/`.\n"
                 ),
             )
         node_id = _format_id("epic", int(github_issue_number), local=False)
@@ -578,7 +578,7 @@ def _new_issue(
                     "Type: issue\n"
                     f"Epic: {epic.id}\n"
                     f"Initiative: {epic.initiative_id}\n\n"
-                    "Local specs are stored under `.spec-dock/initiatives/`.\n"
+                    "Local specs are stored under `spec-dock/initiatives/`.\n"
                 ),
             )
         node_id = _format_id("iss", int(github_issue_number), local=False)
@@ -700,11 +700,11 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
     """Set the active issue and generate pointers + a context-pack.
 
     Side effects:
-    - Writes SSOT: `.spec-dock/.agent/active.json` (fallback read: legacy `.spec-dock/.work/*`)
-    - Updates pointers: `.spec-dock/active/{initiative,epic,issue}`
+    - Writes SSOT: `spec-dock/.agent/active.json` (fallback read: legacy `spec-dock/.work/*`)
+    - Updates pointers: `spec-dock/active/{initiative,epic,issue}`
       - Uses symlinks when possible
       - Falls back to `.path` files when symlinks are not supported
-    - Generates: `.spec-dock/active/context-pack.md`
+    - Generates: `spec-dock/active/context-pack.md`
     """
     nodes = _scan_nodes(specdock_dir)
     issue_id = _resolve_id_input(issue_id, prefix="iss", field="issue", nodes=nodes)
@@ -751,7 +751,7 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         _unlink_any(active_dir / name)
 
     def symlink(name: str, target: Path) -> None:
-        """Create an active pointer under `.spec-dock/active/` (symlink or fallback)."""
+        """Create an active pointer under `spec-dock/active/` (symlink or fallback)."""
         link = active_dir / name
         rel_target = os.path.relpath(target, start=active_dir)
         try:
@@ -773,24 +773,24 @@ def _active_set(specdock_dir: Path, *, issue_id: str) -> None:
         f"- epic: {epic.id}\n"
         f"- issue: {issue.id}\n\n"
         "## Generated state\n"
-        "- index: `.spec-dock/.agent/index.json`\n"
-        "- tree: `.spec-dock/.agent/tree.json`\n\n"
+        "- index: `spec-dock/.agent/index.json`\n"
+        "- tree: `spec-dock/.agent/tree.json`\n\n"
         "## Read order\n"
-        "- `.spec-dock/active/initiative/README.md`\n"
-        "- `.spec-dock/active/epic/README.md`\n"
-        "- `.spec-dock/active/issue/README.md`\n"
-        "- `.spec-dock/active/issue/requirement.md`\n"
-        "- `.spec-dock/active/issue/design.md`\n"
-        "- `.spec-dock/active/issue/plan.md`\n\n"
+        "- `spec-dock/active/initiative/README.md`\n"
+        "- `spec-dock/active/epic/README.md`\n"
+        "- `spec-dock/active/issue/README.md`\n"
+        "- `spec-dock/active/issue/requirement.md`\n"
+        "- `spec-dock/active/issue/design.md`\n"
+        "- `spec-dock/active/issue/plan.md`\n\n"
         "## Commands\n"
-        "- state (local): `./.spec-dock/scripts/spec-dock sync`\n"
-        "- state (github): `./.spec-dock/scripts/spec-dock sync --github`\n"
+        "- state (local): `./spec-dock/scripts/spec-dock sync`\n"
+        "- state (github): `./spec-dock/scripts/spec-dock sync --github`\n"
     )
     (active_dir / "context-pack.md").write_text(ctx, encoding="utf-8")
 
 
 def _active_show(specdock_dir: Path) -> None:
-    """Print the current active pointers from `.spec-dock/.agent/active.json`."""
+    """Print the current active pointers from `spec-dock/.agent/active.json`."""
     agent_dir = specdock_dir / _AGENT_DIRNAME
     legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     active_path = agent_dir / "active.json"
@@ -893,7 +893,7 @@ def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
 
 
 def _sync(specdock_dir: Path, *, github: bool, gh_limit: int) -> None:
-    """Generate derived state files under `.spec-dock/.agent/` from the local tree (and optionally GitHub)."""
+    """Generate derived state files under `spec-dock/.agent/` from the local tree (and optionally GitHub)."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
@@ -1098,7 +1098,7 @@ def _validate(specdock_dir: Path) -> None:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse CLI arguments for the repo-local runtime script."""
-    parser = argparse.ArgumentParser(prog=".spec-dock/scripts/spec-dock")
+    parser = argparse.ArgumentParser(prog="spec-dock/scripts/spec-dock")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/adr)")

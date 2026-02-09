@@ -1,6 +1,6 @@
-# .spec-dock ディレクトリガイド
+# spec-dock ディレクトリガイド
 
-> まずは `.spec-dock/docs/README.md` を開き、このガイド群の構成（何をどこから読むか）を確認してください。
+> まずは `spec-dock/docs/README.md` を開き、このガイド群の構成（何をどこから読むか）を確認してください。
 
 ## 目的（Codex CLI が迷わない状態）
 このガイドは、AI エージェント（Codex CLI）が「推測で進めない」「詰まらない」状態を作るための運用ルールです。
@@ -13,8 +13,8 @@
 
 ## コア原則
 
-I. **95%理解ルール（絶対厳守）**  
-常に「95%以上理解できている／95%以上の確信が持てている」状態になるまで要件定義・設計・実装に進まないこと。  
+I. **99.9%理解ルール（絶対厳守）**  
+常に「99.9%以上理解できている／99.9%以上の確信が持てている」状態になるまで要件定義・設計・実装に進まないこと。  
 コードベースの構造、依存関係、ビジネスロジック、影響範囲、現状仕様を把握し、必要なら調査ツールも使って情報を集める。  
 理解が不足している場合は、まず自力で調査したうえで、なお不明な点だけを整理してユーザー/レビュアーに質問してから進める。
 
@@ -25,35 +25,35 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 
 ## 成果物とディレクトリ
 
-- `.spec-dock/spec-dock.version`
+- `spec-dock/spec-dock.version`
   - 導入/更新した spec-dock のバージョン（1行）
-- `.spec-dock/docs/README.md`
+- `spec-dock/docs/README.md`
   - ドキュメントの入口（GitHub 連携の重要事項を含む）
-- `.spec-dock/docs/github.md`
+- `spec-dock/docs/github.md`
   - GitHub 連携（`gh` 必須、対象リポジトリの解決、`--no-github`、ID ルール）
-- `.spec-dock/docs/sync.md`
+- `spec-dock/docs/sync.md`
   - `sync`（状態集計）の仕組み（ローカル集計 + 任意で GitHub enrich）
-- `.spec-dock/initiatives/`
+- `spec-dock/initiatives/`
   - **仕様ツリー本体**（常置。ファイル移動で状態を表現しない）
   - 例: `initiatives/init-0123-.../epics/epic-0124-.../issues/iss-0125-.../`（GitHub） / `initiatives/init-local-0001-.../`（--no-github）
-- `.spec-dock/templates/`
-  - `./.spec-dock/scripts/spec-dock new ...` が参照するテンプレート群（initiative/epic/issue/adr）
-- `.spec-dock/active/`（gitignore）
+- `spec-dock/templates/`
+  - `./spec-dock/scripts/spec-dock new ...` が参照するテンプレート群（initiative/epic/issue/adr）
+- `spec-dock/active/`（gitignore）
   - **生成物**: 現在取り組む initiative/epic/issue への固定入口（symlink 等）
   - `context-pack.md`: エージェントが最初に読む 1 枚（生成）
-- `.spec-dock/.agent/`（gitignore）
+- `spec-dock/.agent/`（gitignore）
   - **生成物**: `active.json`（SSOT）/ `index.json`（index）/ `tree.json`（tree）など
-- `.spec-dock/.gitignore`
+- `spec-dock/.gitignore`
   - `active/` と `.agent/`（および legacy `.work/`）を誤コミットしないための ignore
 
 ## テンプレート方針
-- `.spec-dock/templates/**` は「最終的に残る仕様/ログ」の雛形とし、原則として本文に運用ルールや作成手順を書かない（ルールはこの `spec-dock-guide.md` に集約する）。
+- `spec-dock/templates/**` は「最終的に残る仕様/ログ」の雛形とし、原則として本文に運用ルールや作成手順を書かない（ルールはこの `spec-dock-guide.md` に集約する）。
 - `issue/discussions/_template.md` は「議論/調査/ヒアリング」資料の雛形。運用ルールはこのガイドを正としつつ、テンプレ内に最低限の説明を書いてよい。
 - テンプレートは **参考**。見出し/順番/粒度はタスクに合わせて自由に追加/削除/並び替えしてよい（“空欄を埋めるための推測”は禁止）。承認可否はこのガイドのチェックリストで判定する。
 - テンプレ見出しの末尾に `(必須)` / `(任意)` を付ける。`(必須)` は成果物（各 Initiative/Epic/Issue の `*.md`）から削除しない（該当しない場合は `該当なし` を明記）。`(任意)` は削除/追加してよい。
   - 付与対象: 主に `##` 見出し。必要に応じて `###`/`####` 見出しにも付けてよい（例: `plan.md` の各ステップ内の `update_plan` / `期待する振る舞い` / `ステップ末尾`）。
 - 例外: `plan.md` は実装時に省略されやすい `update_plan` / テスト / `report.md` 記録 / コミットのチェックを **各ステップ内に必ず残す**（実装フェーズの抜け漏れ防止のため）。
-- 実装フェーズでは `.spec-dock/active/context-pack.md` を入口にし、対象 Issue ディレクトリの `{requirement,design,plan}.md` を仕様として読み、運用確認が必要な時だけこのガイドを参照する。
+- 実装フェーズでは `spec-dock/active/context-pack.md` を入口にし、対象 Issue ディレクトリの `{requirement,design,plan}.md` を仕様として読み、運用確認が必要な時だけこのガイドを参照する。
 
 ## 用語・状態・役割分担
 
@@ -94,7 +94,7 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 - テンプレの各セクションは、タスクに不要なら **削除/省略/追加してよい**（推測で埋めて “それっぽい設計” を捏造しない）。承認可否はチェックリストで判定する。
 - インターフェース契約（API/関数・クラス境界）は、追加/変更がある場合にのみ固定する。該当が無い場合は省略してよい（推測で新規に定義しない）。
 - 主要フローは、複数AC/複数コンポーネント/外部連携/状態遷移など、順序や分岐が重要な場合に記載する。単純な変更で不要なら省略してよい（省略理由は「省略/例外メモ」に残す）。
-- 「既存実装/規約の調査結果（As-Is / 95%理解）」に、参照だけでなく観測した事実と採用パターン（採用しない理由含む）を残す。
+- 「既存実装/規約の調査結果（As-Is / 99.9%理解）」に、参照だけでなく観測した事実と採用パターン（採用しない理由含む）を残す。
 - UML は PlantUML を使う。テンプレは例を豊富に置くが、成果物では必要な図だけ残す（不要な図サブセクションは削除/省略する）。
 - （任意）「ディレクトリ/ファイル構成図」は `tree` 風（`├──` / `│` / `└──`）で、変更点が追える最小範囲にする（入れる場合は変更計画と整合させる）。複数モジュール/複数層に跨る、または変更対象ファイルが多い場合は記載を推奨する。省略する場合は「省略/例外メモ」に代替情報（例: 変更ファイル数、主要ディレクトリ、跨ぎ変更の有無）を残す。
 - テスト戦略は、**コード変更がある場合は原則記載する**（追加/修正するテスト、または既存テストで担保する箇所の参照）。ドキュメントのみ等、コード変更が無い場合のみ省略してよい（省略時は「省略/例外メモ」に理由を残す）。
@@ -164,8 +164,8 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 ### 計画フェーズ（Planning Phase）
 
 0. **active を設定（必須）**
-   - `./.spec-dock/scripts/spec-dock active set --issue iss-xxxx` で、現在の Issue を固定する
-   - `.spec-dock/active/context-pack.md` が生成されることを確認する
+   - `./spec-dock/scripts/spec-dock active set --issue iss-xxxx` で、現在の Issue を固定する
+   - `spec-dock/active/context-pack.md` が生成されることを確認する
 
 1. **要件定義（対象 Issue の `requirement.md`）**
    - AC/EC を観測可能（テスト可能）な形に落とす
@@ -206,6 +206,6 @@ Kent Beck と 和田卓人 (t-wada) の Red → Green → Refactor サイクル�
 ## ベストプラクティス
 
 - ドキュメント本文は日本語で記述しつつ、ファイル名・ディレクトリ名は英語のまま維持する  
-- 関連する成果物は `@.spec-dock/...` 形式で相互参照し、要件・設計・計画・実装ログ・コードをトレーサブルに保つ  
+- 関連する成果物は `@spec-dock/...` 形式で相互参照し、要件・設計・計画・実装ログ・コードをトレーサブルに保つ  
 - 重要な意思決定・未解決の論点・ブロッカーは `report.md` に明記し、人間のレビューや相談につなげる  
 - 要件・設計・plan・report の内容は、最終的に作成される Pull Request の説明やレビューでの議論と整合するように維持する  

@@ -27,7 +27,7 @@ gh issue create --title "<title>" --body "<body>"
 `--github-issue 123` を渡すと、GitHub Issue は作成せず、番号だけ紐づけます。
 
 ```bash
-./.spec-dock/scripts/spec-dock new issue --epic 124 --title "..." --github-issue 123
+./spec-dock/scripts/spec-dock new issue --epic 124 --title "..." --github-issue 123
 ```
 
 ## 2) 「どのリポジトリに作るか」はどう決まるか
@@ -57,10 +57,10 @@ skinparam monochrome true
 hide footbox
 
 actor User
-participant "runtime script\n(.spec-dock/scripts/spec-dock)" as Script
+participant "runtime script\n(spec-dock/scripts/spec-dock)" as Script
 participant "gh CLI" as GH
 database "GitHub Issues" as GHI
-participant "Local FS\n(.spec-dock/initiatives/**)" as FS
+participant "Local FS\n(spec-dock/initiatives/**)" as FS
 
 User -> Script: new issue --epic <id> --title <title>
 activate Script
@@ -86,4 +86,3 @@ deactivate Script
 
 - `gh` が無い: `new` がエラー → `gh` を導入するか `--no-github`
 - GitHub リポジトリとして解決できない / 権限がない: `gh issue create` が失敗 → `git remote` / `gh auth` を確認
-

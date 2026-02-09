@@ -3,37 +3,37 @@
 対象コマンド:
 
 ```bash
-./.spec-dock/scripts/spec-dock sync [--github] [--gh-limit N]
+./spec-dock/scripts/spec-dock sync [--github] [--gh-limit N]
 ```
 
 ## 0. 結論
 
-`sync` は **ローカルの仕様ツリー**（`.spec-dock/initiatives/**/meta.json`）を正として必ず走査し、  
+`sync` は **ローカルの仕様ツリー**（`spec-dock/initiatives/**/meta.json`）を正として必ず走査し、  
 `--github` を付けた場合だけ **GitHub Issue の状態を `gh` で取得して enrich（補強）**します。
 
 - `sync`（デフォルト）: ローカル集計のみ（open/done は `unknown`）
 - `sync --github`: ローカル集計 + GitHub enrich（`github.issue_number` があるものだけ判定可能）
 
 出力:
-- `.spec-dock/.agent/index.json`（生成物 / git 管理しない, フラット索引）
-- `.spec-dock/.agent/tree.json`（生成物 / git 管理しない, ネスト表示）
+- `spec-dock/.agent/index.json`（生成物 / git 管理しない, フラット索引）
+- `spec-dock/.agent/tree.json`（生成物 / git 管理しない, ネスト表示）
 
 ## 1. 何を入力として、何を出力するか
 
 ### 入力（ローカル: 常に）
-- `.spec-dock/initiatives/**/meta.json`（永続メタ）
-- `.spec-dock/.agent/active.json`（存在すれば active の SSOT）
+- `spec-dock/initiatives/**/meta.json`（永続メタ）
+- `spec-dock/.agent/active.json`（存在すれば active の SSOT）
 
 ### 入力（GitHub: 任意）
 - `gh issue list ...` の結果（`--github` の時だけ）
 
 ### 出力（生成物）
-- `.spec-dock/.agent/index.json`（index）
+- `spec-dock/.agent/index.json`（index）
   - ノード索引（id→情報）
   - 親子関係（children）
   - initiative/epic の progress（配下 issue の集計）
   - active（active.json の内容）
-- `.spec-dock/.agent/tree.json`（tree）
+- `spec-dock/.agent/tree.json`（tree）
   - initiative→epic→issue のネスト表示（各ノードは `index.json` と同じスキーマ）
   - active（active.json の内容）
 
@@ -45,11 +45,11 @@ skinparam monochrome true
 hide footbox
 
 actor User
-participant "runtime script\n(.spec-dock/scripts/spec-dock)" as Script
-participant "Local FS\n(.spec-dock/initiatives/**)" as FS
+participant "runtime script\n(spec-dock/scripts/spec-dock)" as Script
+participant "Local FS\n(spec-dock/initiatives/**)" as FS
 participant "gh CLI" as GH
-database "index.json\n(.spec-dock/.agent/index.json)" as State
-database "tree.json\n(.spec-dock/.agent/tree.json)" as Tree
+database "index.json\n(spec-dock/.agent/index.json)" as State
+database "tree.json\n(spec-dock/.agent/tree.json)" as Tree
 
 User -> Script: sync [--github]
 activate Script

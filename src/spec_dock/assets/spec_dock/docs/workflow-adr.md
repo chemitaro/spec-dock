@@ -37,9 +37,9 @@
 ### 2.1 ADR の作成コマンド
 
 ```bash
-./.spec-dock/scripts/spec-dock new adr --initiative init-0123 --title "..."
-./.spec-dock/scripts/spec-dock new adr --epic epic-0124 --title "..."
-./.spec-dock/scripts/spec-dock new adr --issue iss-0125 --title "..."
+./spec-dock/scripts/spec-dock new adr --initiative init-0123 --title "..."
+./spec-dock/scripts/spec-dock new adr --epic epic-0124 --title "..."
+./spec-dock/scripts/spec-dock new adr --issue iss-0125 --title "..."
 ```
 
 生成先:

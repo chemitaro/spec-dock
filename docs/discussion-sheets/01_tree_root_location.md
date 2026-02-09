@@ -43,7 +43,7 @@ v2 は「大量の Issue を含む階層ツリー」を **常置**し、ファ�
 
 1) **人間の直感**: どこに何があるか迷わないか  
 2) **エージェントの導線**: 固定パスで参照しやすいか（Skill/AGENTS から）  
-3) **“隠す/見せる”のバランス**: `.spec-dock` に隠して良いのか、`docs/` に見せたいのか  
+3) **“閉じる/見せる”のバランス**: `spec-dock/` に閉じて良いのか、`docs/` に見せたいのか  
 4) **リポジトリ汚染リスク**: 既存の `docs/` / `spec/` と衝突しないか  
 5) **移行コスト**: v1 既存ユーザーをどのくらい守るか  
 6) **将来拡張**: 生成物（dashboards/index.json 等）と混ざらないか
@@ -54,11 +54,11 @@ v2 は「大量の Issue を含む階層ツリー」を **常置**し、ファ�
 
 ここでは「ツリー本体のルート」を 3 案に整理します。
 
-### 案A: `.spec-dock/initiatives/`（“ツール配下に閉じる”）
+### 案A: `spec-dock/initiatives/`（“ツール配下に閉じる”）
 
 例:
 ```text
-.spec-dock/
+spec-dock/
   initiatives/
     INIT-0001-.../
       epics/
@@ -66,16 +66,16 @@ v2 は「大量の Issue を含む階層ツリー」を **常置**し、ファ�
 ```
 
 **意味**
-- `spec-dock` が管理する仕様資産は `.spec-dock` 以下にまとまる
+- `spec-dock` が管理する仕様資産は `spec-dock/` 以下にまとまる
 - プロジェクトの `docs/` とは分離される
 
 **Pros**
 - ツールの責務が明確（「spec-dock の資産はここ」）
 - 既存 `docs/` と衝突しにくい
-- v1 との連続性が高い（同じ `.spec-dock/`）
+- v1 から v2 への移行が単純（ディレクトリ名の差分だけ）
 
 **Cons**
-- `.spec-dock` が「隠しディレクトリ」なので、仕様が“見えづらい”と感じる人もいる
+- `spec-dock/` がリポジトリ直下に見えるため、見た目が気になる人もいる
 - 既存の v1 構成（`current/`, `templates/` 等）と同居するため、命名設計が雑だと混乱する
 
 **向いている**
@@ -84,24 +84,24 @@ v2 は「大量の Issue を含む階層ツリー」を **常置**し、ファ�
 
 ---
 
-### 案B: `.spec-dock/specs/initiatives/`（“隠し配下に置くが、意味名を付ける”）
+### 案B: `spec-dock/specs/initiatives/`（“配下に置くが、意味名を付ける”）
 
 例:
 ```text
-.spec-dock/
+spec-dock/
   specs/
     initiatives/
 ```
 
 **Pros**
-- `.spec-dock` の下でも「これは仕様ツリー本体」という区別がつく
-- `.spec-dock/current`（ポインタ）や `.spec-dock/.agent`（生成物）と衝突しにくい
+- `spec-dock/` の下でも「これは仕様ツリー本体」という区別がつく
+- `spec-dock/active`（ポインタ）や `spec-dock/.agent`（生成物）と衝突しにくい
 
 **Cons**
 - ディレクトリが1段深くなり、パスが長くなる
 
 **向いている**
-- `.spec-dock` に閉じたいが、`initiatives/` 直下に色々増える未来が不安
+- `spec-dock/` に閉じたいが、`initiatives/` 直下に色々増える未来が不安
 
 ---
 
@@ -121,11 +121,11 @@ docs/
 **Cons**
 - プロジェクトの `docs/` が既にある場合、衝突/混在リスクがある
 - ツールが `docs/` を勝手に触ることに抵抗が出やすい
-- `.spec-dock`（ツール管理領域）と物理的に離れるため、境界を明確に定義しないと運用が崩れる
+- `spec-dock/`（ツール管理領域）と物理的に離れるため、境界を明確に定義しないと運用が崩れる
 
 **向いている**
 - docs を中心に運用しており、仕様を “表のドキュメント” として扱う
-- `.spec-dock` という隠しディレクトリに仕様を置きたくない
+- `spec-dock/` に仕様を置きたくない
 
 ---
 
@@ -155,7 +155,7 @@ docs/
 skinparam componentStyle rectangle
 
 package "Repository root" {
-  folder ".spec-dock/" as specdock
+  folder "spec-dock/" as specdock
   folder "docs/" as docs
 }
 
@@ -167,8 +167,8 @@ specdock --> v1 : v1
 specdock --> runtime : v2
 
 note right of v2
-案A: .spec-dock/initiatives/...
-案B: .spec-dock/specs/initiatives/...
+案A: spec-dock/initiatives/...
+案B: spec-dock/specs/initiatives/...
 案C: docs/spec-dock/initiatives/...
 end note
 @enduml
@@ -188,7 +188,7 @@ end note
   - 例: `INIT-*/meta.*` の存在、など
 
 v1 互換を残すなら:
-- `layout: legacy|tree` を設定（例: `.spec-dock/spec-dock.config.json`）
+- `layout: legacy|tree` を設定（例: `spec-dock/spec-dock.config.json`）
 - 既存ユーザーは legacy を維持、v2 新規は tree デフォルト
 が “破壊的変更” を避ける現実解です。
 
@@ -197,8 +197,8 @@ v1 互換を残すなら:
 ## 7. ユーザー回答欄（ここを埋めてください）
 
 ### 7.1 選択
-- [x] 案A: `.spec-dock/initiatives/`
-- [ ] 案B: `.spec-dock/specs/initiatives/`
+- [x] 案A: `spec-dock/initiatives/`
+- [ ] 案B: `spec-dock/specs/initiatives/`
 - [ ] 案C: `docs/spec-dock/initiatives/`
 - [ ] その他（具体パス）: ______________________________
 
@@ -209,13 +209,13 @@ v1 互換を残すなら:
 - v1 互換/移行の考え:  
 - その他の制約（会社/チーム文化、CI制約等）:  
 
-### 7.3 “.spec-dock は隠し扱い”について
-- `.spec-dock` に仕様を置くことに抵抗はありますか？（はい/いいえ、理由）
+### 7.3 `spec-dock/`（ドット無し）について
+- `spec-dock/` に仕様を置くことに抵抗はありますか？（はい/いいえ、理由）
 
 いいえ
 
 ## 8. 結論（決まったら記入）
 
-- 仕様ツリー本体ルート: `.spec-dock/initiatives/`（案A）
+- 仕様ツリー本体ルート: `spec-dock/initiatives/`（案A）
 - ディレクトリ命名ルール（例: `ID-slug`）: `init-0001-<slug>` 形式。**全て小文字**（macOS のケース非区別FS対策）
 - v1 互換方針（legacy を残す/捨てる）: **捨てる**

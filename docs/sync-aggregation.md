@@ -1,11 +1,11 @@
 # Sync（状態集計）の仕組み解説（spec-dock v2 / ローカルスクリプト）
 
-対象スクリプト: `.spec-dock/scripts/spec-dock`  
-対象コマンド: `./.spec-dock/scripts/spec-dock sync [--github] [--gh-limit N]`
+対象スクリプト: `spec-dock/scripts/spec-dock`  
+対象コマンド: `./spec-dock/scripts/spec-dock sync [--github] [--gh-limit N]`
 
 ## 0. 結論（質問への答え）
 
-`sync` の集計は **ローカルの仕様ツリー（`.spec-dock/initiatives/**`）を正として必ず走査**します。  
+`sync` の集計は **ローカルの仕様ツリー（`spec-dock/initiatives/**`）を正として必ず走査**します。  
 その上で、`--github` を付けた場合だけ **GitHub Issue の状態を `gh` CLI で取得して enrich（補強）**します。
 
 - デフォルト（`sync`）: **ローカル集計のみ**  
@@ -16,9 +16,9 @@
 ## 1. 何を入力として、何を出力するか
 
 ### 入力（ローカル）
-- `.spec-dock/initiatives/**/meta.json`
+- `spec-dock/initiatives/**/meta.json`
   - initiative/epic/issue ノードの **永続メタ**（ID/親/所属など）
-- `.spec-dock/.agent/active.json`（存在すれば）
+- `spec-dock/.agent/active.json`（存在すれば）
   - active（今作業中）の SSOT（Single Source of Truth）
 
 ### 入力（GitHub, 任意）
@@ -26,9 +26,9 @@
   - issue の state（OPEN/CLOSED）, labels, updatedAt, url など
 
 ### 出力（生成物 / git 管理しない）
-- `.spec-dock/.agent/index.json`
+- `spec-dock/.agent/index.json`
   - 全ノードのフラットな索引 + 親子関係 + initiative/epic の進捗集計 + active（current）を含む
-- `.spec-dock/.agent/tree.json`
+- `spec-dock/.agent/tree.json`
   - initiative→epic→issue のネスト表示（`index.json` と同じノードスキーマを持つ）
 
 ## 2. 集計の前提データ（meta.json の役割）
@@ -46,10 +46,10 @@
 
 ## 3. sync の内部処理（ステップ別）
 
-以下は実装上の処理順です（実体は `.spec-dock/scripts/spec-dock` 内の `_sync()`）。
+以下は実装上の処理順です（実体は `spec-dock/scripts/spec-dock` 内の `_sync()`）。
 
 ### Step 1: ローカルツリーを走査してノード辞書を作る（必須）
-1. `.spec-dock/initiatives/` 配下を再帰走査して `meta.json` を全取得
+1. `spec-dock/initiatives/` 配下を再帰走査して `meta.json` を全取得
 2. `id -> node` の辞書（インメモリ）を構築
 3. `parent_id` を元に、`親 -> 子ID一覧` の索引も作る（index.json の `children` 用）
 
@@ -86,12 +86,12 @@
 - `unknown`: GitHub で状態が取れなかった数（`--github` なし/紐づけ無し/limit 漏れ等）
 
 ### Step 4: index.json（index）と tree.json（tree）を生成して書き出す
-最後に `.spec-dock/.agent/index.json`（index）と `.spec-dock/.agent/tree.json`（tree）を生成します。
+最後に `spec-dock/.agent/index.json`（index）と `spec-dock/.agent/tree.json`（tree）を生成します。
 
 含まれるもの:
 - `generated_at`: 生成時刻
-- `root`: ツリーのルート（`.spec-dock/initiatives`）
-- `active`: `.spec-dock/.agent/active.json` があればその内容
+- `root`: ツリーのルート（`spec-dock/initiatives`）
+- `active`: `spec-dock/.agent/active.json` があればその内容
 - `nodes`（index.json）: 全ノードの辞書
   - `children`: 子ノードIDの配列（親子参照を簡単にするため）
   - `progress`: initiative/epic にだけ付与
@@ -106,11 +106,11 @@
 skinparam monochrome true
 
 actor User
-participant "runtime script\n(.spec-dock/scripts/spec-dock)" as Script
-participant "Local FS\n(.spec-dock/initiatives/**)" as FS
+participant "runtime script\n(spec-dock/scripts/spec-dock)" as Script
+participant "Local FS\n(spec-dock/initiatives/**)" as FS
 participant "gh CLI" as GH
-database "index.json\n(.spec-dock/.agent/index.json)" as State
-database "tree.json\n(.spec-dock/.agent/tree.json)" as Tree
+database "index.json\n(spec-dock/.agent/index.json)" as State
+database "tree.json\n(spec-dock/.agent/tree.json)" as Tree
 
 User -> Script: sync [--github]
 
@@ -217,7 +217,7 @@ Epic 配下に issue が 3 つあるとして:
 - 先に GitHub issue を作って番号を確定し、ローカル issue を作る時点で `--github-issue` を渡す
 
 （補足）将来的に “手編集を減らす” なら、
-`./.spec-dock/scripts/spec-dock link --issue iss-local-0001 --github-issue 123` のような
+`./spec-dock/scripts/spec-dock link --issue iss-local-0001 --github-issue 123` のような
 「連携だけ行うコマンド」を追加するのが自然です（現状は未実装）。
 
 ## 6. index.json（index）の最小イメージ
@@ -226,7 +226,7 @@ Epic 配下に issue が 3 つあるとして:
 {
   "schema_version": 1,
   "generated_at": "2026-02-05T12:34:56+09:00",
-  "root": ".spec-dock/initiatives",
+  "root": "spec-dock/initiatives",
   "active": { "...": "..." },
   "nodes": {
     "init-0123": {
@@ -256,14 +256,14 @@ Epic 配下に issue が 3 つあるとして:
 {
   "schema_version": 1,
   "generated_at": "2026-02-05T12:34:56+09:00",
-  "root": ".spec-dock/initiatives",
+  "root": "spec-dock/initiatives",
   "active": { "...": "..." },
   "tree": [
     {
       "type": "initiative",
       "id": "init-0123",
       "title": "Auth platform",
-      "path": ".spec-dock/initiatives/init-0123-auth-platform",
+      "path": "spec-dock/initiatives/init-0123-auth-platform",
       "children": ["epic-0124"],
       "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
       "epics": [
@@ -271,7 +271,7 @@ Epic 配下に issue が 3 つあるとして:
           "type": "epic",
           "id": "epic-0124",
           "title": "JWT auth",
-          "path": ".spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth",
+          "path": "spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth",
           "children": ["iss-0125", "iss-local-0001"],
           "progress": { "total": 2, "done": 0, "open": 1, "unknown": 1 },
           "issues": [
@@ -279,7 +279,7 @@ Epic 配下に issue が 3 つあるとして:
               "type": "issue",
               "id": "iss-0125",
               "title": "Add refresh token",
-              "path": ".spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth/issues/iss-0125-add-refresh-token",
+              "path": "spec-dock/initiatives/init-0123-auth-platform/epics/epic-0124-jwt-auth/issues/iss-0125-add-refresh-token",
               "children": [],
               "github": { "issue_number": 123, "state": "OPEN" }
             },

@@ -25,9 +25,9 @@
 ### 1.1 基本（デフォルト: GitHub Issue を自動作成）
 
 ```bash
-./.spec-dock/scripts/spec-dock new initiative --title "..."
-./.spec-dock/scripts/spec-dock new epic --initiative 123 --title "..."
-./.spec-dock/scripts/spec-dock new issue --epic 124 --title "..."
+./spec-dock/scripts/spec-dock new initiative --title "..."
+./spec-dock/scripts/spec-dock new epic --initiative 123 --title "..."
+./spec-dock/scripts/spec-dock new issue --epic 124 --title "..."
 ```
 
 - `new {initiative,epic,issue}` はデフォルトで `gh` を呼びます（詳細: `github.md`）。
@@ -36,9 +36,9 @@
 ### 1.2 ローカルのみ（GitHub を使わない）
 
 ```bash
-./.spec-dock/scripts/spec-dock new initiative --no-github --title "..."
-./.spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "..."
-./.spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "..."
+./spec-dock/scripts/spec-dock new initiative --no-github --title "..."
+./spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "..."
+./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "..."
 ```
 
 ---
@@ -92,30 +92,30 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 ### 5.1 状態の可視化（sync）
 
 ```bash
-./.spec-dock/scripts/spec-dock sync
-./.spec-dock/scripts/spec-dock sync --github
+./spec-dock/scripts/spec-dock sync
+./spec-dock/scripts/spec-dock sync --github
 ```
 
-- `.spec-dock/.agent/tree.json`（人間向けのネスト表示）
-- `.spec-dock/.agent/index.json`（エージェント向けのフラット索引）
+- `spec-dock/.agent/tree.json`（人間向けのネスト表示）
+- `spec-dock/.agent/index.json`（エージェント向けのフラット索引）
 
 詳細: `sync.md`
 
 ### 5.2 いま作業する対象の固定（active）
 
 ```bash
-./.spec-dock/scripts/spec-dock active show
-./.spec-dock/scripts/spec-dock active set --issue 123
-./.spec-dock/scripts/spec-dock active clear
+./spec-dock/scripts/spec-dock active show
+./spec-dock/scripts/spec-dock active set --issue 123
+./spec-dock/scripts/spec-dock active clear
 ```
 
 - `active` は生成物（gitignore）で、**「いま触る対象」の入口**だけを提供する。
-- エージェントは `.spec-dock/active/context-pack.md` を入口にする。
+- エージェントは `spec-dock/active/context-pack.md` を入口にする。
 
 ### 5.3 構造チェック（validate）
 
 ```bash
-./.spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock validate
 ```
 
 ---

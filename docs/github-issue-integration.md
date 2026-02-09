@@ -1,7 +1,7 @@
 # GitHub Issue 作成（`gh` 連携）の内部仕様メモ（spec-dock v2）
 
 対象:
-- ランタイムスクリプト: `.spec-dock/scripts/spec-dock`（導入先リポジトリに配置される）
+- ランタイムスクリプト: `spec-dock/scripts/spec-dock`（導入先リポジトリに配置される）
 - このリポジトリ上の実体: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
 
 目的:
@@ -25,14 +25,14 @@
 
 ### 1.1 Issue 作成（デフォルト動作）
 
-`./.spec-dock/scripts/spec-dock new {initiative,epic,issue} ...` は、デフォルトで以下を実行します:
+`./spec-dock/scripts/spec-dock new {initiative,epic,issue} ...` は、デフォルトで以下を実行します:
 
 ```bash
 gh issue create --title "<title>" --body "<body>"
 ```
 
 - `--title` と `--body` を **必ず付ける**（非対話で確実に作れるようにする）
-- `cwd`（実行ディレクトリ）は **導入先リポジトリの root**（`<repo>/.spec-dock/..`）に固定
+- `cwd`（実行ディレクトリ）は **導入先リポジトリの root**（`<repo>/spec-dock/..`）に固定
 - `gh` の出力（stdout/stderr）に含まれる URL から `/issues/<number>` を正規表現で抽出して Issue 番号を得る
 - 得られた番号をそのまま ID に使う
   - 例: GitHub #123 → `iss-0123`
@@ -40,7 +40,7 @@ gh issue create --title "<title>" --body "<body>"
 
 ### 1.2 sync の GitHub enrich（任意）
 
-`./.spec-dock/scripts/spec-dock sync --github` は、GitHub 側の状態（OPEN/CLOSED 等）を enrich するために:
+`./spec-dock/scripts/spec-dock sync --github` は、GitHub 側の状態（OPEN/CLOSED 等）を enrich するために:
 
 ```bash
 gh issue list --state all --limit <N> --json number,state,title,labels,updatedAt,url
@@ -49,7 +49,7 @@ gh issue list --state all --limit <N> --json number,state,title,labels,updatedAt
 を実行し、取得した一覧を `issue_number -> issue_json` の辞書にして使います。
 
 ポイント:
-- `sync` の「骨格」は常に **ローカル `.spec-dock/initiatives/**/meta.json` 走査**です
+- `sync` の「骨格」は常に **ローカル `spec-dock/initiatives/**/meta.json` 走査**です
 - `--github` はあくまで **状態の補強**（読み取り）で、GitHub に書き込みはしません
 
 ---
@@ -84,14 +84,14 @@ spec-dock が行うのは次の 1 点だけです:
 GitHub を使わない場合は `--no-github` を明示します。
 
 ```bash
-./.spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "..."
+./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "..."
 ```
 
 このモードでは:
 - `gh` は一切呼びません（GitHub が無い/オフライン/権限無しでも動く）
 - ID は衝突回避のため `*-local-*` 名前空間になります
   - `iss-local-0001` / `epic-local-0001` / `init-local-0001`
-- ローカル連番は `.spec-dock/initiatives/**/meta.json` を走査し、
+- ローカル連番は `spec-dock/initiatives/**/meta.json` を走査し、
   - 同じ prefix（iss/epic/init）の
   - `*-local-*` の最大値 + 1
   を採番します
@@ -112,8 +112,8 @@ skinparam monochrome true
 hide footbox
 
 actor User
-participant "spec-dock runtime\n(.spec-dock/scripts/spec-dock)" as Script
-participant "Local FS\n(.spec-dock/initiatives/**)" as FS
+participant "spec-dock runtime\n(spec-dock/scripts/spec-dock)" as Script
+participant "Local FS\n(spec-dock/initiatives/**)" as FS
 participant "gh CLI" as GH
 database "GitHub Issues" as GHI
 
@@ -152,8 +152,8 @@ skinparam monochrome true
 hide footbox
 
 actor User
-participant "spec-dock runtime\n(.spec-dock/scripts/spec-dock)" as Script
-participant "Local FS\n(.spec-dock/initiatives/**)" as FS
+participant "spec-dock runtime\n(spec-dock/scripts/spec-dock)" as Script
+participant "Local FS\n(spec-dock/initiatives/**)" as FS
 
 User -> Script: new issue --no-github --epic <id> --title <title>
 activate Script

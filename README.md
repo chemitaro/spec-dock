@@ -15,7 +15,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init
 # Install into a target path
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/project
 
-# Overwrite managed files if '.spec-dock' already exists
+# Overwrite managed files if 'spec-dock' already exists
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
 
 # Skip installing the Codex skill (optional)
@@ -50,7 +50,9 @@ uvx --from ~/src/spec-dock spec-dock update
 
 Troubleshooting:
 - If `.spec-dock/initiative/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
-  v2 generates `.spec-dock/initiatives/`, `.spec-dock/active/`, and `.spec-dock/.agent/`.
+  v2 generates `spec-dock/initiatives/`, `spec-dock/active/`, and `spec-dock/.agent/`.
+- If you already have a legacy `.spec-dock/` directory from older v2 versions, rename it:
+  - `mv .spec-dock spec-dock`
 - If your local clone contains the v2 files but `uvx` still behaves like v1, try one of:
   - Avoid the shared cache for a single run: `uvx --no-cache --from ~/src/spec-dock spec-dock init`
   - Use a dedicated cache directory: `uvx --cache-dir /tmp/uv-cache-spec-dock --from ~/src/spec-dock spec-dock init`
@@ -60,40 +62,40 @@ Troubleshooting:
 ## Usage (local scripts)
 
 After `init`, day-to-day operations are done via the runtime script installed into your repo:
-`./.spec-dock/scripts/spec-dock`.
+`./spec-dock/scripts/spec-dock`.
 
 ```bash
 # Create nodes (default: create GitHub issues; ids follow GitHub issue numbers)
 # Requires: GitHub CLI `gh` and a GitHub repository.
-./.spec-dock/scripts/spec-dock new initiative --title "Auth platform"          # creates GH issue, id=init-0123
-./.spec-dock/scripts/spec-dock new epic --initiative 123 --title "JWT auth"    # creates GH issue, id=epic-0124
-./.spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token"  # creates GH issue, id=iss-0125
+./spec-dock/scripts/spec-dock new initiative --title "Auth platform"          # creates GH issue, id=init-0123
+./spec-dock/scripts/spec-dock new epic --initiative 123 --title "JWT auth"    # creates GH issue, id=epic-0124
+./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token"  # creates GH issue, id=iss-0125
 
 # Local-only (no GitHub): ids are created under the collision-proof `*-local-*` namespace.
-./.spec-dock/scripts/spec-dock new initiative --no-github --title "Auth platform"          # id=init-local-0001
-./.spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "JWT auth"      # id=epic-local-0001
-./.spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"  # id=iss-local-0001
+./spec-dock/scripts/spec-dock new initiative --no-github --title "Auth platform"          # id=init-local-0001
+./spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "JWT auth"      # id=epic-local-0001
+./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"  # id=iss-local-0001
 
 # Or: link to an existing GitHub issue number (without creating a new one)
-./.spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-0123
-./.spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
+./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-0123
+./spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
 
 # Set active issue pointers (symlinks) and generate context-pack
-./.spec-dock/scripts/spec-dock active set --issue 0123  # also accepts iss-0123
+./spec-dock/scripts/spec-dock active set --issue 0123  # also accepts iss-0123
 
 # Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
-./.spec-dock/scripts/spec-dock sync
-./.spec-dock/scripts/spec-dock sync --github
+./spec-dock/scripts/spec-dock sync
+./spec-dock/scripts/spec-dock sync --github
 
 # Validate the spec tree structure
-./.spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock validate
 ```
 
 See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
 
 ## What it creates
 
-- `.spec-dock/`
+- `spec-dock/`
   - `spec-dock.version` (installed spec-dock version)
   - `docs/` (guide)
   - `templates/` (initiative/epic/issue/adr templates)
@@ -114,11 +116,11 @@ python -m unittest discover -v
 
 ## 日本語（概要）
 
-`spec-dock` は、既存リポジトリに `.spec-dock/`（仕様書駆動開発のためのドキュメント一式）と
+`spec-dock` は、既存リポジトリに `spec-dock/`（仕様書駆動開発のためのドキュメント一式）と
 Codex Skill を生成するためのスキャフォルディングツールです。
 
 実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。
 
-v2 では `.spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
-`.spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
-状態の集計は `.spec-dock/.agent/index.json` と `.spec-dock/.agent/tree.json` を `./.spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
+v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
+`spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
+状態の集計は `spec-dock/.agent/index.json` と `spec-dock/.agent/tree.json` を `./spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。

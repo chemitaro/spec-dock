@@ -7,7 +7,7 @@ Codex CLI / skill / AGENTS から **必ず同じ入口**に到達できる設計
 
 ## 0. このシートで決めること
 
-- “現在地” を表す **固定パス**をどこに置くか（例: `.spec-dock/current/` をどう扱うか）
+- “現在地” を表す **固定パス**をどこに置くか（例: `spec-dock/current/` をどう扱うか）
 - symlink 方式を採用するか、採用するならフォールバックをどうするか
 - “current を切り替える”運用の事故（文脈混入）をどう防ぐか
 
@@ -52,11 +52,11 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 
 ここでは “固定入口ディレクトリ名” をどうするかを比較します。
 
-### 案A: `.spec-dock/current/` を継続利用（意味を「作業場」→「ポインタ」に変更）
+### 案A: `spec-dock/current/` を継続利用（意味を「作業場」→「ポインタ」に変更）
 
 例:
 ```text
-.spec-dock/current/
+spec-dock/current/
   initiative -> <real path>
   epic       -> <real path>
   issue      -> <real path>
@@ -64,7 +64,7 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 ```
 
 **Pros**
-- 既存の Skill やドキュメントが `.spec-dock/current` を前提にしているため、移行が楽
+- 既存の Skill やドキュメントが `spec-dock/current` を前提にしているため、移行が楽
 - “current という概念” が既に浸透している
 
 **Cons**
@@ -76,11 +76,11 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 
 ---
 
-### 案B: `.spec-dock/focus/` や `.spec-dock/active/` に新設（`current` は legacy 専用にする）
+### 案B: `spec-dock/focus/` や `spec-dock/active/` に新設（`current` は legacy 専用にする）
 
 例:
 ```text
-.spec-dock/focus/
+spec-dock/focus/
   initiative -> ...
   epic       -> ...
   issue      -> ...
@@ -100,7 +100,7 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 
 ---
 
-### 案C: `.spec-dock/current/` と `.spec-dock/focus/` を両方作る（互換エイリアス）
+### 案C: `spec-dock/current/` と `spec-dock/focus/` を両方作る（互換エイリアス）
 
 **Pros**
 - 既存導線を壊さず v2 の意味名も得られる
@@ -119,7 +119,7 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 ### SSOT案1: `active.json`（gitignore） + symlink 生成（推奨）
 
 ```
-.spec-dock/
+spec-dock/
   .agent/              (gitignore)
     active.json        (SSOT)
     index.json         (generated)
@@ -188,8 +188,8 @@ symlink を真実にすると、切れたり、環境差で壊れたり、差し
 @startuml
 skinparam componentStyle rectangle
 
-artifact "SSOT\n.spec-dock/.agent/active.json" as ssot
-folder "Generated pointers\n.spec-dock/focus/" as focus
+artifact "SSOT\nspec-dock/.agent/active.json" as ssot
+folder "Generated pointers\nspec-dock/focus/" as focus
 artifact "Generated entry\ncontext-pack.md" as cp
 folder "Specs tree\n(initiatives/...)" as tree
 
@@ -223,8 +223,8 @@ cp --> tree : links to
 ## 8. ユーザー回答欄（ここを埋めてください）
 
 ### 8.1 固定入口ディレクトリ名（どれが良い？）
-- [ ] 案A: `.spec-dock/current/` をポインタにする
-- [x] 案B: `.spec-dock/active/`新設する
+- [ ] 案A: `spec-dock/current/` をポインタにする
+- [x] 案B: `spec-dock/active/`新設する
 - [ ] 案C: 両方（移行期間だけ）
 - [ ] その他: ______________________________
 
@@ -249,7 +249,7 @@ cp --> tree : links to
 
 ## 9. 結論（決まったら記入）
 
-- 固定入口ディレクトリ: `.spec-dock/active/`（案B）
-- SSOT（manifest）: `.spec-dock/.agent/active.json`
+- 固定入口ディレクトリ: `spec-dock/active/`（案B）
+- SSOT（manifest）: `spec-dock/.agent/active.json`
 - pointers.mode（デフォルト）: `symlink`（mac/linux 前提、symlink 不可事情なし）
 - current 切替の事故対策（worktree/セッション/確認）: **基本は worktree / 別作業ディレクトリで分離**（同一作業ディレクトリでの頻繁切替はしない）

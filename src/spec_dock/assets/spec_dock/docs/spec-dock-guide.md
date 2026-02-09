@@ -1,6 +1,6 @@
 # spec-dock guide（共通原則 / 承認ゲート）
 
-このドキュメントは、`.spec-dock/initiatives/` の仕様ツリー（Initiative → Epic → Issue）を  
+このドキュメントは、`spec-dock/initiatives/` の仕様ツリー（Initiative → Epic → Issue）を  
 人間とコーディングエージェント（Codex CLI）が **同じ前提**で運用するための「共通原則」と「承認ゲート（チェックリスト）」の正です。
 
 詳細手順（ワークフロー）は用途別に分割しています:
@@ -55,12 +55,12 @@
 
 ## ディレクトリと成果物（何が正で、何が生成物か）
 
-- `.spec-dock/initiatives/`（Git管理する）
+- `spec-dock/initiatives/`（Git管理する）
   - 仕様ツリー本体（Initiative/Epic/Issue/ADR が常置）
-- `.spec-dock/active/`（生成物 / gitignore）
+- `spec-dock/active/`（生成物 / gitignore）
   - 現在作業中の initiative/epic/issue への固定入口（symlink または `.path`）
   - `context-pack.md`（エージェントの入口）
-- `.spec-dock/.agent/`（生成物 / gitignore）
+- `spec-dock/.agent/`（生成物 / gitignore）
   - `active.json`（SSOT）
   - `index.json` / `tree.json`（`sync` の出力）
 
