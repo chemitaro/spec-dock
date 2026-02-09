@@ -479,6 +479,69 @@ class TestCli(unittest.TestCase):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-0123")
 
+    def test_active_set_parses_hash_and_url_targets(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create parent nodes locally, but link the issue to an existing GitHub issue number.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            # Make the working tree clean so checkout is allowed.
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            # Provide a fake `gh` binary that records invocations and checks out a branch.
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                counter = bin_dir / "counter.txt"
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    f"counter_file='{counter.as_posix()}'\n"
+                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                # Both `#123` and issue URL should be accepted and behave the same.
+                self._run_runtime(target, ["active", "set", "#123"], env=test_env)
+                self._run_runtime(target, ["active", "set", "https://github.com/example/repo/issues/123"], env=test_env)
+                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "2")
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-0123")
+
     def test_active_set_github_issue_number_requires_linked_node(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")

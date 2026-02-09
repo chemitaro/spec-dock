@@ -78,15 +78,15 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 # Or: link to an existing GitHub issue number (without creating a new one)
 ./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-0123
-	./spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
+./spec-dock/scripts/spec-dock new adr --issue iss-0123 --title "Token rotation strategy"
 
-	# Set active issue pointers (symlinks) and generate context-pack
-	./spec-dock/scripts/spec-dock active set 123            # GitHub issue number (checkout + active + sync)
-	./spec-dock/scripts/spec-dock active set iss-local-0001 # local node id (no checkout)
+# Set active issue pointers (symlinks) and generate context-pack
+./spec-dock/scripts/spec-dock active set 123            # GitHub issue number (checkout + active + sync)
+./spec-dock/scripts/spec-dock active set iss-local-0001 # local node id (no checkout)
 
-	# Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
-	./spec-dock/scripts/spec-dock sync
-	./spec-dock/scripts/spec-dock sync --github
+# Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
+./spec-dock/scripts/spec-dock sync
+./spec-dock/scripts/spec-dock sync --github
 
 # Validate the spec tree structure
 ./spec-dock/scripts/spec-dock validate

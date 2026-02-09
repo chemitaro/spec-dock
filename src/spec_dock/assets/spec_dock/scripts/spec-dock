@@ -1005,6 +1005,23 @@ def _parse_active_set_target(target: str) -> tuple[str, int | str]:
             raise RuntimeError(f"Unsupported id prefix for active set: {prefix}")
         return ("node_id", _format_id(prefix, num, local=is_local))
     if len(unique) > 1:
+        # Practical disambiguation:
+        # When users pass a path/branch name, it may contain multiple ids
+        # (init → epic → iss). Prefer the most specific one.
+        by_prefix: dict[str, list[str]] = {"iss": [], "epic": [], "init": []}
+        for item in unique:
+            for p in ("iss", "epic", "init"):
+                if item.startswith(p + "-"):
+                    by_prefix[p].append(item)
+                    break
+
+        for p in ("iss", "epic", "init"):
+            if len(by_prefix[p]) == 1:
+                parsed_prefix, is_local, num = _parse_id(by_prefix[p][0])
+                return ("node_id", _format_id(parsed_prefix, num, local=is_local))
+            if len(by_prefix[p]) > 1:
+                raise RuntimeError(f"Ambiguous target: multiple {p} ids found: {', '.join(sorted(by_prefix[p]))}")
+
         raise RuntimeError(f"Ambiguous target: multiple ids found: {', '.join(unique)}")
 
     raise RuntimeError(
@@ -1439,7 +1456,24 @@ def _validate(specdock_dir: Path) -> None:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse CLI arguments for the repo-local runtime script."""
-    parser = argparse.ArgumentParser(prog="spec-dock/scripts/spec-dock")
+    class _Parser(argparse.ArgumentParser):
+        def error(self, message: str) -> None:  # noqa: A003 - argparse API
+            legacy_flags = ("--initiative", "--epic", "--issue", "--github-issue", "--checkout")
+            hint = ""
+            if "unrecognized arguments" in message and any(f in message for f in legacy_flags):
+                hint = (
+                    "\n\nHint:\n"
+                    "  'active set' is now: active set <target>\n"
+                    "  - target: GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-0123)\n"
+                    "\n"
+                    "Examples:\n"
+                    "  spec-dock/scripts/spec-dock active set 123\n"
+                    "  spec-dock/scripts/spec-dock active set iss-0123\n"
+                    "  spec-dock/scripts/spec-dock active set iss-local-0001\n"
+                )
+            super().error(message + hint)
+
+    parser = _Parser(prog="spec-dock/scripts/spec-dock")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/adr)")
