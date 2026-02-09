@@ -1448,6 +1448,11 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: boo
 
     repo_root = specdock_dir.parent
 
+    # `--force` is a debugging escape hatch. Keep it side-effect-light by disabling
+    # active auto update regardless of preflight result.
+    if force:
+        update_active = False
+
     preflight = "ok"
     try:
         _validate_nodes(nodes)
@@ -1455,8 +1460,6 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: boo
         if not force:
             raise RuntimeError(f"preflight validate failed: {e}") from e
         preflight = "failed(forced)"
-        # If the tree is invalid, do not auto-update active from branch inference even in forced mode.
-        update_active = False
         print(
             f"spec-dock: (warn) preflight validate failed; continuing due to --force: {e}",
             file=sys.stderr,

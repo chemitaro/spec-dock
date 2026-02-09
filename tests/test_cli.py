@@ -565,6 +565,37 @@ class TestCli(unittest.TestCase):
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
 
+    def test_sync_force_does_not_update_active_from_branch(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Prepare a minimal git repository so `sync` can read the current branch name.
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            # Create nodes (local-only).
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            # Branch name includes the node id. Without --force, `sync` would update active.
+            self._run_git(target, ["checkout", "-b", "feature/iss-local-0001-test"])
+
+            self._run_runtime(target, ["active", "clear"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertIsNone(active.get("issue"))
+
+            self._run_runtime(target, ["sync", "--force"])
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertIsNone(active.get("issue"))
+
     def test_new_adr_increments_id_within_scope(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
