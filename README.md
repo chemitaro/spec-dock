@@ -49,7 +49,7 @@ uvx --from ~/src/spec-dock spec-dock update
 ```
 
 Troubleshooting:
-- If `.spec-dock/initiative/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
+- If `.spec-dock/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
   v2 generates `spec-dock/initiatives/`, `spec-dock/active/`, and `spec-dock/.agent/`.
 - If you already have a legacy `.spec-dock/` directory from older v2 versions, rename it:
   - `mv .spec-dock spec-dock`
