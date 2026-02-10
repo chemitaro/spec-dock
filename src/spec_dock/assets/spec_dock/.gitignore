@@ -1,0 +1,6 @@
+# spec-dock runtime (generated)
+# v2 generated state for agents (SSOT + derived views)
+.agent/
+# legacy v2 name (kept ignored for safe upgrades)
+.work/
+active/

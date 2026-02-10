@@ -1,15 +1,16 @@
 ---
-種別: 実装報告書
-機能ID: "<FEATURE_ID>"
-機能名: "<FEATURE_NAME>"
-関連Issue: ["<ISSUE_NUMBER_OR_URL>"]
+種別: 実装報告書（Issue）
+ID: "<ISS_ID>"
+タイトル: "<ISS_TITLE>"
+関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
 状態: "draft | approved"
 作成者: "<YOUR_NAME>"
 最終更新: "YYYY-MM-DD"
 依存: ["requirement.md", "design.md", "plan.md"]
+親: ["<EPIC_ID>", "<INIT_ID>"]
 ---
 
-# <FEATURE_ID> <FEATURE_NAME> — 実装報告（LOG）
+# <ISS_ID> <ISS_TITLE> — 実装報告（LOG）
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]

@@ -1,15 +1,16 @@
 ---
-種別: 実装計画書
-機能ID: "<FEATURE_ID>"
-機能名: "<FEATURE_NAME>"
-関連Issue: ["<ISSUE_NUMBER_OR_URL>"]
+種別: 実装計画書（Issue）
+ID: "<ISS_ID>"
+タイトル: "<ISS_TITLE>"
+関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
 状態: "draft | approved"
 作成者: "<YOUR_NAME>"
 最終更新: "YYYY-MM-DD"
 依存: ["requirement.md", "design.md"]
+親: ["<EPIC_ID>", "<INIT_ID>"]
 ---
 
-# <FEATURE_ID> <FEATURE_NAME> — 実装計画（TDD: Red → Green → Refactor）
+# <ISS_ID> <ISS_TITLE> — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
 - 対象AC: AC-001, AC-002, ...
@@ -19,6 +20,13 @@
 ## ステップ一覧（観測可能な振る舞い） (必須)
 - [ ] S01: ...
 - [ ] Sxx: ... (任意: 必要に応じて追加)
+
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
 
 ### 要件 ↔ ステップ対応表 (必須)
 - AC-001 → S01
@@ -46,7 +54,7 @@
   - （Green）最小実装
   - （Refactor）整理
   - （品質ゲート）format/lint/test
-  - （報告）`.spec-dock/current/report.md` 更新
+  - （報告）`./spec-dock/active/issue/report.md` 更新
   - （コミット）このステップの区切りでコミット
 
 #### 期待する振る舞い（テストケース） (必須)
@@ -77,7 +85,7 @@
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] 期待するテスト（必要ならフォーマット/リンタ）を実行し、成功した
-- [ ] `.spec-dock/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
 - [ ] コミットした（エージェント）
 
@@ -107,7 +115,7 @@
 
 ## 完了条件（Definition of Done） (必須)
 - 対象AC/ECがすべて満たされ、テストで保証されている
-- MUST NOT / OUT OF SCOPE を破っていない（追加機能を入れていない）
+- MUST NOT / OUT OF SCOPE を破っていない
 - 品質ゲート（フォーマット/リント/テストのうち該当するもの）が満たされている
 
 ## 省略/例外メモ (必須)
