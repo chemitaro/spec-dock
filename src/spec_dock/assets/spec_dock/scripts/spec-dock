@@ -419,6 +419,10 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
 
     for meta_path in initiatives_root.rglob("meta.json"):
         meta = _load_json(meta_path)
+        if not isinstance(meta, dict):
+            raise RuntimeError(
+                f"Invalid meta.json (expected object): {meta_path} (got {type(meta).__name__})"
+            )
         node_type = str(meta.get("type", "")).strip()
         node_id = str(meta.get("id", "")).strip()
         title = str(meta.get("title", "")).strip()
@@ -1225,8 +1229,10 @@ def _active_set(
     # Default behavior:
     # - If the target node is linked to a GitHub issue number, always checkout its branch first.
     if node.github_issue_number is not None:
+        expected_type = node.type
+        issue_number = int(node.github_issue_number)
         try:
-            _gh_issue_checkout(repo_root, issue_number=int(node.github_issue_number))
+            _gh_issue_checkout(repo_root, issue_number=issue_number)
         except RuntimeError as e:
             msg = str(e)
             if msg.startswith("Working tree is not clean"):
@@ -1238,9 +1244,12 @@ def _active_set(
             raise
         # Re-scan after checkout to reflect branch-specific spec trees.
         nodes = _scan_nodes(specdock_dir)
-        node = nodes.get(node.id)
-        if not node:
-            raise RuntimeError(f"Node not found after checkout (did the branch change the spec tree?): {resolved}")
+        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+        if node.type != expected_type:
+            raise RuntimeError(
+                f"Node type mismatch after checkout for github.issue_number={issue_number}: "
+                f"expected {expected_type} but found {node.type}:{node.id}"
+            )
 
     initiative, epic, issue = _select_active_from_node(nodes, node)
     current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)

@@ -97,6 +97,24 @@ class TestCli(unittest.TestCase):
                 f"- stderr:\n{p.stderr}\n"
             )
 
+    def _run_runtime_capture(
+        self, target: Path, args: list[str], *, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+
+        merged_env = os.environ.copy()
+        if env:
+            merged_env.update(env)
+
+        return subprocess.run(
+            [sys.executable, str(script), *args],
+            cwd=str(target),
+            env=merged_env,
+            capture_output=True,
+            text=True,
+        )
+
     def _read_active_pointer_text(self, target: Path, pointer: str, rel_file: str) -> str:
         active_dir = target / "spec-dock" / "active"
         direct = active_dir / pointer
@@ -528,6 +546,33 @@ class TestCli(unittest.TestCase):
 
             self._run_runtime_expect_fail(target, ["validate"])
 
+    def test_validate_reports_invalid_meta_json_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            issue_meta.write_text("[]\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0)
+            self.assertIn("Invalid meta.json", p.stderr)
+            self.assertIn(str(issue_meta), p.stderr)
+
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -950,6 +995,84 @@ class TestCli(unittest.TestCase):
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
+
+    def test_active_set_re_resolves_node_after_checkout_when_id_format_changes(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+            base_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+            # Create parent nodes locally, and a GitHub-linked issue (id is canonical: iss-00123).
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            # Make the working tree clean so checkout is allowed.
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            # Prepare the checkout branch where the node id format differs (e.g. iss-00123 -> iss-0123).
+            self._run_git(target, ["checkout", "-b", "gh-issue-123"])
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["id"] = "iss-0123"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "change id format"],
+            )
+            self._run_git(target, ["checkout", base_branch])
+
+            # Provide a fake `gh` binary that checks out the prepared branch.
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    'if [[ \"$1\" == \"issue\" && \"$2\" == \"checkout\" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                # Even though we specify the old id form, the tool must re-resolve after checkout.
+                self._run_runtime(target, ["active", "set", "iss-00123"], env=test_env)
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-0123")
 
     def test_active_set_github_issue_checkout_refuses_dirty_working_tree(self) -> None:
         if os.name == "nt":
