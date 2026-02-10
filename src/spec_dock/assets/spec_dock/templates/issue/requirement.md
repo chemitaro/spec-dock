@@ -1,17 +1,18 @@
 ---
-種別: 要件定義書
-機能ID: "<FEATURE_ID>"
-機能名: "<FEATURE_NAME>"
-関連Issue: ["<ISSUE_NUMBER_OR_URL>"]
+種別: 要件定義書（Issue）
+ID: "<ISS_ID>"
+タイトル: "<ISS_TITLE>"
+関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
 状態: "draft | approved"
 作成者: "<YOUR_NAME>"
 最終更新: "YYYY-MM-DD"
+親: ["<EPIC_ID>", "<INIT_ID>"]
 ---
 
-# <FEATURE_ID> <FEATURE_NAME> — 要件定義（WHAT / WHY）
+# <ISS_ID> <ISS_TITLE> — 要件定義（WHAT / WHY）
 
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
-- （1〜3行）この機能でユーザーが「何をできるようになるか」を書く。
+- （1〜3行）このIssueでユーザーが「何をできるようになるか」を書く。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -41,12 +42,27 @@
 - 代表的なシナリオ:
   - ...
 
+### UML（任意） (任意)
+```plantuml
+@startuml
+' TODO: 必要なら UML を追加する（形式は自由）
+@enduml
+```
+
 ## スコープ（暴走防止のガードレール） (必須)
 - MUST（必ずやる）:
   - ...
 - MUST NOT（絶対にやらない／追加しない）:
   - ...
-- OUT OF SCOPE（今回やらない）:
+- OUT OF SCOPE:
+  - ...
+
+## 境界（Always / Ask / Never） (必須)
+- Always（常に守る）:
+  - ...
+- Ask（迷ったら相談）:
+  - ...
+- Never（絶対にしない）:
   - ...
 
 ## 非交渉制約（守るべき制約） (必須)
@@ -126,10 +142,18 @@
   - 推奨案（暫定）: ...
   - 影響範囲: ...
 
+## Definition of Ready（着手可能条件） (必須)
+- [ ] 目的が 1〜3行で明確になっている
+- [ ] MUST/MUST NOT/OUT OF SCOPE が書けている
+- [ ] Always/Ask/Never が書けている
+- [ ] AC/EC が観測可能（テスト可能）な形になっている
+- [ ] 観測点（UI/HTTP/DB/Log など）または確認方法が明記されている
+- [ ] 未確定事項が「質問/選択肢/推奨案/影響範囲」で整理されている
+
 ## 完了条件（Definition of Done） (必須)
 - すべてのAC/ECが満たされる
 - 未確定事項が解消される（残す場合は「残す理由」と「合意」を明記）
-- MUST NOT / OUT OF SCOPE を破っていない（追加機能を入れていない）
+- MUST NOT / OUT OF SCOPE を破っていない
 
 ## 省略/例外メモ (必須)
 - 該当なし
