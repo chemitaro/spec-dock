@@ -7,6 +7,6 @@
 - `requirement.md`（要件定義）
 - `design.md`（設計）
 - `plan.md`（実装計画）
+- `adrs/`（意思決定の叩き台: ADR）
 
 必要に応じて `<ISS_ID>` / `<ISS_TITLE>` などのプレースホルダを置換し、議論ログとして更新してください。
-
