@@ -12,8 +12,8 @@ ID: "issue-5"
 # issue-5 active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名） — 要件定義（WHAT / WHY）
 
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
-- `active set` による GitHub Issue checkout 時、最終的に checkout されるブランチ名が **ASCII の決定的な形式**（原則 `id-slug`、不適合時は `id`）になり、日本語ブランチ名が残らない。
-- `new/import {initiative,epic,issue}` の `--title` に ASCII 制約を課し、ASCII 非対応タイトルによる slug/ブランチ名の崩れを **作成時点で防止**できる。
+- `active set` による GitHub Issue checkout 時、最終的に checkout されるブランチ名が **決定的な形式**（原則 `id-slug`、不適合時は `id`）になり、日本語ブランチ名が残らない。
+- `new/import {initiative,epic,issue}` の `--title` / `--slug` を、`--title` は英字/数字/スペースのみ、`--slug` は kebab-case のみに制約し、日本語タイトル等による path/ブランチ名の崩れを **作成時点で防止**できる。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -21,6 +21,7 @@ ID: "issue-5"
   - 実装は `gh issue checkout <num>`（失敗時 `gh issue develop <num> --checkout`）で checkout を行っている。`src/spec_dock/assets/spec_dock/scripts/spec-dock:1072`（`_gh_issue_checkout`）
   - その結果、`gh` 側の自動生成ブランチ名（Issue title 由来）に依存し、Issue title が日本語の場合に **日本語ブランチ名**が生成され得る。
   - `new {initiative,epic,issue}` は現状 `--title` の空チェックのみで、ASCII 制約は無い。`src/spec_dock/assets/spec_dock/scripts/spec-dock:492`（`_new_initiative`）/ `:564`（`_new_epic`）/ `:653`（`_new_issue`）
+  - `new/import` は `--slug` を受け付ける。省略時は `title` から `_slugify(title)` で slug を導出する。`src/spec_dock/assets/spec_dock/scripts/spec-dock:2085`（argparse）/ `:258`（`_slugify`）
   - slug 生成は `_slugify` で、Unicode の `isalnum()` を保持するため、日本語タイトル→日本語 slug が生成され得る。`src/spec_dock/assets/spec_dock/scripts/spec-dock:258`（`_slugify`）/ `:105`（`_validate_slug`）
 - 現状の課題（困っていること）:
   - 日本語ブランチ名は、環境/ツール（シェル、CI、周辺スクリプト、正規表現前提、運用ルール）により取り回しが悪く、チーム運用上の事故原因になり得る。
@@ -81,11 +82,12 @@ Script -> Script: update active.json + pointers
     - 原則: `<node_id>-<slug>`
     - フォールバック: `<node_id>`（`<node_id>-<slug>` が「ASCII でない」または「git ブランチ名として不正」な場合）
     - prefix（例: `feature/`）は付けない
+    - 「git ブランチ名として不正」の判定方法は `git check-ref-format --branch <candidate>` 相当で固定する
   - 対象ノード種別: initiative / epic / issue（GitHub 紐づきノード）
-  - `new {initiative,epic,issue}` は `--title` を ASCII のみに制限し、非ASCIIの場合は **エラーで中断**する（副作用なし）
-  - `new {initiative,epic,issue}` は `--slug`（明示指定/自動生成の結果）も ASCII のみに制限し、非ASCIIの場合は **エラーで中断**する（副作用なし）
-  - `import {initiative,epic,issue}` は `--title` を ASCII のみに制限し、非ASCIIの場合は **エラーで中断**する（副作用なし）
-  - `import {initiative,epic,issue}` は `--slug`（明示指定/自動生成の結果）も ASCII のみに制限し、非ASCIIの場合は **エラーで中断**する（副作用なし）
+  - `new {initiative,epic,issue}` は `--title` を「slug に変換できる形式」に制限し、違反した場合は **エラーで中断**する（副作用なし）
+  - `new {initiative,epic,issue}` は `--slug`（明示指定/自動生成の結果）を kebab-case に制限し、違反した場合は **エラーで中断**する（副作用なし）
+  - `import {initiative,epic,issue}` は `--title` を「slug に変換できる形式」に制限し、違反した場合は **エラーで中断**する（副作用なし）
+  - `import {initiative,epic,issue}` は `--slug`（明示指定/自動生成の結果）を kebab-case に制限し、違反した場合は **エラーで中断**する（副作用なし）
 - MUST NOT（絶対にやらない／追加しない）:
   - リモートブランチのリネーム/削除/強制更新（force push）を行わない
   - GitHub Issue 本体（title/body/labels 等）の自動変更を追加しない（本件の目的外）
@@ -97,7 +99,7 @@ Script -> Script: update active.json + pointers
 ## 境界（Always / Ask / Never） (必須)
 - Always（常に守る）:
   - checkout 前に dirty working tree を検出して安全に中断する（既存の安全装置を維持）
-  - `active set` の結果ブランチ名は ASCII である
+  - `active set` の結果ブランチ名は ASCII である（かつ `git check-ref-format --branch` を満たす）
 - Ask（迷ったら相談）:
   - 該当なし（運用要件は確定）
 - Never（絶対にしない）:
@@ -112,6 +114,18 @@ Script -> Script: update active.json + pointers
 - runtime script は stdlib のみ（依存追加なし）
 - CLI の既存インターフェース（コマンド/引数）は変更しない（`active set <target>` / `new ... --title ...` を維持）
 - エラー時は可能な限り「副作用なし」（少なくとも `new/import` の title/slug バリデーション失敗時は FS/GitHub への書き込み無し）
+- `import` は GitHub title を取り込まない（`--title` は必須のまま維持し、本 Issue の `--title` 制約を適用する）
+- 入力制約の定義を固定する（実装ブレ防止）:
+  - `--title`（title）: **英字/数字/スペースのみ**（= slug に変換できるものだけ）
+    - 正規表現（trim 後）: `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`
+  - `--slug`（slug）: **kebab-case のみ**
+    - 正規表現（trim 後）: `^[a-z0-9]+(?:-[a-z0-9]+)*$`
+  - `--slug` 省略時の合成（title → slug）:
+    - `lower(title)` を取り、半角スペース ` ` を `-` に置換したもの
+  - バリデーション失敗時のエラーメッセージは、コーディングエージェントが修正できるように情報を含める:
+    - どの引数が不正か（`--title` / `--slug`）
+    - 期待する形式（正規表現）
+    - OK/NG 例
 
 ## 前提（Assumptions） (必須)
 - 例: 対象ユーザーは〜である
@@ -120,12 +134,12 @@ Script -> Script: update active.json + pointers
 - `active set` による checkout を行うとき、ユーザーは working tree を clean にできる（安全装置により必須）
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
-- 論点: タイトルを ASCII のみに制限すると、日本語で管理したいユーザーは不便になる
-  - 決定: `new/import` の `--title` を ASCII のみに制限する（今回の運用要件）
+- 論点: タイトル/slug を強く制約すると、日本語や記号で管理したいユーザーは不便になる
+  - 決定: `new/import` の `--title` を「英字/数字/スペースのみ」に、`--slug` を kebab-case のみに制限する
   - 理由: slug/パス/ブランチ名の一貫性と、ツールチェーン互換性を優先する
 
 ## リスク/懸念（Risks） (任意)
-- R-001: 既存ユーザーが日本語 `--title`（または `--slug`）を使っていた場合に破壊的変更になる（影響: `new/import` が失敗する / 対応: リリースノート明記、代替（英語タイトル）提示）
+- R-001: 既存ユーザーが日本語 `--title`（または kebab-case 以外の `--slug`）を使っていた場合に破壊的変更になる（影響: `new/import` が失敗する / 対応: リリースノート明記、代替（英語タイトル/slug）提示）
 - R-002: `id-slug` が git ブランチ名として不正なケース（例: `..` を含む等）により checkout/rename が失敗する（影響: `active set` が失敗 / 対応: git 妥当性チェック + `id` へのフォールバック）
 
 ## 受け入れ条件（観測可能な振る舞い） (必須)
@@ -133,7 +147,7 @@ Script -> Script: update active.json + pointers
   - Actor/Role: 開発者（GitHub 連携運用）
   - Given: GitHub 紐づきノード（initiative/epic/issue）の branch checkout が可能（working tree clean）
   - When: `./spec-dock/scripts/spec-dock active set <github_issue_number>` を実行する
-  - Then: `git rev-parse --abbrev-ref HEAD` の結果が以下のいずれかになる
+  - Then: `git rev-parse --abbrev-ref HEAD` の結果が以下のいずれかになる（候補判定は `git check-ref-format --branch` 相当）
     - 1) `<node_id>-<slug>`（ASCII かつ git ブランチ名として有効）
     - 2) `<node_id>`（フォールバック）
   - 観測点（UI/HTTP/DB/Log など）:
@@ -143,44 +157,44 @@ Script -> Script: update active.json + pointers
   - Actor/Role: 開発者（GitHub 連携運用）
   - Given: GitHub 紐づきノードの id が分かっている（例: `iss-00123`）
   - When: `./spec-dock/scripts/spec-dock active set <node_id>` を実行する（対象が GitHub 紐づきの場合 checkout を伴う）
-  - Then: AC-001 と同じブランチ命名規則が満たされる
+  - Then: AC-001 と同じブランチ命名規則が満たされる（候補判定は `git check-ref-format --branch` 相当）
   - 観測点:
     - Git: `git rev-parse --abbrev-ref HEAD`
     - File: `spec-dock/.agent/active.json`
 - AC-003:
   - Actor/Role: spec-dock 利用者
   - Given: `new` コマンドを実行できる
-  - When: `./spec-dock/scripts/spec-dock new {initiative,epic,issue} --title "<非ASCIIを含む>"` を実行する
+  - When: `./spec-dock/scripts/spec-dock new {initiative,epic,issue} --title "<不正なtitle>"` を実行する
   - Then: コマンドは失敗し、明確なエラーメッセージを出して中断する（GitHub/FS の副作用なし）
   - 観測点:
-    - CLI: exit code != 0、stderr に `--title` と `ASCII` を含む（文言は実装で確定）
+    - CLI: exit code != 0、stderr に `--title` と `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` を含む（文言は実装で確定）
     - FS: 対象の `spec-dock/initiatives/**` 以下が増えていない
     - GitHub:（GitHub モードでも）`gh issue create` が呼ばれない
 - AC-004:
   - Actor/Role: spec-dock 利用者
   - Given: `import` コマンドを実行できる
-  - When: `./spec-dock/scripts/spec-dock import {initiative,epic,issue} <num|#num|url> --title "<非ASCIIを含む>"` を実行する
+  - When: `./spec-dock/scripts/spec-dock import {initiative,epic,issue} <num|#num|url> --title "<不正なtitle>"` を実行する
   - Then: コマンドは失敗し、明確なエラーメッセージを出して中断する（FS/GitHub の副作用なし）
   - 観測点:
-    - CLI: exit code != 0、stderr に `--title` と `ASCII` を含む（文言は実装で確定）
+    - CLI: exit code != 0、stderr に `--title` と `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` を含む（文言は実装で確定）
     - FS: 対象の `spec-dock/initiatives/**` 以下が増えていない
     - GitHub: `gh issue view` が呼ばれない（入力バリデーションで早期中断）
 - AC-005:
   - Actor/Role: spec-dock 利用者
   - Given: `new` コマンドを実行できる
-  - When: `./spec-dock/scripts/spec-dock new {initiative,epic,issue} --title "<ASCII>" --slug "<非ASCIIを含む>"` を実行する
+  - When: `./spec-dock/scripts/spec-dock new {initiative,epic,issue} --title "<正しいtitle>" --slug "<不正なslug>"` を実行する
   - Then: コマンドは失敗し、明確なエラーメッセージを出して中断する（GitHub/FS の副作用なし）
   - 観測点:
-    - CLI: exit code != 0、stderr に `--slug` と `ASCII` を含む（文言は実装で確定）
+    - CLI: exit code != 0、stderr に `--slug` と `^[a-z0-9]+(?:-[a-z0-9]+)*$` を含む（文言は実装で確定）
     - FS: 対象の `spec-dock/initiatives/**` 以下が増えていない
     - GitHub:（GitHub モードでも）`gh issue create` が呼ばれない
 - AC-006:
   - Actor/Role: spec-dock 利用者
   - Given: `import` コマンドを実行できる
-  - When: `./spec-dock/scripts/spec-dock import {initiative,epic,issue} <num|#num|url> --title "<ASCII>" --slug "<非ASCIIを含む>"` を実行する
+  - When: `./spec-dock/scripts/spec-dock import {initiative,epic,issue} <num|#num|url> --title "<正しいtitle>" --slug "<不正なslug>"` を実行する
   - Then: コマンドは失敗し、明確なエラーメッセージを出して中断する（FS/GitHub の副作用なし）
   - 観測点:
-    - CLI: exit code != 0、stderr に `--slug` と `ASCII` を含む（文言は実装で確定）
+    - CLI: exit code != 0、stderr に `--slug` と `^[a-z0-9]+(?:-[a-z0-9]+)*$` を含む（文言は実装で確定）
     - FS: 対象の `spec-dock/initiatives/**` 以下が増えていない
     - GitHub: `gh issue view` が呼ばれない（入力バリデーションで早期中断）
 
@@ -197,16 +211,20 @@ Script -> Script: update active.json + pointers
   - 条件: 対象ノードの `id-slug` が ASCII でない（例: 既存データで slug が日本語）
   - 期待: ブランチ名は `<id>` へフォールバックする（エラーで止めない）
   - 観測点: `git rev-parse --abbrev-ref HEAD`
+- EC-001b:
+  - 条件: 対象ノードの `id-slug` が ASCII だが git ブランチ名として不正（例: `..` 等を含む）
+  - 期待: `git check-ref-format --branch` 相当で不正と判定し、ブランチ名は `<id>` へフォールバックする
+  - 観測点: `git rev-parse --abbrev-ref HEAD`
 - EC-002:
   - 条件: working tree が dirty
   - 期待: checkout を行わずエラーで中断する（既存挙動維持）
   - 観測点: stderr に “Working tree is not clean” を含む / ブランチが変わらない
 - EC-003:
-  - 条件: `new` の `--title` または `--slug` が ASCII でない
+  - 条件: `new` の `--title` が `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` を満たさない、または `--slug` が `^[a-z0-9]+(?:-[a-z0-9]+)*$` を満たさない
   - 期待: `new` はエラーで中断し、ファイル生成も GitHub 連携も行わない
   - 観測点: exit code / `spec-dock/initiatives/**` の不変 / `gh` 未実行（テストで保証）
 - EC-004:
-  - 条件: `import` の `--title` または `--slug` が ASCII でない
+  - 条件: `import` の `--title` が `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` を満たさない、または `--slug` が `^[a-z0-9]+(?:-[a-z0-9]+)*$` を満たさない
   - 期待: `import` はエラーで中断し、ファイル生成も GitHub 参照も行わない
   - 観測点: exit code / `spec-dock/initiatives/**` の不変 / `gh` 未実行（テストで保証）
 
@@ -216,12 +234,15 @@ Script -> Script: update active.json + pointers
 - TERM-003: id = `iss-00123` のような node 識別子（type prefix + 数値、基本 ASCII）
 - TERM-004: slug = タイトル等から生成された path セグメント（`id-slug` ディレクトリ名にも使う）
 - TERM-005: desired branch name = `active set` 後に最終的に残すブランチ名（本件の命名規則に従う）
+- TERM-006: valid title（本Issue） = `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`（英字/数字/スペースのみ）
+- TERM-007: valid slug（本Issue） = `^[a-z0-9]+(?:-[a-z0-9]+)*$`（kebab-case のみ）
+- TERM-008: git ブランチ名として有効 = `git check-ref-format --branch <name>` が成功すること
 
 ## 未確定事項（TBD / 要確認） (必須)
 - Q-001: 解消
-  - 決定: `new` の `--slug` にも ASCII 制約を課す
+  - 決定: `new` の `--slug` を kebab-case に制限する
 - Q-002: 解消
-  - 決定: `import {initiative,epic,issue}` の `--title` / `--slug` にも ASCII 制約を課す
+  - 決定: `import {initiative,epic,issue}` の `--title` / `--slug` にも本 Issue の制約を課す
 
 ## Definition of Ready（着手可能条件） (必須)
 - [ ] 目的が 1〜3行で明確になっている
