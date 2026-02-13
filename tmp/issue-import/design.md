@@ -226,6 +226,8 @@ package "runtime script" {
 - AC-003（gh 失敗で非汚染） → IF-005（gh を先に実行） + import 実装の順序保証
 - AC-004（123/#/URL 同一） → IF-006（target 正規化）
 - EC-001/EC-006（親解決失敗） → IF-007（active 補完のエラー契約）
+- EC-002（親IDが存在しない/種別不正） → IF-007（親解決） + nodes 参照による種別チェック（epic/initiative）
+- EC-003（github.issue_number 既リンク） → `_scan_nodes` + 既存リンク検出（import 前に衝突チェック）
 - 非交渉制約（副作用最小） → import 内で git/active を触らない・sync は update_active=False
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -237,6 +239,9 @@ package "runtime script" {
   - AC-002 → `tests/test_cli.py` の `TestCli.test_import_epic_and_initiative_create_nodes`
   - AC-003 → `tests/test_cli.py` の `TestCli.test_import_aborts_without_local_changes_when_gh_issue_view_fails`
   - AC-004 → `tests/test_cli.py` の `TestCli.test_import_accepts_number_hash_and_url_equivalently`
+  - EC-001 → `tests/test_cli.py` の `TestCli.test_import_issue_requires_parent_when_no_epic_and_active_unavailable`
+  - EC-002 → `tests/test_cli.py` の `TestCli.test_import_rejects_invalid_or_wrong_type_parent_id`
+  - EC-003 → `tests/test_cli.py` の `TestCli.test_import_rejects_already_linked_github_issue_number`
   - EC-004 → `tests/test_cli.py` の `TestCli.test_import_rejects_invalid_slug_and_empty_slugify`
   - EC-005 → `tests/test_cli.py` の `TestCli.test_import_fails_when_sync_preflight_fails`
   - EC-006 → `tests/test_cli.py` の `TestCli.test_import_parent_fallback_errors_on_stale_active`
@@ -245,10 +250,19 @@ package "runtime script" {
 - AC-001:
   - Integration:
     - `import issue` が node を生成し、`sync(update_active=false)` により `.agent/index.json/tree.json` が生成される
-    - `active.json` が更新されない（存在する場合は内容不変、存在しない場合は作られない）
+    - SSOT の `spec-dock/.agent/active.json` が更新されない（存在する場合は内容不変、存在しない場合は作られない）
 - AC-003:
   - Integration:
     - `gh issue view` が失敗したら、テンプレ/meta.json/index/tree を一切作らない（ローカル非汚染）
+- EC-001:
+  - Integration:
+    - `import issue` で `--epic` 未指定かつ active 補完もできない場合に、必ずエラーで落ちる
+- EC-002:
+  - Integration:
+    - 親IDが存在しない/種別不正の場合に、必ずエラーで落ちる（誤った場所に生成しない）
+- EC-003:
+  - Integration:
+    - `github.issue_number` が既に別ノードにリンク済みの場合に、必ずエラーで落ちる（重複リンクを作らない）
 - EC-004:
   - Integration:
     - `--slug` 不正 → import 失敗、ローカル非汚染（gh 成功後でもテンプレ生成前に落ちる）
@@ -259,10 +273,11 @@ package "runtime script" {
 - 非交渉制約（requirement.md）をどう検証するか:
   - 制約: `gh issue view` 以外の `gh` を呼ばない
     - 検証方法: `gh` スタブを用意し、`issue view` 以外の呼び出しは即 `exit 1` にする（誤呼び出しでテストが落ちる）
-  - 制約: active を更新しない（`active.json` を作らない/変更しない）
+  - 制約: active を更新しない（SSOT の `spec-dock/.agent/active.json` を作らない/変更しない）
     - 検証方法:
-      - active.json が無い状態で import し、active.json が生成されないことを確認
-      - active.json がある状態で import し、内容が変化しないことを確認
+      - `spec-dock/.agent/active.json` が無い状態で import し、`spec-dock/.agent/active.json` が生成されないことを確認
+      - `spec-dock/.agent/active.json` がある状態で import し、内容が変化しないことを確認
+      - 補足: `sync` は `spec-dock/active/*` のポインタ（symlink/pathfile）を更新し得るが、これは SSOT ではない（本制約は `.agent/active.json` の不変を指す）
   - 制約: sync は `update_active=False` で実行する
     - 検証方法:
       - ブランチ名に id が含まれる状態でも active が変化しないことを確認（update_active=True なら変わり得る条件を作る）
