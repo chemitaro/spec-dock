@@ -28,6 +28,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 - `import {initiative,epic,issue}` は **読み取りのみ**です
   - `gh issue view` で存在確認するだけで、GitHub の Issue 本体（title/body/labels 等）を更新しません
+  - `--title` は必須です（GitHub title は取り込みません）
   - ローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します（active は変更しません）
 
 ## 3. `import` の URL 入力に関する注意（事故防止）
@@ -51,4 +52,3 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 - `gh` が未導入/未認証で `new` が失敗する → `--no-github` を付けるか、`gh auth login` 等を先に行う
 - URL を貼ったのに別リポジトリの Issue が import されない → 仕様上、URL は番号抽出のみ（`owner/repo` は無視）
-

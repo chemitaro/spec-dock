@@ -3,6 +3,11 @@
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
 人間もコーディングエージェントも、まずはここから参照してください。
 
+## エージェント起点（Codex CLI）
+
+Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven-tdd-workflow/SKILL.md` を起点に運用できます。  
+`spec-dock init/update` はこの skill をデフォルトで導入します。
+
 ## まず読む（全員）
 
 1. [guide.md](guide.md)（全体像・概念・生成物・ディレクトリ構成）
@@ -56,4 +61,3 @@
 
 既存の配布ドキュメントは `old/` に退避しています（互換の正ではなく参考用）。  
 - [old/README.md](old/README.md)
-

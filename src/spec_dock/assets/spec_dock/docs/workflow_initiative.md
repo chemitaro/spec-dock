@@ -30,8 +30,7 @@ GitHub を使わない場合:
 ```
 
 注意:
-- `import` は GitHub を更新しません（`gh issue view` による存在確認のみ）
-- URL は **番号抽出のみ**です（owner/repo は無視されます）
+- `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
 
 ## 2. 記述（requirement/design/plan）
 
@@ -69,4 +68,3 @@ GitHub を使わない場合:
 
 - 「成功」が定義されていない（進捗が議論だけになる）
 - スコープが無限に広がる（Epic/Issue が爆発する）
-

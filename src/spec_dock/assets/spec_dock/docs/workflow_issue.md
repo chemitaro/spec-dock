@@ -32,9 +32,7 @@ GitHub を使わない場合:
 ```
 
 注意:
-- `import` は GitHub を更新しません（`gh issue view` のみ）
-- `--title` は必須です（GitHub title は取り込みません）
-- URL は **番号抽出のみ**です（owner/repo は無視されます）
+- `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
 
 ## 2. active set（作業対象を固定する）
 
@@ -100,4 +98,3 @@ active issue 配下の仕様を埋めます:
 ./spec validate
 ./spec sync
 ```
-

@@ -32,8 +32,7 @@ GitHub を使わない場合:
 ```
 
 注意:
-- `import` は GitHub を更新しません（`gh issue view` のみ）
-- URL は **番号抽出のみ**です（owner/repo は無視されます）
+- `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
 
 ## 2. 記述（requirement/design/plan）
 
@@ -67,4 +66,3 @@ GitHub を使わない場合:
 
 - Issue へ降ろす前に “契約/移行/観測性” を書かない（後で手戻り）
 - 1 Epic に詰め込みすぎて “設計” が破綻する
-
