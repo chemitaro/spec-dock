@@ -1,0 +1,72 @@
+# workflow: initiative
+
+Initiative は「投資単位」です。  
+このワークフローは、Initiative を **単独で完結**させ、後続（Epic/Issue）へ安全に分解できる状態を作ります。
+
+関連:
+- 総合: [guide.md](guide.md)
+- Epic: [workflow_epic.md](workflow_epic.md)
+- GitHub 連携: [reference_github.md](reference_github.md)
+- sync: [reference_sync.md](reference_sync.md)
+
+## 1. 作成（new / import）
+
+### 1.1 new（デフォルト: GitHub）
+
+```bash
+./spec new initiative --title "..."
+```
+
+GitHub を使わない場合:
+
+```bash
+./spec new initiative --no-github --title "..."
+```
+
+### 1.2 import（既存 GitHub Issue を取り込む）
+
+```bash
+./spec import initiative <num|#num|url> --title "..."
+```
+
+注意:
+- `import` は GitHub を更新しません（`gh issue view` による存在確認のみ）
+- URL は **番号抽出のみ**です（owner/repo は無視されます）
+
+## 2. 記述（requirement/design/plan）
+
+作成後、以下のファイルを埋めます（配置は `spec-dock/initiatives/**`）。
+
+- `requirement.md`: なぜやるか / 成功条件 / スコープ
+- `design.md`: 方針 / 境界 / 依存 / リスク
+- `plan.md`: 実行計画（Epic への分解を含む）
+
+## 3. 品質ゲート（Initiative）
+
+最低限、以下を満たしてから次（Epic）へ進みます。
+
+### requirement
+- [ ] 背景/目的が 1〜3 行で言える
+- [ ] 成功条件（観測可能な指標）がある
+- [ ] スコープ（やる/やらない）が明記されている
+
+### design
+- [ ] 依存関係（組織/システム/権限/データ）が列挙されている
+- [ ] リスクと打ち手が書かれている
+
+### plan
+- [ ] Epic への分解方針がある（どこで切るか）
+- [ ] 大まかな順序（先にやること/後にやること）がある
+
+## 4. 観測可能にする（validate / sync）
+
+```bash
+./spec validate
+./spec sync
+```
+
+## 5. よくある失敗
+
+- 「成功」が定義されていない（進捗が議論だけになる）
+- スコープが無限に広がる（Epic/Issue が爆発する）
+

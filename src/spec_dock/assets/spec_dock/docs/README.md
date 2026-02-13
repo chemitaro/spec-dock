@@ -1,96 +1,59 @@
-# spec-dock Docs（入口）
+# spec-dock docs（入口）
 
-このディレクトリは、`spec-dock init/update` によって自動生成・更新されるドキュメントです。  
-コーディングエージェント（Codex CLI）も人間も、まずはここ（`README.md`）から参照してください。
+このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
+人間もコーディングエージェントも、まずはここから参照してください。
 
-## まず知っておくべきこと（重要）
+## まず読む（全員）
 
-- **`new {initiative,epic,issue}` はデフォルトで GitHub Issue を自動作成します**
-  - 内部的に GitHub CLI（`gh`）を実行します
-  - 対象リポジトリは `gh` の解釈で決まります（spec-dock は owner/repo を推測しません）
-  - `gh` が使えない / GitHub リポジトリでない場合は **エラー**になります
-- GitHub を使わない場合は、必ず `--no-github` を付けてください
-  - その場合、ID は衝突回避のため `*-local-*` 名前空間になります（例: `iss-local-00001`）
-- `--slug` は **安全な文字のみ**許可します（空白や `!` などはエラー）
-  - 許可: Unicode の英数字 + `-` `_` `.`
-  - 追加制約: **小文字のみ**（大文字を含む場合はエラー）
-- 既存 GitHub Issue を取り込む場合は `import {initiative,epic,issue}` を使います
-  - `import` は GitHub Issue を作成/更新しません（`gh issue view` による存在確認のみ）
-  - `--title` は必須です（GitHub title は取り込みません）
-  - URL は issue 番号抽出にのみ使用します（owner/repo は無視します）
+1. [guide.md](guide.md)（全体像・概念・生成物・ディレクトリ構成）
+2. 実施する作業のワークフロー
+   - [workflow_initiative.md](workflow_initiative.md)
+   - [workflow_epic.md](workflow_epic.md)
+   - [workflow_issue.md](workflow_issue.md)
+   - [workflow_adr.md](workflow_adr.md)
+3. 仕組みを確認したい場合（参照）
+   - [reference_github.md](reference_github.md)
+   - [reference_sync.md](reference_sync.md)
 
-## クイックスタート
+## 目的別ショートカット
 
-### 1) ノード作成（デフォルト: GitHub）
+| やりたいこと | 参照 |
+|---|---|
+| まず概念を把握したい | [guide.md](guide.md) |
+| Initiative を作る/運用する | [workflow_initiative.md](workflow_initiative.md) |
+| Epic を作る/運用する | [workflow_epic.md](workflow_epic.md) |
+| Issue を実装する（TDD） | [workflow_issue.md](workflow_issue.md) |
+| 議論/意思決定を ADR に切り出す | [workflow_adr.md](workflow_adr.md) |
+| GitHub 連携の前提/副作用を知りたい | [reference_github.md](reference_github.md) |
+| `sync` の入出力/フラグを知りたい | [reference_sync.md](reference_sync.md) |
 
-```bash
-./spec new initiative --title "Auth platform"          # init-00123（GH #123）
-./spec new epic --initiative 123 --title "JWT auth"    # epic-00124（GH #124）
-./spec new issue --epic 124 --title "Add refresh token"  # iss-00125（GH #125）
-```
-
-### 2) ノード作成（ローカルのみ: `--no-github`）
+## コマンド早見（最短）
 
 ```bash
-./spec new initiative --no-github --title "Auth platform"          # init-local-00001
-./spec new epic --no-github --initiative 1 --title "JWT auth"      # epic-local-00001
-./spec new issue --no-github --epic 1 --title "Add refresh token"  # iss-local-00001
+./spec new initiative --title "..."              # デフォルト: GitHub Issue を作る
+./spec new epic --initiative <id> --title "..."
+./spec new issue --epic <id> --title "..."
+
+./spec import issue <num-or-url> --title "..." --epic <id>  # 既存 GitHub Issue を取り込む（読み取りのみ）
+
+./spec active set <id|#num|url>  # 作業対象をアクティブ化（対象が GitHub 紐づきなら checkout を伴う）
+./spec active show
+
+./spec validate
+./spec sync
 ```
-
-### 2.5) 既存 GitHub Issue の取り込み（`import`）
-
-```bash
-./spec import initiative 10 --title "Auth platform"                       # init-00010（GH #10 を取り込み）
-./spec import epic 11 --title "JWT auth" --initiative init-00010          # epic-00011（GH #11 を取り込み）
-./spec import issue 123 --title "Add refresh token" --epic epic-00011     # iss-00123（GH #123 を取り込み）
-```
-
-注意:
-- `import` の target は `123` / `#123` / URL を受け付けますが、URL は **番号抽出のみ**です（別リポジトリの URL は対象外）。
-- `import` は checkout や `active set` を行いません（取り込み後に `sync --no-update-active` 相当まで実行します）。
-
-### 3) active（現在作業中）を設定
-
-```bash
-./spec active set 125            # GitHub issue number（checkout + active + sync）
-./spec active set iss-00125       # node id（checkout + active + sync）
-./spec active set iss-local-00001 # local node id（checkout しない）
-```
-
-注意:
-- `active set 125` は、仕様ツリー内に `github.issue_number == 125` のノードが存在する必要があります（存在しない場合はエラー）。
-- GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set` した場合、`active set` は **必ずブランチのcheckoutも行います**。
-- ローカルのみ（`*-local-*`）のノードは checkout しません。
-- `active set 125` のような **数字のみ**は GitHub Issue 番号として解釈します（ローカルは `iss-local-00001` のように node id を指定してください）。
-
-すると `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
 
 補足:
-- `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカットです（symlink）。
-- 作成に失敗した場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
+- `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカット（symlink）です。無い場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
 
-## 生成物（重要）
+## 重要な注意（事故防止）
 
-- `spec-dock/initiatives/`  
-  仕様ツリー本体（常置。移動で状態を表現しません）
-- `spec-dock/active/`（git 管理しない）  
-  現在の initiative/epic/issue への固定入口（symlink 等） + `context-pack.md`
-- `spec-dock/.agent/`（git 管理しない）  
-  `active.json`（SSOT）/ `index.json`（index）/ `tree.json`（tree）などの生成物
+- `new {initiative,epic,issue}` はデフォルトで `gh` を呼び、GitHub Issue を自動作成します（GitHub を使わない場合は `--no-github` を付けてください）。
+- `import` は GitHub を更新しません（`gh issue view` による **存在確認のみ**）。ただしローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します。
+- `import` の URL 入力は **番号抽出のみ**です（`owner/repo` は無視され、別リポジトリ URL を貼っても「現在の `gh` が見ているリポジトリの同番号」として解釈され得ます）。
 
-## ドキュメント構成（どれを読めばいい？）
+## 旧版（参考）
 
-- `workflow-tree.md`  
-  Initiative → Epic → Issue を複数ネスト/複数同時に扱う **ツリー運用ワークフロー**
-- `workflow-issue.md`  
-  active issue を入口に、Issueを単独完結させる **実装ワークフロー**（要件→設計→計画→TDD→報告）
-- `workflow-adr.md`  
-  ADR を「議題が上がった時点で叩き台として作る」 **意思決定ワークフロー**
-- `spec-dock-guide.md`  
-  共通原則（99.9%理解/SSOT/承認ゲート）と **チェックリスト**（品質ゲート）の正
-- `spec-dock-guide-old.md`  
-  旧版ガイド（参考。現行運用の正ではない）
-- `github.md`  
-  GitHub 連携（`gh` 必須・対象リポジトリの決まり方・`--no-github`・ID ルール）
-- `sync.md`  
-  `sync`（状態集計）の仕組み（ローカル集計 + 任意で GitHub enrich）
+既存の配布ドキュメントは `old/` に退避しています（互換の正ではなく参考用）。  
+- [old/README.md](old/README.md)
+

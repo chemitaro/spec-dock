@@ -6,7 +6,7 @@ description: A workflow that drives development from requirements refined into o
 # Spec-driven TDD Workflow
 
 - Open `spec-dock/docs/README.md` first.
-- Open `spec-dock/docs/workflow-issue.md` next (Issue workflow). If the task is multi-issue or re-architecture, also consult `spec-dock/docs/workflow-tree.md` and `spec-dock/docs/workflow-adr.md`.
+- Open `spec-dock/docs/workflow_issue.md` next (Issue workflow). If the task spans multiple layers (initiative/epic) or requires design decisions, also consult `spec-dock/docs/workflow_initiative.md`, `spec-dock/docs/workflow_epic.md`, and `spec-dock/docs/workflow_adr.md`.
 - Check active pointers: run `./spec-dock/scripts/spec-dock active show`.
   - If active is not set, ask the user to run `./spec-dock/scripts/spec-dock active set iss-xxxx` (or provide the GitHub issue number / issue URL).
   - Then open `spec-dock/active/context-pack.md`.
