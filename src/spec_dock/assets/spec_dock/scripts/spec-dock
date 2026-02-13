@@ -1174,6 +1174,305 @@ def _parse_active_set_target(target: str) -> tuple[str, int | str]:
     )
 
 
+def _parse_github_issue_target(target: str) -> int:
+    """Parse import target into a GitHub issue number (`123` / `#123` / URL)."""
+    raw = target.strip()
+    if not raw:
+        raise RuntimeError("target is required")
+
+    m = _GH_ISSUE_URL_RE.search(raw)
+    if m:
+        return int(m.group("num"))
+
+    if raw.startswith("#") and _NUM_RE.fullmatch(raw[1:]):
+        return int(raw[1:])
+
+    if _NUM_RE.fullmatch(raw):
+        return int(raw)
+
+    raise RuntimeError(
+        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL like .../issues/123)."
+    )
+
+
+def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, Any]:
+    """Validate issue visibility via `gh issue view` and return minimal payload."""
+    _ensure_gh_available()
+    cmd = ["gh", "issue", "view", str(issue_number), "--json", "number,url"]
+    try:
+        p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+
+    try:
+        data = json.loads((p.stdout or "").strip())
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Invalid JSON from gh issue view for issue #{issue_number}") from e
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Invalid gh issue view payload for issue #{issue_number}")
+    try:
+        number = int(data.get("number"))
+    except (TypeError, ValueError) as e:
+        raise RuntimeError(f"Invalid gh issue view payload: number={data.get('number')}") from e
+    if number != issue_number:
+        raise RuntimeError(f"gh issue view returned mismatched number: expected {issue_number}, got {number}")
+    return data
+
+
+def _import_slug(title: str, slug: str | None) -> str:
+    """Resolve/validate slug for import before any file generation."""
+    if slug is None:
+        slug = _slugify(title)
+    if not slug:
+        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
+    return _validate_slug(slug, field="slug")
+
+
+def _ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int) -> None:
+    """Reject imports when github.issue_number is already linked by any node type."""
+    linked = [
+        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    if not linked:
+        return
+    found = ", ".join(sorted(f"{n.type}:{n.id}" for n in linked))
+    raise RuntimeError(f"github.issue_number={issue_number} is already linked: {found}")
+
+
+def _resolve_active_node(nodes: dict[str, _Node], *, entry: Any, expected_type: str) -> _Node | None:
+    """Resolve one active manifest entry to a current node (strict type, width-agnostic id)."""
+    node_id = _active_entry_id(entry)
+    if not node_id:
+        return None
+    try:
+        prefix, is_local, num = _parse_id(node_id.strip().lower())
+    except RuntimeError:
+        return None
+    expected_prefix = {"initiative": "init", "epic": "epic", "issue": "iss"}[expected_type]
+    if prefix != expected_prefix:
+        return None
+    resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if not resolved:
+        return None
+    node = nodes.get(resolved)
+    if not node or node.type != expected_type:
+        return None
+    return node
+
+
+def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], child_type: str) -> str:
+    """Resolve parent id from active manifest for `epic` or `issue` imports."""
+    active = _load_active_manifest(specdock_dir)
+    if not isinstance(active, dict):
+        if child_type == "issue":
+            raise RuntimeError("Cannot resolve parent epic from active selection. Pass --epic explicitly.")
+        raise RuntimeError("Cannot resolve parent initiative from active selection. Pass --initiative explicitly.")
+
+    active_init = _resolve_active_node(nodes, entry=active.get("initiative"), expected_type="initiative")
+    active_epic = _resolve_active_node(nodes, entry=active.get("epic"), expected_type="epic")
+    active_issue = _resolve_active_node(nodes, entry=active.get("issue"), expected_type="issue")
+
+    if child_type == "issue":
+        if active_epic:
+            return active_epic.id
+        if active_issue and active_issue.epic_id:
+            epic = nodes.get(active_issue.epic_id)
+            if epic and epic.type == "epic":
+                return epic.id
+        raise RuntimeError("Cannot resolve parent epic from active selection. Pass --epic explicitly.")
+
+    if child_type == "epic":
+        if active_init:
+            return active_init.id
+        if active_epic and active_epic.initiative_id:
+            initiative = nodes.get(active_epic.initiative_id)
+            if initiative and initiative.type == "initiative":
+                return initiative.id
+        if active_issue and active_issue.initiative_id:
+            initiative = nodes.get(active_issue.initiative_id)
+            if initiative and initiative.type == "initiative":
+                return initiative.id
+        raise RuntimeError("Cannot resolve parent initiative from active selection. Pass --initiative explicitly.")
+
+    raise RuntimeError(f"Internal error: unsupported child type for active fallback: {child_type}")
+
+
+def _import_initiative(
+    specdock_dir: Path,
+    *,
+    issue_number: int,
+    title: str,
+    slug: str | None,
+) -> None:
+    """Import an existing GitHub issue into spec-dock as an initiative node."""
+    repo_root = specdock_dir.parent
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
+
+    nodes = _scan_nodes(specdock_dir)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
+
+    title = title.strip()
+    if not title:
+        raise RuntimeError("--title is required")
+    slug = _import_slug(title, slug)
+
+    node_id = _format_id("init", issue_number, local=False)
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "initiative"
+    dest_dir = _initiatives_root(specdock_dir) / f"{node_id}-{slug}"
+    replacements = {
+        "<INIT_ID>": node_id,
+        "<INIT_TITLE>": title,
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(dest_dir, node_type="initiative", node_id=node_id, title=title, slug=slug, github_issue_number=issue_number)
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    print(f"spec-dock: ok (import initiative) id={node_id} path={rel} github=#{issue_number}")
+
+
+def _import_epic(
+    specdock_dir: Path,
+    *,
+    issue_number: int,
+    title: str,
+    slug: str | None,
+    initiative_id: str | None,
+) -> None:
+    """Import an existing GitHub issue into spec-dock as an epic node."""
+    repo_root = specdock_dir.parent
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
+
+    nodes = _scan_nodes(specdock_dir)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
+
+    title = title.strip()
+    if not title:
+        raise RuntimeError("--title is required")
+    slug = _import_slug(title, slug)
+
+    if initiative_id is None:
+        resolved_initiative_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="epic")
+    else:
+        resolved_initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
+
+    initiative = nodes.get(resolved_initiative_id)
+    if not initiative or initiative.type != "initiative":
+        raise RuntimeError(f"Initiative not found: {resolved_initiative_id}")
+
+    node_id = _format_id("epic", issue_number, local=False)
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "epic"
+    dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
+    replacements = {
+        "<EPIC_ID>": node_id,
+        "<EPIC_TITLE>": title,
+        "<INIT_ID>": initiative.id,
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(
+        dest_dir,
+        node_type="epic",
+        node_id=node_id,
+        title=title,
+        slug=slug,
+        parent_id=initiative.id,
+        initiative_id=initiative.id,
+        github_issue_number=issue_number,
+    )
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    print(f"spec-dock: ok (import epic) id={node_id} initiative={initiative.id} path={rel} github=#{issue_number}")
+
+
+def _import_issue(
+    specdock_dir: Path,
+    *,
+    issue_number: int,
+    title: str,
+    slug: str | None,
+    epic_id: str | None,
+) -> None:
+    """Import an existing GitHub issue into spec-dock as an issue node."""
+    repo_root = specdock_dir.parent
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
+
+    nodes = _scan_nodes(specdock_dir)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
+
+    title = title.strip()
+    if not title:
+        raise RuntimeError("--title is required")
+    slug = _import_slug(title, slug)
+
+    if epic_id is None:
+        resolved_epic_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="issue")
+    else:
+        resolved_epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
+
+    epic = nodes.get(resolved_epic_id)
+    if not epic or epic.type != "epic":
+        raise RuntimeError(f"Epic not found: {resolved_epic_id}")
+    if not epic.initiative_id:
+        raise RuntimeError(f"Epic meta missing initiative_id: {resolved_epic_id}")
+
+    node_id = _format_id("iss", issue_number, local=False)
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "issue"
+    dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
+    replacements = {
+        "<ISS_ID>": node_id,
+        "<ISS_TITLE>": title,
+        "<FEATURE_ID>": node_id,
+        "<FEATURE_NAME>": title,
+        "<EPIC_ID>": epic.id,
+        "<INIT_ID>": epic.initiative_id,
+        "<ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(
+        dest_dir,
+        node_type="issue",
+        node_id=node_id,
+        title=title,
+        slug=slug,
+        parent_id=epic.id,
+        initiative_id=epic.initiative_id,
+        epic_id=epic.id,
+        github_issue_number=issue_number,
+    )
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    print(
+        f"spec-dock: ok (import issue) id={node_id} epic={epic.id} initiative={epic.initiative_id} "
+        f"path={rel} github=#{issue_number}"
+    )
+
+
 def _active_set(
     specdock_dir: Path,
     *,
@@ -1813,6 +2112,32 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Continue even if preflight validation fails (writes index/tree; disables active auto update)",
     )
 
+    p_import = sub.add_parser("import", help="Import an existing GitHub issue as a spec node")
+    import_sub = p_import.add_subparsers(dest="import_kind", required=True)
+
+    p_import_init = import_sub.add_parser("initiative", help="Import a GitHub issue as an initiative")
+    p_import_init.add_argument("target", help="GitHub issue number (123 / #123 / URL)")
+    p_import_init.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
+    p_import_init.add_argument("--slug")
+
+    p_import_epic = import_sub.add_parser("epic", help="Import a GitHub issue as an epic")
+    p_import_epic.add_argument("target", help="GitHub issue number (123 / #123 / URL)")
+    p_import_epic.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
+    p_import_epic.add_argument("--slug")
+    p_import_epic.add_argument(
+        "--initiative",
+        help="Parent initiative (e.g. 123 / init-00123 / init-local-00001). Omit to resolve from active.",
+    )
+
+    p_import_issue = import_sub.add_parser("issue", help="Import a GitHub issue as an issue")
+    p_import_issue.add_argument("target", help="GitHub issue number (123 / #123 / URL)")
+    p_import_issue.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
+    p_import_issue.add_argument("--slug")
+    p_import_issue.add_argument(
+        "--epic",
+        help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001). Omit to resolve from active.",
+    )
+
     sub.add_parser("validate", help="Validate the spec tree structure")
 
     return parser.parse_args(argv)
@@ -1889,6 +2214,33 @@ def main(argv: list[str] | None = None) -> int:
                 update_active=not bool(getattr(ns, "no_update_active", False)),
                 force=bool(getattr(ns, "force", False)),
             )
+        elif ns.command == "import":
+            issue_number = _parse_github_issue_target(str(ns.target))
+            if ns.import_kind == "initiative":
+                _import_initiative(
+                    specdock_dir,
+                    issue_number=issue_number,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                )
+            elif ns.import_kind == "epic":
+                _import_epic(
+                    specdock_dir,
+                    issue_number=issue_number,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    initiative_id=getattr(ns, "initiative", None),
+                )
+            elif ns.import_kind == "issue":
+                _import_issue(
+                    specdock_dir,
+                    issue_number=issue_number,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    epic_id=getattr(ns, "epic", None),
+                )
+            else:
+                raise RuntimeError(f"Unknown import kind: {ns.import_kind}")
         elif ns.command == "validate":
             _validate(specdock_dir)
         else:
