@@ -12,8 +12,8 @@ ID: "issue-5"
 # issue-5 active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名） — 要件定義（WHAT / WHY）
 
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
-- `active set` による GitHub Issue checkout 時、最終的に checkout されるブランチ名が **決定的な形式**（原則 `id-slug`、不適合時は `id`）になり、日本語ブランチ名が残らない。
-- `new/import {initiative,epic,issue}` の `--title` / `--slug` を、`--title` は英字/数字/スペースのみ、`--slug` は kebab-case のみに制約し、日本語タイトル等による path/ブランチ名の崩れを **作成時点で防止**できる。
+- `active set` による GitHub Issue checkout 時、`active set` の結果として checkout されているブランチ名（current）が **ASCII** かつ **`git check-ref-format --branch` を満たす**決定的な形式（原則 `id-slug`、不適合時は `id`）になる（＝非ASCIIにならない）。
+- `new/import {initiative,epic,issue}` の `--title` / `--slug` を、`--title` は「半角スペース区切りの英数字トークン列（trim、連続スペース不可）」、`--slug` は kebab-case のみに制約し、日本語タイトル等による path/ブランチ名の崩れを **作成時点で防止**できる。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -118,10 +118,13 @@ Script -> Script: update active.json + pointers
 - 入力制約の定義を固定する（実装ブレ防止）:
   - `--title`（title）: **英字/数字/スペースのみ**（= slug に変換できるものだけ）
     - 正規表現（trim 後）: `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`
+    - 意味: 半角スペース区切りの英数字トークン列（前後空白は trim、連続スペースは不可）
   - `--slug`（slug）: **kebab-case のみ**
     - 正規表現（trim 後）: `^[a-z0-9]+(?:-[a-z0-9]+)*$`
   - `--slug` 省略時の合成（title → slug）:
     - `lower(title)` を取り、半角スペース ` ` を `-` に置換したもの
+  - ASCII 判定（ブランチ候補）を固定する:
+    - 「ASCII でない」の判定方法は `str.isascii()` 相当で固定する（言語/実装差の吸収）
   - バリデーション失敗時のエラーメッセージは、コーディングエージェントが修正できるように情報を含める:
     - どの引数が不正か（`--title` / `--slug`）
     - 期待する形式（正規表現）
@@ -197,14 +200,30 @@ Script -> Script: update active.json + pointers
     - CLI: exit code != 0、stderr に `--slug` と `^[a-z0-9]+(?:-[a-z0-9]+)*$` を含む（文言は実装で確定）
     - FS: 対象の `spec-dock/initiatives/**` 以下が増えていない
     - GitHub: `gh issue view` が呼ばれない（入力バリデーションで早期中断）
+- AC-007:
+  - Actor/Role: spec-dock 利用者
+  - Given: `new` コマンドを実行できる（GitHub を使わない）
+  - When: `./spec-dock/scripts/spec-dock new initiative --no-github --id init-local-00001 --title "Add Refresh Token"` を実行する（`--slug` は省略）
+  - Then: 作成された node の `meta.json` の `slug` は `add-refresh-token` になっている（title→slug 合成規則どおり）
+  - 観測点:
+    - FS: `spec-dock/initiatives/init-local-00001-add-refresh-token/meta.json`
 
 ### 入力→出力例 (任意)
 - EX-001:
   - Input: node_id=`iss-00123`, slug=`add-refresh-token`
   - Output: branch=`iss-00123-add-refresh-token`
 - EX-002:
-  - Input: node_id=`epic-00124`, slug=`a..b`（git ブランチ不正になり得る）
+  - Input: node_id=`epic-00124`, slug=`a..b`（既存データ等で起こり得る。git ブランチ不正になり得る）
   - Output: branch=`epic-00124`（フォールバック）
+- EX-003:
+  - Input: `--title "Add Refresh Token"`（`--slug` 省略）
+  - Output: `slug=add-refresh-token`
+- EX-004:
+  - Input（NG title）: `--title "Add-Token"` / `--title "Add  Token"` / `--title "日本語"`
+  - Output: error（exit != 0、正規表現と OK/NG 例を含む）
+- EX-005:
+  - Input（NG slug）: `--slug "add_token"` / `--slug "add..token"` / `--slug "日本語"`
+  - Output: error（exit != 0、正規表現と OK/NG 例を含む）
 
 ## 例外・エッジケース（仕様として固定） (必須)
 - EC-001:
@@ -227,6 +246,12 @@ Script -> Script: update active.json + pointers
   - 条件: `import` の `--title` が `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` を満たさない、または `--slug` が `^[a-z0-9]+(?:-[a-z0-9]+)*$` を満たさない
   - 期待: `import` はエラーで中断し、ファイル生成も GitHub 参照も行わない
   - 観測点: exit code / `spec-dock/initiatives/**` の不変 / `gh` 未実行（テストで保証）
+- EC-005:
+  - 条件: `active set` が選んだ desired branch（`<id>-<slug>` または `<id>`）が、既に同名のローカルブランチとして存在する
+  - 期待:
+    - spec-dock は **既存の同名ブランチを checkout して続行**する（内容の正当性までは保証しない）
+    - spec-dock は既存ブランチの削除/上書き/強制更新を行わない
+  - 観測点: `git rev-parse --abbrev-ref HEAD` が desired branch になっている
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: node = `meta.json` を持つ initiative/epic/issue（spec-dock の管理単位）
@@ -237,6 +262,7 @@ Script -> Script: update active.json + pointers
 - TERM-006: valid title（本Issue） = `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`（英字/数字/スペースのみ）
 - TERM-007: valid slug（本Issue） = `^[a-z0-9]+(?:-[a-z0-9]+)*$`（kebab-case のみ）
 - TERM-008: git ブランチ名として有効 = `git check-ref-format --branch <name>` が成功すること
+- TERM-009: ASCII（ブランチ候補） = `str.isascii()` 相当で True になること
 
 ## 未確定事項（TBD / 要確認） (必須)
 - Q-001: 解消
