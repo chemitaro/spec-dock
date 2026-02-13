@@ -3,7 +3,7 @@
 ID: "iss-import-00001"
 タイトル: "Import: 既存 GitHub Issue を spec-dock ツリーへ取り込む（initiative/epic/issue）"
 関連GitHub: []
-状態: "draft"
+状態: "approved"
 作成者: "<YOUR_NAME>"
 最終更新: "2026-02-13"
 親: ["tmp/issue-import"]
@@ -181,8 +181,8 @@ Sync --> Dev: ok
 
 ### 入力→出力例 (任意)
 - EX-001: 既存 Issue を issue として取り込む
-  - Input: `spec-dock/scripts/spec-dock import issue #123 --title "Add refresh token" --epic 1`
-  - Output: `spec-dock: ok (import issue) id=iss-00123 epic=epic-00001 initiative=init-00001 ...`（例）
+  - Input: `spec-dock/scripts/spec-dock import issue #123 --title "Add refresh token" --epic epic-00001`
+  - Output: `spec-dock: ok (import issue) id=iss-00123 epic=epic-00001 initiative=init-00001 path=... github=#123`（例）
 - EX-002: 親未指定で active から補完する
   - Input: `spec-dock/scripts/spec-dock import issue 123 --title "Add refresh token"`（active epic が設定済み）
   - Output: `spec-dock: ok (import issue) ...`（親は active 由来として記録される）
