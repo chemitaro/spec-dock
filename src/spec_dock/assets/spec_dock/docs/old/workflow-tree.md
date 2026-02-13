@@ -41,6 +41,20 @@
 ./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "..."
 ```
 
+### 1.3 既存 GitHub Issue の取り込み（import）
+
+spec-dock 導入前から GitHub Issue が存在する場合は、`import` で spec-dock の SSOT（`meta.json`）として取り込みます。
+
+```bash
+./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"
+./spec-dock/scripts/spec-dock import epic 11 --title "JWT auth" --initiative init-00010
+./spec-dock/scripts/spec-dock import issue 123 --title "Add refresh token" --epic epic-00011
+```
+
+注意:
+- `import` は GitHub Issue を作成/更新しません（`gh issue view` による存在確認のみ）。
+- URL を target に渡せますが、URL は **番号抽出のみ**です（owner/repo は無視します）。
+
 ---
 
 ## 2. Initiative を固める（Outcome とガードレールを固定）
