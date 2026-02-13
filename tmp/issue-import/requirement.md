@@ -81,19 +81,32 @@ Sync --> Dev: ok
   - `spec-dock/scripts/spec-dock import` サブコマンドを追加する（`new` とは別系統）。
   - import 対象は **initiative / epic / issue** の 3 種。
   - 入力として GitHub Issue の **番号**（`123` / `#123`）または **URL**（`.../issues/123`）を受け付ける。
+    - URL は **issue 番号の抽出にのみ使用**し、owner/repo の解釈（別リポジトリの Issue 参照）は行わない。
+    - リポジトリ解決は `gh` に委譲し、import 対象は **現在のリポジトリの Issue** に限定する（別 repo は OUT OF SCOPE）。
   - node id は GitHub issue_number から決定する（0埋めは現行仕様に従う）:
     - initiative: `init-<issue_number>`
     - epic: `epic-<issue_number>`
     - issue: `iss-<issue_number>`
   - GitHub Issue の **存在確認**のために `gh issue view` を実行し、失敗したら import を中断する。
+    - 失敗時は **テンプレ/meta.json/派生ファイル（index/tree）を一切生成しない**（ローカルを汚さない）。
   - spec-dock node の `title` は **ユーザーが `--title` で明示指定**する（GitHub title は採用しない）。
   - `slug` は `--slug` があればそれを採用し、無ければ `--title` から `slugify` で導出する（現行の slug 制約に従う）。
   - 取り込み時は spec-dock のテンプレをコピーし、`meta.json` を生成して SSOT へ登録する。
   - 取り込み後に `sync --no-update-active` 相当を実行し、`.agent/index.json` / `.agent/tree.json` を更新する（active は更新しない）。
   - import 成功時は、生成した node の **id / 親 id / path / github issue_number** を標準出力へ必ず出力する。
   - 親子指定:
-    - `import issue` は `--epic <id>` 指定があればそれを採用し、無ければ **現在の active から epic を解決**する。解決できなければエラー。
-    - `import epic` は `--initiative <id>` 指定があればそれを採用し、無ければ **現在の active から initiative を解決**する。解決できなければエラー。
+    - 親指定フラグの受理形式は `new` と同等にする:
+      - `--initiative`: `NNNN` / `init-NNNN` / `init-local-NNNN`
+      - `--epic`: `NNNN` / `epic-NNNN` / `epic-local-NNNN`
+      - 数値 shorthand が **曖昧**（同じ数値で local と GitHub の両方が存在）な場合は **エラー**として、完全な id 指定を要求する。
+    - `import issue`:
+      - `--epic <id>` 指定があればそれを採用する（解決できない/曖昧ならエラー）
+      - `--epic` が無い場合は **現在の active から epic を解決**する（active epic を優先、active issue の場合はその親 epic を採用）
+      - それでも epic を解決できない場合はエラー（`--epic` 指定を要求）
+    - `import epic`:
+      - `--initiative <id>` 指定があればそれを採用する（解決できない/曖昧ならエラー）
+      - `--initiative` が無い場合は **現在の active から initiative を解決**する（active initiative を優先、active epic/issue の場合はその initiative を採用）
+      - それでも initiative を解決できない場合はエラー（`--initiative` 指定を要求）
     - `import initiative` は親指定なし。
   - 同一 GitHub issue_number の多重リンク（複数 node が同一番号を持つ）を禁止し、既にリンク済みならエラーにする。
 - MUST NOT（絶対にやらない／追加しない）:
@@ -105,16 +118,18 @@ Sync --> Dev: ok
   - import 内で git checkout / branch rename / linked branch 操作などのブランチ操作をしない。
 - OUT OF SCOPE:
   - 既存ブランチの import（既存ブランチを base に work ブランチを作る/rename する/linked branch へ登録する等）
+  - URL から owner/repo を解釈し、別リポジトリの Issue を import する
   - GitHub 情報からの親子自動推定（ラベル/マイルストーン/プロジェクト等の規約ベース推定）
   - バッチ import（複数 issue をまとめて取り込む）
   - dry-run / rollback 等の高度な移行支援（必要になれば別スコープで検討）
+  - `new ... --github-issue` の位置づけ変更（非推奨化/alias 化など）
+  - validate で `github.issue_number` の重複検出を追加する（手編集・移行事故の早期検知）
 
 ## 境界（Always / Ask / Never） (必須)
 - Always（常に守る）:
   - spec-dock の SSOT（`meta.json`）を正として扱い、import は SSOT を追加する操作であることを明確にする。
   - 取り込み対象の種類（initiative/epic/issue）はコマンドで明示し、推測しない。
 - Ask（迷ったら相談）:
-  - `--title` / `--slug` の命名規約（ASCII 強制など）を追加で厳格化するかどうか。
   - `sync` 失敗時にファイル生成をロールバックするかどうか。
 - Never（絶対にしない）:
   - 既存ブランチ名の変更や、共有ブランチへの副作用を伴う操作を import の既定挙動として入れない。
@@ -153,7 +168,16 @@ Sync --> Dev: ok
 - AC-003: GitHub 参照できない Issue は取り込めない
   - Given: `gh issue view 99999` が失敗する環境
   - When: `spec-dock/scripts/spec-dock import issue 99999 --title "X" --epic epic-local-00001`
-  - Then: コマンドは非 0 で終了し、ローカルへの取り込みは行われない（少なくとも成功とは表示されない）
+  - Then:
+    - コマンドは非 0 で終了する
+    - **テンプレ/meta.json/派生ファイル（index/tree）を一切生成しない**
+- AC-004: 入力形式の同一視（番号 / #番号 / URL）
+  - Given: `gh issue view 123` が成功する環境
+  - When:
+    - `spec-dock/scripts/spec-dock import issue 123 --title "X" --epic epic-local-00001`
+    - `spec-dock/scripts/spec-dock import issue #123 --title "X" --epic epic-local-00001`
+    - `spec-dock/scripts/spec-dock import issue https://github.com/<owner>/<repo>/issues/123 --title "X" --epic epic-local-00001`
+  - Then: いずれも同一の node（`iss-00123`）を対象として扱い、成功/失敗の条件が一致する
 
 ### 入力→出力例 (任意)
 - EX-001: 既存 Issue を issue として取り込む
@@ -179,6 +203,9 @@ Sync --> Dev: ok
 - EC-005: sync が失敗する
   - 条件: 既存ツリーが壊れており `sync` preflight validate が失敗する
   - 期待: import は非 0 で終了し、エラーが表示される（ロールバックは OUT OF SCOPE）
+- EC-006: stale/破損 active により親が解決できない
+  - 条件: `--epic/--initiative` 未指定で active から親を補完しようとしたが、active が壊れている/指す先が存在しない/種別が不正で解決できない
+  - 期待: エラーで終了し、親の明示指定（`--epic` / `--initiative`）を促す
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: SSOT = spec-dock が正として扱う永続データ（`meta.json`）
@@ -189,9 +216,21 @@ Sync --> Dev: ok
 - なし
 
 ## 決定事項（ADRs） (任意)
-- D-001: 命名規約（ASCII 強制はしない。現行 slug 制約を維持）
+- D-001: Import のスコープ（initiative/epic/issue を対象に含める）
+  - ADR: `tmp/issue-import/adrs/adr-00001-import-scope.md`
+- D-002: CLI 形状（`import` サブコマンドを追加する）
+  - ADR: `tmp/issue-import/adrs/adr-00002-import-cli-shape.md`
+- D-003: GitHub 取り込み範囲（body/labels 等は取り込まず、`gh issue view` 失敗は中断）
+  - ADR: `tmp/issue-import/adrs/adr-00003-import-gh-data.md`
+- D-004: 既存ブランチ import（今回のスコープ外）
+  - ADR: `tmp/issue-import/adrs/adr-00004-import-existing-branch.md`
+- D-005: 親子指定（原則は明示、未指定時は active から補完）
+  - ADR: `tmp/issue-import/adrs/adr-00005-import-parent-assignment.md`
+- D-006: 副作用（import 後に sync まで。active/checkout は触らない）
+  - ADR: `tmp/issue-import/adrs/adr-00006-import-side-effects.md`
+- D-007: 命名規約（ASCII 強制はしない。現行 slug 制約を維持）
   - ADR: `tmp/issue-import/adrs/adr-00007-import-naming-policy.md`
-- D-002: import 成功メッセージ（node id / 親 id / path / github issue_number を必ず出す）
+- D-008: 成功メッセージ（node id / 親 id / path / github issue_number を必ず出す）
   - ADR: `tmp/issue-import/adrs/adr-00008-import-success-output.md`
 
 ## Definition of Ready（着手可能条件） (必須)
