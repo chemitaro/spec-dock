@@ -3,7 +3,7 @@
 ID: "iss-import-00001"
 タイトル: "Import: 既存 GitHub Issue を spec-dock ツリーへ取り込む（initiative/epic/issue）"
 関連GitHub: []
-状態: "draft"
+状態: "approved"
 作成者: "<YOUR_NAME>"
 最終更新: "2026-02-13"
 依存: ["requirement.md", "design.md"]
@@ -23,17 +23,23 @@ ID: "iss-import-00001"
   - `gh issue view` 失敗時はテンプレ/meta.json/派生（index/tree）を一切生成しない
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: `import` 骨組み + `gh issue view` 失敗時にローカルを汚さず落ちる（AC-003）
-- [ ] S02: `import initiative` が SSOT を作り `sync(update_active=false)` まで実行し、active を変えない（AC-002）
-- [ ] S03: `import epic --initiative <id>` が正しい場所に生成され、親が不正なら落ちる（AC-002/EC-002）
-- [ ] S04: `import issue --epic <id>` が正しい場所に生成され、`sync(update_active=false)` まで実行する（AC-001）
-- [ ] S05: 入力 `123 / #123 / URL` を同一視して issue_number に正規化できる（AC-004）
-- [ ] S06: 親未指定時に active から親を補完して import できる（D-005）
-- [ ] S07: 親が解決できない/active が stale・破損の場合はエラーで落ちる（EC-001/EC-006）
-- [ ] S08: 親IDが存在しない/種別不正の場合はエラーで落ちる（EC-002）
-- [ ] S09: github.issue_number が既にリンク済みならエラーで落ちる（EC-003）
-- [ ] S10: slug 不正 / slugify 空はテンプレ生成前にエラーで落ちる（EC-004）
-- [ ] S11: sync が失敗したら import も失敗として返す（EC-005）
+- [x] S01: `import` 骨組み + `gh issue view` 失敗時にローカルを汚さず落ちる（AC-003）
+- [x] S02: `import initiative` が SSOT を作り `sync(update_active=false)` まで実行し、active を変えない（AC-002）
+- [x] S03: `import epic --initiative <id>` が正しい場所に生成され、親が不正なら落ちる（AC-002/EC-002）
+- [x] S04: `import issue --epic <id>` が正しい場所に生成され、`sync(update_active=false)` まで実行する（AC-001）
+- [x] S05: 入力 `123 / #123 / URL` を同一視して issue_number に正規化できる（AC-004）
+- [x] S06: 親未指定時に active から親を補完して import できる（D-005）
+- [x] S07: 親が解決できない/active が stale・破損の場合はエラーで落ちる（EC-001/EC-006）
+- [x] S08: 親IDが存在しない/種別不正の場合はエラーで落ちる（EC-002）
+- [x] S09: github.issue_number が既にリンク済みならエラーで落ちる（EC-003）
+- [x] S10: slug 不正 / slugify 空はテンプレ生成前にエラーで落ちる（EC-004）
+- [x] S11: sync が失敗したら import も失敗として返す（EC-005）
+
+## 進行状況（実績） (必須)
+- 完了日: `2026-02-13`
+- 実装完了: `src/spec_dock/assets/spec_dock/scripts/spec-dock`（`import` CLI、`gh issue view` 検証、親解決、重複検出、`sync(update_active=false)`）
+- テスト完了: `tests/test_cli.py`（`import` 系 14 テストを追加）
+- 検証結果: `python -B -m unittest -v tests/test_cli.py` で `42 tests OK`
 
 ### UML（任意） (任意)
 ```plantuml
