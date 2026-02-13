@@ -878,6 +878,27 @@ def _load_active_manifest(specdock_dir: Path) -> dict[str, Any] | None:
     return None
 
 
+def _load_active_manifest_no_migrate(specdock_dir: Path) -> dict[str, Any] | None:
+    """Load active manifest without migrating legacy `.work/*` files.
+
+    This is used by side-effect-sensitive commands (e.g. `import`) that must not
+    create/update `spec-dock/.agent/active.json` as a byproduct of reading active.
+    """
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    candidates = (
+        agent_dir / "active.json",
+        legacy_work_dir / "active.json",
+        legacy_work_dir / "current.json",
+    )
+    for p in candidates:
+        if not p.exists():
+            continue
+        current = _load_json(p)
+        return current if isinstance(current, dict) else None
+    return None
+
+
 def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
     """Return the placeholder directory for `layer` (initiative/epic/issue)."""
     p = specdock_dir / "system" / "active-none" / layer
@@ -1262,7 +1283,7 @@ def _resolve_active_node(nodes: dict[str, _Node], *, entry: Any, expected_type: 
 
 def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], child_type: str) -> str:
     """Resolve parent id from active manifest for `epic` or `issue` imports."""
-    active = _load_active_manifest(specdock_dir)
+    active = _load_active_manifest_no_migrate(specdock_dir)
     if not isinstance(active, dict):
         if child_type == "issue":
             raise RuntimeError("Cannot resolve parent epic from active selection. Pass --epic explicitly.")
@@ -1334,7 +1355,7 @@ def _import_initiative(
     }
     _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
     _write_meta(dest_dir, node_type="initiative", node_id=node_id, title=title, slug=slug, github_issue_number=issue_number)
-    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False, migrate_active=False)
     rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
     print(f"spec-dock: ok (import initiative) id={node_id} path={rel} github=#{issue_number}")
 
@@ -1396,7 +1417,7 @@ def _import_epic(
         initiative_id=initiative.id,
         github_issue_number=issue_number,
     )
-    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False, migrate_active=False)
     rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
     print(f"spec-dock: ok (import epic) id={node_id} initiative={initiative.id} path={rel} github=#{issue_number}")
 
@@ -1465,7 +1486,7 @@ def _import_issue(
         epic_id=epic.id,
         github_issue_number=issue_number,
     )
-    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False, migrate_active=False)
     rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
     print(
         f"spec-dock: ok (import issue) id={node_id} epic={epic.id} initiative={epic.initiative_id} "
@@ -1748,7 +1769,15 @@ def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> t
     return (None, f"ambiguous github issue numbers {sorted(nums)}: {ids}")
 
 
-def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: bool, force: bool = False) -> None:
+def _sync(
+    specdock_dir: Path,
+    *,
+    github: bool,
+    gh_limit: int,
+    update_active: bool,
+    force: bool = False,
+    migrate_active: bool = True,
+) -> None:
     """Generate derived state files under `spec-dock/.agent/` from the local tree (and optionally GitHub)."""
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
@@ -1818,7 +1847,7 @@ def _sync(specdock_dir: Path, *, github: bool, gh_limit: int, update_active: boo
 
     state_index_path = agent_dir / "index.json"
     tree_path = agent_dir / "tree.json"
-    current = _load_active_manifest(specdock_dir)
+    current = _load_active_manifest(specdock_dir) if migrate_active else _load_active_manifest_no_migrate(specdock_dir)
     before = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
 
     # Default behavior: infer active target from current git branch (best-effort).
@@ -2116,12 +2145,18 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     import_sub = p_import.add_subparsers(dest="import_kind", required=True)
 
     p_import_init = import_sub.add_parser("initiative", help="Import a GitHub issue as an initiative")
-    p_import_init.add_argument("target", help="GitHub issue number (123 / #123 / URL)")
+    p_import_init.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+    )
     p_import_init.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     p_import_init.add_argument("--slug")
 
     p_import_epic = import_sub.add_parser("epic", help="Import a GitHub issue as an epic")
-    p_import_epic.add_argument("target", help="GitHub issue number (123 / #123 / URL)")
+    p_import_epic.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+    )
     p_import_epic.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     p_import_epic.add_argument("--slug")
     p_import_epic.add_argument(
@@ -2130,7 +2165,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
 
     p_import_issue = import_sub.add_parser("issue", help="Import a GitHub issue as an issue")
-    p_import_issue.add_argument("target", help="GitHub issue number (123 / #123 / URL)")
+    p_import_issue.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+    )
     p_import_issue.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     p_import_issue.add_argument("--slug")
     p_import_issue.add_argument(

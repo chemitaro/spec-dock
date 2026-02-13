@@ -14,6 +14,10 @@
 - `--slug` は **安全な文字のみ**許可します（空白や `!` などはエラー）
   - 許可: Unicode の英数字 + `-` `_` `.`
   - 追加制約: **小文字のみ**（大文字を含む場合はエラー）
+- 既存 GitHub Issue を取り込む場合は `import {initiative,epic,issue}` を使います
+  - `import` は GitHub Issue を作成/更新しません（`gh issue view` による存在確認のみ）
+  - `--title` は必須です（GitHub title は取り込みません）
+  - URL は issue 番号抽出にのみ使用します（owner/repo は無視します）
 
 ## クイックスタート
 
@@ -32,6 +36,18 @@
 ./spec new epic --no-github --initiative 1 --title "JWT auth"      # epic-local-00001
 ./spec new issue --no-github --epic 1 --title "Add refresh token"  # iss-local-00001
 ```
+
+### 2.5) 既存 GitHub Issue の取り込み（`import`）
+
+```bash
+./spec import initiative 10 --title "Auth platform"                       # init-00010（GH #10 を取り込み）
+./spec import epic 11 --title "JWT auth" --initiative init-00010          # epic-00011（GH #11 を取り込み）
+./spec import issue 123 --title "Add refresh token" --epic epic-00011     # iss-00123（GH #123 を取り込み）
+```
+
+注意:
+- `import` の target は `123` / `#123` / URL を受け付けますが、URL は **番号抽出のみ**です（別リポジトリの URL は対象外）。
+- `import` は checkout や `active set` を行いません（取り込み後に `sync --no-update-active` 相当まで実行します）。
 
 ### 3) active（現在作業中）を設定
 
