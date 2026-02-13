@@ -3,7 +3,7 @@
 ID: "docs-restructure-00001"
 タイトル: "spec-dock 配布ドキュメント再構成（フラット化 + old/ 退避 + Guide/Workflow/Reference 分離）"
 状態: "draft"
-作成者: "<YOUR_NAME>"
+作成者: "spec-dock contributors"
 最終更新: "2026-02-13"
 依存: []
 親: ["src/spec_dock/assets/spec_dock/docs"]

@@ -23,6 +23,19 @@
 - `sync` は実行前に preflight validate を行い、致命的不整合がある場合は失敗します
   - `sync --force`: validate NG でも警告して継続します（デバッグ用途）
 
+### active 推定の例（2〜3例）
+
+`sync` は「ブランチ名に含まれる id / GitHub Issue番号」を手がかりに、仕様ツリー内のノードへ **一意に対応**する場合のみ active を更新します（曖昧なら更新しません）。
+
+例:
+- `feature/iss-00123-add-refresh` → `iss-00123` が存在すれば、その issue を active に更新
+- `feature/issue-123-add-refresh` / `feature/gh-123-add-refresh` → `github.issue_number=123` のノードが 1つなら active を更新
+- `feature/123-add-refresh` → 末尾が `123-...` なら GitHub Issue番号候補として扱い、1つに解決できれば更新
+
+補足:
+- `main` / `develop` など「手がかりが無い」ブランチでは、active は変更されません（静かに維持されます）
+- この挙動を避けたい場合は `sync --no-update-active` を使ってください
+
 ## 2. `--github`（GitHub enrich）
 
 `sync --github` を付けた場合のみ、`gh issue list ...` を用いて GitHub 側の状態を取得し、ローカル集計に補強します。
@@ -75,4 +88,3 @@ Script -> Index: write
 Script -> Tree: write
 @enduml
 ```
-
