@@ -147,10 +147,7 @@ class meta_json {
 
 ## インターフェース契約（ここで固定） (任意)
 ### API（ある場合）
-- API-001: `<METHOD> <PATH>`
-  - Request: ...
-  - Response: ...
-  - Errors: ...
+- なし（CLI ツールのため）
 
 ### 関数・クラス境界（重要なものだけ）
 - IF-001: `spec-dock/scripts/spec-dock::_parse_args(argv: list[str]) -> argparse.Namespace`
@@ -184,27 +181,7 @@ package "runtime script" {
 ### クラス/インターフェース詳細設計（主要なもの） (任意)
 > この Issue を “単独の作業単位” として完結させるために、必要な範囲だけ詳細化する。
 
-- Class: `<ClassName>`
-  - Responsibility（責務）:
-    - ...
-  - Public methods（公開メソッド）:
-    - `method(arg: Type) -> Return`
-  - Invariants（不変条件）:
-    - ...
-  - Collaboration（協調関係）:
-    - `<OtherClass>`（理由: ...）
-- Interface / Protocol: `<InterfaceName>`
-  - Contract（契約）:
-    - ...
-  - 実装候補:
-    - `<ImplClass>`
-
-#### UML（任意） (任意)
-```plantuml
-@startuml
-' TODO: 必要なら UML を追加する（形式は自由）
-@enduml
-```
+- なし（既存の runtime script は単一ファイルの関数分割で完結させる）
 
 ### 例外/エラー契約（重要なものだけ） (任意)
 - ERR-001: `gh issue view` 失敗
@@ -217,6 +194,16 @@ package "runtime script" {
 - ERR-003: github.issue_number が既にリンク済み
   - 発生条件: 既存ノードが `github.issue_number=<num>` を保持
   - 返し方: `RuntimeError(...)`（既存 node を示す）
+- ERR-004: slug が不正 / slugify が空
+  - 発生条件:
+    - `--slug` が `_validate_slug` を満たさない
+    - `--slug` 未指定で `slugify(--title)` が空（`--title` が特殊文字のみ等）
+  - 返し方: `RuntimeError(...)`（`--slug` 明示を促す）
+  - 重要: **テンプレ生成前に** slug を確定・検証して落とす（部分生成を避ける）
+- ERR-005: sync 失敗（preflight validate failed 等）
+  - 発生条件: import 後の `_sync(update_active=False)` が `RuntimeError` を投げる
+  - 返し方: `RuntimeError(...)`（`main` が `error: ...` を出して exit 1）
+  - 副作用: **テンプレ/meta.json は生成済み**であり、派生（index/tree）が更新されない可能性がある（ロールバックは OUT OF SCOPE）
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
@@ -246,34 +233,60 @@ package "runtime script" {
   - Integration（runtime script 相当）:
     - `tests/test_cli.py` に `import` の新テストを追加（temp repo + gh bash stub）
 - どのAC/ECをどのテストで保証するか:
-  - AC-001 → `tests/test_cli.py::test_import_issue_creates_node_and_runs_sync_without_updating_active`
-  - AC-002 → `tests/test_cli.py::test_import_epic_and_initiative_create_nodes`
-  - AC-003 → `tests/test_cli.py::test_import_aborts_without_local_changes_when_gh_issue_view_fails`
-  - AC-004 → `tests/test_cli.py::test_import_accepts_number_hash_and_url_equivalently`
-  - EC-006 → `tests/test_cli.py::test_import_parent_fallback_errors_on_stale_active`
+  - AC-001 → `tests/test_cli.py` の `TestCli.test_import_issue_creates_node_and_runs_sync_without_updating_active`
+  - AC-002 → `tests/test_cli.py` の `TestCli.test_import_epic_and_initiative_create_nodes`
+  - AC-003 → `tests/test_cli.py` の `TestCli.test_import_aborts_without_local_changes_when_gh_issue_view_fails`
+  - AC-004 → `tests/test_cli.py` の `TestCli.test_import_accepts_number_hash_and_url_equivalently`
+  - EC-004 → `tests/test_cli.py` の `TestCli.test_import_rejects_invalid_slug_and_empty_slugify`
+  - EC-005 → `tests/test_cli.py` の `TestCli.test_import_fails_when_sync_preflight_fails`
+  - EC-006 → `tests/test_cli.py` の `TestCli.test_import_parent_fallback_errors_on_stale_active`
 
 ### テストマトリクス（AC/EC → テスト） (任意)
 - AC-001:
-  - Unit: ...
-  - Integration: ...
-  - E2E: ...
-- EC-001:
-  - Unit: ...
-  - Integration: ...
-  - E2E: ...
+  - Integration:
+    - `import issue` が node を生成し、`sync(update_active=false)` により `.agent/index.json/tree.json` が生成される
+    - `active.json` が更新されない（存在する場合は内容不変、存在しない場合は作られない）
+- AC-003:
+  - Integration:
+    - `gh issue view` が失敗したら、テンプレ/meta.json/index/tree を一切作らない（ローカル非汚染）
+- EC-004:
+  - Integration:
+    - `--slug` 不正 → import 失敗、ローカル非汚染（gh 成功後でもテンプレ生成前に落ちる）
+    - `slugify(--title)` が空 → import 失敗、`--slug` 明示を促す
+- EC-005:
+  - Integration:
+    - 既存ツリーが壊れて `sync` が preflight validate failed で落ちた場合、import も失敗する（ロールバックしない）
 - 非交渉制約（requirement.md）をどう検証するか:
-  - 制約: ...
-    - 検証方法（テスト/計測点/ログ/運用確認など）: ...
+  - 制約: `gh issue view` 以外の `gh` を呼ばない
+    - 検証方法: `gh` スタブを用意し、`issue view` 以外の呼び出しは即 `exit 1` にする（誤呼び出しでテストが落ちる）
+  - 制約: active を更新しない（`active.json` を作らない/変更しない）
+    - 検証方法:
+      - active.json が無い状態で import し、active.json が生成されないことを確認
+      - active.json がある状態で import し、内容が変化しないことを確認
+  - 制約: sync は `update_active=False` で実行する
+    - 検証方法:
+      - ブランチ名に id が含まれる状態でも active が変化しないことを確認（update_active=True なら変わり得る条件を作る）
+  - 制約: `gh issue view` 失敗時に `.agent/index.json/tree.json` を作らない
+    - 検証方法: `gh issue view` を失敗させ、`.agent/index.json` / `.agent/tree.json` が存在しないことを確認
 - 実行コマンド（該当するものを記載）:
   - `python -B -m unittest -v tests/test_cli.py`
 - 変更後の運用（必要なら）:
-  - 移行手順: ...
-  - ロールバック: ...
-  - Feature flag: ...
+  - 移行手順:
+    1) `spec-dock/scripts/spec-dock import ...` を実行
+    2) 出力された `path` を確認し、生成物（テンプレ/`meta.json`）をレビュー
+    3) 必要なら `spec-dock/scripts/spec-dock active set <node-id>` で作業対象を切り替える（import は active を触らない）
+  - ロールバック:
+    - 自動ロールバックは行わない（必要なら生成ディレクトリを手動削除して戻す）
+  - Feature flag:
+    - なし
 
 ## リスク/懸念（Risks） (任意)
-- R-001: <リスク>（影響: ... / 対応: ...）
-- R-002: ...
+- R-001: `sync` が preflight validate failed で落ち、import が失敗する
+  - 影響: テンプレ/meta.json は生成済みだが index/tree が更新されない可能性
+  - 対応: ツリー修復後に `sync --no-update-active` を再実行（ロールバックは OUT OF SCOPE）
+- R-002: active 補完が stale/破損で親解決できず、import が失敗する
+  - 影響: `--epic/--initiative` 省略の UX が効かない
+  - 対応: 親を明示指定して実行する（要件 EC-006）
 
 ## 未確定事項（TBD） (必須)
 - なし
