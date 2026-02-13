@@ -52,6 +52,21 @@ gh issue list --state all --limit <N> --json number,state,title,labels,updatedAt
 - `sync` の「骨格」は常に **ローカル `spec-dock/initiatives/**/meta.json` 走査**です
 - `--github` はあくまで **状態の補強**（読み取り）で、GitHub に書き込みはしません
 
+### 1.3 既存 Issue の取り込み（import）
+
+`./spec-dock/scripts/spec-dock import {initiative,epic,issue} ...` は、既存 GitHub Issue を spec-dock ツリーへ取り込むためのコマンドです。
+
+内部的には存在確認のために以下のみを実行します:
+
+```bash
+gh issue view <num> --json number,url
+```
+
+ポイント:
+- `import` は GitHub Issue を作成/更新しません（読み取りのみ）。
+- `import` は checkout/branch 操作をしません。
+- URL を target に渡せますが、URL は **番号抽出のみ**で、owner/repo は解釈しません（cross-repo は対象外）。
+
 ---
 
 ## 2) 「どのリポジトリに Issue を作るか」はどう決まるか

@@ -80,6 +80,13 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-00123
 ./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation strategy"
 
+# Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
+./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
+./spec-dock/scripts/spec-dock import epic 11 --title "JWT auth" --initiative init-00010    # id=epic-00011
+./spec-dock/scripts/spec-dock import issue 123 --title "Add refresh token" --epic epic-00011  # id=iss-00123
+#
+# Note: URL targets are parsed for the issue number only; owner/repo in the URL is ignored.
+
 # Set active issue pointers (symlinks) and generate context-pack
 ./spec-dock/scripts/spec-dock active set 123            # GitHub issue number (checkout + active + sync)
 ./spec-dock/scripts/spec-dock active set iss-local-00001 # local node id (no checkout)

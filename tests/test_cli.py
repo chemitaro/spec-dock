@@ -1718,3 +1718,125 @@ class TestCli(unittest.TestCase):
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("preflight validate failed", p.stderr)
+
+    def test_import_rejects_ambiguous_parent_id_shorthand_when_both_local_and_github_exist(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Create both GitHub and local variants with the same numeric suffix.
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "10", "--title", "GitHub initiative"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--id", "10", "--title", "Local initiative"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "epic", "11", "--title", "JWT auth", "--initiative", "10"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("ambiguous", p.stderr.lower())
+
+            imported = list((target / "spec-dock" / "initiatives").rglob("epic-00011-*"))
+            self.assertEqual(imported, [])
+
+    def test_import_aborts_without_local_changes_when_gh_issue_view_returns_non_json(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ \"$1\" == \"issue\" && \"$2\" == \"view\" ]]; then\n'
+                "  echo \"NOT_JSON\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo \"unexpected gh args: $@\" >&2\n"
+                "exit 99\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
+            self.assertEqual(imported, [])
+            self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
+            self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+
+    def test_import_does_not_migrate_legacy_active_manifest(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            init_path = "spec-dock/initiatives/init-local-00001-auth-platform"
+            epic_path = f"{init_path}/epics/epic-local-00001-jwt-auth"
+
+            legacy_dir = target / "spec-dock" / ".work"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            legacy_active_path = legacy_dir / "active.json"
+            legacy_active_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "updated_at": "2026-01-01T00:00:00+00:00",
+                        "initiative": {"id": "init-local-00001", "path": init_path},
+                        "epic": {"id": "epic-local-00001", "path": epic_path},
+                        "issue": None,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            self._run_runtime(target, ["import", "issue", "123", "--title", "Add refresh token"], env=test_env)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+            )
+            self.assertTrue(issue_dir.is_dir())
+            self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
+            self.assertTrue(legacy_active_path.is_file())

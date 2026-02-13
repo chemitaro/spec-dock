@@ -54,6 +54,29 @@ gh issue checkout 123
 補足:
 - `active set iss-00123` のようにノードIDで直接指定した場合でも、そのノードが GitHub Issue に紐づいていれば checkout します（initiative/epic/issue 共通）。
 
+### 1.4 既存 Issue の取り込み（`import`）
+
+既に存在する GitHub Issue を、spec-dock の SSOT（`meta.json`）として取り込む場合は `import` を使います。
+
+```bash
+./spec-dock/scripts/spec-dock import issue 123 --title "Add refresh token" --epic epic-local-00001
+```
+
+内部的に実行されるコマンド（概要）:
+
+```bash
+gh issue view 123 --json number,url
+```
+
+注意:
+- `import` は GitHub Issue を作成/更新しません（読み取りのみ）。
+- `--title` は必須です（GitHub title は取り込みません）。
+- `import` は checkout/branch 操作をしません。
+- `import` は active の「選択」を更新しません（`active set` は実行しません）。
+- `import` 後は `sync --no-update-active` 相当（`update_active=false`）を実行し、`.agent/index.json` / `.agent/tree.json` を更新します。
+- URL を target に渡せますが、URL は **issue 番号抽出にのみ使用**します（owner/repo は無視します）。
+  - そのため **別リポジトリの Issue URL を貼っても**、同じ番号の「現リポジトリの Issue」として扱われ得ます（cross-repo は対象外）。
+
 ## 2) 「どのリポジトリに作るか」はどう決まるか
 
 spec-dock は `--repo owner/repo` を指定しません。  

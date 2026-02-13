@@ -24,6 +24,8 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 補足:
 - GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set` した場合、`active set` は checkout も行います（initiative/epic/issue 共通）。
 - ローカルのみ（`*-local-*`）のノードは checkout しません。
+- GitHub Issue が既に存在していて spec-dock に未登録の場合は、先に `import` でノードを取り込みます。
+  - 例: `./spec-dock/scripts/spec-dock import issue 123 --title "..." --epic epic-local-00001`
 
 `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。
 
