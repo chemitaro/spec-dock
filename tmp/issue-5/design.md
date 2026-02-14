@@ -76,7 +76,7 @@ ID: "issue-5"
 - Flow for AC-003〜006/007（`new/import` の title/slug バリデーション）:
   1) `--title` を trim → 正規表現で検証（失敗なら副作用なしで中断）
   2) `--slug` を（指定があれば trim→検証、なければ title から合成→検証）
-  3) （GitHub連携で `github.issue_number` が確定する場合）`github.issue_number` の重複リンクを検出してエラー（副作用なし）
+  3) （`import` / `new --github-issue` のように **既存の `github.issue_number` をリンクする場合**）`github.issue_number` の重複リンクを検出してエラー（副作用なし）
   4) 以降の副作用（`gh issue create/view`、FS 生成）を実行する
 
 ### UML（シーケンス: active set） (任意)
@@ -332,7 +332,7 @@ endif
 - IF-004: `spec-dock::_ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int) -> None`
   - Input: nodes（scan結果）, issue_number（リンクしようとしている GitHub issue 番号）
   - Behavior: initiative/epic/issue のいずれかが `github.issue_number==issue_number` を持つ場合は `RuntimeError` で拒否する
-  - Note: `import` に加え、`new --github-issue` でも使用して “運用不能な状態” を生成させない
+  - Note: `import` に加え、`new --github-issue`（既存番号リンク）でも使用して “運用不能な状態” を生成させない
 - IF-005: `spec-dock::_validate_github_issue_numbers_unique(nodes: dict[str, _Node]) -> None`
   - Behavior: ツリー全体で `github.issue_number` が一意でない場合は `RuntimeError`（validateで検知）
 
@@ -449,7 +449,7 @@ Branch --> Active: current branch == decision.desired
   - 返し方: `RuntimeError`（exit != 0）、副作用なし
 - ERR-003: Duplicate GitHub link
   - 発生条件: `new --github-issue <n>` で、既に `github.issue_number=<n>` を持つ node が存在する
-  - 返し方: `RuntimeError`（exit != 0）、副作用なし（エラーに既存 node 一覧を含める）
+  - 返し方: `RuntimeError`（exit != 0）、副作用なし（エラーに `github.issue_number=<n>` と既存 node の `type:id` / `meta.json` パスを含める）
 - WARN-001: Branch fallback
   - 発生条件: `id-slug` が non-ascii または invalid ref で `<id>` にフォールバック
   - 出力: stderr に `spec-dock: (warn)` で始まる warning（理由・候補を含む）

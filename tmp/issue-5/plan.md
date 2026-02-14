@@ -246,7 +246,7 @@ stop
 #### 期待する振る舞い（テストケース） (必須)
 - Given: `github.issue_number=1` を持つ node が既に存在する（例: `new initiative --github-issue 1 ...` 済み）
 - When: 別の node を `new ... --github-issue 1` で作成しようとする（initiative/epic/issue のいずれでも）
-- Then: exit code != 0 で失敗し、stderr に `github.issue_number=1 is already linked` を含む（副作用なし）
+- Then: exit code != 0 で失敗し、stderr に `github.issue_number=1` と競合 node の `type:id` / `meta.json` パスが分かる情報を含む（副作用なし）
 - 観測点: exit code / stderr / FS（新しい node が増えていない）
 
 #### Red（失敗するテストを先に書く） (任意)
@@ -254,8 +254,8 @@ stop
   - 例: `new initiative --github-issue 1` → `new issue --github-issue 1` が失敗すること
 
 #### Green（最小実装） (任意)
-- `src/spec_dock/assets/spec_dock/scripts/spec-dock` の `new {initiative,epic,issue}`（GitHub連携で `github_issue_number` が確定する経路）にて:
-  - FS 生成前に scan nodes → `_ensure_github_issue_not_linked(nodes, issue_number=github_issue_number)` を適用する
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock` の `new {initiative,epic,issue}`（`--github-issue` による既存番号リンクの経路）にて:
+  - `--github-issue` が指定された経路（既存番号リンク）で、FS 生成前に scan nodes → `_ensure_github_issue_not_linked(nodes, issue_number=github_issue_number)` を適用する
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest -q` を実行し、成功した
@@ -278,7 +278,7 @@ stop
 #### 期待する振る舞い（テストケース） (必須)
 - Given: 仕様ツリーに `github.issue_number=1` を持つ node が複数存在する（手編集/過去バグ由来）
 - When: `./spec-dock/scripts/spec-dock validate` を実行する
-- Then: exit code != 0 で失敗し、stderr に重複内容（`github.issue_number=1` と該当 node 一覧）が分かる
+- Then: exit code != 0 で失敗し、stderr に重複内容（`github.issue_number=1` と該当 node の `type:id` / `meta.json` パス）が分かる
 
 #### Red（失敗するテストを先に書く） (任意)
 - `tests/test_cli.py` に “重複リンクを meta.json の書き換えで作る” テストを追加し、`validate` が失敗することを固定する
