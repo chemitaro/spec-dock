@@ -45,6 +45,7 @@ _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<n
 _NUM_RE = re.compile(r"^[0-9]+$")
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 _INPUT_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
+_INPUT_SLUG_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 # Branch name parsing helpers (best-effort):
 # - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
@@ -154,6 +155,35 @@ def _validate_input_title(value: str, *, field: str = "--title") -> str:
         "OK examples: 'Add Refresh Token', 'JWT Auth 2'\n"
         "NG examples: 'Add-Token', 'Add  Token', 'Add　Token', '日本語'"
     )
+
+
+def _validate_input_slug_kebab(value: str, *, field: str = "--slug") -> str:
+    """Validate CLI input slug for new/import commands (kebab-case only)."""
+    slug = value.strip()
+    if not slug:
+        raise RuntimeError(f"{field} is required")
+    if _INPUT_SLUG_KEBAB_RE.fullmatch(slug):
+        return slug
+    raise RuntimeError(
+        f"{field} is invalid: {value!r}\n"
+        f"expected regex: {_INPUT_SLUG_KEBAB_RE.pattern}\n"
+        "OK examples: 'add-refresh-token', 'jwt-auth-2'\n"
+        "NG examples: 'Add-token', 'add_token', 'add..token', '日本語'"
+    )
+
+
+def _derive_input_slug_from_title(title: str) -> str:
+    """Derive deterministic kebab-case slug from an already validated title."""
+    return title.lower().replace(" ", "-")
+
+
+def _resolve_input_title_and_slug(title: str, slug: str | None) -> tuple[str, str]:
+    """Normalize+validate title/slug for new/import before any side effects."""
+    normalized_title = _validate_input_title(title, field="--title")
+    if slug is None:
+        derived_slug = _derive_input_slug_from_title(normalized_title)
+        return normalized_title, _validate_input_slug_kebab(derived_slug, field="--slug")
+    return normalized_title, _validate_input_slug_kebab(slug, field="--slug")
 
 
 def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
@@ -523,7 +553,7 @@ def _new_initiative(
     """Create a new initiative node under `spec-dock/initiatives/`."""
     nodes = _scan_nodes(specdock_dir)
 
-    title = _validate_input_title(title, field="--title")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
@@ -556,12 +586,6 @@ def _new_initiative(
     if existing_id:
         existing = nodes[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
-
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "initiative"
     initiatives_root = _initiatives_root(specdock_dir)
@@ -598,7 +622,7 @@ def _new_epic(
     if not initiative or initiative.type != "initiative":
         raise RuntimeError(f"Initiative not found: {initiative_id}")
 
-    title = _validate_input_title(title, field="--title")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     if not no_github:
         if node_id is not None:
@@ -634,12 +658,6 @@ def _new_epic(
     if existing_id:
         existing = nodes[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
-
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "epic"
     dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
@@ -687,7 +705,7 @@ def _new_issue(
     if not epic.initiative_id:
         raise RuntimeError(f"Epic meta missing initiative_id: {epic_id}")
 
-    title = _validate_input_title(title, field="--title")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
@@ -725,12 +743,6 @@ def _new_issue(
     if existing_id:
         existing = nodes[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
-
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "issue"
     dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
@@ -1256,15 +1268,6 @@ def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, A
     return data
 
 
-def _import_slug(title: str, slug: str | None) -> str:
-    """Resolve/validate slug for import before any file generation."""
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    return _validate_slug(slug, field="slug")
-
-
 def _ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int) -> None:
     """Reject imports when github.issue_number is already linked by any node type."""
     linked = [
@@ -1342,14 +1345,12 @@ def _import_initiative(
     slug: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an initiative node."""
-    title = _validate_input_title(title, field="--title")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
     nodes = _scan_nodes(specdock_dir)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
-
-    slug = _import_slug(title, slug)
 
     node_id = _format_id("init", issue_number, local=False)
     prefix, is_local, num = _parse_id(node_id)
@@ -1383,14 +1384,12 @@ def _import_epic(
     initiative_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an epic node."""
-    title = _validate_input_title(title, field="--title")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
     nodes = _scan_nodes(specdock_dir)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
-
-    slug = _import_slug(title, slug)
 
     if initiative_id is None:
         resolved_initiative_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="epic")
@@ -1443,14 +1442,12 @@ def _import_issue(
     epic_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an issue node."""
-    title = _validate_input_title(title, field="--title")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
     nodes = _scan_nodes(specdock_dir)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
-
-    slug = _import_slug(title, slug)
 
     if epic_id is None:
         resolved_epic_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="issue")
