@@ -74,6 +74,7 @@ ID: "issue-5"
   3) 対象 node の `id/slug` から desired branch 候補（`id-slug` → `id`）を決定
   4) desired branch が既存なら、**`gh` checkout をスキップ**し、warning を出してそのブランチを checkout する（内容は検証しない）
      - checkout 後に scan → target 再解決 → desired 再計算を行い、**最終的な current ブランチ名が再計算後の desired になるまで**ブランチ名を寄せる（AC-011 / EC-005）
+     - 寄せる際の優先順位: 再計算後の desired が既に存在する場合はそのブランチを `checkout`（再利用）し、存在しない場合は current ブランチを `rename` して desired に寄せる（いずれも非破壊）
   5) desired branch が既存でない場合のみ、GitHub 紐づきなら `gh issue checkout/develop` で checkout を行い、checkout 後に scan→再解決→desired 再計算を行った上でブランチ名を desired へ寄せる（dirty なら中断）
   6) active manifest / pointers を更新し、sync を実行する
 - Flow for AC-003〜006/007（`new/import` の title/slug バリデーション）:
@@ -133,7 +134,7 @@ alt node is GH-linked\n(target is github_issue OR node has github.issue_number)
 	  Script -> FS: scan nodes (after checkout)
 	  Script -> Script: node = re-resolve by target\n(by id or github.issue_number)
 	  Script -> Script: decision = desired_branch_name(node)\n(recompute)
-	  Script -> Git: rename/switch current -> <decision.desired>\n(if needed)
+	  Script -> Git: ensure current == <decision.desired>\n(if exists: checkout; else: rename current)
 	else missing
 	    Script -> Git: status --porcelain\n(require clean)
 	    alt dirty
@@ -142,14 +143,14 @@ alt node is GH-linked\n(target is github_issue OR node has github.issue_number)
       return
     end
     Script -> GH: issue checkout <n>\n(if not already checked out)
-    Script -> FS: scan nodes (after checkout)
-    Script -> Script: node = re-resolve by github.issue_number
-    Script -> Script: decision = desired_branch_name(node)\n(recompute)
-    Script -> Git: rename/switch current -> <decision.desired>
-  end
-else node is local-only
-  note right
-    Local-only node (no GitHub link)\n=> do not checkout/rename branches\n(update active.json only)
+	    Script -> FS: scan nodes (after checkout)
+	    Script -> Script: node = re-resolve by github.issue_number
+	    Script -> Script: decision = desired_branch_name(node)\n(recompute)
+	    Script -> Git: ensure current == <decision.desired>\n(if exists: checkout; else: rename current)
+	  end
+	else node is local-only
+	  note right
+	    Local-only node (no GitHub link)\n=> do not checkout/rename branches\n(update active.json only)
   end note
 end
 
