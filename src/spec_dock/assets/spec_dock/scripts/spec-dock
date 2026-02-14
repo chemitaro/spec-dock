@@ -44,6 +44,7 @@ _DEFAULT_ID_WIDTH = 5  # minimum width for zero-padded ids (e.g. `iss-00123`)
 _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<num>[0-9]+)$")
 _NUM_RE = re.compile(r"^[0-9]+$")
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
+_INPUT_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
 
 # Branch name parsing helpers (best-effort):
 # - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
@@ -132,6 +133,27 @@ def _validate_slug(value: str, *, field: str = "slug") -> str:
         )
 
     return slug
+
+
+def _validate_input_title(value: str, *, field: str = "--title") -> str:
+    """Validate CLI input title for new/import commands.
+
+    Rules (after trim):
+    - ASCII letters/digits and single spaces between tokens only.
+    - Leading/trailing spaces are removed.
+    - Empty or non-matching values are rejected with actionable examples.
+    """
+    title = value.strip()
+    if not title:
+        raise RuntimeError(f"{field} is required")
+    if _INPUT_TITLE_RE.fullmatch(title):
+        return title
+    raise RuntimeError(
+        f"{field} is invalid: {value!r}\n"
+        f"expected regex: {_INPUT_TITLE_RE.pattern}\n"
+        "OK examples: 'Add Refresh Token', 'JWT Auth 2'\n"
+        "NG examples: 'Add-Token', 'Add  Token', 'Add　Token', '日本語'"
+    )
 
 
 def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
@@ -501,9 +523,7 @@ def _new_initiative(
     """Create a new initiative node under `spec-dock/initiatives/`."""
     nodes = _scan_nodes(specdock_dir)
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
+    title = _validate_input_title(title, field="--title")
 
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
@@ -578,9 +598,7 @@ def _new_epic(
     if not initiative or initiative.type != "initiative":
         raise RuntimeError(f"Initiative not found: {initiative_id}")
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
+    title = _validate_input_title(title, field="--title")
 
     if not no_github:
         if node_id is not None:
@@ -669,9 +687,7 @@ def _new_issue(
     if not epic.initiative_id:
         raise RuntimeError(f"Epic meta missing initiative_id: {epic_id}")
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
+    title = _validate_input_title(title, field="--title")
 
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
@@ -1326,15 +1342,13 @@ def _import_initiative(
     slug: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an initiative node."""
+    title = _validate_input_title(title, field="--title")
+
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-
     nodes = _scan_nodes(specdock_dir)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
     slug = _import_slug(title, slug)
 
     node_id = _format_id("init", issue_number, local=False)
@@ -1369,15 +1383,13 @@ def _import_epic(
     initiative_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an epic node."""
+    title = _validate_input_title(title, field="--title")
+
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-
     nodes = _scan_nodes(specdock_dir)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
     slug = _import_slug(title, slug)
 
     if initiative_id is None:
@@ -1431,15 +1443,13 @@ def _import_issue(
     epic_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an issue node."""
+    title = _validate_input_title(title, field="--title")
+
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-
     nodes = _scan_nodes(specdock_dir)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
     slug = _import_slug(title, slug)
 
     if epic_id is None:
