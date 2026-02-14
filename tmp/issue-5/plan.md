@@ -227,13 +227,16 @@ stop
 - Given:
   - GitHub 紐づき node（例: `iss-00123` / `github.issue_number=123`）が存在する
   - 既存ローカルブランチ `iss-00123-add-refresh-token` が存在し、checkout すると node の `meta.json.slug` が `refresh-token` に変化する（= ブランチ間で `slug` がズレている状態）
-- When: `active set 123`（または URL）を実行する（既存ブランチ再利用分岐に入る）
+- When:
+  - `active set 123`（または URL。GitHub番号経路）を実行する（既存ブランチ再利用分岐に入る）
+  - `active set iss-00123`（node-id 経路）を実行する（既存ブランチ再利用分岐に入る）
 - Then:
   - 最終的な `git rev-parse --abbrev-ref HEAD` が `iss-00123-refresh-token` になる（checkout 後に再計算した desired へ寄る）
   - `gh issue checkout/develop` は呼ばれない（既存ブランチ再利用のまま）
 
 #### Red（失敗するテストを先に書く） (任意)
 - `tests/test_cli.py` に「slugズレ + 既存ブランチ再利用」の回帰テストを追加する:
+  - GitHub番号経路（`active set 123`）と node-id 経路（`active set iss-00123`）の両方を担保する（テスト2本、または `subTest` で2ケース）
   - 例: 既存ブランチ `iss-00123-add-refresh-token` 上で `meta.json.slug=refresh-token` に改変 → 別ブランチから `active set 123` → 最終ブランチ名が `iss-00123-refresh-token`
 
 #### Green（最小実装） (任意)
