@@ -322,6 +322,7 @@ stop
 #### Green（最小実装） (任意)
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock::_import_{initiative,epic,issue}` にて:
   - 副作用（テンプレートコピー/`meta.json`生成）前に scan nodes → `_validate_nodes(...)` を実行し、失敗したら `RuntimeError` で中断する
+  - 実行順序は `preflight validate` → `gh issue view` → FS 生成で固定する
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest -q` を実行し、成功した
@@ -347,6 +348,7 @@ stop
 - Then:
   - exit code != 0 で失敗し、stderr に `github.issue_number=123` と競合 node の `type:id` / `meta.json` パスが分かる情報を含む
   - 復旧ガイド文言が **コマンド非依存**（`--github-issue` 等の特定フラグ名を前提としない）である
+  - stderr に `--github-issue` を含まない（誤誘導を防ぐ）
 
 #### Red（失敗するテストを先に書く） (任意)
 - 既存の import 重複リンク拒否テストに「誤誘導がない」観測点を追加する（例: `--github-issue` を含まない、等）

@@ -80,7 +80,8 @@ ID: "issue-5"
   2) `--slug` を（指定があれば trim→検証、なければ title から合成→検証）
   3) （`import` / `new --github-issue` のように **既存の `github.issue_number` をリンクする場合**）`github.issue_number` の重複リンクを検出してエラー（副作用なし）
   4) （`import` の場合）既存ツリーを scan → preflight validate（`validate` 相当）を実行し、失敗なら副作用なしで中断する（部分的生成物を残さない）
-  5) 以降の副作用（`gh issue create/view`、FS 生成）を実行する
+     - 順序固定: `import` の preflight validate は `gh issue view` より先に実行する（ローカル不整合を先に検知して早期中断するため）
+  5) 以降の副作用を実行する（`new`: `gh issue create`→FS 生成 / `import`: `gh issue view`→FS 生成）
 
 ### UML（シーケンス: active set） (任意)
 ```plantuml
