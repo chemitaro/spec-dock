@@ -1,207 +1,486 @@
 ---
 種別: 設計書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "issue-5"
+タイトル: "active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名）"
+関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/5"]
+状態: "draft"
+作成者: "codex"
+最終更新: "2026-02-13"
 依存: ["requirement.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: []
 ---
 
-# <ISS_ID> <ISS_TITLE> — 設計（HOW）
+# issue-5 active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名） — 設計（HOW）
 
 ## 目的・制約（要件から転記・圧縮） (必須)
-- 目的: ...
-- MUST: ...
-- MUST NOT: ...
-- 非交渉制約: ...
-- 前提: ...
+- 目的:
+  - `active set` の結果として checkout されている current ブランチ名を、node メタデータ（`id` / `slug`）に基づく決定的な形式へ寄せる（原則 `id-slug`、不適合時は `id`）。
+  - `new/import {initiative,epic,issue}` の `--title` / `--slug` を「slug に変換できる形式」に制約し、非ASCII/日本語等によるパス・ブランチ名の崩れを生成源で防ぐ。
+- MUST:
+  - ブランチ候補の妥当性は `git check-ref-format --branch` に固定して判定する（実装ブレ防止）。
+  - `new/import` のバリデーション失敗時は副作用（FS/GitHub）なしで中断する。
+  - 既存データにより `id-slug` が不適合でも、`active set` は `<id>` へフォールバックして継続する（warning 出力）。
+- MUST NOT:
+  - リモートブランチの削除/リネーム/強制更新（force push）を行わない。
+  - GitHub Issue 本体（title/body/labels 等）の自動変更を追加しない。
+- 非交渉制約:
+  - runtime script は stdlib のみ（依存追加なし）。
+  - CLI の既存インターフェース（コマンド/引数）を変更しない。
+  - `import` は GitHub title を取り込まない（`--title` 必須）。
+- 前提:
+  - GitHub 連携では `git` と `gh` が利用可能で、`gh auth` 済みである。
+  - `active set` の checkout は dirty working tree では拒否する（既存挙動維持）。
 
 ---
 
 ## 既存実装/規約の調査結果（As-Is / 99.9%理解） (必須)
 - 参照した規約/実装（根拠）:
-  - `<path/to/doc_or_agents>`: <見た理由 / 採用するルール>
-  - `<path/to/file>`: <見た理由 / 仕様を決めている箇所（関数/クラス/行番号）>
+  - `src/spec_dock/assets/spec_dock/docs/reference_github.md`: `new/import/active set` の GitHub 連携の前提と副作用
+  - `src/spec_dock/assets/spec_dock/scripts/spec-dock`:
+    - `_active_set`（`active set` の checkout/active 更新）: 1497 行付近
+    - `_gh_issue_checkout`（`gh issue checkout/develop`）: 1072 行付近
+    - `_slugify` / `_validate_slug`（title→slug、slug 検証）: 258/105 行付近
+    - `_new_{initiative,epic,issue}`（`new` の title/slug と gh issue create）: 492/564/653 行付近
+    - `_import_{initiative,epic,issue}` と `_import_slug`（`import` の title/slug と gh issue view）: 1243/1321/1363/1425 行付近
 - 観測した現状（事実）:
-  - ...
-- 採用するパターン（命名/責務/例外/DI/テストなど）:
-  - ...
-- 採用しない/変更しない（理由）:
-  - ...
+  - `active set` は GitHub 紐づきノードで `gh issue checkout` →（失敗時）`gh issue develop --checkout` を実行するが、ブランチ名は指定しない。
+    - 結果として `gh` 側の自動命名（Issue title 由来）に依存し、日本語タイトルで日本語ブランチ名が発生し得る。
+  - `_slugify` は Unicode `isalnum()` を保持し、`_validate_slug` も Unicode を許容するため、日本語 title → 日本語 slug が通り得る。
+  - `new` は（GitHub モードで）`gh issue create` を先に実行し得るため、title/slug の厳格バリデーションを入れる場合は「副作用前」に順序を入れ替える必要がある。
+  - `import` は `gh issue view` を先に実行するため、入力バリデーションを「副作用前」に移動する必要がある。
+- 採用するパターン（設計方針）:
+  - 失敗は `RuntimeError` を送出し、CLI は exit != 0 で中断する（既存パターン）。
+  - `git` / `gh` は `subprocess.run(..., check=True, capture_output=True)` で実行し、失敗時は user-friendly な `RuntimeError` に整形する（既存パターン）。
+  - warning/info は `stderr` に出し、成功の `spec-dock: ok (...)` は `stdout` を維持する。
+- 採用しない/変更しない:
+  - 高度な transliteration（日本語→ローマ字変換）による slug 生成は行わない（OUT OF SCOPE）。
+  - 既存 node の slug を自動移行（ディレクトリ名変更）しない（破壊的・範囲外）。
 - 影響範囲（呼び出し元/関連コンポーネント）:
-  - ...
+  - runtime script（`active/new/import` のみ。`validate/sync/new adr` は必要最小限で影響を避ける）
+  - `tests/test_cli.py`（`active set` の checkout スタブ、title/slug バリデーションの副作用なし担保）
 
 ## 主要フロー（テキスト：AC単位で短く） (任意)
-- Flow for AC-001:
-  1) ...
-  2) ...
-  3) ...
-- Flow for AC-002:
-  1) ...
-  2) ...
-  3) ...
+- Flow for AC-001/002（`active set` で current ブランチ名を確定）:
+  1) 入力 target を解決（GitHub issue number か node id）
+  2) GitHub 紐づきなら checkout を伴う（dirty なら中断）
+  3) 対象 node の `id/slug` から desired branch 候補（`id-slug` → `id`）を決定
+  4) desired branch が既存なら warning を出し checkout 継続（内容は検証しない）
+  5) desired branch が既存でないなら checkout 後にブランチ名を desired へ寄せる（`git check-ref-format --branch` に従う）
+  6) active manifest / pointers を更新し、sync を実行する
+- Flow for AC-003〜006/007（`new/import` の title/slug バリデーション）:
+  1) `--title` を trim → 正規表現で検証（失敗なら副作用なしで中断）
+  2) `--slug` を（指定があれば trim→検証、なければ title から合成→検証）
+  3) 以降の副作用（`gh issue create/view`、FS 生成）を実行する
 
-### UML（任意） (任意)
+### UML（シーケンス: active set） (任意)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+skinparam monochrome true
+
+actor User
+participant "spec-dock (runtime)" as Script
+participant "git" as Git
+participant "gh" as GH
+database "spec tree" as FS
+
+User -> Script: active set <target>
+activate Script
+
+Script -> Script: parse target\n(github_issue | node_id)
+
+alt target is GitHub issue number
+  Script -> Git: status --porcelain\n(require clean)
+  alt dirty
+    Script --> User: error + hint\n(no checkout)
+    deactivate Script
+    return
+  end
+  Script -> GH: issue checkout <n>\n(fallback: issue develop --checkout)
+  Script -> FS: scan nodes
+  Script -> Script: node = find by github.issue_number
+else target is node id
+  Script -> FS: scan nodes
+  Script -> Script: node = resolve by id
+  alt GH-linked node
+    Script -> Git: status --porcelain\n(require clean)
+    alt dirty
+      Script --> User: error + hint
+      deactivate Script
+      return
+    end
+    Script -> GH: issue checkout <n>
+    Script -> FS: scan nodes (after checkout)
+    Script -> Script: node = re-resolve by github.issue_number
+  end
+end
+
+Script -> Script: desired = choose([id-slug, id])\n(ASCII + check-ref-format)\n+ warnings
+alt fallback happened
+  Script --> User: warn (stderr)\n(reason)
+end
+
+Script -> Git: desired branch exists?
+alt exists
+  Script --> User: warn (stderr)\n(reuse; content is not verified)
+  Script -> Git: checkout <desired>
+else missing
+  Script -> Git: rename/switch current -> <desired>
+end
+
+Script -> Script: write active.json
+Script -> Script: apply active pointers
+Script -> Script: sync (--no-update-active)
+Script --> User: ok (active set)
+deactivate Script
+@enduml
+```
+
+### UML（アクティビティ: desired branch の決定） (任意)
+```plantuml
+@startuml
+skinparam monochrome true
+
+start
+:candidate = id + "-" + slug;
+
+if (candidate.isascii?) then (yes)
+else (no)
+  :warnings += "id-slug is non-ascii; fallback to id";
+  :desired = id;
+  stop
+endif
+
+if (git check-ref-format --branch candidate == ok?) then (yes)
+  :desired = candidate;
+  stop
+else (no)
+  :warnings += "id-slug is invalid ref; fallback to id";
+  :desired = id;
+  stop
+endif
+@enduml
+```
+
+### UML（アクティビティ: desired branch を成立させる） (任意)
+```plantuml
+@startuml
+skinparam monochrome true
+
+start
+:desired = <computed>;
+
+if (local branch "desired" exists?) then (yes)
+  :warn (stderr)\nbranch already exists;\nreusing existing branch;\ncontent is not verified;
+  :git checkout desired;
+  stop
+else (no)
+  :current = git rev-parse --abbrev-ref HEAD;
+  if (current is a branch?) then (yes)
+    if (current == desired?) then (yes)
+      stop
+    else (no)
+      :git branch -m desired;
+      stop
+    endif
+  else (no)
+    :git checkout -b desired;
+    stop
+  endif
+endif
 @enduml
 ```
 
 ## データ・バリデーション（必要最小限） (任意)
-- MODEL-001: <Entity/DTO/Table名>
-  - Fields: ...
-  - Constraints/Validation: ...
-- ...
+- 入力制約（requirement.md と一致させる）:
+  - Title:
+    - `title = title.strip()` を正規化として採用し、保存する title は trim 後に統一する。
+    - `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` に一致しない場合はエラー（副作用なし）。
+  - Slug:
+    - `slug = slug.strip()` を正規化として採用。
+    - `^[a-z0-9]+(?:-[a-z0-9]+)*$`（kebab-case）に一致しない場合はエラー（副作用なし）。
+    - `--slug` 省略時は `lower(title)` を取り、半角スペース ` ` を `-` に置換して slug を合成する。
+- バリデーションエラーのメッセージ方針:
+  - どの引数が不正か（`--title` / `--slug`）
+  - 期待する正規表現
+  - OK/NG 例（コーディングエージェントが即修正できる粒度）
+- ブランチ候補の検証:
+  - ASCII 判定は `str.isascii()` 相当で固定する。
+  - git ブランチ名の妥当性は `git check-ref-format --branch <candidate>` の成功で判定する。
 
-### UML（任意） (任意)
+### UML（シーケンス: new/import の副作用前バリデーション） (任意)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+skinparam monochrome true
+
+actor User
+participant "spec-dock (runtime)" as Script
+participant "gh" as GH
+database "FS" as FS
+
+User -> Script: new/import ... --title <title> [--slug <slug>]
+activate Script
+
+Script -> Script: normalize title/slug\n+ validate by regex\n+ derive slug when omitted
+alt validation failed
+  Script --> User: error (exit != 0)\n(include regex + OK/NG examples)\n(no GH, no FS)
+  deactivate Script
+  return
+end
+
+alt new (GitHub mode)
+  Script -> GH: gh issue create\n(after validation)
+end
+
+alt import
+  Script -> GH: gh issue view\n(after validation)
+end
+
+Script -> FS: write templates/meta.json
+Script --> User: ok
+deactivate Script
+@enduml
+```
+
+### UML（アクティビティ: title→slug 合成とバリデーション） (任意)
+```plantuml
+@startuml
+skinparam monochrome true
+
+start
+:title_raw = --title;
+:title = trim(title_raw);
+
+if (title matches title_regex?) then (yes)
+else (no)
+  :error (--title)\ninclude regex + OK/NG examples;
+  stop
+endif
+
+if (--slug is provided?) then (yes)
+  :slug = trim(--slug);
+else (no)
+  :slug = lower(title);
+  :slug = replace(slug, \" \", \"-\");
+endif
+
+if (slug matches slug_regex?) then (yes)
+  :return (title, slug);
+  stop
+else (no)
+  :error (--slug)\ninclude regex + OK/NG examples;
+  stop
+endif
 @enduml
 ```
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
-- 論点: ...
-  - 選択肢A: ...（Pros/Cons）
-  - 選択肢B: ...（Pros/Cons）
-  - 決定: ...
-  - 理由: ...
+- 論点: slug 制約を強めると利便性が落ちる（日本語/記号の title を使えない）
+  - 決定: title/slug の正規表現を固定し、入力時点でエラーにする（ADR 参照）
+  - 理由: path/ブランチ名が運用事故を起こしやすいため、生成源で止めるのが最小コスト
 
 ## インターフェース契約（ここで固定） (任意)
-### API（ある場合）
-- API-001: `<METHOD> <PATH>`
-  - Request: ...
-  - Response: ...
-  - Errors: ...
+### CLI（外部IF）
+- `active set <target>`:
+  - target は GitHub issue number（`123` / `#123` / URL）または node id（`iss-00123` 等）
+  - GitHub 紐づきの場合 checkout を伴い、最終的な current ブランチ名を desired へ寄せる
+  - 既存ブランチ再利用やフォールバック時は stderr に warning を出す
+- `new {initiative,epic,issue}` / `import {initiative,epic,issue}`:
+  - `--title` / `--slug` の制約違反はエラー（副作用なし）
+  - `--slug` 省略時は title から deterministic に合成する
+  - `import` は `--title` 必須（GitHub title 取り込みなし）
 
 ### 関数・クラス境界（重要なものだけ）
-- IF-001: `<module>::<function/class signature>`
-  - Input: ...
-  - Output: ...
-  - Errors/Exceptions: ...
+- IF-001: `spec-dock::_resolve_title_and_slug(title: str, slug: str|None, *, context: str) -> tuple[str, str]`
+  - Input: raw title/optional raw slug
+  - Output: (normalized_title, normalized_slug)
+  - Errors: `RuntimeError`（エラーメッセージに regex と OK/NG 例を含む）
+- IF-002: `spec-dock::_desired_branch_name(node: _Node, *, repo_root: Path) -> BranchDecision`
+  - Input: node（id/slug）、repo_root（git check-ref-format のため）
+  - Output: `BranchDecision`（desired + candidates + warnings）
+- IF-003: `spec-dock::_ensure_desired_branch(repo_root: Path, *, decision: BranchDecision) -> None`
+  - Input: desired ブランチ名（decision.desired）+ warnings（decision.warnings）
+  - Behavior:
+    - desired が既存なら checkout して warning（content is not verified）
+    - 既存でなければ現在ブランチを desired に寄せる（必要に応じて rename）
+  - Errors: git 実行失敗は `RuntimeError`
 
-### UML（任意） (任意)
+### UML（クラス図: 主要データ/責務） (必須)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+skinparam monochrome true
+hide circle
+skinparam classAttributeIconSize 0
+
+package "spec-dock runtime script\\n(spec-dock/scripts/spec-dock)" {
+  class _Node {
+    +type: str
+    +id: str
+    +title: str
+    +slug: str
+    +path: Path
+    +parent_id: str?
+    +initiative_id: str?
+    +epic_id: str?
+    +github_issue_number: int?
+  }
+
+  class BranchDecision {
+    +desired: str
+    +warnings: List<String>
+    +candidates: List<String>
+  }
+
+  class Validator <<utility>> {
+    +_resolve_title_and_slug(title: str, slug: str?, context: str): (str, str)
+    +_validate_title(title: str, context: str): str
+    +_validate_slug(slug: str, context: str): str
+  }
+
+  class BranchNaming <<utility>> {
+    +_desired_branch_name(node: _Node, repo_root: Path): BranchDecision
+    +_ensure_desired_branch(repo_root: Path, decision: BranchDecision): void
+    +_git_check_ref_format(repo_root: Path, name: str): bool
+    +_git_branch_exists(repo_root: Path, name: str): bool
+    +_git_checkout(repo_root: Path, name: str): void
+    +_git_rename_current_branch(repo_root: Path, name: str): void
+  }
+
+  class Commands {
+    +_active_set(specdock_dir: Path, target: str): void
+    +_new_initiative(...): void
+    +_new_epic(...): void
+    +_new_issue(...): void
+    +_import_initiative(...): void
+    +_import_epic(...): void
+    +_import_issue(...): void
+  }
+}
+
+Commands ..> Validator : validates\\n(title/slug)
+Commands ..> BranchNaming : ensures branch\\n(decision)
+BranchNaming ..> _Node : reads id/slug
+BranchNaming --> BranchDecision
 @enduml
 ```
 
-### クラス/インターフェース詳細設計（主要なもの） (任意)
-> この Issue を “単独の作業単位” として完結させるために、必要な範囲だけ詳細化する。
-
-- Class: `<ClassName>`
-  - Responsibility（責務）:
-    - ...
-  - Public methods（公開メソッド）:
-    - `method(arg: Type) -> Return`
-  - Invariants（不変条件）:
-    - ...
-  - Collaboration（協調関係）:
-    - `<OtherClass>`（理由: ...）
-- Interface / Protocol: `<InterfaceName>`
-  - Contract（契約）:
-    - ...
-  - 実装候補:
-    - `<ImplClass>`
-
-#### UML（任意） (任意)
+### UML（コンポーネント図: 外部IF） (必須)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+skinparam monochrome true
+left to right direction
+
+actor User
+
+component "spec-dock\\nruntime script" as Script
+component "git CLI" as Git
+component "gh CLI" as GH
+database "spec tree\\n(spec-dock/initiatives/**)" as Spec
+database "active manifest\\n(spec-dock/.agent/active.json)" as Active
+database "derived state\\n(spec-dock/.agent/{index,tree}.json)" as Derived
+
+User --> Script : CLI args\\nstdout/stderr
+Script --> Git : subprocess
+Script --> GH : subprocess
+Script --> Spec : read/write\\n(meta.json + templates)
+Script --> Active : read/write
+Script --> Derived : write (sync)
+@enduml
+```
+
+### UML（シーケンス: active_set と branch helpers） (任意)
+```plantuml
+@startuml
+skinparam monochrome true
+
+participant "active_set()" as Active
+participant "branch helpers" as Branch
+
+Active -> Branch: decision = desired_branch_name(node)\n(desired + candidates + warnings)
+Active -> Branch: ensure_desired_branch(decision)
+Branch --> Active: current branch == decision.desired
 @enduml
 ```
 
 ### 例外/エラー契約（重要なものだけ） (任意)
-- ERR-001: <エラー名/コード>
-  - 発生条件:
-    - ...
-  - 呼び出し元への返し方（例: 例外/戻り値/HTTP）:
-    - ...
-  - ログ/監視:
-    - ...
+- ERR-001: Invalid title
+  - 発生条件: `--title` が `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` に一致しない
+  - 返し方: `RuntimeError`（exit != 0）、副作用なし
+- ERR-002: Invalid slug
+  - 発生条件: `--slug` が `^[a-z0-9]+(?:-[a-z0-9]+)*$` に一致しない
+  - 返し方: `RuntimeError`（exit != 0）、副作用なし
+- WARN-001: Branch fallback
+  - 発生条件: `id-slug` が non-ascii または invalid ref で `<id>` にフォールバック
+  - 出力: stderr に warning（理由・候補を含む）
+- WARN-002: Branch reuse
+  - 発生条件: desired branch が既存のため再利用
+  - 出力: stderr に warning（content is not verified を含む）
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
-  - `<path/to/new_file>`: <役割 / 責務>
+  - （なし）: 依存追加なし・スクリプト内で完結させる
 - 変更（Modify）:
-  - `<path/to/existing_file>`: <何をどう変えるか>
+  - `src/spec_dock/assets/spec_dock/scripts/spec-dock`:
+    - title/slug の正規表現バリデーションを追加（initiative/epic/issue の new/import）
+    - `new/import` の副作用前にバリデーションが必ず走るよう順序を変更
+    - `active set` の checkout 後に desired branch name へ寄せる処理（git helper + warning）
+  - `src/spec_dock/assets/spec_dock/docs/reference_github.md`（必要なら）:
+    - `active set` がブランチ名を id/slug に寄せること、warning の意味を追記
+  - `tests/test_cli.py`:
+    - `active set` の gh スタブと期待ブランチ名の更新
+    - `new/import` の title/slug バリデーション（副作用なし）テスト追加
 - 削除（Delete）:
-  - `<path/to/obsolete_file>`: <なぜ削除するか>
+  - （なし）
 - 移動/リネーム（Move/Rename）:
-  - `<from>` → `<to>`: <目的>
+  - （なし）
 - 参照（Read only / context）:
-  - `<path/to/reference_file>`: <読む理由>
+  - `tmp/issue-5/requirement.md`: 仕様の SSOT
+  - `tmp/issue-5/adrs/adr-00001-title-slug-kebab-case.md`: 制約の意思決定
 
 ## マッピング（要件 → 設計） (必須)
-- AC-001 → API-001, IF-001, `<path/...>`
-- EC-001 → `<path/...>`（エラー処理の場所）
-- 非交渉制約 → どの設計で満たすか（例: キャッシュ、冪等、監査ログなど）
+- AC-001/002 → `src/spec_dock/assets/spec_dock/scripts/spec-dock::_active_set` + branch helpers（`git check-ref-format`）
+- AC-003/004 → `src/spec_dock/assets/spec_dock/scripts/spec-dock::_new_*` / `_import_*` の副作用前バリデーション
+- AC-007 → title→slug 合成ロジック（`_resolve_title_and_slug`）
+- EC-001/001b → `_desired_branch_name`（ascii/ref 判定）+ warning（stderr）
+- EC-005 → `_ensure_desired_branch`（branch exists 判定）+ warning（stderr）
+- 非交渉制約（stdlib only / CLI互換 / 副作用なし） → helper 関数を runtime script 内に閉じ、呼び出し順序で担保
 
 ## テスト戦略（最低限ここまで具体化） (任意)
-- 追加/更新するテスト:
-  - Unit: ...
-  - Integration: ...
-  - Frontend: ...
+- 追加/更新するテスト（`tests/test_cli.py`）:
+  - `active set`:
+    - GH checkout スタブが作るブランチ名（例: `gh-issue-123`）から、最終的に `iss-00123-<slug>` へ寄ること
+    - desired branch が既に存在する場合に warning を出して再利用すること
+    - `id-slug` が non-ascii / invalid ref の場合に `<id>` へフォールバックし warning を出すこと
+  - `new/import`:
+    - `--title` が不正な場合、`gh` が呼ばれず、FS 生成もないこと
+    - `import` は title/slug 検証が `gh issue view` より前に行われること（`gh` 呼び出しログで検証）
+    - `--slug` 省略時の合成が deterministic（`Add Refresh Token` → `add-refresh-token`）であること
 - どのAC/ECをどのテストで保証するか:
-  - AC-001 → `<test_file_path>::<test_name>`
-  - EC-001 → ...
-
-### テストマトリクス（AC/EC → テスト） (任意)
-- AC-001:
-  - Unit: ...
-  - Integration: ...
-  - E2E: ...
-- EC-001:
-  - Unit: ...
-  - Integration: ...
-  - E2E: ...
-- 非交渉制約（requirement.md）をどう検証するか:
-  - 制約: ...
-    - 検証方法（テスト/計測点/ログ/運用確認など）: ...
-- 実行コマンド（該当するものを記載）:
-  - ...
+  - AC-001/002 → `tests/test_cli.py::test_active_set_github_issue_checkout_sets_active`（ブランチ名の期待を更新）
+  - AC-003〜006 → 新規テスト追加（`_make_gh_issue_view_stub` の log を使い「呼ばれない/呼ばれる」を検証）
+  - EC-001/001b/005 → `stderr` の warning 文言に特定フレーズが含まれることを検証
+- 実行コマンド:
+  - `python -m unittest -q`
 - 変更後の運用（必要なら）:
-  - 移行手順: ...
-  - ロールバック: ...
-  - Feature flag: ...
+  - 移行手順: 既存運用で日本語 title を使っている場合は、英字/数字/スペースのみの title に変更する（または `--slug` を kebab-case で明示指定）
+  - ロールバック: title/slug 制約を緩める場合は ADR の Option A 相当に戻す（ただし運用事故リスクが戻る）
 
 ## リスク/懸念（Risks） (任意)
-- R-001: <リスク>（影響: ... / 対応: ...）
-- R-002: ...
+- R-001: 既存ユーザーが日本語 `--title`（または kebab-case 以外の `--slug`）を使っていた場合に破壊的（`new/import` が失敗）
+  - 対応: エラーメッセージに OK/NG 例と正規表現を出し、修正可能にする。リリースノートで告知。
+- R-002: `gh` バージョン差異（`issue develop --name` の有無等）で checkout 最適化が効かない可能性
+  - 対応: `gh issue checkout` + git rename のフォールバックを持つ（最終ブランチ名の要件を満たす）
 
 ## 未確定事項（TBD） (必須)
-- Q-001:
-  - 質問: TBD ...
-  - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）: ...
-  - 影響範囲: AC-___ / API-___ / IF-___ / `<path/...>` / テスト / ...
-- Q-002:
-  - 質問: TBD ...
-  - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）: ...
-  - 影響範囲: ...
+- 該当なし（要件/意思決定は確定）
 
 ---
 
 ## ディレクトリ/ファイル構成図（変更点の見取り図） (任意)
 ```text
 <repo-root>/
-├── <bounded-context-or-module>/
-│   └── <subdir>/
-│       ├── <path/to/new_file>        # Add
-│       ├── <path/to/existing_file>   # Modify
-│       ├── <path/to/obsolete_file>   # Delete
-│       ├── <from>                    # Move/Rename (from)
-│       └── <to>                      # Move/Rename (to)
+├── src/spec_dock/assets/spec_dock/scripts/spec-dock         # Modify
+├── src/spec_dock/assets/spec_dock/docs/reference_github.md  # Modify (optional)
+└── tests/test_cli.py                                        # Modify
 ```
 
 ## 省略/例外メモ (必須)
