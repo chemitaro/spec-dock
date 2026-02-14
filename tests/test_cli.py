@@ -1184,6 +1184,41 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"], env=test_env)
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"], env=test_env)
 
+    def test_new_rejects_invalid_title_before_gh_issue_create(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                f'echo "$@" >> "{log_path.as_posix()}"\n'
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "https://github.com/example/repo/issues/999"\n'
+                "  exit 0\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            p = self._run_runtime_capture(target, ["new", "initiative", "--title", "日本語"], env=test_env)
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("--title", p.stderr)
+            self.assertIn("expected regex", p.stderr)
+
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+            self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
+
     def test_new_nodes_default_to_github_issue_creation(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1663,7 +1698,7 @@ class TestCli(unittest.TestCase):
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("already linked", p.stderr)
 
-    def test_import_rejects_invalid_slug_and_empty_slugify(self) -> None:
+    def test_import_rejects_invalid_slug_and_invalid_title(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1692,9 +1727,40 @@ class TestCli(unittest.TestCase):
                 env=test_env,
             )
             self.assertNotEqual(p2.returncode, 0, p2.stdout + p2.stderr)
-            self.assertIn("--slug", p2.stderr)
+            self.assertIn("--title", p2.stderr)
+            self.assertIn("expected regex", p2.stderr)
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00124-*"))
+            self.assertEqual(imported, [])
+
+    def test_import_rejects_invalid_title_before_gh_issue_view(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "123", "--title", "日本語", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("--title", p.stderr)
+            self.assertIn("expected regex", p.stderr)
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+
+            imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
             self.assertEqual(imported, [])
 
     def test_import_fails_when_sync_preflight_fails(self) -> None:
