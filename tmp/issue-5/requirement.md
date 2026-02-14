@@ -14,6 +14,7 @@ ID: "issue-5"
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
 - `active set` による GitHub Issue checkout 時、`active set` の結果として checkout されているブランチ名（current）が **ASCII** かつ **`git check-ref-format --branch` を満たす**決定的な形式（原則 `id-slug`、不適合時は `id`）になる（＝非ASCIIにならない）。
 - `new/import {initiative,epic,issue}` の `--title` / `--slug` を、`--title` は「半角スペース区切りの英数字トークン列（trim、連続スペース不可）」、`--slug` は kebab-case のみに制約し、日本語タイトル等による path/ブランチ名の崩れを **作成時点で防止**できる。
+- `github.issue_number` を持つ node（initiative/epic/issue）は **ツリー全体で一意**となり、`active set <github_issue_number|url>` が曖昧にならない（＝ spec-dock が “運用不能な状態” を作れない / 早期に検知できる）。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -26,10 +27,12 @@ ID: "issue-5"
 - 現状の課題（困っていること）:
   - 日本語ブランチ名は、環境/ツール（シェル、CI、周辺スクリプト、正規表現前提、運用ルール）により取り回しが悪く、チーム運用上の事故原因になり得る。
   - spec-dock 自身もブランチ名から node を推測する“ベストエフォート”実装を持っており、ブランチに `iss-00123` のような **id が含まれる**のが望ましい（運用上の一貫性）。`src/spec_dock/assets/spec_dock/scripts/spec-dock:48`（コメント）/ `:1693`（`_infer_active_node_from_branch`）
+  - `active set <github_issue_number|url>` は `github.issue_number` で node を一意特定する設計のため、`github.issue_number` が重複すると `active set` が `Ambiguous github.issue_number=...` で失敗し、運用不能な状態を作れてしまう（手動テストで発見）。
 - 再現手順（最小で）:
   1) GitHub 側で日本語タイトルの Issue を作成する
   2) ローカルで working tree を clean にした上で `./spec-dock/scripts/spec-dock active set <issue_number>` を実行する
   3) `git rev-parse --abbrev-ref HEAD` でブランチ名を確認する（日本語が含まれる可能性がある）
+  4) （手動テストで判明）`new ... --github-issue N` により `github.issue_number=N` を複数ノードへ重複リンクできると、`active set N` が曖昧エラーで失敗する
 - 観測点（どこを見て確認するか）:
   - Git: `git rev-parse --abbrev-ref HEAD`（最終ブランチ名）
   - Git: `git status --porcelain`（dirty で checkout が拒否されること）
@@ -88,6 +91,8 @@ Script -> Script: update active.json + pointers
   - `new {initiative,epic,issue}` は `--slug`（明示指定/自動生成の結果）を kebab-case に制限し、違反した場合は **エラーで中断**する（副作用なし）
   - `import {initiative,epic,issue}` は `--title` を「slug に変換できる形式」に制限し、違反した場合は **エラーで中断**する（副作用なし）
   - `import {initiative,epic,issue}` は `--slug`（明示指定/自動生成の結果）を kebab-case に制限し、違反した場合は **エラーで中断**する（副作用なし）
+  - `new {initiative,epic,issue} --github-issue <n>` は、`github.issue_number=<n>` が既に他の node（initiative/epic/issue）でリンク済みの場合、**エラーで中断**する（副作用なし）
+  - `validate` は `github.issue_number` の重複を検知し、**エラーで中断**する（= 破損/不整合データを早期に検知できる）
 - MUST NOT（絶対にやらない／追加しない）:
   - リモートブランチのリネーム/削除/強制更新（force push）を行わない
   - GitHub Issue 本体（title/body/labels 等）の自動変更を追加しない（本件の目的外）
@@ -100,6 +105,7 @@ Script -> Script: update active.json + pointers
 - Always（常に守る）:
   - checkout 前に dirty working tree を検出して安全に中断する（既存の安全装置を維持）
   - `active set` の結果ブランチ名は ASCII である（かつ `git check-ref-format --branch` を満たす）
+  - `github.issue_number` は initiative/epic/issue をまたいで一意である（重複がある場合、`new` は拒否し、`validate` は失敗する）
 - Ask（迷ったら相談）:
   - 該当なし（運用要件は確定）
 - Never（絶対にしない）:
@@ -141,6 +147,7 @@ Script -> Script: update active.json + pointers
 ## リスク/懸念（Risks） (任意)
 - R-001: 既存ユーザーが日本語 `--title`（または kebab-case 以外の `--slug`）を使っていた場合に破壊的変更になる（影響: `new/import` が失敗する / 対応: リリースノート明記、代替（英語タイトル/slug）提示）
 - R-002: `id-slug` が git ブランチ名として不正なケース（例: `..` を含む等）により checkout/rename が失敗する（影響: `active set` が失敗 / 対応: git 妥当性チェック + `id` へのフォールバック）
+- R-003: 既存リポジトリが（過去バグや手編集で）`github.issue_number` を重複リンクしている場合、`validate` が失敗するようになる（影響: `validate` / `sync` が失敗し得る / 対応: エラーメッセージに重複内容（該当 node 一覧）を含め、修正可能にする）
 
 ## 受け入れ条件（観測可能な振る舞い） (必須)
 - AC-001:
@@ -204,6 +211,19 @@ Script -> Script: update active.json + pointers
   - Then: 作成された node の `meta.json` の `slug` は `add-refresh-token` になっている（title→slug 合成規則どおり）
   - 観測点:
     - FS: `spec-dock/initiatives/init-local-00001-add-refresh-token/meta.json`
+- AC-008:
+  - Actor/Role: spec-dock 利用者
+  - Given: `github.issue_number=1` を持つ node（initiative/epic/issue）が既に存在する
+  - When: `./spec-dock/scripts/spec-dock new {initiative,epic,issue} --title "<正しいtitle>" --github-issue 1` を実行する（重複リンクしようとする）
+  - Then: コマンドは失敗し、明確なエラーメッセージを出して中断する（FS/GitHub の副作用なし）
+  - 観測点:
+    - CLI: exit code != 0、stderr に `github.issue_number=1 is already linked` を含む（文言は実装で確定）
+    - FS: 新しい node ディレクトリが増えていない
+- AC-009:
+  - Actor/Role: spec-dock 利用者
+  - Given: 仕様ツリーに `github.issue_number=1` を持つ node が複数存在する（破損/不整合データ）
+  - When: `./spec-dock/scripts/spec-dock validate` を実行する
+  - Then: validate は失敗し、重複している `github.issue_number` と該当 node 一覧が分かるエラーを出す
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -254,10 +274,17 @@ Script -> Script: update active.json + pointers
     - spec-dock は既存ブランチの削除/上書き/強制更新を行わない
     - stderr に warning を出力する（例: `spec-dock: (warn) branch already exists; reusing existing branch; content is not verified`）
   - 観測点: `git rev-parse --abbrev-ref HEAD` が desired branch になっている
+- EC-006:
+  - 条件: `github.issue_number=<n>` が複数 node に重複している
+  - 期待:
+    - `active set <n|url>` は `Ambiguous github.issue_number=<n>` で失敗し得る（既存挙動）
+    - `validate` は重複を検知して失敗する（AC-009）
+  - 観測点: exit code / stderr
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: node = `meta.json` を持つ initiative/epic/issue（spec-dock の管理単位）
 - TERM-002: GitHub 紐づきノード = `meta.json` に `github.issue_number` を持つ node
+- TERM-010: github.issue_number の一意性 = initiative/epic/issue をまたいで、同じ issue_number を持つ node が 1つに定まること
 - TERM-003: id = `iss-00123` のような node 識別子（type prefix + 数値、基本 ASCII）
 - TERM-004: slug = タイトル等から生成された path セグメント（`id-slug` ディレクトリ名にも使う）
 - TERM-005: desired branch name = `active set` 後に最終的に残すブランチ名（本件の命名規則に従う）
