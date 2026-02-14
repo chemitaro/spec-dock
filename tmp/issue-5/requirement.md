@@ -15,6 +15,7 @@ ID: "issue-5"
 - `active set` による GitHub Issue checkout 時、`active set` の結果として checkout されているブランチ名（current）が **ASCII** かつ **`git check-ref-format --branch` を満たす**決定的な形式（原則 `id-slug`、不適合時は `id`）になる（＝非ASCIIにならない）。
 - `new/import {initiative,epic,issue}` の `--title` / `--slug` を、`--title` は「半角スペース区切りの英数字トークン列（trim、連続スペース不可）」、`--slug` は kebab-case のみに制約し、日本語タイトル等による path/ブランチ名の崩れを **作成時点で防止**できる。
 - `github.issue_number` を持つ node（initiative/epic/issue）は **ツリー全体で一意**となり、`active set <github_issue_number|url>` が曖昧にならない（＝ spec-dock が “運用不能な状態” を作れない / 早期に検知できる）。
+- `import {initiative,epic,issue}` は **既存ツリーが不整合（validate失敗）な場合**、新規ディレクトリ/`meta.json` を作らずに中断できる（部分的な副作用が残らない）。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -115,7 +116,7 @@ Script -> Script: update active.json + pointers
 ## 非交渉制約（守るべき制約） (必須)
 - runtime script は stdlib のみ（依存追加なし）
 - CLI の既存インターフェース（コマンド/引数）は変更しない（`active set <target>` / `new ... --title ...` を維持）
-- エラー時は可能な限り「副作用なし」（少なくとも `new/import` の title/slug バリデーション失敗時は FS/GitHub への書き込み無し）
+- エラー時は可能な限り「副作用なし」（少なくとも `new/import` の title/slug バリデーション失敗時、および `import` の preflight validate 失敗時は FS/GitHub への書き込み無し）
 - `import` は GitHub title を取り込まない（`--title` は必須のまま維持し、本 Issue の `--title` 制約を適用する）
 - 入力制約の定義を固定する（実装ブレ防止）:
   - `--title`（title）: **英字/数字/スペースのみ**（= slug に変換できるものだけ）
@@ -135,7 +136,8 @@ Script -> Script: update active.json + pointers
   - `github.issue_number` の重複検知（`new --github-issue` / `validate`）のエラーメッセージは、運用で復旧できるように情報を含める:
     - `github.issue_number=<n>`（どの番号が重複か）
     - 競合している node 一覧（`type:id`）
-    - 競合している `meta.json` のパス（どこを直すべきか）
+    - 競合している `meta.json` のパス（どこを直すべきか、**repo ルート相対パス**で表示）
+    - 復旧ガイドは **コマンド非依存**（`--github-issue` 等の特定フラグ名を前提としない）とし、例: 「一覧のどれかの `github.issue_number` を修正する」/「別の GitHub issue 番号（target）を指定する」を含める
   - warning 出力（運用/テストの安定トークン）:
     - 本 Issue で追加/変更する warning は stderr に `spec-dock: (warn)` プレフィクスで出力する（runtime script 既存の出力慣習に合わせる）
 
@@ -152,6 +154,7 @@ Script -> Script: update active.json + pointers
 - R-001: 既存ユーザーが日本語 `--title`（または kebab-case 以外の `--slug`）を使っていた場合に破壊的変更になる（影響: `new/import` が失敗する / 対応: リリースノート明記、代替（英語タイトル/slug）提示）
 - R-002: `id-slug` が git ブランチ名として不正なケース（例: `..` を含む等）により checkout/rename が失敗する（影響: `active set` が失敗 / 対応: git 妥当性チェック + `id` へのフォールバック）
 - R-003: 既存リポジトリが（過去バグや手編集で）`github.issue_number` を重複リンクしている場合、`validate` が失敗するようになる（影響: `validate` / `sync` が失敗し得る / 対応: エラーメッセージに重複内容（該当 node 一覧）を含め、修正可能にする）
+- R-004: 既存リポジトリが不整合（validate失敗）な場合に `import` が失敗し得る（影響: import が進まず運用が止まる / 対応: `import` は副作用前に preflight validate で停止し、エラーメッセージで復旧手順（どの `meta.json` を直すべきか）を提示する）
 
 ## 受け入れ条件（観測可能な振る舞い） (必須)
 - AC-001:
@@ -228,6 +231,14 @@ Script -> Script: update active.json + pointers
   - Given: 仕様ツリーに `github.issue_number=1` を持つ node が複数存在する（破損/不整合データ）
   - When: `./spec-dock/scripts/spec-dock validate` を実行する
   - Then: validate は失敗し、重複している `github.issue_number` と該当 node 一覧が分かり、どの `meta.json` のどの値（`github.issue_number`）を直すべきかが分かるエラーを出す
+- AC-010:
+  - Actor/Role: spec-dock 利用者
+  - Given: 仕様ツリーが不整合で `validate` が失敗する（例: `github.issue_number` が重複している等）
+  - When: `./spec-dock/scripts/spec-dock import {initiative,epic,issue} <num|#num|url> --title "<正しいtitle>"` を実行する
+  - Then: `import` は **副作用（テンプレートコピー/`meta.json`生成）より前**に `preflight validate failed` 相当で失敗し、新しい node ディレクトリを作らない
+  - 観測点:
+    - CLI: exit code != 0、stderr に `preflight validate failed` を含む
+    - FS: `spec-dock/initiatives/**` に新しい node ディレクトリが増えていない
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -248,6 +259,9 @@ Script -> Script: update active.json + pointers
 - EX-006:
   - Input（破損データ）: `github.issue_number=1` を持つ node が複数ある状態で `validate`
   - Output: error（exit != 0、`github.issue_number=1` と競合 node の `type:id` / `meta.json` パスを含む）
+- EX-007:
+  - Input（破損データ）: `validate` が失敗する状態で `import initiative 123 --title "Imported Initiative"`
+  - Output: error（exit != 0、`preflight validate failed` を含む。新しい `init-00123-*` ディレクトリは作られない）
 
 ## 例外・エッジケース（仕様として固定） (必須)
 - EC-001:

@@ -13,7 +13,7 @@ ID: "issue-5"
 # issue-5 active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009
+- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010
 - 対象EC: EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005, EC-006
 - 対象制約:
   - runtime script は stdlib のみ（依存追加なし）
@@ -29,6 +29,8 @@ ID: "issue-5"
 - [ ] S05: `active set` のフォールバック（non-ascii / invalid ref）で `<id>` を採用し warning を出す
 - [ ] S06: `new --github-issue` が `github.issue_number` の重複リンクを副作用なしで拒否する（initiative/epic/issue をまたぐ）
 - [ ] S07: `validate` が `github.issue_number` の重複リンクを検知して失敗する（= 早期検知）
+- [ ] S08: `import` が preflight validate 失敗時に副作用なしで中断する（部分的生成物を残さない）
+- [ ] S09: 重複リンク拒否/検知の復旧ガイド文言をコマンド非依存にする（new/import で誤誘導しない）
 
 ### UML（任意） (任意)
 ```plantuml
@@ -43,6 +45,8 @@ start
 :S05 (fallback to id\nwarn);
 :S06 (reject duplicate github.issue_number\nfor new --github-issue);
 :S07 (validate rejects duplicate github.issue_number);
+:S08 (import preflight validate\nno partial side effects);
+:S09 (duplicate-link remediation\ncommand-agnostic);
 stop
 @enduml
 ```
@@ -53,12 +57,13 @@ stop
 - AC-005/AC-006/AC-007 → S02
 - AC-008 → S06
 - AC-009 → S07
+- AC-010 → S08
 - EC-001/EC-001b → S05
 - EC-002 → S03（既存の dirty working tree 拒否を維持）
 - EC-003/EC-004 → S01, S02
 - EC-005 → S04
 - EC-006 → S07（validateで早期検知。active set 側の曖昧エラーは既存挙動）
-- 非交渉制約（stdlib only / CLI互換 / 副作用なし） → S01〜S05（各ステップでテスト/実装順序で担保）
+- 非交渉制約（stdlib only / CLI互換 / 副作用なし） → S01〜S05, S08, S09（各ステップでテスト/実装順序で担保）
 
 ---
 
@@ -285,6 +290,69 @@ stop
 
 #### Green（最小実装） (任意)
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock::_validate_nodes` に、`github.issue_number` の重複検知を追加する（initiative/epic/issue をまたぐ）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
+
+---
+
+### S08 — `import` が preflight validate 失敗時に副作用なしで中断する (必須)
+- 対象: AC-010
+- 設計参照:
+  - ERR-004: Import preflight validate failed（`tmp/issue-5/design.md`）
+- 狙い:
+  - 既存リポジトリが不整合（`validate` 失敗）な場合でも、`import` がテンプレート/`meta.json` を作った後に落ちて “中途半端な生成物” が残る状態を防ぐ。
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: 仕様ツリーが不整合で `validate` が失敗する（例: `github.issue_number=1` が複数 node に重複している）
+- When: `import initiative 123 --title "Imported Initiative"`（または epic/issue）を実行する
+- Then:
+  - exit code != 0 で失敗し、stderr に `preflight validate failed` を含む
+  - `spec-dock/initiatives/**` に新しい `init-00123-*`（または `epic-00123-*` / `iss-00123-*`）ディレクトリが増えていない
+
+#### Red（失敗するテストを先に書く） (任意)
+- `tests/test_cli.py` に “既存ツリーが壊れている状態で import を実行しても、生成物が残らない” テストを追加する
+
+#### Green（最小実装） (任意)
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock::_import_{initiative,epic,issue}` にて:
+  - 副作用（テンプレートコピー/`meta.json`生成）前に scan nodes → `_validate_nodes(...)` を実行し、失敗したら `RuntimeError` で中断する
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
+
+---
+
+### S09 — 重複リンク拒否/検知の復旧ガイド文言をコマンド非依存にする (必須)
+- 対象: 非交渉制約（復旧ガイドはコマンド非依存） / ERR-003
+- 設計参照:
+  - IF-004: `_ensure_github_issue_not_linked(...)`（`tmp/issue-5/design.md`）
+- 狙い:
+  - `import` で重複リンクに当たった際に「別の `--github-issue` を選ぶ」等の誤誘導が出ないようにし、復旧を速める。
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `github.issue_number=123` を持つ node が既に存在する
+- When: `import issue 123 --title "Import Attempt" --epic <...>`（例）を実行する
+- Then:
+  - exit code != 0 で失敗し、stderr に `github.issue_number=123` と競合 node の `type:id` / `meta.json` パスが分かる情報を含む
+  - 復旧ガイド文言が **コマンド非依存**（`--github-issue` 等の特定フラグ名を前提としない）である
+
+#### Red（失敗するテストを先に書く） (任意)
+- 既存の import 重複リンク拒否テストに「誤誘導がない」観測点を追加する（例: `--github-issue` を含まない、等）
+
+#### Green（最小実装） (任意)
+- `_ensure_github_issue_not_linked(...)` の例外文言を修正し、`new/import` 双方で意味が通る文言へ寄せる
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest -q` を実行し、成功した
