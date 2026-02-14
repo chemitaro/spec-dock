@@ -25,6 +25,9 @@ GitHub を使わない場合:
 ./spec new epic --no-github --initiative <initiative-id> --title "..."
 ```
 
+注意:
+- `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
+
 ### 1.2 import（既存 GitHub Issue を取り込む）
 
 ```bash

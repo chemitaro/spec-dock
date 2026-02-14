@@ -216,22 +216,11 @@ class TestCli(unittest.TestCase):
             self.assertTrue((docs_dir / "workflow_issue.md").is_file())
             self.assertTrue((docs_dir / "workflow_adr.md").is_file())
             self.assertTrue((docs_dir / "reference_github.md").is_file())
+            self.assertTrue((docs_dir / "reference_naming.md").is_file())
             self.assertTrue((docs_dir / "reference_sync.md").is_file())
 
-            # Legacy docs are preserved under docs/old/ for reference.
-            old_docs_dir = docs_dir / "old"
-            self.assertTrue(old_docs_dir.is_dir())
-            for legacy in (
-                "README.md",
-                "spec-dock-guide.md",
-                "spec-dock-guide-old.md",
-                "workflow-tree.md",
-                "workflow-issue.md",
-                "workflow-adr.md",
-                "github.md",
-                "sync.md",
-            ):
-                self.assertTrue((old_docs_dir / legacy).is_file(), f"legacy doc missing: {legacy}")
+            # v2 does not ship legacy docs/old/ (keep the published docs minimal).
+            self.assertFalse((docs_dir / "old").exists())
 
             # Runtime script exists; legacy close scripts must not be present.
             scripts_dir = target / "spec-dock" / "scripts"

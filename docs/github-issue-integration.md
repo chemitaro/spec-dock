@@ -23,6 +23,16 @@
 
 ## 1) どのコマンドを内部的に実行しているか
 
+### 1.0 入力バリデーション（`--title` / `--slug`）
+
+`new/import {initiative,epic,issue}` は、`gh` 実行の前に入力を検証します（副作用を避けるため）。
+
+- `--title`（必須）: ASCII（英数字 + 半角スペース 1 個区切り）
+- `--slug`（任意）: kebab-case（小文字英数字 + `-`）
+  - `--slug` 省略時は、`lower(title).replace(" ", "-")` で自動生成します
+
+詳細は、導入先リポジトリ側のドキュメント `spec-dock/docs/reference_naming.md` を参照してください。
+
 ### 1.1 Issue 作成（デフォルト動作）
 
 `./spec-dock/scripts/spec-dock new {initiative,epic,issue} ...` は、デフォルトで以下を実行します:
