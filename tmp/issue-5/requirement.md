@@ -237,7 +237,7 @@ Script -> Script: update active.json + pointers
   - When: `./spec-dock/scripts/spec-dock import {initiative,epic,issue} <num|#num|url> --title "<正しいtitle>"` を実行する
   - Then: `import` は **副作用（テンプレートコピー/`meta.json`生成）より前**に `preflight validate failed` 相当で失敗し、新しい node ディレクトリを作らない
   - 観測点:
-    - CLI: exit code != 0、stderr に `preflight validate failed` を含む
+    - CLI: exit code != 0、stderr に `preflight validate failed` を含み、かつ `Duplicate github.issue_number detected` 等の **validate 起因が分かる情報**を含む（文言は実装で確定）
     - FS: `spec-dock/initiatives/**` に新しい node ディレクトリが増えていない
 
 ### 入力→出力例 (任意)
