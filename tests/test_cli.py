@@ -487,6 +487,31 @@ class TestCli(unittest.TestCase):
                 ],
             )
 
+    def test_new_rejects_duplicate_github_issue_link_with_conflict_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--title", "Linked initiative", "--github-issue", "1"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--no-github", "--initiative", "init-local-00001", "--title", "JWT auth"],
+            )
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "issue", "--epic", "epic-local-00001", "--title", "Add refresh token", "--github-issue", "1"],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("github.issue_number=1", p.stderr)
+            self.assertIn("initiative:init-00001", p.stderr)
+            self.assertIn("spec-dock/initiatives/init-00001-linked-initiative/meta.json", p.stderr)
+            self.assertIn("--github-issue", p.stderr)
+
+            created = list((target / "spec-dock" / "initiatives").rglob("iss-00001-*"))
+            self.assertEqual(created, [])
+
     def test_new_rejects_unsafe_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -661,6 +686,55 @@ class TestCli(unittest.TestCase):
             self.assertNotEqual(p.returncode, 0)
             self.assertIn("Invalid meta.json", p.stderr)
             self.assertIn(str(issue_meta), p.stderr)
+
+    def test_validate_detects_duplicate_github_issue_numbers_with_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "meta.json"
+            )
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+
+            init_data = json.loads(init_meta.read_text(encoding="utf-8"))
+            init_data["github"] = {"issue_number": 1}
+            init_meta.write_text(json.dumps(init_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            issue_data["github"] = {"issue_number": 1}
+            issue_meta.write_text(json.dumps(issue_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Duplicate github.issue_number detected", p.stderr)
+            self.assertIn("github.issue_number=1", p.stderr)
+            self.assertIn("initiative:init-local-00001", p.stderr)
+            self.assertIn("issue:iss-local-00001", p.stderr)
+            self.assertIn("spec-dock/initiatives/init-local-00001-auth-platform/meta.json", p.stderr)
+            self.assertIn(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/meta.json",
+                p.stderr,
+            )
+            self.assertIn("Fix github.issue_number", p.stderr)
 
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
