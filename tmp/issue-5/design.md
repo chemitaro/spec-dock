@@ -118,6 +118,9 @@ alt exists
   end
   Script --> User: warn (stderr)\n(spec-dock: (warn) ... reusing existing branch)\n(content is not verified)
   Script -> Git: checkout <decision.desired>\n(skip gh)
+  Script -> FS: scan nodes (after checkout)
+  Script -> Script: node = re-resolve by target\n(by id or github.issue_number)
+  Script -> Script: decision = desired_branch_name(node)\n(recompute; optional)
 else missing
   alt node is GH-linked
     Script -> Git: status --porcelain\n(require clean)

@@ -127,7 +127,7 @@ Script -> Script: update active.json + pointers
     - 期待する形式（正規表現）
     - OK/NG 例
   - warning 出力（運用/テストの安定トークン）:
-    - warning は stderr に `spec-dock: (warn)` プレフィクスで出力する（runtime script 既存の出力慣習に合わせる）
+    - 本 Issue で追加/変更する warning は stderr に `spec-dock: (warn)` プレフィクスで出力する（runtime script 既存の出力慣習に合わせる）
 
 ## 前提（Assumptions） (必須)
 - GitHub 連携モードでは `git` と `gh` が利用可能で、`gh auth` 済みである
