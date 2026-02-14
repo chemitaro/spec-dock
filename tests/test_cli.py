@@ -938,6 +938,79 @@ class TestCli(unittest.TestCase):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "feature/local-keep-branch")
 
+    def test_active_set_reuses_existing_desired_branch_without_gh_checkout(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+            base_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            desired = "iss-00123-add-refresh-token"
+            self._run_git(target, ["checkout", "-b", desired])
+            self._run_git(target, ["checkout", base_branch])
+
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                counter = bin_dir / "counter.txt"
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    f"counter_file='{counter.as_posix()}'\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn("spec-dock: (warn)", p.stderr)
+                self.assertIn("reusing existing branch", p.stderr)
+                self.assertIn("content is not verified", p.stderr)
+
+                if counter.exists():
+                    self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
+
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(current, desired)
+
     def test_active_set_parses_hash_and_url_targets(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -994,9 +1067,10 @@ class TestCli(unittest.TestCase):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 # Both `#123` and issue URL should be accepted and behave the same.
+                # The second call can reuse the existing desired branch without gh checkout.
                 self._run_runtime(target, ["active", "set", "#123"], env=test_env)
                 self._run_runtime(target, ["active", "set", "https://github.com/example/repo/issues/123"], env=test_env)
-                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "2")
+                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
