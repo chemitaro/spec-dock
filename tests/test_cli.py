@@ -507,7 +507,8 @@ class TestCli(unittest.TestCase):
             self.assertIn("github.issue_number=1", p.stderr)
             self.assertIn("initiative:init-00001", p.stderr)
             self.assertIn("spec-dock/initiatives/init-00001-linked-initiative/meta.json", p.stderr)
-            self.assertIn("--github-issue", p.stderr)
+            self.assertIn("different GitHub issue number", p.stderr)
+            self.assertNotIn("--github-issue", p.stderr)
 
             created = list((target / "spec-dock" / "initiatives").rglob("iss-00001-*"))
             self.assertEqual(created, [])
@@ -2115,6 +2116,8 @@ class TestCli(unittest.TestCase):
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("already linked", p.stderr)
+            self.assertIn("different GitHub issue number", p.stderr)
+            self.assertNotIn("--github-issue", p.stderr)
 
     def test_import_rejects_invalid_slug_and_invalid_title(self) -> None:
         if os.name == "nt":
@@ -2208,7 +2211,8 @@ class TestCli(unittest.TestCase):
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            self._make_gh_issue_view_stub(bin_dir)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(
@@ -2218,6 +2222,12 @@ class TestCli(unittest.TestCase):
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("slug must be lowercase", p.stderr)
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+
+            imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
+            self.assertEqual(imported, [])
 
     def test_import_rejects_ambiguous_parent_id_shorthand_when_both_local_and_github_exist(self) -> None:
         if os.name == "nt":
