@@ -540,6 +540,59 @@ class TestCli(unittest.TestCase):
                 ],
             )
 
+    def test_new_derives_kebab_slug_from_title(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(
+                target,
+                ["new", "initiative", "--no-github", "--id", "init-local-00001", "--title", "Add Refresh Token"],
+            )
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-add-refresh-token"
+            self.assertTrue(init_dir.is_dir())
+            meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(meta["slug"], "add-refresh-token")
+
+    def test_new_rejects_invalid_slug_before_gh_issue_create(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                f'echo "$@" >> "{log_path.as_posix()}"\n'
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "https://github.com/example/repo/issues/999"\n'
+                "  exit 0\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            p = self._run_runtime_capture(
+                target,
+                ["new", "initiative", "--title", "Add Refresh Token", "--slug", "Bad!Slug"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("--slug", p.stderr)
+            self.assertIn("expected regex", p.stderr)
+
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+            self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
+
     def test_validate_detects_broken_parent_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1710,7 +1763,8 @@ class TestCli(unittest.TestCase):
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            self._make_gh_issue_view_stub(bin_dir)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p1 = self._run_runtime_capture(
@@ -1719,7 +1773,8 @@ class TestCli(unittest.TestCase):
                 env=test_env,
             )
             self.assertNotEqual(p1.returncode, 0, p1.stdout + p1.stderr)
-            self.assertIn("slug", p1.stderr)
+            self.assertIn("--slug", p1.stderr)
+            self.assertIn("expected regex", p1.stderr)
 
             p2 = self._run_runtime_capture(
                 target,
@@ -1729,6 +1784,8 @@ class TestCli(unittest.TestCase):
             self.assertNotEqual(p2.returncode, 0, p2.stdout + p2.stderr)
             self.assertIn("--title", p2.stderr)
             self.assertIn("expected regex", p2.stderr)
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
 
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00124-*"))
             self.assertEqual(imported, [])
