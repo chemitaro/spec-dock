@@ -1011,6 +1011,152 @@ class TestCli(unittest.TestCase):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, desired)
 
+    def test_active_set_fallbacks_to_id_when_id_slug_is_non_ascii(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / "meta.json"
+            )
+            data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            data["slug"] = "日本語"
+            issue_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "non-ascii slug"],
+            )
+
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn("spec-dock: (warn)", p.stderr)
+                self.assertIn("non-ascii", p.stderr)
+                self.assertIn("fallback to id", p.stderr)
+
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(current, "iss-00123")
+
+    def test_active_set_fallbacks_to_id_when_id_slug_is_invalid_ref(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / "meta.json"
+            )
+            data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            data["slug"] = "a..b"
+            issue_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "invalid-ref slug"],
+            )
+
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
+                    "  n=\"$3\"\n"
+                    "  branch=\"gh-issue-${n}\"\n"
+                    "  git checkout -b \"$branch\" >/dev/null 2>&1 || git checkout \"$branch\" >/dev/null 2>&1\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn("spec-dock: (warn)", p.stderr)
+                self.assertIn("invalid ref", p.stderr)
+                self.assertIn("fallback to id", p.stderr)
+
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(current, "iss-00123")
+
     def test_active_set_parses_hash_and_url_targets(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
