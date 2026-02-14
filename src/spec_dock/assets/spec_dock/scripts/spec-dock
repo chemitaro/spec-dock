@@ -573,6 +573,12 @@ def _new_initiative(
         # Default: require GitHub and derive id from the GitHub issue number.
         if node_id is not None:
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
         if github_issue_number is None:
             repo_root = specdock_dir.parent
             print(
@@ -641,6 +647,12 @@ def _new_epic(
     if not no_github:
         if node_id is not None:
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
         if github_issue_number is None:
             repo_root = specdock_dir.parent
             print(
@@ -725,6 +737,12 @@ def _new_issue(
         # Default: require GitHub and derive id from the GitHub issue number.
         if node_id is not None:
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
         if github_issue_number is None:
             repo_root = specdock_dir.parent
             print(
@@ -1354,6 +1372,35 @@ def _parse_github_issue_target(target: str) -> int:
     )
 
 
+def _meta_json_path_for_output(node: _Node, *, repo_root: Path | None = None) -> str:
+    """Return a stable meta.json path for diagnostics (repo-relative when possible)."""
+    meta_path = node.path / "meta.json"
+    if repo_root is not None:
+        try:
+            return meta_path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+    return meta_path.as_posix()
+
+
+def _linked_github_nodes(
+    nodes: dict[str, _Node], *, issue_number: int, repo_root: Path | None = None
+) -> list[_Node]:
+    """Collect nodes linked to `github.issue_number`, sorted for stable diagnostics."""
+    linked = [
+        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    return sorted(linked, key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)))
+
+
+def _format_linked_github_nodes(linked: list[_Node], *, repo_root: Path | None = None) -> str:
+    """Format linked nodes for error messages (`type:id (path)` CSV)."""
+    return ", ".join(
+        f"{n.type}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
+        for n in linked
+    )
+
+
 def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, Any]:
     """Validate issue visibility via `gh issue view` and return minimal payload."""
     _ensure_gh_available()
@@ -1378,15 +1425,46 @@ def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, A
     return data
 
 
-def _ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int) -> None:
-    """Reject imports when github.issue_number is already linked by any node type."""
-    linked = [
-        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
-    ]
+def _ensure_github_issue_not_linked(
+    nodes: dict[str, _Node],
+    *,
+    issue_number: int,
+    repo_root: Path | None = None,
+) -> None:
+    """Reject link operations when github.issue_number is already linked by any node type."""
+    linked = _linked_github_nodes(nodes, issue_number=issue_number, repo_root=repo_root)
     if not linked:
         return
-    found = ", ".join(sorted(f"{n.type}:{n.id}" for n in linked))
-    raise RuntimeError(f"github.issue_number={issue_number} is already linked: {found}")
+    found = _format_linked_github_nodes(linked, repo_root=repo_root)
+    raise RuntimeError(
+        f"github.issue_number={issue_number} is already linked: {found}. "
+        "Fix github.issue_number in one of the listed meta.json files, or choose another --github-issue."
+    )
+
+
+def _validate_github_issue_numbers_unique(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
+    """Ensure github.issue_number is unique across initiative/epic/issue nodes."""
+    by_issue_number: dict[int, list[_Node]] = {}
+    for node in nodes.values():
+        if node.type not in ("initiative", "epic", "issue"):
+            continue
+        if node.github_issue_number is None:
+            continue
+        by_issue_number.setdefault(int(node.github_issue_number), []).append(node)
+
+    for issue_number in sorted(by_issue_number.keys()):
+        linked = sorted(
+            by_issue_number[issue_number],
+            key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
+        )
+        if len(linked) <= 1:
+            continue
+        found = _format_linked_github_nodes(linked, repo_root=repo_root)
+        raise RuntimeError(
+            f"Duplicate github.issue_number detected: github.issue_number={issue_number} "
+            f"is linked by multiple nodes: {found}. "
+            "Fix github.issue_number in one of the listed meta.json files to restore uniqueness."
+        )
 
 
 def _resolve_active_node(nodes: dict[str, _Node], *, entry: Any, expected_type: str) -> _Node | None:
@@ -1460,7 +1538,7 @@ def _import_initiative(
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
     nodes = _scan_nodes(specdock_dir)
-    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
 
     node_id = _format_id("init", issue_number, local=False)
     prefix, is_local, num = _parse_id(node_id)
@@ -1499,7 +1577,7 @@ def _import_epic(
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
     nodes = _scan_nodes(specdock_dir)
-    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
 
     if initiative_id is None:
         resolved_initiative_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="epic")
@@ -1557,7 +1635,7 @@ def _import_issue(
     repo_root = specdock_dir.parent
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
     nodes = _scan_nodes(specdock_dir)
-    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
 
     if epic_id is None:
         resolved_epic_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="issue")
@@ -1969,7 +2047,7 @@ def _sync(
 
     preflight = "ok"
     try:
-        _validate_nodes(nodes)
+        _validate_nodes(nodes, repo_root=repo_root)
     except RuntimeError as e:
         if not force:
             raise RuntimeError(f"preflight validate failed: {e}") from e
@@ -2148,7 +2226,7 @@ def _sync(
     (legacy_work_dir / "tree.json").unlink(missing_ok=True)
 
 
-def _validate_nodes(nodes: dict[str, _Node]) -> None:
+def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
     """Validate basic structural integrity for a pre-scanned node map.
 
     This is used by:
@@ -2167,6 +2245,8 @@ def _validate_nodes(nodes: dict[str, _Node]) -> None:
             raise RuntimeError(
                 f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
             )
+
+    _validate_github_issue_numbers_unique(nodes, repo_root=repo_root)
 
     for node_id, node in nodes.items():
         _validate_lowercase(node_id, field="id")
@@ -2228,7 +2308,7 @@ def _validate(specdock_dir: Path) -> None:
     if not nodes:
         raise RuntimeError("No nodes found.")
 
-    _validate_nodes(nodes)
+    _validate_nodes(nodes, repo_root=specdock_dir.parent)
     print(f"spec-dock: ok (validate) nodes={len(nodes)}")
 
 
