@@ -239,6 +239,13 @@ Script -> Script: update active.json + pointers
   - 観測点:
     - CLI: exit code != 0、stderr に `preflight validate failed` を含み、かつ `Duplicate github.issue_number detected` 等の **validate 起因が分かる情報**を含む（文言は実装で確定）
     - FS: `spec-dock/initiatives/**` に新しい node ディレクトリが増えていない
+- AC-011:
+  - Actor/Role: 開発者（GitHub 連携運用）
+  - Given: `active set` が **既存ローカルブランチ再利用**（EC-005）に入る状況で、checkout 後に解決される node の `slug` が checkout 前と異なる（ブランチ間で `meta.json` がズレている）
+  - When: `./spec-dock/scripts/spec-dock active set <github_issue_number|node_id>` を実行する（対象が GitHub 紐づきの場合 checkout を伴う）
+  - Then: 最終的な current ブランチ名は **checkout 後に再解決した node** の `id/slug` に基づく命名規則（`<id>-<slug>` または `<id>`）になっている（再利用分岐でも命名正規化が保証される）
+  - 観測点:
+    - Git: `git rev-parse --abbrev-ref HEAD`
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -292,6 +299,7 @@ Script -> Script: update active.json + pointers
   - 条件: `active set` が選んだ desired branch（`<id>-<slug>` または `<id>`）が、既に同名のローカルブランチとして存在する
   - 期待:
     - spec-dock は **既存の同名ブランチを checkout して続行**する（内容の正当性までは保証しない）
+    - spec-dock は checkout 後に scan → target 再解決 → desired 再計算を行い、**最終的な current ブランチ名が再計算後の desired になるまで**ブランチ名を寄せる（AC-011）
     - spec-dock は既存ブランチの削除/上書き/強制更新を行わない
     - stderr に warning を出力する（例: `spec-dock: (warn) branch already exists; reusing existing branch; content is not verified`）
   - 観測点: `git rev-parse --abbrev-ref HEAD` が desired branch になっている
