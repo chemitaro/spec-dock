@@ -1,117 +1,233 @@
 ---
 種別: 実装計画書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "issue-5"
+タイトル: "active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名）"
+関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/5"]
+状態: "draft"
+作成者: "codex"
+最終更新: "2026-02-14"
 依存: ["requirement.md", "design.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: []
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装計画（TDD: Red → Green → Refactor）
+# issue-5 active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001, AC-002, ...
-- 対象EC: EC-001, ...
-- 対象制約（該当があれば）: ...
+- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
+- 対象EC: EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005
+- 対象制約:
+  - runtime script は stdlib のみ（依存追加なし）
+  - CLI の既存インターフェース（コマンド/引数）は変更しない
+  - `import` は GitHub title を取り込まない（`--title` 必須）
+  - 本 Issue で追加/変更する warning は stderr に `spec-dock: (warn)` プレフィクスで出力する
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: ...
-- [ ] Sxx: ... (任意: 必要に応じて追加)
+- [ ] S01: `new/import {initiative,epic,issue}` が不正な `--title` を副作用なしで拒否する
+- [ ] S02: `new/import {initiative,epic,issue}` が `--slug` を kebab-case に制約し、未指定時は title から deterministic に合成する
+- [ ] S03: `active set <github_issue>` 後の current ブランチが `<id>-<slug>`（不適合時 `<id>`）になり、必要に応じて warning を出す
+- [ ] S04: desired branch が既存の場合、既存ブランチを再利用し warning を出す（再利用分岐では `gh issue checkout/develop` を呼ばない。内容は検証しない）
+- [ ] S05: `active set` のフォールバック（non-ascii / invalid ref）で `<id>` を採用し warning を出す
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+skinparam monochrome true
+
+start
+:S01 (title validation\nno side effects);
+:S02 (slug validation/derive\nno side effects);
+:S03 (active set -> id-slug branch);
+:S04 (reuse existing desired\nskip gh + warn);
+:S05 (fallback to id\nwarn);
+stop
 @enduml
 ```
 
 ### 要件 ↔ ステップ対応表 (必須)
-- AC-001 → S01
-- AC-___ → Sxx (任意: 必要に応じて追加)
-- EC-___ → Sxx (任意: 必要に応じて追加)
-- （任意）非交渉制約 → Sxx（どのステップで担保/検証するか）
+- AC-001/AC-002 → S03, S04, S05
+- AC-003/AC-004 → S01
+- AC-005/AC-006/AC-007 → S02
+- EC-001/EC-001b → S05
+- EC-002 → S03（既存の dirty working tree 拒否を維持）
+- EC-003/EC-004 → S01, S02
+- EC-005 → S04
+- 非交渉制約（stdlib only / CLI互換 / 副作用なし） → S01〜S05（各ステップでテスト/実装順序で担保）
 
 ---
 
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
-### S01 — <観測可能な振る舞い> (必須)
-- 対象: AC-___ / EC-___
+### S01 — `new/import` が不正な `--title` を副作用なしで拒否する (必須)
+- 対象: AC-003, AC-004 / EC-003, EC-004
 - 設計参照:
-  - 対象IF/API: IF-___ / API-___
-  - 対象テスト: `<test_file_path>::<test_name>`
+  - IF-001: `_resolve_input_title_and_slug(...)`（`tmp/issue-5/design.md`）
+  - バリデーションは副作用（FS/GitHub）より前に実行する（順序変更）
 - このステップで「追加しないこと（スコープ固定）」:
-  - ...
+  - `import` で GitHub title を取り込む
+  - transliteration（日本語→ローマ字）による変換
 
 #### update_plan（着手時に登録） (必須)
-- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
-- 登録例:
-  - （調査）既存挙動/影響範囲の確認、設計参照の確認
-  - （Red）失敗するテストの追加/修正
-  - （Green）最小実装
-  - （Refactor）整理
-  - （品質ゲート）format/lint/test
-  - （報告）`./spec-dock/active/issue/report.md` 更新
-  - （コミット）このステップの区切りでコミット
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
 
 #### 期待する振る舞い（テストケース） (必須)
-- Given: ...
-- When: ...
-- Then: ...
-- 観測点（UI/HTTP/DB/Log など）: ...
-- 追加/更新するテスト: `<test_file_path>::<test_name>`
+- Given: `--title` が `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` を満たさない（例: `Add-Token` / `日本語` / `Add　Token`）
+- When: `new/import {initiative,epic,issue}` を実行する
+- Then: exit code != 0 で中断し、stderr に `--title` と正規表現と OK/NG 例を含む
+- 観測点: exit code / stderr / FS（生成物なし）/ GitHub（`gh` 未実行）
 
 #### Red（失敗するテストを先に書く） (任意)
-- 期待する失敗:
-  - ...
+- `tests/test_cli.py` に以下を追加（または既存の期待を更新）:
+  - `new` の invalid title で失敗し、ディレクトリが増えない
+  - `import` の invalid title で失敗し、`gh issue view` が呼ばれない（スタブ/ログで検証）
 
 #### Green（最小実装） (任意)
 - 変更予定ファイル:
-  - Add: `<path/...>`
-  - Modify: `<path/...>`
-- 追加する概念（このステップで導入する最小単位）:
-  - ...
-- 実装方針（最小で。余計な最適化は禁止）:
-  - ...
-
-#### Refactor（振る舞い不変で整理） (任意)
-- 目的:
-  - ...
-- 変更対象:
-  - ...
+  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+- 実装方針:
+  - title を `strip()` して正規表現で検証（保存する title も trim 後へ統一）
+  - 失敗時は `RuntimeError` で中断（副作用前）
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] 期待するテスト（必要ならフォーマット/リンタ）を実行し、成功した
-- [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
-- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
-- [ ] コミットした（エージェント）
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
 
 ---
 
-### Sxx — <追加の観測可能な振る舞い> (任意)
-- （上の S01 と同じ構成で記載する。update_plan / 期待する振る舞い / ステップ末尾 は省略しない）
-  ...
+### S02 — `new/import` が `--slug` を kebab-case に制約し、未指定時は title から合成する (必須)
+- 対象: AC-005, AC-006, AC-007 / EC-003, EC-004
+- 設計参照:
+  - IF-001: `_resolve_input_title_and_slug(...)`
+  - 既存 `_validate_slug` は温存し、入力専用の別名バリデータ（kebab-case）を追加する（後方互換のため）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `--title "Add Refresh Token"`（`--slug` 省略）
+- When: `new initiative --no-github --id init-local-00001 --title "Add Refresh Token"` を実行する
+- Then: 作成された node の `meta.json.slug == "add-refresh-token"` になる
+- 観測点: FS（`spec-dock/initiatives/**/meta.json`）
+- Given: `--title "Add Refresh Token"` かつ `--slug "Bad!Slug"`（kebab-case ではない）
+- When: `new/import {initiative,epic,issue}` を実行する
+- Then: exit code != 0 で中断し、stderr に `--slug` と正規表現と OK/NG 例を含む（副作用なし）
+- 観測点: exit code / stderr / FS（生成物なし）/ GitHub（`gh` 未実行）
+
+#### Red（失敗するテストを先に書く） (任意)
+- `tests/test_cli.py` に「title→slug 合成の成功系」テストを追加
+- 既存の slug テスト（unsafe/uppercase）は維持しつつ、エラーメッセージに正規表現と OK/NG 例が含まれることを追加で検証（必要なら）
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+- 実装方針:
+  - `slug = slug.strip()` を正規化し、`^[a-z0-9]+(?:-[a-z0-9]+)*$` で検証
+  - `--slug` 未指定時は `slug = lower(title)`、` ` → `-` で合成してから検証
+  - バリデーションは副作用前（S01 と同様）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
+
+---
+
+### S03 — `active set` 後の current ブランチ名が `<id>-<slug>` / `<id>` に確定する (必須)
+- 対象: AC-001, AC-002 / EC-002
+- 設計参照:
+  - IF-002: `_desired_branch_name(node, repo_root) -> BranchDecision`
+  - IF-003: `_ensure_desired_branch(repo_root, decision)`
+  - `git check-ref-format --branch` と `isascii()`（`str.isascii()` 相当）で候補を確定する
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: GitHub issue #123 に link された node が存在し、working tree が clean
+- When: `active set 123`
+- Then: `git rev-parse --abbrev-ref HEAD` が `iss-00123-add-refresh-token` になる（通常ケース）
+- 観測点: `git rev-parse --abbrev-ref HEAD` / `spec-dock/.agent/active.json`
+
+#### Red（失敗するテストを先に書く） (任意)
+- `tests/test_cli.py::test_active_set_github_issue_checkout_sets_active` にブランチ名のアサーションを追加
+- （非回帰）local-only node を `active set <node_id>` しても current branch が変わらないことをテストで固定する（将来のリファクタでブランチを触る事故を防ぐ）
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+- 実装方針:
+  - ブランチ名を寄せる処理は「GitHub 紐づきで checkout を伴う場合のみ」実行する（local-only node は対象外）
+  - checkout 後に scan→再解決を行い、ブランチ切替後のツリーと active 更新のズレを防ぐ（設計どおり）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
+
+---
+
+### S04 — desired branch 既存時は再利用して `gh` をスキップし warning を出す (必須)
+- 対象: EC-005
+- 設計参照:
+  - 既存ブランチ再利用分岐では `gh issue checkout/develop` を呼ばない（副作用最小化）
+  - stderr に `spec-dock: (warn)` + `reusing existing branch` + `content is not verified` を含む warning
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given:（scan で node が解決でき、checkout を伴う `gh` 呼び出しが不要な状況で）desired branch が既にローカルに存在する
+- When: `active set <github_issue>`
+- Then:
+  - `gh issue checkout/develop` を呼ばず、既存ブランチを checkout して続行する
+  - stderr に warning（`spec-dock: (warn)` + `reusing existing branch` + `content is not verified`）が出る
+- 観測点: gh スタブのログ/回数 / current branch / stderr
+
+#### Green（最小実装） (任意)
+- `git show-ref --verify refs/heads/<desired>` 等で存在判定し、存在する場合は `git checkout <desired>` へ分岐
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
+
+---
+
+### S05 — `active set` が `<id>` へフォールバックし warning を出す (必須)
+- 対象: EC-001, EC-001b
+- 設計参照:
+  - `id-slug` が non-ascii または invalid ref の場合に `<id>` を採用する（エラーで止めない）
+  - stderr に `spec-dock: (warn)` + `fallback to id` を含む warning
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: legacy/既存データとして `node.slug` が non-ascii（例: `日本語`）または invalid ref（例: `a..b`）になっている
+- When: `active set <github_issue>`
+- Then:
+  - current branch が `<id>` になる
+  - stderr に warning（`spec-dock: (warn)` + `fallback to id`）が出る
+
+#### Red（失敗するテストを先に書く） (任意)
+- テストの作り方（どちらかを採用）:
+  - A: テスト用にディレクトリ/`meta.json` を直接作り、scan 対象に入れる（既存データ想定）
+  - B: 既存 node を作成後に `meta.json` の `slug` を改変して simulate する（scan が meta を採用する前提なら簡便）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
 
 ---
 
 ## 未確定事項（TBD） (必須)
-- Q-001:
-  - 質問: TBD ...
-  - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）: ...
-  - 影響範囲: S__ / AC-__ / EC-__ / `design.md` / ...
-- Q-002:
-  - 質問: TBD ...
-  - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）: ...
-  - 影響範囲: ...
+- 該当なし（要件/設計で確定済み）
 
 ## 完了条件（Definition of Done） (必須)
 - 対象AC/ECがすべて満たされ、テストで保証されている

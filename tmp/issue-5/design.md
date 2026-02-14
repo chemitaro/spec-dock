@@ -62,6 +62,7 @@ ID: "issue-5"
 
 ## 主要フロー（テキスト：AC単位で短く） (任意)
 - Flow for AC-001/002（`active set` で current ブランチ名を確定）:
+  - 補足: このフローは GitHub 紐づき（checkout を伴う）場合を想定する。local-only node の `active set` はブランチ操作を行わず、active の更新のみを行う。
   1) 入力 target を解決（GitHub issue number か node id）
   2) 対象 node を解決（scan → id or github.issue_number で特定。必要なら checkout 後に再scan）
   3) 対象 node の `id/slug` から desired branch 候補（`id-slug` → `id`）を決定
@@ -103,38 +104,42 @@ alt node not found AND target is GitHub issue number
   Script -> Script: node = find by github.issue_number
 end
 
-Script -> Script: decision = desired_branch_name(node)\n(candidates=[id-slug, id])\n(ASCII + check-ref-format)\n+ warnings
-alt fallback happened
-  Script --> User: warn (stderr)\n(spec-dock: (warn) ... fallback to id)
-end
-
-Script -> Git: desired branch exists?\n(decision.desired)
-alt exists
-  Script -> Git: status --porcelain\n(require clean)
-  alt dirty
-    Script --> User: error + hint
-    deactivate Script
-    return
+alt node is GH-linked\n(target is github_issue OR node has github.issue_number)
+  Script -> Script: decision = desired_branch_name(node)\n(candidates=[id-slug, id])\n(ASCII + check-ref-format)\n+ warnings
+  alt fallback happened
+    Script --> User: warn (stderr)\n(spec-dock: (warn) ... fallback to id)
   end
-  Script --> User: warn (stderr)\n(spec-dock: (warn) ... reusing existing branch)\n(content is not verified)
-  Script -> Git: checkout <decision.desired>\n(skip gh)
-  Script -> FS: scan nodes (after checkout)
-  Script -> Script: node = re-resolve by target\n(by id or github.issue_number)
-  Script -> Script: decision = desired_branch_name(node)\n(recompute; optional)
-else missing
-  alt node is GH-linked
+
+  Script -> Git: desired branch exists?\n(decision.desired)
+  alt exists
     Script -> Git: status --porcelain\n(require clean)
     alt dirty
       Script --> User: error + hint
       deactivate Script
       return
     end
-    Script -> GH: issue checkout <n>
+    Script --> User: warn (stderr)\n(spec-dock: (warn) ... reusing existing branch)\n(content is not verified)
+    Script -> Git: checkout <decision.desired>\n(skip gh)
+    Script -> FS: scan nodes (after checkout)
+    Script -> Script: node = re-resolve by target\n(by id or github.issue_number)
+    Script -> Script: decision = desired_branch_name(node)\n(recompute; optional: consistency/warnings)
+  else missing
+    Script -> Git: status --porcelain\n(require clean)
+    alt dirty
+      Script --> User: error + hint
+      deactivate Script
+      return
+    end
+    Script -> GH: issue checkout <n>\n(if not already checked out)
     Script -> FS: scan nodes (after checkout)
     Script -> Script: node = re-resolve by github.issue_number
     Script -> Script: decision = desired_branch_name(node)\n(recompute)
+    Script -> Git: rename/switch current -> <decision.desired>
   end
-  Script -> Git: rename/switch current -> <decision.desired>
+else node is local-only
+  note right
+    Local-only node (no GitHub link)\n=> do not checkout/rename branches\n(update active.json only)
+  end note
 end
 
 Script -> Script: write active.json
