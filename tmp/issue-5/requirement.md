@@ -5,7 +5,7 @@ ID: "issue-5"
 関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/5"]
 状態: "draft"
 作成者: "codex"
-最終更新: "2026-02-13"
+最終更新: "2026-02-14"
 親: []
 ---
 
@@ -107,10 +107,6 @@ Script -> Script: update active.json + pointers
   - 失敗時にユーザーの作業ツリーを壊す（中途半端な生成物だけ残す等）
 
 ## 非交渉制約（守るべき制約） (必須)
-- 例: 既存API互換を維持する
-- 例: 依存追加はしない（必要なら要件に明記）
-- 例: セキュリティ/プライバシー要件（ログ、マスキング、権限制御など）
-- 例: 性能（p95など）やSLO
 - runtime script は stdlib のみ（依存追加なし）
 - CLI の既存インターフェース（コマンド/引数）は変更しない（`active set <target>` / `new ... --title ...` を維持）
 - エラー時は可能な限り「副作用なし」（少なくとも `new/import` の title/slug バリデーション失敗時は FS/GitHub への書き込み無し）
@@ -130,10 +126,10 @@ Script -> Script: update active.json + pointers
     - どの引数が不正か（`--title` / `--slug`）
     - 期待する形式（正規表現）
     - OK/NG 例
+  - warning 出力（運用/テストの安定トークン）:
+    - warning は stderr に `spec-dock: (warn)` プレフィクスで出力する（runtime script 既存の出力慣習に合わせる）
 
 ## 前提（Assumptions） (必須)
-- 例: 対象ユーザーは〜である
-- 例: 既存データは〜の状態である
 - GitHub 連携モードでは `git` と `gh` が利用可能で、`gh auth` 済みである
 - `active set` による checkout を行うとき、ユーザーは working tree を clean にできる（安全装置により必須）
 
@@ -231,13 +227,13 @@ Script -> Script: update active.json + pointers
   - 条件: 対象ノードの `id-slug` が ASCII でない（例: 既存データで slug が日本語）
   - 期待:
     - ブランチ名は `<id>` へフォールバックする（エラーで止めない）
-    - stderr に warning を出力する（例: `id-slug is non-ascii; fallback to id`）
+    - stderr に warning を出力する（例: `spec-dock: (warn) id-slug is non-ascii; fallback to id`）
   - 観測点: `git rev-parse --abbrev-ref HEAD`
 - EC-001b:
   - 条件: 対象ノードの `id-slug` が ASCII だが git ブランチ名として不正（例: `..` 等を含む）
   - 期待:
     - `git check-ref-format --branch` 相当で不正と判定し、ブランチ名は `<id>` へフォールバックする
-    - stderr に warning を出力する（例: `id-slug is invalid ref; fallback to id`）
+    - stderr に warning を出力する（例: `spec-dock: (warn) id-slug is invalid ref; fallback to id`）
   - 観測点: `git rev-parse --abbrev-ref HEAD`
 - EC-002:
   - 条件: working tree が dirty
@@ -256,7 +252,7 @@ Script -> Script: update active.json + pointers
   - 期待:
     - spec-dock は **既存の同名ブランチを checkout して続行**する（内容の正当性までは保証しない）
     - spec-dock は既存ブランチの削除/上書き/強制更新を行わない
-    - stderr に warning を出力する（例: `branch already exists; reusing existing branch; content is not verified`）
+    - stderr に warning を出力する（例: `spec-dock: (warn) branch already exists; reusing existing branch; content is not verified`）
   - 観測点: `git rev-parse --abbrev-ref HEAD` が desired branch になっている
 
 ## 用語（ドメイン語彙） (必須)

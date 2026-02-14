@@ -5,7 +5,7 @@ ID: "issue-5"
 関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/5"]
 状態: "draft"
 作成者: "codex"
-最終更新: "2026-02-13"
+最終更新: "2026-02-14"
 依存: ["requirement.md"]
 親: []
 ---
@@ -46,6 +46,7 @@ ID: "issue-5"
   - `active set` は GitHub 紐づきノードで `gh issue checkout` →（失敗時）`gh issue develop --checkout` を実行するが、ブランチ名は指定しない。
     - 結果として `gh` 側の自動命名（Issue title 由来）に依存し、日本語タイトルで日本語ブランチ名が発生し得る。
   - `_slugify` は Unicode `isalnum()` を保持し、`_validate_slug` も Unicode を許容するため、日本語 title → 日本語 slug が通り得る。
+    - 重要: 既存の `_validate_slug` は「既存 node / validate / ADR 等の別用途」で使われているため、本件では **置き換えない**（後方互換性のため温存）。入力専用のバリデータを別名で追加する。
   - `new` は（GitHub モードで）`gh issue create` を先に実行し得るため、title/slug の厳格バリデーションを入れる場合は「副作用前」に順序を入れ替える必要がある。
   - `import` は `gh issue view` を先に実行するため、入力バリデーションを「副作用前」に移動する必要がある。
 - 採用するパターン（設計方針）:
@@ -62,10 +63,10 @@ ID: "issue-5"
 ## 主要フロー（テキスト：AC単位で短く） (任意)
 - Flow for AC-001/002（`active set` で current ブランチ名を確定）:
   1) 入力 target を解決（GitHub issue number か node id）
-  2) GitHub 紐づきなら checkout を伴う（dirty なら中断）
+  2) 対象 node を解決（scan → id or github.issue_number で特定。必要なら checkout 後に再scan）
   3) 対象 node の `id/slug` から desired branch 候補（`id-slug` → `id`）を決定
-  4) desired branch が既存なら warning を出し checkout 継続（内容は検証しない）
-  5) desired branch が既存でないなら checkout 後にブランチ名を desired へ寄せる（`git check-ref-format --branch` に従う）
+  4) desired branch が既存なら、**`gh` checkout をスキップ**し、warning を出してそのブランチを checkout 継続（内容は検証しない）
+  5) desired branch が既存でない場合のみ、GitHub 紐づきなら `gh issue checkout/develop` で checkout を行い、ブランチ名を desired へ寄せる（dirty なら中断）
   6) active manifest / pointers を更新し、sync を実行する
 - Flow for AC-003〜006/007（`new/import` の title/slug バリデーション）:
   1) `--title` を trim → 正規表現で検証（失敗なら副作用なしで中断）
@@ -87,8 +88,10 @@ User -> Script: active set <target>
 activate Script
 
 Script -> Script: parse target\n(github_issue | node_id)
+Script -> FS: scan nodes (best-effort)
+Script -> Script: resolve target -> node\n(by id or github.issue_number)
 
-alt target is GitHub issue number
+alt node not found AND target is GitHub issue number
   Script -> Git: status --porcelain\n(require clean)
   alt dirty
     Script --> User: error + hint\n(no checkout)
@@ -96,12 +99,27 @@ alt target is GitHub issue number
     return
   end
   Script -> GH: issue checkout <n>\n(fallback: issue develop --checkout)
-  Script -> FS: scan nodes
+  Script -> FS: scan nodes (after checkout)
   Script -> Script: node = find by github.issue_number
-else target is node id
-  Script -> FS: scan nodes
-  Script -> Script: node = resolve by id
-  alt GH-linked node
+end
+
+Script -> Script: decision = desired_branch_name(node)\n(candidates=[id-slug, id])\n(ASCII + check-ref-format)\n+ warnings
+alt fallback happened
+  Script --> User: warn (stderr)\n(spec-dock: (warn) ... fallback to id)
+end
+
+Script -> Git: desired branch exists?\n(decision.desired)
+alt exists
+  Script -> Git: status --porcelain\n(require clean)
+  alt dirty
+    Script --> User: error + hint
+    deactivate Script
+    return
+  end
+  Script --> User: warn (stderr)\n(spec-dock: (warn) ... reusing existing branch)\n(content is not verified)
+  Script -> Git: checkout <decision.desired>\n(skip gh)
+else missing
+  alt node is GH-linked
     Script -> Git: status --porcelain\n(require clean)
     alt dirty
       Script --> User: error + hint
@@ -111,20 +129,9 @@ else target is node id
     Script -> GH: issue checkout <n>
     Script -> FS: scan nodes (after checkout)
     Script -> Script: node = re-resolve by github.issue_number
+    Script -> Script: decision = desired_branch_name(node)\n(recompute)
   end
-end
-
-Script -> Script: desired = choose([id-slug, id])\n(ASCII + check-ref-format)\n+ warnings
-alt fallback happened
-  Script --> User: warn (stderr)\n(reason)
-end
-
-Script -> Git: desired branch exists?
-alt exists
-  Script --> User: warn (stderr)\n(reuse; content is not verified)
-  Script -> Git: checkout <desired>
-else missing
-  Script -> Git: rename/switch current -> <desired>
+  Script -> Git: rename/switch current -> <decision.desired>
 end
 
 Script -> Script: write active.json
@@ -170,7 +177,7 @@ start
 :desired = <computed>;
 
 if (local branch "desired" exists?) then (yes)
-  :warn (stderr)\nbranch already exists;\nreusing existing branch;\ncontent is not verified;
+  :warn (stderr)\nspec-dock: (warn) branch already exists;\nreusing existing branch;\ncontent is not verified;
   :git checkout desired;
   stop
 else (no)
@@ -199,6 +206,8 @@ endif
     - `slug = slug.strip()` を正規化として採用。
     - `^[a-z0-9]+(?:-[a-z0-9]+)*$`（kebab-case）に一致しない場合はエラー（副作用なし）。
     - `--slug` 省略時は `lower(title)` を取り、半角スペース ` ` を `-` に置換して slug を合成する。
+- 実装メモ（後方互換・安全性）:
+  - 入力専用の新規関数（例: `_validate_input_title` / `_validate_input_slug_kebab` / `_derive_input_slug_from_title`）として追加し、既存の `_validate_slug` / `_slugify` は温存する（既存 node / validate / ADR の互換を壊さない）。
 - バリデーションエラーのメッセージ方針:
   - どの引数が不正か（`--title` / `--slug`）
   - 期待する正規表現
@@ -290,10 +299,11 @@ endif
   - `import` は `--title` 必須（GitHub title 取り込みなし）
 
 ### 関数・クラス境界（重要なものだけ）
-- IF-001: `spec-dock::_resolve_title_and_slug(title: str, slug: str|None, *, context: str) -> tuple[str, str]`
+- IF-001: `spec-dock::_resolve_input_title_and_slug(title: str, slug: str|None, *, context: str) -> tuple[str, str]`
   - Input: raw title/optional raw slug
   - Output: (normalized_title, normalized_slug)
   - Errors: `RuntimeError`（エラーメッセージに regex と OK/NG 例を含む）
+  - Note: 既存の `_validate_slug`（Unicode 許容・別用途）は呼ばず、入力専用バリデータ（kebab-case）を使う
 - IF-002: `spec-dock::_desired_branch_name(node: _Node, *, repo_root: Path) -> BranchDecision`
   - Input: node（id/slug）、repo_root（git check-ref-format のため）
   - Output: `BranchDecision`（desired + candidates + warnings）
@@ -303,6 +313,7 @@ endif
     - desired が既存なら checkout して warning（content is not verified）
     - 既存でなければ現在ブランチを desired に寄せる（必要に応じて rename）
   - Errors: git 実行失敗は `RuntimeError`
+  - Output: warning は stderr に `spec-dock: (warn)` プレフィクスで出す（安定トークン）
 
 ### UML（クラス図: 主要データ/責務） (必須)
 ```plantuml
@@ -331,9 +342,10 @@ package "spec-dock runtime script\\n(spec-dock/scripts/spec-dock)" {
   }
 
   class Validator <<utility>> {
-    +_resolve_title_and_slug(title: str, slug: str?, context: str): (str, str)
-    +_validate_title(title: str, context: str): str
-    +_validate_slug(slug: str, context: str): str
+    +_validate_input_title(title: str, context: str): str
+    +_derive_input_slug_from_title(title: str): str
+    +_validate_input_slug_kebab(slug: str, context: str): str
+    +_resolve_input_title_and_slug(title: str, slug: str?, context: str): (str, str)
   }
 
   class BranchNaming <<utility>> {
@@ -410,10 +422,10 @@ Branch --> Active: current branch == decision.desired
   - 返し方: `RuntimeError`（exit != 0）、副作用なし
 - WARN-001: Branch fallback
   - 発生条件: `id-slug` が non-ascii または invalid ref で `<id>` にフォールバック
-  - 出力: stderr に warning（理由・候補を含む）
+  - 出力: stderr に `spec-dock: (warn)` で始まる warning（理由・候補を含む）
 - WARN-002: Branch reuse
   - 発生条件: desired branch が既存のため再利用
-  - 出力: stderr に warning（content is not verified を含む）
+  - 出力: stderr に `spec-dock: (warn)` で始まる warning（content is not verified を含む）
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
@@ -421,6 +433,7 @@ Branch --> Active: current branch == decision.desired
 - 変更（Modify）:
   - `src/spec_dock/assets/spec_dock/scripts/spec-dock`:
     - title/slug の正規表現バリデーションを追加（initiative/epic/issue の new/import）
+    - 既存の `_validate_slug` は温存し、入力専用のバリデータ/合成関数（例: `_validate_input_slug_kebab`）を別名で追加
     - `new/import` の副作用前にバリデーションが必ず走るよう順序を変更
     - `active set` の checkout 後に desired branch name へ寄せる処理（git helper + warning）
   - `src/spec_dock/assets/spec_dock/docs/reference_github.md`（必要なら）:
@@ -439,7 +452,7 @@ Branch --> Active: current branch == decision.desired
 ## マッピング（要件 → 設計） (必須)
 - AC-001/002 → `src/spec_dock/assets/spec_dock/scripts/spec-dock::_active_set` + branch helpers（`git check-ref-format`）
 - AC-003/004 → `src/spec_dock/assets/spec_dock/scripts/spec-dock::_new_*` / `_import_*` の副作用前バリデーション
-- AC-007 → title→slug 合成ロジック（`_resolve_title_and_slug`）
+- AC-007 → title→slug 合成ロジック（`_resolve_input_title_and_slug`）
 - EC-001/001b → `_desired_branch_name`（ascii/ref 判定）+ warning（stderr）
 - EC-005 → `_ensure_desired_branch`（branch exists 判定）+ warning（stderr）
 - 非交渉制約（stdlib only / CLI互換 / 副作用なし） → helper 関数を runtime script 内に閉じ、呼び出し順序で担保
@@ -457,7 +470,8 @@ Branch --> Active: current branch == decision.desired
 - どのAC/ECをどのテストで保証するか:
   - AC-001/002 → `tests/test_cli.py::test_active_set_github_issue_checkout_sets_active`（ブランチ名の期待を更新）
   - AC-003〜006 → 新規テスト追加（`_make_gh_issue_view_stub` の log を使い「呼ばれない/呼ばれる」を検証）
-  - EC-001/001b/005 → `stderr` の warning 文言に特定フレーズが含まれることを検証
+  - EC-001/001b/005 → warning は全文一致ではなく、安定トークンの包含で検証する
+    - 例: `spec-dock: (warn)` + `fallback to id` / `reusing existing branch` / `content is not verified`
 - 実行コマンド:
   - `python -m unittest -q`
 - 変更後の運用（必要なら）:
