@@ -132,6 +132,10 @@ Script -> Script: update active.json + pointers
     - どの引数が不正か（`--title` / `--slug`）
     - 期待する形式（正規表現）
     - OK/NG 例
+  - `github.issue_number` の重複検知（`new --github-issue` / `validate`）のエラーメッセージは、運用で復旧できるように情報を含める:
+    - `github.issue_number=<n>`（どの番号が重複か）
+    - 競合している node 一覧（`type:id`）
+    - 競合している `meta.json` のパス（どこを直すべきか）
   - warning 出力（運用/テストの安定トークン）:
     - 本 Issue で追加/変更する warning は stderr に `spec-dock: (warn)` プレフィクスで出力する（runtime script 既存の出力慣習に合わせる）
 
@@ -217,13 +221,13 @@ Script -> Script: update active.json + pointers
   - When: `./spec-dock/scripts/spec-dock new {initiative,epic,issue} --title "<正しいtitle>" --github-issue 1` を実行する（重複リンクしようとする）
   - Then: コマンドは失敗し、明確なエラーメッセージを出して中断する（FS/GitHub の副作用なし）
   - 観測点:
-    - CLI: exit code != 0、stderr に `github.issue_number=1 is already linked` を含む（文言は実装で確定）
+    - CLI: exit code != 0、stderr に `github.issue_number=1` と競合 node の `type:id` / `meta.json` パスが分かる情報を含む（文言は実装で確定）
     - FS: 新しい node ディレクトリが増えていない
 - AC-009:
   - Actor/Role: spec-dock 利用者
   - Given: 仕様ツリーに `github.issue_number=1` を持つ node が複数存在する（破損/不整合データ）
   - When: `./spec-dock/scripts/spec-dock validate` を実行する
-  - Then: validate は失敗し、重複している `github.issue_number` と該当 node 一覧が分かるエラーを出す
+  - Then: validate は失敗し、重複している `github.issue_number` と該当 node 一覧が分かり、どの `meta.json` のどの値（`github.issue_number`）を直すべきかが分かるエラーを出す
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -241,6 +245,9 @@ Script -> Script: update active.json + pointers
 - EX-005:
   - Input（NG slug）: `--slug "add_token"` / `--slug "add..token"` / `--slug "Add-token"` / `--slug "日本語"`
   - Output: error（exit != 0、正規表現と OK/NG 例を含む）
+- EX-006:
+  - Input（破損データ）: `github.issue_number=1` を持つ node が複数ある状態で `validate`
+  - Output: error（exit != 0、`github.issue_number=1` と競合 node の `type:id` / `meta.json` パスを含む）
 
 ## 例外・エッジケース（仕様として固定） (必須)
 - EC-001:
