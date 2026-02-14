@@ -13,7 +13,7 @@ ID: "issue-5"
 # issue-5 active set の checkout で日本語ブランチ名が生成されるのを防ぐ（id-slug 命名） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010
+- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011
 - 対象EC: EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005, EC-006
 - 対象制約:
   - runtime script は stdlib のみ（依存追加なし）
@@ -26,6 +26,7 @@ ID: "issue-5"
 - [ ] S02: `new/import {initiative,epic,issue}` が `--slug` を kebab-case に制約し、未指定時は title から deterministic に合成する
 - [ ] S03: `active set <github_issue>` 後の current ブランチが `<id>-<slug>`（不適合時 `<id>`）になり、必要に応じて warning を出す
 - [ ] S04: desired branch が既存の場合、既存ブランチを再利用し warning を出す（再利用分岐では `gh issue checkout/develop` を呼ばない。内容は検証しない）
+- [ ] S10: 既存ブランチ再利用後も checkout 後の node で desired を再評価し、命名正規化を保証する（slugズレ耐性）
 - [ ] S05: `active set` のフォールバック（non-ascii / invalid ref）で `<id>` を採用し warning を出す
 - [ ] S06: `new --github-issue` が `github.issue_number` の重複リンクを副作用なしで拒否する（initiative/epic/issue をまたぐ）
 - [ ] S07: `validate` が `github.issue_number` の重複リンクを検知して失敗する（= 早期検知）
@@ -42,6 +43,7 @@ start
 :S02 (slug validation/derive\nno side effects);
 :S03 (active set -> id-slug branch);
 :S04 (reuse existing desired\nskip gh + warn);
+:S10 (recompute desired after reuse\nensure final branch name);
 :S05 (fallback to id\nwarn);
 :S06 (reject duplicate github.issue_number\nfor new --github-issue);
 :S07 (validate rejects duplicate github.issue_number);
@@ -52,16 +54,17 @@ stop
 ```
 
 ### 要件 ↔ ステップ対応表 (必須)
-- AC-001/AC-002 → S03, S04, S05
+- AC-001/AC-002 → S03, S04, S05, S10
 - AC-003/AC-004 → S01
 - AC-005/AC-006/AC-007 → S02
 - AC-008 → S06
 - AC-009 → S07
 - AC-010 → S08
+- AC-011 → S10
 - EC-001/EC-001b → S05
 - EC-002 → S03（既存の dirty working tree 拒否を維持）
 - EC-003/EC-004 → S01, S02
-- EC-005 → S04
+- EC-005 → S04, S10
 - EC-006 → S07（validateで早期検知。active set 側の曖昧エラーは既存挙動）
 - 非交渉制約（stdlib only / CLI互換 / 副作用なし） → S01〜S05, S08, S09（各ステップでテスト/実装順序で担保）
 
@@ -200,6 +203,44 @@ stop
 
 #### Green（最小実装） (任意)
 - `git show-ref --verify refs/heads/<desired>` 等で存在判定し、存在する場合は `git checkout <desired>` へ分岐
+  - 補足: checkout 後の node で desired を再評価し命名正規化を保証するケースは S10 で固定する
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest -q` を実行し、成功した
+- [ ] `tmp/issue-5/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップを完了にした
+- [ ] （任意）ユーザー指示がある場合のみコミットした
+
+---
+
+### S10 — 既存ブランチ再利用後に desired を再評価して命名正規化を保証する (必須)
+- 対象: AC-011 / EC-005
+- 設計参照:
+  - Flow for AC-001/002（`active set`）の「既存ブランチ再利用」でも checkout 後に scan→再解決→desired 再計算→ブランチ名を寄せる（`tmp/issue-5/design.md`）
+- 狙い:
+  - 既存ブランチ再利用分岐で `decision` を checkout 前の `meta.json` から計算してしまうと、ブランチ間で `slug` がズレたケースで最終ブランチ名が `<id>-<slug>` にならず、命名正規化の保証が崩れるため。
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given:
+  - GitHub 紐づき node（例: `iss-00123` / `github.issue_number=123`）が存在する
+  - 既存ローカルブランチ `iss-00123-add-refresh-token` が存在し、checkout すると node の `meta.json.slug` が `refresh-token` に変化する（= ブランチ間で `slug` がズレている状態）
+- When: `active set 123`（または URL）を実行する（既存ブランチ再利用分岐に入る）
+- Then:
+  - 最終的な `git rev-parse --abbrev-ref HEAD` が `iss-00123-refresh-token` になる（checkout 後に再計算した desired へ寄る）
+  - `gh issue checkout/develop` は呼ばれない（既存ブランチ再利用のまま）
+
+#### Red（失敗するテストを先に書く） (任意)
+- `tests/test_cli.py` に「slugズレ + 既存ブランチ再利用」の回帰テストを追加する:
+  - 例: 既存ブランチ `iss-00123-add-refresh-token` 上で `meta.json.slug=refresh-token` に改変 → 別ブランチから `active set 123` → 最終ブランチ名が `iss-00123-refresh-token`
+
+#### Green（最小実装） (任意)
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock::_active_set` にて:
+  - 既存ブランチ再利用で `git checkout <decision.desired>` した後、必ず scan→再解決→`decision` 再計算を行う
+  - 再計算した `decision.desired` に対して `_ensure_active_set_branch_name(...)` を実行し、最終ブランチ名を確定させる（必要なら rename/switch）
+  - 同様の再利用分岐を node-id 経路（GitHub 紐づき node 選択）にも適用する
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest -q` を実行し、成功した

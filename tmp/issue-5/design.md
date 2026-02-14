@@ -72,8 +72,9 @@ ID: "issue-5"
   1) 入力 target を解決（GitHub issue number か node id）
   2) 対象 node を解決（scan → id or github.issue_number で特定。必要なら checkout 後に再scan）
   3) 対象 node の `id/slug` から desired branch 候補（`id-slug` → `id`）を決定
-  4) desired branch が既存なら、**`gh` checkout をスキップ**し、warning を出してそのブランチを checkout 継続（内容は検証しない）
-  5) desired branch が既存でない場合のみ、GitHub 紐づきなら `gh issue checkout/develop` で checkout を行い、ブランチ名を desired へ寄せる（dirty なら中断）
+  4) desired branch が既存なら、**`gh` checkout をスキップ**し、warning を出してそのブランチを checkout する（内容は検証しない）
+     - checkout 後に scan → target 再解決 → desired 再計算を行い、**最終的な current ブランチ名が再計算後の desired になるまで**ブランチ名を寄せる（AC-011 / EC-005）
+  5) desired branch が既存でない場合のみ、GitHub 紐づきなら `gh issue checkout/develop` で checkout を行い、checkout 後に scan→再解決→desired 再計算を行った上でブランチ名を desired へ寄せる（dirty なら中断）
   6) active manifest / pointers を更新し、sync を実行する
 - Flow for AC-003〜006/007（`new/import` の title/slug バリデーション）:
   1) `--title` を trim → 正規表現で検証（失敗なら副作用なしで中断）
@@ -121,22 +122,23 @@ alt node is GH-linked\n(target is github_issue OR node has github.issue_number)
 
   Script -> Git: desired branch exists?\n(decision.desired)
   alt exists
-    Script -> Git: status --porcelain\n(require clean)
-    alt dirty
-      Script --> User: error + hint
-      deactivate Script
-      return
-    end
-    Script --> User: warn (stderr)\n(spec-dock: (warn) ... reusing existing branch)\n(content is not verified)
-    Script -> Git: checkout <decision.desired>\n(skip gh)
-    Script -> FS: scan nodes (after checkout)
-    Script -> Script: node = re-resolve by target\n(by id or github.issue_number)
-    Script -> Script: decision = desired_branch_name(node)\n(recompute; optional: consistency/warnings)
-  else missing
-    Script -> Git: status --porcelain\n(require clean)
-    alt dirty
-      Script --> User: error + hint
-      deactivate Script
+	  Script -> Git: status --porcelain\n(require clean)
+	  alt dirty
+	    Script --> User: error + hint
+	    deactivate Script
+	    return
+	  end
+	  Script --> User: warn (stderr)\n(spec-dock: (warn) ... reusing existing branch)\n(content is not verified)
+	  Script -> Git: checkout <decision.desired>\n(skip gh)
+	  Script -> FS: scan nodes (after checkout)
+	  Script -> Script: node = re-resolve by target\n(by id or github.issue_number)
+	  Script -> Script: decision = desired_branch_name(node)\n(recompute)
+	  Script -> Git: rename/switch current -> <decision.desired>\n(if needed)
+	else missing
+	    Script -> Git: status --porcelain\n(require clean)
+	    alt dirty
+	      Script --> User: error + hint
+	      deactivate Script
       return
     end
     Script -> GH: issue checkout <n>\n(if not already checked out)
@@ -501,6 +503,7 @@ Branch --> Active: current branch == decision.desired
 - AC-008 → `_new_*` の `--github-issue` 経路で `_ensure_github_issue_not_linked`
 - AC-009 → `_validate_nodes` から `_validate_github_issue_numbers_unique` を呼ぶ
 - AC-010 → `_import_*` のテンプレート/`meta.json` 生成前に `_validate_nodes`（preflight）を実行する
+- AC-011 → `active set` の既存ブランチ再利用分岐でも checkout 後に scan→target再解決→desired再計算を行い、最終的な current ブランチ名を desired に寄せる
 - EC-001/001b → `_desired_branch_name`（ascii/ref 判定）+ warning（stderr）
 - EC-005 → `_ensure_desired_branch`（branch exists 判定）+ warning（stderr）
 - 非交渉制約（stdlib only / CLI互換 / 副作用なし） → helper 関数を runtime script 内に閉じ、呼び出し順序で担保
@@ -510,6 +513,7 @@ Branch --> Active: current branch == decision.desired
   - `active set`:
     - GH checkout スタブが作るブランチ名（例: `gh-issue-123`）から、最終的に `iss-00123-<slug>` へ寄ること
     - desired branch が既に存在する場合に warning を出して再利用すること
+    - （AC-011）既存ブランチ再利用後に `slug` がズレていた場合でも、checkout 後に再計算した `id-slug` へ最終ブランチ名が寄ること
     - `id-slug` が non-ascii / invalid ref の場合に `<id>` へフォールバックし warning を出すこと
   - `new/import`:
     - `--title` が不正な場合、`gh` が呼ばれず、FS 生成もないこと
