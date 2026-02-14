@@ -119,6 +119,7 @@ Script -> Script: update active.json + pointers
   - `--title`（title）: **英字/数字/スペースのみ**（= slug に変換できるものだけ）
     - 正規表現（trim 後）: `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`
     - 意味: 半角スペース区切りの英数字トークン列（前後空白は trim、連続スペースは不可）
+    - 保存する title は trim 後の文字列とする（メタデータ揺れ防止）
   - `--slug`（slug）: **kebab-case のみ**
     - 正規表現（trim 後）: `^[a-z0-9]+(?:-[a-z0-9]+)*$`
   - `--slug` 省略時の合成（title → slug）:
@@ -219,20 +220,24 @@ Script -> Script: update active.json + pointers
   - Input: `--title "Add Refresh Token"`（`--slug` 省略）
   - Output: `slug=add-refresh-token`
 - EX-004:
-  - Input（NG title）: `--title "Add-Token"` / `--title "Add  Token"` / `--title "日本語"`
+  - Input（NG title）: `--title "Add-Token"` / `--title "Add  Token"` / `--title "Add　Token"` / `--title "日本語"`
   - Output: error（exit != 0、正規表現と OK/NG 例を含む）
 - EX-005:
-  - Input（NG slug）: `--slug "add_token"` / `--slug "add..token"` / `--slug "日本語"`
+  - Input（NG slug）: `--slug "add_token"` / `--slug "add..token"` / `--slug "Add-token"` / `--slug "日本語"`
   - Output: error（exit != 0、正規表現と OK/NG 例を含む）
 
 ## 例外・エッジケース（仕様として固定） (必須)
 - EC-001:
   - 条件: 対象ノードの `id-slug` が ASCII でない（例: 既存データで slug が日本語）
-  - 期待: ブランチ名は `<id>` へフォールバックする（エラーで止めない）
+  - 期待:
+    - ブランチ名は `<id>` へフォールバックする（エラーで止めない）
+    - stderr に warning を出力する（例: `id-slug is non-ascii; fallback to id`）
   - 観測点: `git rev-parse --abbrev-ref HEAD`
 - EC-001b:
   - 条件: 対象ノードの `id-slug` が ASCII だが git ブランチ名として不正（例: `..` 等を含む）
-  - 期待: `git check-ref-format --branch` 相当で不正と判定し、ブランチ名は `<id>` へフォールバックする
+  - 期待:
+    - `git check-ref-format --branch` 相当で不正と判定し、ブランチ名は `<id>` へフォールバックする
+    - stderr に warning を出力する（例: `id-slug is invalid ref; fallback to id`）
   - 観測点: `git rev-parse --abbrev-ref HEAD`
 - EC-002:
   - 条件: working tree が dirty
@@ -251,6 +256,7 @@ Script -> Script: update active.json + pointers
   - 期待:
     - spec-dock は **既存の同名ブランチを checkout して続行**する（内容の正当性までは保証しない）
     - spec-dock は既存ブランチの削除/上書き/強制更新を行わない
+    - stderr に warning を出力する（例: `branch already exists; reusing existing branch; content is not verified`）
   - 観測点: `git rev-parse --abbrev-ref HEAD` が desired branch になっている
 
 ## 用語（ドメイン語彙） (必須)
