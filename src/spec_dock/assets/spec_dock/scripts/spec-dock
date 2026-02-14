@@ -71,6 +71,15 @@ class _Node:
     github_issue_number: int | None
 
 
+@dataclass(frozen=True)
+class _BranchDecision:
+    """Resolved branch naming decision for active set."""
+
+    desired: str
+    candidates: tuple[str, str]
+    warnings: tuple[str, ...]
+
+
 def _now_iso() -> str:
     """Return current local time in ISO-8601 (timezone-aware, seconds precision)."""
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -1166,9 +1175,36 @@ def _git_checkout_branch(repo_root: Path, *, branch: str) -> None:
         raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
 
 
-def _ensure_active_set_branch_name(repo_root: Path, *, node: _Node) -> None:
-    """Ensure current branch matches the deterministic branch name for a GH-linked node."""
-    desired = f"{node.id}-{node.slug}"
+def _git_check_ref_format_branch(repo_root: Path, *, branch: str) -> bool:
+    """Return True when `branch` is valid for `git check-ref-format --branch`."""
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "check-ref-format", "--branch", branch],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return p.returncode == 0
+
+
+def _resolve_active_set_branch_decision(repo_root: Path, *, node: _Node) -> _BranchDecision:
+    """Resolve active-set desired branch as `id-slug`, falling back to `id` when needed."""
+    candidate = f"{node.id}-{node.slug}"
+    fallback = node.id
+    warnings: list[str] = []
+
+    if not candidate.isascii():
+        warnings.append("id-slug is non-ascii; fallback to id")
+        return _BranchDecision(desired=fallback, candidates=(candidate, fallback), warnings=tuple(warnings))
+    if not _git_check_ref_format_branch(repo_root, branch=candidate):
+        warnings.append("id-slug is invalid ref; fallback to id")
+        return _BranchDecision(desired=fallback, candidates=(candidate, fallback), warnings=tuple(warnings))
+    return _BranchDecision(desired=candidate, candidates=(candidate, fallback), warnings=tuple(warnings))
+
+
+def _ensure_active_set_branch_name(repo_root: Path, *, desired: str) -> None:
+    """Ensure current branch matches `desired`."""
     current = _git_current_branch(repo_root)
     if current == desired:
         return
@@ -1592,12 +1628,14 @@ def _active_set(
         node = _find_node_by_github_issue_number_or_none(nodes, issue_number=issue_number)
         reused_existing_branch = False
         if node is not None:
-            desired = f"{node.id}-{node.slug}"
-            if _git_local_branch_exists(repo_root, branch=desired):
+            decision = _resolve_active_set_branch_decision(repo_root, node=node)
+            for warning in decision.warnings:
+                _warn(warning)
+            if _git_local_branch_exists(repo_root, branch=decision.desired):
                 try:
                     _require_clean_working_tree(repo_root)
                     _warn("branch already exists; reusing existing branch; content is not verified")
-                    _git_checkout_branch(repo_root, branch=desired)
+                    _git_checkout_branch(repo_root, branch=decision.desired)
                     reused_existing_branch = True
                 except RuntimeError as e:
                     msg = str(e)
@@ -1621,7 +1659,10 @@ def _active_set(
                 raise
             nodes = _scan_nodes(specdock_dir)
             node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
-            _ensure_active_set_branch_name(repo_root, node=node)
+            decision = _resolve_active_set_branch_decision(repo_root, node=node)
+            for warning in decision.warnings:
+                _warn(warning)
+            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
 
         nodes = _scan_nodes(specdock_dir)
         node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
@@ -1657,12 +1698,14 @@ def _active_set(
     if node.github_issue_number is not None:
         expected_type = node.type
         issue_number = int(node.github_issue_number)
-        desired = f"{node.id}-{node.slug}"
-        if _git_local_branch_exists(repo_root, branch=desired):
+        decision = _resolve_active_set_branch_decision(repo_root, node=node)
+        for warning in decision.warnings:
+            _warn(warning)
+        if _git_local_branch_exists(repo_root, branch=decision.desired):
             try:
                 _require_clean_working_tree(repo_root)
                 _warn("branch already exists; reusing existing branch; content is not verified")
-                _git_checkout_branch(repo_root, branch=desired)
+                _git_checkout_branch(repo_root, branch=decision.desired)
             except RuntimeError as e:
                 msg = str(e)
                 if msg.startswith("Working tree is not clean"):
@@ -1692,7 +1735,10 @@ def _active_set(
                     f"Node type mismatch after checkout for github.issue_number={issue_number}: "
                     f"expected {expected_type} but found {node.type}:{node.id}"
                 )
-            _ensure_active_set_branch_name(repo_root, node=node)
+            decision = _resolve_active_set_branch_decision(repo_root, node=node)
+            for warning in decision.warnings:
+                _warn(warning)
+            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
 
         nodes = _scan_nodes(specdock_dir)
         node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
