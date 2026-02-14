@@ -20,6 +20,7 @@ ID: "issue-5"
 - MUST:
   - ブランチ候補の妥当性は `git check-ref-format --branch` に固定して判定する（実装ブレ防止）。
   - `new/import` のバリデーション失敗時は副作用（FS/GitHub）なしで中断する。
+  - `import` は既存ツリーが不整合で preflight validate が失敗する場合でも、**副作用（テンプレートコピー/`meta.json`生成）なし**で中断する（部分的な生成物を残さない）。
   - 既存データにより `id-slug` が不適合でも、`active set` は `<id>` へフォールバックして継続する（warning 出力）。
   - `github.issue_number` は initiative/epic/issue をまたいで一意とし、`new --github-issue` は重複リンクをエラーで拒否する。`validate` は重複リンクを検知してエラーとする。
 - MUST NOT:
@@ -51,6 +52,7 @@ ID: "issue-5"
     - 重要: 既存の `_validate_slug` は「既存 node / validate / ADR 等の別用途」で使われているため、本件では **置き換えない**（後方互換性のため温存）。入力専用のバリデータを別名で追加する。
   - `new` は（GitHub モードで）`gh issue create` を先に実行し得るため、title/slug の厳格バリデーションを入れる場合は「副作用前」に順序を入れ替える必要がある。
   - `import` は `gh issue view` を先に実行するため、入力バリデーションを「副作用前」に移動する必要がある。
+  - `import` はテンプレート/`meta.json` を書いた後に `_sync` を呼ぶため、既存ツリーが不整合（例: `github.issue_number` 重複）だと **新規ディレクトリが作られた後**に `preflight validate failed` で失敗し、部分的副作用（作成ディレクトリ）が残り得る（手動再現）。
   - `github.issue_number` の一意性は `import` では拒否されているが（`_ensure_github_issue_not_linked`）、`new --github-issue` では現状拒否されず、重複リンクにより `active set <number|url>` が `Ambiguous github.issue_number=...` で失敗し得る（手動テストで再現）。
   - `validate` は現状 `github.issue_number` の重複を検知しないため、`validate` が通るのに `active set` が壊れる状態を作れてしまう。
 - 採用するパターン（設計方針）:
@@ -77,7 +79,8 @@ ID: "issue-5"
   1) `--title` を trim → 正規表現で検証（失敗なら副作用なしで中断）
   2) `--slug` を（指定があれば trim→検証、なければ title から合成→検証）
   3) （`import` / `new --github-issue` のように **既存の `github.issue_number` をリンクする場合**）`github.issue_number` の重複リンクを検出してエラー（副作用なし）
-  4) 以降の副作用（`gh issue create/view`、FS 生成）を実行する
+  4) （`import` の場合）既存ツリーを scan → preflight validate（`validate` 相当）を実行し、失敗なら副作用なしで中断する（部分的生成物を残さない）
+  5) 以降の副作用（`gh issue create/view`、FS 生成）を実行する
 
 ### UML（シーケンス: active set） (任意)
 ```plantuml
@@ -310,6 +313,7 @@ endif
   - `--title` / `--slug` の制約違反はエラー（副作用なし）
   - `--slug` 省略時は title から deterministic に合成する
   - `import` は `--title` 必須（GitHub title 取り込みなし）
+  - `import` は既存ツリーが不整合で preflight validate が失敗する場合、テンプレート/`meta.json` を作らずに中断する（部分的副作用を残さない）
   - `new --github-issue <n>` は `github.issue_number=<n>` の重複リンクを拒否する（initiative/epic/issue をまたぐ）
   - `validate` は `github.issue_number` の重複リンクをエラーとして検知する
 
@@ -329,12 +333,13 @@ endif
     - 既存でなければ現在ブランチを desired に寄せる（必要に応じて rename）
   - Errors: git 実行失敗は `RuntimeError`
   - Output: warning は stderr に `spec-dock: (warn)` プレフィクスで出す（安定トークン）
-- IF-004: `spec-dock::_ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int) -> None`
+- IF-004: `spec-dock::_ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int, repo_root: Path|None = None) -> None`
   - Input: nodes（scan結果）, issue_number（リンクしようとしている GitHub issue 番号）
-  - Behavior: initiative/epic/issue のいずれかが `github.issue_number==issue_number` を持つ場合は `RuntimeError` で拒否する
+  - Behavior: initiative/epic/issue のいずれかが `github.issue_number==issue_number` を持つ場合は `RuntimeError` で拒否する（エラーには `github.issue_number=<n>` / 競合 `type:id` / **repo ルート相対の `meta.json` パス** を含める）
+  - Note: 復旧ガイド文言はコマンド非依存（特定フラグ名を前提としない）とする（`new/import` で共通利用されるため）
   - Note: `import` に加え、`new --github-issue`（既存番号リンク）でも使用して “運用不能な状態” を生成させない
-- IF-005: `spec-dock::_validate_github_issue_numbers_unique(nodes: dict[str, _Node]) -> None`
-  - Behavior: ツリー全体で `github.issue_number` が一意でない場合は `RuntimeError`（validateで検知）
+- IF-005: `spec-dock::_validate_github_issue_numbers_unique(nodes: dict[str, _Node], *, repo_root: Path|None = None) -> None`
+  - Behavior: ツリー全体で `github.issue_number` が一意でない場合は `RuntimeError`（validate/sync preflight で検知。`import` の副作用前 preflight でも利用する）
 
 ### UML（クラス図: 主要データ/責務） (必須)
 ```plantuml
@@ -448,8 +453,11 @@ Branch --> Active: current branch == decision.desired
   - 発生条件: `--slug` が `^[a-z0-9]+(?:-[a-z0-9]+)*$` に一致しない
   - 返し方: `RuntimeError`（exit != 0）、副作用なし
 - ERR-003: Duplicate GitHub link
-  - 発生条件: `new --github-issue <n>` で、既に `github.issue_number=<n>` を持つ node が存在する
-  - 返し方: `RuntimeError`（exit != 0）、副作用なし（エラーに `github.issue_number=<n>` と既存 node の `type:id` / `meta.json` パスを含める）
+  - 発生条件: `new --github-issue <n>` または `import <target>` で、既に `github.issue_number=<n>` を持つ node が存在する
+  - 返し方: `RuntimeError`（exit != 0）、副作用なし（エラーに `github.issue_number=<n>` と既存 node の `type:id` / **repo ルート相対の `meta.json` パス** を含め、復旧ガイドはコマンド非依存にする）
+- ERR-004: Import preflight validate failed
+  - 発生条件: `import` 実行時点で既存ツリーが不整合（`validate` 相当が失敗）である
+  - 返し方: `RuntimeError`（exit != 0）、**テンプレート/`meta.json` を作らずに**中断する（部分的副作用なし）
 - WARN-001: Branch fallback
   - 発生条件: `id-slug` が non-ascii または invalid ref で `<id>` にフォールバック
   - 出力: stderr に `spec-dock: (warn)` で始まる warning（理由・候補を含む）
@@ -468,6 +476,8 @@ Branch --> Active: current branch == decision.desired
     - `active set` の checkout 後に desired branch name へ寄せる処理（git helper + warning）
     - `new --github-issue` で `github.issue_number` の重複リンクを拒否する（`import` と整合）
     - `validate` で `github.issue_number` の重複リンクを検知して失敗させる（早期検知）
+    - `import` は既存ツリーの preflight validate を **副作用前**に実行し、失敗なら中断する（部分的生成物を残さない）
+    - 重複リンク拒否/重複検知の復旧ガイド文言をコマンド非依存にする（`new/import` で共通利用するため）
   - `src/spec_dock/assets/spec_dock/docs/reference_github.md`（必要なら）:
     - `active set` がブランチ名を id/slug に寄せること、warning の意味を追記
   - `tests/test_cli.py`:
@@ -489,6 +499,7 @@ Branch --> Active: current branch == decision.desired
 - AC-007 → title→slug 合成ロジック（`_resolve_input_title_and_slug`）
 - AC-008 → `_new_*` の `--github-issue` 経路で `_ensure_github_issue_not_linked`
 - AC-009 → `_validate_nodes` から `_validate_github_issue_numbers_unique` を呼ぶ
+- AC-010 → `_import_*` のテンプレート/`meta.json` 生成前に `_validate_nodes`（preflight）を実行する
 - EC-001/001b → `_desired_branch_name`（ascii/ref 判定）+ warning（stderr）
 - EC-005 → `_ensure_desired_branch`（branch exists 判定）+ warning（stderr）
 - 非交渉制約（stdlib only / CLI互換 / 副作用なし） → helper 関数を runtime script 内に閉じ、呼び出し順序で担保
@@ -506,6 +517,7 @@ Branch --> Active: current branch == decision.desired
   - `github.issue_number` の一意性:
     - `new --github-issue <n>` が、既にリンク済みの `<n>` を拒否すること（副作用なし）
     - `validate` が `github.issue_number` の重複を検知して失敗すること
+    - `import` が preflight validate 失敗時に node ディレクトリを作らずに失敗すること（部分的副作用なし）
 - どのAC/ECをどのテストで保証するか:
   - AC-001/002 → `tests/test_cli.py::test_active_set_github_issue_checkout_sets_active`（ブランチ名の期待を更新）
   - AC-003〜006 → 新規テスト追加（`_make_gh_issue_view_stub` の log を使い「呼ばれない/呼ばれる」を検証）
