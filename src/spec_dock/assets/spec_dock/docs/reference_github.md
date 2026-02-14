@@ -5,6 +5,7 @@
 関連:
 - 入口: [README.md](README.md)
 - 総合: [guide.md](guide.md)
+- 命名: [reference_naming.md](reference_naming.md)
 
 ## 1. 前提（どのリポジトリが対象になるか）
 
@@ -47,6 +48,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 - target が GitHub Issue と紐づくノード（`github.issue_number` があるノード）の場合、checkout を伴います
 - 作業ツリーが dirty の場合は安全のため checkout を中断します
+- checkout を伴う場合、current ブランチ名を `<id>-<slug>`（不適合なら `<id>`）へ正規化します（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 
 ## 5. よくある失敗
 

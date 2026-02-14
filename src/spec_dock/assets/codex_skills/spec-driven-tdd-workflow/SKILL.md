@@ -14,6 +14,7 @@ description: A workflow that drives development from requirements refined into o
 
 - Safety notes (before running commands):
   - `./spec-dock/scripts/spec-dock active set ...` may checkout branches for GitHub-linked nodes (requires a clean working tree).
+  - For `new/import {initiative,epic,issue}`, `--title` must be ASCII (alphanumerics + single spaces) and `--slug` must be kebab-case; if validation fails, ask the user to provide a compliant title/slug (put non-ASCII context in requirement/design instead).
   - `./spec-dock/scripts/spec-dock new ...` creates GitHub Issues by default (use `--no-github` to opt out).
 - Check active pointers: run `./spec-dock/scripts/spec-dock active show`.
   - If active is not set, ask the user to run `./spec-dock/scripts/spec-dock active set <id|#num|url>`.

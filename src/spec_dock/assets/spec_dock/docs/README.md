@@ -18,6 +18,7 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
    - [workflow_adr.md](workflow_adr.md)
 3. 仕組みを確認したい場合（参照）
    - [reference_github.md](reference_github.md)
+   - [reference_naming.md](reference_naming.md)
    - [reference_sync.md](reference_sync.md)
 
 ## 目的別ショートカット
@@ -30,6 +31,7 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 | Issue を実装する（TDD） | [workflow_issue.md](workflow_issue.md) |
 | 議論/意思決定を ADR に切り出す | [workflow_adr.md](workflow_adr.md) |
 | GitHub 連携の前提/副作用を知りたい | [reference_github.md](reference_github.md) |
+| `--title`/`--slug`/ブランチ命名のルールを知りたい | [reference_naming.md](reference_naming.md) |
 | `sync` の入出力/フラグを知りたい | [reference_sync.md](reference_sync.md) |
 
 ## コマンド早見（最短）
@@ -54,10 +56,6 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 ## 重要な注意（事故防止）
 
 - `new {initiative,epic,issue}` はデフォルトで `gh` を呼び、GitHub Issue を自動作成します（GitHub を使わない場合は `--no-github` を付けてください）。
+- `new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 - `import` は GitHub を更新しません（`gh issue view` による **存在確認のみ**）。ただしローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します。
 - `import` の URL 入力は **番号抽出のみ**です（`owner/repo` は無視され、別リポジトリ URL を貼っても「現在の `gh` が見ているリポジトリの同番号」として解釈され得ます）。
-
-## 旧版（参考）
-
-既存の配布ドキュメントは `old/` に退避しています（互換の正ではなく参考用）。  
-- [old/README.md](old/README.md)

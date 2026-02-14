@@ -11,3 +11,4 @@
 注意:
 - 生成後のファイルは自由に編集して構いません（テンプレは雛形）。
 - 命名規則は **全て小文字**（macOS のケース非区別FS対策）。
+- `new/import {initiative,epic,issue}` の `--slug` は kebab-case（小文字英数字 + `-`）です。`--slug` 省略時は `--title` から合成されます（詳細は `spec-dock/docs/reference_naming.md`）。
