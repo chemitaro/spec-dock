@@ -1438,7 +1438,8 @@ def _ensure_github_issue_not_linked(
     found = _format_linked_github_nodes(linked, repo_root=repo_root)
     raise RuntimeError(
         f"github.issue_number={issue_number} is already linked: {found}. "
-        "Fix github.issue_number in one of the listed meta.json files, or choose another --github-issue."
+        "Fix github.issue_number in one of the listed meta.json files, "
+        "or choose a different GitHub issue number (target)."
     )
 
 
@@ -1525,6 +1526,16 @@ def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], 
     raise RuntimeError(f"Internal error: unsupported child type for active fallback: {child_type}")
 
 
+def _import_preflight_validate(specdock_dir: Path, *, repo_root: Path) -> dict[str, _Node]:
+    """Run import preflight validation before any external call or filesystem generation."""
+    nodes = _scan_nodes(specdock_dir)
+    try:
+        _validate_nodes(nodes, repo_root=repo_root)
+    except RuntimeError as e:
+        raise RuntimeError(f"preflight validate failed: {e}") from e
+    return nodes
+
+
 def _import_initiative(
     specdock_dir: Path,
     *,
@@ -1536,9 +1547,9 @@ def _import_initiative(
     title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
-    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-    nodes = _scan_nodes(specdock_dir)
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
 
     node_id = _format_id("init", issue_number, local=False)
     prefix, is_local, num = _parse_id(node_id)
@@ -1575,9 +1586,9 @@ def _import_epic(
     title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
-    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-    nodes = _scan_nodes(specdock_dir)
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
 
     if initiative_id is None:
         resolved_initiative_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="epic")
@@ -1633,9 +1644,9 @@ def _import_issue(
     title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
-    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-    nodes = _scan_nodes(specdock_dir)
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
     _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
 
     if epic_id is None:
         resolved_epic_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="issue")

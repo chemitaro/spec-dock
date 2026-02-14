@@ -60,6 +60,44 @@ python -B -m unittest -q
 
 ---
 
+### 2026-02-14 23:45 - 24:20
+
+#### 対象
+- Step: S08, S09
+- AC/EC: AC-010, 非交渉制約（コマンド非依存ガイド）
+
+#### 実施内容
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+  - `import` 専用 preflight ヘルパ（`_import_preflight_validate`）を追加し、`_import_{initiative,epic,issue}` で **副作用前**に `validate` 相当を実行するよう変更。
+  - `import` の実行順序を `preflight validate` → `duplicate link check` → `gh issue view` → FS生成 に修正。
+  - 重複リンク拒否の復旧ガイド文言をコマンド非依存化（`--github-issue` 固定文言を除去）。
+- `tests/test_cli.py`
+  - import重複リンク拒否時に `--github-issue` を含まないことを検証。
+  - import preflight失敗時に `gh issue view` が呼ばれないことと、nodeディレクトリが増えないことを検証。
+  - new重複リンク拒否テストも新文言に合わせて更新。
+
+#### 実行コマンド / 結果
+```bash
+python -B -m unittest -v tests/test_cli.py -k "duplicate_github_issue or import_rejects_already_linked_github_issue_number or import_fails_when_sync_preflight_fails"
+# => OK
+
+python -B -m unittest -q
+# => OK (56 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock` - import副作用前preflight + 重複エラー文言の非依存化
+- `tests/test_cli.py` - S08/S09の回帰テスト追加・更新
+- `tmp/issue-5/report.md` - 実装ログ追記
+
+#### コミット
+- （未実施）
+
+#### メモ
+- preflight 失敗時のエラーは `preflight validate failed: ...` 形式で統一し、validate起因情報を引き継ぐ。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
