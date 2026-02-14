@@ -1847,7 +1847,7 @@ def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
         raise RuntimeError(f"Failed to parse issue number from gh output:\n{out}")
     return int(m.group("num"))
 
-def _git_current_branch(repo_root: Path) -> str | None:
+def _git_current_branch_or_none(repo_root: Path) -> str | None:
     """Return the current branch name, or None if unavailable/detached."""
     if shutil.which("git") is None:
         return None
@@ -2029,7 +2029,7 @@ def _sync(
 
     # Default behavior: infer active target from current git branch (best-effort).
     if update_active:
-        branch = _git_current_branch(repo_root)
+        branch = _git_current_branch_or_none(repo_root)
         if branch:
             inferred, reason = _infer_active_node_from_branch(nodes, branch=branch)
             if inferred:
