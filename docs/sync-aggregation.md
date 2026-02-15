@@ -14,7 +14,7 @@
   - `meta.json` に `github.issue_number` がある issue だけ、GitHub から `open/done` を判定して集計
 
 補足（最新の runtime script 仕様）:
-- `sync` は実行前に preflight validate を行い、致命的不整合（例: `github.issue_number` の重複リンク）がある場合は失敗します（`--force` で警告しつつ継続可能）。
+- `sync` は実行前に preflight validate を行い、致命的不整合がある場合は失敗します（`--force` で警告しつつ継続可能）。
 - デフォルトでは **現在ブランチ名から active を推定して更新**します（`--no-update-active` で抑止）。
 - 詳細は導入先ドキュメントの [reference_sync.md](../src/spec_dock/assets/spec_dock/docs/reference_sync.md) を参照してください。
 
@@ -220,6 +220,9 @@ Epic 配下に issue が 3 つあるとして:
 
 - GitHub で issue を作った後、ローカル issue の `meta.json` に `github.issue_number` を追記する
 - 先に GitHub issue を作って番号を確定し、ローカル issue を作る時点で `--github-issue` を渡す
+
+注意:
+- `github.issue_number` は initiative/epic/issue をまたいで一意です。詳細は [reference_github.md](../src/spec_dock/assets/spec_dock/docs/reference_github.md) を参照してください。
 
 （補足）将来的に “手編集を減らす” なら、
 `./spec-dock/scripts/spec-dock link --issue iss-local-00001 --github-issue 123` のような

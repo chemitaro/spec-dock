@@ -102,7 +102,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 Notes:
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
 - For GitHub-linked targets, `active set` may normalize the current git branch name to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
-- `github.issue_number` links (initiative/epic/issue) must be globally unique. `new --github-issue`/`import` reject duplicates, and `validate`/`sync` preflight also detect them (errors include conflicting `meta.json` paths).
+- `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
 
 See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
 
@@ -139,4 +139,4 @@ v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様�
 状態の集計は `spec-dock/.agent/index.json` と `spec-dock/.agent/tree.json` を `./spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
 
 補足: `new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があり、GitHub 紐づきで `active set` する場合はブランチ名が `<id>-<slug>`（不適合なら `<id>`）へ正規化されます。
-また、`github.issue_number` は initiative/epic/issue をまたいで一意である必要があり、重複は `new --github-issue`/`import`/`validate`/`sync` で検知されます（競合 `meta.json` パスが表示されます）。
+また、`github.issue_number` は initiative/epic/issue をまたいで一意です（重複は検知されます）。詳細は導入先の `spec-dock/docs/reference_github.md`（このリポジトリでは `src/spec_dock/assets/spec_dock/docs/reference_github.md`）を参照してください。
