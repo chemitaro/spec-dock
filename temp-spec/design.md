@@ -39,10 +39,12 @@ ID: "iss-00007"
   - `src/spec_dock/cli.py`: installer（`init/update` が assets を `spec-dock/` に同期する範囲と前提の確認）
   - `src/spec_dock/assets/spec_dock/templates/**`: 生成物の雛形（initiative/epic/issue の現行構造、`issue` のみ `artifacts/`/`discussions/` がある点の確認）
   - `src/spec_dock/assets/spec_dock/docs/guide.md`: ツリー構造と SSOT/生成物の前提確認
+  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: エージェント運用の導線（`discussions/` 前提の記述がある点の確認）
 - 観測した現状（事実）:
   - ノード作成は `templates/{initiative,epic,issue}` を `*_copy_template_tree()` でコピーし、最後に `meta.json` を書く。
   - `*_copy_template_tree()` はテキストを再書き込みするため、テンプレ側にスクリプトを置いても実行権限が落ちる（chmodしない限り `./new-epic` が動かない）。
   - initiative/epic には `artifacts/` が無い。issue は `artifacts/` と `discussions/` があり、補足資料の置き場がレイヤー間で不統一。
+  - 同梱Skillが「調査/ヒアリング資料は `discussions/` に置く」前提のままのため、このまま `artifacts/` 統一すると不整合が出る。
 - 採用するパターン（命名/責務/例外/DI/テストなど）:
   - “導線” はテンプレに寄せる（新規ノード作成時に自動で置けるものは templates に置く）。
   - 生成スクリプトは POSIX shell（`/usr/bin/env bash`）で実装し、`meta.json` は `python3` で最小限パースする（外部依存なし）。
@@ -72,7 +74,9 @@ ID: "iss-00007"
   3) `spec-dock/scripts/spec-dock new adr --<scope> <id> --title "<title>"` を実行し、配下に ADR md が作成される
 - Flow for EC-002:
   1) GitHubスコープ（親idが `*-local-*` ではない）で `new-epic/new-issue` を実行
-  2) `gh` が見つからない場合、`new-epic/new-issue` が明確なメッセージで失敗し、手動の直接コマンドを提示する
+  2) `gh` が見つからない場合、`new-epic/new-issue` が明確なメッセージで失敗し、次を提示する
+     - `gh` をインストールして再実行
+     - 明示的に local-only を選ぶ直接コマンド（`--no-github` 付き）
 
 ### UML（任意） (任意)
 ```plantuml
@@ -121,12 +125,35 @@ ID: "iss-00007"
 
 ## インターフェース契約（ここで固定） (任意)
 ### スクリプトI/F（固定）
+- 共通仕様:
+  - 引数:
+    - 受け取る引数はタイトル1つのみ（0個/2個以上は usage を出して失敗）
+    - タイトルのバリデーション/正規化は runtime script に委譲する（ラッパーでは改変しない）
+  - `meta.json`:
+    - 常に `../meta.json` を読む（`new-epic` は initiative の、`new-issue` は epic の、`new-adr` は scope の `meta.json`）
+    - `../meta.json` が無い/壊れている場合は fail-fast し、修復先（`../meta.json`）を明示する
+  - runtime script 解決（cwd不問）:
+    - 探索起点は “実行時cwd” ではなく “スクリプト自身の配置場所” とする（`dirname "$0"`）。
+    - `dirname "$0"` を絶対パス化したディレクトリから親ディレクトリへ向かって探索し、最初に見つかった `<dir>/spec-dock/scripts/spec-dock` を採用する（最も近いものを採用）。
+    - 探索の打ち切り条件:
+      - ルート（`/`）まで到達した場合
+      - 50階層探索しても見つからない場合（安全弁）
+    - 見つからない場合は fail-fast し、stderr に次を含める:
+      - 「runtime script が見つからない」旨
+      - 探索起点（`dirname "$0"` の解決結果）
+      - 対処: `spec-dock init` / `spec-dock update` の再実行、または `spec-dock/` 導入状態の確認
+  - GitHubモード判定（`new-epic/new-issue`）:
+    - 親idに `-local-` を含む場合は local とみなし `--no-github` を付与する（子も local に揃える）
+    - それ以外は GitHubモードとして `gh` が必要（ただし自動フォールバックはしない）
 - `new-epic "<title>"`
   - 受け取る引数: タイトル1つのみ
   - 成功: exit 0（runtime script の stdout をそのまま出す）
   - 失敗:
     - 引数不正（0個/2個以上）: usage を stderr に出して exit != 0
-    - GitHubスコープで `gh` 不在: “直接コマンド” を stderr に出して exit != 0
+    - GitHubスコープで `gh` 不在: 次を stderr に出して exit != 0
+      - 対応1: `gh` をインストールして再実行
+      - 対応2: 明示的に local-only を選ぶ直接コマンド（`--no-github` 付き）
+        - 注: これは “GitHub親の下に local 子を作る” という混在で、意図がある場合のみ明示的に選ぶ（ラッパーは自動フォールバックしない）
 - `new-issue "<title>"` / `new-adr "<title>"` も同様
 
 ### 関数・クラス境界（重要なものだけ）
@@ -169,6 +196,8 @@ ID: "iss-00007"
   - `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`: `new-issue` の導線を追記
   - `src/spec_dock/assets/spec_dock/templates/*/adrs/README.md`: `new-adr` の導線を追記
   - `src/spec_dock/assets/spec_dock/templates/issue/README.md`: 補足資料を `artifacts/` に寄せる（`discussions/` の扱いを更新）
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/README.md`: `artifacts/` の説明を統一（調査メモ(md)/図/ログ断片/スクショまで包含）
+  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: `discussions/` 前提をやめ、補足資料は `artifacts/` へ置くように更新
   - `tests/test_cli.py`: 新規生成物（スクリプト/`artifacts/`）の存在と、localモードでの動作をテスト追加
 - 削除（Delete）:
   - 該当なし（`discussions/_template.md` は Move/Rename で移設）
@@ -183,18 +212,23 @@ ID: "iss-00007"
 - AC-003 → `src/spec_dock/assets/spec_dock/templates/*/adrs/new-adr`, `src/spec_dock/assets/spec_dock/scripts/spec-dock:_new_adr`
 - AC-004 → `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/**`
 - AC-005 → `new-epic/new-issue`（親idのlocal判定→`--no-github` 付与）
+- AC-006（実行可能） → `src/spec_dock/assets/spec_dock/scripts/spec-dock`（shebangファイルのchmod）+ テンプレ上の `new-*` 配置
 - EC-001/EC-004（引数不正） → 各 `new-*` スクリプト側で usage を出して失敗
 - EC-002（gh不可） → `new-epic/new-issue` が `gh` の存在を検査して失敗 + 直接コマンド提示
+- EC-005（meta.json欠落/破損） → `new-*` が `../meta.json` を検査して fail-fast + 修復先提示
+- EC-006（runtime script 不在） → `new-*` が探索に失敗して fail-fast + `spec-dock init/update` 案内
 - 非交渉制約（stdlib維持） → jsonパースは `python3 -c`、外部ツール依存なし
 
 ## テスト戦略（最低限ここまで具体化） (任意)
 - 追加/更新するテスト:
   - Unit:
     - `new initiative --no-github` で生成される `epics/new-epic` の存在確認
+    - `test -x` によるラッパー実行権限の確認（`new-epic/new-issue/new-adr`）
     - `epics/new-epic "<title>"` 実行で `epic-local-*` が作成されること（local伝播）
     - `issues/new-issue "<title>"` 実行で `iss-local-*` が作成されること（local伝播）
     - `adrs/new-adr "<title>"` 実行で `adr-00001-*.md` が作成されること
     - initiative/epic/issue に `artifacts/` が生成されること
+    - `../meta.json` の欠落/破損でラッパーが fail-fast すること
   - Integration: 該当なし（ghを使うGitHub統合は本Issueではテスト対象外）
 - どのAC/ECをどのテストで保証するか:
   - AC-001 → `tests/test_cli.py::test_new_epic_wrapper_creates_local_epic`（新規追加）
@@ -250,3 +284,6 @@ spec-dock/
 
 ## 省略/例外メモ (必須)
 - 該当なし
+
+## 将来メモ（スコープ外） (任意)
+- 既存ノードへ `artifacts/` や `new-*` を後追いで配布したいニーズは高確率で出るため、将来的に `spec-dock/scripts/spec-dock` に「既存ノードへ wrapper/artifacts を追加する明示コマンド」を検討する余地がある（今回は新規生成のみ対象）。
