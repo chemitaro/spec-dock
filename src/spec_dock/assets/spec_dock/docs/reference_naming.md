@@ -109,8 +109,14 @@ desired ブランチが既に存在する場合:
 - 既存ブランチを checkout して **再利用**します（上書き/削除/強制更新はしません）
 - stderr に warning を出します（例: `spec-dock: (warn) branch already exists; reusing existing branch; content is not verified`）
 
+補足（重要）:
+- checkout 後に spec ツリーを再走査し、node を再解決して desired を **再計算**することがあります（例: ブランチ間で `meta.json.slug` がズレている）。
+- 最終的に current ブランチ名を desired に寄せるため、次の順で `ensure current == desired` を行います:
+  - desired が既に存在する場合: そのブランチを `checkout`（再利用）
+  - desired が存在しない場合: current ブランチを `rename`（`git branch -m` 相当。コミット/内容は変更しない）
+- spec-dock は `git branch -D` / `git reset --hard` / `git checkout -B` / `git branch -M` 等の破壊的/強制操作は行いません。
+
 ### 4.5 警告（stderr）の安定トークン
 
 warning は stderr に `spec-dock: (warn)` プレフィクスで出力されます。  
 運用/テストでは全文一致ではなく、このプレフィクスやキーフレーズ（例: `fallback to id`, `reusing existing branch`）の **包含**で検証するのが安全です。
-

@@ -23,6 +23,12 @@
 - `sync` は実行前に preflight validate を行い、致命的不整合がある場合は失敗します
   - `sync --force`: validate NG でも警告して継続します（デバッグ用途）
 
+### preflight validate で弾かれる代表例
+
+- `github.issue_number` の重複（同じ Issue番号が複数 node にリンクされている）
+  - エラーには `type:id (meta.json path)` の競合一覧が含まれます
+  - 復旧は、競合している `meta.json` の `github.issue_number` を修正し、リンクを 1つに戻します
+
 ### active 推定の例（2〜3例）
 
 `sync` は「ブランチ名に含まれる id / GitHub Issue番号」を手がかりに、仕様ツリー内のノードへ **一意に対応**する場合のみ active を更新します（曖昧なら更新しません）。
