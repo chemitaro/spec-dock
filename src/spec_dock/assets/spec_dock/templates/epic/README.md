@@ -8,9 +8,9 @@
 - `design.md`（HOW：契約/API/データ）
 - `plan.md`（Issue分解/順序/テスト戦略）
 - `report.md`（進捗/決定/結果の要約）
+- `artifacts/`（調査メモ/図/ログ断片/スクリーンショットなど）
 - `adrs/`（この epic に閉じる意思決定）
 - `issues/`（配下Issue）
 
 ## リンク (任意)
 - GitHub: <issue/project url>
-

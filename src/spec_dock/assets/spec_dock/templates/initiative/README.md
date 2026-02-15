@@ -16,9 +16,9 @@
 - `design.md`（HOW：境界/契約/非機能）
 - `plan.md`（ロードマップ/エピック分解）
 - `report.md`（進捗/決定/結果の要約）
+- `artifacts/`（調査メモ/図/ログ断片/スクリーンショットなど）
 - `adrs/`（この initiative に効く意思決定）
 - `epics/`（配下エピック）
 
 ## リンク (任意)
 - GitHub: <issue/project url>
-

@@ -88,6 +88,7 @@ ID: "iss-00007"
 - 追加/更新するテスト:
   - Modify: `tests/test_cli.py::test_new_*` 系（`artifacts/` 生成と `discussions/` 非生成の観測を追加）
   - Modify: `tests/test_cli.py::test_init_creates_expected_structure`（Skillファイルの存在と文言の観測を追加）
+  - Skill文言のassert方針: 将来の言い回し変更に耐えるため、「`artifacts/` を主要導線として案内」かつ「`discussions/` はレガシー扱い」を示す最小限の文字列のみ検証する
 
 #### Red（失敗するテストを先に書く） (任意)
 - 期待する失敗:
@@ -147,6 +148,7 @@ ID: "iss-00007"
   - それらが `test -x` で真になる
 - 観測点: FS（実行ビット）
 - 追加/更新するテスト: `tests/test_cli.py::test_wrappers_are_executable`
+  - OS差メモ: 要件上Windowsは対象外だが、テスト安定化のため必要なら `os.name == \"nt\"` でskipする
 
 #### Red（失敗するテストを先に書く） (任意)
 - 期待する失敗:
