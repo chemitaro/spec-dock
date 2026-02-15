@@ -16,11 +16,11 @@ ID: "iss-00007"
 - Initiative/Epic/Issue の各レイヤーに、ADR以外の補足資料を置ける共通ディレクトリが存在し、置き場所に迷わない。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
-- 現状の挙動（事実）:
-  - initiative配下の `epics/` には `README.md` のみがあり、Epic追加は手動で `./spec-dock/scripts/spec-dock new epic --initiative <init-id> ...` を実行する必要がある: `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`
-  - epic配下の `issues/` も同様に `README.md` のみで、Issue追加は手動で `./spec-dock/scripts/spec-dock new issue --epic <epic-id> ...` を実行する必要がある: `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`
-  - issue配下には `artifacts/` と `discussions/` が存在するが、initiative/epic には存在しない: `src/spec_dock/assets/spec_dock/templates/issue/artifacts/README.md`, `src/spec_dock/assets/spec_dock/templates/issue/discussions/_template.md`
-  - ADRは各スコープ配下の `adrs/` にMarkdownファイルとして作成される（`meta.json` は持たない）: `src/spec_dock/assets/spec_dock/scripts/spec-dock:816`
+  - 現状の挙動（事実）:
+    - initiative配下の `epics/` には `README.md` のみがあり、Epic追加は手動で `./spec-dock/scripts/spec-dock new epic --initiative <init-id> ...` を実行する必要がある: `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`
+    - epic配下の `issues/` も同様に `README.md` のみで、Issue追加は手動で `./spec-dock/scripts/spec-dock new issue --epic <epic-id> ...` を実行する必要がある: `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`
+    - issue配下には `artifacts/` と `discussions/`（レガシー）が存在するが、initiative/epic には存在しない: `src/spec_dock/assets/spec_dock/templates/issue/artifacts/README.md`, `src/spec_dock/assets/spec_dock/templates/issue/discussions/_template.md`（旧パス/削除予定。移設先: `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`）
+    - ADRは各スコープ配下の `adrs/` にMarkdownファイルとして作成される（`meta.json` は持たない）: `src/spec_dock/assets/spec_dock/scripts/spec-dock:816`
 - 現状の課題（困っていること）:
   - 子ノード作成時に親IDの指定が毎回必要で、特にエージェントは「どのIDが親か」を都度探索しがちで手戻り/ミスが起きる。
   - ADR以外の補足資料の置き場がレイヤー間で不統一（issueにしかない）で、initiative/epic の議論ログや図をどこへ置くべきか迷う。
