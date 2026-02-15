@@ -21,6 +21,8 @@ ID: "iss-00007"
   - Epic配下 `issues/` に `new-issue` を自動配置（タイトル1引数）。
   - Initiative/Epic/Issue の `adrs/` に `new-adr` を自動配置（タイトル1引数）。
   - Initiative/Epic/Issue の各スコープに `artifacts/` を自動生成（共通構造）。
+  - Initiative/Epic/Issue の `artifacts/` に `artifacts/_template.md` を配置する（空ディレクトリ回避 + 運用ガイド）。
+  - 新規生成されるノード/配下ディレクトリにテンプレ由来の `README.md` を生成しない（SSOTは `requirement.md` / `design.md` / `plan.md` / `report.md` と `artifacts/_template.md`）。
 - MUST NOT:
   - `new {initiative,epic,issue,adr}` の既存仕様（ID、生成先、GitHub連携）を破壊しない。
   - `jq` 等の外部依存を追加しない（runtime script は stdlib のまま）。
@@ -44,6 +46,7 @@ ID: "iss-00007"
   - ノード作成は `templates/{initiative,epic,issue}` を `*_copy_template_tree()` でコピーし、最後に `meta.json` を書く。
   - `*_copy_template_tree()` はテキストを再書き込みするため、テンプレ側にスクリプトを置いても実行権限が落ちる（chmodしない限り `./new-epic` が動かない）。
   - initiative/epic には `artifacts/` が無い。issue は `artifacts/` と `discussions/` があり、補足資料の置き場がレイヤー間で不統一。
+  - `README.md` が複数階層に存在し、生成物でも増殖しやすい（SSOTと二重管理になり得る）。
   - 同梱Skillが「調査/ヒアリング資料は `discussions/` に置く」前提のままのため、このまま `artifacts/` 統一すると不整合が出る。
 - 採用するパターン（命名/責務/例外/DI/テストなど）:
   - “導線” はテンプレに寄せる（新規ノード作成時に自動で置けるものは templates に置く）。
@@ -99,7 +102,7 @@ ID: "iss-00007"
 - 論点1: 補足資料ディレクトリ名（`artifacts` / `discussions` / 別名）
   - 選択肢A: `artifacts/`
     - Pros: 既に issue で使われている、ADR（決定）と役割が被りにくい、中立で包含範囲が広い
-    - Cons: “議論メモ” という意図が名前からは弱い（READMEで補う）
+    - Cons: “議論メモ” という意図が名前からは弱い（`artifacts/_template.md` のテンプレで補う）
   - 選択肢B: `discussions/`
     - Pros: “調査/議論ログ” という意図は強い
     - Cons: ADR（意思決定）と概念が近く、運用が二重化しやすい
@@ -188,22 +191,20 @@ ID: "iss-00007"
   - `src/spec_dock/assets/spec_dock/templates/initiative/adrs/new-adr`: initiativeスコープで ADR を作るラッパー
   - `src/spec_dock/assets/spec_dock/templates/epic/adrs/new-adr`: epicスコープで ADR を作るラッパー
   - `src/spec_dock/assets/spec_dock/templates/issue/adrs/new-adr`: issueスコープで ADR を作るラッパー
-  - `src/spec_dock/assets/spec_dock/templates/initiative/artifacts/README.md`: initiative補足資料置き場
-  - `src/spec_dock/assets/spec_dock/templates/epic/artifacts/README.md`: epic補足資料置き場
-  - `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`: 補足資料（調査/議論メモ）用テンプレ（旧 `discussions/_template.md` を移設）
+  - `src/spec_dock/assets/spec_dock/templates/initiative/artifacts/_template.md`: 補足資料（調査/議論メモ）用テンプレ（READMEの代替。空ディレクトリ回避も兼ねる）
+  - `src/spec_dock/assets/spec_dock/templates/epic/artifacts/_template.md`: 補足資料（調査/議論メモ）用テンプレ（READMEの代替。空ディレクトリ回避も兼ねる）
 - 変更（Modify）:
   - `src/spec_dock/assets/spec_dock/scripts/spec-dock`: テンプレコピー後に shebang ファイルへ `+x` を付与
-  - `src/spec_dock/assets/spec_dock/templates/initiative/README.md`: `artifacts/` を成果物に追加
-  - `src/spec_dock/assets/spec_dock/templates/epic/README.md`: `artifacts/` を成果物に追加
-  - `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`: `new-epic` の導線を追記
-  - `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`: `new-issue` の導線を追記
-  - `src/spec_dock/assets/spec_dock/templates/*/adrs/README.md`: `new-adr` の導線を追記
-  - `src/spec_dock/assets/spec_dock/templates/issue/README.md`: 補足資料を `artifacts/` に寄せる（`discussions/` は新規生成しない。既存に残っている場合はレガシーとして扱う旨を注記）
-  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/README.md`: `artifacts/` の説明を統一（調査メモ(md)/図/ログ断片/スクショまで包含）
+  - `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`: 既存テンプレの内容更新（補足資料の置き場所/粒度/例を示す）
   - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: `discussions/` 前提をやめ、補足資料は `artifacts/` へ置くように更新（既存ノードに `discussions/` が残っている場合のレガシー注記も追加）
   - `tests/test_cli.py`: 新規生成物（スクリプト/`artifacts/`）の存在と、localモードでの動作をテスト追加
 - 削除（Delete）:
   - `src/spec_dock/assets/spec_dock/templates/issue/discussions/`: `discussions/_template.md` を `artifacts/_template.md` へ移設した上で、テンプレからディレクトリ自体を削除する（新規生成で `discussions/` を作らない根拠）
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/README.md`: 仕様書と二重管理になりやすいREADMEを新規生成に含めない
+  - `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`: 同上（READMEは生成しない）
+  - `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`: 同上（READMEは生成しない）
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/adrs/README.md`: 同上（READMEは生成しない）
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/README.md`: `_template.md` に置き換える（READMEは生成しない）
 - 移動/リネーム（Move/Rename）:
   - `src/spec_dock/assets/spec_dock/templates/issue/discussions/_template.md` → `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`: 既存テンプレ内容を `artifacts/` に寄せる
 - 参照（Read only / context）:
@@ -216,6 +217,7 @@ ID: "iss-00007"
 - AC-004 → `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/**`, `src/spec_dock/assets/spec_dock/templates/issue/discussions/`（Delete）
 - AC-005 → `new-epic/new-issue`（親idのlocal判定→`--no-github` 付与）
 - AC-006（実行可能） → `src/spec_dock/assets/spec_dock/scripts/spec-dock`（shebangファイルのchmod）+ テンプレ上の `new-*` 配置
+- AC-007（README非生成） → `src/spec_dock/assets/spec_dock/templates/**/README.md`（Delete）+ `tests/test_cli.py`（非存在テスト）
 - EC-001/EC-004（引数不正） → 各 `new-*` スクリプト側で usage を出して失敗
 - EC-002（gh不可） → `new-epic/new-issue` が `gh` の存在を検査して失敗 + 直接コマンド提示
 - EC-005（meta.json欠落/破損） → `new-*` が `../meta.json` を検査して fail-fast + 修復先提示
@@ -231,7 +233,9 @@ ID: "iss-00007"
     - `issues/new-issue "<title>"` 実行で `iss-local-*` が作成されること（local伝播）
     - `adrs/new-adr "<title>"` 実行で `adr-00001-*.md` が作成されること
     - initiative/epic/issue に `artifacts/` が生成されること
+    - initiative/epic/issue の `artifacts/_template.md` が生成されること（空ディレクトリ回避 + 運用ガイド）
     - 新規生成された issue に `discussions/` が生成されないこと（`artifacts/` に統合されること。例: `assertFalse((issue_dir / "discussions").exists())`）
+    - 新規生成された initiative/epic/issue 配下に `README.md` が生成されないこと（例: `assertEqual([], list(node_dir.rglob("README.md")))`）
     - `../meta.json` の欠落/破損でラッパーが fail-fast すること
     - `spec-dock/scripts/spec-dock` が見つからない場合にラッパーが fail-fast し、案内文言が出ること（EC-006。テストでは runtime script を一時的にリネーム/退避して再現する）
   - Integration: 該当なし（ghを使うGitHub統合は本Issueではテスト対象外）
@@ -263,28 +267,22 @@ spec-dock/
 └── initiatives/
     └── init-.../
         ├── artifacts/                 # Add (initiative)
-        │   └── README.md
+        │   └── _template.md           # Add (READMEは生成しない)
         ├── adrs/
-        │   ├── README.md
         │   └── new-adr                # Add
         └── epics/
-            ├── README.md
             └── new-epic               # Add
             └── epic-.../
                 ├── artifacts/         # Add (epic)
-                │   └── README.md
+                │   └── _template.md   # Add (READMEは生成しない)
                 ├── adrs/
-                │   ├── README.md
                 │   └── new-adr        # Add
                 └── issues/
-                    ├── README.md
                     └── new-issue      # Add
                     └── iss-.../
                         ├── artifacts/ # Keep/Modify (issue)
-                        │   ├── README.md
-                        │   └── _template.md (optional)
+                        │   └── _template.md
                         └── adrs/
-                            ├── README.md
                             └── new-adr  # Add
 ```
 
