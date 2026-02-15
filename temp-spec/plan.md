@@ -13,7 +13,7 @@ ID: "iss-00007"
 # iss-00007 スコープ配下に子ノード作成用スクリプトを自動生成 + 補足資料ディレクトリ追加 — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006
+- 対象AC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
 - 対象EC: EC-001, EC-002, EC-003, EC-004, EC-005, EC-006
 - 対象制約:
   - macOS/Linux のみ（Windowsは対象外）
@@ -22,12 +22,13 @@ ID: "iss-00007"
   - 既存ノードは移行しない（後追い配布/マイグレーションはOUT OF SCOPE）
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: 新規生成されたノードに `artifacts/` が存在し、issue に `discussions/` が生成されない（Skill/READMEの導線も `artifacts/` に統一）
+- [ ] S01: 新規生成されたノードに `artifacts/` が存在し、issue に `discussions/` が生成されない（Skillの導線も `artifacts/` に統一）
 - [ ] S02: テンプレ上に wrapper（`new-*`）が配置され、生成物の wrapper が実行可能（`+x`）である
 - [ ] S03: `new-epic/new-issue/new-adr "<title>"` が local モードで子ノードを作成できる
 - [ ] S04: wrapper が引数不正（0個/2個以上）で usage を出して失敗する
 - [ ] S05: wrapper が `../meta.json` 欠落/破損、runtime script 未発見で fail-fast する
 - [ ] S06: GitHubモードで `gh` 不在なら明確に案内して失敗する（自動フォールバックしない）
+- [ ] S07: 新規生成ノードにテンプレ由来の `README.md` が生成されない（`artifacts/_template.md` を配置する）
 
 ### UML（任意） (任意)
 ```plantuml
@@ -44,19 +45,20 @@ ID: "iss-00007"
 - AC-002 → S03
 - AC-003 → S03
 - AC-005 → S03
+- AC-007 → S07
 - EC-001 → S04
 - EC-004 → S04
 - EC-005 → S05
 - EC-006 → S05
 - EC-002 → S06
 - EC-003 → S03（スペースを含むタイトルが壊れず渡ること。記号の可否は既存バリデーションに従う）
-- 非交渉制約（macOS/Linuxのみ、追加依存なし、既存ノード非移行）→ S01-S06（各ステップで逸脱しない）
+- 非交渉制約（macOS/Linuxのみ、追加依存なし、既存ノード非移行）→ S01-S07（各ステップで逸脱しない）
 
 ---
 
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
-### S01 — 新規生成されたノードに `artifacts/` が存在し、issue に `discussions/` が生成されない（Skill/READMEの導線も `artifacts/` に統一） (必須)
+### S01 — 新規生成されたノードに `artifacts/` が存在し、issue に `discussions/` が生成されない（Skillの導線も `artifacts/` に統一） (必須)
 - 対象: AC-004 + MUST（同梱Skill更新）
 - 設計参照:
   - 対象IF/API: templates 更新（`temp-spec/design.md` の変更計画 Add/Modify/Delete）
@@ -81,8 +83,8 @@ ID: "iss-00007"
 - When: `spec-dock/scripts/spec-dock new initiative/epic/issue --no-github ...` でノードを作成する
 - Then:
   - initiative/epic/issue に `artifacts/` が存在する
+  - initiative/epic/issue の `artifacts/_template.md` が存在する（空ディレクトリ回避 + 運用ガイド）
   - 新規 issue に `discussions/` が存在しない
-  - `issue/artifacts/_template.md` が存在する（旧 `discussions/_template.md` の統合先）
   - `.agents/skills/spec-driven-tdd-workflow/SKILL.md` が存在し、補足資料の置き場として `artifacts/` を案内している（`discussions/` はレガシー注記）
 - 観測点: FS（ディレクトリ/ファイルの存在）
 - 追加/更新するテスト:
@@ -99,14 +101,10 @@ ID: "iss-00007"
 #### Green（最小実装） (任意)
 - 変更予定ファイル:
   - Add:
-    - `src/spec_dock/assets/spec_dock/templates/initiative/artifacts/README.md`
-    - `src/spec_dock/assets/spec_dock/templates/epic/artifacts/README.md`
-    - `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`
+    - `src/spec_dock/assets/spec_dock/templates/initiative/artifacts/_template.md`
+    - `src/spec_dock/assets/spec_dock/templates/epic/artifacts/_template.md`
   - Modify:
-    - `src/spec_dock/assets/spec_dock/templates/initiative/README.md`
-    - `src/spec_dock/assets/spec_dock/templates/epic/README.md`
-    - `src/spec_dock/assets/spec_dock/templates/issue/README.md`（レガシー注記を含む）
-    - `src/spec_dock/assets/spec_dock/templates/issue/artifacts/README.md`（補足資料の説明を拡張）
+    - `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`（補足資料の説明を更新）
     - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`（補足資料の置き場を `artifacts/` に統一 + レガシー注記）
   - Delete:
     - `src/spec_dock/assets/spec_dock/templates/issue/discussions/`
@@ -117,9 +115,9 @@ ID: "iss-00007"
 
 #### Refactor（振る舞い不変で整理） (任意)
 - 目的:
-  - README/Skillの文言揺れを減らし、運用の混乱を避ける
+  - Skillの文言揺れを減らし、運用の混乱を避ける
 - 変更対象:
-  - `src/spec_dock/assets/spec_dock/templates/**/README.md`
+  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] 期待するテスト（必要ならフォーマット/リンタ）を実行し、成功した
@@ -164,11 +162,6 @@ ID: "iss-00007"
     - `src/spec_dock/assets/spec_dock/templates/issue/adrs/new-adr`（同上）
   - Modify:
     - `src/spec_dock/assets/spec_dock/scripts/spec-dock`（コピー後、shebangを持つファイルへ `chmod +x`）
-    - `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`（`new-epic` の導線）
-    - `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`（`new-issue` の導線）
-    - `src/spec_dock/assets/spec_dock/templates/initiative/adrs/README.md`（`new-adr` の導線）
-    - `src/spec_dock/assets/spec_dock/templates/epic/adrs/README.md`（`new-adr` の導線）
-    - `src/spec_dock/assets/spec_dock/templates/issue/adrs/README.md`（`new-adr` の導線）
 - 実装方針:
   - テキスト再書き込みで落ちた実行ビットだけを回復する（shebang判定で限定）
 
@@ -312,6 +305,41 @@ ID: "iss-00007"
 #### Green（最小実装） (任意)
 - 変更予定ファイル:
   - Modify: `src/spec_dock/assets/spec_dock/templates/**/new-{epic,issue}`（`command -v gh` 検査と案内文）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] 期待するテストを実行し、成功した
+- [ ] `./spec-dock/active/issue/report.md` を更新した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] コミットした（エージェント）
+
+---
+
+### S07 — 新規生成ノードにテンプレ由来の `README.md` が生成されない（`artifacts/_template.md` を配置する） (必須)
+- 対象: AC-007
+- 設計参照:
+  - 対象IF/API: templates のREADME削除 + `artifacts/_template.md` 配置
+  - 対象テスト: `tests/test_cli.py::test_new_nodes_do_not_generate_readme_files`（新規）
+- このステップで「追加しないこと（スコープ固定）」:
+  - READMEの代替として新しい“常設ドキュメント”を増やさない（SSOTは `requirement.md` / `design.md` / `plan.md` / `report.md` と `artifacts/_template.md`）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `spec-dock/scripts/spec-dock new initiative/epic/issue --no-github ...` でノードを作成する
+- When: 生成されたノード配下を確認する
+- Then:
+  - initiative/epic/issue 配下（ノード直下 + `epics/` / `issues/` / `adrs/` / `artifacts/`）に `README.md` が存在しない
+  - `artifacts/_template.md` は存在する（空ディレクトリ回避 + 運用ガイド）
+- 観測点: FS（`README.md` 非存在 / `_template.md` 存在）
+- 追加/更新するテスト:
+  - Add: `tests/test_cli.py::test_new_nodes_do_not_generate_readme_files`
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Delete: `src/spec_dock/assets/spec_dock/templates/**/README.md`（生成物に含めない）
+  - Add: `src/spec_dock/assets/spec_dock/templates/{initiative,epic}/artifacts/_template.md`（未作成なら）
+  - Modify: `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`（必要なら内容調整）
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] 期待するテストを実行し、成功した

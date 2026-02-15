@@ -14,24 +14,25 @@ ID: "iss-00007"
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
 - 人間/エージェントが「いま見ているスコープ」配下へ、親ID指定なしで `new epic` / `new issue` / `new adr` を最小引数（タイトル1つ）で実行できる。
 - Initiative/Epic/Issue の各レイヤーに、ADR以外の補足資料を置ける共通ディレクトリが存在し、置き場所に迷わない。
+- 生成物に重複しやすい `README.md` を量産せず、SSOT（`requirement.md` / `design.md` / `plan.md` / `report.md`）と `artifacts/_template.md` に情報を集約できる。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
   - 現状の挙動（事実）:
-    - initiative配下の `epics/` には `README.md` のみがあり、Epic追加は手動で `./spec-dock/scripts/spec-dock new epic --initiative <init-id> ...` を実行する必要がある: `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`
-    - epic配下の `issues/` も同様に `README.md` のみで、Issue追加は手動で `./spec-dock/scripts/spec-dock new issue --epic <epic-id> ...` を実行する必要がある: `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`
-    - issue配下には `artifacts/` と `discussions/`（レガシー）が存在するが、initiative/epic には存在しない: `src/spec_dock/assets/spec_dock/templates/issue/artifacts/README.md`, `src/spec_dock/assets/spec_dock/templates/issue/discussions/_template.md`（旧パス/削除予定。移設先: `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`）
+    - 各レイヤーのテンプレ/生成物に `README.md` が複数箇所で作られ得るが、内容が類似しやすく、仕様書（`requirement.md` / `design.md` / `plan.md` / `report.md`）と二重管理になり得る。
+    - issue配下には `discussions/`（レガシー）が残り得るが、以降の新規資料は `artifacts/` に統合する（ADRは `adrs/`）。
     - ADRは各スコープ配下の `adrs/` にMarkdownファイルとして作成される（`meta.json` は持たない）: `src/spec_dock/assets/spec_dock/scripts/spec-dock:816`
 - 現状の課題（困っていること）:
   - 子ノード作成時に親IDの指定が毎回必要で、特にエージェントは「どのIDが親か」を都度探索しがちで手戻り/ミスが起きる。
   - ADR以外の補足資料の置き場がレイヤー間で不統一（issueにしかない）で、initiative/epic の議論ログや図をどこへ置くべきか迷う。
+  - `README.md` が各レイヤー/各ディレクトリに増殖し、ほぼ同内容が並ぶことでノイズになりやすい（SSOTとの二重管理）。
 - 再現手順（最小で）:
   1) `new initiative` を実行し、生成された `epics/` を開く
-  2) `README.md` しかなく、`new epic` をタイトルだけで実行できる導線がない
+  2) 複数箇所に `README.md` が生成され、内容が似ていてノイズになっている
 - 観測点（どこを見て確認するか）:
-  - FS: `spec-dock/initiatives/**` 配下の生成物（ディレクトリ/スクリプト/README）
+  - FS: `spec-dock/initiatives/**` 配下の生成物（ディレクトリ/スクリプト/テンプレ由来のファイル）
   - CLI: `spec-dock/scripts/spec-dock new ...` の実行結果（生成パス、`meta.json` の内容、ADRファイル名）
 - 実際の観測結果（貼れる範囲で）:
-  - Input/Operation: `./spec-dock/scripts/spec-dock new initiative ...` → `epics/README.md` のみが生成される
+  - Input/Operation: `./spec-dock/scripts/spec-dock new initiative ...` → `README.md` が複数箇所に生成される
   - Output/State: `new epic` には `--initiative <id>` が必須で、親IDを省略できない
 - 情報源（ヒアリング/調査の根拠）:
   - Issue/チケット: https://github.com/chemitaro/spec-dock/issues/7
@@ -61,7 +62,9 @@ ID: "iss-00007"
   - Epic配下 `issues/` に、Issue作成用スクリプト `new-issue` を自動配置する（引数はタイトル1つのみ）
   - Initiative/Epic/Issue の `adrs/` に、ADR作成用スクリプト `new-adr` を自動配置する（引数はタイトル1つのみ）
   - Initiative/Epic/Issue の各スコープに、ADR以外の補足資料ディレクトリ `artifacts/` を1つ配置する（共通構造）
+  - `artifacts/` には空ディレクトリ回避と運用ガイドのために `artifacts/_template.md`（構造化Markdownテンプレ）を必ず配置する（initiative/epic/issue 共通）
   - 新規生成では `discussions/` を生成せず、調査/議論メモも `artifacts/` に統合する（ADR は `adrs/` に残す）
+  - 新規生成される Initiative/Epic/Issue ノードおよび配下ディレクトリ（`epics/` / `issues/` / `adrs/` / `artifacts/`）に、テンプレ由来の `README.md` を生成しない（SSOTは `requirement.md` / `design.md` / `plan.md` / `report.md` と `artifacts/_template.md`）
   - `new-epic/new-issue/new-adr` は `meta.json` を解析して親ID/スコープ種別を取得し、利用者が親IDを渡さずに済む
   - Localスコープ（親idが `*-local-*`）では、`new-epic/new-issue` は自動で `--no-github` を付けて子も local に揃える
   - 生成スクリプトは内部的に既存の runtime script `spec-dock/scripts/spec-dock` を呼び、ロジックを重複しない
@@ -152,8 +155,11 @@ ID: "iss-00007"
   - Actor/Role: 開発者（人間/エージェント）
   - Given: `new initiative` / `new epic` / `new issue` を実行する
   - When: 生成されたノードディレクトリを確認する
-  - Then: ADR以外の補足資料を置ける共通ディレクトリ `artifacts/` が存在する。かつ新規生成された issue では `discussions/` が存在しない（`artifacts/` に統合される）
-  - 観測点（UI/HTTP/DB/Log など）: FS（ディレクトリ存在、READMEの文言）
+  - Then:
+    - ADR以外の補足資料を置ける共通ディレクトリ `artifacts/` が存在する
+    - `artifacts/_template.md` が存在する（補足資料のガイド兼、空ディレクトリ回避）
+    - 新規生成された issue では `discussions/` が存在しない（`artifacts/` に統合される）
+  - 観測点（UI/HTTP/DB/Log など）: FS（ディレクトリ/ファイルの存在）
 - AC-005:
   - Actor/Role: 開発者（人間/エージェント）
   - Given: 親スコープが local（`*-local-*`）である
@@ -166,6 +172,12 @@ ID: "iss-00007"
   - When: 生成されたラッパースクリプトを確認する
   - Then: `new-epic` / `new-issue` / `new-adr` は実行可能（`test -x` が真）である
   - 観測点: FS（実行ビット）、CLI（`test -x` の結果）
+- AC-007:
+  - Actor/Role: 開発者（人間/エージェント）
+  - Given: `new initiative` / `new epic` / `new issue` を実行する
+  - When: 生成されたノード配下（ノード直下 + `epics/` / `issues/` / `adrs/` / `artifacts/`）を確認する
+  - Then: テンプレ由来の `README.md` が存在しない（重複しやすいREADME量産をしない）
+  - 観測点: FS（`README.md` 非存在）
 
 ### 入力→出力例 (任意)
 - EX-001:
