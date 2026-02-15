@@ -22,8 +22,8 @@ ID: "iss-00007"
   - 既存ノードは移行しない（後追い配布/マイグレーションはOUT OF SCOPE）
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: 新規生成されたノードに `artifacts/` と wrapper が存在し、issue に `discussions/` が生成されない
-- [ ] S02: wrapper（`new-*`）が実行可能（`+x`）として生成される
+- [ ] S01: 新規生成されたノードに `artifacts/` が存在し、issue に `discussions/` が生成されない（Skill/READMEの導線も `artifacts/` に統一）
+- [ ] S02: テンプレ上に wrapper（`new-*`）が配置され、生成物の wrapper が実行可能（`+x`）である
 - [ ] S03: `new-epic/new-issue/new-adr "<title>"` が local モードで子ノードを作成できる
 - [ ] S04: wrapper が引数不正（0個/2個以上）で usage を出して失敗する
 - [ ] S05: wrapper が `../meta.json` 欠落/破損、runtime script 未発見で fail-fast する
@@ -38,6 +38,7 @@ ID: "iss-00007"
 
 ### 要件 ↔ ステップ対応表 (必須)
 - AC-004 → S01
+- MUST（同梱Skillの導線を `artifacts/` に統一）→ S01
 - AC-006 → S02
 - AC-001 → S03
 - AC-002 → S03
@@ -55,8 +56,8 @@ ID: "iss-00007"
 
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
-### S01 — 新規生成されたノードに `artifacts/` と wrapper が存在し、issue に `discussions/` が生成されない (必須)
-- 対象: AC-004
+### S01 — 新規生成されたノードに `artifacts/` が存在し、issue に `discussions/` が生成されない（Skill/READMEの導線も `artifacts/` に統一） (必須)
+- 対象: AC-004 + MUST（同梱Skill更新）
 - 設計参照:
   - 対象IF/API: templates 更新（`temp-spec/design.md` の変更計画 Add/Modify/Delete）
   - 対象テスト: `tests/test_cli.py::test_new_nodes_include_artifacts_dir`（更新）+ `tests/test_cli.py::test_new_nodes_do_not_generate_discussions_dir`（新規 or 既存へ統合）
@@ -82,9 +83,11 @@ ID: "iss-00007"
   - initiative/epic/issue に `artifacts/` が存在する
   - 新規 issue に `discussions/` が存在しない
   - `issue/artifacts/_template.md` が存在する（旧 `discussions/_template.md` の統合先）
+  - `.agents/skills/spec-driven-tdd-workflow/SKILL.md` が存在し、補足資料の置き場として `artifacts/` を案内している（`discussions/` はレガシー注記）
 - 観測点: FS（ディレクトリ/ファイルの存在）
 - 追加/更新するテスト:
   - Modify: `tests/test_cli.py::test_new_*` 系（`artifacts/` 生成と `discussions/` 非生成の観測を追加）
+  - Modify: `tests/test_cli.py::test_init_creates_expected_structure`（Skillファイルの存在と文言の観測を追加）
 
 #### Red（失敗するテストを先に書く） (任意)
 - 期待する失敗:
@@ -103,6 +106,7 @@ ID: "iss-00007"
     - `src/spec_dock/assets/spec_dock/templates/epic/README.md`
     - `src/spec_dock/assets/spec_dock/templates/issue/README.md`（レガシー注記を含む）
     - `src/spec_dock/assets/spec_dock/templates/issue/artifacts/README.md`（補足資料の説明を拡張）
+    - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`（補足資料の置き場を `artifacts/` に統一 + レガシー注記）
   - Delete:
     - `src/spec_dock/assets/spec_dock/templates/issue/discussions/`
 - 追加する概念（このステップで導入する最小単位）:
@@ -124,7 +128,7 @@ ID: "iss-00007"
 
 ---
 
-### S02 — wrapper（`new-*`）が実行可能（`+x`）として生成される (必須)
+### S02 — テンプレ上に wrapper（`new-*`）が配置され、生成物の wrapper が実行可能（`+x`）である (必須)
 - 対象: AC-006
 - 設計参照:
   - 対象IF/API: IF-001（`_copy_template_tree` の shebang 判定 + chmod）
@@ -136,9 +140,11 @@ ID: "iss-00007"
 - [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
 
 #### 期待する振る舞い（テストケース） (必須)
-- Given: S01まで完了し、テンプレ上に `new-*`（shebang付き）が存在する
+- Given: テンプレ上に `new-*`（shebang付き）が存在する（このステップで追加する）
 - When: runtime でノードを生成する（initiative/epic/issue）
-- Then: 生成された `new-epic/new-issue/new-adr` が `test -x` で真になる
+- Then:
+  - `epics/new-epic` / `issues/new-issue` / `adrs/new-adr` が生成されている
+  - それらが `test -x` で真になる
 - 観測点: FS（実行ビット）
 - 追加/更新するテスト: `tests/test_cli.py::test_wrappers_are_executable`
 
@@ -148,9 +154,21 @@ ID: "iss-00007"
 
 #### Green（最小実装） (任意)
 - 変更予定ファイル:
-  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec-dock`（コピー後、shebangを持つファイルへ `chmod +x`）
+  - Add:
+    - `src/spec_dock/assets/spec_dock/templates/initiative/epics/new-epic`（中身は最小スタブでよい。次ステップでロジック実装）
+    - `src/spec_dock/assets/spec_dock/templates/epic/issues/new-issue`（同上）
+    - `src/spec_dock/assets/spec_dock/templates/initiative/adrs/new-adr`（同上）
+    - `src/spec_dock/assets/spec_dock/templates/epic/adrs/new-adr`（同上）
+    - `src/spec_dock/assets/spec_dock/templates/issue/adrs/new-adr`（同上）
+  - Modify:
+    - `src/spec_dock/assets/spec_dock/scripts/spec-dock`（コピー後、shebangを持つファイルへ `chmod +x`）
+    - `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`（`new-epic` の導線）
+    - `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`（`new-issue` の導線）
+    - `src/spec_dock/assets/spec_dock/templates/initiative/adrs/README.md`（`new-adr` の導線）
+    - `src/spec_dock/assets/spec_dock/templates/epic/adrs/README.md`（`new-adr` の導線）
+    - `src/spec_dock/assets/spec_dock/templates/issue/adrs/README.md`（`new-adr` の導線）
 - 実装方針:
-  - 텍스트再書き込みで落ちた実行ビットだけを回復する（shebang判定で限定）
+  - テキスト再書き込みで落ちた実行ビットだけを回復する（shebang判定で限定）
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] 期待するテストを実行し、成功した
@@ -193,7 +211,7 @@ ID: "iss-00007"
 
 #### Green（最小実装） (任意)
 - 変更予定ファイル:
-  - Add:
+  - Modify:
     - `src/spec_dock/assets/spec_dock/templates/initiative/epics/new-epic`
     - `src/spec_dock/assets/spec_dock/templates/epic/issues/new-issue`
     - `src/spec_dock/assets/spec_dock/templates/initiative/adrs/new-adr`
