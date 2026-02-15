@@ -61,9 +61,11 @@ ID: "iss-00007"
   - Epic配下 `issues/` に、Issue作成用スクリプト `new-issue` を自動配置する（引数はタイトル1つのみ）
   - Initiative/Epic/Issue の `adrs/` に、ADR作成用スクリプト `new-adr` を自動配置する（引数はタイトル1つのみ）
   - Initiative/Epic/Issue の各スコープに、ADR以外の補足資料ディレクトリ `artifacts/` を1つ配置する（共通構造）
+  - 新規生成では `discussions/` を生成せず、調査/議論メモも `artifacts/` に統合する（ADR は `adrs/` に残す）
   - `new-epic/new-issue/new-adr` は `meta.json` を解析して親ID/スコープ種別を取得し、利用者が親IDを渡さずに済む
   - Localスコープ（親idが `*-local-*`）では、`new-epic/new-issue` は自動で `--no-github` を付けて子も local に揃える
   - 生成スクリプトは内部的に既存の runtime script `spec-dock/scripts/spec-dock` を呼び、ロジックを重複しない
+  - 同梱のエージェントSkill等（導線/置き場所の説明）も `artifacts/` 統一に追従して更新する
 - MUST NOT（絶対にやらない／追加しない）:
   - 既存の `new {initiative,epic,issue,adr}` の振る舞い（ID規則、生成先、GitHub連携）を壊さない
   - `jq` 等の新しい外部依存を必須にしない（runtime script は stdlib のまま）
@@ -116,6 +118,11 @@ ID: "iss-00007"
     - ADRは「決定の記録」であり、補足資料は「決定や実装の根拠となる素材/証跡」。役割を名前で分離したい
     - `discussions/` は“議論=意思決定プロセス”を想起させ、ADRと運用が被って二重管理になりやすい
     - `artifacts/` は中立で包含範囲が広く、図/ログ/スクショ/調査メモ（Markdown）まで受け止められる
+- 論点3: 生成スクリプト名（拡張子）
+  - 選択肢A: 拡張子なし（`new-epic` / `new-issue` / `new-adr`）
+  - 選択肢B: `.sh`（`new-epic.sh` 等）
+  - 決定: A（拡張子なし）
+  - 理由: “自然なコマンド” として実行しやすい。GitHub Issue 初期案（`.sh`）との差分は本決定として明記する。
 
 ## リスク/懸念（Risks） (任意)
 - R-001: 生成スクリプトが実行権限を持たず、`./new-epic` が実行できない（影響: 導線が死ぬ / 対応: 生成時にchmod、または `bash ./new-epic ...` で回避）
@@ -152,6 +159,12 @@ ID: "iss-00007"
   - When: `new-epic` / `new-issue` を実行する
   - Then: 子ノードも local として作成される（`--no-github` が自動で付与される）
   - 観測点（UI/HTTP/DB/Log など）: FS（`epic-local-*` / `iss-local-*`）、CLI stdout
+- AC-006:
+  - Actor/Role: 開発者（人間/エージェント）
+  - Given: ノード作成（`new initiative` / `new epic` / `new issue`）直後である
+  - When: 生成されたラッパースクリプトを確認する
+  - Then: `new-epic` / `new-issue` / `new-adr` は実行可能（`test -x` が真）である
+  - 観測点: FS（実行ビット）、CLI（`test -x` の結果）
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -168,15 +181,26 @@ ID: "iss-00007"
   - 観測点（UI/HTTP/DB/Log など）: CLI stderr / exit code
 - EC-002:
   - 条件: GitHubモードの親スコープだが `gh` が利用できない
-  - 期待: 明確なエラーメッセージで失敗し、直接コマンド（`spec-dock/scripts/spec-dock new ...`）を実行するよう促す
+  - 期待: 明確なエラーメッセージで失敗し、次を必ず案内する
+    - 対応1: `gh` をインストールして再実行
+    - 対応2: 明示的に local-only を選び、直接コマンド（`spec-dock/scripts/spec-dock new ... --no-github`）を実行
+    - 注: 対応2は「GitHub親の下に local 子を作る」混在になり得るため、意図がある場合のみ明示的に選ぶ（ラッパーは自動フォールバックしない）
   - 観測点: CLI stderr / exit code
 - EC-003:
   - 条件: タイトルにスペースや記号が含まれる
-  - 期待: クォートされたタイトルが壊れずに runtime script に渡る（最終的な成否は既存のtitle制約に従う）
+  - 期待: クォートされたタイトルが壊れずに runtime script に渡る（通る/落ちるは既存のバリデーションに従う。例: `new epic/new issue` はASCII英数+半角スペース以外を拒否し得る）
   - 観測点: CLI stderr（バリデーションエラーの有無）、生成物
 - EC-004:
   - 条件: スクリプトに引数が2つ以上渡される
   - 期待: 使い方をstderrに出して失敗（exit code != 0）
+  - 観測点: CLI stderr / exit code
+- EC-005:
+  - 条件: `../meta.json` が存在しない、またはJSONとして不正
+  - 期待: 明確なエラーメッセージで失敗し、修復先（`../meta.json`）を提示して fail-fast
+  - 観測点: CLI stderr / exit code
+- EC-006:
+  - 条件: `spec-dock/scripts/spec-dock` が見つからない（ラッパーが runtime script を解決できない）
+  - 期待: 明確なエラーメッセージで失敗し、`spec-dock init/update` の再実行や導入状態の確認を促す
   - 観測点: CLI stderr / exit code
 
 ## 用語（ドメイン語彙） (必須)
