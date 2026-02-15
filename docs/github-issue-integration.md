@@ -76,7 +76,7 @@ gh issue view <num> --json number,url
 - `import` は GitHub Issue を作成/更新しません（読み取りのみ）。
 - `import` は checkout/branch 操作をしません。
 - URL を target に渡せますが、URL は **番号抽出のみ**で、owner/repo は解釈しません（cross-repo は対象外）。
-- `import` は副作用（テンプレートコピー/`meta.json`生成）より前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **生成物を残さず**に失敗します（例: `github.issue_number` の重複リンク）。
+- `import` は副作用（テンプレートコピー/`meta.json`生成）より前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **生成物を残さず**に失敗します。
 
 ---
 

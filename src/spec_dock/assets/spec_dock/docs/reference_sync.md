@@ -26,8 +26,7 @@
 ### preflight validate で弾かれる代表例
 
 - `github.issue_number` の重複（同じ Issue番号が複数 node にリンクされている）
-  - エラーには `type:id (meta.json path)` の競合一覧が含まれます
-  - 復旧は、競合している `meta.json` の `github.issue_number` を修正し、リンクを 1つに戻します
+  - 復旧手順は [reference_github.md](reference_github.md) の「github.issue_number のリンクと一意性」を参照してください
 
 ### active 推定の例（2〜3例）
 
