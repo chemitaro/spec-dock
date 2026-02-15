@@ -135,6 +135,8 @@ ID: "iss-00007"
   - runtime script 解決（cwd不問）:
     - 探索起点は “実行時cwd” ではなく “スクリプト自身の配置場所” とする（`dirname "$0"`）。
     - `dirname "$0"` を絶対パス化したディレクトリから親ディレクトリへ向かって探索し、最初に見つかった `<dir>/spec-dock/scripts/spec-dock` を採用する（最も近いものを採用）。
+    - 絶対パス化の手段（追加依存なし）:
+      - `script_dir="$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd -P)"`
     - 探索の打ち切り条件:
       - ルート（`/`）まで到達した場合
       - 50階層探索しても見つからない場合（安全弁）
@@ -195,12 +197,12 @@ ID: "iss-00007"
   - `src/spec_dock/assets/spec_dock/templates/initiative/epics/README.md`: `new-epic` の導線を追記
   - `src/spec_dock/assets/spec_dock/templates/epic/issues/README.md`: `new-issue` の導線を追記
   - `src/spec_dock/assets/spec_dock/templates/*/adrs/README.md`: `new-adr` の導線を追記
-  - `src/spec_dock/assets/spec_dock/templates/issue/README.md`: 補足資料を `artifacts/` に寄せる（`discussions/` の扱いを更新）
+  - `src/spec_dock/assets/spec_dock/templates/issue/README.md`: 補足資料を `artifacts/` に寄せる（`discussions/` は新規生成しない。既存に残っている場合はレガシーとして扱う旨を注記）
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/README.md`: `artifacts/` の説明を統一（調査メモ(md)/図/ログ断片/スクショまで包含）
-  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: `discussions/` 前提をやめ、補足資料は `artifacts/` へ置くように更新
+  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: `discussions/` 前提をやめ、補足資料は `artifacts/` へ置くように更新（既存ノードに `discussions/` が残っている場合のレガシー注記も追加）
   - `tests/test_cli.py`: 新規生成物（スクリプト/`artifacts/`）の存在と、localモードでの動作をテスト追加
 - 削除（Delete）:
-  - 該当なし（`discussions/_template.md` は Move/Rename で移設）
+  - `src/spec_dock/assets/spec_dock/templates/issue/discussions/`: `discussions/_template.md` を `artifacts/_template.md` へ移設した上で、テンプレからディレクトリ自体を削除する（新規生成で `discussions/` を作らない根拠）
 - 移動/リネーム（Move/Rename）:
   - `src/spec_dock/assets/spec_dock/templates/issue/discussions/_template.md` → `src/spec_dock/assets/spec_dock/templates/issue/artifacts/_template.md`: 既存テンプレ内容を `artifacts/` に寄せる
 - 参照（Read only / context）:
@@ -210,7 +212,7 @@ ID: "iss-00007"
 - AC-001 → `src/spec_dock/assets/spec_dock/templates/initiative/epics/new-epic`, `src/spec_dock/assets/spec_dock/scripts/spec-dock`
 - AC-002 → `src/spec_dock/assets/spec_dock/templates/epic/issues/new-issue`, `src/spec_dock/assets/spec_dock/scripts/spec-dock`
 - AC-003 → `src/spec_dock/assets/spec_dock/templates/*/adrs/new-adr`, `src/spec_dock/assets/spec_dock/scripts/spec-dock:_new_adr`
-- AC-004 → `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/**`
+- AC-004 → `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/**`, `src/spec_dock/assets/spec_dock/templates/issue/discussions/`（Delete）
 - AC-005 → `new-epic/new-issue`（親idのlocal判定→`--no-github` 付与）
 - AC-006（実行可能） → `src/spec_dock/assets/spec_dock/scripts/spec-dock`（shebangファイルのchmod）+ テンプレ上の `new-*` 配置
 - EC-001/EC-004（引数不正） → 各 `new-*` スクリプト側で usage を出して失敗
@@ -228,13 +230,16 @@ ID: "iss-00007"
     - `issues/new-issue "<title>"` 実行で `iss-local-*` が作成されること（local伝播）
     - `adrs/new-adr "<title>"` 実行で `adr-00001-*.md` が作成されること
     - initiative/epic/issue に `artifacts/` が生成されること
+    - 新規生成された issue に `discussions/` が生成されないこと（`artifacts/` に統合されること。例: `assertFalse((issue_dir / "discussions").exists())`）
     - `../meta.json` の欠落/破損でラッパーが fail-fast すること
+    - `spec-dock/scripts/spec-dock` が見つからない場合にラッパーが fail-fast し、案内文言が出ること（EC-006。テストでは runtime script を一時的にリネーム/退避して再現する）
   - Integration: 該当なし（ghを使うGitHub統合は本Issueではテスト対象外）
 - どのAC/ECをどのテストで保証するか:
   - AC-001 → `tests/test_cli.py::test_new_epic_wrapper_creates_local_epic`（新規追加）
   - AC-002 → `tests/test_cli.py::test_new_issue_wrapper_creates_local_issue`（新規追加）
   - AC-003 → `tests/test_cli.py::test_new_adr_wrapper_creates_adr`（新規追加）
-  - AC-004 → `tests/test_cli.py::test_new_nodes_include_artifacts_dir`（新規追加）
+  - AC-004 → `tests/test_cli.py::test_new_nodes_include_artifacts_dir`（新規追加。`discussions/` 非生成も同テストで観測）
+  - EC-006 → `tests/test_cli.py::test_wrapper_fails_when_runtime_not_found`（新規追加）
   - EC-001/EC-004 → 各ラッパーの引数不正で exit != 0（必要なら追加）
 
 ### テストマトリクス（AC/EC → テスト） (任意)
