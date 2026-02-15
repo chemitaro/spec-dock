@@ -301,7 +301,7 @@ Script -> Script: update active.json + pointers
     - spec-dock は **既存の同名ブランチを checkout して続行**する（内容の正当性までは保証しない）
     - spec-dock は checkout 後に scan → target 再解決 → desired 再計算を行い、**最終的な current ブランチ名が再計算後の desired になるまで**ブランチ名を寄せる（AC-011）
     - spec-dock は既存ブランチの削除/上書き/強制更新（例: `git branch -D` / `git reset --hard` / `git checkout -B` など）を行わない
-      - ただし命名正規化のために、既存ブランチへの `checkout` や current ブランチの `rename`（`git branch -m` 相当）など **非破壊**の操作は行い得る
+      - ただし命名正規化のために、既存ブランチへの `checkout` や current ブランチの `rename`（`git branch -m` 相当）など **コミット/内容を変更せず ref 名を変更するだけ**の操作は行い得る（`git branch -M` のような強制 rename はしない）
     - stderr に warning を出力する（例: `spec-dock: (warn) branch already exists; reusing existing branch; content is not verified`）
   - 観測点: `git rev-parse --abbrev-ref HEAD` が desired branch になっている
 - EC-006:

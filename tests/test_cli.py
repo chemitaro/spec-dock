@@ -1132,6 +1132,186 @@ class TestCli(unittest.TestCase):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, desired)
 
+    def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_github_issue_target(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+            base_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            # Prepare an existing desired branch whose meta.json.slug differs from the base branch.
+            desired_before = "iss-00123-add-refresh-token"
+            self._run_git(target, ["checkout", "-b", desired_before])
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["slug"] = "refresh-token"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "change slug"],
+            )
+            self._run_git(target, ["checkout", base_branch])
+
+            # Ensure the reuse branch path does not call gh.
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                counter = bin_dir / "counter.txt"
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    f"counter_file='{counter.as_posix()}'\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                if counter.exists():
+                    self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
+
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(current, "iss-00123-refresh-token")
+
+    def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_node_id_target(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+            )
+            base_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
+            )
+
+            # Prepare an existing desired branch whose meta.json.slug differs from the base branch.
+            desired_before = "iss-00123-add-refresh-token"
+            self._run_git(target, ["checkout", "-b", desired_before])
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["slug"] = "refresh-token"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._run_git(target, ["add", "-A"])
+            self._run_git(
+                target,
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "change slug"],
+            )
+            self._run_git(target, ["checkout", base_branch])
+
+            # Ensure the reuse branch path does not call gh.
+            with tempfile.TemporaryDirectory() as bin_tmp:
+                bin_dir = Path(bin_tmp)
+                counter = bin_dir / "counter.txt"
+                gh_path = bin_dir / "gh"
+                gh_path.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -euo pipefail\n"
+                    f"counter_file='{counter.as_posix()}'\n"
+                    'if [[ "$1" == "issue" && "$2" == "checkout" ]]; then\n'
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    'if [[ "$1" == "issue" && "$2" == "develop" ]]; then\n'
+                    "  c=0\n"
+                    "  if [[ -f \"$counter_file\" ]]; then\n"
+                    "    c=$(cat \"$counter_file\")\n"
+                    "  fi\n"
+                    "  echo $((c+1)) > \"$counter_file\"\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    "echo \"unexpected gh args: $@\" >&2\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                gh_path.chmod(0o755)
+                test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+                p = self._run_runtime_capture(target, ["active", "set", "iss-00123"], env=test_env)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                if counter.exists():
+                    self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
+
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(current, "iss-00123-refresh-token")
+
     def test_active_set_fallbacks_to_id_when_id_slug_is_non_ascii(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")

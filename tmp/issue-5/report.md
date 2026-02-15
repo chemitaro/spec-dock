@@ -98,6 +98,43 @@ python -B -m unittest -q
 
 ---
 
+### 2026-02-15 00:30 - 00:55
+
+#### 対象
+- Step: S10
+- AC/EC: AC-011, EC-005
+
+#### 実施内容
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+  - `active set` の「既存ブランチ再利用」分岐で、checkout 後に scan → target 再解決 → desired 再計算 → `_ensure_active_set_branch_name(...)` を行うよう修正。
+  - 対象経路: `active set <github_issue_number|url>` / `active set <node_id>`（GitHub 紐づき node）
+- `tests/test_cli.py`
+  - `test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_github_issue_target` を追加。
+  - `test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_node_id_target` を追加。
+
+#### 実行コマンド / 結果
+```bash
+python -B -m unittest -v tests/test_cli.py -k recomputes_desired_after_checkout
+# => OK (2 tests)
+
+python -B -m unittest -q
+# => OK (58 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock` - 既存ブランチ再利用後の desired 再評価/命名正規化の保証
+- `tests/test_cli.py` - S10（slugズレ再発防止）の回帰テスト追加
+- `tmp/issue-5/{requirement,design,plan}.md` - S10の前提/優先順位/テスト独立性の明文化
+- `tmp/issue-5/report.md` - 実装ログ追記
+
+#### コミット
+- （未実施）
+
+#### メモ
+- 既存ブランチ再利用でも、最終的な current ブランチ名は checkout 後に再解決した node の `id/slug` 由来へ寄る。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...

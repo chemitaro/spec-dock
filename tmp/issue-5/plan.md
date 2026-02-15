@@ -237,6 +237,7 @@ stop
 #### Red（失敗するテストを先に書く） (任意)
 - `tests/test_cli.py` に「slugズレ + 既存ブランチ再利用」の回帰テストを追加する:
   - GitHub番号経路（`active set 123`）と node-id 経路（`active set iss-00123`）の両方を担保する（テスト2本、または `subTest` で2ケース）
+  - 注意: 同一repoで連続実行すると 1ケース目の rename/checkout が 2ケース目の前提（`iss-00123-add-refresh-token` が存在する等）を壊し得るため、**ケースごとに独立した作業ツリー**で実行する（例: テスト2本で tempdir を分ける / `subTest` ごとに repo を作り直す）
   - 例: 既存ブランチ `iss-00123-add-refresh-token` 上で `meta.json.slug=refresh-token` に改変 → 別ブランチから `active set 123` → 最終ブランチ名が `iss-00123-refresh-token`
 
 #### Green（最小実装） (任意)
