@@ -99,6 +99,7 @@ ID: "iss-00007"
 - 利用者は `spec-dock/scripts/spec-dock` が存在するリポジトリ内で作業している
 - Epic/Issue 作成は既存仕様どおり「デフォルトはGitHub Issue作成（gh利用）」である
 - `--no-github` を付けることでローカルのみ作成できる（現状仕様）
+- 既存の issue には `discussions/` が残っている場合がある（本Issueでは移行しない）。新規の補足資料は `artifacts/` を使用する
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点1: 生成スクリプトにIDを「埋め込む」か「`meta.json` を解析」するか
@@ -151,7 +152,7 @@ ID: "iss-00007"
   - Actor/Role: 開発者（人間/エージェント）
   - Given: `new initiative` / `new epic` / `new issue` を実行する
   - When: 生成されたノードディレクトリを確認する
-  - Then: ADR以外の補足資料を置ける共通ディレクトリ `artifacts/` が存在する
+  - Then: ADR以外の補足資料を置ける共通ディレクトリ `artifacts/` が存在する。かつ新規生成された issue では `discussions/` が存在しない（`artifacts/` に統合される）
   - 観測点（UI/HTTP/DB/Log など）: FS（ディレクトリ存在、READMEの文言）
 - AC-005:
   - Actor/Role: 開発者（人間/エージェント）
