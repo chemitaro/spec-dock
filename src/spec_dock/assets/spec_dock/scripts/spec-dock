@@ -1725,6 +1725,13 @@ def _active_set(
                     _require_clean_working_tree(repo_root)
                     _warn("branch already exists; reusing existing branch; content is not verified")
                     _git_checkout_branch(repo_root, branch=decision.desired)
+                    # Re-scan after checkout to reflect branch-specific spec trees.
+                    nodes = _scan_nodes(specdock_dir)
+                    node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+                    decision = _resolve_active_set_branch_decision(repo_root, node=node)
+                    for warning in decision.warnings:
+                        _warn(warning)
+                    _ensure_active_set_branch_name(repo_root, desired=decision.desired)
                     reused_existing_branch = True
                 except RuntimeError as e:
                     msg = str(e)
@@ -1795,6 +1802,18 @@ def _active_set(
                 _require_clean_working_tree(repo_root)
                 _warn("branch already exists; reusing existing branch; content is not verified")
                 _git_checkout_branch(repo_root, branch=decision.desired)
+                # Re-scan after checkout to reflect branch-specific spec trees.
+                nodes = _scan_nodes(specdock_dir)
+                node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+                if node.type != expected_type:
+                    raise RuntimeError(
+                        f"Node type mismatch after checkout for github.issue_number={issue_number}: "
+                        f"expected {expected_type} but found {node.type}:{node.id}"
+                    )
+                decision = _resolve_active_set_branch_decision(repo_root, node=node)
+                for warning in decision.warnings:
+                    _warn(warning)
+                _ensure_active_set_branch_name(repo_root, desired=decision.desired)
             except RuntimeError as e:
                 msg = str(e)
                 if msg.startswith("Working tree is not clean"):

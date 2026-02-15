@@ -75,6 +75,8 @@ ID: "issue-5"
   4) desired branch が既存なら、**`gh` checkout をスキップ**し、warning を出してそのブランチを checkout する（内容は検証しない）
      - checkout 後に scan → target 再解決 → desired 再計算を行い、**最終的な current ブランチ名が再計算後の desired になるまで**ブランチ名を寄せる（AC-011 / EC-005）
      - 寄せる際の優先順位: 再計算後の desired が既に存在する場合はそのブランチを `checkout`（再利用）し、存在しない場合は current ブランチを `rename` して desired に寄せる（いずれも非破壊）
+       - 例（exists→checkout）: 再計算後 desired=`iss-00123-refresh-token` が存在する → `git checkout iss-00123-refresh-token`
+       - 例（missing→rename）: 再計算後 desired=`iss-00123-refresh-token` が存在しない → `git branch -m iss-00123-refresh-token`
   5) desired branch が既存でない場合のみ、GitHub 紐づきなら `gh issue checkout/develop` で checkout を行い、checkout 後に scan→再解決→desired 再計算を行った上でブランチ名を desired へ寄せる（dirty なら中断）
   6) active manifest / pointers を更新し、sync を実行する
 - Flow for AC-003〜006/007（`new/import` の title/slug バリデーション）:
