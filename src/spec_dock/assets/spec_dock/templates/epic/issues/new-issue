@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: $(basename "$0") \"<title>\"" >&2
+}
+
+if [[ "$#" -ne 1 ]]; then
+  usage
+  exit 2
+fi
+
+title="$1"
+script_dir="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd -P)"
+
+find_runtime() {
+  local start_dir="$1"
+  local dir="$start_dir"
+  local depth=0
+  while true; do
+    local candidate="$dir/spec-dock/scripts/spec-dock"
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+    if [[ "$dir" == "/" ]] || (( depth >= 50 )); then
+      return 1
+    fi
+    dir="$(dirname "$dir")"
+    depth=$((depth + 1))
+  done
+}
+
+if ! runtime_script="$(find_runtime "$script_dir")"; then
+  echo "new-issue: runtime script not found: spec-dock/scripts/spec-dock" >&2
+  echo "new-issue: search start: $script_dir" >&2
+  echo "new-issue: run 'spec-dock init' or 'spec-dock update' and verify 'spec-dock/' is installed." >&2
+  exit 1
+fi
+
+meta_path="$script_dir/../meta.json"
+if [[ ! -f "$meta_path" ]]; then
+  echo "new-issue: missing meta.json: $meta_path" >&2
+  echo "new-issue: fix ../meta.json and retry." >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "new-issue: python3 is required to parse meta.json." >&2
+  exit 1
+fi
+
+if ! parent_id="$(
+  python3 - "$meta_path" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+except Exception as exc:
+    print(f"new-issue: invalid meta.json: {path}: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+node_id = data.get("id")
+if not isinstance(node_id, str) or not node_id.strip():
+    print(f"new-issue: missing 'id' in {path}", file=sys.stderr)
+    raise SystemExit(1)
+
+node_type = data.get("type")
+if node_type != "epic":
+    print(f"new-issue: expected type='epic' in {path}, got {node_type!r}", file=sys.stderr)
+    raise SystemExit(1)
+
+print(node_id.strip())
+PY
+)"; then
+  echo "new-issue: fix ../meta.json and retry." >&2
+  exit 1
+fi
+
+extra_args=()
+if [[ "$parent_id" == *"-local-"* ]]; then
+  extra_args+=(--no-github)
+else
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "new-issue: 'gh' CLI is required for GitHub-mode parent: $parent_id" >&2
+    echo "new-issue: option 1) install GitHub CLI (gh) and retry." >&2
+    echo "new-issue: option 2) intentionally create a local child via direct command:" >&2
+    echo "new-issue:   $runtime_script new issue --epic \"$parent_id\" --title \"$title\" --no-github" >&2
+    echo "new-issue: note) option 2 creates a local child under a GitHub parent (mixed mode)." >&2
+    exit 1
+  fi
+fi
+
+exec "$runtime_script" new issue --epic "$parent_id" --title "$title" "${extra_args[@]}"

@@ -473,7 +473,15 @@ def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str
             # If the template is binary, just copy it as-is.
             shutil.copy2(src_path, dest_path)
             continue
-        dest_path.write_text(_render_text(raw, replacements), encoding="utf-8")
+        rendered = _render_text(raw, replacements)
+        dest_path.write_text(rendered, encoding="utf-8")
+        # Keep wrapper scripts executable after text rendering.
+        if rendered.startswith("#!"):
+            try:
+                dest_path.chmod(dest_path.stat().st_mode | 0o111)
+            except OSError:
+                # Best-effort: keep generation working even when chmod is restricted.
+                pass
 
 
 def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:

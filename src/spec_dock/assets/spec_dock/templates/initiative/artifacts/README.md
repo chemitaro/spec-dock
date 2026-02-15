@@ -1,6 +1,6 @@
 # artifacts
 
-このディレクトリには、issue の補足資料を置きます。
+このディレクトリには、initiative に関する補足資料を置きます。
 
 - 調査メモ（Markdown）
 - 図（PlantUML / 画像）
