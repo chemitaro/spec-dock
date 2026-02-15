@@ -44,6 +44,8 @@ _DEFAULT_ID_WIDTH = 5  # minimum width for zero-padded ids (e.g. `iss-00123`)
 _ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<num>[0-9]+)$")
 _NUM_RE = re.compile(r"^[0-9]+$")
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
+_INPUT_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
+_INPUT_SLUG_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 # Branch name parsing helpers (best-effort):
 # - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
@@ -67,6 +69,15 @@ class _Node:
     initiative_id: str | None
     epic_id: str | None
     github_issue_number: int | None
+
+
+@dataclass(frozen=True)
+class _BranchDecision:
+    """Resolved branch naming decision for active set."""
+
+    desired: str
+    candidates: tuple[str, str]
+    warnings: tuple[str, ...]
 
 
 def _now_iso() -> str:
@@ -93,6 +104,11 @@ def _write_json(path: Path, data: Any) -> None:
     """Write `data` as pretty-printed JSON into `path` (UTF-8)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _warn(message: str) -> None:
+    """Print a runtime warning using the stable CLI prefix."""
+    print(f"spec-dock: (warn) {message}", file=sys.stderr)
 
 
 def _validate_lowercase(value: str, *, field: str) -> str:
@@ -132,6 +148,56 @@ def _validate_slug(value: str, *, field: str = "slug") -> str:
         )
 
     return slug
+
+
+def _validate_input_title(value: str, *, field: str = "--title") -> str:
+    """Validate CLI input title for new/import commands.
+
+    Rules (after trim):
+    - ASCII letters/digits and single spaces between tokens only.
+    - Leading/trailing spaces are removed.
+    - Empty or non-matching values are rejected with actionable examples.
+    """
+    title = value.strip()
+    if not title:
+        raise RuntimeError(f"{field} is required")
+    if _INPUT_TITLE_RE.fullmatch(title):
+        return title
+    raise RuntimeError(
+        f"{field} is invalid: {value!r}\n"
+        f"expected regex: {_INPUT_TITLE_RE.pattern}\n"
+        "OK examples: 'Add Refresh Token', 'JWT Auth 2'\n"
+        "NG examples: 'Add-Token', 'Add  Token', 'Add　Token', '日本語'"
+    )
+
+
+def _validate_input_slug_kebab(value: str, *, field: str = "--slug") -> str:
+    """Validate CLI input slug for new/import commands (kebab-case only)."""
+    slug = value.strip()
+    if not slug:
+        raise RuntimeError(f"{field} is required")
+    if _INPUT_SLUG_KEBAB_RE.fullmatch(slug):
+        return slug
+    raise RuntimeError(
+        f"{field} is invalid: {value!r}\n"
+        f"expected regex: {_INPUT_SLUG_KEBAB_RE.pattern}\n"
+        "OK examples: 'add-refresh-token', 'jwt-auth-2'\n"
+        "NG examples: 'Add-token', 'add_token', 'add..token', '日本語'"
+    )
+
+
+def _derive_input_slug_from_title(title: str) -> str:
+    """Derive deterministic kebab-case slug from an already validated title."""
+    return title.lower().replace(" ", "-")
+
+
+def _resolve_input_title_and_slug(title: str, slug: str | None) -> tuple[str, str]:
+    """Normalize+validate title/slug for new/import before any side effects."""
+    normalized_title = _validate_input_title(title, field="--title")
+    if slug is None:
+        derived_slug = _derive_input_slug_from_title(normalized_title)
+        return normalized_title, _validate_input_slug_kebab(derived_slug, field="--slug")
+    return normalized_title, _validate_input_slug_kebab(slug, field="--slug")
 
 
 def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
@@ -501,14 +567,18 @@ def _new_initiative(
     """Create a new initiative node under `spec-dock/initiatives/`."""
     nodes = _scan_nodes(specdock_dir)
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
         if node_id is not None:
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
         if github_issue_number is None:
             repo_root = specdock_dir.parent
             print(
@@ -536,12 +606,6 @@ def _new_initiative(
     if existing_id:
         existing = nodes[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
-
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "initiative"
     initiatives_root = _initiatives_root(specdock_dir)
@@ -578,13 +642,17 @@ def _new_epic(
     if not initiative or initiative.type != "initiative":
         raise RuntimeError(f"Initiative not found: {initiative_id}")
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     if not no_github:
         if node_id is not None:
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
         if github_issue_number is None:
             repo_root = specdock_dir.parent
             print(
@@ -616,12 +684,6 @@ def _new_epic(
     if existing_id:
         existing = nodes[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
-
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "epic"
     dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
@@ -669,14 +731,18 @@ def _new_issue(
     if not epic.initiative_id:
         raise RuntimeError(f"Epic meta missing initiative_id: {epic_id}")
 
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
+    title, slug = _resolve_input_title_and_slug(title, slug)
 
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
         if node_id is not None:
             raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
         if github_issue_number is None:
             repo_root = specdock_dir.parent
             print(
@@ -709,12 +775,6 @@ def _new_issue(
     if existing_id:
         existing = nodes[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
-
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
 
     templates_dir = specdock_dir / "templates" / "issue"
     dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
@@ -1094,6 +1154,91 @@ def _gh_issue_checkout(repo_root: Path, *, issue_number: int) -> None:
             ) from e2
 
 
+def _git_current_branch(repo_root: Path) -> str:
+    """Return current branch name (`HEAD` when detached)."""
+    _ensure_git_available()
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: git rev-parse --abbrev-ref HEAD\n{(e.stderr or '').strip()}") from e
+    return (p.stdout or "").strip()
+
+
+def _git_local_branch_exists(repo_root: Path, *, branch: str) -> bool:
+    """Return True when local branch `branch` exists."""
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return p.returncode == 0
+
+
+def _git_checkout_branch(repo_root: Path, *, branch: str) -> None:
+    """Checkout a local branch."""
+    _ensure_git_available()
+    cmd = ["git", "checkout", branch]
+    try:
+        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+
+
+def _git_check_ref_format_branch(repo_root: Path, *, branch: str) -> bool:
+    """Return True when `branch` is valid for `git check-ref-format --branch`."""
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "check-ref-format", "--branch", branch],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return p.returncode == 0
+
+
+def _resolve_active_set_branch_decision(repo_root: Path, *, node: _Node) -> _BranchDecision:
+    """Resolve active-set desired branch as `id-slug`, falling back to `id` when needed."""
+    candidate = f"{node.id}-{node.slug}"
+    fallback = node.id
+    warnings: list[str] = []
+
+    if not candidate.isascii():
+        warnings.append("id-slug is non-ascii; fallback to id")
+        return _BranchDecision(desired=fallback, candidates=(candidate, fallback), warnings=tuple(warnings))
+    if not _git_check_ref_format_branch(repo_root, branch=candidate):
+        warnings.append("id-slug is invalid ref; fallback to id")
+        return _BranchDecision(desired=fallback, candidates=(candidate, fallback), warnings=tuple(warnings))
+    return _BranchDecision(desired=candidate, candidates=(candidate, fallback), warnings=tuple(warnings))
+
+
+def _ensure_active_set_branch_name(repo_root: Path, *, desired: str) -> None:
+    """Ensure current branch matches `desired`."""
+    current = _git_current_branch(repo_root)
+    if current == desired:
+        return
+
+    if _git_local_branch_exists(repo_root, branch=desired):
+        cmd = ["git", "checkout", desired]
+    elif current == "HEAD":
+        cmd = ["git", "checkout", "-b", desired]
+    else:
+        cmd = ["git", "branch", "-m", desired]
+    try:
+        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+
+
 def _select_active_from_node(nodes: dict[str, _Node], node: _Node) -> tuple[_Node | None, _Node | None, _Node | None]:
     """Return (initiative, epic, issue) selection derived from a node."""
     if node.type == "initiative":
@@ -1132,6 +1277,17 @@ def _find_node_by_github_issue_number(nodes: dict[str, _Node], *, issue_number: 
         ids = ", ".join(sorted(f"{m.type}:{m.id}" for m in matches))
         raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
     return matches[0]
+
+
+def _find_node_by_github_issue_number_or_none(nodes: dict[str, _Node], *, issue_number: int) -> _Node | None:
+    """Best-effort resolver for github.issue_number; returns None when not found."""
+    try:
+        return _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+    except RuntimeError as e:
+        msg = str(e)
+        if msg.startswith(f"No node found for github.issue_number={issue_number}"):
+            return None
+        raise
 
 
 def _parse_active_set_target(target: str) -> tuple[str, int | str]:
@@ -1216,6 +1372,35 @@ def _parse_github_issue_target(target: str) -> int:
     )
 
 
+def _meta_json_path_for_output(node: _Node, *, repo_root: Path | None = None) -> str:
+    """Return a stable meta.json path for diagnostics (repo-relative when possible)."""
+    meta_path = node.path / "meta.json"
+    if repo_root is not None:
+        try:
+            return meta_path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+    return meta_path.as_posix()
+
+
+def _linked_github_nodes(
+    nodes: dict[str, _Node], *, issue_number: int, repo_root: Path | None = None
+) -> list[_Node]:
+    """Collect nodes linked to `github.issue_number`, sorted for stable diagnostics."""
+    linked = [
+        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    return sorted(linked, key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)))
+
+
+def _format_linked_github_nodes(linked: list[_Node], *, repo_root: Path | None = None) -> str:
+    """Format linked nodes for error messages (`type:id (path)` CSV)."""
+    return ", ".join(
+        f"{n.type}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
+        for n in linked
+    )
+
+
 def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, Any]:
     """Validate issue visibility via `gh issue view` and return minimal payload."""
     _ensure_gh_available()
@@ -1240,24 +1425,47 @@ def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, A
     return data
 
 
-def _import_slug(title: str, slug: str | None) -> str:
-    """Resolve/validate slug for import before any file generation."""
-    if slug is None:
-        slug = _slugify(title)
-    if not slug:
-        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    return _validate_slug(slug, field="slug")
-
-
-def _ensure_github_issue_not_linked(nodes: dict[str, _Node], *, issue_number: int) -> None:
-    """Reject imports when github.issue_number is already linked by any node type."""
-    linked = [
-        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
-    ]
+def _ensure_github_issue_not_linked(
+    nodes: dict[str, _Node],
+    *,
+    issue_number: int,
+    repo_root: Path | None = None,
+) -> None:
+    """Reject link operations when github.issue_number is already linked by any node type."""
+    linked = _linked_github_nodes(nodes, issue_number=issue_number, repo_root=repo_root)
     if not linked:
         return
-    found = ", ".join(sorted(f"{n.type}:{n.id}" for n in linked))
-    raise RuntimeError(f"github.issue_number={issue_number} is already linked: {found}")
+    found = _format_linked_github_nodes(linked, repo_root=repo_root)
+    raise RuntimeError(
+        f"github.issue_number={issue_number} is already linked: {found}. "
+        "Fix github.issue_number in one of the listed meta.json files, "
+        "or choose a different GitHub issue number (target)."
+    )
+
+
+def _validate_github_issue_numbers_unique(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
+    """Ensure github.issue_number is unique across initiative/epic/issue nodes."""
+    by_issue_number: dict[int, list[_Node]] = {}
+    for node in nodes.values():
+        if node.type not in ("initiative", "epic", "issue"):
+            continue
+        if node.github_issue_number is None:
+            continue
+        by_issue_number.setdefault(int(node.github_issue_number), []).append(node)
+
+    for issue_number in sorted(by_issue_number.keys()):
+        linked = sorted(
+            by_issue_number[issue_number],
+            key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
+        )
+        if len(linked) <= 1:
+            continue
+        found = _format_linked_github_nodes(linked, repo_root=repo_root)
+        raise RuntimeError(
+            f"Duplicate github.issue_number detected: github.issue_number={issue_number} "
+            f"is linked by multiple nodes: {found}. "
+            "Fix github.issue_number in one of the listed meta.json files to restore uniqueness."
+        )
 
 
 def _resolve_active_node(nodes: dict[str, _Node], *, entry: Any, expected_type: str) -> _Node | None:
@@ -1318,6 +1526,16 @@ def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], 
     raise RuntimeError(f"Internal error: unsupported child type for active fallback: {child_type}")
 
 
+def _import_preflight_validate(specdock_dir: Path, *, repo_root: Path) -> dict[str, _Node]:
+    """Run import preflight validation before any external call or filesystem generation."""
+    nodes = _scan_nodes(specdock_dir)
+    try:
+        _validate_nodes(nodes, repo_root=repo_root)
+    except RuntimeError as e:
+        raise RuntimeError(f"preflight validate failed: {e}") from e
+    return nodes
+
+
 def _import_initiative(
     specdock_dir: Path,
     *,
@@ -1326,16 +1544,12 @@ def _import_initiative(
     slug: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an initiative node."""
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
     repo_root = specdock_dir.parent
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-
-    nodes = _scan_nodes(specdock_dir)
-    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
-
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
-    slug = _import_slug(title, slug)
 
     node_id = _format_id("init", issue_number, local=False)
     prefix, is_local, num = _parse_id(node_id)
@@ -1369,16 +1583,12 @@ def _import_epic(
     initiative_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an epic node."""
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
     repo_root = specdock_dir.parent
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-
-    nodes = _scan_nodes(specdock_dir)
-    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
-
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
-    slug = _import_slug(title, slug)
 
     if initiative_id is None:
         resolved_initiative_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="epic")
@@ -1431,16 +1641,12 @@ def _import_issue(
     epic_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an issue node."""
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
     repo_root = specdock_dir.parent
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
     _gh_issue_view_minimal(repo_root, issue_number=issue_number)
-
-    nodes = _scan_nodes(specdock_dir)
-    _ensure_github_issue_not_linked(nodes, issue_number=issue_number)
-
-    title = title.strip()
-    if not title:
-        raise RuntimeError("--title is required")
-    slug = _import_slug(title, slug)
 
     if epic_id is None:
         resolved_epic_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="issue")
@@ -1507,16 +1713,53 @@ def _active_set(
     # If a GitHub issue number is specified, checkout first (branch may change the local spec tree).
     if kind == "github_issue":
         issue_number = int(value)  # type: ignore[arg-type]
-        try:
-            _gh_issue_checkout(repo_root, issue_number=issue_number)
-        except RuntimeError as e:
-            msg = str(e)
-            if msg.startswith("Working tree is not clean"):
-                raise RuntimeError(
-                    msg
-                    + "\n\nHint: if you intended to select a local node, pass its node id (e.g. iss-local-00001)."
-                ) from e
-            raise
+        nodes = _scan_nodes(specdock_dir)
+        node = _find_node_by_github_issue_number_or_none(nodes, issue_number=issue_number)
+        reused_existing_branch = False
+        if node is not None:
+            decision = _resolve_active_set_branch_decision(repo_root, node=node)
+            for warning in decision.warnings:
+                _warn(warning)
+            if _git_local_branch_exists(repo_root, branch=decision.desired):
+                try:
+                    _require_clean_working_tree(repo_root)
+                    _warn("branch already exists; reusing existing branch; content is not verified")
+                    _git_checkout_branch(repo_root, branch=decision.desired)
+                    # Re-scan after checkout to reflect branch-specific spec trees.
+                    nodes = _scan_nodes(specdock_dir)
+                    node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+                    decision = _resolve_active_set_branch_decision(repo_root, node=node)
+                    for warning in decision.warnings:
+                        _warn(warning)
+                    _ensure_active_set_branch_name(repo_root, desired=decision.desired)
+                    reused_existing_branch = True
+                except RuntimeError as e:
+                    msg = str(e)
+                    if msg.startswith("Working tree is not clean"):
+                        raise RuntimeError(
+                            msg
+                            + "\n\nHint: if you intended to select a local node, pass its node id (e.g. iss-local-00001)."
+                        ) from e
+                    raise
+
+        if not reused_existing_branch:
+            try:
+                _gh_issue_checkout(repo_root, issue_number=issue_number)
+            except RuntimeError as e:
+                msg = str(e)
+                if msg.startswith("Working tree is not clean"):
+                    raise RuntimeError(
+                        msg
+                        + "\n\nHint: if you intended to select a local node, pass its node id (e.g. iss-local-00001)."
+                    ) from e
+                raise
+            nodes = _scan_nodes(specdock_dir)
+            node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+            decision = _resolve_active_set_branch_decision(repo_root, node=node)
+            for warning in decision.warnings:
+                _warn(warning)
+            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
+
         nodes = _scan_nodes(specdock_dir)
         node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
         initiative, epic, issue = _select_active_from_node(nodes, node)
@@ -1551,23 +1794,65 @@ def _active_set(
     if node.github_issue_number is not None:
         expected_type = node.type
         issue_number = int(node.github_issue_number)
-        try:
-            _gh_issue_checkout(repo_root, issue_number=issue_number)
-        except RuntimeError as e:
-            msg = str(e)
-            if msg.startswith("Working tree is not clean"):
+        decision = _resolve_active_set_branch_decision(repo_root, node=node)
+        for warning in decision.warnings:
+            _warn(warning)
+        if _git_local_branch_exists(repo_root, branch=decision.desired):
+            try:
+                _require_clean_working_tree(repo_root)
+                _warn("branch already exists; reusing existing branch; content is not verified")
+                _git_checkout_branch(repo_root, branch=decision.desired)
+                # Re-scan after checkout to reflect branch-specific spec trees.
+                nodes = _scan_nodes(specdock_dir)
+                node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+                if node.type != expected_type:
+                    raise RuntimeError(
+                        f"Node type mismatch after checkout for github.issue_number={issue_number}: "
+                        f"expected {expected_type} but found {node.type}:{node.id}"
+                    )
+                decision = _resolve_active_set_branch_decision(repo_root, node=node)
+                for warning in decision.warnings:
+                    _warn(warning)
+                _ensure_active_set_branch_name(repo_root, desired=decision.desired)
+            except RuntimeError as e:
+                msg = str(e)
+                if msg.startswith("Working tree is not clean"):
+                    raise RuntimeError(
+                        msg
+                        + "\n\nHint: this node is linked to GitHub; commit/stash before checkout, "
+                        "or select a local-only node (iss-local-...)."
+                    ) from e
+                raise
+        else:
+            try:
+                _gh_issue_checkout(repo_root, issue_number=issue_number)
+            except RuntimeError as e:
+                msg = str(e)
+                if msg.startswith("Working tree is not clean"):
+                    raise RuntimeError(
+                        msg
+                        + "\n\nHint: this node is linked to GitHub; commit/stash before checkout, "
+                        "or select a local-only node (iss-local-...)."
+                    ) from e
+                raise
+            # Re-scan after checkout to reflect branch-specific spec trees.
+            nodes = _scan_nodes(specdock_dir)
+            node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+            if node.type != expected_type:
                 raise RuntimeError(
-                    msg
-                    + "\n\nHint: this node is linked to GitHub; commit/stash before checkout, "
-                    "or select a local-only node (iss-local-...)."
-                ) from e
-            raise
-        # Re-scan after checkout to reflect branch-specific spec trees.
+                    f"Node type mismatch after checkout for github.issue_number={issue_number}: "
+                    f"expected {expected_type} but found {node.type}:{node.id}"
+                )
+            decision = _resolve_active_set_branch_decision(repo_root, node=node)
+            for warning in decision.warnings:
+                _warn(warning)
+            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
+
         nodes = _scan_nodes(specdock_dir)
         node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
         if node.type != expected_type:
             raise RuntimeError(
-                f"Node type mismatch after checkout for github.issue_number={issue_number}: "
+                f"Node type mismatch after branch rename for github.issue_number={issue_number}: "
                 f"expected {expected_type} but found {node.type}:{node.id}"
             )
 
@@ -1670,7 +1955,7 @@ def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
         raise RuntimeError(f"Failed to parse issue number from gh output:\n{out}")
     return int(m.group("num"))
 
-def _git_current_branch(repo_root: Path) -> str | None:
+def _git_current_branch_or_none(repo_root: Path) -> str | None:
     """Return the current branch name, or None if unavailable/detached."""
     if shutil.which("git") is None:
         return None
@@ -1792,7 +2077,7 @@ def _sync(
 
     preflight = "ok"
     try:
-        _validate_nodes(nodes)
+        _validate_nodes(nodes, repo_root=repo_root)
     except RuntimeError as e:
         if not force:
             raise RuntimeError(f"preflight validate failed: {e}") from e
@@ -1852,7 +2137,7 @@ def _sync(
 
     # Default behavior: infer active target from current git branch (best-effort).
     if update_active:
-        branch = _git_current_branch(repo_root)
+        branch = _git_current_branch_or_none(repo_root)
         if branch:
             inferred, reason = _infer_active_node_from_branch(nodes, branch=branch)
             if inferred:
@@ -1971,7 +2256,7 @@ def _sync(
     (legacy_work_dir / "tree.json").unlink(missing_ok=True)
 
 
-def _validate_nodes(nodes: dict[str, _Node]) -> None:
+def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
     """Validate basic structural integrity for a pre-scanned node map.
 
     This is used by:
@@ -1990,6 +2275,8 @@ def _validate_nodes(nodes: dict[str, _Node]) -> None:
             raise RuntimeError(
                 f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
             )
+
+    _validate_github_issue_numbers_unique(nodes, repo_root=repo_root)
 
     for node_id, node in nodes.items():
         _validate_lowercase(node_id, field="id")
@@ -2051,7 +2338,7 @@ def _validate(specdock_dir: Path) -> None:
     if not nodes:
         raise RuntimeError("No nodes found.")
 
-    _validate_nodes(nodes)
+    _validate_nodes(nodes, repo_root=specdock_dir.parent)
     print(f"spec-dock: ok (validate) nodes={len(nodes)}")
 
 

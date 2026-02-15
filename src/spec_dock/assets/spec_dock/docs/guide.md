@@ -10,6 +10,7 @@
 
 参照（仕組み）:
 - GitHub: [reference_github.md](reference_github.md)
+- Naming: [reference_naming.md](reference_naming.md)
 - sync: [reference_sync.md](reference_sync.md)
 
 ## 1. spec-dock が管理するもの（SSOT と生成物）
@@ -80,6 +81,7 @@ spec-dock/
 
 - `new`: spec-dock がローカルノードを作り、（デフォルトでは）GitHub Issue も作ります
 - `import`: 既存 GitHub Issue を **読み取り確認**した上で、ローカルノードを作ります
+  - `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 
 ### 4.2 アクティブにする（active set）
 
