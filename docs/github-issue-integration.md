@@ -23,6 +23,16 @@
 
 ## 1) どのコマンドを内部的に実行しているか
 
+### 1.0 入力バリデーション（`--title` / `--slug`）
+
+`new/import {initiative,epic,issue}` は、`gh` 実行の前に入力を検証します（副作用を避けるため）。
+
+- `--title`（必須）: ASCII（英数字 + 半角スペース 1 個区切り）
+- `--slug`（任意）: kebab-case（小文字英数字 + `-`）
+  - `--slug` 省略時は、`lower(title).replace(" ", "-")` で自動生成します
+
+詳細は、導入先リポジトリ側のドキュメント `spec-dock/docs/reference_naming.md` を参照してください。
+
 ### 1.1 Issue 作成（デフォルト動作）
 
 `./spec-dock/scripts/spec-dock new {initiative,epic,issue} ...` は、デフォルトで以下を実行します:
@@ -66,6 +76,7 @@ gh issue view <num> --json number,url
 - `import` は GitHub Issue を作成/更新しません（読み取りのみ）。
 - `import` は checkout/branch 操作をしません。
 - URL を target に渡せますが、URL は **番号抽出のみ**で、owner/repo は解釈しません（cross-repo は対象外）。
+- `import` は副作用（テンプレートコピー/`meta.json`生成）より前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **生成物を残さず**に失敗します。
 
 ---
 

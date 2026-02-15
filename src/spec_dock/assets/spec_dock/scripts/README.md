@@ -7,6 +7,7 @@ v2 では、日常運用（initiative/epic/issue/adr の作成、active 切り�
 
 - `new {initiative,epic,issue}` は **デフォルトで GitHub Issue を作成**します（`gh` が必要）。
 - GitHub を使わない場合は、`--no-github` を付けて **ローカルのみ**で作成します。
+- `new/import {initiative,epic,issue}` の `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は `spec-dock/docs/reference_naming.md` を参照してください。
 
 ## 使い方（例）
 
