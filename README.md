@@ -80,6 +80,11 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-00123
 ./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation strategy"
 
+# Scope-local wrappers created in generated nodes (single title arg)
+<initiative-dir>/epics/new-epic "JWT auth"
+<epic-dir>/issues/new-issue "Add refresh token"
+<scope-dir>/adrs/new-adr "Token rotation strategy"
+
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
 ./spec-dock/scripts/spec-dock import epic 11 --title "JWT auth" --initiative init-00010    # id=epic-00011
@@ -103,6 +108,7 @@ Notes:
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
 - For GitHub-linked targets, `active set` may normalize the current git branch name to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
+- Generated initiative/epic/issue nodes include `artifacts/_template.md` (supplemental materials) and do not include template-derived `README.md`.
 
 See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
 
@@ -114,6 +120,7 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `templates/` (initiative/epic/issue/adr templates)
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
+    - generated nodes include wrappers (`epics/new-epic`, `issues/new-issue`, `adrs/new-adr`) and `artifacts/_template.md`
   - `active/` (generated pointers; gitignored)
   - `.agent/` (generated agent state; gitignored)
   - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))

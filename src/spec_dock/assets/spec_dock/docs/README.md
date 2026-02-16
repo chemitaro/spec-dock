@@ -53,6 +53,25 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 補足:
 - `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカット（symlink）です。無い場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
 
+## スコープ内ショートカット（生成後ノード）
+
+ノード生成後は、各スコープ配下に wrapper が配置されます（引数はタイトル1つのみ）。
+
+```bash
+# initiative配下で epic を追加
+<initiative-dir>/epics/new-epic "..."
+
+# epic配下で issue を追加
+<epic-dir>/issues/new-issue "..."
+
+# initiative / epic / issue 配下の adrs で ADR を追加
+<scope-dir>/adrs/new-adr "..."
+```
+
+補足:
+- 補足資料は `artifacts/` に置き、初期ファイルとして `artifacts/_template.md` が入ります。
+- 新規ノードにはテンプレ由来の `README.md` は生成されません。
+
 ## 重要な注意（事故防止）
 
 - `new {initiative,epic,issue}` はデフォルトで `gh` を呼び、GitHub Issue を自動作成します（GitHub を使わない場合は `--no-github` を付けてください）。
