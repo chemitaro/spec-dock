@@ -56,6 +56,7 @@ active issue 配下の仕様を埋めます:
 - `spec-dock/active/issue/requirement.md`
 - `spec-dock/active/issue/design.md`
 - `spec-dock/active/issue/plan.md`
+- `spec-dock/active/issue/artifacts/`（補足資料。`_template.md` をコピーして利用）
 
 方針:
 - requirement は AC/EC（観測可能な振る舞い）に落とす

@@ -31,6 +31,7 @@ GitHub は「作業の入口（Issue番号/URL）」として連携できます�
 
 補足:
 - ADR はツリーの「親子レイヤー」ではなく、initiative/epic/issue の任意のスコープに紐づく **要素**です（保存先は各ノード配下の `adrs/`）。
+- 補足資料（調査メモ/図/ログ断片）は各ノード配下の `artifacts/` に置きます（初期ファイル: `artifacts/_template.md`）。
 
 親子関係（ツリー）:
 
@@ -53,13 +54,24 @@ spec-dock/
 │       ├── design.md
 │       ├── plan.md
 │       ├── report.md
+│       ├── artifacts/
+│       │   └── _template.md
 │       ├── adrs/                # ADR（initiative scope）
+│       │   └── new-adr
 │       └── epics/
+│           ├── new-epic
 │           └── epic-00001-.../
+│               ├── artifacts/
+│               │   └── _template.md
 │               ├── adrs/        # ADR（epic scope）
+│               │   └── new-adr
 │               └── issues/
+│                   ├── new-issue
 │                   └── iss-00001-.../
+│                       ├── artifacts/
+│                       │   └── _template.md
 │                       └── adrs/  # ADR（issue scope）
+│                           └── new-adr
 ├── templates/                   # テンプレ（導入物）
 ├── scripts/                     # runtime script（導入物）
 ├── system/                      # placeholders 等（導入物）
@@ -82,6 +94,13 @@ spec-dock/
 - `new`: spec-dock がローカルノードを作り、（デフォルトでは）GitHub Issue も作ります
 - `import`: 既存 GitHub Issue を **読み取り確認**した上で、ローカルノードを作ります
   - `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
+- 生成済みノード配下では、親IDを省略できる wrapper が使えます（引数はタイトル1つのみ）。
+  - initiative 配下: `epics/new-epic "<title>"`
+  - epic 配下: `issues/new-issue "<title>"`
+  - 任意スコープ配下: `adrs/new-adr "<title>"`
+
+補足:
+- Initiative/Epic/Issue ノード直下や `epics/` / `issues/` / `adrs/` / `artifacts/` に、テンプレ由来の `README.md` は生成されません。
 
 ### 4.2 アクティブにする（active set）
 

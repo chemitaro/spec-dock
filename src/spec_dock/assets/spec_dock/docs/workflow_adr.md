@@ -20,6 +20,21 @@ ADR（Architecture Decision Record）は、意思決定を仕様（requirement/d
 
 Issue/Epic/Initiative のいずれかに紐づけて作成します。
 
+推奨（スコープ配下の wrapper を使う）:
+
+```bash
+# issue スコープ
+<issue-dir>/adrs/new-adr "..."
+
+# epic スコープ
+<epic-dir>/adrs/new-adr "..."
+
+# initiative スコープ
+<initiative-dir>/adrs/new-adr "..."
+```
+
+代替（runtime script へ直接指定）:
+
 ```bash
 ./spec new adr --issue <issue-id> --title "..."
 # or

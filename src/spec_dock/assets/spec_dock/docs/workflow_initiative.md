@@ -35,6 +35,18 @@ GitHub を使わない場合:
 注意:
 - `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
 
+### 1.3 Initiative 配下で Epic を追加（wrapper）
+
+Initiative 作成後は、対象ノード配下の wrapper で Epic を追加できます。
+
+```bash
+<initiative-dir>/epics/new-epic "..."
+```
+
+補足:
+- 引数はタイトル1つのみです。
+- 親が local (`init-local-*`) の場合、子も自動で local として作成されます。
+
 ## 2. 記述（requirement/design/plan）
 
 作成後、以下のファイルを埋めます（配置は `spec-dock/initiatives/**`）。
@@ -42,6 +54,10 @@ GitHub を使わない場合:
 - `requirement.md`: なぜやるか / 成功条件 / スコープ
 - `design.md`: 方針 / 境界 / 依存 / リスク
 - `plan.md`: 実行計画（Epic への分解を含む）
+- `artifacts/`: 補足資料（調査メモ/図/ログ断片）。`_template.md` をコピーして利用する
+
+補足:
+- ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
 
 ## 3. 品質ゲート（Initiative）
 
