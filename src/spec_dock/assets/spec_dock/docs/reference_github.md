@@ -71,4 +71,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 ## 6. よくある失敗
 
 - `gh` が未導入/未認証で `new` が失敗する → `--no-github` を付けるか、`gh auth login` 等を先に行う
+- GitHub 親スコープ配下で `new-epic` / `new-issue`（wrapper）を実行し、`gh` 不在で失敗する
+  - wrapper は自動で `--no-github` へフォールバックしません
+  - エラーメッセージに従い、`gh` を導入するか、意図的に direct command + `--no-github` を選んでください
 - URL を貼ったのに別リポジトリの Issue が import されない → 仕様上、URL は番号抽出のみ（`owner/repo` は無視）
