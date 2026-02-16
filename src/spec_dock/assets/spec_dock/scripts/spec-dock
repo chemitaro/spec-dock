@@ -1048,22 +1048,25 @@ def _render_context_pack(current: dict[str, Any] | None) -> str:
     lines.append("- tree: `spec-dock/.agent/tree.json`")
     lines.append("")
     lines.append("## Read order")
-    lines.append("- `spec-dock/active/initiative/README.md`")
     if has_init:
         lines.append("- `spec-dock/active/initiative/requirement.md`")
         lines.append("- `spec-dock/active/initiative/design.md`")
         lines.append("- `spec-dock/active/initiative/plan.md`")
-    lines.append("- `spec-dock/active/epic/README.md`")
+    else:
+        lines.append("- `spec-dock/active/initiative/README.md`")
     if has_epic:
         lines.append("- `spec-dock/active/epic/requirement.md`")
         lines.append("- `spec-dock/active/epic/design.md`")
         lines.append("- `spec-dock/active/epic/plan.md`")
-    lines.append("- `spec-dock/active/issue/README.md`")
+    else:
+        lines.append("- `spec-dock/active/epic/README.md`")
     if has_issue:
         lines.append("- `spec-dock/active/issue/requirement.md`")
         lines.append("- `spec-dock/active/issue/design.md`")
         lines.append("- `spec-dock/active/issue/plan.md`")
         lines.append("- `spec-dock/active/issue/report.md`")
+    else:
+        lines.append("- `spec-dock/active/issue/README.md`")
     lines.append("")
     lines.append("## Commands")
     lines.append("- state (local): `./spec-dock/scripts/spec-dock sync`")
