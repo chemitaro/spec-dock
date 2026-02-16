@@ -3,6 +3,7 @@
 対象:
 - ランタイムスクリプト: `spec-dock/scripts/spec-dock`（導入先リポジトリに配置される）
 - このリポジトリ上の実体: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+- ラッパースクリプト: `templates/**/new-{epic,issue,adr}`（`meta.json` 解析後に runtime script を呼ぶ薄い導線）
 
 目的:
 - `new initiative/epic/issue` が **どのように GitHub Issue を作成するか**

@@ -37,11 +37,27 @@ GitHub を使わない場合:
 注意:
 - `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
 
+### 1.3 Epic 配下で Issue を追加（wrapper）
+
+Epic 作成後は、対象ノード配下の wrapper で Issue を追加できます。
+
+```bash
+<epic-dir>/issues/new-issue "..."
+```
+
+補足:
+- 引数はタイトル1つのみです。
+- 親が local (`epic-local-*`) の場合、子も自動で local として作成されます。
+
 ## 2. 記述（requirement/design/plan）
 
 - `requirement.md`: 期待する価値 / 受け入れ条件（AC）/ 非機能（NFR）/ スコープ
 - `design.md`: 変更方針 / インタフェース契約 / 移行 / 観測性 / リスク
 - `plan.md`: Issue 分割（粒度）/ 依存順序 / 品質ゲート
+- `artifacts/`: 補足資料（調査メモ/図/ログ断片）。`_template.md` をコピーして利用する
+
+補足:
+- ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
 
 ## 3. 品質ゲート（Epic）
 

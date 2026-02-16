@@ -26,7 +26,11 @@ description: A workflow that drives development from requirements refined into o
   - `spec-dock/active/epic/{requirement,design,plan}.md`
   - `spec-dock/active/initiative/{requirement,design,plan}.md`
 - If a real trade-off/decision is needed, create an ADR early and keep its Decision **TBD** until the user/reviewer makes the final call:
-  - `./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "..."` (or `--epic/--initiative`)
+  - Prefer scope-local wrappers (single title arg):
+    - `spec-dock/active/issue/adrs/new-adr "..."`
+    - `spec-dock/active/epic/adrs/new-adr "..."`
+    - `spec-dock/active/initiative/adrs/new-adr "..."`
+  - Fallback (direct runtime command): `./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "..."` (or `--epic/--initiative`)
 - After the user/reviewer decides, update the ADR Decision, set it to `accepted`, and reflect the decision back into the relevant spec files (`design.md` / `plan.md`) with links.
 - Put investigation/interview materials in the active issue `artifacts/` directory (Markdown; embed diagrams with PlantUML when helpful; do not force a specific UML format). If `discussions/` exists in older nodes, treat it as legacy read-only context.
 - Keep interviews/questions short and prioritized. For each question, include answer candidates (options) and your recommended choice based on analysis.
