@@ -38,9 +38,12 @@ spec_dock = [
   "assets/github/workflows/spec-dock-close.yml",
   "assets/spec_dock/templates/**/current/**",
   "assets/spec_dock/templates/**/completed/**",
+  # v2 node templates should not proliferate README.md; keep only `templates/README.md`.
+  "assets/spec_dock/templates/*/**/README.md",
   "assets/spec_dock/templates/design.md",
   "assets/spec_dock/templates/plan.md",
   "assets/spec_dock/templates/report.md",
   "assets/spec_dock/templates/requirement.md",
-  "assets/spec_dock/templates/discussions/**",
+  # discussions/ is legacy; do not package it even if stale build artifacts exist.
+  "assets/spec_dock/templates/**/discussions/**",
 ]
