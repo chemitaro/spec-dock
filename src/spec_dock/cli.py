@@ -160,6 +160,16 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 
     templates_dir = specdock_dir / "templates"
 
+    # Defensive: node templates should not generate README.md or legacy discussions/.
+    # These can reappear if a local clone has stale `build/` artifacts that get packaged.
+    for p in templates_dir.rglob("README.md"):
+        if p == templates_dir / "README.md":
+            continue
+        p.unlink(missing_ok=True)
+    for d in sorted(templates_dir.rglob("discussions"), key=lambda x: len(str(x)), reverse=True):
+        if d.is_dir():
+            shutil.rmtree(d, ignore_errors=True)
+
     # v1 used top-level templates/*.md; v2 uses templates/{initiative,epic,issue}/.
     for name in ("requirement.md", "design.md", "plan.md", "report.md"):
         (templates_dir / name).unlink(missing_ok=True)
