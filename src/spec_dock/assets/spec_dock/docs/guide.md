@@ -105,7 +105,8 @@ spec-dock/
 ### 4.2 アクティブにする（active set）
 
 `active set` は「いま作業する単位」を固定し、`spec-dock/active/context-pack.md` を生成します。  
-対象ノードが GitHub Issue と紐づいている場合は、**checkout を伴います**（詳細は [reference_github.md](reference_github.md)）。
+デフォルトは **active 更新のみ（no-checkout）**です。  
+ブランチ操作が必要な場合だけ `--checkout` を明示します（詳細は [reference_github.md](reference_github.md)）。
 
 ### 4.3 観測できる状態へ（validate / sync）
 
@@ -131,9 +132,8 @@ User -> Script: new / import
 Script -> Meta: write meta.json\n(+ spec templates)
 
 User -> Script: active set <target>
-alt target is GitHub-linked
+alt --checkout
   Script -> Git: checkout (safety checks)
-  Script -> GH: (read-only ops)\n(depends on command)
 end
 Script -> Active: update pointers\n+ context-pack.md
 

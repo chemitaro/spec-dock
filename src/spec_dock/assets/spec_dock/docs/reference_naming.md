@@ -20,8 +20,8 @@
 
 ### 1.2 ブランチ命名（checkout 後の正規化）が効くコマンド
 
-- `active set <target>`
-  - ただし **GitHub 紐づき（checkout を伴うケース）**のみ（local-only node ではブランチ操作しません）
+- `active set <target> --checkout`
+  - デフォルト（`active set <target>`）は no-checkout のため、ブランチ操作は行いません
 
 ---
 
@@ -77,20 +77,18 @@
 
 ---
 
-## 4. `active set` のブランチ命名（日本語ブランチを避ける）
+## 4. `active set --checkout` のブランチ命名（日本語ブランチを避ける）
 
 ### 4.1 目的
 
-GitHub 側の Issue title によっては、`gh issue checkout` が **非 ASCII（例: 日本語）のブランチ名**を作ることがあります。  
-spec-dock は `active set` 実行後に、checkout されている current ブランチ名が **ASCII かつ git 的に妥当**になるよう、ブランチ名を正規化します。
+`active set --checkout` では、ブランチ名を **ASCII かつ git 的に妥当**な形式へ寄せます。  
+これにより、非ASCII名や不正ref名による運用トラブルを避けます。
 
 ### 4.2 対象
 
-- `active set` の target が GitHub 紐づきで checkout を伴う場合のみ
-  - `github.issue_number` があるノード
-  - `active set 123` / `active set #123` / `active set <issue-url>`
-  - `active set iss-00123`（そのノードが GitHub 紐づきの場合）
-- local-only node（例: `iss-local-00001`）を指定した場合は **ブランチ操作しません**
+- `active set <target> --checkout` を明示した場合のみ
+- target の node 種別（initiative / epic / issue）や GitHub 紐づき有無は問いません
+- `--checkout` を付けない場合は **ブランチ操作しません**
 
 ### 4.3 望ましいブランチ名（desired）
 
@@ -109,12 +107,12 @@ desired ブランチが既に存在する場合:
 - 既存ブランチを checkout して **再利用**します（上書き/削除/強制更新はしません）
 - stderr に warning を出します（例: `spec-dock: (warn) branch already exists; reusing existing branch; content is not verified`）
 
-補足（重要）:
-- checkout 後に spec ツリーを再走査し、node を再解決して desired を **再計算**することがあります（例: ブランチ間で `meta.json.slug` がズレている）。
-- 最終的に current ブランチ名を desired に寄せるため、次の順で `ensure current == desired` を行います:
-  - desired が既に存在する場合: そのブランチを `checkout`（再利用）
-  - desired が存在しない場合: current ブランチを `rename`（`git branch -m` 相当。コミット/内容は変更しない）
-- spec-dock は `git branch -D` / `git reset --hard` / `git checkout -B` / `git branch -M` 等の破壊的/強制操作は行いません。
+desired ブランチが存在しない場合:
+- `git checkout -b <desired>` で新規作成して checkout します
+
+補足:
+- `active` の解決は checkout 前に確定しており、checkout 後に node を再解決しません
+- spec-dock は `git branch -D` / `git reset --hard` / `git checkout -B` / `git branch -M` 等の破壊的/強制操作は行いません
 
 ### 4.5 警告（stderr）の安定トークン
 

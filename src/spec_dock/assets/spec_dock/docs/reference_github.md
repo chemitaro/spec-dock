@@ -47,9 +47,11 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 `active set` は target を active として固定します。
 
-- target が GitHub Issue と紐づくノード（`github.issue_number` があるノード）の場合、checkout を伴います
-- 作業ツリーが dirty の場合は安全のため checkout を中断します
-- checkout を伴う場合、current ブランチ名を `<id>-<slug>`（不適合なら `<id>`）へ正規化します（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
+- デフォルトは **no-checkout**（active 更新のみ）です
+- checkout は `active set <target> --checkout` を明示したときだけ実行します
+- target 解決はローカル node（`meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
+- `--checkout` 時に作業ツリーが dirty の場合は安全のため checkout を中断します
+- `--checkout` を伴う場合、ブランチ名は `<id>-<slug>`（不適合なら `<id>`）へ正規化されます（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 
 ## 5. `github.issue_number` のリンクと一意性（重要）
 
