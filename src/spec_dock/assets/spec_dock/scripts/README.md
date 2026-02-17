@@ -27,9 +27,9 @@ v2 では、日常運用（initiative/epic/issue/adr の作成、active 切り�
 ./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation"
 
 # active（現在作業中）を設定
-./spec-dock/scripts/spec-dock active set 123          # GitHub issue number（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-00123     # node id（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-local-00001  # local node id（checkout しない）
+./spec-dock/scripts/spec-dock active set 123              # GitHub issue number（デフォルト: active のみ / no-checkout）
+./spec-dock/scripts/spec-dock active set iss-00123 --checkout  # node id（active + branch checkout/create）
+./spec-dock/scripts/spec-dock active set iss-local-00001  # local node id（デフォルト: active のみ / no-checkout）
 
 # 状態集計を生成
 ./spec-dock/scripts/spec-dock sync
