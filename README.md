@@ -93,8 +93,9 @@ After `init`, day-to-day operations are done via the runtime script installed in
 # Note: URL targets are parsed for the issue number only; owner/repo in the URL is ignored.
 
 # Set active issue pointers (symlinks) and generate context-pack
-./spec-dock/scripts/spec-dock active set 123            # GitHub issue number (checkout + active + sync)
+./spec-dock/scripts/spec-dock active set 123             # default: active only (no checkout)
 ./spec-dock/scripts/spec-dock active set iss-local-00001 # local node id (no checkout)
+./spec-dock/scripts/spec-dock active set 123 --checkout  # active + branch checkout/create
 
 # Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
 ./spec-dock/scripts/spec-dock sync
@@ -106,7 +107,8 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 Notes:
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
-- For GitHub-linked targets, `active set` may normalize the current git branch name to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
+- `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
+- With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
 - Generated initiative/epic/issue nodes include `artifacts/_template.md` (supplemental materials) and do not include template-derived `README.md`.
 
@@ -145,5 +147,5 @@ v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様�
 `spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
 状態の集計は `spec-dock/.agent/index.json` と `spec-dock/.agent/tree.json` を `./spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
 
-補足: `new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があり、GitHub 紐づきで `active set` する場合はブランチ名が `<id>-<slug>`（不適合なら `<id>`）へ正規化されます。
+補足: `new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があり、`active set --checkout` を使う場合はブランチ名が `<id>-<slug>`（不適合なら `<id>`）へ正規化されます。
 また、`github.issue_number` は initiative/epic/issue をまたいで一意です（重複は検知されます）。詳細は導入先の `spec-dock/docs/reference_github.md`（このリポジトリでは `src/spec_dock/assets/spec_dock/docs/reference_github.md`）を参照してください。

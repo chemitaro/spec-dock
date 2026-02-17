@@ -43,7 +43,8 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 
 ./spec import issue <num-or-url> --title "..." --epic <id>  # 既存 GitHub Issue を取り込む（読み取りのみ）
 
-./spec active set <id|#num|url>  # 作業対象をアクティブ化（対象が GitHub 紐づきなら checkout を伴う）
+./spec active set <id|#num|url>               # 作業対象をアクティブ化（デフォルト: no-checkout）
+./spec active set <id|#num|url> --checkout   # アクティブ化 + ブランチ作成/切替
 ./spec active show
 
 ./spec validate

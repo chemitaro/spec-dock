@@ -1243,7 +1243,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                self._run_runtime(target, ["active", "set", "123"], env=test_env)
+                self._run_runtime(target, ["active", "set", "123", "--checkout"], env=test_env)
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00123-add-refresh-token")
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -1322,7 +1322,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             desired = "iss-00123-add-refresh-token"
@@ -1390,7 +1390,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 self.assertIn("spec-dock: (warn)", p.stderr)
                 self.assertIn("reusing existing branch", p.stderr)
@@ -1484,13 +1484,13 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 if counter.exists():
                     self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123-refresh-token")
+            self.assertEqual(current, "iss-00123-add-refresh-token")
 
     def test_active_set_reuses_existing_branch_recomputes_desired_after_checkout_for_node_id_target(self) -> None:
         if os.name == "nt":
@@ -1574,13 +1574,13 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "iss-00123"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "iss-00123", "--checkout"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 if counter.exists():
                     self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-            self.assertEqual(current, "iss-00123-refresh-token")
+            self.assertEqual(current, "iss-00123-add-refresh-token")
 
     def test_active_set_fallbacks_to_id_when_id_slug_is_non_ascii(self) -> None:
         if os.name == "nt":
@@ -1646,7 +1646,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 self.assertIn("spec-dock: (warn)", p.stderr)
                 self.assertIn("non-ascii", p.stderr)
@@ -1719,7 +1719,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 self.assertIn("spec-dock: (warn)", p.stderr)
                 self.assertIn("invalid ref", p.stderr)
@@ -1784,10 +1784,10 @@ class TestCli(unittest.TestCase):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 # Both `#123` and issue URL should be accepted and behave the same.
-                # The second call can reuse the existing desired branch without gh checkout.
+                # Default is no-checkout, so gh should not be invoked.
                 self._run_runtime(target, ["active", "set", "#123"], env=test_env)
                 self._run_runtime(target, ["active", "set", "https://github.com/example/repo/issues/123"], env=test_env)
-                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
+                self.assertFalse(counter.exists())
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
@@ -1846,9 +1846,9 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                # GitHub issue number requires a linked node; checkout runs, then the command errors.
+                # GitHub issue number requires a linked node; command fails without checkout side effects.
                 self._run_runtime_expect_fail(target, ["active", "set", "999"], env=test_env)
-                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
+                self.assertFalse(counter.exists())
 
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":
@@ -1905,12 +1905,14 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                # Activating a GitHub-linked node id also triggers checkout.
-                self._run_runtime(target, ["active", "set", "iss-0123"], env=test_env)
-                self.assertEqual(counter.read_text(encoding="utf-8").strip(), "1")
+                # Explicit checkout should switch branches, but gh should not be invoked.
+                self._run_runtime(target, ["active", "set", "iss-0123", "--checkout"], env=test_env)
+                self.assertFalse(counter.exists())
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
+            current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(current, "iss-00123-add-refresh-token")
 
     def test_active_set_re_resolves_node_after_checkout_when_id_format_changes(self) -> None:
         if os.name == "nt":
@@ -1984,11 +1986,11 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                # Even though we specify the old id form, the tool must re-resolve after checkout.
-                self._run_runtime(target, ["active", "set", "iss-00123"], env=test_env)
+                # Active is resolved before checkout and must remain stable.
+                self._run_runtime(target, ["active", "set", "iss-00123", "--checkout"], env=test_env)
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-0123")
+            self.assertEqual(active["issue"]["id"], "iss-00123")
 
     def test_active_set_github_issue_checkout_refuses_dirty_working_tree(self) -> None:
         if os.name == "nt":
@@ -2025,7 +2027,7 @@ class TestCli(unittest.TestCase):
             gh_path.chmod(0o755)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            self._run_runtime_expect_fail(target, ["active", "set", "123"], env=test_env)
+            self._run_runtime_expect_fail(target, ["active", "set", "123", "--checkout"], env=test_env)
 
     def test_new_no_github_does_not_invoke_gh(self) -> None:
         if os.name == "nt":

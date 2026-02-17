@@ -41,13 +41,15 @@ GitHub を使わない場合:
 
 ```bash
 ./spec active set <issue-id|github-issue-number|url>
+./spec active set <issue-id|github-issue-number|url> --checkout
 ./spec active show
 ```
 
 すると `spec-dock/active/context-pack.md` が生成され、エージェント/人間の作業入口になります。
 
 注意:
-- 対象が GitHub 紐づき（`github.issue_number` がある）場合、`active set` は checkout を伴います（安全装置あり）。詳細は [reference_github.md](reference_github.md)。
+- `active set` のデフォルトは no-checkout（active 更新のみ）です。
+- 実装作業でブランチ移動が必要な場合のみ `--checkout` を付けます（安全装置あり）。詳細は [reference_github.md](reference_github.md)。
 
 ## 3. 計画（requirement → design → plan）
 
