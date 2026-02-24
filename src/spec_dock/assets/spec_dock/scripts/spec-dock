@@ -2818,6 +2818,27 @@ def _resolved_direct_depends_on(nodes: dict[str, _Node], node_id: str) -> list[s
         _resolve_dep_ref(nodes, ref, src_path=deps_path)
         for ref in (deps.get("depends_on") or [])
     ]
+
+    def is_descendant(dep_id: str) -> bool:
+        current_id = dep_id
+        visited: set[str] = set()
+        while True:
+            current = nodes.get(current_id)
+            if not current or not current.parent_id:
+                return False
+            parent_id = current.parent_id
+            if parent_id == node_id:
+                return True
+            if parent_id in visited:
+                # Broken parent chains are validated elsewhere.
+                return False
+            visited.add(parent_id)
+            current_id = parent_id
+
+    for dep_id in direct:
+        if is_descendant(dep_id):
+            raise RuntimeError(f"Invalid dependency: {node_id} cannot depend on its descendant {dep_id} (in {deps_path})")
+
     return sorted(set(direct))
 
 
