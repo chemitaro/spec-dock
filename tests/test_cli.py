@@ -1431,6 +1431,104 @@ class TestCli(unittest.TestCase):
             json.loads(p.stdout)  # must be valid JSON
             self.assertEqual(p.stderr.strip(), "")
 
+    def test_deps_check_missing_deps_json_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertEqual(data["effective_depends_on"], [])
+
+    def test_deps_json_parse_error_fails_with_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / "deps.json").write_text("{\n", encoding="utf-8")  # invalid JSON
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("deps.json", p.stderr)
+            self.assertIn("Invalid JSON", p.stderr)
+
+    def test_deps_json_schema_error_fails_with_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 2, "depends_on": []}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("deps.json", p.stderr)
+            self.assertIn("schema_version", p.stderr)
+
+    def test_deps_json_schema_rejects_boolean_dep_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [True]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("deps.json", p.stderr)
+            self.assertIn("depends_on[0]", p.stderr)
+
     def test_deps_commands_do_not_mutate_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
