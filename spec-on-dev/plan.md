@@ -93,6 +93,10 @@ Script -> Puml: write puml
 
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
+### 共通品質ゲート（各ステップ末尾） (必須)
+- Red/Green 中は、追加・変更したテストケースを個別に実行してよい
+- ただし「ステップ末尾（省略しない）」では必ず `python -m unittest discover -v` を実行し、**全テスト**が成功していること
+
 ### S01 — `sync --github` をテストで再現できる（gh stub） (必須)
 - 対象: AC-003 / EC-008（テスト基盤として）
 - 設計参照:
@@ -133,7 +137,7 @@ Script -> Puml: write puml
   - 以降の deps テストで `gh` を安定的にスタブできるようにする
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] 期待するテストを実行し、成功した
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
 - [ ] コミットした（エージェント）
@@ -186,7 +190,7 @@ Script -> Puml: write puml
   - 以降の deps 実装を差し込みやすい関数境界に整える
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -225,7 +229,7 @@ Script -> Puml: write puml
   - 不明キーは無視（将来拡張）
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -258,7 +262,7 @@ Script -> Puml: write puml
   - GitHub issue number は spec ツリー内の 1 node に一意に解決できない場合はエラー
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -288,7 +292,7 @@ Script -> Puml: write puml
   - 解決後（canonicalize 後）に重複排除し、node id の決定的 sort を適用
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -319,7 +323,7 @@ Script -> Puml: write puml
   - ただし `sync` は全体検査なので、到達不能でも cycle があれば失敗する
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -359,7 +363,7 @@ Script -> Puml: write puml
   - warn には原因と復旧ヒント（例: `sync --github` / `--gh-limit` / `gh auth status`）が含まれる
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -395,7 +399,7 @@ Script -> Puml: write puml
   - `sync --github` で enrich 済みの `.agent/index.json`/`.agent/tree.json` が、`active set` により local モードで上書きされない（`active` のみ更新）
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -431,7 +435,7 @@ Script -> Puml: write puml
   - `sync --github` の gh 取得失敗は warn して Unknown 扱いで継続（生成物は出る）
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] テスト成功
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -457,6 +461,7 @@ Script -> Puml: write puml
 - Then: `deps.json` の書式、`deps check`、`sync` の生成物、`active set` ガード/`--force` が迷わず分かる
 
 #### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] 変更差分をレビューし、整合している
 - [ ] report 更新
 - [ ] update_plan 更新
