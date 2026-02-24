@@ -50,6 +50,9 @@ GitHub を使わない場合:
 注意:
 - `active set` のデフォルトは no-checkout（active 更新のみ）です。
 - 実装作業でブランチ移動が必要な場合のみ `--checkout` を付けます（安全装置あり）。詳細は [reference_github.md](reference_github.md)。
+- `active set` は依存ガードがあります。依存未解決（blocked）の場合はデフォルトで失敗します。
+  - ブロッカー確認: `./spec deps check <target> --github`
+  - 例外化（非推奨）: `./spec active set <target> --github --force`（または `-f`）
 
 ## 3. 計画（requirement → design → plan）
 
@@ -102,5 +105,5 @@ active issue 配下の仕様を埋めます:
 
 ```bash
 ./spec validate
-./spec sync
+./spec sync --github
 ```

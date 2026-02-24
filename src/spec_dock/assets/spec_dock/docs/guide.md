@@ -11,6 +11,7 @@
 参照（仕組み）:
 - GitHub: [reference_github.md](reference_github.md)
 - Naming: [reference_naming.md](reference_naming.md)
+- deps: [reference_deps.md](reference_deps.md)
 - sync: [reference_sync.md](reference_sync.md)
 
 ## 1. spec-dock が管理するもの（SSOT と生成物）
@@ -18,7 +19,7 @@
 spec-dock の SSOT（Source of Truth）は **ローカルのメタデータ**です。
 
 - SSOT（永続）: `spec-dock/initiatives/**/meta.json`
-- 生成物（git 管理しない）: `spec-dock/.agent/{active.json,index.json,tree.json}`、`spec-dock/active/**`
+- 生成物（git 管理しない）: `spec-dock/.agent/{active.json,index.json,tree.json,deps.json,deps.puml,deps.todo.puml}`、`spec-dock/active/**`
 
 GitHub は「作業の入口（Issue番号/URL）」として連携できますが、**ローカルの仕様ツリーが正**です。
 
@@ -111,7 +112,7 @@ spec-dock/
 ### 4.3 観測できる状態へ（validate / sync）
 
 - `validate`: 仕様ツリーの整合性（メタデータ）を検証します
-- `sync`: 集計物（`.agent/index.json` / `.agent/tree.json`）を生成します
+- `sync`: 集計物（`.agent/index.json` / `.agent/tree.json` / `.agent/deps.json` / PlantUML）を生成します
 
 ## 5. PlantUML（全体のイメージ）
 
