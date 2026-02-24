@@ -2235,6 +2235,8 @@ def _deps_check(
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
+    _load_deps_json(node.path / "deps.json")
+
     effective_depends_on: list[str] = []
     blockers: list[str] = []
     ready = True
@@ -2264,6 +2266,40 @@ def _deps_check(
                 print(f"- {b}", file=sys.stderr)
 
     return 0 if ready else 3
+
+
+def _load_deps_json(path: Path) -> dict[str, Any]:
+    """Load and validate `deps.json` (missing file is treated as empty).
+
+    Schema (MVP):
+    - schema_version: 1
+    - depends_on: list[str|int]
+    """
+    if not path.exists():
+        return {"schema_version": 1, "depends_on": []}
+
+    data = _load_json(path)
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Invalid deps.json schema: {path}: expected a JSON object")
+
+    schema_version = data.get("schema_version")
+    if schema_version != 1:
+        raise RuntimeError(f"Invalid deps.json schema: {path}: schema_version must be 1")
+
+    depends_on = data.get("depends_on")
+    if not isinstance(depends_on, list):
+        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on must be a list")
+
+    for i, ref in enumerate(depends_on):
+        # Note: bool is a subclass of int in Python; reject explicitly.
+        if isinstance(ref, bool):
+            raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on[{i}] must be a string or int")
+        if isinstance(ref, (str, int)):
+            continue
+        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on[{i}] must be a string or int")
+
+    # Keep unknown keys for forward-compatibility, but return a stable shape.
+    return {"schema_version": 1, "depends_on": depends_on}
 
 
 def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
