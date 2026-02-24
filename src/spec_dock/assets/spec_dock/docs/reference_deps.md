@@ -46,12 +46,16 @@
 - `depends_on` の要素は次を許可します:
   - node id 文字列（`init-*` / `epic-*` / `iss-*`）
   - GitHub issue number（`int` または数字文字列）
+- 親→配下（descendant）依存は禁止:
+  - 例: initiative が配下 epic/issue を depends_on に含める、epic が配下 issue を depends_on に含める
+  - 理由: issue/epic は親依存を継承するため、親→子依存は子の自己依存/循環に発展する
 - 依存参照は解決後に node id へ正規化し、重複は排除されます。
 - `deps.json` が無い場合は `depends_on=[]`（依存なし）として扱います。
 
 エラーになる代表例:
 - JSON パース不正 / スキーマ不正
 - 解決不能参照（存在しない id / 未 import の GitHub issue number）
+- 親→配下（descendant）依存
 - 自己依存 / 循環依存（cycle）
 
 ## 3. 実効依存（親の依存をマージ）
@@ -72,6 +76,7 @@
 ready:
 - `ready = effective_depends_on がすべて done`
 - `unknown` は未解決として扱われるため、通常 blocked になります（安全側）
+  - 補足: `state` と `ready` は別軸です（`state=done` でも `ready=false` は起こり得ます）。
 
 ## 5. `deps check`（ready / blockers）
 
@@ -118,3 +123,6 @@ PlantUML の色（state）:
 - unknown: `#EEEEEE`
 - blocked: `#F8CECC`
 
+`sync --force` と deps 構造エラー:
+- deps 構造エラー（循環依存/未解決参照など）がある場合、通常 `sync` は失敗します。
+- `sync --force` の場合は warn code `deps_preflight_failed` を出して index/tree の更新を継続しますが、deps 派生物（`.agent/deps*.{json,puml}`）は削除されます（古い派生物の誤用を防ぐため）。
