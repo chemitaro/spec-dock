@@ -75,7 +75,7 @@ database "Derived\n.agent/deps.json" as Derived
 User -> Script: deps check <target>
 Script -> Meta: scan nodes
 Script -> Deps: load deps (node + parent merge)
-opt --github
+opt GitHub 参照（--github）
   Script -> GH: gh issue list / view
 end
 Script -> Derived: write deps.json (SSOT for deps view)
