@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00004"
 タイトル: "依存の統合 SSOT（deps.json）をどのコマンドで生成するか"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-02-24"
 親: ["iss-00009"]
@@ -11,13 +11,13 @@ ID: "adr-00004"
 # adr-00004 依存の統合 SSOT（deps.json）をどのコマンドで生成するか
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR は「議題が上がった時点」で作成し、結論はユーザー/レビュアーが最終決定した後に更新する。
-- （注意）コーディングエージェントは、ユーザーの明示的な決定なしに結論を埋めない。
-- ステータス運用:
-  - 結論が未決の間は `状態: draft` のままにする
-  - 結論が確定したら `accepted` にする
-- 決定（決定後に記入）:
-  - A
+- 採用: Option A（`sync` に統合して毎回生成）
+- `sync` の追加生成物（git 管理しない。`spec-dock/.agent/` 配下）:
+  - `deps.json`（依存グラフの統合 SSOT）
+  - `deps.puml`（全体: Done を含む）
+  - `deps.todo.puml`（todo-only: Done を除外）
+- enrich:
+  - `sync --github` で GitHub state を取得できる場合、状態（Done/Todo/Unknown）や Doing（active）を反映する
 
 ## 背景（Context） (必須)
 - spec-dock は `sync` で `.agent/index.json` / `.agent/tree.json` を生成している。
@@ -43,8 +43,7 @@ ID: "adr-00004"
     - “まず何を叩けば良いか” を docs で明確にしないと迷う。
 
 ## 判断理由（Rationale） (必須)
-- （暫定案）MVP は Option B を推奨（`sync` の責務を増やしすぎない）。
-- ただし、運用上 “sync だけ回していれば常に最新” を重視する場合は Option A も有力。
+- 理由: “sync を回せば派生状態がすべて最新” を優先し、エージェント/人間の運用を単純化するため。
 
 ## 影響（Consequences） (必須)
 - Positive（良い点）:

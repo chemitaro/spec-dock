@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00002"
 タイトル: "依存可視化の状態モデル（Done/Doing/Todo/Unknown など）"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-02-24"
 親: ["iss-00009"]
@@ -11,13 +11,13 @@ ID: "adr-00002"
 # adr-00002 依存可視化の状態モデル（Done/Doing/Todo/Unknown など）
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR は「議題が上がった時点」で作成し、結論はユーザー/レビュアーが最終決定した後に更新する。
-- （注意）コーディングエージェントは、ユーザーの明示的な決定なしに結論を埋めない。
-- ステータス運用:
-  - 結論が未決の間は `状態: draft` のままにする
-  - 結論が確定したら `accepted` にする
-- 決定（決定後に記入）:
-  - A
+- 採用: Option A（GitHub state + active のみ）
+- 状態モデル（MVP）:
+  - Done: GitHub `CLOSED`
+  - Doing: `spec-dock/.agent/active.json` の leaf（`issue` > `epic` > `initiative`）と一致するノード
+  - Todo: GitHub `OPEN` かつ Doing ではない
+  - Unknown: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+  - Blocked: 依存が未解決（open/unknown 等）で ready ではない（表示用の導出状態）
 
 ## 背景（Context） (必須)
 - spec-dock は `sync --github` により GitHub Issue の `OPEN/CLOSED` を取得できるが、`In Progress` のシグナルは持たない。
@@ -48,8 +48,8 @@ ID: "adr-00002"
     - 運用ルール（ラベル付け等）が増える。
 
 ## 判断理由（Rationale） (必須)
-- （暫定案）MVP は Option A を推奨（active を Doing の唯一のシグナルにする）。
-- Option B は追加要件が固まった段階で拡張する（設定可能な label 名など）。
+- 理由: 判定根拠が明確で壊れにくく、runtime script の責務/依存を増やさずに実装できる。
+- 補足: label / Projects status による拡張は、運用ルールが固まった段階で追加検討する。
 
 ## 影響（Consequences） (必須)
 - Positive（良い点）:
