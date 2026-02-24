@@ -2235,14 +2235,22 @@ def _deps_check(
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
-    deps_path = node.path / "deps.json"
-    deps = _load_deps_json(deps_path)
-    direct = [
-        _resolve_dep_ref(nodes, ref, src_path=deps_path)
-        for ref in (deps.get("depends_on") or [])
-    ]
+    # Resolve direct deps for target + parents, then merge as effective deps.
+    relevant_ids: list[str] = [target_id]
+    if node.type == "issue":
+        if node.epic_id:
+            relevant_ids.append(node.epic_id)
+        if node.initiative_id:
+            relevant_ids.append(node.initiative_id)
+    elif node.type == "epic":
+        if node.initiative_id:
+            relevant_ids.append(node.initiative_id)
 
-    effective_depends_on = sorted(set(direct))
+    direct_map: dict[str, list[str]] = {}
+    for node_id in sorted(set(relevant_ids)):
+        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+
+    effective_depends_on = _effective_depends_on(nodes, target_id, direct_map)
     # Until GitHub enrichment/state evaluation is implemented, treat all deps as Unknown -> blocked (safe default).
     blockers = list(effective_depends_on)
     ready = len(blockers) == 0
@@ -2354,6 +2362,51 @@ def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> st
         return existing
 
     raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported type: {type(ref).__name__}")
+
+
+def _resolved_direct_depends_on(nodes: dict[str, _Node], node_id: str) -> list[str]:
+    """Return resolved direct dependencies for `node_id` (stable order)."""
+    node = nodes.get(node_id)
+    if not node:
+        raise RuntimeError(f"Internal error: missing node: {node_id}")
+
+    deps_path = node.path / "deps.json"
+    deps = _load_deps_json(deps_path)
+    direct = [
+        _resolve_dep_ref(nodes, ref, src_path=deps_path)
+        for ref in (deps.get("depends_on") or [])
+    ]
+    return sorted(set(direct))
+
+
+def _effective_depends_on(
+    nodes: dict[str, _Node],
+    node_id: str,
+    direct_map: dict[str, list[str]],
+) -> list[str]:
+    """Compute effective dependencies by merging parents (initiative/epic/issue rules)."""
+    node = nodes.get(node_id)
+    if not node:
+        raise RuntimeError(f"Node not found: {node_id}")
+
+    deps: set[str] = set(direct_map.get(node_id, []))
+
+    if node.type == "issue":
+        if not node.epic_id or not node.initiative_id:
+            raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {node_id}")
+        deps.update(direct_map.get(node.epic_id, []))
+        deps.update(direct_map.get(node.initiative_id, []))
+    elif node.type == "epic":
+        if not node.initiative_id:
+            raise RuntimeError(f"Epic meta missing initiative_id: {node_id}")
+        deps.update(direct_map.get(node.initiative_id, []))
+    elif node.type == "initiative":
+        # No parent merge.
+        pass
+    else:
+        raise RuntimeError(f"Unsupported node type for deps check: {node.type} ({node_id})")
+
+    return sorted(deps)
 
 
 def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
