@@ -2235,13 +2235,21 @@ def _deps_check(
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
-    _load_deps_json(node.path / "deps.json")
+    deps_path = node.path / "deps.json"
+    deps = _load_deps_json(deps_path)
+    direct = [
+        _resolve_dep_ref(nodes, ref, src_path=deps_path)
+        for ref in (deps.get("depends_on") or [])
+    ]
 
-    effective_depends_on: list[str] = []
-    blockers: list[str] = []
-    ready = True
+    effective_depends_on = sorted(set(direct))
+    # Until GitHub enrichment/state evaluation is implemented, treat all deps as Unknown -> blocked (safe default).
+    blockers = list(effective_depends_on)
+    ready = len(blockers) == 0
     warnings: list[str] = []
-    out_nodes = {target_id: {"state": "unknown", "ready": ready}}
+    out_nodes: dict[str, Any] = {target_id: {"state": "unknown", "ready": ready}}
+    for dep_id in effective_depends_on:
+        out_nodes.setdefault(dep_id, {"state": "unknown", "ready": False})
 
     if json_output:
         payload = {
@@ -2300,6 +2308,52 @@ def _load_deps_json(path: Path) -> dict[str, Any]:
 
     # Keep unknown keys for forward-compatibility, but return a stable shape.
     return {"schema_version": 1, "depends_on": depends_on}
+
+
+def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> str:
+    """Resolve a dependency reference into a canonical node id.
+
+    Supported ref forms:
+    - node id string: `init-*` / `epic-*` / `iss-*` (width variants are canonicalized)
+    - GitHub issue number: int or digits-only string (must resolve to exactly one imported node)
+    """
+    if isinstance(ref, bool):
+        # Defensive: should be rejected by schema validation already.
+        raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
+
+    if isinstance(ref, int):
+        try:
+            node = _find_node_by_github_issue_number(nodes, issue_number=int(ref))
+        except RuntimeError as e:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+        return node.id
+
+    if isinstance(ref, str):
+        raw = ref.strip()
+        if not raw:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
+        if _NUM_RE.fullmatch(raw):
+            num = int(raw)
+            try:
+                node = _find_node_by_github_issue_number(nodes, issue_number=num)
+            except RuntimeError as e:
+                raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+            return node.id
+
+        try:
+            prefix, is_local, num = _parse_id(raw.lower())
+        except RuntimeError as e:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+
+        if prefix not in ("init", "epic", "iss"):
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported id prefix: {prefix}")
+
+        existing = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+        if not existing:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): node not found")
+        return existing
+
+    raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported type: {type(ref).__name__}")
 
 
 def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
