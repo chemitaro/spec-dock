@@ -1714,6 +1714,9 @@ def _active_set(
     *,
     target: str,
     checkout: bool = False,
+    force: bool = False,
+    github: bool = False,
+    gh_limit: int = 10000,
 ) -> None:
     """Set active pointers (initiative/epic/issue) from a single target."""
     repo_root = specdock_dir.parent
@@ -1739,6 +1742,27 @@ def _active_set(
         display_target = node.id
     else:
         raise RuntimeError("Internal error: invalid active target kind")
+
+    # Deps guard: refuse blocked targets by default (active.json must not be updated).
+    deps = _deps_evaluate(
+        specdock_dir,
+        nodes,
+        target_id=node.id,
+        github=github,
+        gh_limit=gh_limit,
+    )
+    if not bool(deps.get("ready", False)):
+        blockers = list(deps.get("blockers") or [])
+        if not force:
+            lines = [f"active set blocked: target={node.id} ready=false blockers={len(blockers)}"]
+            for b in blockers:
+                lines.append(f"- {b}")
+            raise RuntimeError("\n".join(lines))
+        _warn(
+            f"deps_blocked: active set target is blocked; continuing due to --force: target={node.id} blockers={len(blockers)}"
+        )
+        for b in blockers:
+            _warn(f"blocker: {b}")
 
     initiative, epic, issue = _select_active_from_node(nodes, node)
     current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
@@ -2235,6 +2259,50 @@ def _deps_check(
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
+    result = _deps_evaluate(
+        specdock_dir,
+        nodes,
+        target_id=target_id,
+        github=github,
+        gh_limit=gh_limit,
+    )
+    ready = bool(result["ready"])
+
+    if json_output:
+        payload = {
+            "schema_version": 1,
+            "target": target_id,
+            "ready": bool(result["ready"]),
+            "effective_depends_on": list(result["effective_depends_on"]),
+            "blockers": list(result["blockers"]),
+            "nodes": dict(result["nodes"]),
+            "warnings": list(result["warnings"]),
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        blockers = list(result["blockers"])
+        if bool(result["ready"]):
+            print(f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0")
+        else:
+            print(
+                f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
+                file=sys.stderr,
+            )
+            for b in blockers:
+                print(f"- {b}", file=sys.stderr)
+
+    return 0 if ready else 3
+
+
+def _deps_evaluate(
+    specdock_dir: Path,
+    nodes: dict[str, _Node],
+    *,
+    target_id: str,
+    github: bool,
+    gh_limit: int,
+) -> dict[str, Any]:
+    """Evaluate deps readiness and node states for `target_id` (no printing; warnings may be emitted)."""
     deps_map = _build_reachable_effective_deps_map(nodes, target_id)
     _validate_deps_cycles(deps_map)
     effective_depends_on = deps_map.get(target_id, [])
@@ -2397,29 +2465,14 @@ def _deps_check(
     for node_id in sorted(deps_map.keys()):
         out_nodes[node_id] = {"state": derived_state(node_id), "ready": ready_by_id.get(node_id, False)}
 
-    if json_output:
-        payload = {
-            "schema_version": 1,
-            "target": target_id,
-            "ready": ready,
-            "effective_depends_on": effective_depends_on,
-            "blockers": blockers,
-            "nodes": out_nodes,
-            "warnings": warnings,
-        }
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-    else:
-        if ready:
-            print(f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0")
-        else:
-            print(
-                f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
-                file=sys.stderr,
-            )
-            for b in blockers:
-                print(f"- {b}", file=sys.stderr)
-
-    return 0 if ready else 3
+    return {
+        "target": target_id,
+        "ready": ready,
+        "effective_depends_on": effective_depends_on,
+        "blockers": blockers,
+        "nodes": out_nodes,
+        "warnings": warnings,
+    }
 
 
 def _load_deps_json(path: Path) -> dict[str, Any]:
@@ -2821,6 +2874,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Set active only and skip branch operations (default).",
     )
     p_active_set.set_defaults(checkout=False)
+    p_active_set.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI (deps guard)")
+    p_active_set.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
+    p_active_set.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Ignore deps guard and set active anyway (prints blockers as warnings)",
+    )
 
     active_sub.add_parser("show", help="Show current active pointers")
     active_sub.add_parser("clear", help="Clear active pointers")
@@ -2949,6 +3010,9 @@ def main(argv: list[str] | None = None) -> int:
                     specdock_dir,
                     target=str(ns.target),
                     checkout=bool(getattr(ns, "checkout", False)),
+                    force=bool(getattr(ns, "force", False)),
+                    github=bool(getattr(ns, "github", False)),
+                    gh_limit=int(getattr(ns, "gh_limit", 10000)),
                 )
             elif ns.active_cmd == "show":
                 _active_show(specdock_dir)
