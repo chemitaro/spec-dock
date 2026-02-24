@@ -2028,6 +2028,28 @@ class TestCli(unittest.TestCase):
             self.assertIn("iss-local-00001", p.stderr)
             self.assertIn("->", p.stderr)
 
+    def test_deps_descendant_dependency_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            deps_path = init_dir / "deps.json"
+            deps_path.write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "init-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(str(deps_path), p.stderr)
+            self.assertIn("iss-local-00001", p.stderr)
+
     def test_deps_cycle_detected_in_reachable_graph(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
