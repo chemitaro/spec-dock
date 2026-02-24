@@ -1618,6 +1618,67 @@ class TestCli(unittest.TestCase):
             self.assertIn("123", p.stderr)
             self.assertIn("deps.json", p.stderr)
 
+    def test_deps_effective_depends_on_merges_parents_and_dedups(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep one"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep two"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target"])
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            target_issue_dir = epic_dir / "issues" / "iss-local-00003-target"
+
+            # Parent initiative/epic both depend on the same dep (dedup expected).
+            (init_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-1"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (epic_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (target_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00003", "--json"])
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertEqual(data["effective_depends_on"], ["iss-local-00001", "iss-local-00002"])
+
+    def test_deps_effective_depends_on_merges_epic_and_initiative(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep one"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep two"])
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+
+            (init_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (epic_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "epic-local-00001", "--json"])
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertEqual(data["effective_depends_on"], ["iss-local-00001", "iss-local-00002"])
+
     def test_deps_commands_do_not_mutate_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
