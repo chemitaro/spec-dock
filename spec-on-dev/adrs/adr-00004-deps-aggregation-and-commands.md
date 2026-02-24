@@ -18,6 +18,9 @@ ID: "adr-00004"
   - `deps.todo.puml`（todo-only: Done を除外）
 - enrich:
   - `sync --github` で GitHub state を取得できる場合、状態（Done/Todo/Unknown）や Doing（active）を反映する
+- 例外:
+  - `sync --force` はデバッグ用 escape hatch と位置づける。
+  - deps 構造エラー（不正 JSON / 解決不能参照 / 循環依存など）がある場合、`sync --force` は index/tree の更新を優先し、deps 派生物（`.agent/deps*.{json,puml}`）は削除して「最新が無い」ことを明確にする（古い派生物の誤用を防ぐ）。
 
 ## 背景（Context） (必須)
 - spec-dock は `sync` で `.agent/index.json` / `.agent/tree.json` を生成している。

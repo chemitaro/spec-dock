@@ -14,7 +14,7 @@ ID: "iss-00009"
 
 ## この計画で満たす要件ID (必須)
 - 対象AC: AC-001〜AC-008（`spec-on-dev/requirement.md`）
-- 対象EC: EC-001〜EC-008（`spec-on-dev/requirement.md`）
+- 対象EC: EC-001〜EC-010（`spec-on-dev/requirement.md`）
 - 対象制約:
   - `meta.json` は変更しない（依存は `deps.json` に分離）
   - runtime script は stdlib のみ（外部依存追加なし）
@@ -31,6 +31,9 @@ ID: "iss-00009"
 - [ ] S08: `active set` を依存でガードし、`--force` で例外化する（AC-004/005）。派生物の上書き事故を防ぐ
 - [ ] S09: `sync` で `.agent/deps.json` と PlantUML（全体/todo-only）を生成する（AC-006/007/008）
 - [ ] S10: docs を更新し、運用/コマンド/生成物をリファレンス化する
+- [ ] S11: 親→配下（descendant）依存を fail-fast で検出し、deps.json パス+依存先 id を含む構造エラーにする（EC-009）
+- [ ] S12: `sync --force` は deps 構造エラー時も index/tree を更新し、deps 派生物は削除し、warn code を安定化する（EC-010）
+- [ ] S13: 追加仕様（EC-009/010、state/ready の補足）を docs に反映する
 
 ### 終了コード（契約） (必須)
 - `0`: ready（実行可能）
@@ -87,7 +90,9 @@ Script -> Puml: write puml
 - EC-006 → S04
 - EC-007 → S03
 - EC-008 → S01, S07, S09
-- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S10（全ステップで維持し、テスト/差分で検証）
+- EC-009 → S11
+- EC-010 → S12
+- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S13（全ステップで維持し、テスト/差分で検証）
 
 ---
 
@@ -471,6 +476,80 @@ Script -> Puml: write puml
 
 ## 未確定事項（TBD） (必須)
 - 該当なし（`spec-on-dev/requirement.md` / ADR で決定済み）
+
+---
+
+## 追加修正（手動テストフィードバック対応） (必須)
+
+### 位置づけ（この追補の目的）
+- 手動テスト（2026-02-24）の指摘で判明した「運用上の落とし穴」と「仕様解釈差分」を、追加のTDDステップとして取り込む。
+- 既存 S01〜S10 の実施記録は残しつつ、本追補（S11〜S13）で差分を上書きする。
+  - 注意: 既存ステップ内の `sync --force` に関する記述は、本追補の EC-010（S12）で定義した契約が優先される。
+
+### 対象（追加で満たす要件）
+- EC-009: 親→配下（descendant）依存は構造エラーで fail-fast
+- EC-010: `sync --force` は deps 構造エラー時も index/tree 更新を継続し、deps 派生物は削除、warn code を出す
+
+### S11 — 親→配下（descendant）依存を fail-fast で検出する (必須)
+- 対象: EC-009
+- 目的:
+  - 親（initiative/epic）の `deps.json` が配下ノードを参照した場合、循環検出の副作用ではなく **直接の構造エラー** として分かりやすく落とす
+  - エラーには `deps.json` パスと依存先 id（canonical id）を含める
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_deps_descendant_dependency_fails`
+- 実装方針（例）:
+  - direct deps 解決（`_resolved_direct_depends_on`）段階で「dep が node の descendant か」を判定し、`RuntimeError` で fail-fast
+- 観測点（必須）:
+  - 終了コード == `1`
+  - stderr に `deps.json` のパスと依存先 id（canonical id）が含まれる
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S12 — `sync --force` の deps 構造エラー時の継続（index/tree 更新 + deps 派生物削除） (必須)
+- 対象: EC-010
+- 目的:
+  - `sync --force` でも deps 構造エラーで全体が止まらず、index/tree が最新化される（手動テスト期待）
+  - deps 派生物は削除して古い参照を防ぎ、warn code（例: `deps_preflight_failed`）を安定化する
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_sync_force_skips_deps_on_deps_error`
+- 実装方針（例）:
+  - `_sync` の deps 解析（effective deps 構築 + cycle 検出）を `try/except` で囲み、`--force` の場合は warn して継続
+  - 継続時は `.agent/deps*.{json,puml}` を削除（存在すれば）
+- 観測点（必須）:
+  - 終了コード == `0`
+  - stderr に warn code `deps_preflight_failed` が含まれる
+  - `.agent/index.json` / `.agent/tree.json` は更新される
+  - `.agent/deps.json` / `.agent/deps.puml` / `.agent/deps.todo.puml` は存在しない（削除される）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S13 — docs の追補（EC-009/010 と state/ready の読み方） (必須)
+- 目的:
+  - 運用上の落とし穴（親→配下依存、`sync --force` の deps 派生物削除）と、`state`/`ready` の解釈を docs に反映する
+- 変更対象（例）:
+  - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+  - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
+- 補足:
+  - ここでは仕様追加ではなく、S11/S12 で確定した挙動をリファレンスに落とし込む
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] 変更差分をレビューし、整合している
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
 
 ## 完了条件（Definition of Done） (必須)
 - 対象AC/ECがすべて満たされ、テストで保証されている
