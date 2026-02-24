@@ -2163,6 +2163,56 @@ class TestCli(unittest.TestCase):
             self.assertIn("iss-local-00003", p.stderr)
             self.assertIn("->", p.stderr)
 
+    def test_sync_force_skips_deps_on_deps_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle a"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle b"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            self._run_runtime(target, ["sync", "--no-update-active"])
+            self.assertTrue((agent_dir / "deps.json").is_file())
+            self.assertTrue((agent_dir / "deps.puml").is_file())
+            self.assertTrue((agent_dir / "deps.todo.puml").is_file())
+
+            epic_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+            )
+            cycle_a_dir = epic_dir / "issues" / "iss-local-00002-cycle-a"
+            cycle_b_dir = epic_dir / "issues" / "iss-local-00003-cycle-b"
+            (cycle_a_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00003"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            (cycle_b_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            (agent_dir / "index.json").unlink(missing_ok=True)
+            (agent_dir / "tree.json").unlink(missing_ok=True)
+
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("deps_preflight_failed", p.stderr)
+            self.assertTrue((agent_dir / "index.json").is_file())
+            self.assertTrue((agent_dir / "tree.json").is_file())
+            self.assertFalse((agent_dir / "deps.json").exists())
+            self.assertFalse((agent_dir / "deps.puml").exists())
+            self.assertFalse((agent_dir / "deps.todo.puml").exists())
+
     def test_deps_commands_do_not_mutate_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
