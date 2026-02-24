@@ -2195,6 +2195,77 @@ def _sync(
     (legacy_work_dir / "tree.json").unlink(missing_ok=True)
 
 
+def _deps_check(
+    specdock_dir: Path,
+    *,
+    target: str,
+    github: bool,
+    gh_limit: int,
+    json_output: bool,
+) -> int:
+    """Check whether `target` is ready to start based on dependencies.
+
+    Note (MVP):
+    - This step only implements the command surface and exit codes.
+    - Missing deps definitions are treated as no dependencies (ready).
+    - GitHub enrichment is accepted but not used until later steps.
+    """
+    _ = github
+    _ = gh_limit
+
+    nodes = _scan_nodes(specdock_dir)
+    if not nodes:
+        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
+
+    kind, value = _parse_active_set_target(target)
+    if kind == "github_issue":
+        issue_number = int(value)  # type: ignore[arg-type]
+        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+        target_id = node.id
+    elif kind == "node_id":
+        raw_id = str(value).lower()
+        prefix, is_local, num = _parse_id(raw_id)
+        resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local) or _format_id(
+            prefix, num, local=is_local
+        )
+        node = nodes.get(resolved)
+        if not node or node.type not in ("initiative", "epic", "issue"):
+            raise RuntimeError(f"Node not found: {resolved}")
+        target_id = node.id
+    else:
+        raise RuntimeError("Internal error: invalid deps target kind")
+
+    effective_depends_on: list[str] = []
+    blockers: list[str] = []
+    ready = True
+    warnings: list[str] = []
+    out_nodes = {target_id: {"state": "unknown", "ready": ready}}
+
+    if json_output:
+        payload = {
+            "schema_version": 1,
+            "target": target_id,
+            "ready": ready,
+            "effective_depends_on": effective_depends_on,
+            "blockers": blockers,
+            "nodes": out_nodes,
+            "warnings": warnings,
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        if ready:
+            print(f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0")
+        else:
+            print(
+                f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
+                file=sys.stderr,
+            )
+            for b in blockers:
+                print(f"- {b}", file=sys.stderr)
+
+    return 0 if ready else 3
+
+
 def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
     """Validate basic structural integrity for a pre-scanned node map.
 
@@ -2380,6 +2451,18 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Continue even if preflight validation fails (writes index/tree; disables active auto update)",
     )
 
+    p_deps = sub.add_parser("deps", help="Check and visualize issue/epic/initiative dependencies")
+    deps_sub = p_deps.add_subparsers(dest="deps_cmd", required=True)
+
+    p_deps_check = deps_sub.add_parser("check", help="Check whether a target is ready based on dependencies")
+    p_deps_check.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
+    )
+    p_deps_check.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
+    p_deps_check.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
+    p_deps_check.add_argument("--json", action="store_true", help="Output JSON to stdout only")
+
     p_import = sub.add_parser("import", help="Import an existing GitHub issue as a spec node")
     import_sub = p_import.add_subparsers(dest="import_kind", required=True)
 
@@ -2424,6 +2507,7 @@ def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns a process exit code (0=success)."""
     ns = _parse_args(sys.argv[1:] if argv is None else argv)
 
+    exit_code: int | None = None
     try:
         specdock_dir = _find_specdock_dir()
 
@@ -2484,6 +2568,17 @@ def main(argv: list[str] | None = None) -> int:
                 _active_clear(specdock_dir)
             else:
                 raise RuntimeError(f"Unknown active command: {ns.active_cmd}")
+        elif ns.command == "deps":
+            if ns.deps_cmd == "check":
+                exit_code = _deps_check(
+                    specdock_dir,
+                    target=str(ns.target),
+                    github=bool(getattr(ns, "github", False)),
+                    gh_limit=int(getattr(ns, "gh_limit", 10000)),
+                    json_output=bool(getattr(ns, "json", False)),
+                )
+            else:
+                raise RuntimeError(f"Unknown deps command: {ns.deps_cmd}")
         elif ns.command == "sync":
             _sync(
                 specdock_dir,
@@ -2527,7 +2622,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    return 0
+    return int(exit_code) if exit_code is not None else 0
 
 
 if __name__ == "__main__":

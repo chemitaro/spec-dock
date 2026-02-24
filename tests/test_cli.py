@@ -1370,6 +1370,93 @@ class TestCli(unittest.TestCase):
             nodes = index["nodes"]
             self.assertEqual(nodes["iss-00301"]["status"], "unknown")
 
+    def test_deps_check_no_deps_is_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (deps check)", p.stdout)
+            self.assertIn("ready=true", p.stdout)
+
+    def test_deps_check_missing_target_is_argparse_exit_2_not_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(target, ["deps", "check"])
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+
+    def test_deps_check_accepts_github_number_forms_and_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Add refresh token"],
+            )
+
+            forms = [
+                "301",
+                "#301",
+                "https://github.com/example/repo/issues/301",
+            ]
+            for form in forms:
+                p = self._run_runtime_capture(target, ["deps", "check", form, "--json"])
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                data = json.loads(p.stdout)
+                self.assertEqual(data["target"], "iss-00301")
+
+    def test_deps_check_json_stdout_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            json.loads(p.stdout)  # must be valid JSON
+            self.assertEqual(p.stderr.strip(), "")
+
+    def test_deps_commands_do_not_mutate_meta_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            before = issue_meta.read_text(encoding="utf-8")
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            after = issue_meta.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
