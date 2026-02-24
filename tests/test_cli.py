@@ -1629,28 +1629,37 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep two"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target"])
 
+            # Dependency targets must not be within the same hierarchy, otherwise parent-merge would
+            # create a self-dependency for that issue. Create an external dep issue.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "External deps"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "2", "--title", "External epic"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "2", "--title", "External issue"])
+
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
             target_issue_dir = epic_dir / "issues" / "iss-local-00003-target"
 
             # Parent initiative/epic both depend on the same dep (dedup expected).
             (init_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-1"]}, ensure_ascii=False, indent=2) + "\n",
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-4"]}, ensure_ascii=False, indent=2)
+                + "\n",
                 encoding="utf-8",
             )
             (epic_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2) + "\n",
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00004"]}, ensure_ascii=False, indent=2)
+                + "\n",
                 encoding="utf-8",
             )
             (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2) + "\n",
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                + "\n",
                 encoding="utf-8",
             )
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00003", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
-            self.assertEqual(data["effective_depends_on"], ["iss-local-00001", "iss-local-00002"])
+            self.assertEqual(data["effective_depends_on"], ["iss-local-00002", "iss-local-00004"])
 
     def test_deps_effective_depends_on_merges_epic_and_initiative(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1662,22 +1671,173 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep one"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Dep two"])
 
+            # External deps (must not be under the same parents as the target epic).
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "External deps"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "2", "--title", "External epic"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "2", "--title", "External issue one"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "2", "--title", "External issue two"])
+
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
 
             (init_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2) + "\n",
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00003"]}, ensure_ascii=False, indent=2)
+                + "\n",
                 encoding="utf-8",
             )
             (epic_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2) + "\n",
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00004"]}, ensure_ascii=False, indent=2)
+                + "\n",
                 encoding="utf-8",
             )
 
             p = self._run_runtime_capture(target, ["deps", "check", "epic-local-00001", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
-            self.assertEqual(data["effective_depends_on"], ["iss-local-00001", "iss-local-00002"])
+            self.assertEqual(data["effective_depends_on"], ["iss-local-00003", "iss-local-00004"])
+
+    def test_deps_self_dependency_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-issue-one"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("iss-local-00001", p.stderr)
+            self.assertIn("->", p.stderr)
+
+    def test_deps_cycle_detected_in_reachable_graph(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue two"])
+
+            epic_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+            )
+            issue_one_dir = epic_dir / "issues" / "iss-local-00001-issue-one"
+            issue_two_dir = epic_dir / "issues" / "iss-local-00002-issue-two"
+
+            (issue_one_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            (issue_two_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("iss-local-00001", p.stderr)
+            self.assertIn("iss-local-00002", p.stderr)
+            self.assertIn("->", p.stderr)
+
+    def test_deps_check_ignores_unreachable_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle a"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle b"])
+
+            epic_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+            )
+            cycle_a_dir = epic_dir / "issues" / "iss-local-00002-cycle-a"
+            cycle_b_dir = epic_dir / "issues" / "iss-local-00003-cycle-b"
+            (cycle_a_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00003"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            (cycle_b_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertTrue(data["ready"])
+
+    def test_sync_fails_on_cycle_anywhere_in_graph(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle a"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle b"])
+
+            epic_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+            )
+            cycle_a_dir = epic_dir / "issues" / "iss-local-00002-cycle-a"
+            cycle_b_dir = epic_dir / "issues" / "iss-local-00003-cycle-b"
+            (cycle_a_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00003"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            (cycle_b_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("iss-local-00002", p.stderr)
+            self.assertIn("iss-local-00003", p.stderr)
+            self.assertIn("->", p.stderr)
 
     def test_deps_commands_do_not_mutate_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

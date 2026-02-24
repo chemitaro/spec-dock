@@ -1997,6 +1997,10 @@ def _sync(
             f"spec-dock: (warn) preflight validate failed; continuing due to --force: {e}",
             file=sys.stderr,
         )
+    else:
+        # Validate deps cycles across the whole graph (sync=global scope).
+        deps_map = _build_effective_deps_map_all(nodes)
+        _validate_deps_cycles(deps_map)
 
     issue_index: dict[int, dict[str, Any]] = {}
     if github:
@@ -2235,22 +2239,9 @@ def _deps_check(
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
-    # Resolve direct deps for target + parents, then merge as effective deps.
-    relevant_ids: list[str] = [target_id]
-    if node.type == "issue":
-        if node.epic_id:
-            relevant_ids.append(node.epic_id)
-        if node.initiative_id:
-            relevant_ids.append(node.initiative_id)
-    elif node.type == "epic":
-        if node.initiative_id:
-            relevant_ids.append(node.initiative_id)
-
-    direct_map: dict[str, list[str]] = {}
-    for node_id in sorted(set(relevant_ids)):
-        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
-
-    effective_depends_on = _effective_depends_on(nodes, target_id, direct_map)
+    deps_map = _build_reachable_effective_deps_map(nodes, target_id)
+    _validate_deps_cycles(deps_map)
+    effective_depends_on = deps_map.get(target_id, [])
     # Until GitHub enrichment/state evaluation is implemented, treat all deps as Unknown -> blocked (safe default).
     blockers = list(effective_depends_on)
     ready = len(blockers) == 0
@@ -2407,6 +2398,113 @@ def _effective_depends_on(
         raise RuntimeError(f"Unsupported node type for deps check: {node.type} ({node_id})")
 
     return sorted(deps)
+
+
+def _build_effective_deps_map_all(nodes: dict[str, _Node]) -> dict[str, list[str]]:
+    """Build an effective dependency map for all nodes (sync=global scope)."""
+    dep_node_ids = sorted(
+        node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")
+    )
+    direct_map: dict[str, list[str]] = {}
+    for node_id in dep_node_ids:
+        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+
+    effective_map: dict[str, list[str]] = {}
+    for node_id in dep_node_ids:
+        effective_map[node_id] = _effective_depends_on(nodes, node_id, direct_map)
+    return effective_map
+
+
+def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) -> dict[str, list[str]]:
+    """Build an effective dependency map for the reachable subgraph from `start_id` (deps check scope)."""
+    if start_id not in nodes:
+        raise RuntimeError(f"Node not found: {start_id}")
+
+    direct_map: dict[str, list[str]] = {}
+    effective_map: dict[str, list[str]] = {}
+
+    def ensure_direct(node_id: str) -> None:
+        if node_id in direct_map:
+            return
+        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+
+    def get_effective(node_id: str) -> list[str]:
+        cached = effective_map.get(node_id)
+        if cached is not None:
+            return cached
+
+        node = nodes.get(node_id)
+        if not node or node.type not in ("initiative", "epic", "issue"):
+            raise RuntimeError(f"Unsupported node type for deps check: {node.type if node else '(missing)'} ({node_id})")
+
+        ensure_direct(node_id)
+        if node.type == "issue":
+            if not node.epic_id or not node.initiative_id:
+                raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {node_id}")
+            ensure_direct(node.epic_id)
+            ensure_direct(node.initiative_id)
+        elif node.type == "epic":
+            if not node.initiative_id:
+                raise RuntimeError(f"Epic meta missing initiative_id: {node_id}")
+            ensure_direct(node.initiative_id)
+
+        eff = _effective_depends_on(nodes, node_id, direct_map)
+        effective_map[node_id] = eff
+        return eff
+
+    reachable: set[str] = set()
+    stack: list[str] = [start_id]
+    while stack:
+        node_id = stack.pop()
+        if node_id in reachable:
+            continue
+        reachable.add(node_id)
+        for dep_id in get_effective(node_id):
+            stack.append(dep_id)
+
+    return {node_id: get_effective(node_id) for node_id in sorted(reachable)}
+
+
+def _validate_deps_cycles(deps_map: dict[str, list[str]]) -> None:
+    """Detect dependency cycles and raise with at least one `A -> B -> ... -> A` path."""
+    visited: set[str] = set()
+    in_stack: set[str] = set()
+    path: list[str] = []
+
+    # Iterative DFS to avoid `RecursionError` on deep dependency chains.
+    for start_id in sorted(deps_map.keys()):
+        if start_id in visited:
+            continue
+
+        stack: list[tuple[str, int]] = [(start_id, 0)]
+        while stack:
+            node_id, next_index = stack[-1]
+
+            if node_id not in visited:
+                visited.add(node_id)
+                in_stack.add(node_id)
+                path.append(node_id)
+
+            deps = deps_map.get(node_id, [])
+            if next_index >= len(deps):
+                stack.pop()
+                in_stack.remove(node_id)
+                path.pop()
+                continue
+
+            dep_id = deps[next_index]
+            stack[-1] = (node_id, next_index + 1)
+
+            if dep_id in in_stack:
+                try:
+                    start_index = path.index(dep_id)
+                except ValueError:
+                    start_index = 0
+                cycle = path[start_index:] + [dep_id]
+                raise RuntimeError("Dependency cycle detected: " + " -> ".join(cycle))
+
+            if dep_id not in visited:
+                stack.append((dep_id, 0))
 
 
 def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
