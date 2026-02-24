@@ -2011,6 +2011,7 @@ def _sync(
         update_active = False
 
     effective_deps_map_all: dict[str, list[str]] | None = None
+    deps_preflight_failed = False
 
     preflight = "ok"
     try:
@@ -2025,8 +2026,16 @@ def _sync(
         )
     else:
         # Validate deps cycles across the whole graph (sync=global scope).
-        effective_deps_map_all = _build_effective_deps_map_all(nodes)
-        _validate_deps_cycles(effective_deps_map_all)
+        try:
+            effective_deps_map_all = _build_effective_deps_map_all(nodes)
+            _validate_deps_cycles(effective_deps_map_all)
+        except RuntimeError as e:
+            if not force:
+                raise
+            preflight = "failed(forced)"
+            deps_preflight_failed = True
+            _warn(f"deps_preflight_failed: deps preflight failed; continuing due to --force. Details: {e}")
+            effective_deps_map_all = None
 
     issue_index: dict[int, dict[str, Any]] = {}
     sync_warnings: list[str] = []
@@ -2217,6 +2226,9 @@ def _sync(
     _write_json(tree_path, state_tree)
 
     # Deps derived state (optional when preflight failed forced).
+    deps_json_path = agent_dir / "deps.json"
+    deps_puml_path = agent_dir / "deps.puml"
+    deps_todo_puml_path = agent_dir / "deps.todo.puml"
     if effective_deps_map_all is not None:
         deps_state = _build_deps_state(
             repo_root,
@@ -2227,9 +2239,13 @@ def _sync(
             active=current if isinstance(current, dict) else None,
             warnings=sync_warnings,
         )
-        _write_json(agent_dir / "deps.json", deps_state)
-        (agent_dir / "deps.puml").write_text(_render_deps_puml(deps_state, todo_only=False), encoding="utf-8")
-        (agent_dir / "deps.todo.puml").write_text(_render_deps_puml(deps_state, todo_only=True), encoding="utf-8")
+        _write_json(deps_json_path, deps_state)
+        deps_puml_path.write_text(_render_deps_puml(deps_state, todo_only=False), encoding="utf-8")
+        deps_todo_puml_path.write_text(_render_deps_puml(deps_state, todo_only=True), encoding="utf-8")
+    elif deps_preflight_failed:
+        deps_json_path.unlink(missing_ok=True)
+        deps_puml_path.unlink(missing_ok=True)
+        deps_todo_puml_path.unlink(missing_ok=True)
 
     rel_index = state_index_path.relative_to(repo_root).as_posix()
     rel_tree = tree_path.relative_to(repo_root).as_posix()
