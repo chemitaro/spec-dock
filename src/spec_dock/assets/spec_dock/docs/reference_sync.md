@@ -26,6 +26,11 @@
 - `sync` は実行前に preflight validate を行い、致命的不整合がある場合は失敗します
   - `sync --force`: validate NG でも警告して継続します（デバッグ用途）
 
+deps（依存関係）に関する補足:
+- `sync` は deps 派生物（`.agent/deps*.{json,puml}`）を生成するために、deps の preflight（`deps.json` の解決/循環検出など）も行います。
+  - deps 構造エラー（不正 JSON/未解決参照/循環依存/親→配下依存など）がある場合、通常は `sync` が失敗します。
+  - `sync --force` の場合は `deps_preflight_failed` を warn して **index/tree の更新を継続**しますが、deps 派生物は **削除** して「最新が無い」ことを明確にします（古い派生物の誤用を防ぐため）。
+
 ### preflight validate で弾かれる代表例
 
 - `github.issue_number` の重複（同じ Issue番号が複数 node にリンクされている）
@@ -65,6 +70,9 @@
 - `spec-dock/.agent/deps.puml`（依存グラフ: 全体）
 - `spec-dock/.agent/deps.todo.puml`（依存グラフ: Done 除外）
 - `spec-dock/active/**`（active pointer + `context-pack.md`、ただし `--no-update-active` では更新しない）
+
+補足:
+- deps 派生物は deps preflight が成功した場合に生成されます（`sync --force` で deps 構造エラーがある場合は削除されます）。
 
 ## 4. PlantUML（処理フロー）
 
