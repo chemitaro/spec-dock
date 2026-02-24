@@ -16,6 +16,9 @@
 
 - `spec-dock/.agent/index.json`
 - `spec-dock/.agent/tree.json`
+- `spec-dock/.agent/deps.json`
+- `spec-dock/.agent/deps.puml`
+- `spec-dock/.agent/deps.todo.puml`
 
 加えて、デフォルトでは **現在ブランチ名から active を推定して更新**します（best-effort）。
 
@@ -58,6 +61,9 @@
 出力:
 - `spec-dock/.agent/index.json`（フラット索引 + progress）
 - `spec-dock/.agent/tree.json`（ツリー表示）
+- `spec-dock/.agent/deps.json`（依存グラフ SSOT）
+- `spec-dock/.agent/deps.puml`（依存グラフ: 全体）
+- `spec-dock/.agent/deps.todo.puml`（依存グラフ: Done 除外）
 - `spec-dock/active/**`（active pointer + `context-pack.md`、ただし `--no-update-active` では更新しない）
 
 ## 4. PlantUML（処理フロー）

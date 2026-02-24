@@ -19,6 +19,7 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 3. 仕組みを確認したい場合（参照）
    - [reference_github.md](reference_github.md)
    - [reference_naming.md](reference_naming.md)
+   - [reference_deps.md](reference_deps.md)
    - [reference_sync.md](reference_sync.md)
 
 ## 目的別ショートカット
@@ -32,6 +33,7 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 | 議論/意思決定を ADR に切り出す | [workflow_adr.md](workflow_adr.md) |
 | GitHub 連携の前提/副作用を知りたい | [reference_github.md](reference_github.md) |
 | `--title`/`--slug`/ブランチ命名のルールを知りたい | [reference_naming.md](reference_naming.md) |
+| 依存関係（deps check / PlantUML）を知りたい | [reference_deps.md](reference_deps.md) |
 | `sync` の入出力/フラグを知りたい | [reference_sync.md](reference_sync.md) |
 
 ## コマンド早見（最短）
@@ -46,6 +48,8 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 ./spec active set <id|#num|url>               # 作業対象をアクティブ化（デフォルト: no-checkout）
 ./spec active set <id|#num|url> --checkout   # アクティブ化 + ブランチ作成/切替
 ./spec active show
+
+./spec deps check <id|#num|url> --github      # 着手可能か判定（依存がある場合は推奨）
 
 ./spec validate
 ./spec sync
