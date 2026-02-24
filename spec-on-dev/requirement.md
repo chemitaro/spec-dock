@@ -3,7 +3,7 @@
 ID: "iss-00009"
 タイトル: "Issue/Epic/Initiative の依存関係管理（実行可能判定・PlantUML可視化・active setガード）"
 関連GitHub: ["#9"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-02-24"
 親: []
@@ -109,6 +109,7 @@ end
   - GitHub Projects の Status 等（In Progress 等）の厳密な参照（MVP では扱わない/要相談）。
   - 依存関係を編集するための専用 UI / TUI（まずはファイル編集で十分）。
   - 依存の自動解決（例: PR マージで自動的に依存を消す等）。
+  - local-only ノード（`*-local-*` / `github.issue_number` 無し）の Done 付け（手動 override / マーカー等）
 
 ## 境界（Always / Ask / Never） (必須)
 - Always（常に守る）:
@@ -116,13 +117,86 @@ end
   - 依存解決判定は観測可能（出力に根拠を含める）にする。
   - 既存コマンドの互換性を壊さない（新機能は後方互換で追加）。
 - Ask（迷ったら相談）:
-  - 依存定義ファイルのファイル名/形式/スキーマ（ADR で決める）。
-  - “実施中（In Progress）” の判定方法（active のみで良いか、label/status を見るか）。
-  - `sync` に統合するか、`deps` コマンド群で派生物を生成するか。
-  - spec ツリー外（未 import）の GitHub Issue を依存として許可するか。
+  - 状態モデル拡張（Doing を GitHub label / Projects status で判定する等）を追加する場合
+  - spec ツリー外（未 import）の GitHub Issue を “外部ノード” として依存に含めたい場合
 - Never（絶対にしない）:
   - `meta.json` を依存管理の入れ物として使う（目的外拡張）。
   - エラーを黙殺して “なんとなく動く” 状態にする（依存は順序を決めるので曖昧さは危険）。
+
+## 決定事項（ADR） (必須)
+- ADR-00001: 依存定義は `deps.json`（JSON）で管理する
+- ADR-00002: 状態モデルは GitHub state + active のみ（MVP）
+- ADR-00003: 依存先は spec ツリー内ノードに限定（外部 Issue は MVP では不可）
+- ADR-00004: 依存の統合 SSOT / PlantUML は `sync` の生成物として毎回生成する
+- ADR-00005: epic/initiative の Done は「親 issue CLOSED」または「配下 issue 全部 Done」
+
+## 仕様（固定ルール） (必須)
+### 依存定義（`deps.json`）
+- 置き場所: initiative/epic/issue ノード直下の `deps.json`
+- スキーマ:
+  - `schema_version: 1`（必須。`1` 以外はエラー）
+  - `depends_on: [...]`（任意。省略時は `[]` として扱う）
+    - 要素: node id 文字列（`init-*`/`epic-*`/`iss-*`）または GitHub issue number（整数、または数字文字列）
+    - 不正な要素（例: `null` / `true` / `-1` / `{}` / `\"\"`）はエラー
+  - 不明なキーは無視する（将来拡張のため）
+- ファイルが無い場合: `depends_on=[]`（依存なし）
+
+### 依存の継承（実効依存）
+- initiative: 自身の `depends_on` のみ
+- epic: 自身 + 親 initiative（和集合）
+- issue: 自身 + 親 epic + 親 initiative（和集合）
+
+### 依存指定の解決（MVP）
+- node id 指定: spec ツリー内のノードへ解決できること（存在しない id はエラー）
+- GitHub issue number 指定: spec ツリー内の `github.issue_number=<num>` のノードへ一意に解決できること（未 import はエラー）
+- 正規化:
+  - 数字文字列は trim して GitHub issue number として解釈する
+  - 解決後は node id に正規化してから重複排除する（同一ノードを `iss-00123` と `123` で二重指定しても 1 件として扱う）
+  - 出力順序は決定的にする（例: node id の数値順、同値なら辞書順）※テストの安定性のため
+
+### 状態モデル（MVP）
+- Done: GitHub `CLOSED`
+- Doing: `spec-dock/.agent/active.json` の leaf（`issue` > `epic` > `initiative`）
+- Todo: GitHub `OPEN` かつ Doing ではない
+- Unknown: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+- Blocked: 依存が未解決（open/unknown 等）で ready ではない（導出状態）
+
+### 状態取得（MVP）
+- GitHub state（OPEN/CLOSED）は `gh` CLI を用いて取得する（`sync --github` と同等）
+- `gh` が利用できない/取得できない場合は Unknown として扱う（安全側で blocked）
+
+### epic/initiative の Done 判定（依存評価用）
+- Done = A または B
+  - A: 自身の GitHub Issue が `CLOSED`
+    - 注意: 子 issue が未完了でも Done になり得る（運用オーバーライド）。依存ガードの意味を薄めないよう運用で注意する。
+  - B: 配下 issue がすべて Done（`total > 0` かつ `done == total` かつ `open == 0` かつ `unknown == 0`）
+    - 例外: `total == 0` の場合は B を満たさない（自動 Done を防ぐ）。この場合は A のみで Done を判定する。
+
+### ready（実行可能）判定
+- ready = 実効依存がすべて Done
+- Unknown は “未解決” として扱う（安全側）
+
+### 派生状態（`sync` の生成物）
+- `sync` は依存関係も統合し、以下を `spec-dock/.agent/` に生成する（git 管理しない）:
+  - `deps.json`（依存グラフの統合 SSOT。エージェントが ready/blocked を機械判定できる形）
+  - `deps.puml`（全体: Done を含む）
+  - `deps.todo.puml`（todo-only: Done を除外）
+
+### 依存グラフ検証（MVP）
+- 目的: 依存管理は「着手順」のガードなので、曖昧さ/壊れた定義は原則エラーで止める
+- 検査項目:
+  - `deps.json` のパース/スキーマ不正
+  - 解決不能参照（存在しない id / 未 import の GitHub issue number）
+  - 自己依存
+  - 循環依存（cycle）
+- 検査範囲:
+  - `sync`: 依存グラフ全体
+  - `deps check <target>` / `active set <target>`: `<target>` の実効依存から到達可能な部分グラフ
+
+### `active set` ガード（MVP）
+- `active set <target>` は、依存チェック（`deps check <target>` 相当）を事前に行う
+  - blocked の場合: デフォルトで失敗し、ブロッカーを表示する
+  - `-f/--force` の場合: blocked でも警告を出した上で強制的に active 化する
 
 ## 非交渉制約（守るべき制約） (必須)
 - runtime script（`spec-dock/scripts/spec-dock`）は stdlib のみで完結すること。
@@ -140,7 +214,7 @@ end
 - 論点: “実施中（In Progress）” をどのシグナルで判定するか
   - 選択肢A: active のみ（最小・壊れにくい）
   - 選択肢B: GitHub label / Projects status（表現力は上がるが運用と取得が複雑）
-  - 決定: TBD（ADR に切り出す）
+  - 決定: A（ADR-00002）
 
 ## リスク/懸念（Risks） (任意)
 - R-001: 依存定義が増えると循環依存が発生しやすい（影響: 判定不能/永遠に blocked / 可視化崩壊 / 対応: cycle 検出と明確なエラー）
@@ -181,15 +255,25 @@ end
 - AC-006:
   - Actor/Role: 開発者
   - Given: 依存定義が複数ノードに存在する
-  - When: PlantUML 生成コマンドを実行する（例: `deps puml`）
-  - Then: 依存グラフが 1ファイルに統合された `.puml` が生成され、状態（done/doing/todo/unknown 等）で色分けされる
-  - 観測点: 生成された `.puml` ファイル（内容）/ CLI 出力
+  - When: `sync` を実行する（例: `sync` / `sync --github`）
+  - Then: 依存の統合 SSOT（`spec-dock/.agent/deps.json`）が生成され、少なくとも以下を満たす
+    - `schema_version: 1`
+    - `generated_at` が存在する
+    - `nodes[<id>]` に `state`（文字列）と `ready`（真偽値）が含まれる
+    - `nodes[<id>]` に `effective_depends_on` と `blockers`（配列）が含まれる
+  - 観測点: `spec-dock/.agent/deps.json`（内容）
 - AC-007:
   - Actor/Role: 開発者
+  - Given: 依存定義が複数ノードに存在する
+  - When: `sync` を実行する（例: `sync` / `sync --github`）
+  - Then: PlantUML（全体版: `spec-dock/.agent/deps.puml`）が生成され、状態（done/doing/todo/unknown/blocked）で色分けされる
+  - 観測点: `spec-dock/.agent/deps.puml`（内容）
+- AC-008:
+  - Actor/Role: 開発者
   - Given: done のノードが存在する
-  - When: Done 除外版を生成する（例: `deps puml --todo-only`）
-  - Then: done ノードが除外された `.puml` が生成される（未実施/実施中のみ）
-  - 観測点: 生成された `.puml` ファイル（内容）
+  - When: `sync` を実行する（例: `sync` / `sync --github`）
+  - Then: todo-only（Done 除外版: `spec-dock/.agent/deps.todo.puml`）が生成される（未実施/実施中のみ）
+  - 観測点: `spec-dock/.agent/deps.todo.puml`（内容）
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -214,56 +298,35 @@ end
   - 観測点: CLI エラー出力（id）/ 終了コード != 0
 - EC-004:
   - 条件: 循環依存（cycle）が存在する
-  - 期待: コマンドは失敗し、cycle の経路を可能な範囲で表示する
+  - 期待: コマンドは失敗し、cycle の経路を少なくとも1つ `A -> B -> ... -> A` の形式で表示する
   - 観測点: CLI エラー出力 / 終了コード != 0
 - EC-005:
   - 条件: 依存先の状態が判定できない（unknown）
   - 期待: 安全側（未解決）として扱い、blocked にする（`--force` で回避可能）
   - 観測点: `deps check` の blocked 判定 / `active set` のブロック
+- EC-006:
+  - 条件: `deps.json` の依存指定が解決できない（存在しない node id / 未 import の GitHub issue number）
+  - 期待: コマンドは失敗し、どの依存指定がどのファイルにあるかを明示する
+  - 観測点: CLI エラー出力（依存指定 + ファイルパス）/ 終了コード != 0
+- EC-007:
+  - 条件: `deps.json` のスキーマが不正（例: `schema_version` が 1 ではない、`depends_on` が配列ではない）
+  - 期待: コマンドは失敗し、どのファイルがどの理由で不正かを明示する
+  - 観測点: CLI エラー出力（ファイルパス + 理由）/ 終了コード != 0
+- EC-008:
+  - 条件: GitHub state を取得できない（例: `gh` 未インストール、未認証、通信不可、`--gh-limit` 不足で取得漏れ）
+  - 期待: Unknown として扱い blocked になる（安全側）。ただし原因と復旧手順（例: `sync --github` / `--gh-limit` 調整）を表示する
+  - 観測点: `deps check` の blocked 判定 / CLI 出力
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: 依存（depends_on） = あるノードを着手/active 化する前に完了している必要がある他ノード
 - TERM-002: 実効依存（effective deps） = 自分の依存 + 上位（親 epic / 親 initiative）の依存をマージしたもの
 - TERM-003: ブロッカー（blockers） = 実効依存のうち未解決（open/unknown 等）のもの
-- TERM-004: Done = GitHub Issue が CLOSED（`sync --github` と同等の enrich がある場合）
+- TERM-004: Done =
+  - issue: GitHub Issue が `CLOSED`
+  - epic/initiative: ADR-00005 の Done 判定（A または B）
 
 ## 未確定事項（TBD / 要確認） (必須)
-- Q-001:
-  - 質問: 依存定義ファイルの名前・フォーマットはどれにするか？
-  - 選択肢:
-    - A: `deps.json`（JSON: `{ \"depends_on\": [...] }`）
-    - B: `depends_on.txt`（1行1依存。シンプルだが拡張しづらい）
-  - 推奨案（暫定）: A（stdlib で扱いやすく、将来の拡張余地がある）
-  - 影響範囲: AC-001〜003 / EC-001〜002 / docs / templates
-- Q-002:
-  - 質問: “実施中（In Progress）” は何を根拠に判定するか？
-  - 選択肢:
-    - A: active（`spec-dock/.agent/active.json`）の target のみを doing とする
-    - B: GitHub label / Projects status を参照する（例: `in-progress` ラベル）
-  - 推奨案（暫定）: A（MVP。壊れにくい）
-  - 影響範囲: AC-006〜007（色分け）/ PlantUML 仕様 / 出力
-- Q-003:
-  - 質問: spec ツリー外（未 import）の GitHub Issue を依存として許可するか？
-  - 選択肢:
-    - A: 許可しない（依存は spec ツリー内ノードに限定）
-    - B: 許可する（GitHub から状態/タイトルのみ取得して外部ノードとして扱う）
-  - 推奨案（暫定）: A（MVP は境界を明確に。必要なら B を追加）
-  - 影響範囲: 依存解決ロジック / PlantUML 表示 / エラー設計
-- Q-004:
-  - 質問: 依存の統合 SSOT（例: `.agent/deps.json`）はいつ生成するか？
-  - 選択肢:
-    - A: `sync` の一部として毎回生成
-    - B: `deps` 系コマンド（check/puml）実行時に生成
-  - 推奨案（暫定）: B（既存 `sync` の責務を増やしすぎない）
-  - 影響範囲: CLI 設計 / 実装箇所 / docs
-- Q-005:
-  - 質問: 依存先に epic/initiative を指定した場合、“Done” は何を根拠に判定するか？
-  - 選択肢:
-    - A: epic/initiative 自身の GitHub Issue が `CLOSED` なら Done
-    - B: 配下 issue がすべて Done（`done == total` かつ `open/unknown == 0`）なら Done
-    - C: A または B を満たせば Done（どちらも許容）
-  - 推奨案（暫定）: B（子 issue の完了が実質的な完了条件になりやすく、運用漏れ（親 issue を閉じ忘れ）に強い）
-  - 影響範囲: 依存解決ロジック / PlantUML の色分け / `deps check` 出力
+- 該当なし（ADR-00001〜00005 で決定済み）
 
 ## Definition of Ready（着手可能条件） (必須)
 - [ ] 目的が 1〜3行で明確になっている

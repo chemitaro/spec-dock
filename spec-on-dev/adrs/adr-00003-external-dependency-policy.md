@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00003"
 タイトル: "依存先の許容範囲（spec ツリー内限定か、外部 GitHub Issue も許可するか）"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-02-24"
 親: ["iss-00009"]
@@ -11,13 +11,11 @@ ID: "adr-00003"
 # adr-00003 依存先の許容範囲（spec ツリー内限定か、外部 GitHub Issue も許可するか）
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR は「議題が上がった時点」で作成し、結論はユーザー/レビュアーが最終決定した後に更新する。
-- （注意）コーディングエージェントは、ユーザーの明示的な決定なしに結論を埋めない。
-- ステータス運用:
-  - 結論が未決の間は `状態: draft` のままにする
-  - 結論が確定したら `accepted` にする
-- 決定（決定後に記入）:
-  - A
+- 採用: Option A（spec ツリー内ノードに限定）
+- 依存指定の解決ルール:
+  - node id 指定（`init-*`/`epic-*`/`iss-*`）: その id が spec ツリー内に存在すること
+  - GitHub issue number 指定（例: `123`）: spec ツリー内の `github.issue_number=123` のノードへ一意に解決できること
+- 上記で解決できない依存指定はエラー（「未 import の Issue に依存」は MVP では不可）
 
 ## 背景（Context） (必須)
 - spec-dock の依存グラフは「spec ツリー（initiative/epic/issue）にある作業単位」を可視化する目的。
@@ -46,8 +44,8 @@ ID: "adr-00003"
     - 別レポや権限の違いなど、要件が増えやすい。
 
 ## 判断理由（Rationale） (必須)
-- （暫定案）MVP は Option A を推奨（境界を明確化して壊れにくくする）。
-- Option B は「本当に必要なユースケース」が具体化した段階で追加検討する。
+- 理由: 境界が明確で、依存グラフと spec ドキュメントの導線が常に一致し、運用が壊れにくい。
+- 補足: 未 import の Issue 参照が必要になった段階で Option B を追加検討する。
 
 ## 影響（Consequences） (必須)
 - Positive（良い点）:

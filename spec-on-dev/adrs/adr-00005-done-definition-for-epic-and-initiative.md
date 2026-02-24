@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00005"
 タイトル: "epic/initiative を依存先にしたときの Done 判定"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-02-24"
 親: ["iss-00009"]
@@ -11,13 +11,11 @@ ID: "adr-00005"
 # adr-00005 epic/initiative を依存先にしたときの Done 判定
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR は「議題が上がった時点」で作成し、結論はユーザー/レビュアーが最終決定した後に更新する。
-- （注意）コーディングエージェントは、ユーザーの明示的な決定なしに結論を埋めない。
-- ステータス運用:
-  - 結論が未決の間は `状態: draft` のままにする
-  - 結論が確定したら `accepted` にする
-- 決定（決定後に記入）:
-  - C  配下 issue がすべて Done なら Done とするが、親 issue の状態も参照して、CLOSED なら Done とする。
+- 採用: Option C（A または B を満たせば Done）
+- Done 判定ルール:
+  - A: epic/initiative 自身の GitHub Issue が `CLOSED` なら Done
+  - B: 配下 issue がすべて Done（`total > 0` かつ `done == total` かつ `open == 0` かつ `unknown == 0`）なら Done
+    - 例外: `total == 0` の場合は B を満たさない（自動 Done を防ぐ）。この場合は A のみで Done を判定する。
 
 ## 背景（Context） (必須)
 - 依存関係は issue だけでなく epic / initiative も依存先として指定できる必要がある（要件）。
@@ -46,8 +44,9 @@ ID: "adr-00005"
     - “いつ Done になるか” が曖昧になり、誤解が生まれやすい。
 
 ## 判断理由（Rationale） (必須)
-- （暫定案）MVP は Option B を推奨。
-  - 理由: 依存の順序付けは「実装の実体（issue）」で決まることが多く、親 issue の開閉に運用依存しない方が安全。
+- 理由:
+  - 基本は B（実体 = issue 完了）を優先しつつ、A（親 issue を閉じた）も Done として扱える柔軟性を残すため。
+  - 親 issue を先に閉じる運用がある場合でも依存判定が破綻しにくい。
 
 ## 影響（Consequences） (必須)
 - Positive（良い点）:
