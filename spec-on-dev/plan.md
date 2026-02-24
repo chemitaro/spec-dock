@@ -1,122 +1,476 @@
 ---
 種別: 実装計画書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "iss-00009"
+タイトル: "Issue/Epic/Initiative の依存関係管理（実行可能判定・PlantUML可視化・active setガード）"
+関連GitHub: ["#9"]
+状態: "approved"
+作成者: "Codex CLI"
+最終更新: "2026-02-24"
 依存: ["requirement.md", "design.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: []
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装計画（TDD: Red → Green → Refactor）
+# iss-00009 Issue/Epic/Initiative の依存関係管理（実行可能判定・PlantUML可視化・active setガード） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001, AC-002, ...
-- 対象EC: EC-001, ...
-- 対象制約（該当があれば）: ...
+- 対象AC: AC-001〜AC-008（`spec-on-dev/requirement.md`）
+- 対象EC: EC-001〜EC-008（`spec-on-dev/requirement.md`）
+- 対象制約:
+  - `meta.json` は変更しない（依存は `deps.json` に分離）
+  - runtime script は stdlib のみ（外部依存追加なし）
+  - GitHub Issue を更新しない（ラベル/クローズ/本文編集などは禁止）
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: ...
-- [ ] Sxx: ... (任意: 必要に応じて追加)
+- [ ] S01: `sync --github`（成功/部分取得/失敗）をテストで再現できる（`gh issue list` stub + ベースライン固定）
+- [ ] S02: `deps check <target>` が動作し、ready/blocked と終了コード（0/3/1）を返す（MVP: 依存なし）
+- [ ] S03: `deps.json` のパース/スキーマ検証（EC-001/002/007）を実装し、エラーはパス+理由つきで失敗する
+- [ ] S04: 依存参照の解決（node id / GH番号、canonicalize、EC-006）を実装し、解決不能/曖昧は失敗する
+- [ ] S05: 実効依存の継承/マージ（issue: self+epic+init、epic: self+init）を実装し、順序は決定的になる（AC-002）
+- [ ] S06: 自己依存/循環依存の検出（EC-003/004）を実装する（`sync`=全体、`deps check`/`active set`=到達範囲）
+- [ ] S07: GitHub state を使った Done/Unknown と ready 判定（AC-003/EC-005/008、ADR-00005）を実装する（warn code を安定化）
+- [ ] S08: `active set` を依存でガードし、`--force` で例外化する（AC-004/005）。派生物の上書き事故を防ぐ
+- [ ] S09: `sync` で `.agent/deps.json` と PlantUML（全体/todo-only）を生成する（AC-006/007/008）
+- [ ] S10: docs を更新し、運用/コマンド/生成物をリファレンス化する
+
+### 終了コード（契約） (必須)
+- `0`: ready（実行可能）
+- `3`: blocked（依存未解決/Unknown を含む）
+- `1`: 構造エラー（deps.json 不正、解決不能参照、自己依存、cycle など）
+- `2`: 引数エラー（`argparse`。reserved）
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+actor User
+participant "runtime\n(spec-dock/scripts/spec-dock)" as Script
+database "SSOT\nmeta.json" as Meta
+database "per-node\ndeps.json" as Deps
+participant "gh\n(optional)" as GH
+database ".agent/deps.json" as Out
+database ".agent/deps.puml\n.deps.todo.puml" as Puml
+
+== deps check ==
+User -> Script: deps check <target> [--github]
+Script -> Meta: scan nodes
+Script -> Deps: load reachable deps.json\n(+ merge parents)
+opt GitHub 参照（--github）
+  Script -> GH: gh issue list ...
+end
+Script --> User: ready/blocked + blockers
+
+== sync ==
+User -> Script: sync [--github]
+Script -> Meta: scan nodes (all)
+Script -> Deps: load deps.json (all)
+opt GitHub 参照（--github）
+  Script -> GH: gh issue list ...
+end
+Script -> Out: write deps.json
+Script -> Puml: write puml
 @enduml
 ```
 
 ### 要件 ↔ ステップ対応表 (必須)
-- AC-001 → S01
-- AC-___ → Sxx (任意: 必要に応じて追加)
-- EC-___ → Sxx (任意: 必要に応じて追加)
-- （任意）非交渉制約 → Sxx（どのステップで担保/検証するか）
+- AC-001 → S02〜S07
+- AC-002 → S05
+- AC-003 → S01, S07
+- AC-004 → S08
+- AC-005 → S08
+- AC-006 → S09
+- AC-007 → S09
+- AC-008 → S09
+- EC-001 → S03
+- EC-002 → S03
+- EC-003 → S06
+- EC-004 → S06
+- EC-005 → S07
+- EC-006 → S04
+- EC-007 → S03
+- EC-008 → S01, S07, S09
+- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S10（全ステップで維持し、テスト/差分で検証）
 
 ---
 
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
-### S01 — <観測可能な振る舞い> (必須)
-- 対象: AC-___ / EC-___
+### S01 — `sync --github` をテストで再現できる（gh stub） (必須)
+- 対象: AC-003 / EC-008（テスト基盤として）
 - 設計参照:
-  - 対象IF/API: IF-___ / API-___
-  - 対象テスト: `<test_file_path>::<test_name>`
+  - 対象IF/API: `_gh_issue_index()` / `sync --github --gh-limit`
+  - 対象テスト:
+    - `tests/test_cli.py::test_sync_github_populates_issue_statuses`
+    - `tests/test_cli.py::test_sync_github_passes_gh_limit_to_gh`（任意: 引数伝播の固定）
+    - `tests/test_cli.py::test_sync_github_index_incomplete_warns_and_marks_unknown`（部分取得）
+    - `tests/test_cli.py::test_sync_github_fetch_failure_warns_and_continues`（完全失敗）
 - このステップで「追加しないこと（スコープ固定）」:
-  - ...
+  - deps コマンドや deps 派生物の生成はまだ追加しない（テスト基盤のみ）
 
 #### update_plan（着手時に登録） (必須)
 - [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
-- 登録例:
-  - （調査）既存挙動/影響範囲の確認、設計参照の確認
-  - （Red）失敗するテストの追加/修正
-  - （Green）最小実装
-  - （Refactor）整理
-  - （品質ゲート）format/lint/test
-  - （報告）`./spec-dock/active/issue/report.md` 更新
-  - （コミット）このステップの区切りでコミット
 
 #### 期待する振る舞い（テストケース） (必須)
-- Given: ...
-- When: ...
-- Then: ...
-- 観測点（UI/HTTP/DB/Log など）: ...
-- 追加/更新するテスト: `<test_file_path>::<test_name>`
+- Given: `gh issue list` を返す stub が PATH 先頭にある
+- When: `sync --github --gh-limit N` を実行する
+- Then: 既存 `index.json` の issue `status` が OPEN/CLOSED に従って `open/done` になる
+- 追加で:
+  - `--gh-limit` 不足で取得漏れがある場合、取得できない issue は Unknown として扱い warn を出しつつ継続する（EC-008）
+  - `gh` 取得が完全に失敗した場合も warn を出しつつ継続し、GitHub state は Unknown として扱う（EC-008）
+- 観測点: `.agent/index.json`、stderr（warn + 復旧ヒント）、終了コード（0）
 
 #### Red（失敗するテストを先に書く） (任意)
 - 期待する失敗:
-  - ...
+  - stub が無いと `gh` 取得で失敗する（非 determinism の排除）
 
 #### Green（最小実装） (任意)
 - 変更予定ファイル:
-  - Add: `<path/...>`
-  - Modify: `<path/...>`
-- 追加する概念（このステップで導入する最小単位）:
-  - ...
-- 実装方針（最小で。余計な最適化は禁止）:
-  - ...
+  - Modify: `tests/test_cli.py`（`gh issue list` stub 追加）
+- 実装方針:
+  - stub は `gh issue list` のみを実装し、最小 JSON を返す
+  - 併せて、テスト側に「spec ツリー生成（init/epic/issue）」「deps.json 配置」「--json 出力のパース」ヘルパーを追加し、以降の重複を抑える
 
 #### Refactor（振る舞い不変で整理） (任意)
 - 目的:
-  - ...
-- 変更対象:
-  - ...
+  - 以降の deps テストで `gh` を安定的にスタブできるようにする
 
 #### ステップ末尾（省略しない） (必須)
-- [ ] 期待するテスト（必要ならフォーマット/リンタ）を実行し、成功した
+- [ ] 期待するテストを実行し、成功した
 - [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
 - [ ] コミットした（エージェント）
 
 ---
 
-### Sxx — <追加の観測可能な振る舞い> (任意)
-- （上の S01 と同じ構成で記載する。update_plan / 期待する振る舞い / ステップ末尾 は省略しない）
-  ...
+### S02 — `deps check` が動作し、ready/blocked と終了コードを返す（依存なし） (必須)
+- 対象: AC-001 / EC-001
+- 設計参照:
+  - 対象IF/API: CLI 契約（`deps check`）/ 終了コード実装メモ
+  - 対象テスト:
+    - `tests/test_cli.py::test_deps_check_no_deps_is_ready`
+    - `tests/test_cli.py::test_deps_check_missing_target_is_argparse_exit_2_not_blocked`
+    - `tests/test_cli.py::test_deps_check_accepts_github_number_forms_and_urls`
+    - `tests/test_cli.py::test_deps_check_json_stdout_only`（stdout=JSON 固定）
+    - `tests/test_cli.py::test_deps_commands_do_not_mutate_meta_json`
+- このステップで「追加しないこと（スコープ固定）」:
+  - `deps.json` の厳密バリデーション（次ステップ）
+  - GitHub state を使った Done 判定（S07）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: 依存定義ファイルが存在しない（deps 未定義）
+- When: `spec-dock deps check <target>` を実行する
+- Then: `ready=true`（実効依存が空）で exit=0
+- 観測点:
+  - 終了コード
+  - `--json` の stdout が JSON のみ（stderr は空）
+  - `meta.json` が変更されないこと
+
+#### Red（失敗するテストを先に書く） (任意)
+- 期待する失敗:
+  - `deps` サブコマンドが存在しない（argparse error）
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+  - Modify: `tests/test_cli.py`
+- 追加する概念（このステップで導入する最小単位）:
+  - `deps check` サブコマンド（argparse + ハンドラ）
+  - `--json` 時の stdout=JSON 固定（warnings は常に `[]`）
+  - 終了コード（0/3/1）の返却経路（`main()` の返り値尊重）
+- 実装方針:
+  - 依存未定義は空として扱い、まず “動く入口” を作る（機能は次ステップで拡張）
+
+#### Refactor（振る舞い不変で整理） (任意)
+- 目的:
+  - 以降の deps 実装を差し込みやすい関数境界に整える
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S03 — `deps.json` のパース/スキーマ検証を実装する (必須)
+- 対象: EC-001 / EC-002 / EC-007
+- 設計参照:
+  - 対象IF/API: IF-001（`_load_deps_json`）/ ERR-001/ERR-002
+  - 対象テスト:
+    - `tests/test_cli.py::test_deps_check_missing_deps_json_is_empty`
+    - `tests/test_cli.py::test_deps_json_parse_error_fails_with_path`
+    - `tests/test_cli.py::test_deps_json_schema_error_fails_with_reason`
+- このステップで「追加しないこと（スコープ固定）」:
+  - ref 解決（次ステップ）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: 壊れた JSON / schema_version 不正 / depends_on の型不正
+- When: `deps check <target>` を実行する
+- Then: exit=1 で失敗し、stderr に「deps.json のパス + 理由」が含まれる
+
+#### Red（失敗するテストを先に書く） (任意)
+- 期待する失敗:
+  - 壊れた JSON を黙殺してしまう、または理由/パスが出ない
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
+  - Modify: `tests/test_cli.py`
+- 実装方針:
+  - `deps.json` 不在は `depends_on=[]` として扱う
+  - 不明キーは無視（将来拡張）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S04 — 依存参照の解決（node id / GH番号、canonicalize） (必須)
+- 対象: EC-006
+- 設計参照:
+  - 対象IF/API: IF-002（`_resolve_dep_ref`）/ ERR-003
+  - 対象テスト:
+    - `tests/test_cli.py::test_deps_unresolved_ref_reports_ref_and_deps_path`
+    - `tests/test_cli.py::test_deps_canonicalizes_width_variants`
+    - `tests/test_cli.py::test_deps_github_number_requires_imported_node`
+    - `tests/test_cli.py::test_deps_ambiguous_github_number_reference_fails_with_ref_and_path`（任意）
+- このステップで「追加しないこと（スコープ固定）」:
+  - 親依存のマージ（次ステップ）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `deps.json` が存在し、depends_on に存在しない node id / 未 import の GitHub issue number が含まれる
+- When: `deps check <target>` を実行する
+- Then: exit=1。stderr に ref と定義元 `deps.json` のパスが含まれる
+
+#### Green（最小実装） (任意)
+- 実装方針:
+  - node id は numeric id として解決し、canonical id に正規化する（幅差を吸収）
+  - GitHub issue number は spec ツリー内の 1 node に一意に解決できない場合はエラー
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S05 — 実効依存の継承/マージ（親の依存を含める） (必須)
+- 対象: AC-002
+- 設計参照:
+  - 対象IF/API: IF-003（`_effective_depends_on`）
+  - 対象テスト:
+    - `tests/test_cli.py::test_deps_effective_depends_on_merges_parents_and_dedups`
+    - `tests/test_cli.py::test_deps_effective_depends_on_merges_epic_and_initiative`（epic=self+init）
+- このステップで「追加しないこと（スコープ固定）」:
+  - cycle 検出（次ステップ）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: issue 自身/親 epic/親 initiative がそれぞれ deps を持つ
+- When: issue を `deps check` する
+- Then: 実効依存が和集合になり、重複が除かれ、順序が決定的である
+
+#### Green（最小実装） (任意)
+- 実装方針:
+  - 解決後（canonicalize 後）に重複排除し、node id の決定的 sort を適用
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S06 — 自己依存/循環依存の検出（scope 付き） (必須)
+- 対象: EC-003 / EC-004
+- 設計参照:
+  - 対象IF/API: IF-004（scope: `sync`=全体 / `deps check`/`active set`=到達範囲）
+  - 対象テスト:
+    - `tests/test_cli.py::test_deps_self_dependency_fails`
+    - `tests/test_cli.py::test_deps_cycle_detected_in_reachable_graph`
+    - `tests/test_cli.py::test_deps_check_ignores_unreachable_cycle`
+    - `tests/test_cli.py::test_sync_fails_on_cycle_anywhere_in_graph`（sync=全体検査）
+- このステップで「追加しないこと（スコープ固定）」:
+  - GitHub Done 判定（次ステップ）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: cycle が存在する
+- When: `deps check <target>` / `sync` を実行する
+- Then:
+  - reachable cycle は exit=1 で失敗し、`A -> B -> ... -> A` が出力される
+  - unreachable cycle は `deps check <target>` の失敗要因にしない
+  - ただし `sync` は全体検査なので、到達不能でも cycle があれば失敗する
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S07 — GitHub state 連携の ready 判定と warnings（安定化） (必須)
+- 対象: AC-003 / EC-005 / EC-008
+- 設計参照:
+  - ADR-00002（状態モデル）/ ADR-00005（epic/initiative Done）/ WARN-001/002（warning code）
+  - 対象テスト:
+    - `tests/test_cli.py::test_deps_check_without_github_treats_deps_as_unknown_and_blocks`
+    - `tests/test_cli.py::test_deps_check_exit_codes_ready_blocked_error`（exit code の分離）
+    - `tests/test_cli.py::test_deps_check_github_ready_and_blocked`
+    - `tests/test_cli.py::test_deps_github_fetch_failure_warns_and_blocks`
+    - `tests/test_cli.py::test_deps_github_index_incomplete_warns_and_blocks`
+    - `tests/test_cli.py::test_deps_check_passes_gh_limit_to_gh`（任意: 引数伝播）
+    - `tests/test_cli.py::test_deps_check_json_stdout_only_and_warnings_on_stderr`
+    - `tests/test_cli.py::test_deps_check_json_includes_effective_depends_on_blockers_and_nodes`
+    - `tests/test_cli.py::test_deps_check_github_treats_local_only_dep_as_unknown_and_blocks`（EC-005: local-only）
+    - `tests/test_cli.py::test_epic_total_zero_open_is_not_done_by_aggregation`
+    - `tests/test_cli.py::test_epic_total_zero_closed_is_done_by_rule_a`
+- このステップで「追加しないこと（スコープ固定）」:
+  - `active set` ガード（次ステップ）
+  - `sync` の deps 生成（S09）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: 依存先の GitHub state が取得できる（stub）
+- When: `deps check <target> --github` を実行する
+- Then: 依存先がすべて CLOSED なら ready/exit=0、OPEN/Unknown があれば blocked/exit=3
+- 追加で:
+  - gh 取得失敗: warn（`warnings[]` に `gh_fetch_failed`）+ Unknown 扱い + blocked
+  - gh-limit 不足: warn（`warnings[]` に `gh_index_incomplete`）+ missing を Unknown 扱い
+  - warn には原因と復旧ヒント（例: `sync --github` / `--gh-limit` / `gh auth status`）が含まれる
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S08 — `active set` の依存ガード + `--force` + 派生物上書き事故の回避 (必須)
+- 対象: AC-004 / AC-005
+- 設計参照:
+  - `active set` 契約（exit=3、`--force`、`--github`）/ IF-007（派生物 active patch）
+  - 対象テスト:
+    - `tests/test_cli.py::test_active_set_blocked_does_not_mutate_active_json_without_force`
+    - `tests/test_cli.py::test_active_set_force_updates_active_and_emits_warn`
+    - `tests/test_cli.py::test_active_set_github_allows_when_deps_done`（`--github` 伝播）
+    - `tests/test_cli.py::test_active_set_passes_gh_limit_to_gh`（`--gh-limit` 伝播）
+    - `tests/test_cli.py::test_active_set_updates_index_tree_active_only`
+    - `tests/test_cli.py::test_active_set_does_not_mutate_meta_json`
+- このステップで「追加しないこと（スコープ固定）」:
+  - `sync` の deps 生成（次ステップ）
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: target が blocked
+- When: `active set <target>` を実行する
+- Then: exit=3、active.json は不変、blockers が表示される
+- When: `active set <target> --force` を実行する
+- Then: exit=0、active.json が更新され、warn が出る
+- When: `active set <target> --github [--gh-limit N]` を実行する
+- Then: `deps check --github` 相当の判定が行われ、GitHub state により ready/blocked が変化する
+- 回帰防止:
+  - `sync --github` で enrich 済みの `.agent/index.json`/`.agent/tree.json` が、`active set` により local モードで上書きされない（`active` のみ更新）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S09 — `sync` が deps 派生物（json/puml）を生成する (必須)
+- 対象: AC-006 / AC-007 / AC-008
+- 設計参照:
+  - MODEL-002/003（最小契約）/ IF-005/006 / `sync --force` と deps エラーの関係
+  - 対象テスト:
+    - `tests/test_cli.py::test_sync_generates_deps_json_and_puml`
+    - `tests/test_cli.py::test_sync_github_fetch_failure_warns_and_still_generates_deps_outputs`
+    - `tests/test_cli.py::test_sync_github_index_incomplete_warns_and_still_generates_deps_outputs`
+    - `tests/test_cli.py::test_sync_deps_puml_contains_legend_and_state_colors`
+    - `tests/test_cli.py::test_sync_todo_puml_excludes_done_nodes`
+    - `tests/test_cli.py::test_sync_force_does_not_ignore_deps_structural_errors`
+    - `tests/test_cli.py::test_sync_does_not_mutate_meta_json`
+- このステップで「追加しないこと（スコープ固定）」:
+  - UI/TUI 等の編集機能は追加しない
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- When: `sync` を実行する
+- Then:
+  - `.agent/deps.json` が生成され、`schema_version/generated_at/nodes[<id>].state/ready/effective_depends_on/blockers` を含む（`nodes` は id-keyed dict）
+  - `.agent/deps.puml` が生成され、凡例と state 色分けがある
+  - `.agent/deps.todo.puml` は done ノード/edge を除外する
+- 追加で:
+  - deps 構造エラーは `sync --force` でも握りつぶさず exit=1
+  - `sync --github` の gh 取得失敗は warn して Unknown 扱いで継続（生成物は出る）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] テスト成功
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S10 — docs 更新（運用・コマンド・生成物） (必須)
+- 対象: ドキュメント整備（要件の観測点/運用を支える）
+- 設計参照:
+  - 変更計画（docs）/ CLI 契約 / 生成物一覧
+- 変更予定ファイル:
+  - Add: `src/spec_dock/assets/spec_dock/docs/reference_deps.md`（依存定義/コマンド/生成物）
+  - Modify: `src/spec_dock/assets/spec_dock/docs/reference_sync.md`（deps 出力追記）
+  - Modify: `src/spec_dock/assets/spec_dock/docs/guide.md`（導線追加）
+- このステップで「追加しないこと（スコープ固定）」:
+  - 仕様変更（AC/EC の追加）は行わない
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: ユーザー/エージェントが docs を読む
+- Then: `deps.json` の書式、`deps check`、`sync` の生成物、`active set` ガード/`--force` が迷わず分かる
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] 変更差分をレビューし、整合している
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
 
 ---
 
 ## 未確定事項（TBD） (必須)
-- Q-001:
-  - 質問: TBD ...
-  - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）: ...
-  - 影響範囲: S__ / AC-__ / EC-__ / `design.md` / ...
-- Q-002:
-  - 質問: TBD ...
-  - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）: ...
-  - 影響範囲: ...
+- 該当なし（`spec-on-dev/requirement.md` / ADR で決定済み）
 
 ## 完了条件（Definition of Done） (必須)
 - 対象AC/ECがすべて満たされ、テストで保証されている
 - MUST NOT / OUT OF SCOPE を破っていない
-- 品質ゲート（フォーマット/リント/テストのうち該当するもの）が満たされている
+- 品質ゲート（テスト等）が満たされている
 
 ## 省略/例外メモ (必須)
 - 該当なし
