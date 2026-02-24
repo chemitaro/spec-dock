@@ -146,6 +146,11 @@ end
 - epic: 自身 + 親 initiative（和集合）
 - issue: 自身 + 親 epic + 親 initiative（和集合）
 
+### 依存定義の追加制約（運用上の落とし穴の防止）
+- ノードは **自分自身の配下（descendant）ノード**（例: initiative 配下の epic/issue、epic 配下の issue）を `depends_on` に含めてはならない。
+  - 理由: issue/epic は親の依存を継承するため、親→子依存を置くと **子が自分自身に依存**する形になり、自己依存/循環依存として破綻する。
+  - 期待: `deps check` / `sync` は **構造エラー（exit=1）** として失敗し、どの `deps.json` によるものか分かるエラーを出す。
+
 ### 依存指定の解決（MVP）
 - node id 指定: spec ツリー内のノードへ解決できること（存在しない id はエラー）
 - GitHub issue number 指定: spec ツリー内の `github.issue_number=<num>` のノードへ一意に解決できること（未 import はエラー）
@@ -160,6 +165,14 @@ end
 - Todo: GitHub `OPEN` かつ Doing ではない
 - Unknown: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
 - Blocked: 依存が未解決（open/unknown 等）で ready ではない（導出状態）
+  - 表示用の畳み込み（優先順位）:
+    - `state` は 1つのラベルに畳み込むため、以下の順で決める（MVP）:
+      1) `done`
+      2) `blocked`（`ready=false`）
+      3) `doing`
+      4) `todo`
+      5) `unknown`
+    - これにより、`state=done` でも `ready=false` があり得る（done を優先して表示する）
 
 ### 状態取得（MVP）
 - GitHub state（OPEN/CLOSED）は `gh` CLI を用いて取得する（`sync --github` と同等）
@@ -175,6 +188,10 @@ end
 ### ready（実行可能）判定
 - ready = 実効依存がすべて Done
 - Unknown は “未解決” として扱う（安全側）
+  - 補足: `state`（done/doing/todo/unknown/blocked）と `ready` は **別軸**。
+    - `state` は「そのノード自体の進捗状態（表示用）」で、PlantUML の色分けに使う。
+    - `ready` は「依存がクリアされているか（着手順の判定）」で、`deps check` / `active set` ガードの根拠になる。
+    - そのため **`state=done` でも `ready=false` は起こり得る**（例: 依存未解決のままクローズしたケース）。この場合は「進捗は完了したが、依存順の観点では不整合がある」ことを示す。
 
 ### 派生状態（`sync` の生成物）
 - `sync` は依存関係も統合し、以下を `spec-dock/.agent/` に生成する（git 管理しない）:
@@ -316,6 +333,17 @@ end
   - 条件: GitHub state を取得できない（例: `gh` 未インストール、未認証、通信不可、`--gh-limit` 不足で取得漏れ）
   - 期待: Unknown として扱い blocked になる（安全側）。ただし原因と復旧手順（例: `sync --github` / `--gh-limit` 調整）を表示する
   - 観測点: `deps check` の blocked 判定 / CLI 出力
+- EC-009:
+  - 条件: 親ノード（initiative/epic）が、自分の配下ノード（descendant）を `depends_on` に含めている
+  - 期待: 自己依存/循環依存に発展するため、**構造エラー（exit=1）** として失敗する（`deps.json` のパスと依存先 id を含む）
+  - 観測点: CLI エラー出力（deps.json パス + 理由）/ 終了コード == 1
+- EC-010:
+  - 条件: deps 構造エラー（不正 JSON / スキーマ不正 / 解決不能参照 / 自己依存 / cycle / EC-009 など）が存在する状態で `sync --force` を実行する
+  - 期待:
+    - `sync` は **警告付きで継続（exit=0）** し、`index.json` / `tree.json` を更新する
+    - deps 派生物（`.agent/deps.json` / `.puml`）は **削除** して「最新が無い」ことを明確にする（古い派生物の誤用を防ぐ）
+    - warn には安定したコード（例: `deps_preflight_failed`）を含める
+  - 観測点: `sync` の標準出力（ok）/ stderr（warn code）/ `.agent/index.json` / `.agent/tree.json` の更新 / deps 派生物が存在しないこと
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: 依存（depends_on） = あるノードを着手/active 化する前に完了している必要がある他ノード

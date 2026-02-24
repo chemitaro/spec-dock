@@ -129,6 +129,10 @@ Script -> Puml: write puml
     - `depends_on` 要素は node id（`init|epic|iss`）または GitHub issue number（int/数字文字列）
     - 解決後は node id に正規化して重複排除（出力順は決定的）
     - 不明キーは無視（将来拡張）
+    - **descendant 依存は禁止**:
+      - 例: initiative が配下 epic/issue を depends_on に含める、epic が配下 issue を depends_on に含める
+      - 理由: issue/epic は親依存を継承するため、親→子依存は子の自己依存/循環に発展する
+      - 扱い: 構造エラー（`deps check`/`sync` ともに exit=1、エラーに deps.json のパス + 依存先 id を含める）
 - MODEL-002: `.agent/deps.json`（派生 SSOT / schema_version=1）
   - Fields（最小）:
     - `schema_version: 1`
@@ -193,6 +197,9 @@ A --> B : depends_on
     - Doing: active leaf と一致（ただし Done が優先）
 - ready（実行可能）:
   - `ready = effective_depends_on がすべて Done`（requirement.md の定義どおり。target 自身の Done で短絡しない）
+  - 補足:
+    - `state` と `ready` は別軸であり、`state=done` でも `ready=false` は起こり得る（依存未解決のままクローズした等）
+    - PlantUML は `state` を色分けに使うため、依存不整合の監査が必要な場合は `.agent/deps.json` の `ready/blockers` を見る
 - blockers:
   - `blockers = effective_depends_on のうち Done ではないもの`（Todo/Doing/Unknown/Blocked を含む）
 - 表示用 state（PlantUML/`.agent/deps.json` の `state`）:
@@ -274,12 +281,15 @@ A --> B : depends_on
   - `spec-dock/.agent/deps.puml`
   - `spec-dock/.agent/deps.todo.puml`
 - `sync` の失敗条件:
-  - deps 構造エラー（不正 JSON / 不正 schema / 解決不能参照 / 自己依存 / cycle）はエラーで停止（要件どおり）
+  - deps 構造エラー（不正 JSON / 不正 schema / 解決不能参照 / 自己依存 / cycle / descendant 依存）はエラーで停止（要件どおり）
 - `sync --github` の `gh` 取得失敗時:
   - warn + Unknown 扱いで継続（構造エラーではないため）
 - `sync --force` との関係（既存仕様の整理）:
   - `--force` は meta の preflight validate を握りつぶして index/tree を生成するためのデバッグ用 escape hatch
-  - deps 構造エラーは `--force` でも握りつぶさない（常に exit=1）
+  - deps 構造エラーがある場合も、`--force` なら warn を出して継続し、**index/tree は更新する**
+    - ただし deps 派生物（`.agent/deps.json` / `.puml`）は **削除** して「最新が無い」ことを明確にする（古い派生物の誤用を防ぐ）
+    - warn code は安定させる（例: `deps_preflight_failed`）
+    - このケースの終了コードは `0`（force による劣化成功）。機械判定は warn code または deps 派生物の有無で行う
 
 ### 終了コード実装メモ（runtime script） (必須)
 - 現状: runtime script の `main()` は例外を捕捉して常に `exit=1` で失敗する（blocked を `3` にできない）。
@@ -359,6 +369,9 @@ class DepsStateNode {
 - ERR-004: cycle detected
   - 発生条件: cycle（EC-004）
   - 返し方: `RuntimeError("Dependency cycle detected: A -> B -> ... -> A")`
+- ERR-006: invalid descendant dependency
+  - 発生条件: `deps.json` が自分の配下（descendant）ノードを `depends_on` に含めている（EC-009）
+  - 返し方（例）: `RuntimeError("Invalid dependency: <src> cannot depend on its descendant <dst> (in <deps.json path>)")`
 - ERR-005: blocked（active set のみ）
   - 発生条件: `active set` 対象が blocked かつ `--force` なし（AC-004）
   - 返し方: `spec-dock: blocked (active set) ...` を出し、exit=3（例外ではなく終了コードで表現）
@@ -396,6 +409,8 @@ class DepsStateNode {
 - EC-001/002/006/007 → deps パース/解決（IF-001/002、ERR-001〜003）
 - EC-003/004 → 自己依存/循環（IF-004、ERR-004）
 - EC-005/008 → Unknown を blocker 扱い + `--force` で回避（状態モデル/ガード）
+- EC-009 → descendant 依存の検出（MODEL-001 / ERR-006、direct deps 解決段階で fail-fast）
+- EC-010 → `sync --force` の deps preflight 失敗時ハンドリング（deps 派生物削除 + warn code）
 - 非交渉制約（stdlib/非破壊/meta不変更）→ 実装を runtime script 内に閉じ、`.agent/` 出力に限定する
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -424,6 +439,8 @@ class DepsStateNode {
   - EC-003 → `tests/test_cli.py::test_deps_self_dependency_fails`（仮）
   - EC-006 → `tests/test_cli.py::test_deps_unresolved_ref_fails`（仮）
   - EC-008 → `tests/test_cli.py::test_deps_github_fetch_failure_warns_and_blocks`（仮）
+  - EC-009 → `tests/test_cli.py::test_deps_descendant_dependency_fails`（仮）
+  - EC-010 → `tests/test_cli.py::test_sync_force_skips_deps_on_deps_error`（仮）
   - WARN-002（`--gh-limit` 不足）→ `tests/test_cli.py::test_deps_github_index_incomplete_warns_and_blocks`（仮）
   - ADR-00005（`total==0` 例外）→ `tests/test_cli.py::test_epic_total_zero_is_not_done_by_aggregation`（仮）
   - ADR-00005（A による Done）→ `tests/test_cli.py::test_epic_total_zero_closed_is_done_by_rule_a`（仮）
