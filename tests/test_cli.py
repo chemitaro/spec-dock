@@ -198,6 +198,38 @@ class TestCli(unittest.TestCase):
         )
         gh_path.chmod(0o755)
 
+    def _make_gh_issue_list_stub(
+        self,
+        bin_dir: Path,
+        *,
+        issues: list[dict[str, object]],
+        fail: bool = False,
+        log_path: Path | None = None,
+    ) -> None:
+        log_line = ""
+        if log_path is not None:
+            log_line = f'  echo "$@" >> "{log_path.as_posix()}"\n'
+
+        payload = json.dumps(issues, ensure_ascii=False)
+
+        gh_path = bin_dir / "gh"
+        gh_path.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
+            f"{log_line}"
+            + ("  echo \"gh stub: simulated failure\" >&2\n  exit 1\n" if fail else "")
+            + "  cat <<'JSON'\n"
+            + f"{payload}\n"
+            + "JSON\n"
+            "  exit 0\n"
+            "fi\n"
+            'echo "unexpected gh args: $@" >&2\n'
+            "exit 99\n",
+            encoding="utf-8",
+        )
+        gh_path.chmod(0o755)
+
     def _assert_version_file(self, target: Path) -> None:
         version_file = target / "spec-dock" / "spec-dock.version"
         self.assertTrue(version_file.is_file())
@@ -1186,6 +1218,157 @@ class TestCli(unittest.TestCase):
             self.assertEqual(active["initiative"]["id"], "init-local-00001")
             self.assertEqual(active["epic"]["id"], "epic-local-00001")
             self.assertEqual(active["issue"]["id"], "iss-local-00001")
+
+    def test_sync_github_populates_issue_statuses(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Add refresh token"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Rotate refresh token"],
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Issue 301", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Issue 302", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            nodes = index["nodes"]
+            self.assertEqual(nodes["iss-00301"]["status"], "done")
+            self.assertEqual(nodes["iss-00301"]["github"]["state"], "CLOSED")
+            self.assertEqual(nodes["iss-00302"]["status"], "open")
+            self.assertEqual(nodes["iss-00302"]["github"]["state"], "OPEN")
+
+    def test_sync_github_passes_gh_limit_to_gh(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[{"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"}],
+                log_path=log_path,
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["sync", "--github", "--gh-limit", "123", "--no-update-active"],
+                env=test_env,
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            self.assertTrue(log_path.is_file())
+            lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            self.assertNotEqual(lines, [])
+            argv = lines[-1].split()
+            self.assertIn("--limit", argv)
+            i = argv.index("--limit")
+            self.assertLess(i + 1, len(argv))
+            self.assertEqual(argv[i + 1], "123")
+
+    def test_sync_github_index_incomplete_warns_and_marks_unknown(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Add refresh token"],
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            # Missing 301 on purpose.
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("gh_index_incomplete", p.stderr)
+
+            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            nodes = index["nodes"]
+            self.assertEqual(nodes["iss-00301"]["status"], "unknown")
+            self.assertEqual(nodes["iss-00301"]["github"], {"issue_number": 301})
+
+    def test_sync_github_fetch_failure_warns_and_continues(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Add refresh token"],
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("gh_fetch_failed", p.stderr)
+
+            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            nodes = index["nodes"]
+            self.assertEqual(nodes["iss-00301"]["status"], "unknown")
 
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

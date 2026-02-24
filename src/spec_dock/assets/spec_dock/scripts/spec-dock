@@ -1829,7 +1829,12 @@ def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{e.stderr.strip()}") from e
 
-    data = json.loads(p.stdout)
+    try:
+        data = json.loads(p.stdout)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"gh returned invalid JSON: {' '.join(cmd)}") from e
+    if not isinstance(data, list):
+        raise RuntimeError(f"gh returned invalid JSON payload (expected a list): {' '.join(cmd)}")
     index: dict[int, dict[str, Any]] = {}
     # Normalize to {number: issue_json}.
     for item in data:
@@ -1995,7 +2000,30 @@ def _sync(
 
     issue_index: dict[int, dict[str, Any]] = {}
     if github:
-        issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+        try:
+            issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+        except RuntimeError as e:
+            _warn(
+                "gh_fetch_failed: failed to fetch GitHub issue states; treating as unknown. "
+                f"Hint: check `gh auth status`, or re-run without --github. Details: {e}"
+            )
+            issue_index = {}
+        else:
+            linked_numbers = sorted(
+                {
+                    int(n.github_issue_number)
+                    for n in nodes.values()
+                    if n.github_issue_number is not None and n.type in ("initiative", "epic", "issue")
+                }
+            )
+            missing = [n for n in linked_numbers if n not in issue_index]
+            if missing:
+                examples = ", ".join(str(n) for n in missing[:5])
+                suffix = "..." if len(missing) > 5 else ""
+                _warn(
+                    "gh_index_incomplete: gh issue list does not include some linked issues; treating missing as unknown. "
+                    f"missing={len(missing)} examples=[{examples}{suffix}] (hint: increase --gh-limit; current: {gh_limit})"
+                )
 
     def sort_key(node_id: str) -> tuple[int, int, str]:
         """Deterministic sort key for ids (GitHub ids first, then local)."""
@@ -2014,6 +2042,7 @@ def _sync(
         if node.type in ("initiative", "epic"):
             progress[node.id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
 
+    issue_status_by_id: dict[str, str] = {}
     for node in nodes.values():
         if node.type != "issue":
             continue
@@ -2025,6 +2054,7 @@ def _sync(
             gh = issue_index.get(node.github_issue_number)
             if gh:
                 status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+        issue_status_by_id[node.id] = status
 
         for parent in filter(None, (node.epic_id, node.initiative_id)):
             if parent not in progress:
@@ -2073,6 +2103,9 @@ def _sync(
             "epic_id": node.epic_id,
             "children": sorted(children.get(node.id, []), key=sort_key),
         }
+
+        if node.type == "issue":
+            item["status"] = issue_status_by_id.get(node.id, "unknown")
 
         if node.github_issue_number is not None:
             item["github"] = {"issue_number": node.github_issue_number}
