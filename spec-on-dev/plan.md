@@ -39,6 +39,9 @@ ID: "iss-00009"
 - [ ] S16: `deps check` / `active set` 非`--github`時は `.agent/index.json` を参照して状態を扱う（AC-001/003、EC-005/008）
 - [ ] S17: ADR-00006 反映の docs 追補（`guide.md` / `reference_github.md` / `reference_sync.md` など）
 - [ ] S18: `deps.puml` のノードラベルに `ready=false` を追記し、done+ready=false を図上で識別できるようにする（AC-007）
+- [ ] S19: `active set/clear` は `sync` を自動実行せず、既存 `.agent/{index,tree}.json` の active のみをbest-effortで更新する
+- [ ] S20: `sync --force` の tree preflight forced fail 時も deps 派生物を削除して stale を防止する
+- [ ] S21: docs 追補（`reference_deps.md` の PlantUML ラベルに `ready=false` を明記する）
 
 ### 終了コード（契約） (必須)
 - `0`: ready（実行可能）
@@ -82,10 +85,10 @@ Script -> Puml: write puml
 - AC-001 → S02〜S07, S16
 - AC-002 → S05
 - AC-003 → S01, S07
-- AC-004 → S08
-- AC-005 → S08
+- AC-004 → S08, S19
+- AC-005 → S08, S19
 - AC-006 → S09, S15
-- AC-007 → S09, S18
+- AC-007 → S09, S18, S21
 - AC-008 → S09
 - AC-009 → S14
 - AC-010 → S14
@@ -99,9 +102,9 @@ Script -> Puml: write puml
 - EC-007 → S03
 - EC-008 → S01, S07, S09
 - EC-009 → S11
-- EC-010 → S12
+- EC-010 → S12, S20
 - EC-011 → S15
-- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S18（全ステップで維持し、テスト/差分で検証）
+- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S21（全ステップで維持し、テスト/差分で検証）
 
 ---
 
@@ -703,6 +706,64 @@ Script -> Puml: write puml
 - 観測点（必須）:
   - `.agent/deps.puml` の `state=done` ノードの label に `ready=false` が含まれる（例: `Done\\nready=false`）
   - `.agent/deps.todo.puml` は Done 除外の仕様どおり（Done ノード自体は出ない）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S19 — `active set/clear` は `sync` を自動実行せず active のみをbest-effortで反映する (必須)
+- 対象: AC-004/005（active set の運用安全性）
+- 目的:
+  - `active set` の成功/失敗が、無関係な `sync` の失敗（global deps cycle など）に引きずられないようにする
+  - `sync` による派生物の再生成ではなく、既存 `.agent/{index,tree}.json` の `active` フィールドのみを更新して整合させる
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_active_set_ignores_unreachable_cycle_and_does_not_run_sync`
+- 実装方針（例）:
+  - `_patch_agent_state_active_fields` を導入し、read/shape/write 失敗は warn して継続（best-effort）
+- 観測点（必須）:
+  - 到達不能な cycle が存在しても `active set` は成功する
+  - `.agent/index.json` / `.agent/tree.json` が存在する場合、`active` だけが更新される
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S20 — `sync --force` の tree preflight forced fail 時も deps 派生物を削除する (必須)
+- 対象: EC-010（stale 派生物の誤用防止）
+- 目的:
+  - `sync --force` で tree preflight（`_validate_nodes`）が失敗した場合も、deps 派生物が stale のまま残る事故を防ぐ
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_sync_force_continues_when_tree_is_invalid`
+- 実装方針（例）:
+  - forced preflight validate 失敗でも deps 派生物削除の分岐に入るようフラグを立てる
+- 観測点（必須）:
+  - index/tree は更新される
+  - deps 派生物（`.agent/deps*.{json,puml}`）は削除される
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S21 — docs 追補（PlantUML の `ready=false` ラベル規約） (必須)
+- 目的:
+  - 図（色=state）だけで誤認しないよう、`ready=false` がラベルで判別できる契約を docs に明記する
+- 変更対象（例）:
+  - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
