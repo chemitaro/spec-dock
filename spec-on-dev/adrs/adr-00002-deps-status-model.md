@@ -4,7 +4,7 @@ ID: "adr-00002"
 タイトル: "依存可視化の状態モデル（Done/Doing/Todo/Unknown など）"
 状態: "accepted"
 作成者: "Codex CLI"
-最終更新: "2026-02-24"
+最終更新: "2026-02-27"
 親: ["iss-00009"]
 ---
 
@@ -13,10 +13,18 @@ ID: "adr-00002"
 ## 結論（Decision） (必須)
 - 採用: Option A（GitHub state + active のみ）
 - 状態モデル（MVP）:
-  - Done: GitHub `CLOSED`
-  - Doing: `spec-dock/.agent/active.json` の leaf（`issue` > `epic` > `initiative`）と一致するノード
-  - Todo: GitHub `OPEN` かつ Doing ではない
-  - Unknown: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+  - Done:
+    - issue: GitHub `CLOSED`
+    - epic/initiative: 配下 issue の集計で `open == 0` かつ `unknown == 0`（`total == 0` も Done 扱い）
+  - Doing:
+    - issue: `spec-dock/.agent/active.json` の leaf（`issue`）と一致するノード
+    - epic/initiative: active leaf が配下に存在するノード（= 配下で作業中）
+  - Todo:
+    - issue: GitHub `OPEN` かつ Doing ではない
+    - epic/initiative: Done/Doing/Unknown ではない（= 未完了だが active は無い）
+  - Unknown:
+    - issue: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+    - epic/initiative: 配下 issue の集計で `unknown > 0`
   - Blocked: 依存が未解決（open/unknown 等）で ready ではない（表示用の導出状態）
 
 ## 背景（Context） (必須)
@@ -27,10 +35,18 @@ ID: "adr-00002"
 ## 選択肢（Options considered） (必須)
 - Option A: GitHub state + active のみで判定（MVP）
   - ルール（案）:
-    - Done: GitHub `CLOSED`
-    - Doing: `spec-dock/.agent/active.json` の current target と一致するノード
-    - Todo: GitHub `OPEN` かつ Doing ではない
-    - Unknown: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+    - Done:
+      - issue: GitHub `CLOSED`
+      - epic/initiative: 配下 issue の集計で `open == 0` かつ `unknown == 0`（`total == 0` も Done 扱い）
+    - Doing:
+      - issue: `spec-dock/.agent/active.json` の current target と一致するノード
+      - epic/initiative: active leaf が配下に存在するノード
+    - Todo:
+      - issue: GitHub `OPEN` かつ Doing ではない
+      - epic/initiative: Done/Doing/Unknown ではない
+    - Unknown:
+      - issue: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+      - epic/initiative: 配下 issue に Unknown が存在する
     - Blocked: 依存が未解決（open/unknown 等）で ready ではない（表示用に追加）
   - Pros:
     - 取得・実装が簡単で壊れにくい。
@@ -65,3 +81,4 @@ ID: "adr-00002"
 
 ## 参考（References） (任意)
 - `spec-on-dev/requirement.md`（Q-002）
+- `spec-on-dev/adrs/adr-00006-github-policy-and-derived-state-for-initiative-and-epic.md`

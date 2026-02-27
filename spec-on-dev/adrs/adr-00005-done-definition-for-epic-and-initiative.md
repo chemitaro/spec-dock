@@ -2,13 +2,15 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00005"
 タイトル: "epic/initiative を依存先にしたときの Done 判定"
-状態: "accepted"
+状態: "superseded"
 作成者: "Codex CLI"
-最終更新: "2026-02-24"
+最終更新: "2026-02-27"
 親: ["iss-00009"]
 ---
 
 # adr-00005 epic/initiative を依存先にしたときの Done 判定
+
+> Superseded by: `adr-00006-github-policy-and-derived-state-for-initiative-and-epic.md`
 
 ## 結論（Decision） (必須)
 - 採用: Option C（A または B を満たせば Done）
