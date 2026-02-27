@@ -63,8 +63,15 @@ ID: "iss-00009"
     - `sync`: 新しい派生物の生成（deps.json / puml）
     - `active set`: ガード（--force）
     - `deps check`: 新規サブコマンド
-  - docs: `reference_sync.md` に出力追加、依存定義/運用ガイドの追加
-  - tests: `tests/test_cli.py` に依存関連のテスト追加
+    - `new initiative` / `new epic`: GitHub Issue 自動作成のデフォルトを廃止（local-only デフォルト、opt-in で link/create。ADR-00006）
+    - `new issue`: GitHub Issue 自動作成はデフォルト維持（`--no-github` は例外。ADR-00006）
+  - docs:
+    - `reference_sync.md`: deps 生成物の出力追加
+    - 依存定義/運用ガイドの追加
+    - initiative/epic の GitHub ポリシーと状態導出（ADR-00006）の反映
+  - tests:
+    - `tests/test_cli.py`: 依存関連のテスト追加
+    - `tests/test_cli.py`: `new initiative` / `new epic` / `new issue` の GitHub デフォルト挙動の回帰テスト追加（ADR-00006）
 
 ## 主要フロー（テキスト：AC単位で短く） (任意)
 - Flow for AC-001:
@@ -127,6 +134,7 @@ Script -> Puml: write puml
     - `depends_on: list`（任意 / 省略時 `[]`）
   - Constraints/Validation:
     - `depends_on` 要素は node id（`init|epic|iss`）または GitHub issue number（int/数字文字列）
+      - 数字文字列は trim して GitHub issue number として解釈する（例: `" 123 "` → `123`）
     - 解決後は node id に正規化して重複排除（出力順は決定的）
     - 不明キーは無視（将来拡張）
     - **descendant 依存は禁止**:
@@ -138,11 +146,15 @@ Script -> Puml: write puml
     - `schema_version: 1`
     - `generated_at: str(ISO-8601)`
     - `active: object|null`（既存の active.json と同形でよい）
-    - `nodes: { <id>: { type,id,title,path,state,ready,effective_depends_on,blockers,... } }`
+    - `nodes: { <id>: { type,id,title,path,state,ready,effective_depends_on,blockers,progress,... } }`
   - Constraints:
     - `nodes[<id>].state` は `done|doing|todo|unknown|blocked`
     - `ready` は「実効依存がすべて Done」のとき true（state とは独立）
     - `effective_depends_on` / `blockers` は node id 配列（決定的順序）
+    - `progress` は配下 issue 集計の機械可読表現（表示・判定の根拠）:
+      - issue: `progress={total:1, open|done|unknown のいずれかが 1}`（MVP。簡略化して `null` でも良いが、`done(empty)` 判別のため epic/initiative は必須）
+      - epic/initiative: `progress={total, open, done, unknown}`（配下 issue 集計。`total==0` の場合も含む）
+      - `done(empty)` は `type in {epic,initiative} && state==done && progress.total==0` で判別できること
 - MODEL-003: `.agent/deps.puml` / `.agent/deps.todo.puml`
   - Constraints:
     - 色分け（state）と凡例を含める
@@ -173,10 +185,12 @@ A --> B : depends_on
   - active（`spec-dock/.agent/active.json` の leaf。ADR-00002）
   - GitHub issue state index（任意。`gh issue list` の結果）
   - progress（epic/initiative の配下 issue 集計。ADR-00006 の Done/state 導出で使用）
+    - 注意: progress 集計のスコープは **常に spec ツリー全体**（当該 epic/initiative の全 descendant issue）とし、`deps check` の到達可能グラフに限定しない（表示の一貫性のため）
 - 依存の解決（ADR-00001/00003）:
   - `depends_on` の各要素は node id 文字列（`init-*`/`epic-*`/`iss-*`）または GitHub issue number（int/数字文字列）
-  - node id 文字列は、幅の違い（例: `iss-local-1`）があっても numeric id として解決し、実在する canonical id に正規化する
-  - GitHub issue number は spec ツリー内の 1 node に解決できる必要がある（未 import はエラー）
+  - node id 文字列は spec ツリー内の node id として **完全一致**で解決する（数値抽出による “それっぽい正規化” はしない）
+    - 例: `init-00001` と `init-local-00001` は別物なので、必ずフル id を指定する（曖昧解決を避ける）
+  - GitHub issue number は spec ツリー内の `github.issue_number=<n>` の node に一意に解決できる必要がある（未 import はエラー）
 - 実効依存（effective_depends_on）:
   - initiative: 自身の依存のみ
   - epic: 自身 + 親 initiative の依存（和集合）
@@ -235,7 +249,11 @@ A --> B : depends_on
   - `gh` 取得に失敗した場合は `spec-dock: (warn) ...` を出し、Unknown として継続（安全側で blocked になりやすい）
 - `--gh-limit`:
   - `gh issue list --limit`（default は `sync` と同じ `10000`）
-  - `--github` 指定時に「node がリンクしている GitHub issue が取得できていない」場合は warn（`--gh-limit` 調整ヒント）し、Unknown として扱う
+  - `--github` 指定時に「**issue ノード**がリンクしている GitHub issue が取得できていない」場合は warn（`--gh-limit` 調整ヒント）し、該当 issue は Unknown として扱う
+    - initiative/epic 自身が `github.issue_number` を持っていても state 判定に使わないため、`gh_index_incomplete` の対象には含めない（ADR-00006）
+    - warn の判定スコープ:
+      - `deps check` / `active set`: **評価に必要な issue**（target の依存閉包 + 依存先 epic/initiative の全 descendant issue）に限定して判定する（無関係な欠落でノイズ化させない）
+      - `sync`: spec ツリー内の **全 issue** を対象に判定する（全体の整合監査）
 - 出力（text, default）:
   - ready のとき: `spec-dock: ok (deps check) target=<id> ready=true blockers=0`
   - blocked のとき: `spec-dock: blocked (deps check) target=<id> ready=false blockers=<n>` + ブロッカー一覧
@@ -267,6 +285,7 @@ A --> B : depends_on
   - 内部的に `deps check <target>` 相当の判定を行う（scope は到達可能な部分グラフ）
   - blocked かつ `--force` なし: 失敗（exit=3）。active は更新しない。ブロッカーと `--force` のヒントを表示
   - blocked かつ `--force`: warn（ブロッカーを列挙）を出して継続し、active を更新
+  - 構造エラー（deps.json 不正 / 解決不能参照 / cycle 等, exit=1）は `--force` でも回避しない（blocked=exit=3 のみが `--force` 対象）
   - `--github`: `deps check --github` 相当（判定根拠を GitHub state に寄せる）
   - `--gh-limit`: `gh issue list --limit`（default は `sync` と同じ `10000`）
   - 派生物整合（best-effort）:
@@ -287,8 +306,26 @@ A --> B : depends_on
   - `--force` は meta の preflight validate を握りつぶして index/tree を生成するためのデバッグ用 escape hatch
   - deps 構造エラーがある場合も、`--force` なら warn を出して継続し、**index/tree は更新する**
     - ただし deps 派生物（`.agent/deps.json` / `.puml`）は **削除** して「最新が無い」ことを明確にする（古い派生物の誤用を防ぐ）
-    - warn code は安定させる（例: `deps_preflight_failed`）
+    - warn code は `deps_preflight_failed` とする（安定した機械判定のため）
     - このケースの終了コードは `0`（force による劣化成功）。機械判定は warn code または deps 派生物の有無で行う
+
+#### `new`（GitHub 連携デフォルト: ADR-00006）
+- 背景: initiative/epic は “作業対象” ではなく抽象度が高い概念のため、GitHub Issue をデフォルトでは作らない（状態は配下 issue から導出）。
+- initiative/epic:
+  - デフォルト: local-only（`gh` 不要）
+  - 任意: `--create-github-issue`（新規作成してリンク）または `--github-issue <n>`（既存番号へリンク）
+  - 排他/制約（契約）:
+    - `--create-github-issue` / `--github-issue` / `--no-github` は相互に排他
+    - `--id` は local-only（デフォルトまたは `--no-github`）でのみ許可する
+- issue:
+  - デフォルト: GitHub Issue を作成（従来どおり）
+  - 例外: `--no-github` で local-only（`gh` 未導入/未認証の回避用）
+  - 任意: `--github-issue <n>` で既存番号へリンク（新規作成しない）
+  - 排他/制約（契約）:
+    - `--no-github` と `--github-issue` は相互に排他
+- wrapper（導線）:
+  - `new-epic` wrapper は親 initiative の GitHub 連携有無に関わらず、epic を local-only で作成できること
+  - `new-issue` wrapper は親 epic が local-only でも、issue を GitHub デフォルトで作成すること（失敗時は `gh` 導入/認証 or `--no-github` を案内）
 
 ### 終了コード実装メモ（runtime script） (必須)
 - 現状: runtime script の `main()` は例外を捕捉して常に `exit=1` で失敗する（blocked を `3` にできない）。
@@ -318,6 +355,9 @@ A --> B : depends_on
 - IF-005: `spec-dock/scripts/spec-dock::_build_deps_state(...) -> dict`
   - Input: nodes, active, GitHub issue_index（任意）
   - Output: `.agent/deps.json` と同型の dict
+  - Note:
+    - `deps check` と `sync` で **同一の評価関数**を使い、Done/state/ready 計算の乖離を防ぐ（`deps check` は `_build_deps_state` の結果を部分出力するだけにする）
+    - `_build_deps_state` は **常に全ノード**を評価して `nodes{...}` を構築する（epic/initiative の progress 集計も全 descendant issue を対象に行う）
 - IF-006: `spec-dock/scripts/spec-dock::_render_deps_puml(deps_state, *, todo_only: bool) -> str`
   - Input: deps_state（`.agent/deps.json`）
   - Output: PlantUML テキスト
@@ -348,6 +388,7 @@ class DepsStateNode {
   +ready: bool
   +effective_depends_on: list
   +blockers: list
+  +progress: object?
 }
 @enduml
 ```
@@ -380,7 +421,8 @@ class DepsStateNode {
   - 復旧ヒント（出力に含める）:
     - `sync --github` の実行、`--gh-limit` 調整、`gh auth status` の確認
 - WARN-002: GitHub issue index が不完全（`--gh-limit` 不足など）
-  - 発生条件: `--github` 指定時に、`github.issue_number` を持つ node が `gh issue list` の結果に存在しない
+  - 発生条件: `--github` 指定時に、**issue ノード**が持つ `github.issue_number` が `gh issue list` の結果に存在しない
+    - 判定スコープ: `deps check` / `active set` は評価に必要な issue のみ、`sync` は spec ツリー内の全 issue
   - 返し方: `spec-dock: (warn) GitHub issue states are incomplete; treating missing issues as unknown: ...`
   - 復旧ヒント（出力に含める）:
     - `--gh-limit` の増加、`sync --github` の再実行
@@ -390,8 +432,11 @@ class DepsStateNode {
   - （任意）`src/spec_dock/assets/spec_dock/docs/reference_deps.md`: 依存定義/コマンド/生成物のリファレンス
 - 変更（Modify）:
   - `src/spec_dock/assets/spec_dock/scripts/spec-dock`: deps 機能の実装（sync 出力追加 / deps check / active set ガード）
+  - `src/spec_dock/assets/spec_dock/templates/initiative/epics/new-epic`: wrapper の GitHub デフォルト変更（epic は local-only デフォルト。親 local を二重に伝播しない）
+  - `src/spec_dock/assets/spec_dock/templates/epic/issues/new-issue`: wrapper の GitHub デフォルト変更（親 epic が local-only でも issue は GitHub デフォルト）
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`: `sync` の生成物に deps を追記
   - `src/spec_dock/assets/spec_dock/docs/guide.md`: 依存機能の導線（どこに何が生成されるか）
+  - `src/spec_dock/assets/spec_dock/docs/reference_github.md`: wrapper / `new` の GitHub ポリシー（ADR-00006）を反映
   - `tests/test_cli.py`: deps 機能のテスト追加（AC/EC を担保）
 - 削除（Delete）:
   - 該当なし
@@ -405,11 +450,13 @@ class DepsStateNode {
 - AC-001/002/003 → `spec-dock/scripts/spec-dock` の `deps check`（IF-001〜004）
 - AC-004/005 → `spec-dock/scripts/spec-dock` の `active set --force`（ERR-005）
 - AC-006/007/008 → `spec-dock/scripts/spec-dock` の `_sync()` 拡張（IF-005/006）
+- AC-009/010/011 → `spec-dock/scripts/spec-dock` の `new`（GitHub デフォルト変更）+ wrapper（`templates/initiative/epics/new-epic`, `templates/epic/issues/new-issue`）
 - EC-001/002/006/007 → deps パース/解決（IF-001/002、ERR-001〜003）
 - EC-003/004 → 自己依存/循環（IF-004、ERR-004）
 - EC-005/008 → Unknown を blocker 扱い + `--force` で回避（状態モデル/ガード）
 - EC-009 → descendant 依存の検出（MODEL-001 / ERR-006、direct deps 解決段階で fail-fast）
 - EC-010 → `sync --force` の deps preflight 失敗時ハンドリング（deps 派生物削除 + warn code）
+- EC-011 → epic/initiative の Done/state 導出（親 GitHub CLOSED を無視。ADR-00006、IF-005）
 - 非交渉制約（stdlib/非破壊/meta不変更）→ 実装を runtime script 内に閉じ、`.agent/` 出力に限定する
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -432,6 +479,8 @@ class DepsStateNode {
   - AC-004/005 → `tests/test_cli.py::test_active_set_blocked_requires_force`（仮）
   - AC-004 派生物整合（best-effort）→ `tests/test_cli.py::test_active_set_updates_index_tree_active_only`（仮）
   - AC-006/007/008 → `tests/test_cli.py::test_sync_generates_deps_and_puml`（仮）
+  - AC-009/010 → `tests/test_cli.py::test_new_initiative_and_epic_default_local_only`（仮）
+  - AC-011 → `tests/test_cli.py::test_new_issue_default_creates_github_even_with_local_parent`（仮）
   - EC-002/007 → `tests/test_cli.py::test_deps_json_schema_errors_fail`（仮）
   - EC-004 → `tests/test_cli.py::test_deps_cycle_detected`（仮）
   - EC-004（到達不能 cycle 非対象）→ `tests/test_cli.py::test_deps_check_ignores_unreachable_cycle`（仮）
@@ -489,8 +538,12 @@ class DepsStateNode {
 <repo-root>/
 ├── src/spec_dock/assets/spec_dock/
 │   ├── scripts/spec-dock                      # Modify（deps 実装）
+│   ├── templates/
+│   │   ├── initiative/epics/new-epic          # Modify（epic は local-only デフォルト）
+│   │   └── epic/issues/new-issue              # Modify（issue は GitHub デフォルト維持）
 │   └── docs/
 │       ├── reference_sync.md                  # Modify（出力追加）
+│       ├── reference_github.md                # Modify（GitHub ポリシー反映）
 │       └── reference_deps.md                  # Add（任意）
 └── tests/test_cli.py                          # Modify（deps テスト追加）
 ```

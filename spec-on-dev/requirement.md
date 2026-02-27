@@ -116,6 +116,7 @@ end
   - 依存定義は「人間が読み書きできる」シンプルな形式にする。
   - 依存解決判定は観測可能（出力に根拠を含める）にする。
   - 破壊的変更を許容する（本件では `new initiative` / `new epic` のデフォルト GitHub Issue 作成を廃止する）。
+  - `new issue` は GitHub Issue 自動作成がデフォルト（既存挙動維持）とする（`--no-github` は例外）。
 - Ask（迷ったら相談）:
   - 状態モデル拡張（Doing を GitHub label / Projects status で判定する等）を追加する場合
   - spec ツリー外（未 import）の GitHub Issue を “外部ノード” として依存に含めたい場合
@@ -158,7 +159,7 @@ end
 - 正規化:
   - 数字文字列は trim して GitHub issue number として解釈する
   - 解決後は node id に正規化してから重複排除する（同一ノードを `iss-00123` と `123` で二重指定しても 1 件として扱う）
-  - 出力順序は決定的にする（例: node id の数値順、同値なら辞書順）※テストの安定性のため
+  - 出力順序は決定的にする（node id の辞書順・昇順）※テストの安定性のため（`iss-00001` のように 0 埋め前提）
 
 ### 状態モデル（MVP）
 - Done:
@@ -186,6 +187,9 @@ end
 
 ### 状態取得（MVP）
 - GitHub state（OPEN/CLOSED）は `gh` CLI を用いて取得する（`sync --github` と同等）
+- `deps check` / `active set` は、`--github` 指定時のみ GitHub へアクセスして状態を取得する（未指定時は GitHub へアクセスしない）
+  - 未指定時は、可能なら `spec-dock/.agent/index.json`（最後の `sync` 生成物）を参照して issue の open/done/unknown を扱う
+  - `spec-dock/.agent/index.json` が無い（または対象 issue が載っていない）場合は Unknown として扱う（安全側）
 - `gh` が利用できない/取得できない場合は Unknown として扱う（安全側で blocked）
 
 ### epic/initiative の Done 判定（依存評価用）
@@ -204,6 +208,7 @@ end
 ### 派生状態（`sync` の生成物）
 - `sync` は依存関係も統合し、以下を `spec-dock/.agent/` に生成する（git 管理しない）:
   - `deps.json`（依存グラフの統合 SSOT。エージェントが ready/blocked を機械判定できる形）
+    - `nodes[<id>].progress={total,open,done,unknown}` を含み、epic/initiative の `done(empty)`（`total==0`）が機械判定できる
   - `deps.puml`（全体: Done を含む）
   - `deps.todo.puml`（todo-only: Done を除外）
 
@@ -233,7 +238,7 @@ end
 ## 前提（Assumptions） (必須)
 - `github.issue_number` は initiative/epic/issue 全体で一意である（既存仕様）。
 - 依存管理は “番号/ID を列挙するだけ” の運用で十分である（編集 UI は不要）。
-- GitHub の状態（OPEN/CLOSED）を用いて “Done” を判定する運用が主である。
+- GitHub の状態（OPEN/CLOSED）は **issue の Done 判定**に用いる（epic/initiative の Done/state は配下 issue の集計で導出する。initiative/epic 自身の GitHub OPEN/CLOSED は状態判定に使わない）。
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: “実施中（In Progress）” をどのシグナルで判定するか
@@ -263,7 +268,7 @@ end
   - Actor/Role: 開発者 / エージェント
   - Given: 依存先の GitHub state が取得できる（`--github` または同等の enrich）
   - When: `deps check <target> --github` を実行する
-  - Then: 依存先がすべて CLOSED（Done）なら ready、1つでも OPEN/unknown なら blocked と判定される
+  - Then: 依存先がすべて Done（issue: `CLOSED` / epic・initiative: 配下 issue 集計で `open==0 && unknown==0`、`total==0` も Done）なら ready、1つでも未Done（open/unknown 等）があれば blocked と判定される
   - 観測点: CLI 出力（依存ごとの state）/ 終了コード
 - AC-004:
   - Actor/Role: エージェント
@@ -286,6 +291,7 @@ end
     - `generated_at` が存在する
     - `nodes[<id>]` に `state`（文字列）と `ready`（真偽値）が含まれる
     - `nodes[<id>]` に `effective_depends_on` と `blockers`（配列）が含まれる
+    - `nodes[<id>].progress`（少なくとも `{total,open,done,unknown}`）が含まれる（epic/initiative の `done(empty)` 判別ができること）
   - 観測点: `spec-dock/.agent/deps.json`（内容）
 - AC-007:
   - Actor/Role: 開発者
@@ -299,6 +305,24 @@ end
   - When: `sync` を実行する（例: `sync` / `sync --github`）
   - Then: todo-only（Done 除外版: `spec-dock/.agent/deps.todo.puml`）が生成される（未実施/実施中のみ）
   - 観測点: `spec-dock/.agent/deps.todo.puml`（内容）
+- AC-009:
+  - Actor/Role: 開発者
+  - Given: `gh` が未導入/未認証などで利用できない
+  - When: `new initiative --title <t>` を実行する
+  - Then: GitHub Issue を作成せず、local-only initiative が作成される（`meta.json` に `github.issue_number` が無い/空）
+  - 観測点: CLI 終了コード / 生成された `meta.json`
+- AC-010:
+  - Actor/Role: 開発者
+  - Given: `gh` が未導入/未認証などで利用できない
+  - When: `new epic --initiative <init> --title <t>`（または wrapper `epics/new-epic "<t>"`）を実行する
+  - Then: GitHub Issue を作成せず、local-only epic が作成される（`meta.json` に `github.issue_number` が無い/空）
+  - 観測点: CLI 終了コード / 生成された `meta.json`
+- AC-011:
+  - Actor/Role: 開発者
+  - Given: 親 epic が local-only であっても、GitHub Issue 作成が可能な状態である（`gh` 利用可）
+  - When: `new issue --epic <epic> --title <t>`（または wrapper `issues/new-issue "<t>"`）を実行する
+  - Then: `--no-github` 指定が無い限り GitHub Issue が作成され、issue ノードがリンクされる（`meta.json` に `github.issue_number` が設定される）
+  - 観測点: CLI 終了コード / 生成された `meta.json`
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -350,8 +374,12 @@ end
   - 期待:
     - `sync` は **警告付きで継続（exit=0）** し、`index.json` / `tree.json` を更新する
     - deps 派生物（`.agent/deps.json` / `.puml`）は **削除** して「最新が無い」ことを明確にする（古い派生物の誤用を防ぐ）
-    - warn には安定したコード（例: `deps_preflight_failed`）を含める
+    - warn には安定したコード `deps_preflight_failed` を含める
   - 観測点: `sync` の標準出力（ok）/ stderr（warn code）/ `.agent/index.json` / `.agent/tree.json` の更新 / deps 派生物が存在しないこと
+- EC-011:
+  - 条件: epic/initiative が `github.issue_number` を持ち、その GitHub Issue が `CLOSED` だが、配下 issue に `OPEN`（または `unknown`）が含まれる
+  - 期待: epic/initiative の Done 判定は **配下 issue 集計のみ**で行われるため、`done` にはならない（依存先にした場合は ready を阻害する）
+  - 観測点: `deps check --github` の state/ready 判定、`spec-dock/.agent/deps.json` の `state` と `progress`
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: 依存（depends_on） = あるノードを着手/active 化する前に完了している必要がある他ノード
@@ -362,7 +390,7 @@ end
   - epic/initiative: 配下 issue の集計で `open == 0` かつ `unknown == 0`（`total == 0` も Done 扱い）
 
 ## 未確定事項（TBD / 要確認） (必須)
-- 該当なし（ADR-00001〜00005 で決定済み）
+- 該当なし（ADR-00001〜00006 で決定済み）
 
 ## Definition of Ready（着手可能条件） (必須)
 - [ ] 目的が 1〜3行で明確になっている
