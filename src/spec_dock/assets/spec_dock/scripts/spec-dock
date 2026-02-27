@@ -2389,7 +2389,8 @@ def _deps_evaluate(
                 n = nodes.get(node_id)
                 if not n:
                     continue
-                if n.github_issue_number is not None:
+                # Only issue GitHub states affect Done/ready evaluation.
+                if n.type == "issue" and n.github_issue_number is not None:
                     relevant_numbers.add(int(n.github_issue_number))
                 if n.type == "initiative":
                     for iss in nodes.values():
@@ -2447,23 +2448,8 @@ def _deps_evaluate(
             return issue_status_by_id.get(node_id) == "done"
 
         if n.type in ("epic", "initiative"):
-            # A: own GitHub issue is CLOSED.
-            done_a = False
-            if github and n.github_issue_number is not None:
-                gh = issue_index.get(n.github_issue_number)
-                if gh and str(gh.get("state", "")).upper() == "CLOSED":
-                    done_a = True
-
-            # B: all descendant issues are Done (and there is at least one issue).
             counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
-            total = int(counts.get("total", 0))
-            done_b = (
-                total > 0
-                and int(counts.get("done", 0)) == total
-                and int(counts.get("open", 0)) == 0
-                and int(counts.get("unknown", 0)) == 0
-            )
-            return done_a or done_b
+            return int(counts.get("open", 0)) == 0 and int(counts.get("unknown", 0)) == 0
 
         return False
 
@@ -2490,13 +2476,27 @@ def _deps_evaluate(
             return "todo" if issue_status_by_id.get(node_id) == "open" else "unknown"
 
         if n.type in ("epic", "initiative"):
-            if github and n.github_issue_number is not None:
-                gh = issue_index.get(n.github_issue_number)
-                if gh and str(gh.get("state", "")).upper() == "OPEN":
-                    return "todo"
-            return "unknown"
+            counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
+            if int(counts.get("unknown", 0)) > 0:
+                return "unknown"
+            return "todo"
 
         return "unknown"
+
+    def is_active_scope(node_id: str) -> bool:
+        if not leaf_id:
+            return False
+        if leaf_id == node_id:
+            return True
+        active_leaf = nodes.get(leaf_id)
+        node = nodes.get(node_id)
+        if not active_leaf or not node:
+            return False
+        if node.type == "epic":
+            return active_leaf.type == "issue" and active_leaf.epic_id == node.id
+        if node.type == "initiative":
+            return active_leaf.type in ("epic", "issue") and active_leaf.initiative_id == node.id
+        return False
 
     def derived_state(node_id: str) -> str:
         base = base_state(node_id)
@@ -2504,7 +2504,7 @@ def _deps_evaluate(
             return "done"
         if not ready_by_id.get(node_id, False):
             return "blocked"
-        if leaf_id and node_id == leaf_id:
+        if is_active_scope(node_id):
             return "doing"
         if base == "todo":
             return "todo"
@@ -2512,7 +2512,10 @@ def _deps_evaluate(
 
     out_nodes: dict[str, Any] = {}
     for node_id in sorted(deps_map.keys()):
-        out_nodes[node_id] = {"state": derived_state(node_id), "ready": ready_by_id.get(node_id, False)}
+        item: dict[str, Any] = {"state": derived_state(node_id), "ready": ready_by_id.get(node_id, False)}
+        if node_id in progress:
+            item["progress"] = dict(progress[node_id])
+        out_nodes[node_id] = item
 
     return {
         "target": target_id,
@@ -2589,23 +2592,8 @@ def _build_deps_state(
             return issue_status_by_id.get(node_id) == "done"
 
         if n.type in ("epic", "initiative"):
-            # A: own GitHub issue is CLOSED.
-            done_a = False
-            if github and n.github_issue_number is not None:
-                gh = issue_index.get(n.github_issue_number)
-                if gh and str(gh.get("state", "")).upper() == "CLOSED":
-                    done_a = True
-
-            # B: all descendant issues are Done (and there is at least one issue).
             counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
-            total = int(counts.get("total", 0))
-            done_b = (
-                total > 0
-                and int(counts.get("done", 0)) == total
-                and int(counts.get("open", 0)) == 0
-                and int(counts.get("unknown", 0)) == 0
-            )
-            return done_a or done_b
+            return int(counts.get("open", 0)) == 0 and int(counts.get("unknown", 0)) == 0
 
         return False
 
@@ -2629,13 +2617,27 @@ def _build_deps_state(
             return "todo" if issue_status_by_id.get(node_id) == "open" else "unknown"
 
         if n.type in ("epic", "initiative"):
-            if github and n.github_issue_number is not None:
-                gh = issue_index.get(n.github_issue_number)
-                if gh and str(gh.get("state", "")).upper() == "OPEN":
-                    return "todo"
-            return "unknown"
+            counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
+            if int(counts.get("unknown", 0)) > 0:
+                return "unknown"
+            return "todo"
 
         return "unknown"
+
+    def is_active_scope(node_id: str) -> bool:
+        if not leaf_id:
+            return False
+        if leaf_id == node_id:
+            return True
+        active_leaf = nodes.get(leaf_id)
+        node = nodes.get(node_id)
+        if not active_leaf or not node:
+            return False
+        if node.type == "epic":
+            return active_leaf.type == "issue" and active_leaf.epic_id == node.id
+        if node.type == "initiative":
+            return active_leaf.type in ("epic", "issue") and active_leaf.initiative_id == node.id
+        return False
 
     def derived_state(node_id: str) -> str:
         base = base_state(node_id)
@@ -2643,7 +2645,7 @@ def _build_deps_state(
             return "done"
         if not ready_by_id.get(node_id, False):
             return "blocked"
-        if leaf_id and node_id == leaf_id:
+        if is_active_scope(node_id):
             return "doing"
         if base == "todo":
             return "todo"
@@ -2664,6 +2666,8 @@ def _build_deps_state(
             "effective_depends_on": list(effective_deps_map.get(node_id, [])),
             "blockers": list(blockers_by_id.get(node_id, [])),
         }
+        if node_id in progress:
+            out_nodes[node_id]["progress"] = dict(progress[node_id])
 
     return {
         "schema_version": 1,
