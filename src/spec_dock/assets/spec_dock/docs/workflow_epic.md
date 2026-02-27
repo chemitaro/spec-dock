@@ -13,16 +13,20 @@ Epic は「設計の背骨」です。
 
 Epic は必ず Initiative 配下に作成します。
 
-### 1.1 new（デフォルト: GitHub）
+### 1.1 new（デフォルト: local-only）
 
 ```bash
 ./spec new epic --initiative <initiative-id> --title "..."
 ```
 
-GitHub を使わない場合:
+GitHub Issue とリンクしたい場合（任意）:
 
 ```bash
-./spec new epic --no-github --initiative <initiative-id> --title "..."
+# 既存の GitHub Issue 番号へリンク（GitHub Issue は作りません）
+./spec new epic --initiative <initiative-id> --github-issue <n> --title "..."
+
+# GitHub Issue を新規作成してリンク（gh が必要）
+./spec new epic --initiative <initiative-id> --create-github-issue --title "..."
 ```
 
 注意:
@@ -47,7 +51,8 @@ Epic 作成後は、対象ノード配下の wrapper で Issue を追加でき�
 
 補足:
 - 引数はタイトル1つのみです。
-- 親が local (`epic-local-*`) の場合、子も自動で local として作成されます。
+- wrapper `issues/new-issue` は親 epic が local-only でも、**デフォルトでは GitHub Issue を作成**します。
+  - local-only issue を作りたい場合は direct command: `./spec new issue --no-github --epic <epic-id> --title \"...\"`
 
 ## 2. 記述（requirement/design/plan）
 

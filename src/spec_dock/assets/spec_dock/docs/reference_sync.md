@@ -55,6 +55,7 @@ deps（依存関係）に関する補足:
 
 - 読み取りのみ（GitHub への更新はしません）
 - `github.issue_number` が無いノードは enrich できません（`unknown` のまま）
+- `--github` を付けない場合は GitHub 状態を更新しません（`gh` を呼びません）。ただし `.agent/index.json` が既に存在する場合は、過去のスナップショット（`status` / `github.state` 等）を保持します（古くなり得るため、必要なら再度 `sync --github` してください）。
 
 ## 3. 入出力（まとめ）
 

@@ -67,11 +67,19 @@
 ## 4. 状態（state）と ready 判定
 
 状態（MVP）:
-- `done`: GitHub `CLOSED`
-- `doing`: active leaf（`issue` > `epic` > `initiative`）
-- `todo`: GitHub `OPEN`（ただし doing ではない）
-- `unknown`: `--github` 無し / `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ
+
+- issue:
+  - `done`: GitHub `CLOSED`（`--github` 指定時）/ `.agent/index.json` の `status=done`（`--github` 非指定時のスナップショット）
+  - `doing`: active leaf と一致（ただし `done` が優先）
+  - `todo`: GitHub `OPEN` / `status=open`（ただし doing ではない）
+  - `unknown`: `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ / `.agent/index.json` が無い（または該当 issue が載っていない）
+- epic/initiative:
+  - `done`: 配下 issue の集計で `open==0 && unknown==0`（`total==0` も Done 扱い。表示上は `done(empty)` 相当）
+  - `doing`: active leaf が配下に存在する（=「配下で作業中」）
+  - `todo`: `done/doing/unknown` ではない
+  - `unknown`: 配下 issue の集計で `unknown>0`
 - `blocked`: 依存未解決（ready=false）の導出状態
+  - `state` は 1つのラベルに畳み込むため、優先順位は `done > blocked > doing > todo > unknown`（`ready` は別軸。進捗として `done` を優先表示するが、依存不整合の監査は `ready/blockers` を見る）
 
 ready:
 - `ready = effective_depends_on がすべて done`
@@ -97,6 +105,10 @@ ready:
 - 取得できない場合は `gh_fetch_failed` として warn し、unknown 扱いで継続します。
 - 一部の linked issue が取得できていない場合は `gh_index_incomplete` として warn します（`--gh-limit` 調整のヒント）。
 
+`--github` なし:
+- GitHub へはアクセスせず、可能なら `.agent/index.json` の `status`（最後の `sync` スナップショット）を使って判定します。
+- `.agent/index.json` が無い（または状態が載っていない）場合は unknown（安全側）として blocked になりやすいため、必要に応じて `sync --github` を実行してください。
+
 ## 6. `active set`（依存ガード / force）
 
 ```bash
@@ -107,6 +119,7 @@ ready:
 
 - blocked の場合、デフォルトでは失敗し active は更新されません。
 - `-f/--force` の場合、警告を出した上で active 化します（順番違反の可視化のため）。
+- `--github` なしでも deps guard は動作します（GitHub へはアクセスせず `.agent/index.json` のスナップショットを使います）。
 
 ## 7. `sync` の deps 派生物（.agent）
 
