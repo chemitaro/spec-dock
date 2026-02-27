@@ -1366,6 +1366,10 @@ class TestCli(unittest.TestCase):
                 target,
                 ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Target issue"],
             )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Open blocker"],
+            )
 
             issue_dir = (
                 target
@@ -1381,6 +1385,20 @@ class TestCli(unittest.TestCase):
                 json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
+            done_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-dep-issue"
+            )
+            (done_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [303]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1391,6 +1409,7 @@ class TestCli(unittest.TestCase):
                     {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 301, "state": "CLOSED", "title": "Dep", "labels": [], "updatedAt": "t", "url": "u"},
                     {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 303, "state": "OPEN", "title": "Blocker", "labels": [], "updatedAt": "t", "url": "u"},
                 ],
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -1405,6 +1424,8 @@ class TestCli(unittest.TestCase):
             self.assertIn("generated_at", deps)
             nodes = deps["nodes"]
             self.assertEqual(nodes["iss-00301"]["state"], "done")
+            self.assertFalse(nodes["iss-00301"]["ready"])
+            self.assertEqual(nodes["iss-00301"]["blockers"], ["iss-00303"])
             self.assertTrue(nodes["iss-00302"]["ready"])
             self.assertEqual(nodes["iss-00302"]["effective_depends_on"], ["iss-00301"])
             self.assertEqual(nodes["iss-00302"]["blockers"], [])
@@ -1418,6 +1439,7 @@ class TestCli(unittest.TestCase):
 
             self.assertIn("iss-00302", puml)
             self.assertIn("iss-00301", puml)
+            self.assertIn("iss-00301\\nDone\\nready=false", puml)
             self.assertIn("#D5E8D4", puml)  # done color
             self.assertIn("#FFF2CC", puml)  # todo color
             self.assertIn("depends_on", puml)
