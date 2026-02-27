@@ -80,18 +80,4 @@ PY
   exit 1
 fi
 
-extra_args=()
-if [[ "$parent_id" == *"-local-"* ]]; then
-  extra_args+=(--no-github)
-else
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "new-epic: 'gh' CLI is required for GitHub-mode parent: $parent_id" >&2
-    echo "new-epic: option 1) install GitHub CLI (gh) and retry." >&2
-    echo "new-epic: option 2) intentionally create a local child via direct command:" >&2
-    echo "new-epic:   $runtime_script new epic --initiative \"$parent_id\" --title \"$title\" --no-github" >&2
-    echo "new-epic: note) option 2 creates a local child under a GitHub parent (mixed mode)." >&2
-    exit 1
-  fi
-fi
-
-exec "$runtime_script" new epic --initiative "$parent_id" --title "$title" "${extra_args[@]}"
+exec "$runtime_script" new epic --initiative "$parent_id" --title "$title" --no-github
