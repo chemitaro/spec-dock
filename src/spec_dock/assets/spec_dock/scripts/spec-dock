@@ -1123,6 +1123,28 @@ def _apply_active_pointers(specdock_dir: Path, current: dict[str, Any] | None) -
     (active_dir / "context-pack.md").write_text(_render_context_pack(current), encoding="utf-8")
 
 
+def _patch_agent_state_active_fields(specdock_dir: Path, current: dict[str, Any]) -> None:
+    """Best-effort: patch cached derived state (`index.json` / `tree.json`) with the latest `active`."""
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    for name in ("index.json", "tree.json"):
+        path = agent_dir / name
+        if not path.is_file():
+            continue
+        try:
+            data = _load_json(path)
+        except RuntimeError as e:
+            _warn(f"active_patch_failed: failed to read {path}: {e}")
+            continue
+        if not isinstance(data, dict):
+            _warn(f"active_patch_failed: invalid JSON shape (expected object): {path}")
+            continue
+        data["active"] = current
+        try:
+            _write_json(path, data)
+        except OSError as e:
+            _warn(f"active_patch_failed: failed to write {path}: {e}")
+
+
 def _ensure_git_available() -> None:
     """Raise if `git` is not available in PATH."""
     if shutil.which("git") is None:
@@ -1781,7 +1803,7 @@ def _active_set(
     initiative, epic, issue = _select_active_from_node(nodes, node)
     current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
     _apply_active_pointers(specdock_dir, current)
-    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False)
+    _patch_agent_state_active_fields(specdock_dir, current)
     ini = initiative.id if initiative else "(none)"
     ep = epic.id if epic else "(none)"
     iss = issue.id if issue else "(none)"
@@ -1837,6 +1859,7 @@ def _active_clear(specdock_dir: Path) -> None:
     """Clear active pointers (set all layers to placeholder)."""
     current = _write_active_manifest(specdock_dir, initiative=None, epic=None, issue=None)
     _apply_active_pointers(specdock_dir, current)
+    _patch_agent_state_active_fields(specdock_dir, current)
     print("spec-dock: ok (active clear)")
 
 
@@ -2034,6 +2057,7 @@ def _sync(
         if not force:
             raise RuntimeError(f"preflight validate failed: {e}") from e
         preflight = "failed(forced)"
+        deps_preflight_failed = True
         print(
             f"spec-dock: (warn) preflight validate failed; continuing due to --force: {e}",
             file=sys.stderr,

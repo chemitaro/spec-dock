@@ -852,6 +852,13 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
+            # Baseline: deps artifacts are generated when the tree is valid.
+            self._run_runtime(target, ["sync", "--no-update-active"])
+            agent_dir = target / "spec-dock" / ".agent"
+            self.assertTrue((agent_dir / "deps.json").is_file())
+            self.assertTrue((agent_dir / "deps.puml").is_file())
+            self.assertTrue((agent_dir / "deps.todo.puml").is_file())
+
             issue_meta = (
                 target
                 / "spec-dock"
@@ -868,8 +875,13 @@ class TestCli(unittest.TestCase):
             issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             self._run_runtime(target, ["sync", "--no-update-active", "--force"])
-            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
-            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+            self.assertTrue((agent_dir / "index.json").is_file())
+            self.assertTrue((agent_dir / "tree.json").is_file())
+
+            # Tree preflight failed (forced) -> deps outputs must be removed to avoid stale artifacts.
+            self.assertFalse((agent_dir / "deps.json").exists())
+            self.assertFalse((agent_dir / "deps.puml").exists())
+            self.assertFalse((agent_dir / "deps.todo.puml").exists())
 
     def test_sync_force_does_not_update_active_from_branch(self) -> None:
         if shutil.which("git") is None:
@@ -3500,6 +3512,57 @@ class TestCli(unittest.TestCase):
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00302")
+
+    def test_active_set_ignores_unreachable_cycle_and_does_not_run_sync(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle A"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle B"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target C"])
+
+            # Prepare cached `.agent/index.json` / `.agent/tree.json` to verify active-only patching.
+            self._run_runtime(target, ["sync", "--no-update-active"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            self.assertTrue((agent_dir / "index.json").is_file())
+            self.assertTrue((agent_dir / "tree.json").is_file())
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+            )
+            (issue_dir / "iss-local-00001-cycle-a" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            (issue_dir / "iss-local-00002-cycle-b" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            # There is a global deps cycle, but it's unreachable from the target; `active set` must still succeed.
+            p = self._run_runtime_capture(target, ["active", "set", "iss-local-00003"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            active = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-local-00003")
+
+            # `active set` must not run `sync`: it should only patch the cached index/tree active field.
+            state_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            state_tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertEqual(state_index["active"]["issue"]["id"], "iss-local-00003")
+            self.assertEqual(state_tree["active"]["issue"]["id"], "iss-local-00003")
 
     def test_active_set_without_github_uses_synced_index_for_deps_guard(self) -> None:
         if os.name == "nt":
