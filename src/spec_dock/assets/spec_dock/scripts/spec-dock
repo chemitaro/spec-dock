@@ -2791,6 +2791,8 @@ def _render_deps_puml(deps_state: dict[str, Any], *, todo_only: bool) -> str:
         state = str(item.get("state") or "unknown")
         color = state_color.get(state, state_color["unknown"])
         label = f"{node_id}\\n{state.capitalize()}"
+        if item.get("ready") is False:
+            label += "\\nready=false"
         lines.append(f'rectangle "{label}" as {alias(node_id)} {color}')
     lines.append("")
 
