@@ -20,10 +20,12 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 ## 2. 何が GitHub を更新し、何が読み取りだけか
 
-### 更新する（デフォルト動作）
+### 更新する（GitHub Issue を作成する）
 
-- `new {initiative,epic,issue}`（デフォルト）は GitHub Issue を作ります
-  - GitHub を使わない場合は `--no-github` を付けてください（`gh` を呼びません）
+- `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
+  - GitHub を使わない場合は `new issue --no-github` を使ってください（`gh` を呼びません）
+- `new initiative --create-github-issue` / `new epic --create-github-issue` は GitHub Issue を作ります（opt-in）
+  - initiative/epic は **デフォルトでは GitHub Issue を作りません**（local-only）
 
 ### 読み取りだけ（非交渉）
 
@@ -32,6 +34,11 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
   - `--title` は必須です（GitHub title は取り込みません）
   - ローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します（active は変更しません）
   - `import` は実行前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **副作用（テンプレートコピー/`meta.json`生成）なし**で失敗します
+
+### GitHub を呼ばない（ローカルのみ）
+
+- `new initiative` / `new epic`（デフォルト）は local-only です（`gh` を呼びません）
+- `new {initiative,epic,issue} --github-issue <n>` は「既存番号へリンク」するだけで、GitHub Issue は作りません（`gh` を呼びません）
 
 ## 3. `import` の URL 入力に関する注意（事故防止）
 
@@ -57,8 +64,9 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 `github.issue_number` は、node（initiative/epic/issue）を GitHub Issue 番号へ紐づけるためのメタデータです。
 
-- `new`（デフォルト）: `gh issue create` の結果（Issue番号）でリンクします
-- `new --github-issue <n>`: 既存番号へリンクします（新規 Issue は作りません）
+- `new issue`（デフォルト）: `gh issue create` の結果（Issue番号）でリンクします
+- `new {initiative,epic,issue} --github-issue <n>`: 既存番号へリンクします（新規 Issue は作りません）
+- `new initiative --create-github-issue` / `new epic --create-github-issue`: `gh issue create` の結果（Issue番号）でリンクします
 - `import <n|#n|url>`: 既存番号へリンクします（読み取り確認のみ）
 
 制約:
@@ -72,8 +80,10 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 ## 6. よくある失敗
 
-- `gh` が未導入/未認証で `new` が失敗する → `--no-github` を付けるか、`gh auth login` 等を先に行う
-- GitHub 親スコープ配下で `new-epic` / `new-issue`（wrapper）を実行し、`gh` 不在で失敗する
-  - wrapper は自動で `--no-github` へフォールバックしません
-  - エラーメッセージに従い、`gh` を導入するか、意図的に direct command + `--no-github` を選んでください
+- `gh` が未導入/未認証で `new issue`（デフォルト）が失敗する
+  - GitHub を使わないなら `new issue --no-github` を選ぶ（`gh` を呼びません）
+  - GitHub を使うなら `gh auth login` 等を先に行う
+- Epic 配下で `issues/new-issue`（wrapper）を実行し、`gh` 不在で失敗する
+  - wrapper は `--no-github` を付けられません（GitHub 作成がデフォルト）
+  - local-only issue を作りたい場合は direct command: `./spec new issue --no-github --epic <id> --title \"...\"`
 - URL を貼ったのに別リポジトリの Issue が import されない → 仕様上、URL は番号抽出のみ（`owner/repo` は無視）

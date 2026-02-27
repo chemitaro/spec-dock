@@ -92,7 +92,9 @@ spec-dock/
 
 ### 4.1 作る（new / import）
 
-- `new`: spec-dock がローカルノードを作り、（デフォルトでは）GitHub Issue も作ります
+- `new`: spec-dock がローカルノードを作ります
+  - issue は（デフォルトで）GitHub Issue も作ります（`--no-github` で local-only）
+  - initiative/epic は（デフォルトで）local-only です（必要なら `--create-github-issue` / `--github-issue <n>` で GitHub と紐づけ）
 - `import`: 既存 GitHub Issue を **読み取り確認**した上で、ローカルノードを作ります
   - `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 - 生成済みノード配下では、親IDを省略できる wrapper が使えます（引数はタイトル1つのみ）。
