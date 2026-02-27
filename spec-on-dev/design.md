@@ -5,7 +5,7 @@ ID: "iss-00009"
 関連GitHub: ["#9"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-02-24"
+最終更新: "2026-02-27"
 依存: ["requirement.md"]
 親: []
 ---
@@ -77,7 +77,7 @@ ID: "iss-00009"
   3) effective_depends_on / blockers が決定的順序で表示される
 - Flow for AC-003:
   1) `deps check <target> --github` が `gh issue list` を実行し、OPEN/CLOSED を取得する（失敗時は warn して Unknown 扱い）
-  2) 依存先がすべて Done（CLOSED / epic/initiative は ADR-00005）なら ready=true
+  2) 依存先がすべて Done（issue は CLOSED / epic/initiative は ADR-00006）なら ready=true
   3) 1つでも open/unknown があれば blocked（blockers に列挙）
 - Flow for AC-004/005（active set ガード）:
   1) `active set <target>` 実行時に `deps check` 相当の判定を行う
@@ -172,7 +172,7 @@ A --> B : depends_on
   - 依存定義（各ノード直下 `deps.json`）
   - active（`spec-dock/.agent/active.json` の leaf。ADR-00002）
   - GitHub issue state index（任意。`gh issue list` の結果）
-  - progress（epic/initiative の配下 issue 集計。ADR-00005 の B で使用）
+  - progress（epic/initiative の配下 issue 集計。ADR-00006 の Done/state 導出で使用）
 - 依存の解決（ADR-00001/00003）:
   - `depends_on` の各要素は node id 文字列（`init-*`/`epic-*`/`iss-*`）または GitHub issue number（int/数字文字列）
   - node id 文字列は、幅の違い（例: `iss-local-1`）があっても numeric id として解決し、実在する canonical id に正規化する
@@ -182,19 +182,17 @@ A --> B : depends_on
   - epic: 自身 + 親 initiative の依存（和集合）
   - issue: 自身 + 親 epic + 親 initiative の依存（和集合）
   - 重複排除は「解決後（canonical id 化後）」に行い、出力順は決定的（sort key は node id）
-- base state（進捗状態: ADR-00002/00005）:
+- base state（進捗状態: ADR-00002/00006）:
   - issue:
     - Done: GitHub `CLOSED`
     - Todo: GitHub `OPEN`
     - Unknown: `--github` 無し / `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ
     - Doing: active leaf と一致（ただし Done が優先）
   - epic/initiative:
-    - Done: ADR-00005 の A または B を満たす
-      - A: 自身の GitHub issue が `CLOSED`
-      - B: `total > 0` かつ `done == total` かつ `open == 0` かつ `unknown == 0`
-    - Unknown: GitHub state が取れない（`--github` 無し / `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ）
-    - Todo: 上記以外（= GitHub `OPEN` かつ Doing ではない）
-    - Doing: active leaf と一致（ただし Done が優先）
+    - Done: 配下 issue の集計で `open == 0` かつ `unknown == 0`（`total == 0` も Done 扱い。表示上は `done(empty)` 相当で区別する）
+    - Unknown: 配下 issue の集計で `unknown > 0`
+    - Todo: 上記以外（= 未完了だが Unknown ではない）
+    - Doing: active leaf が配下に存在する（ただし Done/Blocked が優先）
 - ready（実行可能）:
   - `ready = effective_depends_on がすべて Done`（requirement.md の定義どおり。target 自身の Done で短絡しない）
   - 補足:
@@ -213,9 +211,9 @@ A --> B : depends_on
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: Doing 判定をどうするか
-  - 選択肢A: active leaf のみ（採用）
+  - 選択肢A: active ベース（issue=leaf 一致、epic/initiative=配下に active leaf が存在）
   - 選択肢B: GitHub label / Projects status（不採用）
-  - 決定: A（ADR-00002）
+  - 決定: A（ADR-00002、ただし epic/initiative は ADR-00006 により配下 active を反映）
   - 理由: 取得/運用コストが低く、壊れにくい
 - 論点: 依存の統合生成を `sync` に寄せるか
   - 決定: `sync` に統合して毎回生成（ADR-00004）
@@ -232,7 +230,8 @@ A --> B : depends_on
 - `target`:
   - `123` / `#123` / URL（GitHub issue number として解釈）または node id（`iss-00123` 等）
 - `--github`:
-  - `gh issue list` で GitHub state（OPEN/CLOSED）を取得し、Done 判定に使用する
+  - `gh issue list` で GitHub state（OPEN/CLOSED）を取得し、issue の Done 判定に使用する
+  - epic/initiative の Done/state は、配下 issue の状態から導出する（親 GitHub state は使わない）
   - `gh` 取得に失敗した場合は `spec-dock: (warn) ...` を出し、Unknown として継続（安全側で blocked になりやすい）
 - `--gh-limit`:
   - `gh issue list --limit`（default は `sync` と同じ `10000`）
@@ -442,8 +441,8 @@ class DepsStateNode {
   - EC-009 → `tests/test_cli.py::test_deps_descendant_dependency_fails`（仮）
   - EC-010 → `tests/test_cli.py::test_sync_force_skips_deps_on_deps_error`（仮）
   - WARN-002（`--gh-limit` 不足）→ `tests/test_cli.py::test_deps_github_index_incomplete_warns_and_blocks`（仮）
-  - ADR-00005（`total==0` 例外）→ `tests/test_cli.py::test_epic_total_zero_is_not_done_by_aggregation`（仮）
-  - ADR-00005（A による Done）→ `tests/test_cli.py::test_epic_total_zero_closed_is_done_by_rule_a`（仮）
+  - ADR-00006（empty は done）→ `tests/test_cli.py::test_epic_total_zero_is_done_by_aggregation`（仮）
+  - ADR-00006（親 GitHub CLOSED を無視）→ `tests/test_cli.py::test_epic_ignores_own_github_closed_for_done`（仮）
 
 ### テストマトリクス（AC/EC → テスト） (任意)
 - AC-001:
@@ -461,9 +460,9 @@ class DepsStateNode {
   - Unit: 未 import の GitHub issue number / 存在しない node id が「ref + 定義元 deps.json パス」つきで失敗すること
 - EC-008:
   - Unit: `gh` 取得失敗時に warn が出て Unknown 扱い（安全側で blocked）になり、復旧ヒント（`sync --github` / `--gh-limit` / `gh auth status`）が出ること
-- ADR-00005:
-  - Unit: epic/initiative の `total==0` では B を満たさず、依存先にした場合に ready にならないこと
-  - Unit: epic/initiative 自身の GitHub issue が `CLOSED` の場合は、`total==0` でも A により Done になること
+- ADR-00006:
+  - Unit: epic/initiative の `total==0` は Done 扱いになり、依存先にした場合に ready を阻害しないこと（表示上は `done(empty)` 相当で区別されること）
+  - Unit: epic/initiative 自身の GitHub issue が `CLOSED` でも、配下 issue が未完了なら Done 扱いにならないこと
 - 非交渉制約（requirement.md）をどう検証するか:
   - 制約: stdlib のみ
     - 検証方法: `pyproject.toml` 依存追加無し、runtime script 内完結

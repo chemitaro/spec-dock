@@ -5,7 +5,7 @@ ID: "iss-00009"
 関連GitHub: ["#9"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-02-24"
+最終更新: "2026-02-27"
 親: []
 ---
 
@@ -115,7 +115,7 @@ end
 - Always（常に守る）:
   - 依存定義は「人間が読み書きできる」シンプルな形式にする。
   - 依存解決判定は観測可能（出力に根拠を含める）にする。
-  - 既存コマンドの互換性を壊さない（新機能は後方互換で追加）。
+  - 破壊的変更を許容する（本件では `new initiative` / `new epic` のデフォルト GitHub Issue 作成を廃止する）。
 - Ask（迷ったら相談）:
   - 状態モデル拡張（Doing を GitHub label / Projects status で判定する等）を追加する場合
   - spec ツリー外（未 import）の GitHub Issue を “外部ノード” として依存に含めたい場合
@@ -125,10 +125,11 @@ end
 
 ## 決定事項（ADR） (必須)
 - ADR-00001: 依存定義は `deps.json`（JSON）で管理する
-- ADR-00002: 状態モデルは GitHub state + active のみ（MVP）
+- ADR-00002: 状態モデルは GitHub state + active のみ（MVP、ただし initiative/epic の state 導出は ADR-00006 で改訂）
 - ADR-00003: 依存先は spec ツリー内ノードに限定（外部 Issue は MVP では不可）
 - ADR-00004: 依存の統合 SSOT / PlantUML は `sync` の生成物として毎回生成する
-- ADR-00005: epic/initiative の Done は「親 issue CLOSED」または「配下 issue 全部 Done」
+- ADR-00005: epic/initiative を依存先にしたときの Done 判定（※ ADR-00006 で改訂）
+- ADR-00006: initiative/epic は GitHub Issue をデフォルトで作らず、状態は配下 issue から導出する（empty は done として扱う）
 
 ## 仕様（固定ルール） (必須)
 ### 依存定義（`deps.json`）
@@ -160,10 +161,19 @@ end
   - 出力順序は決定的にする（例: node id の数値順、同値なら辞書順）※テストの安定性のため
 
 ### 状態モデル（MVP）
-- Done: GitHub `CLOSED`
-- Doing: `spec-dock/.agent/active.json` の leaf（`issue` > `epic` > `initiative`）
-- Todo: GitHub `OPEN` かつ Doing ではない
-- Unknown: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+- Done:
+  - issue: GitHub `CLOSED`
+  - epic/initiative: 配下 issue の集計で `open == 0` かつ `unknown == 0`
+    - `total == 0`（配下 issue が無い）も Done として扱う（表示上は `done(empty)` 相当で区別する）
+- Doing:
+  - issue: `spec-dock/.agent/active.json` の leaf と一致する issue
+  - epic/initiative: active leaf が配下に存在する（= 「配下で作業中」）
+- Todo:
+  - issue: GitHub `OPEN` かつ Doing ではない
+  - epic/initiative: Done/Doing/Unknown ではない（= 未完了だが active は無い）
+- Unknown:
+  - issue: GitHub 未参照 / `github.issue_number` 無し / `gh` で見つからない
+  - epic/initiative: 配下 issue の集計で `unknown > 0`
 - Blocked: 依存が未解決（open/unknown 等）で ready ではない（導出状態）
   - 表示用の畳み込み（優先順位）:
     - `state` は 1つのラベルに畳み込むため、以下の順で決める（MVP）:
@@ -179,11 +189,9 @@ end
 - `gh` が利用できない/取得できない場合は Unknown として扱う（安全側で blocked）
 
 ### epic/initiative の Done 判定（依存評価用）
-- Done = A または B
-  - A: 自身の GitHub Issue が `CLOSED`
-    - 注意: 子 issue が未完了でも Done になり得る（運用オーバーライド）。依存ガードの意味を薄めないよう運用で注意する。
-  - B: 配下 issue がすべて Done（`total > 0` かつ `done == total` かつ `open == 0` かつ `unknown == 0`）
-    - 例外: `total == 0` の場合は B を満たさない（自動 Done を防ぐ）。この場合は A のみで Done を判定する。
+- Done = 配下 issue の集計で `open == 0` かつ `unknown == 0`
+  - `total == 0`（配下 issue が無い）も Done として扱う（依存の観点では “ブロックしない” を優先）
+  - initiative/epic 自身が GitHub Issue にリンクされている場合でも、その OPEN/CLOSED は Done 判定に使わない（ADR-00006）
 
 ### ready（実行可能）判定
 - ready = 実効依存がすべて Done
@@ -351,7 +359,7 @@ end
 - TERM-003: ブロッカー（blockers） = 実効依存のうち未解決（open/unknown 等）のもの
 - TERM-004: Done =
   - issue: GitHub Issue が `CLOSED`
-  - epic/initiative: ADR-00005 の Done 判定（A または B）
+  - epic/initiative: 配下 issue の集計で `open == 0` かつ `unknown == 0`（`total == 0` も Done 扱い）
 
 ## 未確定事項（TBD / 要確認） (必須)
 - 該当なし（ADR-00001〜00005 で決定済み）
