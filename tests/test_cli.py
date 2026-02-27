@@ -669,7 +669,15 @@ class TestCli(unittest.TestCase):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
             p = self._run_runtime_capture(
                 target,
-                ["new", "initiative", "--title", "Add Refresh Token", "--slug", "Bad!Slug"],
+                [
+                    "new",
+                    "initiative",
+                    "--create-github-issue",
+                    "--title",
+                    "Add Refresh Token",
+                    "--slug",
+                    "Bad!Slug",
+                ],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -994,11 +1002,23 @@ class TestCli(unittest.TestCase):
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             wrapper = init_dir / "epics" / "new-epic"
 
-            p = self._run_wrapper_capture(wrapper, ["JWT Auth"])
+            bin_dir = target / ".bin-no-gh"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            for cmd in ("bash", "python3", "dirname"):
+                cmd_path = shutil.which(cmd)
+                self.assertIsNotNone(cmd_path, f"{cmd} not available")
+                link_path = bin_dir / cmd
+                try:
+                    os.symlink(cmd_path, link_path)
+                except OSError:
+                    shutil.copy2(cmd_path, link_path)
+                    link_path.chmod(0o755)
+
+            p = self._run_wrapper_capture(wrapper, ["JWT Auth"], env={"PATH": str(bin_dir)})
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / "meta.json").is_file())
 
-    def test_new_issue_wrapper_creates_local_issue(self) -> None:
+    def test_new_issue_wrapper_creates_github_issue_by_default(self) -> None:
         if os.name == "nt":
             self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
 
@@ -1018,9 +1038,33 @@ class TestCli(unittest.TestCase):
             )
             wrapper = epic_dir / "issues" / "new-issue"
 
-            p = self._run_wrapper_capture(wrapper, ["Add refresh token"])
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
+                "  echo \"https://github.com/example/repo/issues/123\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo \"unexpected gh args: $@\" >&2\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+
+            p = self._run_wrapper_capture(
+                wrapper,
+                ["Add refresh token"],
+                env={"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"},
+            )
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertTrue((epic_dir / "issues" / "iss-local-00001-add-refresh-token" / "meta.json").is_file())
+            issue_meta_path = epic_dir / "issues" / "iss-00123-add-refresh-token" / "meta.json"
+            self.assertTrue(issue_meta_path.is_file())
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(issue_meta["id"], "iss-00123")
+            self.assertEqual(issue_meta["github"]["issue_number"], 123)
 
     def test_new_adr_wrapper_creates_adr(self) -> None:
         if os.name == "nt":
@@ -1121,7 +1165,7 @@ class TestCli(unittest.TestCase):
             self.assertIn("runtime script not found", p.stderr)
             self.assertIn("spec-dock init", p.stderr)
 
-    def test_wrapper_fails_without_gh_in_github_mode(self) -> None:
+    def test_new_epic_wrapper_does_not_require_gh_even_with_github_parent(self) -> None:
         if os.name == "nt":
             self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
 
@@ -1146,10 +1190,47 @@ class TestCli(unittest.TestCase):
                     link_path.chmod(0o755)
 
             p = self._run_wrapper_capture(wrapper, ["JWT Auth"], env={"PATH": str(bin_dir)})
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / "meta.json").is_file())
+
+    def test_new_issue_wrapper_fails_without_gh_and_shows_guidance(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            epic_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+            )
+            wrapper = epic_dir / "issues" / "new-issue"
+
+            bin_dir = target / ".bin-no-gh"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            for cmd in ("bash", "python3", "dirname"):
+                cmd_path = shutil.which(cmd)
+                self.assertIsNotNone(cmd_path, f"{cmd} not available")
+                link_path = bin_dir / cmd
+                try:
+                    os.symlink(cmd_path, link_path)
+                except OSError:
+                    shutil.copy2(cmd_path, link_path)
+                    link_path.chmod(0o755)
+
+            p = self._run_wrapper_capture(wrapper, ["Add refresh token"], env={"PATH": str(bin_dir)})
             self.assertNotEqual(p.returncode, 0)
-            self.assertIn("'gh' CLI is required", p.stderr)
             self.assertIn("option 1)", p.stderr)
+            self.assertIn("option 2)", p.stderr)
             self.assertIn("--no-github", p.stderr)
+            self.assertEqual(list((epic_dir / "issues").glob("iss-*")), [])
 
     def test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3253,7 +3334,11 @@ class TestCli(unittest.TestCase):
             gh_path.chmod(0o755)
 
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-            p = self._run_runtime_capture(target, ["new", "initiative", "--title", "日本語"], env=test_env)
+            p = self._run_runtime_capture(
+                target,
+                ["new", "initiative", "--create-github-issue", "--title", "日本語"],
+                env=test_env,
+            )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("--title", p.stderr)
             self.assertIn("expected regex", p.stderr)
@@ -3262,32 +3347,22 @@ class TestCli(unittest.TestCase):
                 self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
             self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
 
-    def test_new_nodes_default_to_github_issue_creation(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
-
+    def test_new_initiative_and_epic_default_to_local_even_when_gh_is_available(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            # Provide a fake `gh` binary that returns unique issue URLs per `issue create`.
-            bin_dir = target / ".bin"
+            # Default for initiative/epic is local-only; `gh` must not be invoked even if it is present.
+            bin_dir = target / ".bin-gh"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            counter = bin_dir / "counter.txt"
+            called_path = target / ".gh.called"
             gh_path = bin_dir / "gh"
             gh_path.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                f"counter_file='{counter.as_posix()}'\n"
+                f'echo \"$@\" >> \"{called_path.as_posix()}\"\\n'
                 'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
-                "  n=0\n"
-                "  if [[ -f \"$counter_file\" ]]; then\n"
-                "    n=$(cat \"$counter_file\")\n"
-                "  fi\n"
-                "  n=$((n+1))\n"
-                "  echo \"$n\" > \"$counter_file\"\n"
-                "  issue_num=$((122 + n))\n"
-                "  echo \"https://github.com/example/repo/issues/${issue_num}\"\n"
+                '  echo \"https://github.com/example/repo/issues/123\"\n'
                 "  exit 0\n"
                 "fi\n"
                 "echo \"unexpected gh args: $@\" >&2\n"
@@ -3297,28 +3372,90 @@ class TestCli(unittest.TestCase):
             gh_path.chmod(0o755)
 
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-            # Default: GitHub issue is created and its number becomes the node id suffix.
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform"], env=test_env)
-            self._run_runtime(target, ["new", "epic", "--initiative", "123", "--title", "JWT auth"], env=test_env)
-            self._run_runtime(target, ["new", "issue", "--epic", "124", "--title", "Add refresh token"], env=test_env)
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth"], env=test_env)
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-00123-auth-platform"
-            epic_dir = init_dir / "epics" / "epic-00124-jwt-auth"
-            issue_dir = epic_dir / "issues" / "iss-00125-add-refresh-token"
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
             self.assertTrue(init_dir.is_dir())
             self.assertTrue(epic_dir.is_dir())
-            self.assertTrue(issue_dir.is_dir())
+            self.assertFalse(called_path.exists(), f"gh was invoked unexpectedly: {called_path}")
 
-            init_meta = (init_dir / "meta.json").read_text(encoding="utf-8")
-            epic_meta = (epic_dir / "meta.json").read_text(encoding="utf-8")
-            issue_meta = (issue_dir / "meta.json").read_text(encoding="utf-8")
-            self.assertIn('\"id\": \"init-00123\"', init_meta)
-            self.assertIn('\"issue_number\": 123', init_meta)
-            self.assertIn('\"id\": \"epic-00124\"', epic_meta)
-            self.assertIn('\"issue_number\": 124', epic_meta)
-            self.assertIn('\"id\": \"iss-00125\"', issue_meta)
-            self.assertIn('\"issue_number\": 125', issue_meta)
+            init_meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
+            epic_meta = json.loads((epic_dir / "meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(init_meta["id"], "init-local-00001")
+            self.assertEqual(epic_meta["id"], "epic-local-00001")
+            self.assertNotIn("github", init_meta)
+            self.assertNotIn("github", epic_meta)
+
+    def test_new_initiative_and_epic_github_flags_are_mutually_exclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform"])
+
+            p1 = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "initiative",
+                    "--title",
+                    "Auth platform 2",
+                    "--create-github-issue",
+                    "--github-issue",
+                    "123",
+                ],
+            )
+            self.assertEqual(p1.returncode, 2, p1.stdout + p1.stderr)
+            self.assertIn("not allowed with argument", p1.stderr)
+
+            p2 = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "1",
+                    "--title",
+                    "JWT auth",
+                    "--create-github-issue",
+                    "--no-github",
+                ],
+            )
+            self.assertEqual(p2.returncode, 2, p2.stdout + p2.stderr)
+            self.assertIn("not allowed with argument", p2.stderr)
+
+            p3 = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "initiative",
+                    "--title",
+                    "Auth platform 3",
+                    "--github-issue",
+                    "123",
+                    "--no-github",
+                ],
+            )
+            self.assertEqual(p3.returncode, 2, p3.stdout + p3.stderr)
+            self.assertIn("not allowed with argument", p3.stderr)
+
+            p4 = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "epic",
+                    "--initiative",
+                    "1",
+                    "--title",
+                    "JWT auth 2",
+                    "--github-issue",
+                    "123",
+                    "--no-github",
+                ],
+            )
+            self.assertEqual(p4.returncode, 2, p4.stdout + p4.stderr)
+            self.assertIn("not allowed with argument", p4.stderr)
 
     def test_new_issue_can_create_github_issue_and_use_its_number(self) -> None:
         if os.name == "nt":

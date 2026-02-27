@@ -14,7 +14,8 @@ It performs day-to-day operations without requiring `uvx` at runtime:
 
 Design goals:
 - Keep dependencies minimal (stdlib only).
-- Use GitHub issues by default for `new` (requires `gh`); opt out with `--no-github`.
+- Use local-only by default for `new initiative`/`new epic`.
+- Keep GitHub-default behavior for `new issue` (opt out with `--no-github`).
 - Keep `sync --github` optional (GitHub state enrichment only when requested).
 """
 from __future__ import annotations
@@ -570,6 +571,7 @@ def _new_initiative(
     slug: str | None,
     node_id: str | None,
     github_issue_number: int | None,
+    create_github_issue: bool,
     no_github: bool,
 ) -> None:
     """Create a new initiative node under `spec-dock/initiatives/`."""
@@ -577,10 +579,15 @@ def _new_initiative(
 
     title, slug = _resolve_input_title_and_slug(title, slug)
 
-    if not no_github:
-        # Default: require GitHub and derive id from the GitHub issue number.
+    use_github = bool(create_github_issue or github_issue_number is not None)
+    if no_github and use_github:
+        raise RuntimeError("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+
+    if use_github:
         if node_id is not None:
-            raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+            raise RuntimeError(
+                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+            )
         if github_issue_number is not None:
             _ensure_github_issue_not_linked(
                 nodes,
@@ -601,9 +608,7 @@ def _new_initiative(
             )
         node_id = _format_id("init", int(github_issue_number), local=False)
     else:
-        # Local-only mode: avoid collisions with GitHub issue numbers.
-        if github_issue_number is not None:
-            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
+        # Default local-only mode: avoid collisions with GitHub issue numbers.
         if node_id is None:
             node_id = _next_id(specdock_dir, "init", local=True)
         else:
@@ -641,6 +646,7 @@ def _new_epic(
     slug: str | None,
     node_id: str | None,
     github_issue_number: int | None,
+    create_github_issue: bool,
     no_github: bool,
 ) -> None:
     """Create a new epic node under a given initiative."""
@@ -652,9 +658,15 @@ def _new_epic(
 
     title, slug = _resolve_input_title_and_slug(title, slug)
 
-    if not no_github:
+    use_github = bool(create_github_issue or github_issue_number is not None)
+    if no_github and use_github:
+        raise RuntimeError("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+
+    if use_github:
         if node_id is not None:
-            raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+            raise RuntimeError(
+                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+            )
         if github_issue_number is not None:
             _ensure_github_issue_not_linked(
                 nodes,
@@ -680,8 +692,6 @@ def _new_epic(
             )
         node_id = _format_id("epic", int(github_issue_number), local=False)
     else:
-        if github_issue_number is not None:
-            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
         if node_id is None:
             node_id = _next_id(specdock_dir, "epic", local=True)
         else:
@@ -744,7 +754,9 @@ def _new_issue(
     if not no_github:
         # Default: require GitHub and derive id from the GitHub issue number.
         if node_id is not None:
-            raise RuntimeError("Cannot combine '--id' with GitHub mode. Use '--no-github' to create local ids.")
+            raise RuntimeError(
+                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+            )
         if github_issue_number is not None:
             _ensure_github_issue_not_linked(
                 nodes,
@@ -3111,8 +3123,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_new_init.add_argument("--slug")
     p_new_init.add_argument("--id")
     gh_init = p_new_init.add_mutually_exclusive_group()
+    gh_init.add_argument("--create-github-issue", action="store_true", help="Create and link a new GitHub issue (id becomes init-NNNN)")
     gh_init.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes init-NNNN)")
-    gh_init.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes init-local-NNNN)")
+    gh_init.add_argument("--no-github", action="store_true", help="Explicit local-only mode (default; id becomes init-local-NNNN)")
 
     p_new_epic = new_sub.add_parser("epic", help="Create a new epic under an initiative")
     p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. 123 / init-00123 / init-local-00001)")
@@ -3120,8 +3133,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_new_epic.add_argument("--slug")
     p_new_epic.add_argument("--id")
     gh_epic = p_new_epic.add_mutually_exclusive_group()
+    gh_epic.add_argument("--create-github-issue", action="store_true", help="Create and link a new GitHub issue (id becomes epic-NNNN)")
     gh_epic.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes epic-NNNN)")
-    gh_epic.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes epic-local-NNNN)")
+    gh_epic.add_argument("--no-github", action="store_true", help="Explicit local-only mode (default; id becomes epic-local-NNNN)")
 
     p_new_issue = new_sub.add_parser("issue", help="Create a new issue under an epic")
     p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001)")
@@ -3129,8 +3143,16 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p_new_issue.add_argument("--slug")
     p_new_issue.add_argument("--id")
     gh_issue = p_new_issue.add_mutually_exclusive_group()
-    gh_issue.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes iss-NNNN)")
-    gh_issue.add_argument("--no-github", action="store_true", help="Do not use GitHub (id becomes iss-local-NNNN)")
+    gh_issue.add_argument(
+        "--github-issue",
+        type=int,
+        help="Existing GitHub issue number to link (id becomes iss-NNNN)",
+    )
+    gh_issue.add_argument(
+        "--no-github",
+        action="store_true",
+        help="Do not use GitHub (default is to create a new GitHub issue; id becomes iss-local-NNNN)",
+    )
 
     p_new_adr = new_sub.add_parser("adr", help="Create a new ADR under a scope (initiative/epic/issue)")
     scope = p_new_adr.add_mutually_exclusive_group(required=True)
@@ -3256,6 +3278,7 @@ def main(argv: list[str] | None = None) -> int:
                     slug=getattr(ns, "slug", None),
                     node_id=getattr(ns, "id", None),
                     github_issue_number=getattr(ns, "github_issue", None),
+                    create_github_issue=bool(getattr(ns, "create_github_issue", False)),
                     no_github=bool(getattr(ns, "no_github", False)),
                 )
             elif ns.new_kind == "epic":
@@ -3266,6 +3289,7 @@ def main(argv: list[str] | None = None) -> int:
                     slug=getattr(ns, "slug", None),
                     node_id=getattr(ns, "id", None),
                     github_issue_number=getattr(ns, "github_issue", None),
+                    create_github_issue=bool(getattr(ns, "create_github_issue", False)),
                     no_github=bool(getattr(ns, "no_github", False)),
                 )
             elif ns.new_kind == "issue":
