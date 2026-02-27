@@ -1426,6 +1426,273 @@ class TestCli(unittest.TestCase):
             self.assertIn("iss-00302", todo_puml)
             self.assertNotIn("iss-00301", todo_puml)
 
+    def test_sync_deps_progress_aggregation_for_epic_and_initiative(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Target issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "OAuth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "303", "--title", "Second epic issue"],
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "OPEN", "title": "Epic2", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 303, "state": "OPEN", "title": "Second", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
+            nodes = deps["nodes"]
+            self.assertEqual(nodes["epic-00201"]["progress"], {"total": 2, "done": 1, "open": 1, "unknown": 0})
+            self.assertEqual(nodes["epic-00202"]["progress"], {"total": 1, "done": 0, "open": 1, "unknown": 0})
+            self.assertEqual(nodes["init-00101"]["progress"], {"total": 3, "done": 1, "open": 2, "unknown": 0})
+            self.assertEqual(nodes["epic-00201"]["state"], "todo")
+            self.assertEqual(nodes["epic-00202"]["state"], "todo")
+            self.assertEqual(nodes["init-00101"]["state"], "todo")
+
+    def test_sync_deps_empty_epic_and_initiative_are_done_and_non_blocking(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Empty init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Empty epic"],
+            )
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Work init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Work epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "301", "--title", "Target issue"],
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00102-work-init"
+                / "epics"
+                / "epic-00202-work-epic"
+                / "issues"
+                / "iss-00301-target-issue"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [201]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Empty init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Empty epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 102, "state": "OPEN", "title": "Work init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "OPEN", "title": "Work epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
+            nodes = deps["nodes"]
+            self.assertEqual(nodes["epic-00201"]["progress"], {"total": 0, "done": 0, "open": 0, "unknown": 0})
+            self.assertEqual(nodes["init-00101"]["progress"], {"total": 0, "done": 0, "open": 0, "unknown": 0})
+            self.assertEqual(nodes["epic-00201"]["state"], "done")
+            self.assertEqual(nodes["init-00101"]["state"], "done")
+            self.assertTrue(nodes["iss-00301"]["ready"])
+            self.assertEqual(nodes["iss-00301"]["blockers"], [])
+
+    def test_sync_deps_ignores_parent_github_closed_for_done(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Target issue"],
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00302-target-issue"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [201]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "CLOSED", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "CLOSED", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
+            nodes = deps["nodes"]
+            self.assertEqual(nodes["epic-00201"]["state"], "todo")
+            self.assertEqual(nodes["init-00101"]["state"], "todo")
+            self.assertFalse(nodes["iss-00302"]["ready"])
+            self.assertEqual(nodes["iss-00302"]["blockers"], ["epic-00201"])
+
+    def test_sync_deps_active_leaf_makes_epic_and_initiative_doing(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Active issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Sibling issue"],
+            )
+            self._run_runtime(target, ["active", "set", "iss-00301"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Active", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Sibling", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
+            nodes = deps["nodes"]
+            self.assertEqual(nodes["iss-00301"]["state"], "doing")
+            self.assertEqual(nodes["iss-00302"]["state"], "todo")
+            self.assertEqual(nodes["epic-00201"]["state"], "doing")
+            self.assertEqual(nodes["init-00101"]["state"], "doing")
+
+    def test_sync_deps_active_epic_makes_initiative_doing(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Child issue"],
+            )
+            self._run_runtime(target, ["active", "set", "epic-00201"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Child", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
+            nodes = deps["nodes"]
+            self.assertEqual(nodes["epic-00201"]["state"], "doing")
+            self.assertEqual(nodes["init-00101"]["state"], "doing")
+            self.assertEqual(nodes["iss-00301"]["state"], "todo")
+
     def test_sync_github_passes_gh_limit_to_gh(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
