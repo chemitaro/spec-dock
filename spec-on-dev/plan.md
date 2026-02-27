@@ -5,7 +5,7 @@ ID: "iss-00009"
 関連GitHub: ["#9"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-02-24"
+最終更新: "2026-02-27"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -13,8 +13,8 @@ ID: "iss-00009"
 # iss-00009 Issue/Epic/Initiative の依存関係管理（実行可能判定・PlantUML可視化・active setガード） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001〜AC-008（`spec-on-dev/requirement.md`）
-- 対象EC: EC-001〜EC-010（`spec-on-dev/requirement.md`）
+- 対象AC: AC-001〜AC-011（`spec-on-dev/requirement.md`）
+- 対象EC: EC-001〜EC-011（`spec-on-dev/requirement.md`）
 - 対象制約:
   - `meta.json` は変更しない（依存は `deps.json` に分離）
   - runtime script は stdlib のみ（外部依存追加なし）
@@ -27,13 +27,17 @@ ID: "iss-00009"
 - [ ] S04: 依存参照の解決（node id / GH番号、canonicalize、EC-006）を実装し、解決不能/曖昧は失敗する
 - [ ] S05: 実効依存の継承/マージ（issue: self+epic+init、epic: self+init）を実装し、順序は決定的になる（AC-002）
 - [ ] S06: 自己依存/循環依存の検出（EC-003/004）を実装する（`sync`=全体、`deps check`/`active set`=到達範囲）
-- [ ] S07: GitHub state を使った Done/Unknown と ready 判定（AC-003/EC-005/008、ADR-00005）を実装する（warn code を安定化）
+- [ ] S07: GitHub state を使った Done/Unknown と ready 判定（AC-003/EC-005/008、ADR-00006）を実装する（warn code を安定化）
 - [ ] S08: `active set` を依存でガードし、`--force` で例外化する（AC-004/005）。派生物の上書き事故を防ぐ
 - [ ] S09: `sync` で `.agent/deps.json` と PlantUML（全体/todo-only）を生成する（AC-006/007/008）
 - [ ] S10: docs を更新し、運用/コマンド/生成物をリファレンス化する
 - [ ] S11: 親→配下（descendant）依存を fail-fast で検出し、deps.json パス+依存先 id を含む構造エラーにする（EC-009）
 - [ ] S12: `sync --force` は deps 構造エラー時も index/tree を更新し、deps 派生物は削除し、warn code を安定化する（EC-010）
 - [ ] S13: 追加仕様（EC-009/010、state/ready の補足）を docs に反映する
+- [ ] S14: `new` の GitHub デフォルトを ADR-00006 に合わせて変更し、wrapper 導線を整備する（AC-009〜AC-011）
+- [ ] S15: epic/initiative の state/Done を配下 issue から導出し、`.agent/deps.json` に `progress` を追加する（EC-011、AC-006）
+- [ ] S16: `deps check` / `active set` 非`--github`時は `.agent/index.json` を参照して状態を扱う（AC-001/003、EC-005/008）
+- [ ] S17: ADR-00006 反映の docs 追補（`guide.md` / `reference_github.md` / `reference_sync.md` など）
 
 ### 終了コード（契約） (必須)
 - `0`: ready（実行可能）
@@ -74,25 +78,29 @@ Script -> Puml: write puml
 ```
 
 ### 要件 ↔ ステップ対応表 (必須)
-- AC-001 → S02〜S07
+- AC-001 → S02〜S07, S16
 - AC-002 → S05
 - AC-003 → S01, S07
 - AC-004 → S08
 - AC-005 → S08
-- AC-006 → S09
+- AC-006 → S09, S15
 - AC-007 → S09
 - AC-008 → S09
+- AC-009 → S14
+- AC-010 → S14
+- AC-011 → S14
 - EC-001 → S03
 - EC-002 → S03
 - EC-003 → S06
 - EC-004 → S06
-- EC-005 → S07
+- EC-005 → S07, S16
 - EC-006 → S04
 - EC-007 → S03
 - EC-008 → S01, S07, S09
 - EC-009 → S11
 - EC-010 → S12
-- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S13（全ステップで維持し、テスト/差分で検証）
+- EC-011 → S15
+- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S17（全ステップで維持し、テスト/差分で検証）
 
 ---
 
@@ -101,6 +109,7 @@ Script -> Puml: write puml
 ### 共通品質ゲート（各ステップ末尾） (必須)
 - Red/Green 中は、追加・変更したテストケースを個別に実行してよい
 - ただし「ステップ末尾（省略しない）」では必ず `python -m unittest discover -v` を実行し、**全テスト**が成功していること
+- ステップ末尾でレビュアー（マルチエージェント）にレビューを依頼し、指摘を反映して承認を得ること
 
 ### S01 — `sync --github` をテストで再現できる（gh stub） (必須)
 - 対象: AC-003 / EC-008（テスト基盤として）
@@ -143,6 +152,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
 - [ ] コミットした（エージェント）
@@ -196,6 +206,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -235,6 +246,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -263,11 +275,12 @@ Script -> Puml: write puml
 
 #### Green（最小実装） (任意)
 - 実装方針:
-  - node id は numeric id として解決し、canonical id に正規化する（幅差を吸収）
+  - node id は spec ツリー内の id と **完全一致**で解決する（数値抽出で “それっぽく” 正規化しない）
   - GitHub issue number は spec ツリー内の 1 node に一意に解決できない場合はエラー
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -298,6 +311,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -329,6 +343,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -338,19 +353,17 @@ Script -> Puml: write puml
 ### S07 — GitHub state 連携の ready 判定と warnings（安定化） (必須)
 - 対象: AC-003 / EC-005 / EC-008
 - 設計参照:
-  - ADR-00002（状態モデル）/ ADR-00005（epic/initiative Done）/ WARN-001/002（warning code）
+  - ADR-00002（状態モデル）/ ADR-00006（epic/initiative Done・GitHubポリシー）/ WARN-001/002（warning code）
   - 対象テスト:
-    - `tests/test_cli.py::test_deps_check_without_github_treats_deps_as_unknown_and_blocks`
     - `tests/test_cli.py::test_deps_check_exit_codes_ready_blocked_error`（exit code の分離）
     - `tests/test_cli.py::test_deps_check_github_ready_and_blocked`
     - `tests/test_cli.py::test_deps_github_fetch_failure_warns_and_blocks`
     - `tests/test_cli.py::test_deps_github_index_incomplete_warns_and_blocks`
+    - `tests/test_cli.py::test_deps_github_index_incomplete_is_scoped_to_evaluated_issues`（負例: 無関係な欠落で warn しない）
     - `tests/test_cli.py::test_deps_check_passes_gh_limit_to_gh`（任意: 引数伝播）
     - `tests/test_cli.py::test_deps_check_json_stdout_only_and_warnings_on_stderr`
     - `tests/test_cli.py::test_deps_check_json_includes_effective_depends_on_blockers_and_nodes`
     - `tests/test_cli.py::test_deps_check_github_treats_local_only_dep_as_unknown_and_blocks`（EC-005: local-only）
-    - `tests/test_cli.py::test_epic_total_zero_open_is_not_done_by_aggregation`
-    - `tests/test_cli.py::test_epic_total_zero_closed_is_done_by_rule_a`
 - このステップで「追加しないこと（スコープ固定）」:
   - `active set` ガード（次ステップ）
   - `sync` の deps 生成（S09）
@@ -361,7 +374,7 @@ Script -> Puml: write puml
 #### 期待する振る舞い（テストケース） (必須)
 - Given: 依存先の GitHub state が取得できる（stub）
 - When: `deps check <target> --github` を実行する
-- Then: 依存先がすべて CLOSED なら ready/exit=0、OPEN/Unknown があれば blocked/exit=3
+- Then: 依存先がすべて Done なら ready/exit=0、未Done（OPEN/Unknown 等）があれば blocked/exit=3
 - 追加で:
   - gh 取得失敗: warn（`warnings[]` に `gh_fetch_failed`）+ Unknown 扱い + blocked
   - gh-limit 不足: warn（`warnings[]` に `gh_index_incomplete`）+ missing を Unknown 扱い
@@ -369,6 +382,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -382,6 +396,7 @@ Script -> Puml: write puml
   - 対象テスト:
     - `tests/test_cli.py::test_active_set_blocked_does_not_mutate_active_json_without_force`
     - `tests/test_cli.py::test_active_set_force_updates_active_and_emits_warn`
+    - `tests/test_cli.py::test_active_set_force_does_not_bypass_deps_structural_errors`
     - `tests/test_cli.py::test_active_set_github_allows_when_deps_done`（`--github` 伝播）
     - `tests/test_cli.py::test_active_set_passes_gh_limit_to_gh`（`--gh-limit` 伝播）
     - `tests/test_cli.py::test_active_set_updates_index_tree_active_only`
@@ -398,6 +413,8 @@ Script -> Puml: write puml
 - Then: exit=3、active.json は不変、blockers が表示される
 - When: `active set <target> --force` を実行する
 - Then: exit=0、active.json が更新され、warn が出る
+- When: 構造エラー（cycle / 不正 deps.json / 解決不能参照など）が存在する状態で `active set <target> --force` を実行する
+- Then: exit=1 で失敗し、`--force` でも構造エラーは回避できない
 - When: `active set <target> --github [--gh-limit N]` を実行する
 - Then: `deps check --github` 相当の判定が行われ、GitHub state により ready/blocked が変化する
 - 回帰防止:
@@ -405,6 +422,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -421,7 +439,6 @@ Script -> Puml: write puml
     - `tests/test_cli.py::test_sync_github_index_incomplete_warns_and_still_generates_deps_outputs`
     - `tests/test_cli.py::test_sync_deps_puml_contains_legend_and_state_colors`
     - `tests/test_cli.py::test_sync_todo_puml_excludes_done_nodes`
-    - `tests/test_cli.py::test_sync_force_does_not_ignore_deps_structural_errors`
     - `tests/test_cli.py::test_sync_does_not_mutate_meta_json`
 - このステップで「追加しないこと（スコープ固定）」:
   - UI/TUI 等の編集機能は追加しない
@@ -433,14 +450,17 @@ Script -> Puml: write puml
 - When: `sync` を実行する
 - Then:
   - `.agent/deps.json` が生成され、`schema_version/generated_at/nodes[<id>].state/ready/effective_depends_on/blockers` を含む（`nodes` は id-keyed dict）
+    - `progress` は S15 で追加する（このステップでは未要求）
   - `.agent/deps.puml` が生成され、凡例と state 色分けがある
   - `.agent/deps.todo.puml` は done ノード/edge を除外する
 - 追加で:
-  - deps 構造エラーは `sync --force` でも握りつぶさず exit=1
+  - deps 構造エラーは `sync`（非`--force`）では exit=1
+    - `sync --force` の扱い（exit=0 で継続、deps 派生物削除、warn code）は S12/EC-010 に従う
   - `sync --github` の gh 取得失敗は warn して Unknown 扱いで継続（生成物は出る）
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -467,6 +487,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] 変更差分をレビューし、整合している
 - [ ] report 更新
 - [ ] update_plan 更新
@@ -505,6 +526,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -515,7 +537,7 @@ Script -> Puml: write puml
 - 対象: EC-010
 - 目的:
   - `sync --force` でも deps 構造エラーで全体が止まらず、index/tree が最新化される（手動テスト期待）
-  - deps 派生物は削除して古い参照を防ぎ、warn code（例: `deps_preflight_failed`）を安定化する
+  - deps 派生物は削除して古い参照を防ぎ、warn code `deps_preflight_failed` を安定化する
 - 対象テスト（例）:
   - `tests/test_cli.py::test_sync_force_skips_deps_on_deps_error`
 - 実装方針（例）:
@@ -529,6 +551,7 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
@@ -546,6 +569,121 @@ Script -> Puml: write puml
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] 変更差分をレビューし、整合している
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S14 — `new` の GitHub デフォルト変更（initiative/epic は local-only、issue は GitHub）+ wrapper 整備 (必須)
+- 対象: AC-009 / AC-010 / AC-011（ADR-00006）
+- 目的:
+  - initiative/epic を作成しても GitHub Issue を増殖させない（デフォルト local-only、`gh` 非依存）
+  - issue は “実作業単位” のため GitHub デフォルトを維持する（親 epic が local-only でも）
+  - wrapper（`new-epic` / `new-issue`）が親 local を誤って伝播しない
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_new_initiative_default_is_local_only_without_gh`
+  - `tests/test_cli.py::test_new_epic_default_is_local_only_without_gh`
+  - `tests/test_cli.py::test_new_issue_default_creates_github_even_with_local_parent`
+  - `tests/test_cli.py::test_new_flags_are_mutually_exclusive`（排他）
+- 実装方針（例）:
+  - runtime:
+    - `new initiative` / `new epic` のデフォルト分岐を local-only に反転し、`--create-github-issue` / `--github-issue <n>` は opt-in
+    - `new issue` は GitHub デフォルト維持（`--no-github` は例外）
+  - wrapper:
+    - `templates/initiative/epics/new-epic`: epic は常に local-only デフォルトで作る（`--no-github` の明示 or デフォルト依存を固定）
+    - `templates/epic/issues/new-issue`: 親 epic が local-only でも `--no-github` を自動付与しない（GitHub デフォルト維持）
+- 観測点（必須）:
+  - AC-009/010: `gh` 不在でも exit=0、生成された `meta.json` に `github.issue_number` が無い/空
+  - AC-011: `gh` stub ありで exit=0、生成された `meta.json` に `github.issue_number` が設定される
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S15 — epic/initiative の state/Done 導出（親 GitHub CLOSED 無視）+ `.agent/deps.json` に `progress` 追加 (必須)
+- 対象: EC-011 / AC-006（`nodes[].progress`）
+- 目的:
+  - initiative/epic の Done/state を配下 issue の集計で導出し、親 GitHub state の二重管理を排除する（ADR-00006）
+  - `done(empty)` を機械判定できるよう `.agent/deps.json` に `progress={total,open,done,unknown}` を追加する
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_epic_total_zero_is_done_by_aggregation`
+  - `tests/test_cli.py::test_epic_ignores_own_github_closed_for_done`
+  - `tests/test_cli.py::test_deps_check_blocks_when_dependency_epic_has_open_descendants_even_if_own_github_closed`
+  - `tests/test_cli.py::test_sync_deps_json_includes_progress_fields`
+  - （任意）`tests/test_cli.py::test_deps_puml_marks_done_empty_distinctly`
+- 実装方針（例）:
+  - `_build_deps_state` を単一の評価関数として、`sync`/`deps check` で共通利用する
+  - epic/initiative:
+    - progress は常に全 descendant issue で集計する（deps check の到達範囲に限定しない）
+    - Done 条件: `open==0 && unknown==0`（`total==0` も Done）
+    - 自身が `github.issue_number` を持っていても OPEN/CLOSED は state 判定に使わない
+  - issue:
+    - progress は `{total:1, open|done|unknown のいずれかが 1}`（または `null`）
+- 観測点（必須）:
+  - `.agent/deps.json` に `nodes[<id>].progress` が含まれる
+  - EC-011 の条件で epic/initiative が `done` にならない
+  - 依存元ノードの `deps check --github` が blocked になり、blockers に当該 epic/initiative が含まれる（ready も阻害される）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S16 — `deps check` / `active set` 非`--github`時の state 取得（`.agent/index.json` 参照） (必須)
+- 対象: AC-001（deps check）/ EC-005（Unknown=blocked）/ 状態取得仕様（`spec-on-dev/requirement.md`）
+- 目的:
+  - `--github` なしでは GitHub へアクセスせず、可能なら `.agent/index.json`（最後の `sync`）を参照して ready/blocked を判定できるようにする
+  - `.agent/index.json` が無い/不足の場合は Unknown に倒して安全側にする
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_deps_check_without_github_uses_cached_index_when_available`
+  - `tests/test_cli.py::test_deps_check_without_github_without_index_is_unknown_and_blocks`
+  - `tests/test_cli.py::test_active_set_without_github_uses_cached_index_when_available`
+  - `tests/test_cli.py::test_active_set_without_github_without_index_is_unknown_and_blocked`
+- 実装方針（例）:
+  - `deps check` / `active set` は `--github` 指定時のみ `gh` を呼ぶ
+  - `--github` なし:
+    - `.agent/index.json` があれば issue の open/done/unknown を参照する
+    - 無ければ Unknown として扱う
+- 観測点（必須）:
+  - `--github` なしで `gh` を呼ばない（stub 不在でも動作する）
+  - `.agent/index.json` がある場合、ready/blocked がキャッシュに従って変化する
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S17 — ADR-00006 反映の docs 追補（導線/ポリシー/状態の読み方） (必須)
+- 目的:
+  - “new は GitHub デフォルト” の前提を、initiative/epic と issue で分離した新ポリシーに更新する
+  - epic/initiative の state/Done が配下 issue 由来であること、`progress` の意味、`done(empty)` の読み方を docs に反映する
+- 変更対象（例）:
+  - `README.md`（入口導線の更新漏れ防止）
+  - `src/spec_dock/assets/spec_dock/docs/guide.md`
+  - `src/spec_dock/assets/spec_dock/docs/README.md`（docs index）
+  - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+  - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+  - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] 変更差分をレビューし、整合している
 - [ ] report 更新
 - [ ] update_plan 更新
