@@ -136,6 +136,11 @@ PlantUML の色（state）:
 - unknown: `#EEEEEE`
 - blocked: `#F8CECC`
 
+PlantUML のラベル（ready）:
+- node label は `"<id>\\n<State>"` を基本とし、`ready=false` の場合は `\\nready=false` を追記します。
+  - 例: `iss-00301\\nDone\\nready=false`
+  - `deps.todo.puml` は Done ノードを除外するため、Done ノードの `ready=false` は `deps.puml`（全体）で確認してください。
+
 `sync --force` と deps 構造エラー:
 - deps 構造エラー（循環依存/未解決参照など）がある場合、通常 `sync` は失敗します。
 - `sync --force` の場合は warn code `deps_preflight_failed` を出して index/tree の更新を継続しますが、deps 派生物（`.agent/deps*.{json,puml}`）は削除されます（古い派生物の誤用を防ぐため）。
