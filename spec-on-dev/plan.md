@@ -38,6 +38,7 @@ ID: "iss-00009"
 - [ ] S15: epic/initiative の state/Done を配下 issue から導出し、`.agent/deps.json` に `progress` を追加する（EC-011、AC-006）
 - [ ] S16: `deps check` / `active set` 非`--github`時は `.agent/index.json` を参照して状態を扱う（AC-001/003、EC-005/008）
 - [ ] S17: ADR-00006 反映の docs 追補（`guide.md` / `reference_github.md` / `reference_sync.md` など）
+- [ ] S18: `deps.puml` のノードラベルに `ready=false` を追記し、done+ready=false を図上で識別できるようにする（AC-007）
 
 ### 終了コード（契約） (必須)
 - `0`: ready（実行可能）
@@ -84,7 +85,7 @@ Script -> Puml: write puml
 - AC-004 → S08
 - AC-005 → S08
 - AC-006 → S09, S15
-- AC-007 → S09
+- AC-007 → S09, S18
 - AC-008 → S09
 - AC-009 → S14
 - AC-010 → S14
@@ -100,7 +101,7 @@ Script -> Puml: write puml
 - EC-009 → S11
 - EC-010 → S12
 - EC-011 → S15
-- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S17（全ステップで維持し、テスト/差分で検証）
+- 非交渉制約（stdlib/meta不変更/GitHub更新禁止）→ S02〜S18（全ステップで維持し、テスト/差分で検証）
 
 ---
 
@@ -685,6 +686,27 @@ Script -> Puml: write puml
 - [ ] `python -m unittest discover -v` を実行し、全テストが成功した
 - [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] 変更差分をレビューし、整合している
+- [ ] report 更新
+- [ ] update_plan 更新
+- [ ] コミット
+
+---
+
+### S18 — `deps.puml` で `ready=false` をラベル表示する (必須)
+- 対象: AC-007（state/ready の二軸）
+- 目的:
+  - `state=done` でも `ready=false` になりうるため、依存図（`deps.puml`）上で誤解が起きないよう明示する
+- 対象テスト（例）:
+  - `tests/test_cli.py::test_sync_generates_deps_json_and_plantuml`
+- 実装方針（例）:
+  - `_render_deps_puml` の node label に `ready=false` を追記する（`ready` が `False` の場合のみ）
+- 観測点（必須）:
+  - `.agent/deps.puml` の `state=done` ノードの label に `ready=false` が含まれる（例: `Done\\nready=false`）
+  - `.agent/deps.todo.puml` は Done 除外の仕様どおり（Done ノード自体は出ない）
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] `python -m unittest discover -v` を実行し、全テストが成功した
+- [ ] レビュアーにレビューを依頼し、指摘を反映して承認を得た
 - [ ] report 更新
 - [ ] update_plan 更新
 - [ ] コミット
