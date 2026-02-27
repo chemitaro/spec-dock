@@ -184,6 +184,7 @@ A --> B : depends_on
   - 依存定義（各ノード直下 `deps.json`）
   - active（`spec-dock/.agent/active.json` の leaf。ADR-00002）
   - GitHub issue state index（任意。`gh issue list` の結果）
+  - `.agent/index.json`（任意。`--github` 非指定時の issue 状態スナップショット）
   - progress（epic/initiative の配下 issue 集計。ADR-00006 の Done/state 導出で使用）
     - 注意: progress 集計のスコープは **常に spec ツリー全体**（当該 epic/initiative の全 descendant issue）とし、`deps check` の到達可能グラフに限定しない（表示の一貫性のため）
 - 依存の解決（ADR-00001/00003）:
@@ -200,7 +201,9 @@ A --> B : depends_on
   - issue:
     - Done: GitHub `CLOSED`
     - Todo: GitHub `OPEN`
-    - Unknown: `--github` 無し / `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ
+    - Unknown:
+      - `--github` 指定時: `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ / `gh` index に存在しない
+      - `--github` 非指定時: `.agent/index.json` が無い / 該当 issue が載っていない / status が unknown
     - Doing: active leaf と一致（ただし Done が優先）
   - epic/initiative:
     - Done: 配下 issue の集計で `open == 0` かつ `unknown == 0`（`total == 0` も Done 扱い。表示上は `done(empty)` 相当で区別する）
@@ -356,8 +359,8 @@ A --> B : depends_on
   - Input: nodes, active, GitHub issue_index（任意）
   - Output: `.agent/deps.json` と同型の dict
   - Note:
-    - `deps check` と `sync` で **同一の評価関数**を使い、Done/state/ready 計算の乖離を防ぐ（`deps check` は `_build_deps_state` の結果を部分出力するだけにする）
-    - `_build_deps_state` は **常に全ノード**を評価して `nodes{...}` を構築する（epic/initiative の progress 集計も全 descendant issue を対象に行う）
+    - `sync` は `_build_deps_state` で **全ノード**を評価して `nodes{...}` を構築する（epic/initiative の progress 集計も全 descendant issue を対象に行う）
+    - `deps check` / `active set` は `_deps_evaluate`（到達可能な部分グラフ）で評価し、出力も到達可能ノードに限定する（ただし progress 集計は全 descendant issue を対象に行う）
 - IF-006: `spec-dock/scripts/spec-dock::_render_deps_puml(deps_state, *, todo_only: bool) -> str`
   - Input: deps_state（`.agent/deps.json`）
   - Output: PlantUML テキスト
