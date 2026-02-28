@@ -1,7 +1,12 @@
 # Manual Tests
 
-This directory contains Git-tracked scaffolding for manual test workspaces.
+This directory is reserved for manual test workspaces.
 
-- Workspaces are organized by tool and focus area.
-- Each `trial-*` directory is a disposable workspace; generated files are ignored by a local `.gitignore`.
+- The main repository ignores everything under `manual-tests/` except this `README.md`.
+- If you want to track artifacts, initialize a separate Git repository inside a trial directory.
 
+Recommended structure (examples):
+
+- `manual-tests/spec-dock-deps/trial-01-baseline/`
+- `manual-tests/spec-dock-deps/trial-02-deps-guard/`
+- `manual-tests/spec-dock-deps/trial-03-github-sync/`

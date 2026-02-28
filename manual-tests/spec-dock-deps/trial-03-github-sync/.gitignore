@@ -1,5 +1,0 @@
-# Ignore everything in this trial workspace (generated specs, caches, etc.)
-*
-!.gitignore
-!README.md
-
