@@ -8,3 +8,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Manual test workspaces (keep the top README only)
+/manual-tests/*
+!/manual-tests/README.md
