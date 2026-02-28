@@ -64,4 +64,4 @@ ID: "adr-00001"
   - 依存定義のサンプル/ベストプラクティスの整備
 
 ## 参考（References） (任意)
-- `spec-on-dev/requirement.md`（Q-001）
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`（Q-001）

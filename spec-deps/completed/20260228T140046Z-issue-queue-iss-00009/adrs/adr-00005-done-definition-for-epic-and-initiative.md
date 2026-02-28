@@ -61,4 +61,4 @@ ID: "adr-00005"
   - docs: “Done の定義” の明文化
 
 ## 参考（References） (任意)
-- `spec-on-dev/requirement.md`（Q-005）
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`（Q-005）

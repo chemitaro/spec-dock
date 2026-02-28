@@ -58,4 +58,4 @@ ID: "adr-00003"
   - PlantUML 表示（外部ノードの見せ方）
 
 ## 参考（References） (任意)
-- `spec-on-dev/requirement.md`（Q-003）
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`（Q-003）

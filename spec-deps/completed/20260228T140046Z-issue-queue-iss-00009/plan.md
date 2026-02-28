@@ -13,8 +13,8 @@ ID: "iss-00009"
 # iss-00009 Issue/Epic/Initiative の依存関係管理（実行可能判定・PlantUML可視化・active setガード） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001〜AC-011（`spec-on-dev/requirement.md`）
-- 対象EC: EC-001〜EC-011（`spec-on-dev/requirement.md`）
+- 対象AC: AC-001〜AC-011（`spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`）
+- 対象EC: EC-001〜EC-011（`spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`）
 - 対象制約:
   - `meta.json` は変更しない（依存は `deps.json` に分離）
   - runtime script は stdlib のみ（外部依存追加なし）
@@ -500,7 +500,7 @@ Script -> Puml: write puml
 ---
 
 ## 未確定事項（TBD） (必須)
-- 該当なし（`spec-on-dev/requirement.md` / ADR で決定済み）
+- 該当なし（`spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md` / ADR で決定済み）
 
 ---
 
@@ -646,7 +646,7 @@ Script -> Puml: write puml
 ---
 
 ### S16 — `deps check` / `active set` 非`--github`時の state 取得（`.agent/index.json` 参照） (必須)
-- 対象: AC-001（deps check）/ EC-005（Unknown=blocked）/ 状態取得仕様（`spec-on-dev/requirement.md`）
+- 対象: AC-001（deps check）/ EC-005（Unknown=blocked）/ 状態取得仕様（`spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`）
 - 目的:
   - `--github` なしでは GitHub へアクセスせず、可能なら `.agent/index.json`（最後の `sync`）を参照して ready/blocked を判定できるようにする
   - `.agent/index.json` が無い/不足の場合は Unknown に倒して安全側にする

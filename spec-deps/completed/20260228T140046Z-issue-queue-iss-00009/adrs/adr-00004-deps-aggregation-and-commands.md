@@ -59,4 +59,4 @@ ID: "adr-00004"
   - tests（期待する生成物と失敗条件）
 
 ## 参考（References） (任意)
-- `spec-on-dev/requirement.md`（Q-004）
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`（Q-004）

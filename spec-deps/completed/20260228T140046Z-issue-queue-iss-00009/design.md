@@ -446,8 +446,8 @@ class DepsStateNode {
 - 移動/リネーム（Move/Rename）:
   - 該当なし
 - 参照（Read only / context）:
-  - `spec-on-dev/requirement.md`: AC/EC と固定仕様の参照
-  - `spec-on-dev/adrs/*.md`: ADR 決定事項の参照
+  - `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`: AC/EC と固定仕様の参照
+  - `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/adrs/*.md`: ADR 決定事項の参照
 
 ## マッピング（要件 → 設計） (必須)
 - AC-001/002/003 → `spec-dock/scripts/spec-dock` の `deps check`（IF-001〜004）
