@@ -3851,6 +3851,7 @@ class TestCli(unittest.TestCase):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             self._run_runtime_expect_fail(target, ["active", "set", "123", "--checkout"], env=test_env)
+            self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
 
     def test_new_no_github_does_not_invoke_gh(self) -> None:
         if os.name == "nt":
