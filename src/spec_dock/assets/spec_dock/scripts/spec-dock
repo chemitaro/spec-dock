@@ -1801,6 +1801,26 @@ def _active_set(
             _warn(f"blocker: {b}")
 
     initiative, epic, issue = _select_active_from_node(nodes, node)
+    branch: str | None = None
+    if checkout:
+        decision = _resolve_active_set_branch_decision(repo_root, node=node)
+        for warning in decision.warnings:
+            _warn(warning)
+        try:
+            _require_clean_working_tree(repo_root)
+            if _git_local_branch_exists(repo_root, branch=decision.desired):
+                _warn("branch already exists; reusing existing branch; content is not verified")
+            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
+        except RuntimeError as e:
+            msg = str(e)
+            if msg.startswith("Working tree is not clean"):
+                raise RuntimeError(
+                    msg
+                    + "\n\nHint: use '--no-checkout' to update active only, or commit/stash before '--checkout'."
+                ) from e
+            raise
+        branch = decision.desired
+
     current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
     _apply_active_pointers(specdock_dir, current)
     _patch_agent_state_active_fields(specdock_dir, current)
@@ -1808,28 +1828,8 @@ def _active_set(
     ep = epic.id if epic else "(none)"
     iss = issue.id if issue else "(none)"
     print(f"spec-dock: ok (active set) target={display_target} initiative={ini} epic={ep} issue={iss}")
-
-    if not checkout:
-        return
-
-    decision = _resolve_active_set_branch_decision(repo_root, node=node)
-    for warning in decision.warnings:
-        _warn(warning)
-    try:
-        _require_clean_working_tree(repo_root)
-        if _git_local_branch_exists(repo_root, branch=decision.desired):
-            _warn("branch already exists; reusing existing branch; content is not verified")
-        _ensure_active_set_branch_name(repo_root, desired=decision.desired)
-    except RuntimeError as e:
-        msg = str(e)
-        if msg.startswith("Working tree is not clean"):
-            raise RuntimeError(
-                msg
-                + "\n\nHint: use '--no-checkout' to update active only, or commit/stash before '--checkout'."
-            ) from e
-        raise
-
-    print(f"spec-dock: ok (active checkout) branch={decision.desired}")
+    if branch:
+        print(f"spec-dock: ok (active checkout) branch={branch}")
 
 
 def _active_show(specdock_dir: Path) -> None:
