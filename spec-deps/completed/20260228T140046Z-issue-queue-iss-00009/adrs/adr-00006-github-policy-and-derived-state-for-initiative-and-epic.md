@@ -151,6 +151,6 @@ ID: "adr-00006"
   - tests: “デフォルトは GitHub” 前提の回帰テスト更新
 
 ## 参考（References） (任意)
-- `spec-on-dev/adrs/adr-00002-deps-status-model.md`
-- `spec-on-dev/adrs/adr-00005-done-definition-for-epic-and-initiative.md`
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/adrs/adr-00002-deps-status-model.md`
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/adrs/adr-00005-done-definition-for-epic-and-initiative.md`
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock`

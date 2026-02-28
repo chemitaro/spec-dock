@@ -80,5 +80,5 @@ ID: "adr-00002"
   - 追加の状態判定（label 等）は後方互換で追加可能。
 
 ## 参考（References） (任意)
-- `spec-on-dev/requirement.md`（Q-002）
-- `spec-on-dev/adrs/adr-00006-github-policy-and-derived-state-for-initiative-and-epic.md`
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/requirement.md`（Q-002）
+- `spec-deps/completed/20260228T140046Z-issue-queue-iss-00009/adrs/adr-00006-github-policy-and-derived-state-for-initiative-and-epic.md`
