@@ -49,12 +49,11 @@
 | MUST | `spec-dock/.agent/tree.json` | JSON | todo | `sync` | human/agent | `index.json` の表示用ビュー（包含ツリー） |
 | MUST | `spec-dock/.agent/tree-all.json` | JSON | all | `sync` | human/agent | all 版ツリー |
 | MUST | `spec-dock/.agent/active.json` | JSON | n/a | `active set` / `sync` | agent/human | 現在の作業点（ポインタ） |
-| SHOULD | `spec-dock/.agent/tree.puml` | PlantUML | todo | `sync` | human | Readyボード（矢印なし tree + 状態表示） |
-| SHOULD | `spec-dock/.agent/tree-all.puml` | PlantUML | all | `sync` | human | all 版 Readyボード |
-| SHOULD | `spec-dock/.agent/deps-issues.json` | JSON | todo | `sync` | agent/human | **issue-only 依存グラフ（投影）**（`index.json` から issue のみ抽出したグラフ: edges + closure + ready/blockers） |
-| SHOULD | `spec-dock/.agent/deps-issues.puml` | PlantUML | todo | `sync` | human | **issue-only 依存グラフ（可視化）**（完了済み除外の俯瞰） |
-| SHOULD | `spec-dock/.agent/dashboard.md` | Markdown | todo | `sync` | human/agent | “次にやれる/詰まり/unknown” の要約（indexから生成） |
-| MAY | `spec-dock/.agent/focus/deps-issues-<iss-id>.puml` | PlantUML | focus | `deps graph`（案） | human | 特定 issue の上流（ブロッカー）だけ |
+| MUST | `spec-dock/.agent/tree.puml` | PlantUML | todo | `sync` | human | Readyボード（矢印なし tree + 状態表示） |
+| MUST | `spec-dock/.agent/tree-all.puml` | PlantUML | all | `sync` | human | all 版 Readyボード |
+| MUST | `spec-dock/.agent/deps-issues.json` | JSON | todo | `sync` | agent/human | **issue-only 依存グラフ（投影）**（`index.json` から issue のみ抽出したグラフ: edges + closure + ready/blockers） |
+| MUST | `spec-dock/.agent/deps-issues.puml` | PlantUML | todo | `sync` | human | **issue-only 依存グラフ（可視化）**（完了済み除外の俯瞰） |
+| MUST | `spec-dock/.agent/dashboard.md` | Markdown | todo | `sync` | human/agent | “次にやれる/詰まり/unknown” の要約（indexから生成） |
 
 補足（ユーザー要望反映）:
 - issue-only 依存グラフは **todo のみ**を生成する（all は生成しない）。必要なら `index-all.json` から投影で再構築できる。
@@ -111,7 +110,11 @@ Todo --> DepsIssues : render issue graph\n(json/puml)
 ```
 
 ## 7. 次の議論ポイント（この資料のゴール）
-- この表の MUST/SHOULD/MAY/DEPRECATE の妥当性
-- 命名（`tree*.puml` / `deps-issues*.puml` / focus をサブディレクトリにするか）
-- issue-only の JSON 投影（`deps-issues.json`）を SHOULD として持つか（それとも `index.json` のみで十分か）
-- “dashboard.md” の要否（人間/agent の導線として価値があるか）
+（決定済み）
+- focus 図（`spec-dock/.agent/focus/**`）は出力しない
+- `dashboard.md` を採用する
+- issue-only の依存は `deps-issues.json`（構造化）と `deps-issues.puml`（可視化）を採用する
+
+（残りの議論ポイント）
+- `deps-issues.json` のスキーマ詳細（edge の向き、id=spec id/GitHub番号の両方を載せるか、provenance まで載せるか）
+- `dashboard.md` の中身（最低限の項目と表示粒度）

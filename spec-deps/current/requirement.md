@@ -98,8 +98,11 @@ package "Dependency (DAG)\n(canonical issue graph)" {
       - 推移依存（closure）を含み、Done 依存は除外する（決定事項 D-004）
     - 依存グラフ（canonical issue edges）をツール/エージェントが機械判定できる形で保持（例: `index.json` のトップレベル `deps.issue_edges`）
   - `sync` は PlantUML の **Readyボード（矢印なしツリー）**を生成できる（initiative→epic→issue の階層をそのまま表示し、各 issue の READY/BLOCKED/DOING/DONE/UNKNOWN を明示）。
-    - 生成物は `tree*.puml`（todo/all）として扱う（TBD=Q-004）
-  - `sync` は PlantUML の **issue-only 依存グラフ**を生成できる（initiative/epic を除外し、issue のみで依存矢印を描く。todo/all）。
+    - 生成物: `spec-dock/.agent/tree.puml`（todo）/ `spec-dock/.agent/tree-all.puml`（all）
+  - `sync` は **issue-only 依存グラフ**を todo-only として生成できる（initiative/epic を除外し、issue のみで依存を描く。Done issue は除外）。
+    - 構造化: `spec-dock/.agent/deps-issues.json`
+    - 可視化: `spec-dock/.agent/deps-issues.puml`
+  - `sync` は `.agent/dashboard.md`（todo-only）を生成できる（“次にやれる/詰まり/unknown” の要約と導線）。
   - shorthand 依存の展開結果が空（依存先 epic/initiative に issue が無い）場合は **エラーにしない**（ブロックしない）。ただし「空だった」事実は warnings/summary として観測できる。
   - canonical issue グラフ上で **自己依存/循環依存（cycle）**を検出し、構造エラーとして止める（エラーは “どの deps.json のどの参照が原因か” を説明できる）。
   - Unknown（GitHub状態未取得/未リンク/取得漏れ等）は安全側（blocked）に倒し、warn code（例: `gh_fetch_failed`, `gh_index_incomplete`）を安定化する。
@@ -150,7 +153,7 @@ package "Dependency (DAG)\n(canonical issue graph)" {
 ## リスク/懸念（Risks） (任意)
 - R-001: shorthand 展開により依存エッジが増える（サイズ/可読性）
   - 影響: `.agent/index-all.json` が肥大化、図が読めない
-  - 対応: canonical edges はトップレベルに集約し、tree には summary のみ。図は Ready（矢印なし）を主、依存図は focus/集約を採用。
+  - 対応: canonical edges はトップレベルに集約し、tree には summary のみ。図は Ready（矢印なし）を主、依存図は issue-only（todo-only）を補助とする。詳細は `deps check --json` で追えるようにする。
 - R-002: shorthand 展開で自己依存/循環が“暗黙に”発生する
   - 影響: 永久 blocked / `sync` 失敗
   - 対応: canonical issue グラフで cycle 検出し、原因（どの deps.json が生成したか）を出す
@@ -205,8 +208,20 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Actor/Role: 開発者 / エージェント
   - Given: deps 情報が解決できる（構造エラーなし）
   - When: `./spec sync` を実行する
-  - Then: PlantUML の issue-only 依存グラフが生成され、READY/BLOCKED/DOING/DONE/UNKNOWN が色/ラベルで区別できる
-  - 観測点: `spec-dock/.agent/deps-issues*.puml`（todo/all。命名は ADR で確定）
+  - Then: PlantUML の issue-only 依存グラフ（todo-only）が生成され、READY/BLOCKED/DOING/UNKNOWN が色/ラベルで区別できる
+  - 観測点: `spec-dock/.agent/deps-issues.puml`
+- AC-012:
+  - Actor/Role: 開発者 / エージェント
+  - Given: deps 情報が解決できる（構造エラーなし）
+  - When: `./spec sync` を実行する
+  - Then: 構造化された issue-only 依存グラフ（todo-only）が `deps-issues.json` として生成され、issue の状態（ready/blocked 等）と edges を機械的に参照できる
+  - 観測点: `spec-dock/.agent/deps-issues.json`
+- AC-013:
+  - Actor/Role: 開発者 / エージェント
+  - Given: `./spec sync` が成功する
+  - When: `./spec sync` を実行する
+  - Then: `.agent/dashboard.md` が生成され、“次にやれる/詰まり/unknown” の要約を確認できる（`index.json` / `tree.puml` / `deps-issues.puml` の導線がある）
+  - 観測点: `spec-dock/.agent/dashboard.md`
 - AC-007:
   - Actor/Role: 開発者 / エージェント
   - Given: `--github` を指定していない
@@ -290,26 +305,13 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - 参照: `spec-deps/current/adrs/adr-00005-issue-deps-derived-fields.md`
 - D-005: index/tree を all と todo に分割し、todo をデフォルト観測点にする（`index-all.json` / `tree-all.json` を新設）
   - 参照: `spec-deps/current/adrs/adr-00006-sync-artifacts-all-vs-todo.md`
+- D-006: Readyボード（矢印なしツリー）は `tree.puml` / `tree-all.puml` として生成する（tree の図ビューとして固定する）
+  - 参照: `spec-deps/current/adrs/adr-00004-ready-board-artifact-naming.md`
+- D-007: `sync` の生成物として `dashboard.md` を採用し、issue-only deps は `deps-issues.json` + `deps-issues.puml`（todo-only）を生成する。focus 図は生成しない
+  - 参照: `spec-deps/current/adrs/adr-00008-sync-artifacts-dashboard-and-issue-only-deps.md`
 
 ## 未確定事項（TBD / 要確認） (必須)
-- Q-004:
-  - 質問: Readyボード（矢印なしツリー=tree）の生成物ファイル名/種類（todo/all）をどう固定するか？
-  - 選択肢:
-    - A: `tree.puml` / `tree-all.puml`（推奨。`tree.json` / `tree-all.json` と対応）
-    - B: `ready.puml` / `ready-all.puml`（board専用名）
-    - C: 1ファイルのみ（todo-only か all のみ）
-  - 推奨案（暫定）: A（観測点が `tree` に寄り、迷いにくい）
-  - 影響範囲: AC-006（生成物の観測点）
-  - 参照: `spec-deps/current/adrs/adr-00004-ready-board-artifact-naming.md`
-- Q-006:
-  - 質問: issue-only 依存グラフ（PlantUML）の生成物（全体/フォーカス、矢印方向、命名）をどう固定するか？
-  - 選択肢:
-    - A: 全体（todo/all）のみ生成
-    - B: フォーカス（指定 issue の上流のみ）だけ生成（コマンドで生成）
-    - C: 全体 + フォーカス（推奨候補）
-  - 推奨案（暫定）: C（毛玉化してもフォーカスで回避できる）
-  - 影響範囲: AC-011（生成物の観測点）, `deps check` / `sync` の UX
-  - 参照: `spec-deps/current/adrs/adr-00007-issue-only-deps-visualization.md`
+- 該当なし
 
 ## Definition of Ready（着手可能条件） (必須)
 - [ ] 目的が 1〜3行で明確になっている

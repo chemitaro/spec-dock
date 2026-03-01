@@ -45,9 +45,9 @@
 |---|---|---|---|
 | Board | `spec-dock/.agent/tree-all.puml` | all | Readyボード（all） |
 | Board | `spec-dock/.agent/tree.puml` | todo | Readyボード（todo） |
-| Viz | `spec-dock/.agent/deps-issues-all.puml` | all | issue-only 依存グラフ（all） |
-| Viz | `spec-dock/.agent/deps-issues.puml` | todo | issue-only 依存グラフ（todo） |
-| Viz（任意） | `spec-dock/.agent/deps-issues-focus-<iss-id>.puml` | focus | 特定 issue の上流（ブロッカー）に絞った図 |
+| Viz | `spec-dock/.agent/deps-issues.puml` | todo | issue-only 依存グラフ（todo-only） |
+| Export | `spec-dock/.agent/deps-issues.json` | todo | issue-only 依存グラフ（構造化 / エージェント向け） |
+| Dashboard | `spec-dock/.agent/dashboard.md` | todo | ready/blocked/unknown の要約（導線） |
 
 補足:
 - `.agent/active.json` は引き続き「現在の作業点」を示す（派生だが運用上重要）。
@@ -66,7 +66,8 @@ issue の closure（Done 除外）を index/tree に載せるための、最小�
 8) emit:
    - JSON（all/todo）
    - tree board（all/todo）
-   - issue-only deps graph（all/todo + 任意フォーカス）
+   - issue-only deps graph（todo-only）
+   - dashboard（todo-only）
 
 ### UML（任意）
 ```plantuml
@@ -79,7 +80,8 @@ rectangle "sync\n(scan/load/compile/validate/enrich)" as Sync
 database ".agent/index-all.json\n.agent/tree-all.json" as All
 database ".agent/index.json\n.agent/tree.json" as Todo
 database ".agent/tree-all.puml\n.agent/tree.puml" as TreePuml
-database ".agent/deps-issues-all.puml\n.agent/deps-issues.puml" as DepsPuml
+database ".agent/deps-issues.json\n.agent/deps-issues.puml" as DepsIssues
+file ".agent/dashboard.md" as Dashboard
 rectangle "gh\n(optional)" as GH
 
 Meta --> Sync
@@ -88,11 +90,12 @@ Sync --> GH : optional enrich
 Sync --> All : emit (all)
 All --> Todo : filter done (todo)
 Todo --> TreePuml : render board
-Todo --> DepsPuml : render issue graph
+Todo --> DepsIssues : render issue graph\n(json/puml)
+Todo --> Dashboard : render summary
 @enduml
 ```
 
 ## 5. 次アクション
-- Q-004（tree board の命名/種別）を確定: `spec-deps/current/adrs/adr-00004-ready-board-artifact-naming.md`
-- Q-006（issue-only deps graph の方式）を確定: `spec-deps/current/adrs/adr-00007-issue-only-deps-visualization.md`
+- 生成物セットを ADR で固定: `spec-deps/current/adrs/adr-00008-sync-artifacts-dashboard-and-issue-only-deps.md`
+- issue-only deps graph の矢印方向等を ADR で固定: `spec-deps/current/adrs/adr-00007-issue-only-deps-visualization.md`
 - 仕様を固定したら、設計書（`spec-deps/current/design.md`）に具体スキーマと生成手順を落とし込む
