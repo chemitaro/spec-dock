@@ -83,29 +83,31 @@ hide footbox
 skinparam shadowing false
 
 actor User
-participant "spec-dock\\n(runtime)" as Script
-database "SSOT\\nmeta.json" as Meta
-database "SSOT\\ndeps.json" as Deps
-participant "gh\\n(optional)" as GH
-database ".agent/index-all.json\\n.tree-all.json" as All
-database ".agent/index.json\\n.tree.json" as Todo
-file ".agent/tree-all.puml\\n.tree.puml" as TreePuml
-database ".agent/deps-issues.json\\n.deps-issues.puml" as DepsIssues
-file ".agent/dashboard.md" as Dashboard
+participant "spec-dock\n(runtime)" as Script
+participant "SSOT\nmeta.json" as Meta
+participant "SSOT\ndeps.json" as Deps
+participant "gh\n(optional)" as GH
+participant ".agent\nindex-all.json\ntree-all.json" as All
+participant ".agent\nindex.json\ntree.json" as Todo
+participant ".agent\ntree-all.puml" as TreeAllPuml
+participant ".agent\ntree.puml" as TreeTodoPuml
+participant ".agent\ndeps-issues.json\ndeps-issues.puml" as DepsIssues
+participant ".agent\ndashboard.md" as Dashboard
 
 == sync ==
 User -> Script: sync [--github] [--force]
 Script -> Meta: scan nodes (containment)
 Script -> Deps: load deps.json (shorthand)
-Script -> Script: compile to canonical\\n(issue->issue direct edges)
-opt --github
+Script -> Script: compile to canonical\n(issue->issue direct edges)
+opt GitHub enabled
   Script -> GH: gh issue list/view (enrich)
 end
-Script -> Script: derive ready/closure\\n(Done excluded)
+Script -> Script: derive ready/closure\n(Done excluded)
 Script -> All: emit all
 All -> Todo: filter Done issues
-Todo -> TreePuml: render Ready board
-Todo -> DepsIssues: project+render\\n(issue-only)
+All -> TreeAllPuml: render Ready board (all)
+Todo -> TreeTodoPuml: render Ready board (todo)
+Todo -> DepsIssues: project+render\n(issue-only)
 Todo -> Dashboard: render summary
 @enduml
 ```
@@ -135,6 +137,44 @@ Todo -> Dashboard: render summary
       - PlantUML（`deps-issues.puml`）では見やすさのため **反転して描画**する（prereq -> dependent / blocks 表示。ADR-00007）
       - `depends_on_edges` は内部で保持し、描画時に反転できる
 
+#### UML（shorthand 展開と矢印方向の対応） (任意)
+```plantuml
+@startuml
+left to right direction
+skinparam shadowing false
+
+rectangle "iss-A (dependent)" as A
+package "epic-00020 (contains)" as Epic20 {
+  rectangle "iss-B (prereq)" as B
+  rectangle "iss-C (prereq)" as C
+}
+
+note right of A
+deps.json on iss-A:
+depends_on=["epic-00020"]
+end note
+
+' JSON（機械可読）: depends_on 方向（dependent -> prerequisite）
+A --> B : depends_on
+A --> C : depends_on
+@enduml
+```
+
+```plantuml
+@startuml
+top to bottom direction
+skinparam shadowing false
+
+rectangle "iss-A (blocked)" as A
+rectangle "iss-B (ready)" as B
+rectangle "iss-C (ready)" as C
+
+' PlantUML（人間向け）: blocks 表示（prereq -> dependent）に反転して描く（ADR-00007）
+B --> A : blocks
+C --> A : blocks
+@enduml
+```
+
 ### MODEL-003: issue の派生 deps（`index*.json` / `tree*.json`）
 - issue ノードに追加するフィールド（例）:
   - `deps.ready`: `bool`
@@ -143,6 +183,41 @@ Todo -> Dashboard: render summary
 - 不変条件（混乱回避）:
   - `status == \"done\"` の issue は、`deps.ready=true` / `deps.depends_on=[]` とする（“着手可否”の観点では trivially ready）
   - `unknown` は `deps.ready=false` の評価に倒れる（依存先の unknown も Done ではない扱い）
+
+#### UML（ready / state の導出） (任意)
+```plantuml
+@startuml
+skinparam shadowing false
+
+start
+
+if (status == done?) then (yes)
+  :deps.ready = true;
+  :deps.depends_on = [];
+  :state = done;
+  stop
+endif
+
+:deps.depends_on = closure(issue -> prerequisites)\n(Done excluded);
+:deps.ready = (deps.depends_on is empty);
+
+if (active leaf?) then (yes)
+  :state = doing;
+else (no)
+  if (status == unknown?) then (yes)
+    :state = unknown;
+  else (no)
+    if (deps.ready?) then (yes)
+      :state = ready;
+    else (no)
+      :state = blocked;
+    endif
+  endif
+endif
+
+stop
+@enduml
+```
 
 ### MODEL-004: `.agent/*` 生成物スキーマ（MVP）
 > エージェントが読むのは `index.json`（todo）を第一とし、`deps-issues.json` は issue-only 投影として “読みやすさ” のために用意する。
@@ -164,11 +239,11 @@ Todo -> Dashboard: render summary
   "root": "spec-dock/initiatives",
   "active": { /* active.json と同型 */ },
   "warnings": ["gh_fetch_failed", "gh_index_incomplete", "deps_ref_expanded_to_empty"],
-	  "deps": {
-	    "valid": true,
-	    "issue_edges": [{ "from": "iss-00001", "to": "iss-00002", "kind": "depends_on" }],
-	    "edge_direction": "depends_on (dependent -> prerequisite)"
-	  },
+  "deps": {
+    "valid": true,
+    "issue_edges": [{ "from": "iss-00001", "to": "iss-00002", "kind": "depends_on" }],
+    "edge_direction": "depends_on (dependent -> prerequisite)"
+  },
   "nodes": {
     "iss-00001": {
       "type": "issue",
@@ -233,6 +308,37 @@ Todo -> Dashboard: render summary
   - Blocked の issue 上位 N 件（id/title + `blockers_top`）
   - Unknown（status=unknown）の issue 上位 N 件（id/title）
 
+#### UML（生成物の派生関係） (任意)
+```plantuml
+@startuml
+skinparam shadowing false
+
+file "index-all.json" as IndexAll
+file "tree-all.json" as TreeAll
+file "tree-all.puml" as TreeAllPuml
+
+file "index.json" as IndexTodo
+file "tree.json" as TreeTodo
+file "tree.puml" as TreeTodoPuml
+
+file "deps-issues.json" as DepsIssuesJson
+file "deps-issues.puml" as DepsIssuesPuml
+file "dashboard.md" as Dashboard
+
+IndexAll --> TreeAll : view
+IndexAll --> IndexTodo : todo projection\n(filter Done + empty branches)
+IndexTodo --> TreeTodo : view
+
+TreeAll --> TreeAllPuml : render Ready board\n(all)
+TreeTodo --> TreeTodoPuml : render Ready board\n(todo)
+
+IndexTodo --> DepsIssuesJson : project issue-only\n(todo-only)
+DepsIssuesJson --> DepsIssuesPuml : render graph\n(blocks view)
+
+IndexTodo --> Dashboard : render summary
+@enduml
+```
+
 ### MODEL-005: todo フィルタ（Done 除外）のルール
 - “Done” 判定は issue の `status=="done"` のみで行う（epic/initiative は progress で集計するが、todo 生成の除外判定には使わない）。
 - todo 投影で除外するもの:
@@ -254,6 +360,40 @@ Todo -> Dashboard: render summary
     - `deps.valid=false` と error 要約のみを出し、`nodes/edges` は空で上書きする
   - `.agent/dashboard.md`:
     - `DEPS_DISABLED` と error 要約のみを出し、利用者が誤解しないよう「ready/blocked 集計は無効」と明記する
+
+#### UML（`sync --force` の分岐と stale 防止） (任意)
+```plantuml
+@startuml
+hide footbox
+skinparam shadowing false
+
+actor User
+participant "spec-dock\n(runtime)" as Script
+participant "SSOT\ndeps.json" as Deps
+participant ".agent\nindex(-all).json, index.json\ntree(-all).json, tree.json" as IndexTree
+participant ".agent\ntree(-all).puml, tree.puml" as TreePuml
+participant ".agent\ndeps-issues.json, deps-issues.puml" as DepsIssues
+participant ".agent\ndashboard.md" as Dashboard
+participant ".agent\ndeps.json, deps.puml, deps.todo.puml\n(legacy v1)" as Legacy
+
+User -> Script: sync --force
+Script -> Deps: compile + validate
+
+alt deps valid
+  Script -> IndexTree: emit (deps.valid=true)\n+ deps.issue_edges
+  Script -> TreePuml: render normal
+  Script -> DepsIssues: render normal
+  Script -> Dashboard: render normal
+else deps invalid
+  Script -> IndexTree: emit (deps.valid=false)\n+ deps.issue_edges=[]
+  Script -> TreePuml: overwrite placeholder\n(DEPS_DISABLED)
+  Script -> DepsIssues: overwrite placeholder\n(nodes/edges empty)
+  Script -> Dashboard: overwrite placeholder\n(DEPS_DISABLED + error summary)
+end
+
+Script -> Legacy: delete if exists\n(stale v1 artifacts)
+@enduml
+```
 
 ### UML（任意） (任意)
 ```plantuml
@@ -366,7 +506,11 @@ rectangle "enrich\n(--github)" as Enrich
 rectangle "derive\n(ready/closure)" as Derive
 rectangle "emit\n(index/tree/puml/md)" as Emit
 
-Scan --> Compile --> Validate --> Enrich --> Derive --> Emit
+Scan --> Compile
+Compile --> Validate
+Validate --> Enrich
+Enrich --> Derive
+Derive --> Emit
 @enduml
 ```
 
