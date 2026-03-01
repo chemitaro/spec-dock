@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "ADR-00005"
 タイトル: "index/tree の issue ノードに載せる deps 派生フィールド: 依存リストの粒度（直接/推移/ブロッカー）"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-03-01"
 親: ["iss-00010"]
@@ -11,9 +11,10 @@ ID: "ADR-00005"
 # ADR-00005 index/tree の issue ノードに載せる deps 派生フィールド: 依存リストの粒度（直接/推移/ブロッカー）
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR はディスカッションのために作成しました。結論はユーザーが最終決定した後に更新します。
-- 決定（決定後に記入）:
-  - ...
+- 決定: **Option C（推移依存/closure を issue ノードへ出力。Done は除外）**
+  - `.agent/index*.json` / `.agent/tree*.json` の issue ノードは、shorthand compile 後の canonical issue→issue 依存について、**推移依存（transitive closure）**を保持する。
+  - ただし、**Done 依存は除外**する（未完了/unknown の依存のみを保持する）。
+  - 実装が “どうしても” 難しい場合の妥協点は Option B（direct のみ）とするが、まずは Option C を達成する。
 
 ## 背景（Context） (必須)
 ADR-00002 の決定により、deps の派生状態は `.agent/index.json` / `.agent/tree.json` に統合します。  
@@ -104,19 +105,24 @@ Cons:
 - 二重管理に見え、運用説明が難しい。
 
 ## 判断理由（Rationale） (必須)
-このADRは「結論未決」です。  
-ただし、現時点の暫定推奨は **Option B（direct + blockers）** です。
+ユーザー要望として「**推移依存（全ての依存）を見たい**」が明確であり、Done を除外すれば実務上のノイズも抑えられるため Option C を採用します。  
+また、想定規模（initiative あたり数十〜最大 ~100 issue）では、closure の計算と出力は現実的です。
 
-暫定推奨理由:
-- index/tree は “判断に必要な最小” を載せ、詳細は `deps.issue_edges`（グラフ）から機械計算できる形が、拡張と説明の両方に強い。
-- closure は便利だが、出力肥大・差分の揺れ・二重管理の誤解が増えやすい。
+### Option C を “複雑にしすぎず” 達成する設計メモ
+- closure は “direct edges（canonical）” から **毎回再計算して出力**する（キャッシュを SSOT にしない）。
+- closure 計算は「Done issue を除外したグラフ」に対して行う（Done 依存を自然に落とす）。
+- JSON の closure は **ソートして決定的出力**にする（差分レビュー/テスト安定）。
+- 直接依存（direct）は `deps.issue_edges`（グラフ）として保持し、issue ノード側は closure のみに寄せる（混同防止）。
+  - どうしても direct が欲しい場合は、利用側が `deps.issue_edges` から抽出する（または別フィールド追加を別ADRで検討）。
 
 ## 影響（Consequences） (必須)
 Positive（良い点）:
 - issue ノードで「blocked か」「何に依存しているか」を一目で扱いやすくなる。
+- multi-agent が index/tree だけで「この issue を進めるには何が必要か」を機械的に取得できる。
 
 Negative / Debt（悪い点 / 将来負債）:
-- blockers の定義（direct/transitive/leaf）を別途固定しないと、表示/説明がブレる。
+- closure は便利だが、依存が多い場合は出力が増える（ただし Done を除外する）。
+- “ブロッカーの出し方（何件/どの粒度）” は、表示（PlantUML）と `deps check --json` の設計で別途固定が必要。
 
 影響範囲（コード/テスト/運用/データ）:
 - runtime: `.agent/index.json` / `.agent/tree.json` のスキーマ拡張
@@ -124,7 +130,7 @@ Negative / Debt（悪い点 / 将来負債）:
 - tests: JSON schema 回帰、Readyボード生成の回帰
 
 Follow-ups:
-- blockers の定義（direct/transitive/leaf）を別ADRに分ける案もある（必要なら）。
+- PlantUML 上で「blocked の理由」を見せる粒度（top N / leaf など）は別ADRで固定する（必要なら）。
 
 ## 参考（References） (任意)
 - `spec-deps/current/requirement.md`（Q-005）

@@ -14,11 +14,11 @@ ID: "iss-00010"
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
 - spec-dock の依存関係管理（deps）を “実作業単位=issue” に正規化し、**着手可能（ready）/着手不可（blocked）/ブロッカー**が一目で分かる状態を提供する。
 - `deps.json` の宣言は「issue→issue」だけでなく **epic/initiative への shorthand 依存**を許可し、N対Nの依存記述をまとめて管理できるようにする。
-- `sync` が生成する `.agent/index.json` / `.agent/tree.json` と PlantUML（特に **矢印なしのツリー=Readyボード**）を、multi-agent と人間の共通認識として使えるようにする。
+- `sync` が生成する `.agent/index*.json` / `.agent/tree*.json`（todo/all）と PlantUML（特に **矢印なしのツリー=Readyボード**）を、multi-agent と人間の共通認識として使えるようにする。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
-  - SSOT は `spec-dock/initiatives/**/meta.json`（initiative/epic/issue）。`sync` が `.agent/index.json` / `.agent/tree.json` を生成する（git 管理しない）。  
+  - SSOT は `spec-dock/initiatives/**/meta.json`（initiative/epic/issue）。`sync` が `.agent/index*.json` / `.agent/tree*.json`（todo/all）を生成する（git 管理しない）。  
     - 実装: `src/spec_dock/assets/spec_dock/scripts/spec-dock` の `_scan_nodes()` / `_sync()`
   - deps v1 は `deps.json`（ノード直下）で依存を定義し、`deps check` / `sync` が `.agent/deps.json` + `deps.puml`/`deps.todo.puml` を生成する。  
     - ドキュメント: `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
@@ -33,10 +33,10 @@ ID: "iss-00010"
   2) `.agent/deps.puml` を見ると、包含（ツリー）と依存（矢印）が混ざり、Ready/Blocked の判定が図だけでは直感的でないケースがある
 - 観測点（どこを見て確認するか）:
   - CLI: `./spec`（wrapper）/ `spec-dock/scripts/spec-dock`（runtime script）
-  - Derived: `spec-dock/.agent/index.json` / `spec-dock/.agent/tree.json` / `spec-dock/.agent/*.puml`
+  - Derived: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `spec-dock/.agent/*.puml`
   - Docs: `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `reference_sync.md`
 - 実際の観測結果（貼れる範囲で）:
-  - `sync` は包含ツリーを `.agent/tree.json` に出せるが、Ready/Blocked をツリー上で表現する “矢印なしビュー” が無い
+  - `sync` は包含ツリーを `.agent/tree*.json` に出せるが、Ready/Blocked をツリー上で表現する “矢印なしビュー” が無い
   - 依存の shorthand を issue→issue に還元して扱うための canonical 仕様が無い
 - 情報源（ヒアリング/調査の根拠）:
   - ヒアリング:
@@ -91,12 +91,15 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - `deps.json` による依存宣言を **shorthand（initiative/epic）込み**で受け付け、`sync` 時に **canonical（issue→issue）**へ還元（compile）できる。
   - `deps check <target>`（既存）で、canonical 依存に基づく `ready/blocked` とブロッカーを判定できる（`--github` / `--json` を含む）。
   - `active set <target>` は canonical 依存に基づいてガードされ、blocked の場合はデフォルトで失敗し active を更新しない（`--force` でのみ例外化）。
-  - `sync` は `.agent/index.json` / `.agent/tree.json` に、少なくとも以下の deps 派生情報を含める:
+  - `sync` は `.agent/index*.json` / `.agent/tree*.json`（todo/all）に、少なくとも以下の deps 派生情報を含める:
     - issue: 既存の `status`（open/done/active 等）とは **別フィールド**で、依存起因の状態（例: `ready` / `blocked`）を判定できる
       - 例: `ready`（bool）と、blocked理由の summary（例: `blockers_summary` / `blockers_top`）
-    - issue: “依存している（merge 済み）issue” を機械的に扱える情報を保持できる（詳細は ADR で確定）
+    - issue: “依存している（merge 済み）issue” を機械的に扱える情報を保持できる
+      - 推移依存（closure）を含み、Done 依存は除外する（決定事項 D-004）
     - 依存グラフ（canonical issue edges）をツール/エージェントが機械判定できる形で保持（例: `index.json` のトップレベル `deps.issue_edges`）
   - `sync` は PlantUML の **Readyボード（矢印なしツリー）**を生成できる（initiative→epic→issue の階層をそのまま表示し、各 issue の READY/BLOCKED/DOING/DONE/UNKNOWN を明示）。
+    - 生成物は `tree*.puml`（todo/all）として扱う（TBD=Q-004）
+  - `sync` は PlantUML の **issue-only 依存グラフ**を生成できる（initiative/epic を除外し、issue のみで依存矢印を描く。todo/all）。
   - shorthand 依存の展開結果が空（依存先 epic/initiative に issue が無い）場合は **エラーにしない**（ブロックしない）。ただし「空だった」事実は warnings/summary として観測できる。
   - canonical issue グラフ上で **自己依存/循環依存（cycle）**を検出し、構造エラーとして止める（エラーは “どの deps.json のどの参照が原因か” を説明できる）。
   - Unknown（GitHub状態未取得/未リンク/取得漏れ等）は安全側（blocked）に倒し、warn code（例: `gh_fetch_failed`, `gh_index_incomplete`）を安定化する。
@@ -115,10 +118,10 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - 出力は決定的順序（ソート）にする（テストと差分レビューの安定性）
   - `sync --force` で継続する場合でも、deps 派生物が stale にならないように「無効化された」ことが観測できる
   - `deps.json` の `schema_version` は **1 のみ**（v2 は作らない。v1 を作り直す）
+  - 親→配下（descendant）依存は禁止（fail-fast）
 - Ask（迷ったら相談）:
-  - 親→配下（descendant）依存を許可するか/禁止するか（v2での扱い）
   - Readyボードに表示する情報量（blocked のブロッカーを何件までラベルに出すか）
-  - index/tree に載せる deps 派生フィールド（依存リストの粒度: 直接/推移/ブロッカー）をどう固定するか
+  - `sync` 生成物の観測点（`*-all.json` と todo の分割、PlantUML の命名）をどう固定するか
 - Never（絶対にしない）:
   - GitHub token や認証情報を出力/保存する
   - `meta.json` を deps の都合で書き換える
@@ -130,7 +133,7 @@ package "Dependency (DAG)\n(canonical issue graph)" {
 - 規模想定: initiative あたり issue は数十〜最大 ~100 程度（200/2000 規模は想定しない）
 
 ## 前提（Assumptions） (必須)
-- 依存の “完了” は主に GitHub issue state（OPEN/CLOSED）または `.agent/index.json` のスナップショットで判定できる
+- 依存の “完了” は主に GitHub issue state（OPEN/CLOSED）または `.agent/index*.json` のスナップショットで判定できる
 - `sync` は必要に応じて繰り返し実行され、派生物は上書きされる（git管理しない）
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
@@ -146,14 +149,14 @@ package "Dependency (DAG)\n(canonical issue graph)" {
 
 ## リスク/懸念（Risks） (任意)
 - R-001: shorthand 展開により依存エッジが増える（サイズ/可読性）
-  - 影響: `.agent/index.json` が肥大化、図が読めない
+  - 影響: `.agent/index-all.json` が肥大化、図が読めない
   - 対応: canonical edges はトップレベルに集約し、tree には summary のみ。図は Ready（矢印なし）を主、依存図は focus/集約を採用。
 - R-002: shorthand 展開で自己依存/循環が“暗黙に”発生する
   - 影響: 永久 blocked / `sync` 失敗
   - 対応: canonical issue グラフで cycle 検出し、原因（どの deps.json が生成したか）を出す
 - R-003: `sync --force` 時の stale（古い deps の誤用）
   - 影響: 図/JSONが古い deps を含み、誤判断する
-  - 対応: deps が無効な場合は `.agent/index.json`/`.agent/tree.json` 側でも “deps 無効” を明示し、古い deps を残さない
+  - 対応: deps が無効な場合は `.agent/index*.json`/`.agent/tree*.json` 側でも “deps 無効” を明示し、古い deps を残さない
 
 ## 受け入れ条件（観測可能な振る舞い） (必須)
 - AC-001:
@@ -161,16 +164,17 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Given: spec ツリーに `deps.json`（shorthand含む）が存在する
   - When: `./spec sync --github` を実行する
   - Then:
-    - `.agent/index.json` に canonical issue 依存（例: `deps.issue_edges`）が出力される
-    - `.agent/index.json` の issue ノードに `ready`（bool）と blockers summary が出力される
-    - `.agent/tree.json` の issue ノードにも `ready` と blockers summary が出力される（ビューとして）
-  - 観測点: `spec-dock/.agent/index.json` / `spec-dock/.agent/tree.json`
+    - `.agent/index-all.json` / `.agent/tree-all.json` が生成される（all）
+    - `.agent/index.json` / `.agent/tree.json` が生成される（todo = Done除外）
+    - index/tree（all/todo）の issue ノードに `ready`（bool）と blockers summary が出力される
+    - index（all/todo）のトップレベルに canonical issue 依存（例: `deps.issue_edges`）が出力される
+  - 観測点: `spec-dock/.agent/index.json` / `spec-dock/.agent/tree.json` / `spec-dock/.agent/index-all.json` / `spec-dock/.agent/tree-all.json`
 - AC-002:
   - Actor/Role: 開発者 / エージェント
   - Given: issue が `depends_on` に `epic-*` / `init-*` を含む（shorthand）
   - When: `deps check <issue>` または `sync` を実行する
   - Then: shorthand が展開され、最終的に issue→issue の依存として ready 判定される（epic/init 自体への依存としては残らない）
-  - 観測点: `deps check --json` 出力 / `.agent/index.json` の `deps.issue_edges`
+  - 観測点: `deps check --json` 出力 / `.agent/index*.json` の `deps.issue_edges`
 - AC-003:
   - Actor/Role: 開発者
   - Given: 依存先 epic/initiative に issue が1件も無い（空）
@@ -196,19 +200,25 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Given: deps 情報が解決できる（構造エラーなし）
   - When: `./spec sync` を実行する
   - Then: PlantUML の Readyボード（矢印なしツリー）が生成され、READY/BLOCKED/DOING/DONE/UNKNOWN がラベルで区別できる
-  - 観測点: `spec-dock/.agent/*.puml`（ファイル名は設計で確定）
+  - 観測点: `spec-dock/.agent/tree*.puml`（todo/all）
+- AC-011:
+  - Actor/Role: 開発者 / エージェント
+  - Given: deps 情報が解決できる（構造エラーなし）
+  - When: `./spec sync` を実行する
+  - Then: PlantUML の issue-only 依存グラフが生成され、READY/BLOCKED/DOING/DONE/UNKNOWN が色/ラベルで区別できる
+  - 観測点: `spec-dock/.agent/deps-issues*.puml`（todo/all。命名は ADR で確定）
 - AC-007:
   - Actor/Role: 開発者 / エージェント
   - Given: `--github` を指定していない
   - When: `deps check` / `active set` を実行する
-  - Then: GitHub へアクセスせず、可能なら `.agent/index.json` のスナップショットを用いて status を扱う（無い場合は unknown 扱い）
-  - 観測点: 実行ログ / `.agent/index.json` の有無による差分
+  - Then: GitHub へアクセスせず、可能なら `.agent/index*.json` のスナップショットを用いて status を扱う（無い場合は unknown 扱い）
+  - 観測点: 実行ログ / `.agent/index*.json` の有無による差分
 - AC-008:
   - Actor/Role: 開発者
   - Given: `--github` で `gh issue list` が一部の linked issue を含まない（`--gh-limit` 不足など）
   - When: `sync --github --gh-limit N` を実行する
   - Then: missing を unknown 扱いに倒しつつ `gh_index_incomplete` を warn できる
-  - 観測点: stderr warn / `.agent/index.json` の ready 判定（unknown=blocked）
+  - 観測点: stderr warn / `.agent/index*.json` の ready 判定（unknown=blocked）
 - AC-009:
   - Actor/Role: 開発者
   - Given: deps 構造エラー（cycle/未解決参照/スキーマ不正）がある
@@ -222,7 +232,7 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Then:
     - index/tree の更新は継続する（既存挙動）
     - deps 派生物は stale にならない（無効化/削除/`deps: null` 等で誤用防止できる）
-  - 観測点: `spec-dock/.agent/index.json` / `spec-dock/.agent/tree.json` / `.agent/*.puml`
+  - 観測点: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `.agent/*.puml`
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -272,33 +282,34 @@ package "Dependency (DAG)\n(canonical issue graph)" {
 ## 決定事項（確定 / ADR） (必須)
 - D-001: `deps.json` のスキーマは `schema_version=1` のまま作り直す（`schema_version=2` は作らない）
   - 参照: `spec-deps/current/adrs/adr-00001-deps-json-schema-version.md`
-- D-002: deps 派生状態（ready/blocked・ブロッカー等）は `.agent/index.json` / `.agent/tree.json` に統合する（issue のみ）
+- D-002: deps 派生状態（ready/blocked・ブロッカー等）は `.agent/index*.json` / `.agent/tree*.json` に統合する（issue のみ）
   - 参照: `spec-deps/current/adrs/adr-00002-derived-state-integration.md`
+- D-003: 親→配下（descendant）依存は禁止（fail-fast を維持）
+  - 参照: `spec-deps/current/adrs/adr-00003-descendant-dependency-policy.md`
+- D-004: index/tree の issue ノードは「推移依存（closure）を保持し、Done 依存は除外」する（Option C）
+  - 参照: `spec-deps/current/adrs/adr-00005-issue-deps-derived-fields.md`
+- D-005: index/tree を all と todo に分割し、todo をデフォルト観測点にする（`index-all.json` / `tree-all.json` を新設）
+  - 参照: `spec-deps/current/adrs/adr-00006-sync-artifacts-all-vs-todo.md`
 
 ## 未確定事項（TBD / 要確認） (必須)
-- Q-003:
-  - 質問: 親→配下（descendant）依存の扱いは v2 でも禁止でよいか？（例: initiative が配下 epic/issue を depends_on に含める）
-  - 選択肢:
-    - A: 禁止（構造エラーで fail-fast。v1踏襲）
-    - B: 許可（ただし compile 時に自己依存/循環を検出してエラー）
-  - 推奨案（暫定）: A（運用の落とし穴を減らす）
-  - 影響範囲: AC-002, EC-003/004（cycle/自己依存）
 - Q-004:
-  - 質問: Readyボード（矢印なしツリー）の生成物ファイル名/種類をどう固定するか？
+  - 質問: Readyボード（矢印なしツリー=tree）の生成物ファイル名/種類（todo/all）をどう固定するか？
   - 選択肢:
-    - A: 既存の `deps*.puml` に追加（例: `deps.ready.puml` / `deps.ready.todo.puml`）
-    - B: `tree*.puml` として deps から独立（例: `tree.ready.puml`）
-  - 推奨案（暫定）: A（deps機能の一部として集約）
+    - A: `tree.puml` / `tree-all.puml`（推奨。`tree.json` / `tree-all.json` と対応）
+    - B: `ready.puml` / `ready-all.puml`（board専用名）
+    - C: 1ファイルのみ（todo-only か all のみ）
+  - 推奨案（暫定）: A（観測点が `tree` に寄り、迷いにくい）
   - 影響範囲: AC-006（生成物の観測点）
-- Q-005:
-  - 質問: index/tree の issue ノードに載せる deps 派生フィールド（依存リストの粒度: 直接/推移/ブロッカー）をどう固定するか？
+  - 参照: `spec-deps/current/adrs/adr-00004-ready-board-artifact-naming.md`
+- Q-006:
+  - 質問: issue-only 依存グラフ（PlantUML）の生成物（全体/フォーカス、矢印方向、命名）をどう固定するか？
   - 選択肢:
-    - A: ブロッカーのみ（未完了/unknown の依存 issue を列挙）
-    - B: 直接依存 + ブロッカー（推移依存は `deps.issue_edges` から計算）
-    - C: 推移依存（closure）+ ブロッカー（Done 依存は除外）
-  - 推奨案（暫定）: B（index/tree は “判断に必要な最小” を載せ、詳細はグラフから計算できるようにする）
-  - 影響範囲: AC-001（index/tree のスキーマ）, `deps check --json`（出力設計）, Readyボードのラベル表示
-  - 参照: `spec-deps/current/adrs/adr-00005-issue-deps-derived-fields.md`
+    - A: 全体（todo/all）のみ生成
+    - B: フォーカス（指定 issue の上流のみ）だけ生成（コマンドで生成）
+    - C: 全体 + フォーカス（推奨候補）
+  - 推奨案（暫定）: C（毛玉化してもフォーカスで回避できる）
+  - 影響範囲: AC-011（生成物の観測点）, `deps check` / `sync` の UX
+  - 参照: `spec-deps/current/adrs/adr-00007-issue-only-deps-visualization.md`
 
 ## Definition of Ready（着手可能条件） (必須)
 - [ ] 目的が 1〜3行で明確になっている

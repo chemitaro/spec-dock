@@ -4,7 +4,7 @@ ID: "ADR-00004"
 タイトル: "Readyボード（矢印なしツリー）の生成物: ファイル名・形式・表示情報"
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-02-28"
+最終更新: "2026-03-01"
 親: ["iss-00010"]
 ---
 
@@ -19,6 +19,9 @@ ID: "ADR-00004"
 Readyボードは「依存矢印を描かない」代わりに、ツリー上で **READY/BLOCKED/DOING/DONE/UNKNOWN** を明示して、  
 “次にやれる issue” を一目で見つけることを目的とします。
 
+ただし、運用上は Readyボードは「tree（包含ツリー）に状態ラベルを付けたもの」とほぼ同義であり、  
+別名の生成物を増やすより **tree 系の生成物として揃える**方が混乱が少ないです。
+
 この機能を運用で確実に使うためには:
 - 生成物の **ファイル名**（観測点）
 - PlantUML の **図形式**（WBS/mindmap/dot など）
@@ -31,24 +34,23 @@ Readyボードは「依存矢印を描かない」代わりに、ツリー上で
 left to right direction
 skinparam shadowing false
 
-rectangle ".agent/index.json" as I
-rectangle ".agent/tree.json" as T
-rectangle ".agent/deps.ready.puml" as R
-rectangle ".agent/deps.ready.todo.puml" as Rt
+rectangle ".agent/tree-all.json" as TAll
+rectangle ".agent/tree.json\n(todo-only)" as TTodo
+rectangle ".agent/tree-all.puml" as PAll
+rectangle ".agent/tree.puml\n(todo-only)" as PTodo
 
-I --> T : tree view
-I --> R : Ready board
-I --> Rt : Ready board\n(done excluded)
+TAll --> PAll : render tree board (all)
+TTodo --> PTodo : render tree board (todo)
 @enduml
 ```
 
 ## 選択肢（Options considered） (必須)
 
-### Option A: `deps.*` 配下として固定（推奨）
+### Option A: `tree*.puml` として固定（推奨）
 概要:
-- Readyボードを deps 機能の成果物として扱い、以下を生成する。
-  - `spec-dock/.agent/deps.ready.puml`（全体）
-  - `spec-dock/.agent/deps.ready.todo.puml`（Done除外）
+- Readyボードを tree 表示の成果物として扱い、以下を生成する。
+  - `spec-dock/.agent/tree-all.puml`（全体 / all）
+  - `spec-dock/.agent/tree.puml`（Done除外 / todo）
 - 図形式は `@startwbs` を基本とし、包含ツリー（initiative→epic→issue）をそのまま表現する。
 
 例（イメージ）:
@@ -65,27 +67,27 @@ I --> Rt : Ready board\n(done excluded)
 ```
 
 Pros:
-- deps 機能の出力としてまとまりが良い（既存 `deps.puml` / `deps.todo.puml` と並ぶ）。
-- 観測点（パス）が分かりやすく、ドキュメント化しやすい。
+- Readyボード＝tree の拡張、という直感に一致する（名称が迷子にならない）。
+- `.agent/tree*.json`（all/todo）と対応が取れ、運用の観測点が固定できる。
 
 Cons:
-- “deps の PlantUML は矢印がある” という先入観があると、最初は戸惑う可能性がある。
+- deps 由来の状態（ready/blocked）であることを docs で明示する必要がある。
 
-### Option B: `tree.*` として deps から独立
+### Option B: `ready*.puml` として独立（board専用名）
 概要:
-- Readyボードを “ツリー表示の拡張” として扱い、以下のような命名にする。
-  - `spec-dock/.agent/tree.ready.puml`
-  - `spec-dock/.agent/tree.ready.todo.puml`
+- Readyボードを board 専用名として扱い、以下を生成する。
+  - `spec-dock/.agent/ready-all.puml`
+  - `spec-dock/.agent/ready.puml`（todo）
 
 Pros:
-- 「矢印なし=ツリー」という直感に合う。
+- Ready 目的が名前から明確（board専用）。
 
 Cons:
-- deps の状態（ready/blocked）を tree 側に寄せるため、概念上の境界がやや曖昧になる（“depsの結果だがtree名”）。
+- tree と “ほぼ同義の図” が別名で増え、観測点が散る可能性がある。
 
 ### Option C: 1ファイルのみ（todo-onlyのみ等）に絞る
 概要:
-- `deps.ready.puml` のみ（Doneも含める）/ もしくは todo-only のみ、のように生成物を減らす。
+- `tree.puml` のみ（todo-only）に絞る、または `tree-all.puml` のみ（all）に絞る、のように生成物を減らす。
 
 Pros:
 - 生成物が少なくシンプル。
@@ -105,11 +107,11 @@ Readyボードは “見ただけで判断できる” ことが最重要なの�
 
 ## 判断理由（Rationale） (必須)
 このADRは「結論未決」です。  
-ただし、現時点の暫定推奨は **Option A（`deps.ready*.puml`）** です。
+ただし、現時点の暫定推奨は **Option A（`tree*.puml`）** です。
 
 推奨理由（暫定）:
-- Readyボードは “deps の結果（ready/blocked）” なので、deps 出力としてまとまっている方が運用上迷いにくい。
-- `deps.puml`（矢印あり）と `deps.ready.puml`（矢印なし）をペアで扱うと、「順序（DAG）」と「次にやる（Ready）」を行き来しやすい。
+- Readyボードは tree と同義に扱う方が、運用の観測点が固定され、multi-agent も迷いにくい。
+- `.agent/tree*.json`（all/todo）と `.agent/tree*.puml` をペアにすると、JSON と図を行き来しやすい。
 
 ## 影響（Consequences） (必須)
 Positive（良い点）:
@@ -126,4 +128,3 @@ Negative / Debt（悪い点 / 将来負債）:
 ## 参考（References） (任意)
 - `spec-deps/current/requirement.md`（Q-004 / AC-006）
 - `spec-deps/current/artifacts/deps-best-practice-issue-normalization.md`
-

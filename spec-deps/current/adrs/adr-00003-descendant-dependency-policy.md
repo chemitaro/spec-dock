@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "ADR-00003"
 タイトル: "descendant（親→配下）依存の扱い: 禁止（fail-fast）を維持するか"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-03-01"
 親: ["iss-00010"]
@@ -11,9 +11,9 @@ ID: "ADR-00003"
 # ADR-00003 descendant（親→配下）依存の扱い: 禁止（fail-fast）を維持するか
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR はディスカッションのために作成しました。結論はユーザーが最終決定した後に更新します。
-- 決定（決定後に記入）:
-  - ...
+- 決定: **Option A（descendant 依存は禁止を維持 / fail-fast）**
+  - 「宣言元ノードの subtree（配下）にある node id」を `depends_on` に含めることは構造エラーにする（v1 踏襲）。
+  - shorthand 展開（compile）により self-edge/cycle が生まれるケースも、原因となる参照を示して fail-fast する。
 
 ## 背景（Context） (必須)
 deps v2 は shorthand（initiative/epic 参照）を **issue→issue** へ展開します。  
@@ -94,12 +94,8 @@ Cons:
 - 実質的には descendant 参照がほぼ self-edge を生むため、許可しても多くがエラーになり得る（混乱しやすい）。
 
 ## 判断理由（Rationale） (必須)
-このADRは「結論未決」です。  
-ただし、現時点の暫定推奨は **Option A（禁止維持）** です。
-
-推奨理由（暫定）:
-- “一目瞭然” を支えるのは、まず **運用事故を起こさない単純ルール** です。
-- gate issue パターンは別の表現（issue→issue 明示 or 外出し）で代替できます。
+“一目瞭然” を支えるのは、まず **運用事故を起こさない単純ルール** です。  
+手動テストでも「親依存マージにより自己循環が起きる」事例が確認されているため、v2 でも禁止を維持します。
 
 ## 影響（Consequences） (必須)
 Positive（良い点）:
@@ -117,6 +113,6 @@ Negative / Debt（悪い点 / 将来負債）:
 - Option A は v1 と整合しやすい。
 
 ## 参考（References） (任意)
-- `spec-deps/current/requirement.md`（Q-003 / EC-003 / EC-004）
+- `spec-deps/current/requirement.md`（決定事項 D-003 / EC-003 / EC-004）
 - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`（現行の禁止ルール）
 - `spec-deps/current/artifacts/deps-best-practice-issue-normalization.md`
