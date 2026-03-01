@@ -3,7 +3,7 @@
 ID: "iss-00010"
 タイトル: "deps v2: shorthand 依存（initiative/epic）を issue 依存へ還元し、Readyボード（矢印なしツリー）で一目瞭然にする"
 関連GitHub: ["TBD"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-01"
 依存: ["requirement.md"]
@@ -42,13 +42,13 @@ ID: "iss-00010"
   - tests: `tests/test_cli.py`（runtime script の生成物や挙動を回帰で担保）
 - 観測した現状（事実）:
   - `sync` は `.agent/index.json` / `.agent/tree.json`（schema_version=2）を生成する（現状は **all 相当**）。
-  - deps v1 はノード直下の `deps.json` をロードし、`deps check` / `sync` が `.agent/deps.json` と `deps.puml` / `deps.todo.puml` を生成する。
+  - deps v1 はノード直下の `deps.json` をロードし、`deps check` / `sync` が `.agent/deps.json` と `.agent/deps.puml` / `.agent/deps.todo.puml` を生成する。
   - deps v1 の可視化は “包含（initiative/epic/issue）” と “依存（矢印）” が混在し、Ready/Blocked の直感が崩れやすい。
   - `--github` を付けない場合、`.agent/index.json` のスナップショットから issue の `status` を best-effort で読み、unknown を補う。
 - 採用するパターン:
   - 依存の入力は `deps.json` に集約し、派生SSOTを増やさない（派生の主観測点は `index*.json`）。
   - 決定的順序（既存の `sort_key()` の方針に準拠）。
-  - `sync --force` は index/tree の更新を継続しつつ、deps派生物の stale 誤用を防ぐ（削除 or 無効プレースホルダ）。
+  - `sync --force` は index/tree の更新を継続しつつ、deps派生物の stale 誤用を防ぐ（無効プレースホルダで上書き）。
 - 採用しない/変更しない:
   - GUI/TUI は追加しない（生成物 + CLI で完結）。
   - PlantUML を “機械判定の正” にしない（JSON を正とする）。
@@ -128,10 +128,12 @@ Todo -> Dashboard: render summary
 - 内部表現（実装都合）:
   - `depends_on_edges`: `dict[issue_id, set[issue_id]]`（dependent -> prerequisites）
 - 出力表現（観測点: `index*.json`）:
-  - `deps.issue_edges`: `list[{\"from\": <issue_id>, \"to\": <issue_id>, \"kind\": \"blocks\"}]`
-    - 方向: **prerequisite -> dependent**（blocks edge）
-    - 理由: 図・JSON で「上が空いている=着手可能」の直感に寄せる（ADR-00007）
-    - 備考: `depends_on` 方向（dependent->prereq）は内部で保持し、出力時に反転できる
+  - `deps.issue_edges`: `list[{\"from\": <issue_id>, \"to\": <issue_id>, \"kind\": \"depends_on\"}]`
+    - 方向: **dependent -> prerequisite**（depends_on edge）
+    - 理由: 要件の語彙（depends_on）と一致し、エージェントが `issue -> prerequisites` を素直に辿れるため（機械判定の正は JSON）
+    - 備考:
+      - PlantUML（`deps-issues.puml`）では見やすさのため **反転して描画**する（prereq -> dependent / blocks 表示。ADR-00007）
+      - `depends_on_edges` は内部で保持し、描画時に反転できる
 
 ### MODEL-003: issue の派生 deps（`index*.json` / `tree*.json`）
 - issue ノードに追加するフィールド（例）:
@@ -162,11 +164,11 @@ Todo -> Dashboard: render summary
   "root": "spec-dock/initiatives",
   "active": { /* active.json と同型 */ },
   "warnings": ["gh_fetch_failed", "gh_index_incomplete", "deps_ref_expanded_to_empty"],
-  "deps": {
-    "valid": true,
-    "issue_edges": [{ "from": "iss-00001", "to": "iss-00002" }],
-    "edge_direction": "blocks (prereq -> dependent)"
-  },
+	  "deps": {
+	    "valid": true,
+	    "issue_edges": [{ "from": "iss-00001", "to": "iss-00002", "kind": "depends_on" }],
+	    "edge_direction": "depends_on (dependent -> prerequisite)"
+	  },
   "nodes": {
     "iss-00001": {
       "type": "issue",
@@ -189,13 +191,19 @@ Todo -> Dashboard: render summary
 ```
 
 #### `spec-dock/.agent/index.json`（todo = Done issue 除外）
-- `index-all.json` から “Done issue のみ” を除外した投影。
+- `index-all.json` から以下を除外した投影（todo 観測点）:
+  - `status=="done"` の issue
+  - 配下に todo issue が 1件も残らない epic/initiative（MODEL-005 と同一）
 - `deps.issue_edges` も todo-only にフィルタする（from/to が双方とも todo issue の edge のみ残す）。
+- `index.json` と `tree.json` のノード集合（todo 集合）は一致させる（参照先により判断がぶれないため）。
 
 #### `spec-dock/.agent/tree-all.json` / `tree.json`
 - `tree*.json` は `index*.json` のビュー（投影）であり、追加情報は持たせない（同じ node item をネストした形）。
 
 #### `spec-dock/.agent/deps-issues.json`（todo-only / issue-only）
+- `deps-issues.json` は `index.json`（todo）の issue だけを抜き出した投影（epic/initiative は含めない）。
+- `nodes` の集合は **`index.json` に含まれる todo issue 全件**と一致させる（孤立 issue を落とさない）。
+- `edges` は todo issue 間の canonical issue 依存（depends_on edge）を載せる（端点が todo issue のもののみ）。
 ```jsonc
 {
   "schema_version": 1,
@@ -213,10 +221,10 @@ Todo -> Dashboard: render summary
       "state": "doing|ready|blocked|unknown"
     }
   },
-  "edges": [{ "from": "iss-00010", "to": "iss-00020" }],
-  "edge_direction": "blocks (prereq -> dependent)"
-}
-```
+	  "edges": [{ "from": "iss-00010", "to": "iss-00020" }],
+	  "edge_direction": "depends_on (dependent -> prerequisite)"
+	}
+	```
 
 #### `spec-dock/.agent/dashboard.md`（todo-only）
 - 少なくとも以下を含める:
@@ -229,12 +237,23 @@ Todo -> Dashboard: render summary
 - “Done” 判定は issue の `status=="done"` のみで行う（epic/initiative は progress で集計するが、todo 生成の除外判定には使わない）。
 - todo 投影で除外するもの:
   - issue: `status=="done"` のもの
-  - epic/initiative: 配下に todo issue が 1件も残らない場合は、tree から除外する（ノイズ削減）。ただし `index.json` からは除外せず、`tree.json` 側のみの最適化とする。
+  - epic/initiative: 配下に todo issue が 1件も残らない場合は、`index.json` / `tree.json` の双方から除外する（todo 集合を一致させる）。
+    - `index-all.json` / `tree-all.json` には残る（監査/完了済み含むビュー）。
 
 ### MODEL-006: deps 無効（`sync --force`）の扱い
 - `deps.valid=false` を `index*.json` に明示する（例: `deps: { \"valid\": false, \"error\": \"...\" }`）。
-- `tree*.puml` / `deps-issues.*` / `dashboard.md` は stale を残さない:
-  - 削除する、または “deps 無効” のプレースホルダで上書きする（どちらかに統一する）
+- `sync --force` により deps が無効になった場合でも、MUST 生成物は **無効プレースホルダで上書き**して stale を残さない（ファイルの存在契約を安定化する）。
+  - `.agent/index*.json` / `.agent/tree*.json`:
+    - トップレベル `deps.valid=false` と `deps.error` を必ず出力する
+    - `deps.valid=false` のときは `deps.issue_edges=[]`（空配列）を必ず出力し、直前実行の stale edge を残さない
+    - issue ノードの `deps` は `null` を許容し、ready/closure を未計算として表現する（`deps.valid=true` のときのみ `deps.ready` 等が必須）
+  - `.agent/tree*.puml`:
+    - ヘッダに `DEPS_DISABLED` の note を表示する
+    - issue の state は `done/doing/unknown` のみを用いる（ready/blocked は出さない）
+  - `.agent/deps-issues.json` / `.agent/deps-issues.puml`:
+    - `deps.valid=false` と error 要約のみを出し、`nodes/edges` は空で上書きする
+  - `.agent/dashboard.md`:
+    - `DEPS_DISABLED` と error 要約のみを出し、利用者が誤解しないよう「ready/blocked 集計は無効」と明記する
 
 ### UML（任意） (任意)
 ```plantuml
@@ -279,22 +298,31 @@ package "Derived (index/tree)" {
 - CLI-001: `sync [--github] [--gh-limit N] [--force]`
   - Success:
     - `.agent/index-all.json`, `.agent/tree-all.json`, `.agent/index.json`, `.agent/tree.json` を生成
-    - deps が有効なら `.agent/tree*.puml`, `.agent/deps-issues.{json,puml}`, `.agent/dashboard.md` を生成
+    - `.agent/tree*.puml`, `.agent/deps-issues.{json,puml}`, `.agent/dashboard.md` を生成（deps 無効時はプレースホルダで上書き）
   - Failure:
-    - deps の構造エラー（未解決参照/self/cycle 等）は exit=1（`--force` なら継続し、deps派生物は無効化）
+    - deps の構造エラー（未解決参照/self/cycle 等）は exit=1（`--force` なら exit=0 で継続し、deps派生物は無効化プレースホルダにする）
 - CLI-002: `deps check <target> [--github] [--gh-limit N] [--json]`
   - Success:
     - exit=0（ready） / exit=3（blocked）
-    - `--json` は `ready`, `blockers`, `effective_depends_on`（closure）を返す
+    - `--json` は `ready`, `blockers`, `effective_depends_on`（closure）, `warnings` を返す（warnings は空配列を含め常に出す）
   - Failure:
     - deps の構造エラーは exit=1（原因と provenance を出す）
+- CLI-003: `active set <target> [--github] [--gh-limit N] [--force]`
+  - Success:
+    - exit=0
+    - `spec-dock/.agent/active.json` が更新される
+    - blocked な target でも `--force` があれば警告（blockers）付きで更新する
+  - Failure:
+    - deps guard により blocked の target は exit=1（`--force` が無い場合）
+    - このとき `spec-dock/.agent/active.json` は更新しない
 
 ### 関数・クラス境界（重要なものだけ）
-- IF-001: `spec-dock::_compile_issue_graph(nodes) -> (depends_on_edges, blocks_edges, warnings, provenance)`
+- IF-001: `spec-dock::_compile_issue_graph(nodes) -> (depends_on_edges, warnings, provenance)`
   - Input: `_Node` map + `deps.json`
   - Output:
     - internal: `depends_on_edges`（dependent->prereq）
-    - output: `blocks_edges`（prereq->dependent）を生成物に載せる
+    - output: `deps.issue_edges` は depends_on edge（dependent->prereq）として生成物に載せる
+    - view: PlantUML 描画では blocks edge（prereq->dependent）へ反転して描画できる（ADR-00007）
   - Errors: unresolved ref / descendant / self / cycle
 - IF-002: `spec-dock::_derive_issue_deps(nodes, issue_status_by_id, depends_on_edges) -> per_issue_deps`
   - Output: `ready`, `depends_on(closure, Done除外)` 等
@@ -355,6 +383,15 @@ Scan --> Compile --> Validate --> Enrich --> Derive --> Emit
 - WARN-001: `deps_ref_expanded_to_empty`
   - 発生条件: `epic/init` shorthand の展開が空（配下 issue=0）
   - 返し方: warnings に追加（ブロックしない）
+- WARN-002: `gh_fetch_failed`
+  - 発生条件: `--github` 時に GitHub 取得（`gh`）が失敗
+  - 返し方: warnings に追加し、該当 issue は `status=unknown` として安全側（blocked）に倒す
+- WARN-003: `gh_index_incomplete`
+  - 発生条件: `--github` 時に `--gh-limit` 等により linked issue の一部が取得できない
+  - 返し方: warnings に追加し、missing は `status=unknown` として安全側（blocked）に倒す
+- WARN-004: `deps_preflight_failed`
+  - 発生条件: `sync --force` で deps の構造エラーを検出し、deps を無効化して継続
+  - 返し方: warnings に追加し、deps 派生物は無効プレースホルダで上書きする（MODEL-006）
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
@@ -363,40 +400,56 @@ Scan --> Compile --> Validate --> Enrich --> Derive --> Emit
   - `src/spec_dock/assets/spec_dock/scripts/spec-dock`
     - `sync` の生成物を v2（index/tree all/todo + tree puml + deps-issues.* + dashboard）へ更新
     - deps compile を “issue→issue へ還元” するロジックに置換
-    - legacy: `.agent/deps.json` / `deps.puml` / `deps.todo.puml` の生成を廃止（または互換モードで無効化）
+    - legacy: `.agent/deps.json` / `.agent/deps.puml` / `.agent/deps.todo.puml` の生成を廃止し、`sync` 実行時に存在していれば削除する（stale 誤読防止）
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md` / `reference_deps.md`
     - v2 の生成物と意味を反映（実装と同時に更新）
   - `tests/test_cli.py`
     - `sync` の生成物/スキーマ変更に追従
     - `deps check` / `active set` guard / `sync --force` の境界を回帰で担保
 - 削除（Delete）:
-  - （実装で `.agent/deps*` を “出力しない” にする。ファイル自体は生成物なので repo から削除対象は無し）
+  - （なし。legacy の削除は runtime output（`spec-dock/.agent/`）側で行う）
 - 参照（Read only）:
   - `spec-deps/current/requirement.md`
   - `spec-deps/current/adrs/*.md`
 
 ## マッピング（要件 → 設計） (必須)
 - AC-001 → `_sync()` / `index-*.json` / `tree-*.json`（`src/spec_dock/assets/spec_dock/scripts/spec-dock`）
+- AC-004/005 → `active set` の deps guard（同上）
 - AC-006 → `tree(-all).puml` render（同上）
 - AC-011/012 → `deps-issues.{json,puml}`（同上）
 - AC-013 → `dashboard.md`（同上）
 - AC-002/003/009 → deps compile/validate（同上）
 - AC-007/008 → `--github` と snapshot/cached status（同上）
+- AC-010 → `sync --force` の deps 無効化・stale 防止（同上）
 - EC-001..004 → deps.json schema / unresolved / self / cycle（同上）
+- EC-005 → `gh` 失敗時の warn + unknown=blocked（同上）
 - 非交渉制約（stdlib only / GH更新しない）→ runtime script 内の実装制約として維持
 
 ## テスト戦略（最低限ここまで具体化） (任意)
 - 追加/更新するテスト（すべて `python -m unittest discover -v` で回す）:
   - `tests/test_cli.py` を拡張し、temp repo 上で runtime `spec-dock/scripts/spec-dock` を実行して成果物を検証する。
+  - `generated_at` / `run_id` などの非決定値は “存在と形式” のみを検証し、値一致のアサートはしない（フレーク防止）。
+  - “決定的順序” の担保として、配列フィールド（`warnings`, `deps.issue_edges`, `deps.depends_on`, `deps.blockers_top` 等）が安定ソートされることをテストで検証する。
 - どのAC/ECをどのテストで保証するか（案）:
   - AC-001 → `test_sync_emits_index_all_and_todo_views_and_contains_deps_fields`（新規）
+  - AC-002 → `test_deps_check_expands_shorthand_to_issue_edges`（新規）
+  - AC-003 → `test_deps_check_warnings_include_expanded_to_empty`（新規）
+  - AC-003 → `test_sync_warnings_include_expanded_to_empty`（新規）
+  - AC-004 → `test_active_set_is_blocked_when_deps_not_ready`（新規）
+  - AC-005 → `test_active_set_force_overrides_deps_guard`（新規）
   - AC-006 → `test_sync_emits_tree_puml_ready_board`（新規）
+  - AC-007 → `test_sync_without_github_uses_index_snapshot_for_status`（新規/更新）
+  - AC-008 → `test_sync_github_limit_warns_incomplete_and_unknown_blocks`（新規）
+  - AC-009 → `test_sync_fails_on_deps_structural_error_without_force`（新規）
   - AC-011/012 → `test_sync_emits_deps_issues_json_and_puml_todo_only`（新規）
   - AC-013 → `test_sync_emits_dashboard_md`（新規）
+  - AC-010 → `test_sync_force_sets_deps_valid_false_and_emits_placeholders`（新規/更新）
+  - AC-010 → `test_sync_force_removes_legacy_deps_artifacts`（新規）
+  - 決定的順序 → `test_sync_outputs_are_deterministically_sorted`（新規）
   - EC-001 → `test_deps_json_schema_version_must_be_1`（新規）
   - EC-002 → `test_deps_unresolved_ref_is_error`（新規）
   - EC-003/004 → `test_deps_self_edge_and_cycle_are_errors`（新規）
-  - AC-010 → `test_sync_force_disables_deps_outputs_and_avoids_stale`（更新/新規）
+  - EC-005 → `test_github_fetch_failed_warns_and_unknown_blocks`（新規）
 
 ### テストマトリクス（AC/EC → テスト） (任意)
 - 実行コマンド:
@@ -408,7 +461,7 @@ Scan --> Compile --> Validate --> Enrich --> Derive --> Emit
 - R-002: shorthand 展開で自己依存/循環が暗黙に生まれる
   - 対応: compile 後の canonical issue グラフで fail-fast（`--force` は deps 無効化で継続）
 - R-003: `sync --force` 時の stale 誤用
-  - 対応: deps 派生物を削除 or 無効プレースホルダで上書きし、`index*.json` に `deps.valid=false` を明示する
+  - 対応: deps 派生物を無効プレースホルダで上書きし、`index*.json` に `deps.valid=false` を明示する
 
 ## 未確定事項（TBD） (必須)
 - 該当なし（本設計の論点は ADR 群で確定済み）
