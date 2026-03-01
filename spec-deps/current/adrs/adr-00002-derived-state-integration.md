@@ -2,18 +2,20 @@
 種別: ADR（Architecture Decision Record）
 ID: "ADR-00002"
 タイトル: "deps 派生状態の置き場所: index/tree に統合するか、.agent/deps.json を維持するか"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
-最終更新: "2026-02-28"
+最終更新: "2026-03-01"
 親: ["iss-00010"]
 ---
 
 # ADR-00002 deps 派生状態の置き場所: index/tree に統合するか、.agent/deps.json を維持するか
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR はディスカッションのために作成しました。結論はユーザーが最終決定した後に更新します。
-- 決定（決定後に記入）:
-  - ...
+- 決定: **Option A（`.agent/index.json` / `.agent/tree.json` に統合）**
+  - 依存宣言の SSOT は **per-node `deps.json` を維持**する（`meta.json` に埋め込まない）。
+  - `sync` が生成する派生状態（Ready/Blocked 判定、ブロッカー、依存サマリ）は、**`.agent/index.json` / `.agent/tree.json` の issue ノードに統合**する。
+    - epic/initiative には “blocked/ready” のステータスは持たせない（issue 正規化の前提）。
+  - `.agent/deps.json` を“別の管理SSOT”として増やさない（必要なら debug 用の補助出力に留め、運用の観測点は index/tree に寄せる）。
 
 ## 背景（Context） (必須)
 deps v2 では、Readyボード（矢印なしツリー）を中心に「今できる/できない」を一目で判断できる状態を作ります。  
@@ -27,6 +29,7 @@ deps v2 では、Readyボード（矢印なしツリー）を中心に「今で�
 
 ユーザー要望（背景）:
 - “新しい管理の仕組み” を増やすより、可能なら **既存の index/tree を richer にして管理したい**。
+- 依存関係の入力は `deps.json` に分離したまま、index/tree で “今取り組めるか（blocked/ready）” を判断できるようにしたい。
 
 論点:
 - 依存グラフ（canonical issue edges）はサイズが大きくなり得る。
@@ -95,6 +98,8 @@ Pros:
 Cons:
 - “状態が散らばる” ため、利用者が複数ファイルを読む必要がある。
 - 「新しい管理を増やしたくない」という要望に反する（ファイルが増える）。
+棄却理由:
+- ユーザー決定により、「依存の派生状態は index/tree に統合して判断したい」方針が確定したため。
 
 ### Option C: ハイブリッド（deps.json 維持 + index/tree に summary も載せる）
 概要:
@@ -106,21 +111,20 @@ Pros:
 Cons:
 - 二重管理に見え、矛盾/誤用（stale）が発生しやすい。
 - “どっちが正か” の運用説明が必要になる。
+棄却理由:
+- “見る場所を1つに寄せる” 目的に対して、ハイブリッドは説明コストと stale リスクが増えるため。
 
 ## 判断理由（Rationale） (必須)
-このADRは「結論未決」です。  
-ただし、現時点の暫定推奨は **Option A（統合）** です。
-
-推奨理由（暫定）:
-- Readyボード（矢印なしツリー）を中心に運用するなら、tree/index に `ready` が載っていることが最も自然です。
-- `.agent/deps.json` を主戦場にすると、「見る場所が増える」問題が残りやすいです。
+Readyボード（矢印なしツリー）を中心に運用するなら、tree/index に `ready/blocked`（および blockers）が載っていることが最も自然です。  
+`.agent/deps.json` を主戦場にすると、「見る場所が増える」問題が残りやすいため、統合を選びます。
 
 ## 影響（Consequences） (必須)
 Positive（良い点）:
-- Option A なら、エージェント/人間が参照する JSON が集約され、判断が速い。
+- エージェント/人間が参照する JSON が集約され、判断が速い。
+- “依存の入力（deps.json）” と “派生状態（index/tree）” の役割分担が明確になる。
 
 Negative / Debt（悪い点 / 将来負債）:
-- Option A はスキーマ変更を伴うため、既存利用者がいる場合は周知が必要。
+- index/tree のスキーマ変更を伴うため、既存利用者がいる場合は周知が必要。
 
 影響範囲（コード/テスト/運用/データ）:
 - runtime: `_sync()` の index/tree の schema 拡張、`--force` 時の無効化表現
@@ -128,10 +132,9 @@ Negative / Debt（悪い点 / 将来負債）:
 - tests: `sync --force` の “stale防止” 回帰
 
 移行/ロールバック:
-- Option A を採用しつつ、一定期間 `.agent/deps.json` を互換出力として残す案もある（ただし追加コストあり）。
+- `.agent/deps.json` を互換出力として残す場合は、二重管理に見えないよう「debug用途」である旨を明記する必要がある。
 
 ## 参考（References） (任意)
-- `spec-deps/current/requirement.md`（Q-002 / AC-001 / AC-010）
+- `spec-deps/current/requirement.md`（決定事項 D-002 / AC-001 / AC-010）
 - `spec-deps/current/artifacts/deps-best-practice-issue-normalization.md`
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock`（`_sync()` / deps preflight と削除ロジック）
-

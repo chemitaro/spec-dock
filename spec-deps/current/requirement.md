@@ -5,7 +5,7 @@ ID: "iss-00010"
 関連GitHub: ["TBD"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-02-28"
+最終更新: "2026-03-01"
 親: []
 ---
 
@@ -92,7 +92,9 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - `deps check <target>`（既存）で、canonical 依存に基づく `ready/blocked` とブロッカーを判定できる（`--github` / `--json` を含む）。
   - `active set <target>` は canonical 依存に基づいてガードされ、blocked の場合はデフォルトで失敗し active を更新しない（`--force` でのみ例外化）。
   - `sync` は `.agent/index.json` / `.agent/tree.json` に、少なくとも以下の deps 派生情報を含める:
-    - issue: `ready`（bool）と、blocked理由の summary（例: `blockers_summary` / `blockers_top`）
+    - issue: 既存の `status`（open/done/active 等）とは **別フィールド**で、依存起因の状態（例: `ready` / `blocked`）を判定できる
+      - 例: `ready`（bool）と、blocked理由の summary（例: `blockers_summary` / `blockers_top`）
+    - issue: “依存している（merge 済み）issue” を機械的に扱える情報を保持できる（詳細は ADR で確定）
     - 依存グラフ（canonical issue edges）をツール/エージェントが機械判定できる形で保持（例: `index.json` のトップレベル `deps.issue_edges`）
   - `sync` は PlantUML の **Readyボード（矢印なしツリー）**を生成できる（initiative→epic→issue の階層をそのまま表示し、各 issue の READY/BLOCKED/DOING/DONE/UNKNOWN を明示）。
   - shorthand 依存の展開結果が空（依存先 epic/initiative に issue が無い）場合は **エラーにしない**（ブロックしない）。ただし「空だった」事実は warnings/summary として観測できる。
@@ -112,10 +114,11 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - unknown は blocked（安全側）に倒す
   - 出力は決定的順序（ソート）にする（テストと差分レビューの安定性）
   - `sync --force` で継続する場合でも、deps 派生物が stale にならないように「無効化された」ことが観測できる
+  - `deps.json` の `schema_version` は **1 のみ**（v2 は作らない。v1 を作り直す）
 - Ask（迷ったら相談）:
-  - `deps.json` のスキーマを v2（フィールド分割）へ上げるかどうか
   - 親→配下（descendant）依存を許可するか/禁止するか（v2での扱い）
   - Readyボードに表示する情報量（blocked のブロッカーを何件までラベルに出すか）
+  - index/tree に載せる deps 派生フィールド（依存リストの粒度: 直接/推移/ブロッカー）をどう固定するか
 - Never（絶対にしない）:
   - GitHub token や認証情報を出力/保存する
   - `meta.json` を deps の都合で書き換える
@@ -266,21 +269,13 @@ package "Dependency (DAG)\n(canonical issue graph)" {
 - TERM-004: Blocked = canonical 依存に未解決（open/unknown/cycle）があり着手できない状態
 - TERM-005: Readyボード = 矢印なしで包含ツリーを表示し、READY/BLOCKED 等をラベル/色で見せる図
 
+## 決定事項（確定 / ADR） (必須)
+- D-001: `deps.json` のスキーマは `schema_version=1` のまま作り直す（`schema_version=2` は作らない）
+  - 参照: `spec-deps/current/adrs/adr-00001-deps-json-schema-version.md`
+- D-002: deps 派生状態（ready/blocked・ブロッカー等）は `.agent/index.json` / `.agent/tree.json` に統合する（issue のみ）
+  - 参照: `spec-deps/current/adrs/adr-00002-derived-state-integration.md`
+
 ## 未確定事項（TBD / 要確認） (必須)
-- Q-001:
-  - 質問: `deps.json` のスキーマは v1（`depends_on:[]`）のまま継続するか、v2（フィールド分割）へ上げるか？
-  - 選択肢:
-    - A: v1 継続（`depends_on` に id/番号を混在）
-    - B: v2 で分割（`depends_on_initiatives/epics/issues`）
-  - 推奨案（暫定）: A（ファイル形式は維持し、意味論（compile）を v2 にする）
-  - 影響範囲: AC-001/002, EC-001/002（パース/互換）
-- Q-002:
-  - 質問: `.agent/deps.json`（v1の派生SSOT）を v2 ではどう扱うか？
-  - 選択肢:
-    - A: `.agent/index.json` / `.agent/tree.json` に統合し、`.agent/deps.json` は廃止（または互換出力のみ）
-    - B: `.agent/deps.json` を存続しつつ、index/tree へも summary を載せる（二重管理）
-  - 推奨案（暫定）: A（“新しい管理を増やさない” 要望を優先）
-  - 影響範囲: ...
 - Q-003:
   - 質問: 親→配下（descendant）依存の扱いは v2 でも禁止でよいか？（例: initiative が配下 epic/issue を depends_on に含める）
   - 選択肢:
@@ -295,6 +290,15 @@ package "Dependency (DAG)\n(canonical issue graph)" {
     - B: `tree*.puml` として deps から独立（例: `tree.ready.puml`）
   - 推奨案（暫定）: A（deps機能の一部として集約）
   - 影響範囲: AC-006（生成物の観測点）
+- Q-005:
+  - 質問: index/tree の issue ノードに載せる deps 派生フィールド（依存リストの粒度: 直接/推移/ブロッカー）をどう固定するか？
+  - 選択肢:
+    - A: ブロッカーのみ（未完了/unknown の依存 issue を列挙）
+    - B: 直接依存 + ブロッカー（推移依存は `deps.issue_edges` から計算）
+    - C: 推移依存（closure）+ ブロッカー（Done 依存は除外）
+  - 推奨案（暫定）: B（index/tree は “判断に必要な最小” を載せ、詳細はグラフから計算できるようにする）
+  - 影響範囲: AC-001（index/tree のスキーマ）, `deps check --json`（出力設計）, Readyボードのラベル表示
+  - 参照: `spec-deps/current/adrs/adr-00005-issue-deps-derived-fields.md`
 
 ## Definition of Ready（着手可能条件） (必須)
 - [ ] 目的が 1〜3行で明確になっている

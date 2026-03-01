@@ -2,18 +2,20 @@
 種別: ADR（Architecture Decision Record）
 ID: "ADR-00001"
 タイトル: "deps.json のスキーマ: v1（depends_on 1フィールド）継続 vs v2（フィールド分割）"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
-最終更新: "2026-02-28"
+最終更新: "2026-03-01"
 親: ["iss-00010"]
 ---
 
 # ADR-00001 deps.json のスキーマ: v1（depends_on 1フィールド）継続 vs v2（フィールド分割）
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR はディスカッションのために作成しました。結論はユーザーが最終決定した後に更新します。
-- 決定（決定後に記入）:
-  - ...
+- 決定: **Option A（v1 継続 / `schema_version=1` のまま作り直す）**
+  - `schema_version` は **変更しない（1のまま）**。`schema_version=2` は作らない。
+  - 依存の入口は **`depends_on` 1フィールド**のままにする（フィールド分割しない）。
+  - `schema_version=1` は公開・稼働していない前提のため、**破壊的変更を許容して v1 を作り直す**（既存 v1 との互換維持は必須ではない）。
+  - shorthand（initiative/epic 参照）や GitHub issue number の扱いは、v2 の compile（issue→issue 正規化）設計に合わせて定義する。
 
 ## 背景（Context） (必須)
 deps v2 では、「依存は最終的に issue→issue に還元（compile）して判定する」方針を採用します。  
@@ -27,7 +29,7 @@ deps v2 では、「依存は最終的に issue→issue に還元（compile）�
 
 ディスカッション目的:
 - **shorthand（initiative/epic 参照）**を導入しても、運用が破綻しない “編集しやすさ/分かりやすさ” を確保する。
-- 破壊的変更を許容する前提でも、将来の移行コストを最小化する。
+- `schema_version` を上げずに破壊的変更できる前提で、将来の移行コストと複雑性を最小化する。
 
 ### UML（任意） (任意)
 ```plantuml
@@ -94,6 +96,9 @@ Pros:
 Cons:
 - 現行実装は `schema_version must be 1` で停止するため、破壊的変更になる。
 - パーサ/ドキュメント/サンプル/テスト/運用ルールの更新が増える。
+棄却理由:
+- ユーザー決定により、`schema_version` を上げずに v1 を作り直す方針になったため。
+- “フィールド分割” は将来必要になった時に別ADRで再検討できる（今は過剰）。
 
 ### Option C: v1+v2 を同時サポート（段階移行）
 概要:
@@ -105,21 +110,20 @@ Pros:
 Cons:
 - 実装が複雑化し、仕様の “抜け/矛盾” が増える（優先順位・同時指定の扱い等）。
 - テストケースが増え、保守コストが上がる。
+棄却理由:
+- 破壊的変更を許容し、段階移行が不要のため。
 
 ## 判断理由（Rationale） (必須)
-このADRは「結論未決」です。  
-ただし、現時点の暫定推奨は **Option A（v1継続）** です。
-
-推奨理由（暫定）:
-- 今回の本質は「shorthand を issue→issue に compile し、Readyボード等で一目瞭然にする」ことであり、ファイル形式変更は本質ではない。
-- 既存実装/運用と衝突しづらく、短いイテレーションで安全に改善を届けやすい。
+ユーザー決定により、`schema_version` は上げずに `schema_version=1` を作り直す。  
+今回の本質は「shorthand を issue→issue に compile し、Readyボード等で一目瞭然にする」ことであり、フィールド分割は必須ではない。
 
 ## 影響（Consequences） (必須)
 Positive（良い点）:
-- Option A なら移行コストが低く、実装・検証のスピードが出る。
+- `schema_version` を上げずに導入でき、運用説明がシンプルになる。
+- 破壊的変更を許容した上で v1 を作り直せるため、仕様の “歪み” を抱えた互換維持が不要になる。
 
 Negative / Debt（悪い点 / 将来負債）:
-- Option A だと “書き方の明示性” は弱いので、運用ガイド/警告/説明出力で補う必要がある。
+- 1フィールド混在の読みづらさは残るため、運用ガイド/警告/説明出力で補う必要がある。
 
 影響範囲（コード/テスト/運用/データ）:
 - runtime: `deps.json` ローダの受理条件（schema_version）
@@ -127,14 +131,13 @@ Negative / Debt（悪い点 / 将来負債）:
 - tests: スキーマ不正のテスト（EC-001）
 
 移行/ロールバック:
-- Option A は現行と同様に「ファイルが無い=依存なし」の運用ができ、段階導入が容易。
+- v1 を作り直すため、旧仕様の `deps.json` は破壊的に変わり得る（ただし v1 未公開前提）。
 
 Follow-ups:
-- “v2 schema が必要な痛み” が出たら、別ADRで schema_version=2 を検討する。
+- “フィールド分割が必要な痛み” が出たら、別ADRで `schema_version=2`（または別方式）を検討する。
 
 ## 参考（References） (任意)
-- `spec-deps/current/requirement.md`（Q-001）
+- `spec-deps/current/requirement.md`（決定事項 D-001）
 - `spec-deps/current/artifacts/deps-best-practice-issue-normalization.md`
 - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock`（`_load_deps_json()`）
-
