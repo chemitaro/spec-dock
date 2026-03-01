@@ -4,7 +4,7 @@ ID: "ADR-00003"
 タイトル: "descendant（親→配下）依存の扱い: 禁止（fail-fast）を維持するか"
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-02-28"
+最終更新: "2026-03-01"
 親: ["iss-00010"]
 ---
 
@@ -32,14 +32,14 @@ v2 では「compile（展開）」が入るため、禁止ルールをどうす�
 left to right direction
 skinparam shadowing false
 
-package "epic E (contains)" {
+package "epic E (contains)" as E {
   rectangle "iss-A" as A
   rectangle "iss-G (gate)" as G
 }
 
 note top of E
 deps.json on epic E:
-depends_on=[\"iss-G\"]
+depends_on=["iss-G"]
 end note
 
 rectangle "compile result\n(canonical issue edges)" as C
@@ -120,4 +120,3 @@ Negative / Debt（悪い点 / 将来負債）:
 - `spec-deps/current/requirement.md`（Q-003 / EC-003 / EC-004）
 - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`（現行の禁止ルール）
 - `spec-deps/current/artifacts/deps-best-practice-issue-normalization.md`
-
