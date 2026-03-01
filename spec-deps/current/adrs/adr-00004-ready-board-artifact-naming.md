@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "ADR-00004"
 タイトル: "Readyボード（矢印なしツリー）の生成物: ファイル名・形式・表示情報"
-状態: "draft"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-03-01"
 親: ["iss-00010"]
@@ -11,9 +11,10 @@ ID: "ADR-00004"
 # ADR-00004 Readyボード（矢印なしツリー）の生成物: ファイル名・形式・表示情報
 
 ## 結論（Decision） (必須)
-- **未決（TBD）**: この ADR はディスカッションのために作成しました。結論はユーザーが最終決定した後に更新します。
-- 決定（決定後に記入）:
-  - ...
+- 決定: **Option A**（`tree*.puml` として固定）を採用する。
+  - `spec-dock/.agent/tree-all.puml`（all）
+  - `spec-dock/.agent/tree.puml`（todo = Done除外）
+  - Readyボードは “tree（包含ツリー）に状態ラベルを付けたもの” として扱う。
 
 ## 背景（Context） (必須)
 Readyボードは「依存矢印を描かない」代わりに、ツリー上で **READY/BLOCKED/DOING/DONE/UNKNOWN** を明示して、  
@@ -106,10 +107,7 @@ Readyボードは “見ただけで判断できる” ことが最重要なの�
   - `progress`（open/done/unknown）を括弧で短く表示
 
 ## 判断理由（Rationale） (必須)
-このADRは「結論未決」です。  
-ただし、現時点の暫定推奨は **Option A（`tree*.puml`）** です。
-
-推奨理由（暫定）:
+採用理由:
 - Readyボードは tree と同義に扱う方が、運用の観測点が固定され、multi-agent も迷いにくい。
 - `.agent/tree*.json`（all/todo）と `.agent/tree*.puml` をペアにすると、JSON と図を行き来しやすい。
 
