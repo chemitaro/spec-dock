@@ -11,7 +11,7 @@
 ## 2. 設計原則（迷わないためのルール）
 ### 2.1 “見る場所” を固定する
 - 派生状態の主観測点（派生SSOT）は **`spec-dock/.agent/index*.json`** に固定する。
-- `tree*.json` / `*.puml` / `dashboard.md` は **index からのビュー**に限定し、同じ情報を別JSONに二重保持しない。
+- `tree*.json` / `deps-issues.json` / `*.puml` / `dashboard.md` は **index からのビュー（投影）**に限定する（追加情報は持たせない）。
 
 ### 2.2 `todo` をデフォルト、`all` は `-all`
 - デフォルト（suffixなし）を「作業用（todo = Done除外）」にする。
@@ -30,6 +30,11 @@
 - `run_id`（1回の sync を一意に識別）
 - `inputs_fingerprint`（deps.json + meta.json + GitHub enrich の有無/gh-limit 等）
 
+### 2.6 コーディングエージェントは JSON を主に読む（PlantUML をパースしない）
+- **Codex CLI にとって最も読み取りやすい形式は JSON**（構造が安定・決定的・機械処理が容易）である。
+- PlantUML は「人間の視覚化」用途に寄せ、**エージェントが仕様としてパースする前提にしない**（表現の揺れ/レイアウト依存/将来変更の影響が大きい）。
+- したがって、依存グラフの “判断に必要な情報” は `index*.json`（およびその投影）で完結させる。
+
 ## 3. 出力ファイル一覧（提案）
 凡例:
 - MUST = 生成必須（運用の観測点）
@@ -46,10 +51,13 @@
 | MUST | `spec-dock/.agent/active.json` | JSON | n/a | `active set` / `sync` | agent/human | 現在の作業点（ポインタ） |
 | SHOULD | `spec-dock/.agent/tree.puml` | PlantUML | todo | `sync` | human | Readyボード（矢印なし tree + 状態表示） |
 | SHOULD | `spec-dock/.agent/tree-all.puml` | PlantUML | all | `sync` | human | all 版 Readyボード |
-| SHOULD | `spec-dock/.agent/deps-issues.puml` | PlantUML | todo | `sync` | human | **issue-only 依存グラフ**（順序の俯瞰） |
-| SHOULD | `spec-dock/.agent/deps-issues-all.puml` | PlantUML | all | `sync` | human | all 版 issue-only 依存グラフ |
+| SHOULD | `spec-dock/.agent/deps-issues.json` | JSON | todo | `sync` | agent/human | **issue-only 依存グラフ（投影）**（`index.json` から issue のみ抽出したグラフ: edges + closure + ready/blockers） |
+| SHOULD | `spec-dock/.agent/deps-issues.puml` | PlantUML | todo | `sync` | human | **issue-only 依存グラフ（可視化）**（完了済み除外の俯瞰） |
 | SHOULD | `spec-dock/.agent/dashboard.md` | Markdown | todo | `sync` | human/agent | “次にやれる/詰まり/unknown” の要約（indexから生成） |
 | MAY | `spec-dock/.agent/focus/deps-issues-<iss-id>.puml` | PlantUML | focus | `deps graph`（案） | human | 特定 issue の上流（ブロッカー）だけ |
+
+補足（ユーザー要望反映）:
+- issue-only 依存グラフは **todo のみ**を生成する（all は生成しない）。必要なら `index-all.json` から投影で再構築できる。
 
 ### v1 生成物の扱い（v2 で落とす/置き換える候補）
 | Keep | 生成物 | 理由 |
@@ -69,6 +77,11 @@
 - `deps.issue_edges`（canonical direct issue edges）
 - （任意）`deps.edge_provenance`（どの `deps.json` / ref が生んだか）
 
+エージェント運用の推奨:
+- Codex CLI は **`index.json`（todo）を第一に読む**（必要な判断材料がすべて入る前提）。
+- さらに単純化したい場合のみ、`deps-issues.json`（issue-only 投影）を読む（`index.json` を読むよりフィルタが不要）。
+- PlantUML（`*.puml`）は人間の補助として扱い、エージェントのロジック判断には使わない。
+
 ## 5. stale（古い生成物の誤用）を防ぐルール
 - deps preflight が失敗した場合:
   - `index/tree` は更新できても、deps 派生は **無効**になる
@@ -86,18 +99,19 @@ rectangle "sync\n(scan/load/compile/validate/enrich)" as Sync
 database ".agent/index-all.json\n.agent/tree-all.json" as All
 database ".agent/index.json\n.agent/tree.json" as Todo
 database ".agent/tree-all.puml\n.agent/tree.puml" as TreePuml
-database ".agent/deps-issues-all.puml\n.agent/deps-issues.puml" as DepsPuml
+database ".agent/deps-issues.json\n.agent/deps-issues.puml" as DepsIssues
 
 Meta --> Sync
 Deps --> Sync
 Sync --> All : emit all
 All --> Todo : filter done
 Todo --> TreePuml : render board
-Todo --> DepsPuml : render issue graph
+Todo --> DepsIssues : render issue graph\n(json/puml)
 @enduml
 ```
 
 ## 7. 次の議論ポイント（この資料のゴール）
 - この表の MUST/SHOULD/MAY/DEPRECATE の妥当性
 - 命名（`tree*.puml` / `deps-issues*.puml` / focus をサブディレクトリにするか）
+- issue-only の JSON 投影（`deps-issues.json`）を SHOULD として持つか（それとも `index.json` のみで十分か）
 - “dashboard.md” の要否（人間/agent の導線として価値があるか）
