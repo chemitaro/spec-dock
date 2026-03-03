@@ -494,6 +494,63 @@ class TestCli(unittest.TestCase):
             self.assertEqual(issue_item, index_nodes["iss-local-00001"])
             self._run_runtime(target, ["validate"])
 
+    def test_sync_emits_all_and_todo_json_views(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            self._run_runtime(target, ["sync"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            index_all_path = agent_dir / "index-all.json"
+            tree_all_path = agent_dir / "tree-all.json"
+            index_todo_path = agent_dir / "index.json"
+            tree_todo_path = agent_dir / "tree.json"
+
+            self.assertTrue(index_all_path.is_file())
+            self.assertTrue(tree_all_path.is_file())
+            self.assertTrue(index_todo_path.is_file())
+            self.assertTrue(tree_todo_path.is_file())
+
+            index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
+            tree_all = json.loads(tree_all_path.read_text(encoding="utf-8"))
+            index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
+            tree_todo = json.loads(tree_todo_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(index_all["schema_version"], 2)
+            self.assertEqual(tree_all["schema_version"], 2)
+            self.assertEqual(index_todo["schema_version"], 2)
+            self.assertEqual(tree_todo["schema_version"], 2)
+
+            def _collect_tree_node_ids(items: list[dict[str, object]]) -> set[str]:
+                ids: set[str] = set()
+                for initiative in items:
+                    init_id = initiative.get("id")
+                    if isinstance(init_id, str):
+                        ids.add(init_id)
+
+                    for epic in initiative.get("epics", []):
+                        if not isinstance(epic, dict):
+                            continue
+                        epic_id = epic.get("id")
+                        if isinstance(epic_id, str):
+                            ids.add(epic_id)
+
+                        for issue in epic.get("issues", []):
+                            if not isinstance(issue, dict):
+                                continue
+                            issue_id = issue.get("id")
+                            if isinstance(issue_id, str):
+                                ids.add(issue_id)
+                return ids
+
+            self.assertEqual(set(index_all["nodes"].keys()), _collect_tree_node_ids(tree_all["tree"]))
+            self.assertEqual(set(index_todo["nodes"].keys()), _collect_tree_node_ids(tree_todo["tree"]))
+
     def test_new_rejects_duplicate_id_with_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

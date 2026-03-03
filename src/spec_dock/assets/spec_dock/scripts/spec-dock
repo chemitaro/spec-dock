@@ -2117,7 +2117,11 @@ def _sync(
             children[node.parent_id].append(node.id)
 
     agent_dir = specdock_dir / _AGENT_DIRNAME
-    state_index_path = agent_dir / "index.json"
+    state_index_todo_path = agent_dir / "index.json"
+    state_tree_todo_path = agent_dir / "tree.json"
+    state_index_all_path = agent_dir / "index-all.json"
+    state_tree_all_path = agent_dir / "tree-all.json"
+    state_index_path = state_index_todo_path
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_github_by_id: dict[str, dict[str, Any]] = {}
@@ -2172,8 +2176,6 @@ def _sync(
 
     legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     agent_dir.mkdir(parents=True, exist_ok=True)
-
-    tree_path = agent_dir / "tree.json"
     current = _load_active_manifest(specdock_dir) if migrate_active else _load_active_manifest_no_migrate(specdock_dir)
     before = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
 
@@ -2279,22 +2281,30 @@ def _sync(
         init_item["epics"] = epics
         tree.append(init_item)
 
-    state_index = {
+    state_index_all = {
         "schema_version": 2,
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
         "nodes": out_nodes,
     }
-    state_tree = {
+    state_tree_all = {
         "schema_version": 2,
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
         "tree": tree,
     }
-    _write_json(state_index_path, state_index)
-    _write_json(tree_path, state_tree)
+
+    # S01 contract: emit both `all` and `todo` JSON observation points.
+    # TODO projection is introduced in later steps; for now it is equivalent to all.
+    state_index_todo = dict(state_index_all)
+    state_tree_todo = dict(state_tree_all)
+
+    _write_json(state_index_all_path, state_index_all)
+    _write_json(state_tree_all_path, state_tree_all)
+    _write_json(state_index_todo_path, state_index_todo)
+    _write_json(state_tree_todo_path, state_tree_todo)
 
     # Deps derived state (optional when preflight failed forced).
     deps_json_path = agent_dir / "deps.json"
@@ -2318,12 +2328,18 @@ def _sync(
         deps_puml_path.unlink(missing_ok=True)
         deps_todo_puml_path.unlink(missing_ok=True)
 
-    rel_index = state_index_path.relative_to(repo_root).as_posix()
-    rel_tree = tree_path.relative_to(repo_root).as_posix()
+    rel_index_all = state_index_all_path.relative_to(repo_root).as_posix()
+    rel_tree_all = state_tree_all_path.relative_to(repo_root).as_posix()
+    rel_index_todo = state_index_todo_path.relative_to(repo_root).as_posix()
+    rel_tree_todo = state_tree_todo_path.relative_to(repo_root).as_posix()
     mode = "github" if github else "local"
     after = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
     changed = " active=updated" if (before is not None and after is not None and before != after) else ""
-    print(f"spec-dock: ok (sync) mode={mode} preflight={preflight} wrote={rel_index},{rel_tree}{changed}")
+    print(
+        "spec-dock: ok (sync) "
+        f"mode={mode} preflight={preflight} "
+        f"wrote={rel_index_all},{rel_tree_all},{rel_index_todo},{rel_tree_todo}{changed}"
+    )
 
     # Prune legacy v2 directory/file names to avoid duplicates.
     (legacy_work_dir / "state.json").unlink(missing_ok=True)
