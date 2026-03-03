@@ -3886,6 +3886,7 @@ def _render_deps_disabled_deps_issues_puml(*, error: str | None) -> str:
     lines.append("@startuml")
     lines.append("left to right direction")
     lines.append("skinparam shadowing false")
+    lines.append("skinparam linetype ortho")
     lines.append("title deps-issues - DEPS_DISABLED")
     lines.append(
         f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled'
@@ -4004,6 +4005,7 @@ def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
     lines.append("@startuml")
     lines.append("left to right direction")
     lines.append("skinparam shadowing false")
+    lines.append("skinparam linetype ortho")
     lines.append("")
     lines.append("legend right")
     lines.append("|= State |= Color |")
