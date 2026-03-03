@@ -1783,15 +1783,26 @@ def _active_set(
         raise RuntimeError("Internal error: invalid active target kind")
 
     # Deps guard: refuse blocked targets by default (active.json must not be updated).
-    deps = _deps_evaluate(
-        specdock_dir,
-        nodes,
-        target_id=node.id,
-        github=github,
-        gh_limit=gh_limit,
+    deps = (
+        _deps_evaluate_v2(
+            specdock_dir,
+            nodes,
+            target_id=node.id,
+            github=github,
+            gh_limit=gh_limit,
+        )
+        if node.type == "issue"
+        else _deps_evaluate(
+            specdock_dir,
+            nodes,
+            target_id=node.id,
+            github=github,
+            gh_limit=gh_limit,
+        )
     )
-    if not bool(deps.get("ready", False)):
-        blockers = list(deps.get("blockers") or [])
+    blockers = list(deps.get("blockers") or [])
+    is_blocked = bool(blockers) if node.type == "issue" else not bool(deps.get("ready", False))
+    if is_blocked:
         if not force:
             lines = [f"active set blocked: target={node.id} ready=false blockers={len(blockers)}"]
             for b in blockers:
