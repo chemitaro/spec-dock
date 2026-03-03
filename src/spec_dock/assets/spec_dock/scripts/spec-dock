@@ -2367,12 +2367,125 @@ def _sync(
         "tree": tree,
     }
 
-    # S01 contract: emit both `all` and `todo` JSON observation points.
-    # TODO projection is introduced in later steps; for now it is equivalent to all.
-    state_index_todo = dict(state_index_all)
-    state_index_todo["deps"] = dict(deps_top_level)
-    state_tree_todo = dict(state_tree_all)
-    state_tree_todo["deps"] = dict(deps_top_level)
+    # Build todo projection:
+    # - exclude done issues
+    # - prune epic/initiative branches with zero remaining todo issues
+    todo_issue_ids = sorted(
+        [
+            node_id
+            for node_id, item in out_nodes.items()
+            if isinstance(item, dict)
+            and item.get("type") == "issue"
+            and str(item.get("status") or "unknown").lower() != "done"
+        ],
+        key=sort_key,
+    )
+    todo_issue_set = set(todo_issue_ids)
+
+    todo_epic_ids: list[str] = []
+    for node_id, node in nodes.items():
+        if node.type != "epic":
+            continue
+        issue_ids = [
+            cid for cid in children.get(node_id, [])
+            if cid in todo_issue_set and nodes.get(cid) and nodes[cid].type == "issue"
+        ]
+        if issue_ids:
+            todo_epic_ids.append(node_id)
+    todo_epic_ids.sort(key=sort_key)
+    todo_epic_set = set(todo_epic_ids)
+
+    todo_init_ids: list[str] = []
+    for node_id, node in nodes.items():
+        if node.type != "initiative":
+            continue
+        epic_ids = [
+            cid for cid in children.get(node_id, [])
+            if cid in todo_epic_set and nodes.get(cid) and nodes[cid].type == "epic"
+        ]
+        if epic_ids:
+            todo_init_ids.append(node_id)
+    todo_init_ids.sort(key=sort_key)
+    todo_init_set = set(todo_init_ids)
+
+    todo_node_ids = todo_init_set | todo_epic_set | todo_issue_set
+    todo_nodes: dict[str, Any] = {}
+    for node_id in sorted(todo_node_ids, key=sort_key):
+        base = out_nodes.get(node_id)
+        if not isinstance(base, dict):
+            continue
+        item = dict(base)
+        item["children"] = sorted([cid for cid in children.get(node_id, []) if cid in todo_node_ids], key=sort_key)
+        todo_nodes[node_id] = item
+
+    tree_todo: list[dict[str, Any]] = []
+    for init_id in todo_init_ids:
+        init_base = todo_nodes.get(init_id)
+        if not isinstance(init_base, dict):
+            continue
+        init_item = dict(init_base)
+        epics: list[dict[str, Any]] = []
+        for epic_id in sorted([cid for cid in children.get(init_id, []) if cid in todo_epic_set], key=sort_key):
+            epic_base = todo_nodes.get(epic_id)
+            if not isinstance(epic_base, dict):
+                continue
+            epic_item = dict(epic_base)
+            issue_items: list[dict[str, Any]] = []
+            for issue_id in sorted([cid for cid in children.get(epic_id, []) if cid in todo_issue_set], key=sort_key):
+                issue_base = todo_nodes.get(issue_id)
+                if isinstance(issue_base, dict):
+                    issue_items.append(dict(issue_base))
+            if not issue_items:
+                continue
+            epic_item["issues"] = issue_items
+            epics.append(epic_item)
+        if not epics:
+            continue
+        init_item["epics"] = epics
+        tree_todo.append(init_item)
+
+    deps_issue_edges_todo: list[dict[str, str]] = []
+    if not deps_preflight_failed:
+        for edge in deps_issue_edges_all:
+            if not isinstance(edge, dict):
+                continue
+            from_id = edge.get("from")
+            to_id = edge.get("to")
+            if not isinstance(from_id, str) or not isinstance(to_id, str):
+                continue
+            if from_id in todo_issue_set and to_id in todo_issue_set:
+                out_edge: dict[str, str] = {"from": from_id, "to": to_id}
+                kind = edge.get("kind")
+                if isinstance(kind, str) and kind:
+                    out_edge["kind"] = kind
+                deps_issue_edges_todo.append(out_edge)
+        deps_issue_edges_todo.sort(key=lambda x: (_deps_node_sort_key(x["from"]), _deps_node_sort_key(x["to"])))
+
+    deps_top_level_todo: dict[str, Any] = {
+        "valid": (not deps_preflight_failed),
+        "error": deps_preflight_error if deps_preflight_failed else None,
+        "issue_edges": list(deps_issue_edges_todo if not deps_preflight_failed else []),
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+    state_index_todo = {
+        "schema_version": 2,
+        "generated_at": state_index_all["generated_at"],
+        "root": state_index_all["root"],
+        "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level_todo),
+        "nodes": todo_nodes,
+    }
+    state_tree_todo = {
+        "schema_version": 2,
+        "generated_at": state_tree_all["generated_at"],
+        "root": state_tree_all["root"],
+        "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level_todo),
+        "tree": tree_todo,
+    }
 
     _write_json(state_index_all_path, state_index_all)
     _write_json(state_tree_all_path, state_tree_all)
@@ -2421,8 +2534,8 @@ def _sync(
     deps_issues_puml_path = specdock_dir / "deps-issues.puml"
     if not deps_preflight_failed:
         deps_issues_state = _build_deps_issues_state(
-            out_nodes,
-            deps_issue_edges_all,
+            state_index_todo["nodes"],
+            deps_issue_edges_todo,
             active=current if isinstance(current, dict) else None,
         )
         _write_json(deps_issues_json_path, deps_issues_state)
