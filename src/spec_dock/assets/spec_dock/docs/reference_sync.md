@@ -66,8 +66,10 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - issueノードの `deps` は `null`（未計算扱い）
 - `spec-dock/.agent/deps-issues.json` は placeholder（`deps.valid=false`, `nodes={}`, `edges=[]`）で上書き
 - `spec-dock/deps-issues.puml`, `spec-dock/tree*.puml`, `spec-dock/dashboard.md` も placeholder内容で上書き
+- `--force` はデバッグ/リカバリ用途のため、depsの成否に関わらず active auto-update を無効化（`--no-update-active` 相当）
 
 削除ではなく上書きにすることで、stale 参照を防ぎます。
+`--force` 実行後に active を更新したい場合は、`./spec active set <target>` を使って明示更新してください。
 
 ## 5. `--github` とスナップショット
 
@@ -84,6 +86,7 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 デフォルトでは、ブランチ名から active を best-effort 推定して更新します。
 
 - `sync --no-update-active`: active を更新しない
+- `sync --force`: `--no-update-active` 相当として扱い、active auto-update を行わない
 - `main` / `develop` など手がかりが無いブランチでは active は維持
 
 ## 7. 矢印方向（JSONとPlantUML）
