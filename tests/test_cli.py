@@ -3695,7 +3695,9 @@ class TestCli(unittest.TestCase):
 
             tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
             self.assertFalse(tree["deps"]["valid"])
+            self.assertEqual(tree["deps"]["issue_edges"], [])
             self.assertIn("Dependency cycle detected", str(tree["deps"]["error"]))
+            self.assertIn("deps_preflight_failed", tree["warnings"])
             tree_issues = tree["tree"][0]["epics"][0]["issues"]
             tree_issue_deps = {issue["id"]: issue.get("deps") for issue in tree_issues}
             self.assertIsNone(tree_issue_deps["iss-local-00001"])
@@ -3706,6 +3708,7 @@ class TestCli(unittest.TestCase):
             self.assertFalse(tree_all["deps"]["valid"])
             self.assertEqual(tree_all["deps"]["issue_edges"], [])
             self.assertIn("Dependency cycle detected", str(tree_all["deps"]["error"]))
+            self.assertIn("deps_preflight_failed", tree_all["warnings"])
             tree_all_issues = tree_all["tree"][0]["epics"][0]["issues"]
             tree_all_issue_deps = {issue["id"]: issue.get("deps") for issue in tree_all_issues}
             self.assertIsNone(tree_all_issue_deps["iss-local-00001"])
