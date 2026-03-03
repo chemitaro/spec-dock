@@ -451,7 +451,7 @@ class TestCli(unittest.TestCase):
             self.assertIn("iss-local-00001", requirement)
 
             # Active pointers are set by a single target argument (node id or GitHub issue number).
-            self._run_runtime(target, ["active", "set", "iss-local-00001"])
+            self._run_runtime(target, ["active", "set", "iss-local-00001", "--force"])
             self.assertTrue((target / "spec-dock" / ".agent" / "active.json").is_file())
             self.assertTrue(
                 (target / "spec-dock" / "active" / "issue").exists()
@@ -2390,7 +2390,7 @@ class TestCli(unittest.TestCase):
                 target,
                 ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Sibling issue"],
             )
-            self._run_runtime(target, ["active", "set", "iss-00301"])
+            self._run_runtime(target, ["active", "set", "iss-00301", "--force"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -3740,7 +3740,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                self._run_runtime(target, ["active", "set", "123", "--checkout"], env=test_env)
+                self._run_runtime(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00123-add-refresh-token")
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -3764,7 +3764,7 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-            self._run_runtime(target, ["active", "set", "iss-local-00001"])
+            self._run_runtime(target, ["active", "set", "iss-local-00001", "--force"])
 
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "feature/local-keep-branch")
@@ -3819,7 +3819,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             desired = "iss-00123-add-refresh-token"
@@ -3887,7 +3887,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 self.assertIn("spec-dock: (warn)", p.stderr)
                 self.assertIn("reusing existing branch", p.stderr)
@@ -3981,7 +3981,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 if counter.exists():
                     self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
@@ -4071,7 +4071,9 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "iss-00123", "--checkout"], env=test_env)
+                p = self._run_runtime_capture(
+                    target, ["active", "set", "iss-00123", "--checkout", "--force"], env=test_env
+                )
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 if counter.exists():
                     self.assertEqual(counter.read_text(encoding="utf-8").strip(), "0")
@@ -4143,7 +4145,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 self.assertIn("spec-dock: (warn)", p.stderr)
                 self.assertIn("non-ascii", p.stderr)
@@ -4216,7 +4218,7 @@ class TestCli(unittest.TestCase):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout"], env=test_env)
+                p = self._run_runtime_capture(target, ["active", "set", "123", "--checkout", "--force"], env=test_env)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 self.assertIn("spec-dock: (warn)", p.stderr)
                 self.assertIn("invalid ref", p.stderr)
@@ -4282,8 +4284,10 @@ class TestCli(unittest.TestCase):
 
                 # Both `#123` and issue URL should be accepted and behave the same.
                 # Default is no-checkout, so gh should not be invoked.
-                self._run_runtime(target, ["active", "set", "#123"], env=test_env)
-                self._run_runtime(target, ["active", "set", "https://github.com/example/repo/issues/123"], env=test_env)
+                self._run_runtime(target, ["active", "set", "#123", "--force"], env=test_env)
+                self._run_runtime(
+                    target, ["active", "set", "https://github.com/example/repo/issues/123", "--force"], env=test_env
+                )
                 self.assertFalse(counter.exists())
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -4398,7 +4402,7 @@ class TestCli(unittest.TestCase):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             # Baseline: active is set to the dependency issue (ready).
-            self._run_runtime(target, ["active", "set", "iss-00301"])
+            self._run_runtime(target, ["active", "set", "iss-00301", "--force"])
             before = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
 
             # Blocked: active must not be updated.
@@ -4638,7 +4642,7 @@ class TestCli(unittest.TestCase):
             )
 
             # There is a global deps cycle, but it's unreachable from the target; `active set` must still succeed.
-            p = self._run_runtime_capture(target, ["active", "set", "iss-local-00003"])
+            p = self._run_runtime_capture(target, ["active", "set", "iss-local-00003", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             active = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
@@ -4692,7 +4696,7 @@ class TestCli(unittest.TestCase):
             )
 
             # Baseline: set ready dep issue to active.
-            self._run_runtime(target, ["active", "set", "iss-00301"])
+            self._run_runtime(target, ["active", "set", "iss-00301", "--force"])
             before = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
 
             bin_dir = target / ".bin"
@@ -4900,6 +4904,28 @@ class TestCli(unittest.TestCase):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
+    def test_active_set_without_github_blocks_unknown_issue_even_without_deps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Unknown issue"])
+            self._run_runtime(target, ["active", "clear"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            (agent_dir / "index-all.json").unlink(missing_ok=True)
+            (agent_dir / "index.json").unlink(missing_ok=True)
+
+            before = (agent_dir / "active.json").read_text(encoding="utf-8")
+            p = self._run_runtime_capture(target, ["active", "set", "iss-local-00001"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("active set blocked", p.stderr)
+            self.assertIn("ready=false", p.stderr)
+            after = (agent_dir / "active.json").read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -4956,7 +4982,7 @@ class TestCli(unittest.TestCase):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 # Explicit checkout should switch branches, but gh should not be invoked.
-                self._run_runtime(target, ["active", "set", "iss-0123", "--checkout"], env=test_env)
+                self._run_runtime(target, ["active", "set", "iss-0123", "--checkout", "--force"], env=test_env)
                 self.assertFalse(counter.exists())
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -5037,7 +5063,7 @@ class TestCli(unittest.TestCase):
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
                 # Active is resolved before checkout and must remain stable.
-                self._run_runtime(target, ["active", "set", "iss-00123", "--checkout"], env=test_env)
+                self._run_runtime(target, ["active", "set", "iss-00123", "--checkout", "--force"], env=test_env)
 
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
