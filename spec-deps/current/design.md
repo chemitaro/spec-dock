@@ -18,8 +18,9 @@ ID: "iss-00010"
 - MUST（要件の圧縮）:
   - `deps.json` の shorthand（initiative/epic 指定）を **canonical issue→issue** へ compile し、ready 判定に使う（`deps check` / `active set` guard / `sync`）。
   - `sync` は以下の成果物を生成する（命名は ADR 準拠）:
-    - 監査用（all）: `.agent/index-all.json`, `.agent/tree-all.json`, `.agent/tree-all.puml`
-    - 作業用（todo）: `.agent/index.json`, `.agent/tree.json`, `.agent/tree.puml`, `.agent/deps-issues.json`, `.agent/deps-issues.puml`, `.agent/dashboard.md`
+    - 機械可読（agent / all）: `.agent/index-all.json`, `.agent/tree-all.json`
+    - 機械可読（agent / todo）: `.agent/index.json`, `.agent/tree.json`, `.agent/deps-issues.json`
+    - 人間向け（quick view）: `spec-dock/tree-all.puml`, `spec-dock/tree.puml`, `spec-dock/deps-issues.puml`, `spec-dock/dashboard.md`
   - issue の派生状態（ready/blocked、ブロッカー、推移依存=closure、Done除外）を `index*.json` / `tree*.json` に統合する。
   - unknown は安全側（blocked）に倒す。出力順序は決定的（ソート）にする。
 - MUST NOT:
@@ -89,10 +90,11 @@ participant "SSOT\ndeps.json" as Deps
 participant "gh\n(optional)" as GH
 participant ".agent\nindex-all.json\ntree-all.json" as All
 participant ".agent\nindex.json\ntree.json" as Todo
-participant ".agent\ntree-all.puml" as TreeAllPuml
-participant ".agent\ntree.puml" as TreeTodoPuml
-participant ".agent\ndeps-issues.json\ndeps-issues.puml" as DepsIssues
-participant ".agent\ndashboard.md" as Dashboard
+participant "spec-dock\ntree-all.puml" as TreeAllPuml
+participant "spec-dock\ntree.puml" as TreeTodoPuml
+participant ".agent\ndeps-issues.json" as DepsIssuesJson
+participant "spec-dock\ndeps-issues.puml" as DepsIssuesPuml
+participant "spec-dock\ndashboard.md" as Dashboard
 
 == sync ==
 User -> Script: sync [--github] [--force]
@@ -107,7 +109,8 @@ Script -> All: emit all
 All -> Todo: filter Done issues
 All -> TreeAllPuml: render Ready board (all)
 Todo -> TreeTodoPuml: render Ready board (todo)
-Todo -> DepsIssues: project+render\n(issue-only)
+Todo -> DepsIssuesJson: project (issue-only)
+DepsIssuesJson -> DepsIssuesPuml: render (blocks view)
 Todo -> Dashboard: render summary
 @enduml
 ```
@@ -199,7 +202,11 @@ if (status == done?) then (yes)
 endif
 
 :deps.depends_on = closure(issue -> prerequisites)\n(Done excluded);
-:deps.ready = (deps.depends_on is empty);
+if (status == unknown?) then (yes)
+  :deps.ready = false;
+else (no)
+  :deps.ready = (deps.depends_on is empty);
+endif
 
 if (active leaf?) then (yes)
   :state = doing;
@@ -301,7 +308,7 @@ stop
 	}
 	```
 
-#### `spec-dock/.agent/dashboard.md`（todo-only）
+#### `spec-dock/dashboard.md`（todo-only）
 - 少なくとも以下を含める:
   - “観測点” への導線（`index.json`, `tree.puml`, `deps-issues.puml`）
   - Ready（`ready=true`）の issue 上位 N 件（id/title）
@@ -313,17 +320,17 @@ stop
 @startuml
 skinparam shadowing false
 
-file "index-all.json" as IndexAll
-file "tree-all.json" as TreeAll
-file "tree-all.puml" as TreeAllPuml
+file "spec-dock/.agent/index-all.json" as IndexAll
+file "spec-dock/.agent/tree-all.json" as TreeAll
+file "spec-dock/tree-all.puml" as TreeAllPuml
 
-file "index.json" as IndexTodo
-file "tree.json" as TreeTodo
-file "tree.puml" as TreeTodoPuml
+file "spec-dock/.agent/index.json" as IndexTodo
+file "spec-dock/.agent/tree.json" as TreeTodo
+file "spec-dock/tree.puml" as TreeTodoPuml
 
-file "deps-issues.json" as DepsIssuesJson
-file "deps-issues.puml" as DepsIssuesPuml
-file "dashboard.md" as Dashboard
+file "spec-dock/.agent/deps-issues.json" as DepsIssuesJson
+file "spec-dock/deps-issues.puml" as DepsIssuesPuml
+file "spec-dock/dashboard.md" as Dashboard
 
 IndexAll --> TreeAll : view
 IndexAll --> IndexTodo : todo projection\n(filter Done + empty branches)
@@ -353,12 +360,12 @@ IndexTodo --> Dashboard : render summary
     - トップレベル `deps.valid=false` と `deps.error` を必ず出力する
     - `deps.valid=false` のときは `deps.issue_edges=[]`（空配列）を必ず出力し、直前実行の stale edge を残さない
     - issue ノードの `deps` は `null` を許容し、ready/closure を未計算として表現する（`deps.valid=true` のときのみ `deps.ready` 等が必須）
-  - `.agent/tree*.puml`:
+  - `spec-dock/tree*.puml`:
     - ヘッダに `DEPS_DISABLED` の note を表示する
     - issue の state は `done/doing/unknown` のみを用いる（ready/blocked は出さない）
-  - `.agent/deps-issues.json` / `.agent/deps-issues.puml`:
+  - `.agent/deps-issues.json` / `spec-dock/deps-issues.puml`:
     - `deps.valid=false` と error 要約のみを出し、`nodes/edges` は空で上書きする
-  - `.agent/dashboard.md`:
+  - `spec-dock/dashboard.md`:
     - `DEPS_DISABLED` と error 要約のみを出し、利用者が誤解しないよう「ready/blocked 集計は無効」と明記する
 
 #### UML（`sync --force` の分岐と stale 防止） (任意)
@@ -371,9 +378,10 @@ actor User
 participant "spec-dock\n(runtime)" as Script
 participant "SSOT\ndeps.json" as Deps
 participant ".agent\nindex(-all).json, index.json\ntree(-all).json, tree.json" as IndexTree
-participant ".agent\ntree(-all).puml, tree.puml" as TreePuml
-participant ".agent\ndeps-issues.json, deps-issues.puml" as DepsIssues
-participant ".agent\ndashboard.md" as Dashboard
+participant "spec-dock\ntree(-all).puml, tree.puml" as TreePuml
+participant ".agent\ndeps-issues.json" as DepsIssuesJson
+participant "spec-dock\ndeps-issues.puml" as DepsIssuesPuml
+participant "spec-dock\ndashboard.md" as Dashboard
 participant ".agent\ndeps.json, deps.puml, deps.todo.puml\n(legacy v1)" as Legacy
 
 User -> Script: sync --force
@@ -382,12 +390,14 @@ Script -> Deps: compile + validate
 alt deps valid
   Script -> IndexTree: emit (deps.valid=true)\n+ deps.issue_edges
   Script -> TreePuml: render normal
-  Script -> DepsIssues: render normal
+  Script -> DepsIssuesJson: render normal
+  Script -> DepsIssuesPuml: render normal
   Script -> Dashboard: render normal
 else deps invalid
   Script -> IndexTree: emit (deps.valid=false)\n+ deps.issue_edges=[]
   Script -> TreePuml: overwrite placeholder\n(DEPS_DISABLED)
-  Script -> DepsIssues: overwrite placeholder\n(nodes/edges empty)
+  Script -> DepsIssuesJson: overwrite placeholder\n(nodes/edges empty)
+  Script -> DepsIssuesPuml: overwrite placeholder\n(nodes/edges empty)
   Script -> Dashboard: overwrite placeholder\n(DEPS_DISABLED + error summary)
 end
 
@@ -438,7 +448,8 @@ package "Derived (index/tree)" {
 - CLI-001: `sync [--github] [--gh-limit N] [--force]`
   - Success:
     - `.agent/index-all.json`, `.agent/tree-all.json`, `.agent/index.json`, `.agent/tree.json` を生成
-    - `.agent/tree*.puml`, `.agent/deps-issues.{json,puml}`, `.agent/dashboard.md` を生成（deps 無効時はプレースホルダで上書き）
+    - `.agent/deps-issues.json` を生成（deps 無効時はプレースホルダで上書き）
+    - `spec-dock/tree*.puml`, `spec-dock/deps-issues.puml`, `spec-dock/dashboard.md` を生成（deps 無効時はプレースホルダで上書き）
   - Failure:
     - deps の構造エラー（未解決参照/self/cycle 等）は exit=1（`--force` なら exit=0 で継続し、deps派生物は無効化プレースホルダにする）
 - CLI-002: `deps check <target> [--github] [--gh-limit N] [--json]`
@@ -467,7 +478,9 @@ package "Derived (index/tree)" {
 - IF-002: `spec-dock::_derive_issue_deps(nodes, issue_status_by_id, depends_on_edges) -> per_issue_deps`
   - Output: `ready`, `depends_on(closure, Done除外)` 等
 - IF-003: `spec-dock::_emit_agent_artifacts(...)`
-  - Output: `index-*.json`, `tree-*.json`, `tree*.puml`, `deps-issues.*`, `dashboard.md`
+  - Output:
+    - 機械可読: `.agent/index-*.json`, `.agent/tree-*.json`, `.agent/deps-issues.json`
+    - 人間向け: `spec-dock/tree*.puml`, `spec-dock/deps-issues.puml`, `spec-dock/dashboard.md`
 
 ### UML（任意） (任意)
 ```plantuml
@@ -492,7 +505,10 @@ Derive --> RenderDash
 ### クラス/インターフェース詳細設計（主要なもの） (任意)
 > この Issue を “単独の作業単位” として完結させるために、必要な範囲だけ詳細化する。
 
-- この実装は runtime script 1ファイル運用のため、クラス新設よりも “小さな純関数” を追加して責務分割する。
+- runtime は target repo にコピーされる Python（stdlib only）として運用する。
+  - `spec-dock/scripts/spec-dock` は **薄い CLI エントリポイント**に留める
+  - 主要ロジックは `spec-dock/scripts/spec_dock_runtime/` に責務分割し、肥大化を抑える（モジュール設計）
+  - 起動経路（`./spec` wrapper / symlink 等）に依存せず import できるよう、entrypoint は `Path(__file__).resolve().parent` を基準に `sys.path` を固定した上で `spec_dock_runtime` を import する（`spec_dock_runtime/__init__.py` を置き package として扱う）
 
 #### UML（任意） (任意)
 ```plantuml
@@ -504,13 +520,48 @@ rectangle "compile\n(shorthand->issue)" as Compile
 rectangle "validate\n(desc/self/cycle)" as Validate
 rectangle "enrich\n(--github)" as Enrich
 rectangle "derive\n(ready/closure)" as Derive
-rectangle "emit\n(index/tree/puml/md)" as Emit
+rectangle "emit\n(json -> .agent/\n(puml, md) -> spec-dock/" as Emit
 
 Scan --> Compile
 Compile --> Validate
 Validate --> Enrich
 Enrich --> Derive
 Derive --> Emit
+@enduml
+```
+
+#### UML（モジュール構成） (任意)
+```plantuml
+@startuml
+skinparam shadowing false
+
+rectangle "spec-dock/scripts/spec-dock\n(entrypoint)" as Entry
+
+package "spec-dock/scripts/spec_dock_runtime" {
+  rectangle "cli\n(argparse / dispatch)" as CLI
+  rectangle "sync\n(pipeline orchestrator)" as Sync
+  rectangle "deps\n(load/compile/validate/closure)" as Deps
+  rectangle "github\n(enrich via gh)" as GH
+  rectangle "derive\n(ready/state/blockers)" as Derive
+  rectangle "artifacts_json\n(.agent/*.json)" as ArtJson
+  rectangle "artifacts_human\n(spec-dock/*.puml, dashboard.md)" as ArtHuman
+  rectangle "util\n(sort/hash/fs)" as Util
+}
+
+Entry --> CLI
+CLI --> Sync
+
+Sync --> Deps
+Sync --> GH
+Sync --> Derive
+
+Derive --> ArtJson
+Derive --> ArtHuman
+
+Deps --> Util
+GH --> Util
+ArtJson --> Util
+ArtHuman --> Util
 @enduml
 ```
 
@@ -539,10 +590,14 @@ Derive --> Emit
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
-  - （なし。設計としては runtime script 内の関数追加で完結させる）
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`
+    - 役割ごとに分割した runtime モジュール群（stdlib only）
 - 変更（Modify）:
+  - `src/spec_dock/assets/spec_dock/.gitignore`
+    - 人間向け生成物（`tree*.puml`, `deps-issues.puml`, `dashboard.md`）を ignore に追加（この `.gitignore` 自体が `spec-dock/` 直下に配置される前提）
   - `src/spec_dock/assets/spec_dock/scripts/spec-dock`
-    - `sync` の生成物を v2（index/tree all/todo + tree puml + deps-issues.* + dashboard）へ更新
+    - CLI エントリポイントを薄く保ち、主要ロジックを `spec_dock_runtime/` へ委譲する
+    - `sync` の生成物を v2（index/tree all/todo + deps-issues.json + human-facing puml/md）へ更新
     - deps compile を “issue→issue へ還元” するロジックに置換
     - legacy: `.agent/deps.json` / `.agent/deps.puml` / `.agent/deps.todo.puml` の生成を廃止し、`sync` 実行時に存在していれば削除する（stale 誤読防止）
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md` / `reference_deps.md`
@@ -615,7 +670,9 @@ Derive --> Emit
 ## ディレクトリ/ファイル構成図（変更点の見取り図） (任意)
 ```text
 <repo-root>/
-├── src/spec_dock/assets/spec_dock/scripts/spec-dock          # Modify (deps v2 + artifacts)
+├── src/spec_dock/assets/spec_dock/.gitignore                # Modify (ignore human-facing generated artifacts)
+├── src/spec_dock/assets/spec_dock/scripts/spec-dock          # Modify (thin CLI entrypoint)
+├── src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ # Add (runtime modules; stdlib only)
 ├── src/spec_dock/assets/spec_dock/docs/reference_sync.md     # Modify (artifacts)
 ├── src/spec_dock/assets/spec_dock/docs/reference_deps.md     # Modify (deps v2)
 ├── tests/test_cli.py                                         # Modify (regression)
@@ -625,14 +682,16 @@ Derive --> Emit
 <target-repo>/spec-dock/.agent/
 ├── index-all.json
 ├── tree-all.json
-├── tree-all.puml
 ├── index.json
 ├── tree.json
-├── tree.puml
 ├── deps-issues.json
-├── deps-issues.puml
-├── dashboard.md
 └── active.json
+
+<target-repo>/spec-dock/
+├── tree-all.puml
+├── tree.puml
+├── deps-issues.puml
+└── dashboard.md
 ```
 
 ## 省略/例外メモ (必須)

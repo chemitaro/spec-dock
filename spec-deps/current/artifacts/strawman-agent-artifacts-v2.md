@@ -43,11 +43,11 @@
 #### Derived（PlantUML: dashboard / visualization）
 | 種別 | パス（案） | 対象 | 目的 |
 |---|---|---|---|
-| Board | `spec-dock/.agent/tree-all.puml` | all | Readyボード（all） |
-| Board | `spec-dock/.agent/tree.puml` | todo | Readyボード（todo） |
-| Viz | `spec-dock/.agent/deps-issues.puml` | todo | issue-only 依存グラフ（todo-only） |
+| Board | `spec-dock/tree-all.puml` | all | Readyボード（all） |
+| Board | `spec-dock/tree.puml` | todo | Readyボード（todo） |
+| Viz | `spec-dock/deps-issues.puml` | todo | issue-only 依存グラフ（todo-only） |
 | Export | `spec-dock/.agent/deps-issues.json` | todo | issue-only 依存グラフ（構造化 / エージェント向け） |
-| Dashboard | `spec-dock/.agent/dashboard.md` | todo | ready/blocked/unknown の要約（導線） |
+| Dashboard | `spec-dock/dashboard.md` | todo | ready/blocked/unknown の要約（導線） |
 
 補足:
 - `.agent/active.json` は引き続き「現在の作業点」を示す（派生だが運用上重要）。
@@ -79,9 +79,9 @@ database "deps.json\n(SSOT)" as Deps
 rectangle "sync\n(scan/load/compile/validate/enrich)" as Sync
 database ".agent/index-all.json\n.agent/tree-all.json" as All
 database ".agent/index.json\n.agent/tree.json" as Todo
-database ".agent/tree-all.puml\n.agent/tree.puml" as TreePuml
-database ".agent/deps-issues.json\n.agent/deps-issues.puml" as DepsIssues
-file ".agent/dashboard.md" as Dashboard
+database "spec-dock/tree-all.puml\nspec-dock/tree.puml" as TreePuml
+database ".agent/deps-issues.json\nspec-dock/deps-issues.puml" as DepsIssues
+file "spec-dock/dashboard.md" as Dashboard
 rectangle "gh\n(optional)" as GH
 
 Meta --> Sync

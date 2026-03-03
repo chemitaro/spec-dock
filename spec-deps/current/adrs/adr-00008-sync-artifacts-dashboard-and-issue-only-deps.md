@@ -4,21 +4,24 @@ ID: "ADR-00008"
 タイトル: "sync の出力成果物: dashboard.md の採用 / issue-only deps を todo-only に固定（focus 廃止）"
 状態: "accepted"
 作成者: "Codex CLI"
-最終更新: "2026-03-01"
+最終更新: "2026-03-03"
 親: ["iss-00010"]
 ---
 
 # ADR-00008 sync の出力成果物: dashboard.md の採用 / issue-only deps を todo-only に固定（focus 廃止）
 
+> 注記（2026-03-03）: 人間向け生成物の配置を `.agent/` から `spec-dock/` 直下へ移動（ADR-00009）。
+> 本 ADR の決定（生成物の種類・スコープ）は維持し、パス表記のみ更新しました。
+
 ## 結論（Decision） (必須)
 以下を採用する。
 
-- `sync` は `.agent/dashboard.md`（todo-only）を生成する
+- `sync` は `spec-dock/dashboard.md`（todo-only）を生成する
   - 目的: 人間/エージェントが “次にやれる / 詰まり / unknown” を素早く把握できる導線にする
 - `sync` は issue-only の依存グラフを **todo-only** として生成する（Done 除外）
   - 構造化（エージェント向け）: `spec-dock/.agent/deps-issues.json`
-  - 可視化（人間向け）: `spec-dock/.agent/deps-issues.puml`
-- `.agent/focus/**`（例: `spec-dock/.agent/focus/deps-issues-<iss-id>.puml`）の “フォーカス図” は **生成しない**
+  - 可視化（人間向け）: `spec-dock/deps-issues.puml`
+- per-issue の “フォーカス図” は **生成しない**
 - コーディングエージェントは **JSON を主に読む**（PlantUML をパースして仕様判断しない）
   - 判断に必要な情報は `index*.json`（および投影である `deps-issues.json`）で完結させる
 
@@ -34,12 +37,12 @@ database ".agent/tree-all.json\n(all)" as TreeAll
 database ".agent/index.json\n(todo)" as IndexTodo
 database ".agent/tree.json\n(todo)" as TreeTodo
 
-file ".agent/dashboard.md\n(todo)" as Dashboard
+file "spec-dock/dashboard.md\n(todo)" as Dashboard
 database ".agent/deps-issues.json\n(todo)" as DepsIssuesJson
-file ".agent/deps-issues.puml\n(todo)" as DepsIssuesPuml
+file "spec-dock/deps-issues.puml\n(todo)" as DepsIssuesPuml
 
-file ".agent/tree-all.puml\n(all)" as TreeAllPuml
-file ".agent/tree.puml\n(todo)" as TreeTodoPuml
+file "spec-dock/tree-all.puml\n(all)" as TreeAllPuml
+file "spec-dock/tree.puml\n(todo)" as TreeTodoPuml
 
 Sync --> IndexAll
 Sync --> TreeAll
@@ -123,3 +126,4 @@ Follow-ups（追加の Epic/Issue/ADR）:
 - `spec-deps/current/requirement.md`
 - `spec-deps/current/artifacts/output-artifacts-proposal.md`
 - `spec-deps/current/adrs/adr-00007-issue-only-deps-visualization.md`
+- `spec-deps/current/adrs/adr-00009-human-facing-artifacts-at-spec-dock-root.md`

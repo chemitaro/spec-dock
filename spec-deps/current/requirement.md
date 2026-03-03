@@ -33,7 +33,8 @@ ID: "iss-00010"
   2) `.agent/deps.puml` を見ると、包含（ツリー）と依存（矢印）が混ざり、Ready/Blocked の判定が図だけでは直感的でないケースがある
 - 観測点（どこを見て確認するか）:
   - CLI: `./spec`（wrapper）/ `spec-dock/scripts/spec-dock`（runtime script）
-  - Derived: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `spec-dock/.agent/*.puml`
+  - Derived（機械可読）: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `spec-dock/.agent/deps-issues.json`
+  - Derived（人間向け）: `spec-dock/tree*.puml` / `spec-dock/deps-issues.puml` / `spec-dock/dashboard.md`
   - Docs: `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `reference_sync.md`
 - 実際の観測結果（貼れる範囲で）:
   - `sync` は包含ツリーを `.agent/tree*.json` に出せるが、Ready/Blocked をツリー上で表現する “矢印なしビュー” が無い
@@ -93,16 +94,17 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - `active set <target>` は canonical 依存に基づいてガードされ、blocked の場合はデフォルトで失敗し active を更新しない（`--force` でのみ例外化）。
   - `sync` は `.agent/index*.json` / `.agent/tree*.json`（todo/all）に、少なくとも以下の deps 派生情報を含める:
     - issue: 既存の `status`（open/done/active 等）とは **別フィールド**で、依存起因の状態（例: `ready` / `blocked`）を判定できる
-      - 例: `ready`（bool）と、blocked理由の summary（例: `blockers_summary` / `blockers_top`）
+      - フィールド例: `deps.ready`（bool）と `deps.blockers_top`（list。表示用の上位N件）
     - issue: “依存している（merge 済み）issue” を機械的に扱える情報を保持できる
       - 推移依存（closure）を含み、Done 依存は除外する（決定事項 D-004）
+      - フィールド例: `deps.depends_on`（list。推移依存 closure / Done除外 / 決定的順序）
     - 依存グラフ（canonical issue edges）をツール/エージェントが機械判定できる形で保持（例: `index.json` のトップレベル `deps.issue_edges`）
   - `sync` は PlantUML の **Readyボード（矢印なしツリー）**を生成できる（initiative→epic→issue の階層をそのまま表示し、各 issue の READY/BLOCKED/DOING/DONE/UNKNOWN を明示）。
-    - 生成物: `spec-dock/.agent/tree.puml`（todo）/ `spec-dock/.agent/tree-all.puml`（all）
+    - 生成物: `spec-dock/tree.puml`（todo）/ `spec-dock/tree-all.puml`（all）
   - `sync` は **issue-only 依存グラフ**を todo-only として生成できる（initiative/epic を除外し、issue のみで依存を描く。Done issue は除外）。
     - 構造化: `spec-dock/.agent/deps-issues.json`
-    - 可視化: `spec-dock/.agent/deps-issues.puml`
-  - `sync` は `.agent/dashboard.md`（todo-only）を生成できる（“次にやれる/詰まり/unknown” の要約と導線）。
+    - 可視化: `spec-dock/deps-issues.puml`
+  - `sync` は `spec-dock/dashboard.md`（todo-only）を生成できる（“次にやれる/詰まり/unknown” の要約と導線）。
   - shorthand 依存の展開結果が空（依存先 epic/initiative に issue が無い）場合は **エラーにしない**（ブロックしない）。ただし「空だった」事実は warnings/summary として観測できる。
   - canonical issue グラフ上で **自己依存/循環依存（cycle）**を検出し、構造エラーとして止める（エラーは “どの deps.json のどの参照が原因か” を説明できる）。
   - Unknown（GitHub状態未取得/未リンク/取得漏れ等）は安全側（blocked）に倒し、warn code（例: `gh_fetch_failed`, `gh_index_incomplete`）を安定化する。
@@ -169,7 +171,7 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Then:
     - `.agent/index-all.json` / `.agent/tree-all.json` が生成される（all）
     - `.agent/index.json` / `.agent/tree.json` が生成される（todo = Done除外）
-    - index/tree（all/todo）の issue ノードに `ready`（bool）と blockers summary が出力される
+    - index/tree（all/todo）の issue ノードに `deps.ready`（bool）/ `deps.blockers_top`（list）/ `deps.depends_on`（list）が出力される
     - index（all/todo）のトップレベルに canonical issue 依存（例: `deps.issue_edges`）が出力される
   - 観測点: `spec-dock/.agent/index.json` / `spec-dock/.agent/tree.json` / `spec-dock/.agent/index-all.json` / `spec-dock/.agent/tree-all.json`
 - AC-002:
@@ -203,13 +205,13 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Given: deps 情報が解決できる（構造エラーなし）
   - When: `./spec sync` を実行する
   - Then: PlantUML の Readyボード（矢印なしツリー）が生成され、READY/BLOCKED/DOING/DONE/UNKNOWN がラベルで区別できる
-  - 観測点: `spec-dock/.agent/tree*.puml`（todo/all）
+  - 観測点: `spec-dock/tree.puml` / `spec-dock/tree-all.puml`
 - AC-011:
   - Actor/Role: 開発者 / エージェント
   - Given: deps 情報が解決できる（構造エラーなし）
   - When: `./spec sync` を実行する
   - Then: PlantUML の issue-only 依存グラフ（todo-only）が生成され、READY/BLOCKED/DOING/UNKNOWN が色/ラベルで区別できる
-  - 観測点: `spec-dock/.agent/deps-issues.puml`
+  - 観測点: `spec-dock/deps-issues.puml`
 - AC-012:
   - Actor/Role: 開発者 / エージェント
   - Given: deps 情報が解決できる（構造エラーなし）
@@ -220,8 +222,8 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Actor/Role: 開発者 / エージェント
   - Given: `./spec sync` が成功する
   - When: `./spec sync` を実行する
-  - Then: `.agent/dashboard.md` が生成され、“次にやれる/詰まり/unknown” の要約を確認できる（`index.json` / `tree.puml` / `deps-issues.puml` の導線がある）
-  - 観測点: `spec-dock/.agent/dashboard.md`
+  - Then: `spec-dock/dashboard.md` が生成され、“次にやれる/詰まり/unknown” の要約を確認できる（`index.json` / `tree.puml` / `deps-issues.puml` の導線がある）
+  - 観測点: `spec-dock/dashboard.md`
 - AC-007:
   - Actor/Role: 開発者 / エージェント
   - Given: `--github` を指定していない
@@ -247,7 +249,7 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Then:
     - index/tree の更新は継続する（既存挙動）
     - deps 派生物は stale にならない（無効化/削除/`deps: null` 等で誤用防止できる）
-  - 観測点: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `.agent/*.puml`
+  - 観測点: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `spec-dock/.agent/deps-issues.json` / `spec-dock/*.puml` / `spec-dock/dashboard.md`
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -309,6 +311,8 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - 参照: `spec-deps/current/adrs/adr-00004-ready-board-artifact-naming.md`
 - D-007: `sync` の生成物として `dashboard.md` を採用し、issue-only deps は `deps-issues.json` + `deps-issues.puml`（todo-only）を生成する。focus 図は生成しない
   - 参照: `spec-deps/current/adrs/adr-00008-sync-artifacts-dashboard-and-issue-only-deps.md`
+- D-008: 人間向け生成物（PlantUML / dashboard）は `spec-dock/` 直下に配置し、`.agent/` は機械可読（JSON）を中心に扱う
+  - 参照: `spec-deps/current/adrs/adr-00009-human-facing-artifacts-at-spec-dock-root.md`
 
 ## 未確定事項（TBD / 要確認） (必須)
 - 該当なし

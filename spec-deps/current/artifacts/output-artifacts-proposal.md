@@ -35,6 +35,11 @@
 - PlantUML は「人間の視覚化」用途に寄せ、**エージェントが仕様としてパースする前提にしない**（表現の揺れ/レイアウト依存/将来変更の影響が大きい）。
 - したがって、依存グラフの “判断に必要な情報” は `index*.json`（およびその投影）で完結させる。
 
+### 2.7 人間向け生成物は `spec-dock/` 直下、機械可読は `.agent/`
+- 人間がクイックに開けるよう、PlantUML と dashboard は `spec-dock/` 直下へ配置する。
+- `.agent/` は JSON（機械可読）の観測点として固定する。
+- これら人間向け生成物は生成物なので、`spec-dock/.gitignore` で一律 ignore する（git 状態を汚さない）。
+
 ## 3. 出力ファイル一覧（提案）
 凡例:
 - MUST = 生成必須（運用の観測点）
@@ -49,11 +54,11 @@
 | MUST | `spec-dock/.agent/tree.json` | JSON | todo | `sync` | human/agent | `index.json` の表示用ビュー（包含ツリー） |
 | MUST | `spec-dock/.agent/tree-all.json` | JSON | all | `sync` | human/agent | all 版ツリー |
 | MUST | `spec-dock/.agent/active.json` | JSON | n/a | `active set` / `sync` | agent/human | 現在の作業点（ポインタ） |
-| MUST | `spec-dock/.agent/tree.puml` | PlantUML | todo | `sync` | human | Readyボード（矢印なし tree + 状態表示） |
-| MUST | `spec-dock/.agent/tree-all.puml` | PlantUML | all | `sync` | human | all 版 Readyボード |
+| MUST | `spec-dock/tree.puml` | PlantUML | todo | `sync` | human | Readyボード（矢印なし tree + 状態表示） |
+| MUST | `spec-dock/tree-all.puml` | PlantUML | all | `sync` | human | all 版 Readyボード |
 | MUST | `spec-dock/.agent/deps-issues.json` | JSON | todo | `sync` | agent/human | **issue-only 依存グラフ（投影）**（`index.json` から issue のみ抽出したグラフ: edges + closure + ready/blockers） |
-| MUST | `spec-dock/.agent/deps-issues.puml` | PlantUML | todo | `sync` | human | **issue-only 依存グラフ（可視化）**（完了済み除外の俯瞰） |
-| MUST | `spec-dock/.agent/dashboard.md` | Markdown | todo | `sync` | human/agent | “次にやれる/詰まり/unknown” の要約（indexから生成） |
+| MUST | `spec-dock/deps-issues.puml` | PlantUML | todo | `sync` | human | **issue-only 依存グラフ（可視化）**（完了済み除外の俯瞰） |
+| MUST | `spec-dock/dashboard.md` | Markdown | todo | `sync` | human/agent | “次にやれる/詰まり/unknown” の要約（indexから生成） |
 
 補足（ユーザー要望反映）:
 - issue-only 依存グラフは **todo のみ**を生成する（all は生成しない）。必要なら `index-all.json` から投影で再構築できる。
@@ -67,9 +72,9 @@
 ## 4. `index*.json` に載せるべき情報（agent が “迷わず判断” するため）
 最小でも issue ノードに以下を持たせる（詳細フィールド名は design で確定）:
 - `status`（open/done/unknown）: GitHub enrich or cached snapshot
-- `ready`（bool）: deps による着手可否（unknown は false 扱い）
+- `deps.ready`（bool）: deps による着手可否（unknown は false 扱い）
 - `deps.depends_on`（list）: **推移依存（closure）**（Done除外）…決定済み（ADR-00005）
-- `deps.blockers_summary`（短い文字列 or top N）: human/表示向け
+- `deps.blockers_top`（list）: blocked 理由の上位N件（表示向け。詳細は `deps.depends_on` / `deps check --json`）
 - `warnings`（list）: `gh_fetch_failed`, `gh_index_incomplete`, `deps_preflight_failed` 等
 
 加えて、indexトップレベルに direct edges を 1回だけ保持:
@@ -84,7 +89,7 @@
 ## 5. stale（古い生成物の誤用）を防ぐルール
 - deps preflight が失敗した場合:
   - `index/tree` は更新できても、deps 派生は **無効**になる
-  - 無効状態は `deps_valid=false`（例）等で **index/tree に明示**する
+  - 無効状態は `deps.valid=false`（例）等で **index/tree に明示**する
   - `*.puml` は「削除」か「無効プレースホルダで上書き」のどちらかに統一（旧内容を残さない）
 
 ## 6. 生成の流れ（実装イメージ）
@@ -97,8 +102,8 @@ database "deps.json\n(SSOT)" as Deps
 rectangle "sync\n(scan/load/compile/validate/enrich)" as Sync
 database ".agent/index-all.json\n.agent/tree-all.json" as All
 database ".agent/index.json\n.agent/tree.json" as Todo
-database ".agent/tree-all.puml\n.agent/tree.puml" as TreePuml
-database ".agent/deps-issues.json\n.agent/deps-issues.puml" as DepsIssues
+database "spec-dock/tree-all.puml\nspec-dock/tree.puml" as TreePuml
+database ".agent/deps-issues.json\nspec-dock/deps-issues.puml" as DepsIssues
 
 Meta --> Sync
 Deps --> Sync
