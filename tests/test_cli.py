@@ -1037,6 +1037,191 @@ class TestCli(unittest.TestCase):
             self.assertNotIn("iss-00301", puml)
             self.assertIn("Niss_00303 --> Niss_00302 : blocks", puml)
 
+    def test_sync_emits_tree_puml_ready_board_at_spec_dock_root(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Done issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Blocked issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Ready issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Ready second"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "305", "--title", "Doing issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "306", "--title", "Unknown issue"],
+            )
+
+            issues_root = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+            )
+            (issues_root / "iss-00302-blocked-issue" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [303]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (issues_root / "iss-00304-ready-second" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p_active = self._run_runtime_capture(target, ["active", "set", "305", "--force", "--no-checkout"])
+            self.assertEqual(p_active.returncode, 0, p_active.stdout + p_active.stderr)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Done", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Blocked", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 303, "state": "OPEN", "title": "Ready", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 304, "state": "OPEN", "title": "Ready2", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 305, "state": "OPEN", "title": "Doing", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            tree_all_puml_path = target / "spec-dock" / "tree-all.puml"
+            tree_todo_puml_path = target / "spec-dock" / "tree.puml"
+            self.assertTrue(tree_all_puml_path.is_file())
+            self.assertTrue(tree_todo_puml_path.is_file())
+
+            tree_all_puml = tree_all_puml_path.read_text(encoding="utf-8")
+            self.assertIn("iss-00301\\n[DONE]", tree_all_puml)
+            self.assertIn("iss-00302\\n[BLOCKED]", tree_all_puml)
+            self.assertIn("iss-00303\\n[READY]", tree_all_puml)
+            self.assertIn("iss-00305\\n[DOING]", tree_all_puml)
+            self.assertIn("iss-00306\\n[UNKNOWN]", tree_all_puml)
+            self.assertIn("blockers:", tree_all_puml)
+
+            tree_todo_puml = tree_todo_puml_path.read_text(encoding="utf-8")
+            self.assertNotIn("iss-00301", tree_todo_puml)
+            self.assertIn("iss-00302", tree_todo_puml)
+            self.assertIn("iss-00303", tree_todo_puml)
+            self.assertIn("iss-00305", tree_todo_puml)
+            self.assertIn("iss-00306", tree_todo_puml)
+
+    def test_sync_emits_dashboard_md_at_spec_dock_root(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Done issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Blocked issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Ready issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Unknown issue"],
+            )
+
+            issues_root = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+            )
+            (issues_root / "iss-00302-blocked-issue" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [303]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Done", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Blocked", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 303, "state": "OPEN", "title": "Ready", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            dashboard_path = target / "spec-dock" / "dashboard.md"
+            self.assertTrue(dashboard_path.is_file())
+            dashboard = dashboard_path.read_text(encoding="utf-8")
+            self.assertIn("spec-dock/.agent/index.json", dashboard)
+            self.assertIn("spec-dock/tree.puml", dashboard)
+            self.assertIn("spec-dock/deps-issues.puml", dashboard)
+            self.assertIn("## Ready", dashboard)
+            self.assertIn("## Blocked", dashboard)
+            self.assertIn("## Unknown", dashboard)
+            self.assertIn("`iss-00303`", dashboard)
+            self.assertIn("`iss-00302`", dashboard)
+            self.assertIn("blockers: iss-00303", dashboard)
+            self.assertIn("`iss-00304`", dashboard)
+            self.assertNotIn("`iss-00301`", dashboard)
+
+    def test_spec_dock_gitignore_ignores_human_facing_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn("tree-all.puml", gitignore)
+            self.assertIn("tree.puml", gitignore)
+            self.assertIn("deps-issues.puml", gitignore)
+            self.assertIn("dashboard.md", gitignore)
+
     def test_new_rejects_duplicate_id_with_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
