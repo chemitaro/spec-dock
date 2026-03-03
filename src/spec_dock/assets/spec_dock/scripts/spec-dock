@@ -1124,9 +1124,9 @@ def _apply_active_pointers(specdock_dir: Path, current: dict[str, Any] | None) -
 
 
 def _patch_agent_state_active_fields(specdock_dir: Path, current: dict[str, Any]) -> None:
-    """Best-effort: patch cached derived state (`index.json` / `tree.json`) with the latest `active`."""
+    """Best-effort: patch cached derived state with the latest `active`."""
     agent_dir = specdock_dir / _AGENT_DIRNAME
-    for name in ("index.json", "tree.json"):
+    for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
         path = agent_dir / name
         if not path.is_file():
             continue
@@ -2121,15 +2121,22 @@ def _sync(
     state_tree_todo_path = agent_dir / "tree.json"
     state_index_all_path = agent_dir / "index-all.json"
     state_tree_all_path = agent_dir / "tree-all.json"
-    state_index_path = state_index_todo_path
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_github_by_id: dict[str, dict[str, Any]] = {}
-    if not github and state_index_path.is_file():
-        try:
-            cached_index = _load_json(state_index_path)
-        except RuntimeError:
-            cached_index = None
+    if not github:
+        cached_index: dict[str, Any] | None = None
+        for state_index_path in (state_index_all_path, state_index_todo_path):
+            if not state_index_path.is_file():
+                continue
+            try:
+                loaded = _load_json(state_index_path)
+            except RuntimeError:
+                continue
+            if isinstance(loaded, dict):
+                cached_index = loaded
+                break
+
         if isinstance(cached_index, dict):
             raw_nodes = cached_index.get("nodes")
             if isinstance(raw_nodes, dict):
@@ -2488,24 +2495,31 @@ def _deps_evaluate(
 
     index_issue_status_by_id: dict[str, str] = {}
     if not github:
-        state_index_path = specdock_dir / _AGENT_DIRNAME / "index.json"
-        if state_index_path.is_file():
+        agent_dir = specdock_dir / _AGENT_DIRNAME
+        state_index: dict[str, Any] | None = None
+        for state_index_path in (agent_dir / "index-all.json", agent_dir / "index.json"):
+            if not state_index_path.is_file():
+                continue
             try:
-                state_index = _load_json(state_index_path)
+                loaded = _load_json(state_index_path)
             except RuntimeError:
-                state_index = None
-            if isinstance(state_index, dict):
-                raw_nodes = state_index.get("nodes")
-                if isinstance(raw_nodes, dict):
-                    for issue_id, item in raw_nodes.items():
-                        if not isinstance(issue_id, str) or not isinstance(item, dict):
-                            continue
-                        raw_status = item.get("status")
-                        if not isinstance(raw_status, str):
-                            continue
-                        status = raw_status.strip().lower()
-                        if status in ("done", "open", "unknown"):
-                            index_issue_status_by_id[issue_id] = status
+                continue
+            if isinstance(loaded, dict):
+                state_index = loaded
+                break
+
+        if isinstance(state_index, dict):
+            raw_nodes = state_index.get("nodes")
+            if isinstance(raw_nodes, dict):
+                for issue_id, item in raw_nodes.items():
+                    if not isinstance(issue_id, str) or not isinstance(item, dict):
+                        continue
+                    raw_status = item.get("status")
+                    if not isinstance(raw_status, str):
+                        continue
+                    status = raw_status.strip().lower()
+                    if status in ("done", "open", "unknown"):
+                        index_issue_status_by_id[issue_id] = status
 
     # Map issue GitHub state (OPEN/CLOSED) to a minimal done/open/unknown status.
     issue_status_by_id: dict[str, str] = {}

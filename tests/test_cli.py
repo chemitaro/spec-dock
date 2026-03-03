@@ -548,8 +548,16 @@ class TestCli(unittest.TestCase):
                                 ids.add(issue_id)
                 return ids
 
-            self.assertEqual(set(index_all["nodes"].keys()), _collect_tree_node_ids(tree_all["tree"]))
-            self.assertEqual(set(index_todo["nodes"].keys()), _collect_tree_node_ids(tree_todo["tree"]))
+            index_all_nodes = set(index_all["nodes"].keys())
+            tree_all_nodes = _collect_tree_node_ids(tree_all["tree"])
+            index_todo_nodes = set(index_todo["nodes"].keys())
+            tree_todo_nodes = _collect_tree_node_ids(tree_todo["tree"])
+
+            self.assertNotEqual(index_all_nodes, set())
+            self.assertEqual(index_all_nodes, tree_all_nodes)
+            self.assertEqual(index_todo_nodes, tree_todo_nodes)
+            self.assertTrue(index_todo_nodes.issubset(index_all_nodes))
+            self.assertEqual(index_all_nodes, index_todo_nodes)
 
     def test_new_rejects_duplicate_id_with_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3581,10 +3589,12 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Cycle B"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target C"])
 
-            # Prepare cached `.agent/index.json` / `.agent/tree.json` to verify active-only patching.
+            # Prepare cached `.agent/index*.json` / `.agent/tree*.json` to verify active-only patching.
             self._run_runtime(target, ["sync", "--no-update-active"])
 
             agent_dir = target / "spec-dock" / ".agent"
+            self.assertTrue((agent_dir / "index-all.json").is_file())
+            self.assertTrue((agent_dir / "tree-all.json").is_file())
             self.assertTrue((agent_dir / "index.json").is_file())
             self.assertTrue((agent_dir / "tree.json").is_file())
 
@@ -3615,9 +3625,13 @@ class TestCli(unittest.TestCase):
             active = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-local-00003")
 
-            # `active set` must not run `sync`: it should only patch the cached index/tree active field.
+            # `active set` must not run `sync`: it should only patch the cached active field.
+            state_index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
+            state_tree_all = json.loads((agent_dir / "tree-all.json").read_text(encoding="utf-8"))
             state_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
             state_tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertEqual(state_index_all["active"]["issue"]["id"], "iss-local-00003")
+            self.assertEqual(state_tree_all["active"]["issue"]["id"], "iss-local-00003")
             self.assertEqual(state_index["active"]["issue"]["id"], "iss-local-00003")
             self.assertEqual(state_tree["active"]["issue"]["id"], "iss-local-00003")
 
@@ -3705,6 +3719,14 @@ class TestCli(unittest.TestCase):
                 target, ["sync", "--github", "--no-update-active"], env=test_env
             )
             self.assertEqual(p_sync_closed.returncode, 0, p_sync_closed.stdout + p_sync_closed.stderr)
+
+            # Simulate future todo projection: `index.json` can omit done issues.
+            # non-`--github` deps guard must prefer `index-all.json` as snapshot source.
+            index_todo_path = target / "spec-dock" / ".agent" / "index.json"
+            index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
+            removed = index_todo["nodes"].pop("iss-00301", None)
+            self.assertIsNotNone(removed)
+            index_todo_path.write_text(json.dumps(index_todo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             # Guard again: no gh calls on active set without --github.
             guard_log_closed = bin_dir / "gh-guard-closed.log"
