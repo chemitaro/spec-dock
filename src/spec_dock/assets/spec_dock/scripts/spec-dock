@@ -2350,6 +2350,20 @@ def _sync(
     _write_json(state_index_todo_path, state_index_todo)
     _write_json(state_tree_todo_path, state_tree_todo)
 
+    deps_issues_json_path = agent_dir / "deps-issues.json"
+    deps_issues_puml_path = specdock_dir / "deps-issues.puml"
+    if not deps_preflight_failed:
+        deps_issues_state = _build_deps_issues_state(
+            out_nodes,
+            deps_issue_edges_all,
+            active=current if isinstance(current, dict) else None,
+        )
+        _write_json(deps_issues_json_path, deps_issues_state)
+        deps_issues_puml_path.write_text(_render_deps_issues_puml(deps_issues_state), encoding="utf-8")
+    else:
+        deps_issues_json_path.unlink(missing_ok=True)
+        deps_issues_puml_path.unlink(missing_ok=True)
+
     # Deps derived state (optional when preflight failed forced).
     deps_json_path = agent_dir / "deps.json"
     deps_puml_path = agent_dir / "deps.puml"
@@ -3202,6 +3216,160 @@ def _derive_issue_deps_fields(
         }
 
     return derived
+
+
+def _build_deps_issues_state(
+    index_nodes: dict[str, Any],
+    deps_issue_edges: list[dict[str, str]],
+    *,
+    active: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Build todo-only issue projection for `.agent/deps-issues.json`."""
+    active_issue_id = _active_entry_id(active.get("issue")) if isinstance(active, dict) else None
+
+    issue_nodes: dict[str, Any] = {}
+    for node_id in sorted(index_nodes.keys(), key=_deps_node_sort_key):
+        item = index_nodes.get(node_id)
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "issue":
+            continue
+
+        status = str(item.get("status") or "unknown")
+        if status == "done":
+            continue
+
+        deps = item.get("deps")
+        ready = False
+        depends_on: list[str] = []
+        if isinstance(deps, dict):
+            raw_ready = deps.get("ready")
+            if isinstance(raw_ready, bool):
+                ready = raw_ready
+            raw_depends_on = deps.get("depends_on")
+            if isinstance(raw_depends_on, list):
+                depends_on = [str(dep_id) for dep_id in raw_depends_on if isinstance(dep_id, str)]
+
+        if active_issue_id == node_id:
+            state = "doing"
+        elif status == "unknown":
+            state = "unknown"
+        elif ready:
+            state = "ready"
+        else:
+            state = "blocked"
+
+        issue_nodes[node_id] = {
+            "id": node_id,
+            "title": item.get("title"),
+            "status": status,
+            "ready": ready,
+            "depends_on": depends_on,
+            "state": state,
+        }
+
+    issue_id_set = set(issue_nodes.keys())
+    issue_edges: list[dict[str, str]] = []
+    for edge in deps_issue_edges:
+        if not isinstance(edge, dict):
+            continue
+        from_id = edge.get("from")
+        to_id = edge.get("to")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            continue
+        if from_id not in issue_id_set or to_id not in issue_id_set:
+            continue
+        out_edge: dict[str, str] = {"from": from_id, "to": to_id}
+        kind = edge.get("kind")
+        if isinstance(kind, str) and kind:
+            out_edge["kind"] = kind
+        issue_edges.append(out_edge)
+
+    issue_edges.sort(key=lambda x: (_deps_node_sort_key(x["from"]), _deps_node_sort_key(x["to"])))
+
+    return {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+        "nodes": issue_nodes,
+        "edges": issue_edges,
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+
+def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
+    """Render issue-only todo deps graph in blocks view (prereq -> dependent)."""
+    nodes = deps_issues_state.get("nodes")
+    if not isinstance(nodes, dict):
+        raise RuntimeError("Invalid deps-issues.json: nodes must be an object")
+    raw_edges = deps_issues_state.get("edges")
+    if not isinstance(raw_edges, list):
+        raise RuntimeError("Invalid deps-issues.json: edges must be a list")
+
+    state_color = {
+        "doing": "#DAE8FC",
+        "ready": "#D5E8D4",
+        "blocked": "#F8CECC",
+        "unknown": "#EEEEEE",
+    }
+
+    def alias(node_id: str) -> str:
+        safe = re.sub(r"[^0-9A-Za-z_]", "_", node_id)
+        if not safe or safe[0].isdigit():
+            safe = "_" + safe
+        return f"N{safe}"
+
+    include_ids = sorted([node_id for node_id in nodes.keys() if isinstance(node_id, str)], key=_deps_node_sort_key)
+    include_set = set(include_ids)
+
+    lines: list[str] = []
+    lines.append("@startuml")
+    lines.append("left to right direction")
+    lines.append("skinparam shadowing false")
+    lines.append("")
+    lines.append("legend right")
+    lines.append("|= State |= Color |")
+    for state, color in (
+        ("doing", "#DAE8FC"),
+        ("ready", "#D5E8D4"),
+        ("blocked", "#F8CECC"),
+        ("unknown", "#EEEEEE"),
+    ):
+        lines.append(f"| {state} |<{color}> |")
+    lines.append("endlegend")
+    lines.append("")
+
+    for node_id in include_ids:
+        item = nodes.get(node_id)
+        if not isinstance(item, dict):
+            continue
+        state = str(item.get("state") or "unknown")
+        color = state_color.get(state, state_color["unknown"])
+        label = f"{node_id}\\n{state.capitalize()}"
+        if item.get("ready") is False:
+            label += "\\nready=false"
+        lines.append(f'rectangle "{label}" as {alias(node_id)} {color}')
+    lines.append("")
+
+    # JSON edges are depends_on (dependent -> prerequisite); reverse for blocks view.
+    block_edges: list[tuple[str, str]] = []
+    for edge in raw_edges:
+        if not isinstance(edge, dict):
+            continue
+        dependent = edge.get("from")
+        prerequisite = edge.get("to")
+        if not isinstance(dependent, str) or not isinstance(prerequisite, str):
+            continue
+        if dependent not in include_set or prerequisite not in include_set:
+            continue
+        block_edges.append((prerequisite, dependent))
+    block_edges.sort(key=lambda x: (_deps_node_sort_key(x[0]), _deps_node_sort_key(x[1])))
+    for prerequisite, dependent in block_edges:
+        lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks")
+
+    lines.append("@enduml")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) -> dict[str, list[str]]:

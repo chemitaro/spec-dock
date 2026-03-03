@@ -931,6 +931,112 @@ class TestCli(unittest.TestCase):
             self.assertEqual(deps1["depends_on"], ["iss-local-00001", "iss-local-00002", "iss-local-00003"])
             self.assertEqual(deps1["blockers_top"], deps1["depends_on"][: len(deps1["blockers_top"])])
 
+    def test_sync_emits_deps_issues_json_and_puml_todo_only(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Done prereq"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Open blocked"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Open prereq"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Open done dep"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "305", "--title", "Open isolated"],
+            )
+
+            issues_root = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+            )
+            (issues_root / "iss-00302-open-blocked" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [303]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (issues_root / "iss-00304-open-done-dep" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Done", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Blocked", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 303, "state": "OPEN", "title": "Prereq", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 304, "state": "OPEN", "title": "Done dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 305, "state": "OPEN", "title": "Isolated", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            deps_issues_path = target / "spec-dock" / ".agent" / "deps-issues.json"
+            deps_issues_puml_path = target / "spec-dock" / "deps-issues.puml"
+            self.assertTrue(deps_issues_path.is_file())
+            self.assertTrue(deps_issues_puml_path.is_file())
+
+            deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
+            self.assertEqual(deps_issues["schema_version"], 1)
+            self.assertEqual(
+                set(deps_issues["nodes"].keys()),
+                {"iss-00302", "iss-00303", "iss-00304", "iss-00305"},
+            )
+
+            node_302 = deps_issues["nodes"]["iss-00302"]
+            node_304 = deps_issues["nodes"]["iss-00304"]
+            node_305 = deps_issues["nodes"]["iss-00305"]
+            self.assertEqual(node_302["ready"], False)
+            self.assertEqual(node_302["depends_on"], ["iss-00303"])
+            self.assertEqual(node_302["state"], "blocked")
+            self.assertEqual(node_304["ready"], True)
+            self.assertEqual(node_304["depends_on"], [])
+            self.assertEqual(node_304["state"], "ready")
+            self.assertEqual(node_305["ready"], True)
+            self.assertEqual(node_305["depends_on"], [])
+            self.assertEqual(node_305["state"], "ready")
+
+            edge_pairs = [(edge["from"], edge["to"]) for edge in deps_issues["edges"]]
+            self.assertEqual(edge_pairs, [("iss-00302", "iss-00303")])
+
+            puml = deps_issues_puml_path.read_text(encoding="utf-8")
+            self.assertIn("iss-00302", puml)
+            self.assertIn("iss-00303", puml)
+            self.assertIn("iss-00305", puml)
+            self.assertNotIn("iss-00301", puml)
+            self.assertIn("Niss_00303 --> Niss_00302 : blocks", puml)
+
     def test_new_rejects_duplicate_id_with_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
