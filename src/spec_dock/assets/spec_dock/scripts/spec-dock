@@ -2048,7 +2048,11 @@ def _sync(
         update_active = False
 
     effective_deps_map_all: dict[str, list[str]] | None = None
+    issue_direct_depends_on_all: dict[str, list[str]] | None = None
+    deps_issue_edges_all: list[dict[str, str]] = []
+    deps_compile_warnings: list[str] = []
     deps_preflight_failed = False
+    sync_warnings: list[str] = []
 
     preflight = "ok"
     try:
@@ -2065,6 +2069,10 @@ def _sync(
     else:
         # Validate deps cycles across the whole graph (sync=global scope).
         try:
+            issue_direct_depends_on_all, deps_compile_warnings = _compile_issue_direct_depends_on_map(nodes)
+            _validate_deps_cycles(issue_direct_depends_on_all)
+            deps_issue_edges_all = _issue_depends_on_edges(issue_direct_depends_on_all)
+
             effective_deps_map_all = _build_effective_deps_map_all(nodes)
             _validate_deps_cycles(effective_deps_map_all)
         except RuntimeError as e:
@@ -2076,7 +2084,6 @@ def _sync(
             effective_deps_map_all = None
 
     issue_index: dict[int, dict[str, Any]] = {}
-    sync_warnings: list[str] = []
     if github:
         try:
             issue_index = _gh_issue_index(repo_root, limit=gh_limit)
@@ -2104,6 +2111,10 @@ def _sync(
                     f"missing={len(missing)} examples=[{examples}{suffix}] (hint: increase --gh-limit; current: {gh_limit})"
                 )
                 sync_warnings.append("gh_index_incomplete")
+
+    for warning_code in deps_compile_warnings:
+        if warning_code not in sync_warnings:
+            sync_warnings.append(warning_code)
 
     def sort_key(node_id: str) -> tuple[int, int, str]:
         """Deterministic sort key for ids (GitHub ids first, then local)."""
@@ -2293,6 +2304,8 @@ def _sync(
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
+        "warnings": list(sync_warnings),
+        "deps": {"issue_edges": list(deps_issue_edges_all)},
         "nodes": out_nodes,
     }
     state_tree_all = {
@@ -3031,6 +3044,92 @@ def _build_effective_deps_map_all(nodes: dict[str, _Node]) -> dict[str, list[str
     for node_id in dep_node_ids:
         effective_map[node_id] = _effective_depends_on(nodes, node_id, direct_map)
     return effective_map
+
+
+def _deps_node_sort_key(node_id: str) -> tuple[int, int, str]:
+    """Deterministic sort key for dependency-related outputs."""
+    _, is_local, num = _parse_id(node_id)
+    return (1 if is_local else 0, num, node_id)
+
+
+def _issue_ids_for_dep_node(nodes: dict[str, _Node], node_id: str) -> list[str]:
+    """Expand one dependency node id into canonical issue ids."""
+    node = nodes.get(node_id)
+    if not node:
+        raise RuntimeError(f"Node not found: {node_id}")
+
+    if node.type == "issue":
+        return [node.id]
+    if node.type == "epic":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.epic_id == node.id],
+            key=_deps_node_sort_key,
+        )
+    if node.type == "initiative":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.initiative_id == node.id],
+            key=_deps_node_sort_key,
+        )
+    raise RuntimeError(f"Unsupported dependency node type: {node.type} ({node_id})")
+
+
+def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[str, list[str]], list[str]]:
+    """Compile deps shorthand into canonical issue->issue direct dependencies."""
+    dep_node_ids = sorted(
+        [node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")],
+        key=_deps_node_sort_key,
+    )
+    issue_ids = sorted([node_id for node_id, node in nodes.items() if node.type == "issue"], key=_deps_node_sort_key)
+    issue_depends_on: dict[str, set[str]] = {issue_id: set() for issue_id in issue_ids}
+
+    warning_codes: list[str] = []
+    warned_empty_refs: set[tuple[str, str]] = set()
+
+    for src_id in dep_node_ids:
+        src_node = nodes[src_id]
+        src_issue_ids = _issue_ids_for_dep_node(nodes, src_id)
+        if not src_issue_ids:
+            continue
+
+        deps_path = src_node.path / "deps.json"
+        direct_dep_node_ids = _resolved_direct_depends_on(nodes, src_id)
+
+        for dep_node_id in direct_dep_node_ids:
+            dep_issue_ids = _issue_ids_for_dep_node(nodes, dep_node_id)
+            if not dep_issue_ids:
+                key = (src_id, dep_node_id)
+                if key not in warned_empty_refs:
+                    warned_empty_refs.add(key)
+                    if "deps_ref_expanded_to_empty" not in warning_codes:
+                        warning_codes.append("deps_ref_expanded_to_empty")
+                    _warn(
+                        "deps_ref_expanded_to_empty: "
+                        f"{src_id} depends_on={dep_node_id} expanded_to=0 (in {deps_path})"
+                    )
+                continue
+
+            for src_issue_id in src_issue_ids:
+                for dep_issue_id in dep_issue_ids:
+                    # Keep explicit self dependency (issue -> same issue) as an error signal.
+                    # But when shorthand expands a scope (init/epic), drop only implicit self edges.
+                    if dep_issue_id == src_issue_id and dep_node_id != src_issue_id:
+                        continue
+                    issue_depends_on[src_issue_id].add(dep_issue_id)
+
+    compiled = {
+        issue_id: sorted(list(issue_depends_on.get(issue_id, set())), key=_deps_node_sort_key)
+        for issue_id in issue_ids
+    }
+    return compiled, warning_codes
+
+
+def _issue_depends_on_edges(issue_depends_on: dict[str, list[str]]) -> list[dict[str, str]]:
+    """Render canonical issue direct dependencies into edge objects."""
+    edges: list[dict[str, str]] = []
+    for src_id in sorted(issue_depends_on.keys(), key=_deps_node_sort_key):
+        for dst_id in sorted(issue_depends_on.get(src_id, []), key=_deps_node_sort_key):
+            edges.append({"from": src_id, "to": dst_id, "kind": "depends_on"})
+    return edges
 
 
 def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) -> dict[str, list[str]]:
