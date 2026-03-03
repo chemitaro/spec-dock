@@ -3137,6 +3137,19 @@ class TestCli(unittest.TestCase):
             self.assertIn("deps_preflight_failed", p.stderr)
             self.assertTrue((agent_dir / "index.json").is_file())
             self.assertTrue((agent_dir / "tree.json").is_file())
+
+            index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertIsNone(index["nodes"]["iss-local-00001"]["deps"])
+            self.assertIsNone(index["nodes"]["iss-local-00002"]["deps"])
+            self.assertIsNone(index["nodes"]["iss-local-00003"]["deps"])
+
+            tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            tree_issues = tree["tree"][0]["epics"][0]["issues"]
+            tree_issue_deps = {issue["id"]: issue.get("deps") for issue in tree_issues}
+            self.assertIsNone(tree_issue_deps["iss-local-00001"])
+            self.assertIsNone(tree_issue_deps["iss-local-00002"])
+            self.assertIsNone(tree_issue_deps["iss-local-00003"])
+
             self.assertFalse((agent_dir / "deps.json").exists())
             self.assertFalse((agent_dir / "deps.puml").exists())
             self.assertFalse((agent_dir / "deps.todo.puml").exists())
