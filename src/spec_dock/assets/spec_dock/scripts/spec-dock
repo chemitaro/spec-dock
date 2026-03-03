@@ -2079,10 +2079,9 @@ def _sync(
         preflight = "failed(forced)"
         deps_preflight_failed = True
         deps_preflight_error = f"preflight validate failed: {e}"
-        print(
-            f"spec-dock: (warn) preflight validate failed; continuing due to --force: {e}",
-            file=sys.stderr,
-        )
+        _warn(f"deps_preflight_failed: preflight validate failed; continuing due to --force. Details: {e}")
+        if "deps_preflight_failed" not in sync_warnings:
+            sync_warnings.append("deps_preflight_failed")
     else:
         # Validate deps cycles across the whole graph (sync=global scope).
         try:
