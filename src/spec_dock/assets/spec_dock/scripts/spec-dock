@@ -2472,7 +2472,7 @@ def _deps_check(
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
-    result = _deps_evaluate(
+    result = _deps_evaluate_v2(
         specdock_dir,
         nodes,
         target_id=target_id,
@@ -2505,6 +2505,202 @@ def _deps_check(
                 print(f"- {b}", file=sys.stderr)
 
     return 0 if ready else 3
+
+
+def _deps_target_issue_ids(nodes: dict[str, _Node], *, target_id: str) -> list[str]:
+    """Resolve a deps-check target into issue ids for canonical issue graph evaluation."""
+    target = nodes.get(target_id)
+    if not target:
+        raise RuntimeError(f"Node not found: {target_id}")
+
+    if target.type == "issue":
+        return [target.id]
+    if target.type == "epic":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.epic_id == target.id],
+            key=_deps_node_sort_key,
+        )
+    if target.type == "initiative":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.initiative_id == target.id],
+            key=_deps_node_sort_key,
+        )
+    raise RuntimeError(f"Unsupported node type for deps check: {target.type} ({target_id})")
+
+
+def _deps_check_snapshot_issue_statuses(specdock_dir: Path) -> dict[str, str]:
+    """Load issue statuses from sync snapshots (`index-all.json` preferred)."""
+    out: dict[str, str] = {}
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    state_index: dict[str, Any] | None = None
+    for state_index_path in (agent_dir / "index-all.json", agent_dir / "index.json"):
+        if not state_index_path.is_file():
+            continue
+        try:
+            loaded = _load_json(state_index_path)
+        except RuntimeError:
+            continue
+        if isinstance(loaded, dict):
+            state_index = loaded
+            break
+
+    if not isinstance(state_index, dict):
+        return out
+
+    raw_nodes = state_index.get("nodes")
+    if not isinstance(raw_nodes, dict):
+        return out
+
+    for issue_id, item in raw_nodes.items():
+        if not isinstance(issue_id, str) or not isinstance(item, dict):
+            continue
+        raw_status = item.get("status")
+        if not isinstance(raw_status, str):
+            continue
+        status = raw_status.strip().lower()
+        if status in ("done", "open", "unknown"):
+            out[issue_id] = status
+    return out
+
+
+def _deps_check_active_issue_id(specdock_dir: Path) -> str | None:
+    """Return active issue id when present."""
+    current = _load_active_manifest_no_migrate(specdock_dir)
+    if not isinstance(current, dict):
+        return None
+    return _active_entry_id(current.get("issue"))
+
+
+def _deps_evaluate_v2(
+    specdock_dir: Path,
+    nodes: dict[str, _Node],
+    *,
+    target_id: str,
+    github: bool,
+    gh_limit: int,
+) -> dict[str, Any]:
+    """Evaluate deps readiness using canonical issue-only dependency graph (v2)."""
+    issue_direct_depends_on, compile_warnings = _compile_issue_direct_depends_on_map(nodes)
+    target_issue_ids = _deps_target_issue_ids(nodes, target_id=target_id)
+
+    reachable_issue_ids: set[str] = set()
+    stack: list[str] = list(reversed(target_issue_ids))
+    while stack:
+        issue_id = stack.pop()
+        if issue_id in reachable_issue_ids:
+            continue
+        reachable_issue_ids.add(issue_id)
+        for dep_id in reversed(sorted(issue_direct_depends_on.get(issue_id, []), key=_deps_node_sort_key)):
+            if dep_id not in reachable_issue_ids:
+                stack.append(dep_id)
+
+    reachable_depends_on = {
+        issue_id: sorted(list(issue_direct_depends_on.get(issue_id, [])), key=_deps_node_sort_key)
+        for issue_id in sorted(reachable_issue_ids, key=_deps_node_sort_key)
+    }
+    _validate_deps_cycles(reachable_depends_on)
+
+    warnings: list[str] = []
+    for code in compile_warnings:
+        if code not in warnings:
+            warnings.append(code)
+
+    repo_root = specdock_dir.parent
+    issue_status_by_id: dict[str, str] = {}
+    if github:
+        issue_index: dict[int, dict[str, Any]] = {}
+        try:
+            issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+        except RuntimeError as e:
+            if "gh_fetch_failed" not in warnings:
+                warnings.append("gh_fetch_failed")
+            _warn(
+                "gh_fetch_failed: failed to fetch GitHub issue states; treating as unknown. "
+                f"Hint: check `gh auth status`, or re-run without --github. Details: {e}"
+            )
+            issue_index = {}
+        else:
+            linked_numbers = sorted(
+                {
+                    int(n.github_issue_number)
+                    for n in nodes.values()
+                    if n.type == "issue" and n.github_issue_number is not None
+                }
+            )
+            missing = [n for n in linked_numbers if n not in issue_index]
+            if missing:
+                if "gh_index_incomplete" not in warnings:
+                    warnings.append("gh_index_incomplete")
+                examples = ", ".join(str(n) for n in missing[:5])
+                suffix = "..." if len(missing) > 5 else ""
+                _warn(
+                    "gh_index_incomplete: gh issue list does not include some linked issues; treating missing as unknown. "
+                    f"missing={len(missing)} examples=[{examples}{suffix}] (hint: increase --gh-limit; current: {gh_limit})"
+                )
+
+        for n in nodes.values():
+            if n.type != "issue":
+                continue
+            status = "unknown"
+            if n.github_issue_number is not None:
+                gh = issue_index.get(n.github_issue_number)
+                if gh:
+                    status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+            issue_status_by_id[n.id] = status
+    else:
+        snapshot_statuses = _deps_check_snapshot_issue_statuses(specdock_dir)
+        for n in nodes.values():
+            if n.type != "issue":
+                continue
+            issue_status_by_id[n.id] = snapshot_statuses.get(n.id, "unknown")
+
+    derived_issue_deps = _derive_issue_deps_fields(issue_direct_depends_on, issue_status_by_id)
+
+    effective_set: set[str] = set()
+    for issue_id in target_issue_ids:
+        deps = derived_issue_deps.get(issue_id) or {}
+        for dep_id in deps.get("depends_on") or []:
+            if isinstance(dep_id, str):
+                effective_set.add(dep_id)
+
+    effective_depends_on = sorted(list(effective_set), key=_deps_node_sort_key)
+    blockers = list(effective_depends_on)
+
+    target_node = nodes.get(target_id)
+    if not target_node:
+        raise RuntimeError(f"Node not found: {target_id}")
+    if target_node.type == "issue":
+        target_ready = bool((derived_issue_deps.get(target_id) or {}).get("ready", False))
+    else:
+        target_ready = all(bool((derived_issue_deps.get(issue_id) or {}).get("ready", False)) for issue_id in target_issue_ids)
+
+    active_issue_id = _deps_check_active_issue_id(specdock_dir)
+    out_node_ids = sorted(set(target_issue_ids) | set(reachable_issue_ids), key=_deps_node_sort_key)
+    out_nodes: dict[str, Any] = {}
+    for issue_id in out_node_ids:
+        status = issue_status_by_id.get(issue_id, "unknown")
+        info = derived_issue_deps.get(issue_id) or {"ready": False}
+        ready = bool(info.get("ready", False))
+        if status == "done":
+            state = "done"
+        elif issue_id == active_issue_id:
+            state = "doing"
+        elif status == "unknown":
+            state = "unknown"
+        elif ready:
+            state = "ready"
+        else:
+            state = "blocked"
+        out_nodes[issue_id] = {"state": state, "ready": ready}
+
+    return {
+        "target": target_id,
+        "ready": target_ready,
+        "effective_depends_on": effective_depends_on,
+        "blockers": blockers,
+        "nodes": out_nodes,
+        "warnings": warnings,
+    }
 
 
 def _deps_evaluate(

@@ -2571,9 +2571,220 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            self.assertIn("spec-dock: blocked (deps check)", p.stderr)
+            self.assertIn("ready=false", p.stderr)
+
+    def test_deps_check_returns_ready_and_blockers_and_closure_json(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "202", "--title", "Deps epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Open blocker"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "402", "--title", "Done issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "203", "--title", "Transitive epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "203", "--github-issue", "403", "--title", "Transitive blocker"],
+            )
+
+            main_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-main-epic"
+                / "issues"
+                / "iss-00301-target-issue"
+            )
+            (main_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            blocker_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00202-deps-epic"
+                / "issues"
+                / "iss-00401-open-blocker"
+            )
+            (blocker_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [403]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Main epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "OPEN", "title": "Deps epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 203, "state": "OPEN", "title": "Trans epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 401, "state": "OPEN", "title": "Blocker", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 402, "state": "CLOSED", "title": "Done", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 403, "state": "OPEN", "title": "Transitive", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301", "--github", "--json"], env=test_env)
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertEqual(
+                list(data.keys()),
+                ["schema_version", "target", "ready", "effective_depends_on", "blockers", "nodes", "warnings"],
+            )
+            self.assertEqual(data["target"], "iss-00301")
+            self.assertFalse(data["ready"])
+            self.assertEqual(data["effective_depends_on"], ["iss-00401", "iss-00403"])
+            self.assertEqual(data["blockers"], ["iss-00401", "iss-00403"])
+            self.assertEqual(data["warnings"], [])
+
+    def test_deps_check_without_github_uses_index_snapshot_when_present(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Target issue"],
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00302-target-issue"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+
+            index_todo_path = target / "spec-dock" / ".agent" / "index.json"
+            index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
+            index_todo["nodes"]["iss-00301"]["status"] = "open"
+            index_todo_path.write_text(json.dumps(index_todo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            guard_log = bin_dir / "gh-guard.log"
+            guard_log.unlink(missing_ok=True)
+            self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (deps check)", p.stdout)
-            self.assertIn("ready=true", p.stdout)
+            self.assertFalse(guard_log.exists(), "gh must not be invoked without --github")
+            data = json.loads(p.stdout)
+            self.assertTrue(data["ready"])
+            self.assertEqual(data["blockers"], [])
+            self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
+
+    def test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Target issue"],
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00302-target-issue"
+            )
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
+            (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"])
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertFalse(data["ready"])
+            self.assertEqual(data["blockers"], ["iss-00301"])
+            self.assertEqual(data["nodes"]["iss-00301"]["state"], "unknown")
 
     def test_deps_check_missing_target_is_argparse_exit_2_not_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2604,9 +2815,10 @@ class TestCli(unittest.TestCase):
             ]
             for form in forms:
                 p = self._run_runtime_capture(target, ["deps", "check", form, "--json"])
-                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
                 data = json.loads(p.stdout)
                 self.assertEqual(data["target"], "iss-00301")
+                self.assertFalse(data["ready"])
 
     def test_deps_check_github_ready_when_deps_closed(self) -> None:
         if os.name == "nt":
@@ -2662,7 +2874,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             data = json.loads(p.stdout)
             self.assertTrue(data["ready"])
-            self.assertEqual(data["effective_depends_on"], ["iss-00301"])
+            self.assertEqual(data["effective_depends_on"], [])
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
 
@@ -2948,7 +3160,7 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             json.loads(p.stdout)  # must be valid JSON
             self.assertEqual(p.stderr.strip(), "")
 
@@ -2962,7 +3174,7 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
             self.assertEqual(data["effective_depends_on"], [])
 
@@ -3245,7 +3457,7 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("iss-local-00001", p.stderr)
-            self.assertIn("->", p.stderr)
+            self.assertIn("self edge produced", p.stderr)
 
     def test_deps_descendant_dependency_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3340,9 +3552,10 @@ class TestCli(unittest.TestCase):
             )
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
-            self.assertTrue(data["ready"])
+            self.assertFalse(data["ready"])
+            self.assertEqual(data["effective_depends_on"], [])
 
     def test_sync_fails_on_cycle_anywhere_in_graph(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3467,7 +3680,7 @@ class TestCli(unittest.TestCase):
             )
             before = issue_meta.read_text(encoding="utf-8")
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             after = issue_meta.read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
