@@ -135,6 +135,7 @@
 `sync --force` かつ deps preflight失敗時:
 - `deps.valid=false`, `deps.error` を持つ placeholder で上書き
 - `deps-issues.json` は `nodes={}`, `edges=[]` で上書き（削除しない）
+- `sync --force` は active auto-update を行わない（`--no-update-active` 相当）
 
 legacy v1 生成物は廃止:
 - `.agent/deps.json`, `.agent/deps.puml`, `.agent/deps.todo.puml` は `sync` で削除
