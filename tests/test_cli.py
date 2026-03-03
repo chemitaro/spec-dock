@@ -1580,12 +1580,12 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
-            # Baseline: deps artifacts are generated when the tree is valid.
             self._run_runtime(target, ["sync", "--no-update-active"])
             agent_dir = target / "spec-dock" / ".agent"
-            self.assertTrue((agent_dir / "deps.json").is_file())
-            self.assertTrue((agent_dir / "deps.puml").is_file())
-            self.assertTrue((agent_dir / "deps.todo.puml").is_file())
+            baseline_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertTrue(baseline_index["deps"]["valid"])
+            self.assertEqual(baseline_index["deps"]["issue_edges"], [])
+            self.assertIsNone(baseline_index["deps"]["error"])
 
             issue_meta = (
                 target
@@ -1602,11 +1602,38 @@ class TestCli(unittest.TestCase):
             meta["parent_id"] = "epic-local-99999"
             issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-            self._run_runtime(target, ["sync", "--no-update-active", "--force"])
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("preflight validate failed", p.stderr)
             self.assertTrue((agent_dir / "index.json").is_file())
             self.assertTrue((agent_dir / "tree.json").is_file())
 
-            # Tree preflight failed (forced) -> deps outputs must be removed to avoid stale artifacts.
+            index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertFalse(index["deps"]["valid"])
+            self.assertEqual(index["deps"]["issue_edges"], [])
+            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
+            self.assertIsNone(index["nodes"]["iss-local-00001"]["deps"])
+
+            tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertFalse(tree["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
+
+            deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
+            self.assertFalse(deps_issues["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(deps_issues["deps"]["error"]))
+            self.assertEqual(deps_issues["nodes"], {})
+            self.assertEqual(deps_issues["edges"], [])
+
+            tree_puml = (target / "spec-dock" / "tree.puml").read_text(encoding="utf-8")
+            self.assertIn("deps_preflight_failed", tree_puml)
+            self.assertIn("deps.valid=false", tree_puml)
+            self.assertIn("--force", tree_puml)
+            dashboard = (target / "spec-dock" / "dashboard.md").read_text(encoding="utf-8")
+            self.assertIn("DEPS_DISABLED", dashboard)
+            self.assertIn("deps_preflight_failed", dashboard)
+            self.assertIn("deps.valid=false", dashboard)
+
+            # Legacy v1 deps artifacts must always be removed.
             self.assertFalse((agent_dir / "deps.json").exists())
             self.assertFalse((agent_dir / "deps.puml").exists())
             self.assertFalse((agent_dir / "deps.todo.puml").exists())
@@ -2085,7 +2112,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(nodes["iss-00302"]["status"], "open")
             self.assertEqual(nodes["iss-00302"]["github"]["state"], "OPEN")
 
-    def test_sync_generates_deps_json_and_plantuml(self) -> None:
+    def test_sync_generates_index_deps_and_deps_issues_artifacts(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -2157,36 +2184,42 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            deps_path = target / "spec-dock" / ".agent" / "deps.json"
-            self.assertTrue(deps_path.is_file())
-            deps = json.loads(deps_path.read_text(encoding="utf-8"))
-            self.assertEqual(deps["schema_version"], 1)
-            self.assertIn("generated_at", deps)
-            nodes = deps["nodes"]
-            self.assertEqual(nodes["iss-00301"]["state"], "done")
-            self.assertFalse(nodes["iss-00301"]["ready"])
-            self.assertEqual(nodes["iss-00301"]["blockers"], ["iss-00303"])
-            self.assertTrue(nodes["iss-00302"]["ready"])
-            self.assertEqual(nodes["iss-00302"]["effective_depends_on"], ["iss-00301"])
-            self.assertEqual(nodes["iss-00302"]["blockers"], [])
+            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            self.assertTrue(index["deps"]["valid"])
+            self.assertIsNone(index["deps"]["error"])
+            self.assertEqual(
+                index["deps"]["issue_edges"],
+                [
+                    {"from": "iss-00301", "to": "iss-00303", "kind": "depends_on"},
+                    {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
+                ],
+            )
+            nodes = index["nodes"]
+            self.assertEqual(nodes["iss-00301"]["deps"]["depends_on"], [])
+            self.assertTrue(nodes["iss-00301"]["deps"]["ready"])
+            self.assertEqual(nodes["iss-00302"]["deps"]["depends_on"], [])
+            self.assertTrue(nodes["iss-00302"]["deps"]["ready"])
 
-            puml_path = target / "spec-dock" / ".agent" / "deps.puml"
-            todo_puml_path = target / "spec-dock" / ".agent" / "deps.todo.puml"
-            self.assertTrue(puml_path.is_file())
-            self.assertTrue(todo_puml_path.is_file())
-            puml = puml_path.read_text(encoding="utf-8")
-            todo_puml = todo_puml_path.read_text(encoding="utf-8")
+            deps_issues_path = target / "spec-dock" / ".agent" / "deps-issues.json"
+            deps_issues_puml_path = target / "spec-dock" / "deps-issues.puml"
+            self.assertTrue(deps_issues_path.is_file())
+            self.assertTrue(deps_issues_puml_path.is_file())
+            deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
+            self.assertTrue(deps_issues["deps"]["valid"])
+            self.assertIsNone(deps_issues["deps"]["error"])
+            self.assertNotIn("iss-00301", deps_issues["nodes"])  # done issue is filtered from todo projection
+            self.assertIn("iss-00302", deps_issues["nodes"])
+            self.assertIn("iss-00303", deps_issues["nodes"])
 
-            self.assertIn("iss-00302", puml)
-            self.assertIn("iss-00301", puml)
-            self.assertIn("iss-00301\\nDone\\nready=false", puml)
-            self.assertIn("#D5E8D4", puml)  # done color
-            self.assertIn("#FFF2CC", puml)  # todo color
-            self.assertIn("depends_on", puml)
+            deps_issues_puml = deps_issues_puml_path.read_text(encoding="utf-8")
+            self.assertIn("iss-00302", deps_issues_puml)
+            self.assertIn("iss-00303", deps_issues_puml)
+            self.assertNotIn("iss-00301", deps_issues_puml)
 
-            # todo-only must exclude done nodes and edges.
-            self.assertIn("iss-00302", todo_puml)
-            self.assertNotIn("iss-00301", todo_puml)
+            # Legacy v1 deps artifacts are no longer generated.
+            self.assertFalse((target / "spec-dock" / ".agent" / "deps.json").exists())
+            self.assertFalse((target / "spec-dock" / ".agent" / "deps.puml").exists())
+            self.assertFalse((target / "spec-dock" / ".agent" / "deps.todo.puml").exists())
 
     def test_sync_deps_progress_aggregation_for_epic_and_initiative(self) -> None:
         if os.name == "nt":
@@ -2236,14 +2269,14 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
-            nodes = deps["nodes"]
+            index = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            nodes = index["nodes"]
             self.assertEqual(nodes["epic-00201"]["progress"], {"total": 2, "done": 1, "open": 1, "unknown": 0})
             self.assertEqual(nodes["epic-00202"]["progress"], {"total": 1, "done": 0, "open": 1, "unknown": 0})
             self.assertEqual(nodes["init-00101"]["progress"], {"total": 3, "done": 1, "open": 2, "unknown": 0})
-            self.assertEqual(nodes["epic-00201"]["state"], "todo")
-            self.assertEqual(nodes["epic-00202"]["state"], "todo")
-            self.assertEqual(nodes["init-00101"]["state"], "todo")
+            self.assertEqual(nodes["iss-00301"]["status"], "done")
+            self.assertEqual(nodes["iss-00302"]["status"], "open")
+            self.assertEqual(nodes["iss-00303"]["status"], "open")
 
     def test_sync_deps_empty_epic_and_initiative_are_done_and_non_blocking(self) -> None:
         if os.name == "nt":
@@ -2300,14 +2333,13 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
-            nodes = deps["nodes"]
+            index = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            nodes = index["nodes"]
             self.assertEqual(nodes["epic-00201"]["progress"], {"total": 0, "done": 0, "open": 0, "unknown": 0})
             self.assertEqual(nodes["init-00101"]["progress"], {"total": 0, "done": 0, "open": 0, "unknown": 0})
-            self.assertEqual(nodes["epic-00201"]["state"], "done")
-            self.assertEqual(nodes["init-00101"]["state"], "done")
-            self.assertTrue(nodes["iss-00301"]["ready"])
-            self.assertEqual(nodes["iss-00301"]["blockers"], [])
+            self.assertTrue(nodes["iss-00301"]["deps"]["ready"])
+            self.assertEqual(nodes["iss-00301"]["deps"]["depends_on"], [])
+            self.assertEqual(nodes["iss-00301"]["deps"]["blockers_top"], [])
 
     def test_sync_deps_ignores_parent_github_closed_for_done(self) -> None:
         if os.name == "nt":
@@ -2362,12 +2394,12 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
-            nodes = deps["nodes"]
-            self.assertEqual(nodes["epic-00201"]["state"], "todo")
-            self.assertEqual(nodes["init-00101"]["state"], "todo")
-            self.assertFalse(nodes["iss-00302"]["ready"])
-            self.assertEqual(nodes["iss-00302"]["blockers"], ["iss-00301"])
+            index = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            nodes = index["nodes"]
+            self.assertEqual(nodes["epic-00201"]["progress"], {"total": 2, "done": 0, "open": 2, "unknown": 0})
+            self.assertEqual(nodes["init-00101"]["progress"], {"total": 2, "done": 0, "open": 2, "unknown": 0})
+            self.assertFalse(nodes["iss-00302"]["deps"]["ready"])
+            self.assertEqual(nodes["iss-00302"]["deps"]["depends_on"], ["iss-00301"])
 
     def test_sync_deps_active_leaf_makes_epic_and_initiative_doing(self) -> None:
         if os.name == "nt":
@@ -2408,12 +2440,10 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
-            nodes = deps["nodes"]
+            deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+            nodes = deps_issues["nodes"]
             self.assertEqual(nodes["iss-00301"]["state"], "doing")
-            self.assertEqual(nodes["iss-00302"]["state"], "todo")
-            self.assertEqual(nodes["epic-00201"]["state"], "doing")
-            self.assertEqual(nodes["init-00101"]["state"], "doing")
+            self.assertEqual(nodes["iss-00302"]["state"], "ready")
 
     def test_sync_deps_active_epic_makes_initiative_doing(self) -> None:
         if os.name == "nt":
@@ -2449,11 +2479,9 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            deps = json.loads((target / "spec-dock" / ".agent" / "deps.json").read_text(encoding="utf-8"))
-            nodes = deps["nodes"]
-            self.assertEqual(nodes["epic-00201"]["state"], "doing")
-            self.assertEqual(nodes["init-00101"]["state"], "doing")
-            self.assertEqual(nodes["iss-00301"]["state"], "todo")
+            deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+            nodes = deps_issues["nodes"]
+            self.assertEqual(nodes["iss-00301"]["state"], "ready")
 
     def test_sync_github_passes_gh_limit_to_gh(self) -> None:
         if os.name == "nt":
@@ -3557,7 +3585,7 @@ class TestCli(unittest.TestCase):
             self.assertFalse(data["ready"])
             self.assertEqual(data["effective_depends_on"], [])
 
-    def test_sync_fails_on_cycle_anywhere_in_graph(self) -> None:
+    def test_sync_fails_on_deps_structural_error_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -3595,7 +3623,7 @@ class TestCli(unittest.TestCase):
             self.assertIn("iss-local-00003", p.stderr)
             self.assertIn("->", p.stderr)
 
-    def test_sync_force_skips_deps_on_deps_error(self) -> None:
+    def test_sync_force_sets_deps_valid_false_and_emits_placeholders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -3608,9 +3636,10 @@ class TestCli(unittest.TestCase):
 
             agent_dir = target / "spec-dock" / ".agent"
             self._run_runtime(target, ["sync", "--no-update-active"])
-            self.assertTrue((agent_dir / "deps.json").is_file())
-            self.assertTrue((agent_dir / "deps.puml").is_file())
-            self.assertTrue((agent_dir / "deps.todo.puml").is_file())
+            baseline_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertTrue(baseline_index["deps"]["valid"])
+            self.assertEqual(baseline_index["deps"]["issue_edges"], [])
+            self.assertIsNone(baseline_index["deps"]["error"])
 
             epic_dir = (
                 target
@@ -3643,16 +3672,58 @@ class TestCli(unittest.TestCase):
             self.assertTrue((agent_dir / "tree.json").is_file())
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertFalse(index["deps"]["valid"])
+            self.assertEqual(index["deps"]["issue_edges"], [])
+            self.assertIn("Dependency cycle detected", str(index["deps"]["error"]))
             self.assertIsNone(index["nodes"]["iss-local-00001"]["deps"])
             self.assertIsNone(index["nodes"]["iss-local-00002"]["deps"])
             self.assertIsNone(index["nodes"]["iss-local-00003"]["deps"])
 
             tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertFalse(tree["deps"]["valid"])
+            self.assertIn("Dependency cycle detected", str(tree["deps"]["error"]))
             tree_issues = tree["tree"][0]["epics"][0]["issues"]
             tree_issue_deps = {issue["id"]: issue.get("deps") for issue in tree_issues}
             self.assertIsNone(tree_issue_deps["iss-local-00001"])
             self.assertIsNone(tree_issue_deps["iss-local-00002"])
             self.assertIsNone(tree_issue_deps["iss-local-00003"])
+
+            deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
+            self.assertFalse(deps_issues["deps"]["valid"])
+            self.assertIn("Dependency cycle detected", str(deps_issues["deps"]["error"]))
+            self.assertEqual(deps_issues["nodes"], {})
+            self.assertEqual(deps_issues["edges"], [])
+
+            tree_all_puml = (target / "spec-dock" / "tree-all.puml").read_text(encoding="utf-8")
+            tree_todo_puml = (target / "spec-dock" / "tree.puml").read_text(encoding="utf-8")
+            deps_issues_puml = (target / "spec-dock" / "deps-issues.puml").read_text(encoding="utf-8")
+            dashboard = (target / "spec-dock" / "dashboard.md").read_text(encoding="utf-8")
+            for text in (tree_all_puml, tree_todo_puml, deps_issues_puml, dashboard):
+                self.assertIn("deps_preflight_failed", text)
+                self.assertIn("deps.valid=false", text)
+                self.assertIn("--force", text)
+
+            self.assertFalse((agent_dir / "deps.json").exists())
+            self.assertFalse((agent_dir / "deps.puml").exists())
+            self.assertFalse((agent_dir / "deps.todo.puml").exists())
+
+    def test_sync_force_removes_legacy_v1_deps_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            (agent_dir / "deps.json").write_text("{\"stale\": true}\n", encoding="utf-8")
+            (agent_dir / "deps.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
+            (agent_dir / "deps.todo.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             self.assertFalse((agent_dir / "deps.json").exists())
             self.assertFalse((agent_dir / "deps.puml").exists())
