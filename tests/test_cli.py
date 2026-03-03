@@ -720,9 +720,10 @@ class TestCli(unittest.TestCase):
             )
             issue_one_dir = epic_dir / "issues" / "iss-local-00001-issue-one"
             issue_two_dir = epic_dir / "issues" / "iss-local-00002-issue-two"
+            issue_one_deps_path = issue_one_dir / "deps.json"
 
             # Self dependency must fail.
-            (issue_one_dir / "deps.json").write_text(
+            issue_one_deps_path.write_text(
                 json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
@@ -730,9 +731,22 @@ class TestCli(unittest.TestCase):
             p_self = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p_self.returncode, 1, p_self.stdout + p_self.stderr)
             self.assertIn("iss-local-00001", p_self.stderr)
+            self.assertIn(str(issue_one_deps_path), p_self.stderr)
+
+            # Shorthand self (issue depends on own epic) must also fail.
+            issue_one_deps_path.write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["epic-local-00001"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            p_shorthand_self = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(p_shorthand_self.returncode, 1, p_shorthand_self.stdout + p_shorthand_self.stderr)
+            self.assertIn("iss-local-00001", p_shorthand_self.stderr)
+            self.assertIn("epic-local-00001", p_shorthand_self.stderr)
+            self.assertIn(str(issue_one_deps_path), p_shorthand_self.stderr)
 
             # Cycle dependency must fail.
-            (issue_one_dir / "deps.json").write_text(
+            issue_one_deps_path.write_text(
                 json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
@@ -1868,7 +1882,7 @@ class TestCli(unittest.TestCase):
                 / "iss-00302-target-issue"
             )
             (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [201]}, ensure_ascii=False, indent=2) + "\n",
+                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
 
@@ -1893,7 +1907,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(nodes["epic-00201"]["state"], "todo")
             self.assertEqual(nodes["init-00101"]["state"], "todo")
             self.assertFalse(nodes["iss-00302"]["ready"])
-            self.assertEqual(nodes["iss-00302"]["blockers"], ["epic-00201"])
+            self.assertEqual(nodes["iss-00302"]["blockers"], ["iss-00301"])
 
     def test_sync_deps_active_leaf_makes_epic_and_initiative_doing(self) -> None:
         if os.name == "nt":
