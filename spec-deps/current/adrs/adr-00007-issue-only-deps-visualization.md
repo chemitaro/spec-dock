@@ -4,17 +4,20 @@ ID: "ADR-00007"
 タイトル: "issue-only 依存可視化（PlantUML）: 図の形式・矢印方向・生成物"
 状態: "accepted"
 作成者: "Codex CLI"
-最終更新: "2026-03-01"
+最終更新: "2026-03-03"
 親: ["iss-00010"]
 ---
 
 # ADR-00007 issue-only 依存可視化（PlantUML）: 図の形式・矢印方向・生成物
 
+> 注記（2026-03-03）: 人間向け生成物の配置を `.agent/` から `spec-dock/` 直下へ移動（ADR-00009）。
+> 本 ADR の決定（図の形式・矢印方向・生成物の種類）は維持し、パス表記のみ更新しました。
+
 ## 結論（Decision） (必須)
 - 決定:
   - issue-only の依存可視化は “全体図（todo-only）” のみを `sync` で生成する（focus 図は生成しない）
     - 構造化: `spec-dock/.agent/deps-issues.json`
-    - 可視化: `spec-dock/.agent/deps-issues.puml`
+    - 可視化: `spec-dock/deps-issues.puml`
   - 矢印方向（表示用）は **「依存される側 → 依存する側」**（prereq -> dependent）とする
     - 目的: 図で “上が空いている=着手可能（READY）” の直感に寄せる
 
@@ -92,7 +95,7 @@ Cons:
 ## 生成物案（ファイル名のたたき台） (必須)
 - 作業用（todo = Done 除外）のみ生成する:
   - `spec-dock/.agent/deps-issues.json`
-  - `spec-dock/.agent/deps-issues.puml`
+  - `spec-dock/deps-issues.puml`
 
 ## 判断理由（Rationale） (必須)
 `deps check --json` により “対象 issue のブロッカー理由” は機械的に確認できるため、  

@@ -4,16 +4,19 @@ ID: "ADR-00004"
 タイトル: "Readyボード（矢印なしツリー）の生成物: ファイル名・形式・表示情報"
 状態: "accepted"
 作成者: "Codex CLI"
-最終更新: "2026-03-01"
+最終更新: "2026-03-03"
 親: ["iss-00010"]
 ---
 
 # ADR-00004 Readyボード（矢印なしツリー）の生成物: ファイル名・形式・表示情報
 
+> 注記（2026-03-03）: 人間向け生成物の配置を `.agent/` から `spec-dock/` 直下へ移動（ADR-00009）。
+> 本 ADR の決定（ファイル名・形式・表示情報）は維持し、パス表記のみ更新しました。
+
 ## 結論（Decision） (必須)
 - 決定: **Option A**（`tree*.puml` として固定）を採用する。
-  - `spec-dock/.agent/tree-all.puml`（all）
-  - `spec-dock/.agent/tree.puml`（todo = Done除外）
+  - `spec-dock/tree-all.puml`（all）
+  - `spec-dock/tree.puml`（todo = Done除外）
   - Readyボードは “tree（包含ツリー）に状態ラベルを付けたもの” として扱う。
 
 ## 背景（Context） (必須)
@@ -37,8 +40,8 @@ skinparam shadowing false
 
 rectangle ".agent/tree-all.json" as TAll
 rectangle ".agent/tree.json\n(todo-only)" as TTodo
-rectangle ".agent/tree-all.puml" as PAll
-rectangle ".agent/tree.puml\n(todo-only)" as PTodo
+rectangle "spec-dock/tree-all.puml" as PAll
+rectangle "spec-dock/tree.puml\n(todo-only)" as PTodo
 
 TAll --> PAll : render tree board (all)
 TTodo --> PTodo : render tree board (todo)
@@ -50,8 +53,8 @@ TTodo --> PTodo : render tree board (todo)
 ### Option A: `tree*.puml` として固定（推奨）
 概要:
 - Readyボードを tree 表示の成果物として扱い、以下を生成する。
-  - `spec-dock/.agent/tree-all.puml`（全体 / all）
-  - `spec-dock/.agent/tree.puml`（Done除外 / todo）
+  - `spec-dock/tree-all.puml`（全体 / all）
+  - `spec-dock/tree.puml`（Done除外 / todo）
 - 図形式は `@startwbs` を基本とし、包含ツリー（initiative→epic→issue）をそのまま表現する。
 
 例（イメージ）:
@@ -77,8 +80,8 @@ Cons:
 ### Option B: `ready*.puml` として独立（board専用名）
 概要:
 - Readyボードを board 専用名として扱い、以下を生成する。
-  - `spec-dock/.agent/ready-all.puml`
-  - `spec-dock/.agent/ready.puml`（todo）
+  - `spec-dock/ready-all.puml`
+  - `spec-dock/ready.puml`（todo）
 
 Pros:
 - Ready 目的が名前から明確（board専用）。
@@ -109,7 +112,7 @@ Readyボードは “見ただけで判断できる” ことが最重要なの�
 ## 判断理由（Rationale） (必須)
 採用理由:
 - Readyボードは tree と同義に扱う方が、運用の観測点が固定され、multi-agent も迷いにくい。
-- `.agent/tree*.json`（all/todo）と `.agent/tree*.puml` をペアにすると、JSON と図を行き来しやすい。
+- `.agent/tree*.json`（all/todo）と `spec-dock/tree*.puml` をペアにすると、JSON と図を行き来しやすい。
 
 ## 影響（Consequences） (必須)
 Positive（良い点）:
@@ -119,7 +122,7 @@ Negative / Debt（悪い点 / 将来負債）:
 - 出力ファイルが増える（ただし用途別に分けた方が読みやすい）。
 
 影響範囲（コード/テスト/運用/データ）:
-- runtime: `sync` の出力追加（`.agent/*.puml`）
+- runtime: `sync` の出力追加（`spec-dock/*.puml`）
 - docs: `reference_sync.md` / `reference_deps.md` の生成物記述
 - tests: `sync` 実行で新ファイルが生成されることの回帰
 
