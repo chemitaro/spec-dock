@@ -47,6 +47,7 @@ _NUM_RE = re.compile(r"^[0-9]+$")
 _GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 _INPUT_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
 _INPUT_SLUG_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_BLOCKERS_TOP_LIMIT = 5
 
 # Branch name parsing helpers (best-effort):
 # - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
@@ -2192,6 +2193,21 @@ def _sync(
             progress[parent]["total"] += 1
             progress[parent][status] += 1
 
+    issue_direct_depends_on_for_derive: dict[str, list[str]]
+    if isinstance(issue_direct_depends_on_all, dict):
+        issue_direct_depends_on_for_derive = {
+            issue_id: sorted(list(issue_direct_depends_on_all.get(issue_id, [])), key=_deps_node_sort_key)
+            for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key)
+        }
+    else:
+        issue_direct_depends_on_for_derive = {
+            issue_id: [] for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key)
+        }
+    issue_deps_fields_by_id = _derive_issue_deps_fields(
+        issue_direct_depends_on_for_derive,
+        issue_status_by_id,
+    )
+
     legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     agent_dir.mkdir(parents=True, exist_ok=True)
     current = _load_active_manifest(specdock_dir) if migrate_active else _load_active_manifest_no_migrate(specdock_dir)
@@ -2232,6 +2248,12 @@ def _sync(
 
         if node.type == "issue":
             item["status"] = issue_status_by_id.get(node.id, "unknown")
+            item["deps"] = dict(
+                issue_deps_fields_by_id.get(
+                    node.id,
+                    {"ready": False, "depends_on": [], "blockers_top": []},
+                )
+            )
 
         if node.github_issue_number is not None:
             item["github"] = {"issue_number": node.github_issue_number}
@@ -3131,6 +3153,53 @@ def _issue_depends_on_edges(issue_depends_on: dict[str, list[str]]) -> list[dict
         for dst_id in sorted(issue_depends_on.get(src_id, []), key=_deps_node_sort_key):
             edges.append({"from": src_id, "to": dst_id, "kind": "depends_on"})
     return edges
+
+
+def _derive_issue_deps_fields(
+    issue_direct_depends_on: dict[str, list[str]],
+    issue_status_by_id: dict[str, str],
+    *,
+    blockers_top_limit: int = _BLOCKERS_TOP_LIMIT,
+) -> dict[str, dict[str, Any]]:
+    """Derive per-issue deps fields for index/tree issue nodes."""
+
+    def closure_excluding_done(start_issue_id: str) -> list[str]:
+        seen: set[str] = set()
+        stack = list(reversed(sorted(issue_direct_depends_on.get(start_issue_id, []), key=_deps_node_sort_key)))
+        while stack:
+            dep_id = stack.pop()
+            if dep_id in seen:
+                continue
+
+            dep_status = issue_status_by_id.get(dep_id, "unknown")
+            if dep_status == "done":
+                continue
+
+            seen.add(dep_id)
+            next_ids = sorted(issue_direct_depends_on.get(dep_id, []), key=_deps_node_sort_key)
+            for next_id in reversed(next_ids):
+                if next_id not in seen:
+                    stack.append(next_id)
+
+        return sorted(seen, key=_deps_node_sort_key)
+
+    derived: dict[str, dict[str, Any]] = {}
+    for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key):
+        status = issue_status_by_id.get(issue_id, "unknown")
+        if status == "done":
+            depends_on: list[str] = []
+            ready = True
+        else:
+            depends_on = closure_excluding_done(issue_id)
+            ready = False if status == "unknown" else len(depends_on) == 0
+
+        derived[issue_id] = {
+            "ready": ready,
+            "depends_on": depends_on,
+            "blockers_top": depends_on[:blockers_top_limit],
+        }
+
+    return derived
 
 
 def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) -> dict[str, list[str]]:
