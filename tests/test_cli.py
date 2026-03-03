@@ -834,8 +834,8 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            nodes = index["nodes"]
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            nodes = index_all["nodes"]
             self.assertEqual(nodes["iss-00301"]["status"], "done")
             self.assertEqual(nodes["iss-00301"]["deps"], {"ready": True, "depends_on": [], "blockers_top": []})
             self.assertEqual(nodes["iss-00302"]["deps"], {"ready": True, "depends_on": [], "blockers_top": []})
@@ -1036,6 +1036,128 @@ class TestCli(unittest.TestCase):
             self.assertIn("iss-00305", puml)
             self.assertNotIn("iss-00301", puml)
             self.assertIn("Niss_00303 --> Niss_00302 : blocks", puml)
+
+    def test_sync_todo_projection_excludes_done_and_empty_branches(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Branch A: mixed done/open issues.
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Done prereq"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Open target"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Open mid"],
+            )
+
+            # Branch B: done-only; should be removed from todo projection.
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Legacy platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Legacy epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "401", "--title", "Done legacy issue"],
+            )
+
+            issues_root = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+            )
+            (issues_root / "iss-00302-open-target" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [303]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (issues_root / "iss-00303-open-mid" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init A", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic A", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Done prereq", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Open target", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 303, "state": "OPEN", "title": "Open mid", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 102, "state": "OPEN", "title": "Init B", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 202, "state": "OPEN", "title": "Epic B", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 401, "state": "CLOSED", "title": "Done legacy", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            tree_todo = json.loads((target / "spec-dock" / ".agent" / "tree.json").read_text(encoding="utf-8"))
+            deps_issues = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+
+            self.assertIn("iss-00301", index_all["nodes"])  # done issue remains in all
+            self.assertIn("iss-00401", index_all["nodes"])  # done-only branch remains in all
+
+            # todo projection: done issues + empty ancestors are removed.
+            todo_nodes = set(index_todo["nodes"].keys())
+            self.assertNotIn("iss-00301", todo_nodes)
+            self.assertNotIn("iss-00401", todo_nodes)
+            self.assertNotIn("epic-00202", todo_nodes)
+            self.assertNotIn("init-00102", todo_nodes)
+            self.assertIn("iss-00302", todo_nodes)
+            self.assertIn("iss-00303", todo_nodes)
+            self.assertIn("epic-00201", todo_nodes)
+            self.assertIn("init-00101", todo_nodes)
+
+            # deps.issue_edges for todo keeps only edges with both endpoints in todo issues.
+            self.assertEqual(
+                index_todo["deps"]["issue_edges"],
+                [{"from": "iss-00302", "to": "iss-00303", "kind": "depends_on"}],
+            )
+
+            # tree.json node set must match index.json todo node set.
+            def collect_tree_ids(items: list[dict]) -> set[str]:
+                ids: set[str] = set()
+                for init_item in items:
+                    ids.add(init_item["id"])
+                    for epic_item in init_item.get("epics", []):
+                        ids.add(epic_item["id"])
+                        for issue_item in epic_item.get("issues", []):
+                            ids.add(issue_item["id"])
+                return ids
+
+            self.assertEqual(collect_tree_ids(tree_todo["tree"]), todo_nodes)
+
+            # deps-issues nodes should match todo issue set from index.json.
+            todo_issue_ids = {
+                node_id
+                for node_id, item in index_todo["nodes"].items()
+                if isinstance(item, dict) and item.get("type") == "issue"
+            }
+            self.assertEqual(set(deps_issues["nodes"].keys()), todo_issue_ids)
 
     def test_sync_emits_tree_puml_ready_board_at_spec_dock_root(self) -> None:
         if os.name == "nt":
@@ -2107,12 +2229,14 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            nodes = index["nodes"]
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            nodes = index_all["nodes"]
             self.assertEqual(nodes["iss-00301"]["status"], "done")
             self.assertEqual(nodes["iss-00301"]["github"]["state"], "CLOSED")
             self.assertEqual(nodes["iss-00302"]["status"], "open")
             self.assertEqual(nodes["iss-00302"]["github"]["state"], "OPEN")
+            index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            self.assertNotIn("iss-00301", index_todo["nodes"])
 
     def test_sync_generates_index_deps_and_deps_issues_artifacts(self) -> None:
         if os.name == "nt":
@@ -2186,19 +2310,25 @@ class TestCli(unittest.TestCase):
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
-            self.assertTrue(index["deps"]["valid"])
-            self.assertIsNone(index["deps"]["error"])
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertTrue(index_all["deps"]["valid"])
+            self.assertIsNone(index_all["deps"]["error"])
             self.assertEqual(
-                index["deps"]["issue_edges"],
+                index_all["deps"]["issue_edges"],
                 [
                     {"from": "iss-00301", "to": "iss-00303", "kind": "depends_on"},
                     {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
                 ],
             )
-            nodes = index["nodes"]
-            self.assertEqual(nodes["iss-00301"]["deps"]["depends_on"], [])
-            self.assertTrue(nodes["iss-00301"]["deps"]["ready"])
+            self.assertEqual(index_all["nodes"]["iss-00301"]["deps"]["depends_on"], [])
+            self.assertTrue(index_all["nodes"]["iss-00301"]["deps"]["ready"])
+
+            index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            self.assertTrue(index_todo["deps"]["valid"])
+            self.assertIsNone(index_todo["deps"]["error"])
+            self.assertEqual(index_todo["deps"]["issue_edges"], [])
+            nodes = index_todo["nodes"]
+            self.assertNotIn("iss-00301", nodes)
             self.assertEqual(nodes["iss-00302"]["deps"]["depends_on"], [])
             self.assertTrue(nodes["iss-00302"]["deps"]["ready"])
 
@@ -2755,9 +2885,13 @@ class TestCli(unittest.TestCase):
             p_sync = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
 
+            index_all_path = target / "spec-dock" / ".agent" / "index-all.json"
             index_todo_path = target / "spec-dock" / ".agent" / "index.json"
+            index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
             index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
-            index_todo["nodes"]["iss-00301"]["status"] = "open"
+            shadow = dict(index_all["nodes"]["iss-00301"])
+            shadow["status"] = "open"
+            index_todo["nodes"]["iss-00301"] = shadow
             index_todo_path.write_text(json.dumps(index_todo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             guard_log = bin_dir / "gh-guard.log"
@@ -4841,12 +4975,15 @@ class TestCli(unittest.TestCase):
             )
             self.assertEqual(p_sync_closed.returncode, 0, p_sync_closed.stdout + p_sync_closed.stderr)
 
-            # Simulate future todo projection: `index.json` can omit done issues.
-            # non-`--github` deps guard must prefer `index-all.json` as snapshot source.
+            # Inject a conflicting snapshot in todo view.
+            # non-`--github` deps guard must still prefer `index-all.json`.
+            index_all_path = target / "spec-dock" / ".agent" / "index-all.json"
             index_todo_path = target / "spec-dock" / ".agent" / "index.json"
+            index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
             index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
-            removed = index_todo["nodes"].pop("iss-00301", None)
-            self.assertIsNotNone(removed)
+            shadow = dict(index_all["nodes"]["iss-00301"])
+            shadow["status"] = "open"
+            index_todo["nodes"]["iss-00301"] = shadow
             index_todo_path.write_text(json.dumps(index_todo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             # Guard again: no gh calls on active set without --github.
@@ -4934,10 +5071,13 @@ class TestCli(unittest.TestCase):
             p_sync = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
 
+            index_all_path = target / "spec-dock" / ".agent" / "index-all.json"
             index_todo_path = target / "spec-dock" / ".agent" / "index.json"
+            index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
             index_todo = json.loads(index_todo_path.read_text(encoding="utf-8"))
-            removed = index_todo["nodes"].pop("iss-00401", None)
-            self.assertIsNotNone(removed)
+            shadow = dict(index_all["nodes"]["iss-00401"])
+            shadow["status"] = "open"
+            index_todo["nodes"]["iss-00401"] = shadow
             index_todo_path.write_text(json.dumps(index_todo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             guard_log = bin_dir / "gh-guard-snapshot.log"
