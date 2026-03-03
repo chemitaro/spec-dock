@@ -1801,7 +1801,8 @@ def _active_set(
         )
     )
     blockers = list(deps.get("blockers") or [])
-    is_blocked = bool(blockers) if node.type == "issue" else not bool(deps.get("ready", False))
+    ready = bool(deps.get("ready", False))
+    is_blocked = not ready
     if is_blocked:
         if not force:
             lines = [f"active set blocked: target={node.id} ready=false blockers={len(blockers)}"]
