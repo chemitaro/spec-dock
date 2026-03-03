@@ -13,12 +13,12 @@
 - 総合: [guide.md](guide.md)
 - sync: [reference_sync.md](reference_sync.md)
 
-## 1. 結論（何ができるか）
+## 1. 結論（v2）
 
-- ノード（initiative/epic/issue）ごとに `deps.json` で依存関係を定義できます（SSOT は `meta.json` とは別）。
-- `deps check` で「着手可能（ready）か / 何がブロッカーか」を機械判定できます。
-- `active set` は依存未解決をデフォルトでブロックし、`-f/--force` でのみ例外化できます。
-- `sync` は依存関係を統合して `.agent/deps.json` と PlantUML（全体/Done除外）を生成します。
+- `deps.json` の shorthand（`init-*` / `epic-*` / GitHub issue番号）を展開し、canonical な issue->issue direct edge にコンパイルします。
+- `deps check` は v2 evaluator（issue-only canonical graph）で `ready / blockers / effective_depends_on` を判定します。
+- `active set`（issue target）は v2の `ready` をガード条件に使い、`ready=false` ならデフォルトで失敗します。
+- `sync` は `index-*.json` の `deps.issue_edges` と `deps-issues.*`（todo issue-only）を生成します。
 
 ## 2. `deps.json`（ノード直下 / 任意）
 
@@ -27,7 +27,7 @@
 - epic: `<epic-dir>/deps.json`
 - issue: `<issue-dir>/deps.json`
 
-スキーマ（MVP）:
+スキーマ:
 
 ```json
 {
@@ -42,105 +42,108 @@
 ```
 
 ルール:
-- `schema_version` は `1` 固定（それ以外はエラー）。
-- `depends_on` の要素は次を許可します:
-  - node id 文字列（`init-*` / `epic-*` / `iss-*`）
-  - GitHub issue number（`int` または数字文字列）
-- 親→配下（descendant）依存は禁止:
-  - 例: initiative が配下 epic/issue を depends_on に含める、epic が配下 issue を depends_on に含める
-  - 理由: issue/epic は親依存を継承するため、親→子依存は子の自己依存/循環に発展する
-- 依存参照は解決後に node id へ正規化し、重複は排除されます。
-- `deps.json` が無い場合は `depends_on=[]`（依存なし）として扱います。
+- `schema_version` は `1` 固定
+- `depends_on` 要素は node id または GitHub issue番号（int / 数字文字列）
+- shorthand は最終的に issue->issue edge へ還元されます
+- `deps.json` が無い場合は `depends_on=[]`
 
-エラーになる代表例:
-- JSON パース不正 / スキーマ不正
-- 解決不能参照（存在しない id / 未 import の GitHub issue number）
-- 親→配下（descendant）依存
-- 自己依存 / 循環依存（cycle）
+構造エラー（fail-fast）:
+- JSONパース不正 / schema不正
+- 未解決参照
+- 親->配下（descendant）依存
+- 自己依存（shorthand展開で生じる implicit self も含む）
+- 循環依存（cycle）
 
-## 3. 実効依存（親の依存をマージ）
+補足:
+- shorthand 展開結果が空でもエラーにはせず、warning `deps_ref_expanded_to_empty` を出します。
 
-- initiative: 自身の依存のみ
-- epic: 自身 + 親 initiative
-- issue: 自身 + 親 epic + 親 initiative
+## 3. v2評価の基本
 
-## 4. 状態（state）と ready 判定
+- 評価グラフは issue-only（canonical direct edges）
+- `effective_depends_on` は closure かつ Done除外
+- `unknown` は Done扱いしない（安全側）
+- issue の `ready`:
+  - `status==done` は常に `ready=true`
+  - それ以外は closure が空かつ status が unknown でない場合のみ `ready=true`
 
-状態（MVP）:
-
-- issue:
-  - `done`: GitHub `CLOSED`（`--github` 指定時）/ `.agent/index.json` の `status=done`（`--github` 非指定時のスナップショット）
-  - `doing`: active leaf と一致（ただし `done` が優先）
-  - `todo`: GitHub `OPEN` / `status=open`（ただし doing ではない）
-  - `unknown`: `github.issue_number` 無し / `gh` 取得失敗 / `gh` 取得漏れ / `.agent/index.json` が無い（または該当 issue が載っていない）
-- epic/initiative:
-  - `done`: 配下 issue の集計で `open==0 && unknown==0`（`total==0` も Done 扱い。表示上は `done(empty)` 相当）
-  - `doing`: active leaf が配下に存在する（=「配下で作業中」）
-  - `todo`: `done/doing/unknown` ではない
-  - `unknown`: 配下 issue の集計で `unknown>0`
-- `blocked`: 依存未解決（ready=false）の導出状態
-  - `state` は 1つのラベルに畳み込むため、優先順位は `done > blocked > doing > todo > unknown`（`ready` は別軸。進捗として `done` を優先表示するが、依存不整合の監査は `ready/blockers` を見る）
-
-ready:
-- `ready = effective_depends_on がすべて done`
-- `unknown` は未解決として扱われるため、通常 blocked になります（安全側）
-  - 補足: `state` と `ready` は別軸です（`state=done` でも `ready=false` は起こり得ます）。
-
-## 5. `deps check`（ready / blockers）
+## 4. `deps check`
 
 ```bash
 ./spec deps check <target>
 ./spec deps check <target> --github
-./spec deps check <target> --github --json
+./spec deps check <target> --json
 ```
 
 終了コード:
-- `0`: ready（実行可能）
-- `3`: blocked（依存未解決 / unknown を含む）
-- `1`: 構造エラー（deps.json 不正、解決不能参照、cycle など）
+- `0`: ready
+- `3`: blocked（unknown を含む）
+- `1`: 実行時エラー（構造エラー等）
 - `2`: 引数エラー（argparse）
 
 `--github`:
-- `gh issue list` を使って OPEN/CLOSED を取得し、Done 判定に使います。
-- 取得できない場合は `gh_fetch_failed` として warn し、unknown 扱いで継続します。
-- 一部の linked issue が取得できていない場合は `gh_index_incomplete` として warn します（`--gh-limit` 調整のヒント）。
+- `gh issue list` を参照して OPEN/CLOSED を判定
+- 失敗時は `gh_fetch_failed` warn で unknown 扱い
+- 取得漏れは `gh_index_incomplete` warn
 
 `--github` なし:
-- GitHub へはアクセスせず、可能なら `.agent/index.json` の `status`（最後の `sync` スナップショット）を使って判定します。
-- `.agent/index.json` が無い（または状態が載っていない）場合は unknown（安全側）として blocked になりやすいため、必要に応じて `sync --github` を実行してください。
+- GitHub へアクセスしない
+- snapshot は `spec-dock/.agent/index-all.json` 優先、無ければ `spec-dock/.agent/index.json`
+- snapshotが無い/不足なら unknown（blocked 側）
 
-## 6. `active set`（依存ガード / force）
+`--json` 出力（stable keys）:
 
-```bash
-./spec active set <target> --github
-./spec active set <target> --github --force
-./spec active set <target> --github -f
+```json
+{
+  "schema_version": 1,
+  "target": "iss-00302",
+  "ready": false,
+  "effective_depends_on": ["iss-00301"],
+  "blockers": ["iss-00301"],
+  "nodes": {
+    "iss-00301": {"state": "blocked", "ready": false}
+  },
+  "warnings": []
+}
 ```
 
-- blocked の場合、デフォルトでは失敗し active は更新されません。
-- `-f/--force` の場合、警告を出した上で active 化します（順番違反の可視化のため）。
-- `--github` なしでも deps guard は動作します（GitHub へはアクセスせず `.agent/index.json` のスナップショットを使います）。
+## 5. `active set` の deps guard（v2）
 
-## 7. `sync` の deps 派生物（.agent）
+```bash
+./spec active set <issue-id>
+./spec active set <issue-id> --force
+```
 
-`sync` は依存関係も統合し、以下を生成します（git 管理しない）:
+- issue target は v2 evaluator で判定
+- ブロック条件は `not ready`（`blockers` の有無ではない）
+- `ready=false` かつ `--force` なし: 失敗（exit=1）し、`spec-dock/.agent/active.json` は更新しない
+- `--force` あり: `deps_blocked` 警告を出して active 更新を続行
+- `--github` なし時は snapshot（`index-all -> index`）を使い、無ければ unknown で blocked
 
-- `spec-dock/.agent/deps.json`（依存グラフの統合 SSOT）
-- `spec-dock/.agent/deps.puml`（全体: Done を含む）
-- `spec-dock/.agent/deps.todo.puml`（todo-only: Done を除外）
+## 6. `sync` における deps 生成物（v2）
 
-PlantUML の色（state）:
-- done: `#D5E8D4`
-- doing: `#DAE8FC`
-- todo: `#FFF2CC`
-- unknown: `#EEEEEE`
-- blocked: `#F8CECC`
+`.agent/`:
+- `index-all.json` / `tree-all.json`（all）
+- `index.json` / `tree.json`（todo projection）
+- `deps-issues.json`（todo issue-only graph）
 
-PlantUML のラベル（ready）:
-- node label は `"<id>\\n<State>"` を基本とし、`ready=false` の場合は `\\nready=false` を追記します。
-  - 例: `iss-00301\\nDone\\nready=false`
-  - `deps.todo.puml` は Done ノードを除外するため、Done ノードの `ready=false` は `deps.puml`（全体）で確認してください。
+人間向け:
+- `spec-dock/deps-issues.puml`
+- `spec-dock/tree-all.puml`
+- `spec-dock/tree.puml`
+- `spec-dock/dashboard.md`
 
-`sync --force` と deps 構造エラー:
-- deps 構造エラー（循環依存/未解決参照など）がある場合、通常 `sync` は失敗します。
-- `sync --force` の場合は warn code `deps_preflight_failed` を出して index/tree の更新を継続しますが、deps 派生物（`.agent/deps*.{json,puml}`）は削除されます（古い派生物の誤用を防ぐため）。
+`sync --force` かつ deps preflight失敗時:
+- `deps.valid=false`, `deps.error` を持つ placeholder で上書き
+- `deps-issues.json` は `nodes={}`, `edges=[]` で上書き（削除しない）
+
+legacy v1 生成物は廃止:
+- `.agent/deps.json`, `.agent/deps.puml`, `.agent/deps.todo.puml` は `sync` で削除
+
+## 7. 矢印方向（JSON vs PlantUML）
+
+- JSON edge（`deps.issue_edges` / `deps-issues.json.edges`）:
+  - `depends_on` 方向（`dependent -> prerequisite`）
+- PlantUML（`deps-issues.puml`）:
+  - blocks 表示（`prerequisite -> dependent`）
+
+同一依存を用途別に向きを変えて表現しています。
