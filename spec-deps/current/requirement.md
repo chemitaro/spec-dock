@@ -3,9 +3,9 @@
 ID: "iss-00010"
 タイトル: "deps v2: shorthand 依存（initiative/epic）を issue 依存へ還元し、Readyボード（矢印なしツリー）で一目瞭然にする"
 関連GitHub: ["TBD"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-01"
+最終更新: "2026-03-04"
 親: []
 ---
 
@@ -136,6 +136,7 @@ package "Dependency (DAG)\n(canonical issue graph)" {
 - GitHub state 取得は `gh` CLI を用い、取得失敗は Unknown 扱いで継続（blocked へ）
 - 依存の SSOT は `deps.json`（ノード直下）であり、`.agent/*` は “観測スナップショット”
 - 規模想定: initiative あたり issue は数十〜最大 ~100 程度（200/2000 規模は想定しない）
+- 保守性: runtime 実装は単一巨大ファイル化を避け、`spec_dock_runtime/` 配下に責務分割する（`app.py` は entrypoint として薄く保つ）。外部仕様（CLI/生成物/exit code）は不変。
 
 ## 前提（Assumptions） (必須)
 - 依存の “完了” は主に GitHub issue state（OPEN/CLOSED）または `.agent/index*.json` のスナップショットで判定できる
@@ -210,7 +211,9 @@ package "Dependency (DAG)\n(canonical issue graph)" {
   - Actor/Role: 開発者 / エージェント
   - Given: deps 情報が解決できる（構造エラーなし）
   - When: `./spec sync` を実行する
-  - Then: PlantUML の issue-only 依存グラフ（todo-only）が生成され、READY/BLOCKED/DOING/UNKNOWN が色/ラベルで区別できる
+  - Then:
+    - PlantUML の issue-only 依存グラフ（todo-only）が生成され、READY/BLOCKED/DOING/UNKNOWN が色/ラベルで区別できる
+    - 可読性のため、`deps-issues.puml` は `skinparam linetype ortho`（直交エッジ）を含む
   - 観測点: `spec-dock/deps-issues.puml`
 - AC-012:
   - Actor/Role: 開発者 / エージェント
@@ -250,6 +253,14 @@ package "Dependency (DAG)\n(canonical issue graph)" {
     - index/tree の更新は継続する（既存挙動）
     - deps 派生物は stale にならない（無効化/削除/`deps: null` 等で誤用防止できる）
   - 観測点: `spec-dock/.agent/index*.json` / `spec-dock/.agent/tree*.json` / `spec-dock/.agent/deps-issues.json` / `spec-dock/*.puml` / `spec-dock/dashboard.md`
+- AC-014:
+  - Actor/Role: 開発者（保守者）
+  - Given: `spec-dock init` / `spec-dock update` により runtime が配置されている
+  - When: runtime の配置と基本動作を確認する
+  - Then:
+    - `spec-dock/scripts/spec_dock_runtime/` は責務ごとに複数モジュールへ分割されている（例: `ids.py`, `nodes.py`, `deps.py`, `github.py`, `active.py`, `render_puml.py`, `render_md.py`, `io_json.py`）
+    - entrypoint（`spec-dock/scripts/spec-dock` → `spec_dock_runtime.app:main`）は維持され、`./spec --help` が成功する
+  - 観測点: `spec-dock/scripts/spec_dock_runtime/` のファイル構成 / `./spec --help` の exit=0
 
 ### 入力→出力例 (任意)
 - EX-001:

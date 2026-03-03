@@ -27,11 +27,40 @@ import re
 import shutil
 import subprocess
 import sys
-import unicodedata
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from .github import (
+    _ensure_gh_available,
+    _gh_issue_create,
+    _gh_issue_index,
+    _gh_issue_view_minimal,
+)
+from .ids import (
+    _deps_node_sort_key,
+    _find_existing_id_by_num,
+    _format_id,
+    _normalize_id_input,
+    _normalize_local_id_input,
+    _parse_id,
+    _resolve_id_input,
+    _resolve_input_title_and_slug,
+    _slugify,
+    _validate_input_slug_kebab,
+    _validate_input_title,
+    _validate_lowercase,
+    _validate_slug,
+)
+from .io_json import _load_json, _now_iso, _today, _warn, _write_json
+from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
+from .render_puml import (
+    _deps_disabled_error_text,
+    _render_deps_disabled_deps_issues_puml,
+    _render_deps_disabled_tree_puml,
+    _render_deps_issues_puml,
+    _render_tree_ready_board_puml,
+)
 
 _SPEC_DOCK_DIRNAME = "spec-dock"
 
@@ -82,295 +111,6 @@ class _BranchDecision:
     desired: str
     candidates: tuple[str, str]
     warnings: tuple[str, ...]
-
-
-def _now_iso() -> str:
-    """Return current local time in ISO-8601 (timezone-aware, seconds precision)."""
-    return datetime.now().astimezone().isoformat(timespec="seconds")
-
-
-def _today() -> str:
-    """Return today's date as `YYYY-MM-DD`."""
-    return datetime.now().date().isoformat()
-
-
-def _load_json(path: Path) -> Any:
-    """Read and parse JSON from `path` with user-friendly errors."""
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Invalid JSON: {path}: {e}") from e
-    except UnicodeDecodeError as e:
-        raise RuntimeError(f"Failed to read: {path}: {e}") from e
-    except OSError as e:
-        raise RuntimeError(f"Failed to read: {path}: {e}") from e
-
-
-def _write_json(path: Path, data: Any) -> None:
-    """Write `data` as pretty-printed JSON into `path` (UTF-8)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
-def _warn(message: str) -> None:
-    """Print a runtime warning using the stable CLI prefix."""
-    print(f"spec-dock: (warn) {message}", file=sys.stderr)
-
-
-def _validate_lowercase(value: str, *, field: str) -> str:
-    """Ensure `value` is lowercase (macOS case-insensitive FS safety)."""
-    if value != value.lower():
-        raise RuntimeError(f"{field} must be lowercase: {value}")
-    return value
-
-
-def _validate_slug(value: str, *, field: str = "slug") -> str:
-    """Validate a slug used in filesystem paths.
-
-    Rules:
-    - Must be lowercase.
-    - Must not contain whitespace or path separators.
-    - Allowed characters are:
-      - Unicode letters/digits (via `str.isalnum()`), and
-      - `-`, `_`, `.`
-    """
-    slug = value.strip()
-    if not slug:
-        raise RuntimeError(f"{field} is required")
-
-    slug = _validate_lowercase(slug, field=field)
-    if slug in (".", ".."):
-        raise RuntimeError(f"{field} must not be '{slug}'")
-
-    if "/" in slug or "\\" in slug:
-        raise RuntimeError(f"{field} must not contain path separators: {slug}")
-
-    for ch in slug:
-        if ch.isalnum() or ch in ("-", "_", "."):
-            continue
-        raise RuntimeError(
-            f"{field} contains unsupported character: {ch!r} (slug={slug!r}). "
-            "Use only letters/digits (Unicode ok) and '-', '_', '.'."
-        )
-
-    return slug
-
-
-def _validate_input_title(value: str, *, field: str = "--title") -> str:
-    """Validate CLI input title for new/import commands.
-
-    Rules (after trim):
-    - ASCII letters/digits and single spaces between tokens only.
-    - Leading/trailing spaces are removed.
-    - Empty or non-matching values are rejected with actionable examples.
-    """
-    title = value.strip()
-    if not title:
-        raise RuntimeError(f"{field} is required")
-    if _INPUT_TITLE_RE.fullmatch(title):
-        return title
-    raise RuntimeError(
-        f"{field} is invalid: {value!r}\n"
-        f"expected regex: {_INPUT_TITLE_RE.pattern}\n"
-        "OK examples: 'Add Refresh Token', 'JWT Auth 2'\n"
-        "NG examples: 'Add-Token', 'Add  Token', 'Add　Token', '日本語'"
-    )
-
-
-def _validate_input_slug_kebab(value: str, *, field: str = "--slug") -> str:
-    """Validate CLI input slug for new/import commands (kebab-case only)."""
-    slug = value.strip()
-    if not slug:
-        raise RuntimeError(f"{field} is required")
-    if _INPUT_SLUG_KEBAB_RE.fullmatch(slug):
-        return slug
-    raise RuntimeError(
-        f"{field} is invalid: {value!r}\n"
-        f"expected regex: {_INPUT_SLUG_KEBAB_RE.pattern}\n"
-        "OK examples: 'add-refresh-token', 'jwt-auth-2'\n"
-        "NG examples: 'Add-token', 'add_token', 'add..token', '日本語'"
-    )
-
-
-def _derive_input_slug_from_title(title: str) -> str:
-    """Derive deterministic kebab-case slug from an already validated title."""
-    return title.lower().replace(" ", "-")
-
-
-def _resolve_input_title_and_slug(title: str, slug: str | None) -> tuple[str, str]:
-    """Normalize+validate title/slug for new/import before any side effects."""
-    normalized_title = _validate_input_title(title, field="--title")
-    if slug is None:
-        derived_slug = _derive_input_slug_from_title(normalized_title)
-        return normalized_title, _validate_input_slug_kebab(derived_slug, field="--slug")
-    return normalized_title, _validate_input_slug_kebab(slug, field="--slug")
-
-
-def _normalize_id_input(value: str, *, prefix: str, field: str) -> str:
-    """Normalize an id argument into the canonical `<prefix>-NNNN` form.
-
-    Accepted inputs:
-    - Canonical form: `init-00001`, `epic-00001`, `iss-00001`, `adr-00001`
-    - Local form: `init-local-00001`, `epic-local-00001`, `iss-local-00001`
-    - Shorthand numeric: `1` or `0001` (prefix is inferred from the argument context)
-
-    This lets callers type less while keeping the on-disk ids consistent and lowercase.
-    """
-    raw = value.strip()
-    if not raw:
-        raise RuntimeError(f"{field} is required")
-
-    # Be forgiving on input case, but always canonicalize to lowercase.
-    raw = raw.lower()
-
-    if _NUM_RE.fullmatch(raw):
-        return _format_id(prefix, int(raw), local=False)
-
-    parsed_prefix, is_local, num = _parse_id(raw)
-    if parsed_prefix != prefix:
-        raise RuntimeError(f"{field} must be '{prefix}-NNNN' or 'NNNN': {value}")
-    return _format_id(prefix, num, local=is_local)
-
-
-def _normalize_local_id_input(value: str, *, prefix: str, field: str) -> str:
-    """Normalize an id into the canonical local form: `<prefix>-local-NNNNN`.
-
-    This is used for `--no-github` mode to avoid collisions with GitHub issue numbers.
-
-    Accepted inputs:
-    - Local canonical: `iss-local-00001`
-    - Shorthand numeric: `1` or `0001` (interpreted as local)
-    """
-    raw = value.strip()
-    if not raw:
-        raise RuntimeError(f"{field} is required")
-
-    raw = raw.lower()
-    if _NUM_RE.fullmatch(raw):
-        return _format_id(prefix, int(raw), local=True)
-
-    parsed_prefix, is_local, num = _parse_id(raw)
-    if parsed_prefix != prefix:
-        raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' or 'NNNN' when using --no-github: {value}")
-    if not is_local:
-        raise RuntimeError(f"{field} must be '{prefix}-local-NNNN' (not '{prefix}-NNNN') when using --no-github: {value}")
-    return _format_id(prefix, num, local=True)
-
-
-def _find_existing_id_by_num(nodes: dict[str, "_Node"], *, prefix: str, num: int, local: bool) -> str | None:
-    """Find an existing node id by its numeric suffix (width-agnostic).
-
-    This intentionally ignores the zero-padding width so that:
-    - callers can accept `iss-0123` and `iss-00123` interchangeably, and
-    - the tool remains robust if the id width changes in the future.
-    """
-    matches: list[str] = []
-    for node_id in nodes.keys():
-        try:
-            p, is_local, n = _parse_id(str(node_id))
-        except RuntimeError:
-            continue
-        if p == prefix and is_local == local and n == num:
-            matches.append(str(node_id))
-
-    matches = sorted(set(matches))
-    if not matches:
-        return None
-    if len(matches) > 1:
-        marker = "-local" if local else ""
-        raise RuntimeError(
-            f"Ambiguous id: {prefix}{marker}-{num} matches multiple node ids: {', '.join(matches)}"
-        )
-    return matches[0]
-
-
-def _resolve_id_input(value: str, *, prefix: str, field: str, nodes: dict[str, "_Node"] | None = None) -> str:
-    """Resolve an id argument that may be numeric shorthand.
-
-    Behavior:
-    - If `value` is numeric, return:
-      - `<prefix>-NNNN` when it exists (preferred) or when nothing exists yet.
-      - `<prefix>-local-NNNN` when only the local variant exists.
-      - error when both exist (ambiguous).
-    - If `value` is already an id, normalize it to the canonical form (lowercase, padded).
-    """
-    raw = value.strip()
-    if not raw:
-        raise RuntimeError(f"{field} is required")
-
-    raw = raw.lower()
-    if _NUM_RE.fullmatch(raw):
-        num = int(raw)
-        normal = _format_id(prefix, num, local=False)
-        local_id = _format_id(prefix, num, local=True)
-        if nodes is None:
-            return normal
-        existing_normal = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=False)
-        existing_local = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=True)
-        if existing_normal and not existing_local:
-            return existing_normal
-        if existing_local and not existing_normal:
-            return existing_local
-        if existing_normal and existing_local:
-            raise RuntimeError(
-                f"{field} is ambiguous: both '{existing_normal}' and '{existing_local}' exist; specify the full id"
-            )
-        return normal
-
-    parsed_prefix, is_local, num = _parse_id(raw)
-    if parsed_prefix != prefix:
-        raise RuntimeError(f"{field} must be '{prefix}-NNNN' / '{prefix}-local-NNNN' or 'NNNN': {value}")
-    if nodes is not None:
-        existing = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
-        if existing:
-            return existing
-    return _format_id(prefix, num, local=is_local)
-
-
-def _slugify(title: str) -> str:
-    """Convert an arbitrary title into a filesystem-safe slug (lowercase).
-
-    Notes:
-    - Keeps alnum and `-_.` and replaces other chars with `-`.
-    - Normalizes Unicode (NFKC) to reduce surprises across inputs.
-    - Avoids reserved names like `.` / `..` and empty output.
-    """
-    s = unicodedata.normalize("NFKC", title).strip().lower()
-
-    # Normalize separators and whitespace early so later processing is simpler.
-    s = re.sub(r"[\\/]+", "-", s)
-    s = re.sub(r"\s+", "-", s)
-
-    # Replace Windows-forbidden characters and control chars.
-    s = re.sub(r'[<>:"|?*]+', "-", s)
-    s = re.sub(r"[\x00-\x1f\x7f]+", "-", s)
-
-    out: list[str] = []
-    for ch in s:
-        if ch.isalnum() or ch in ("-", "_", "."):
-            out.append(ch)
-        else:
-            out.append("-")
-
-    s = "".join(out)
-    s = re.sub(r"-{2,}", "-", s).strip("-.")
-    if s in ("", ".", ".."):
-        return ""
-    return s
-
-
-def _parse_id(value: str) -> tuple[str, bool, int]:
-    """Parse a node id like `init-00001` into (`prefix`, is_local, number)."""
-    m = _ID_RE.match(value)
-    if not m:
-        raise RuntimeError(f"Invalid id: {value} (expected e.g. init-00001 or init-local-00001)")
-    return (m.group("prefix"), m.group("local") is not None, int(m.group("num")))
-
-
-def _format_id(prefix: str, num: int, *, width: int = _DEFAULT_ID_WIDTH, local: bool = False) -> str:
-    """Format an id using a minimum width, e.g. `iss-00001` or `iss-local-00001`."""
-    marker = "-local" if local else ""
-    return f"{prefix}{marker}-{num:0{width}d}"
 
 
 def _find_specdock_dir() -> Path:
@@ -1460,30 +1200,6 @@ def _format_linked_github_nodes(linked: list[_Node], *, repo_root: Path | None =
     )
 
 
-def _gh_issue_view_minimal(repo_root: Path, *, issue_number: int) -> dict[str, Any]:
-    """Validate issue visibility via `gh issue view` and return minimal payload."""
-    _ensure_gh_available()
-    cmd = ["gh", "issue", "view", str(issue_number), "--json", "number,url"]
-    try:
-        p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
-
-    try:
-        data = json.loads((p.stdout or "").strip())
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Invalid JSON from gh issue view for issue #{issue_number}") from e
-    if not isinstance(data, dict):
-        raise RuntimeError(f"Invalid gh issue view payload for issue #{issue_number}")
-    try:
-        number = int(data.get("number"))
-    except (TypeError, ValueError) as e:
-        raise RuntimeError(f"Invalid gh issue view payload: number={data.get('number')}") from e
-    if number != issue_number:
-        raise RuntimeError(f"gh issue view returned mismatched number: expected {issue_number}, got {number}")
-    return data
-
-
 def _ensure_github_issue_not_linked(
     nodes: dict[str, _Node],
     *,
@@ -1888,70 +1604,6 @@ def _active_clear(specdock_dir: Path) -> None:
     _patch_agent_state_active_fields(specdock_dir, current)
     print("spec-dock: ok (active clear)")
 
-
-def _ensure_gh_available() -> None:
-    """Raise if GitHub CLI (`gh`) is not available in PATH."""
-    if shutil.which("gh") is None:
-        raise RuntimeError(
-            "'gh' CLI not found. Install GitHub CLI (gh), or use '--no-github' for 'new', or omit '--github' for 'sync'."
-        )
-
-
-def _gh_issue_index(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]:
-    """Fetch GitHub issues via `gh` and index them by issue number."""
-    _ensure_gh_available()
-    cmd = [
-        "gh",
-        "issue",
-        "list",
-        "--state",
-        "all",
-        "--limit",
-        str(limit),
-        "--json",
-        "number,state,title,labels,updatedAt,url",
-    ]
-    try:
-        p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{e.stderr.strip()}") from e
-
-    try:
-        data = json.loads(p.stdout)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"gh returned invalid JSON: {' '.join(cmd)}") from e
-    if not isinstance(data, list):
-        raise RuntimeError(f"gh returned invalid JSON payload (expected a list): {' '.join(cmd)}")
-    index: dict[int, dict[str, Any]] = {}
-    # Normalize to {number: issue_json}.
-    for item in data:
-        try:
-            number = int(item.get("number"))
-        except (TypeError, ValueError):
-            continue
-        index[number] = item
-    return index
-
-
-def _gh_issue_create(repo_root: Path, *, title: str, body: str) -> int:
-    """Create a GitHub issue via `gh` and return its issue number.
-
-    Notes:
-    - This function is intentionally non-interactive; it always supplies `--title` and `--body`.
-    - `gh issue create` prints the created issue URL on success; we parse the number from it.
-    """
-    _ensure_gh_available()
-    cmd = ["gh", "issue", "create", "--title", title, "--body", body]
-    try:
-        p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
-
-    out = f"{(p.stdout or '').strip()}\n{(p.stderr or '').strip()}".strip()
-    m = _GH_ISSUE_URL_RE.search(out)
-    if not m:
-        raise RuntimeError(f"Failed to parse issue number from gh output:\n{out}")
-    return int(m.group("num"))
 
 def _git_current_branch_or_none(repo_root: Path) -> str | None:
     """Return the current branch name, or None if unavailable/detached."""
@@ -3458,12 +3110,6 @@ def _build_effective_deps_map_all(nodes: dict[str, _Node]) -> dict[str, list[str
     return effective_map
 
 
-def _deps_node_sort_key(node_id: str) -> tuple[int, int, str]:
-    """Deterministic sort key for dependency-related outputs."""
-    _, is_local, num = _parse_id(node_id)
-    return (1 if is_local else 0, num, node_id)
-
-
 def _issue_ids_for_dep_node(nodes: dict[str, _Node], node_id: str) -> list[str]:
     """Expand one dependency node id into canonical issue ids."""
     node = nodes.get(node_id)
@@ -3592,279 +3238,6 @@ def _derive_issue_deps_fields(
     return derived
 
 
-def _issue_ready_board_state(
-    issue_id: str,
-    issue_item: dict[str, Any],
-    *,
-    active_issue_id: str | None,
-) -> tuple[str, list[str]]:
-    """Return state label and blockers for human-facing issue views."""
-    status = str(issue_item.get("status") or "unknown").lower()
-    deps = issue_item.get("deps")
-    ready = False
-    blockers_top: list[str] = []
-    if isinstance(deps, dict):
-        raw_ready = deps.get("ready")
-        if isinstance(raw_ready, bool):
-            ready = raw_ready
-        raw_blockers_top = deps.get("blockers_top")
-        if isinstance(raw_blockers_top, list):
-            blockers_top = [str(dep_id) for dep_id in raw_blockers_top if isinstance(dep_id, str)]
-
-    if status == "done":
-        return ("DONE", [])
-    if issue_id == active_issue_id:
-        return ("DOING", blockers_top)
-    if status == "unknown":
-        return ("UNKNOWN", blockers_top)
-    if ready:
-        return ("READY", [])
-    return ("BLOCKED", blockers_top)
-
-
-def _render_tree_ready_board_puml(
-    tree_state: dict[str, Any],
-    *,
-    active: dict[str, Any] | None,
-    todo_only: bool,
-    blockers_label_limit: int = _TREE_BOARD_BLOCKERS_LABEL_LIMIT,
-) -> str:
-    """Render hierarchy-only ready board in PlantUML."""
-    raw_tree = tree_state.get("tree")
-    if not isinstance(raw_tree, list):
-        raise RuntimeError("Invalid tree state: tree must be a list")
-
-    active_issue_id = _active_entry_id(active.get("issue")) if isinstance(active, dict) else None
-    state_color = {
-        "READY": "#D5E8D4",
-        "BLOCKED": "#F8CECC",
-        "DOING": "#DAE8FC",
-        "DONE": "#E3E3E3",
-        "UNKNOWN": "#EEEEEE",
-    }
-
-    def alias(node_id: str) -> str:
-        safe = re.sub(r"[^0-9A-Za-z_]", "_", node_id)
-        if not safe or safe[0].isdigit():
-            safe = "_" + safe
-        return f"N{safe}"
-
-    def esc(text: Any) -> str:
-        return str(text).replace("\\", "\\\\").replace('"', '\\"')
-
-    rendered_count = 0
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append("")
-    lines.append("legend right")
-    lines.append("|= State |= Color |")
-    for state in ("READY", "BLOCKED", "DOING", "DONE", "UNKNOWN"):
-        lines.append(f"| {state} |<{state_color[state]}> |")
-    lines.append("endlegend")
-    lines.append("")
-
-    for init_item in raw_tree:
-        if not isinstance(init_item, dict):
-            continue
-        epic_blocks: list[str] = []
-        raw_epics = init_item.get("epics")
-        if not isinstance(raw_epics, list):
-            continue
-        for epic_item in raw_epics:
-            if not isinstance(epic_item, dict):
-                continue
-            issue_blocks: list[str] = []
-            raw_issues = epic_item.get("issues")
-            if not isinstance(raw_issues, list):
-                continue
-            for issue_item in raw_issues:
-                if not isinstance(issue_item, dict):
-                    continue
-                issue_id = issue_item.get("id")
-                if not isinstance(issue_id, str):
-                    continue
-                state, blockers_top = _issue_ready_board_state(
-                    issue_id,
-                    issue_item,
-                    active_issue_id=active_issue_id,
-                )
-                if todo_only and state == "DONE":
-                    continue
-
-                label = f"{esc(issue_id)}\\n[{state}]"
-                if state == "BLOCKED" and blockers_top:
-                    shown = blockers_top[:blockers_label_limit]
-                    rest = len(blockers_top) - len(shown)
-                    suffix = f"+{rest}" if rest > 0 else ""
-                    label += f"\\nblockers: {esc(','.join(shown))}{suffix}"
-                issue_blocks.append(
-                    f'      rectangle "{label}" as {alias(issue_id)} {state_color.get(state, state_color["UNKNOWN"])}'
-                )
-            if not issue_blocks:
-                continue
-
-            epic_id = epic_item.get("id")
-            if not isinstance(epic_id, str):
-                continue
-            epic_title = str(epic_item.get("title") or "")
-            epic_blocks.append(f'    package "{esc(epic_id)}\\n{esc(epic_title)}" as {alias(epic_id)} {{')
-            epic_blocks.extend(issue_blocks)
-            epic_blocks.append("    }")
-            rendered_count += len(issue_blocks)
-
-        if not epic_blocks:
-            continue
-
-        init_id = init_item.get("id")
-        if not isinstance(init_id, str):
-            continue
-        init_title = str(init_item.get("title") or "")
-        lines.append(f'  package "{esc(init_id)}\\n{esc(init_title)}" as {alias(init_id)} {{')
-        lines.extend(epic_blocks)
-        lines.append("  }")
-        lines.append("")
-
-    if rendered_count == 0:
-        lines.append('note "No issues to show" as Empty')
-        lines.append("")
-
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _render_dashboard_md(
-    index_nodes: dict[str, Any],
-    *,
-    active: dict[str, Any] | None,
-    top_limit: int = _DASHBOARD_TOP_LIMIT,
-) -> str:
-    """Render todo-only markdown summary for human quick view."""
-    active_issue_id = _active_entry_id(active.get("issue")) if isinstance(active, dict) else None
-
-    entries: list[dict[str, Any]] = []
-    for node_id in sorted(index_nodes.keys(), key=_deps_node_sort_key):
-        item = index_nodes.get(node_id)
-        if not isinstance(item, dict):
-            continue
-        if item.get("type") != "issue":
-            continue
-        status = str(item.get("status") or "unknown").lower()
-        if status == "done":
-            continue
-
-        state, blockers_top = _issue_ready_board_state(
-            node_id,
-            item,
-            active_issue_id=active_issue_id,
-        )
-        entries.append(
-            {
-                "id": node_id,
-                "title": str(item.get("title") or ""),
-                "state": state,
-                "blockers_top": blockers_top,
-            }
-        )
-
-    by_state: dict[str, list[dict[str, Any]]] = {
-        "DOING": [],
-        "READY": [],
-        "BLOCKED": [],
-        "UNKNOWN": [],
-    }
-    for entry in entries:
-        state = entry.get("state")
-        if isinstance(state, str) and state in by_state:
-            by_state[state].append(entry)
-
-    lines: list[str] = []
-    lines.append("# Dashboard (generated)")
-    lines.append("")
-    lines.append("## Observability")
-    lines.append("- index: `spec-dock/.agent/index.json`")
-    lines.append("- ready board: `spec-dock/tree.puml`")
-    lines.append("- deps graph: `spec-dock/deps-issues.puml`")
-    lines.append("")
-    lines.append("## Summary")
-    lines.append(f"- todo_total: {len(entries)}")
-    lines.append(f"- doing: {len(by_state['DOING'])}")
-    lines.append(f"- ready: {len(by_state['READY'])}")
-    lines.append(f"- blocked: {len(by_state['BLOCKED'])}")
-    lines.append(f"- unknown: {len(by_state['UNKNOWN'])}")
-    lines.append("")
-
-    def append_state_section(state: str, title: str) -> None:
-        lines.append(f"## {title}")
-        section_items = by_state[state][:top_limit]
-        if not section_items:
-            lines.append("- (none)")
-            lines.append("")
-            return
-        for entry in section_items:
-            issue_id = entry["id"]
-            issue_title = entry["title"]
-            if state == "BLOCKED" and entry.get("blockers_top"):
-                blockers_top = entry["blockers_top"]
-                blockers = ", ".join(blockers_top[:_TREE_BOARD_BLOCKERS_LABEL_LIMIT])
-                lines.append(f"- `{issue_id}` {issue_title} (blockers: {blockers})")
-            else:
-                lines.append(f"- `{issue_id}` {issue_title}")
-        lines.append("")
-
-    append_state_section("DOING", "Doing")
-    append_state_section("READY", "Ready")
-    append_state_section("BLOCKED", "Blocked")
-    append_state_section("UNKNOWN", "Unknown")
-    return "\n".join(lines)
-
-
-def _deps_disabled_error_text(error: str | None) -> str:
-    """Return a stable error summary for deps-disabled placeholders."""
-    text = str(error or "").strip()
-    return text if text else "unknown"
-
-
-def _render_deps_disabled_tree_puml(*, todo_only: bool, error: str | None) -> str:
-    """Render placeholder PlantUML when deps preflight failed in `sync --force`."""
-    scope = "todo" if todo_only else "all"
-    err = _deps_disabled_error_text(error)
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append(f'title Tree Ready Board ({scope}) - DEPS_DISABLED')
-    lines.append(
-        f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled'
-    )
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _render_deps_disabled_dashboard_md(*, error: str | None) -> str:
-    """Render placeholder dashboard when deps preflight failed in `sync --force`."""
-    err = _deps_disabled_error_text(error)
-    lines: list[str] = []
-    lines.append("# Dashboard (generated)")
-    lines.append("")
-    lines.append("## DEPS_DISABLED")
-    lines.append("- deps_preflight_failed")
-    lines.append("- deps.valid=false")
-    lines.append("- mode: `sync --force`")
-    lines.append(f"- error: `{err}`")
-    lines.append("- ready/blocked 集計は無効です")
-    lines.append("")
-    lines.append("## Observability")
-    lines.append("- index: `spec-dock/.agent/index.json`")
-    lines.append("- ready board: `spec-dock/tree.puml`")
-    lines.append("- deps graph: `spec-dock/deps-issues.puml`")
-    lines.append("")
-    return "\n".join(lines)
-
-
 def _build_deps_issues_placeholder_state(*, error: str | None) -> dict[str, Any]:
     """Build placeholder `.agent/deps-issues.json` when deps are disabled."""
     err = _deps_disabled_error_text(error)
@@ -3877,23 +3250,6 @@ def _build_deps_issues_placeholder_state(*, error: str | None) -> dict[str, Any]
         "edges": [],
         "edge_direction": "depends_on (dependent -> prerequisite)",
     }
-
-
-def _render_deps_disabled_deps_issues_puml(*, error: str | None) -> str:
-    """Render placeholder deps-issues PlantUML when deps are disabled."""
-    err = _deps_disabled_error_text(error)
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append("skinparam linetype ortho")
-    lines.append("title deps-issues - DEPS_DISABLED")
-    lines.append(
-        f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled'
-    )
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
 
 
 def _build_deps_issues_state(
@@ -3974,82 +3330,6 @@ def _build_deps_issues_state(
         "edges": issue_edges,
         "edge_direction": "depends_on (dependent -> prerequisite)",
     }
-
-
-def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
-    """Render issue-only todo deps graph in blocks view (prereq -> dependent)."""
-    nodes = deps_issues_state.get("nodes")
-    if not isinstance(nodes, dict):
-        raise RuntimeError("Invalid deps-issues.json: nodes must be an object")
-    raw_edges = deps_issues_state.get("edges")
-    if not isinstance(raw_edges, list):
-        raise RuntimeError("Invalid deps-issues.json: edges must be a list")
-
-    state_color = {
-        "doing": "#DAE8FC",
-        "ready": "#D5E8D4",
-        "blocked": "#F8CECC",
-        "unknown": "#EEEEEE",
-    }
-
-    def alias(node_id: str) -> str:
-        safe = re.sub(r"[^0-9A-Za-z_]", "_", node_id)
-        if not safe or safe[0].isdigit():
-            safe = "_" + safe
-        return f"N{safe}"
-
-    include_ids = sorted([node_id for node_id in nodes.keys() if isinstance(node_id, str)], key=_deps_node_sort_key)
-    include_set = set(include_ids)
-
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append("skinparam linetype ortho")
-    lines.append("")
-    lines.append("legend right")
-    lines.append("|= State |= Color |")
-    for state, color in (
-        ("doing", "#DAE8FC"),
-        ("ready", "#D5E8D4"),
-        ("blocked", "#F8CECC"),
-        ("unknown", "#EEEEEE"),
-    ):
-        lines.append(f"| {state} |<{color}> |")
-    lines.append("endlegend")
-    lines.append("")
-
-    for node_id in include_ids:
-        item = nodes.get(node_id)
-        if not isinstance(item, dict):
-            continue
-        state = str(item.get("state") or "unknown")
-        color = state_color.get(state, state_color["unknown"])
-        label = f"{node_id}\\n{state.capitalize()}"
-        if item.get("ready") is False:
-            label += "\\nready=false"
-        lines.append(f'rectangle "{label}" as {alias(node_id)} {color}')
-    lines.append("")
-
-    # JSON edges are depends_on (dependent -> prerequisite); reverse for blocks view.
-    block_edges: list[tuple[str, str]] = []
-    for edge in raw_edges:
-        if not isinstance(edge, dict):
-            continue
-        dependent = edge.get("from")
-        prerequisite = edge.get("to")
-        if not isinstance(dependent, str) or not isinstance(prerequisite, str):
-            continue
-        if dependent not in include_set or prerequisite not in include_set:
-            continue
-        block_edges.append((prerequisite, dependent))
-    block_edges.sort(key=lambda x: (_deps_node_sort_key(x[0]), _deps_node_sort_key(x[1])))
-    for prerequisite, dependent in block_edges:
-        lines.append(f"{alias(prerequisite)} --> {alias(dependent)} : blocks")
-
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
 
 
 def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) -> dict[str, list[str]]:
