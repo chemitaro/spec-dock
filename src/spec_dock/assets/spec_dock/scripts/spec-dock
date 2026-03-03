@@ -6,6 +6,11 @@ import sys
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
+_RUNTIME_DIR = _SCRIPT_DIR / "spec_dock_runtime"
+_APP_PATH = _RUNTIME_DIR / "app.py"
+if not _APP_PATH.is_file():
+    raise SystemExit("error: spec-dock runtime module missing; run 'spec-dock update'")
+
 sys.path.insert(0, str(_SCRIPT_DIR))
 
 from spec_dock_runtime.app import main
