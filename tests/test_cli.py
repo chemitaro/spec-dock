@@ -2056,6 +2056,20 @@ class TestCli(unittest.TestCase):
             self.assertIn("runtime script not found", p.stderr)
             self.assertIn("spec-dock init", p.stderr)
 
+    def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            runtime_app = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "app.py"
+            runtime_backup = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "app.py.bak"
+            runtime_app.rename(runtime_backup)
+
+            p = self._run_runtime_capture(target, ["sync"])
+            self.assertNotEqual(p.returncode, 0)
+            self.assertIn("runtime module missing", p.stderr)
+            self.assertIn("spec-dock update", p.stderr)
+
     def test_new_epic_wrapper_does_not_require_gh_even_with_github_parent(self) -> None:
         if os.name == "nt":
             self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
