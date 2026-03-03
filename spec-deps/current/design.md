@@ -5,7 +5,7 @@ ID: "iss-00010"
 関連GitHub: ["TBD"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-01"
+最終更新: "2026-03-04"
 依存: ["requirement.md"]
 親: []
 ---
@@ -35,10 +35,12 @@ ID: "iss-00010"
 ## 既存実装/規約の調査結果（As-Is / 99.9%理解） (必須)
 - 参照した規約/実装（根拠）:
   - `AGENTS.md`（repo root）: 会話日本語 / git操作制約 / commitメッセージ規約
-  - runtime script: `src/spec_dock/assets/spec_dock/scripts/spec-dock`
-    - `sync`: `_sync()`
-    - deps v1: `_load_deps_json()` / `_resolve_dep_ref()` / `_build_effective_deps_map_all()` / `_build_deps_state()` / `_render_deps_puml()`
-    - deps check: `_deps_check()` / `_deps_evaluate()`
+  - runtime:
+    - entrypoint: `src/spec_dock/assets/spec_dock/scripts/spec-dock`（thin wrapper）
+    - implementation: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`（現状monolithic。分割は本設計で実施）
+      - `sync`: `_sync()`
+      - deps: `_load_deps_json()` / `_resolve_dep_ref()` / compile/derive/render（v2）
+      - deps check: `_deps_check()` / `_deps_evaluate()`
   - docs: `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `reference_sync.md`
   - tests: `tests/test_cli.py`（runtime script の生成物や挙動を回帰で担保）
 - 観測した現状（事実）:
@@ -114,6 +116,94 @@ DepsIssuesJson -> DepsIssuesPuml: render (blocks view)
 Todo -> Dashboard: render summary
 @enduml
 ```
+
+## モジュール設計（runtime 分割 / リファクタリング） (必須)
+- 背景:
+  - 現状 `spec_dock_runtime/app.py` が単一ファイルで肥大化しており、機能追加（deps v2 / 可視化 / GitHub連携 / active）に対して理解・変更コストが上がっている。
+- 目的:
+  - **外部仕様（CLI / 生成物 / exit code / JSON schema）を不変**のまま、責務ごとに分割して保守性を上げる。
+  - 既存の `unittest` 回帰（`tests/test_cli.py`）を安全網にし、段階的に移設する。
+- 方針:
+  - runtime は stdlib only（依存追加なし）
+  - entrypoint は維持:
+    - `spec-dock/scripts/spec-dock` → `spec_dock_runtime.app:main`（変更しない）
+  - `app.py` は「argparse + コマンドdispatch + 例外整形」に寄せ、ドメインロジックはモジュールへ移す
+  - 移設は “小さく・頻繁にテスト” を回し、循環importを避ける（依存方向を固定）
+
+### 提案するファイル分割（案）
+- `spec_dock_runtime/app.py`
+  - `main()` / argparse / subcommand wiring（薄く保つ）
+- `spec_dock_runtime/ids.py`
+  - id 正規化・パース（`init/epic/iss/adr`）、入力解釈（`#123`/URL 等）、ソートキー
+- `spec_dock_runtime/io_json.py`
+  - JSON load/write（安定フォーマット）、エラー整形
+- `spec_dock_runtime/nodes.py`
+  - node scan / meta 読み取り / 構造validate（containment）
+- `spec_dock_runtime/deps.py`
+  - `deps.json` schema / ref resolve / shorthand compile（issue graph）/ cycle 検出 / closure / ready 判定
+- `spec_dock_runtime/github.py`
+  - `gh issue list/view/create` ラッパ、index 化、失敗時の扱い（unknown）
+- `spec_dock_runtime/active.py`
+  - active manifest / pointer apply / index/tree への active patch（必要最小）
+- `spec_dock_runtime/render_puml.py`
+  - `tree*.puml`（Readyボード）/ `deps-issues.puml`（blocks view）/ DEPS_DISABLED placeholder
+  - **`deps-issues.puml` は `skinparam linetype ortho` を標準採用**（矢印を直交にして可読性を上げる）
+- `spec_dock_runtime/render_md.py`
+  - `dashboard.md` 生成（todo-only 集計）
+
+### 依存方向（循環を避ける）
+```plantuml
+@startuml
+skinparam shadowing false
+skinparam linetype ortho
+
+package spec_dock_runtime {
+  [app] --> [active]
+  [app] --> [nodes]
+  [app] --> [deps]
+  [app] --> [github]
+  [app] --> [render_puml]
+  [app] --> [render_md]
+
+  [active] --> [io_json]
+  [nodes] --> [io_json]
+  [deps] --> [io_json]
+  [github] --> [io_json]
+
+  [active] --> [ids]
+  [nodes] --> [ids]
+  [deps] --> [ids]
+  [github] --> [ids]
+  [render_puml] --> [ids]
+  [render_md] --> [ids]
+}
+@enduml
+```
+
+### 移設順序（推奨: 小さく安全に）
+- 原則: 1回の変更で「移す責務」を小さくし、毎回 `unittest` 回帰で外部仕様不変を確認する。
+- 推奨順:
+  1) `ids.py` / `io_json.py`（横断ユーティリティ）を抽出
+  2) `github.py`（subprocess/gh 周辺）を抽出
+  3) `nodes.py`（scan/validate）を抽出
+  4) `deps.py`（compile/derive/cycle）を抽出
+  5) `render_puml.py` / `render_md.py`（可視化）を抽出（`deps-issues.puml` の `ortho` もここで固定）
+  6) `active.py`（active/pointer/patch）を抽出
+  7) `app.py` を dispatch 中心に薄くし、旧関数/重複を削除
+
+### 要件 → モジュール対応（案）
+- AC-001/002/003/009/010:
+  - `nodes.py`（scan/containment validate）
+  - `deps.py`（shorthand compile / cycle / closure / ready）
+  - `github.py`（`--github` enrich、失敗は unknown）
+  - `render_puml.py` / `render_md.py`（生成物）
+- AC-004/005/007:
+  - `active.py`（active set/show/clear、manifest/pointer/patch）
+  - `deps.py`（deps guard の判定ロジック）
+  - `github.py`（`--github` guard の status 取得）
+- AC-006/011/012/013:
+  - `render_puml.py`（Readyボード / deps-issues.puml）
+  - `render_md.py`（dashboard）
 
 ## データ・バリデーション（必要最小限） (任意)
 ### MODEL-001: 入力 `deps.json`（SSOT / schema_version=1）
@@ -590,16 +680,21 @@ ArtHuman --> Util
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`
-    - 役割ごとに分割した runtime モジュール群（stdlib only）
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/nodes.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/deps.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/active.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py`
 - 変更（Modify）:
   - `src/spec_dock/assets/spec_dock/.gitignore`
     - 人間向け生成物（`tree*.puml`, `deps-issues.puml`, `dashboard.md`）を ignore に追加（この `.gitignore` 自体が `spec-dock/` 直下に配置される前提）
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+    - 現状の monolithic 実装を薄くし、責務を追加モジュールへ移設する（外部仕様は不変）
   - `src/spec_dock/assets/spec_dock/scripts/spec-dock`
-    - CLI エントリポイントを薄く保ち、主要ロジックを `spec_dock_runtime/` へ委譲する
-    - `sync` の生成物を v2（index/tree all/todo + deps-issues.json + human-facing puml/md）へ更新
-    - deps compile を “issue→issue へ還元” するロジックに置換
-    - legacy: `.agent/deps.json` / `.agent/deps.puml` / `.agent/deps.todo.puml` の生成を廃止し、`sync` 実行時に存在していれば削除する（stale 誤読防止）
+    - entrypoint は維持（thin wrapper）。必要最小の整形以外は原則変更しない
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md` / `reference_deps.md`
     - v2 の生成物と意味を反映（実装と同時に更新）
   - `tests/test_cli.py`
@@ -612,17 +707,27 @@ ArtHuman --> Util
   - `spec-deps/current/adrs/*.md`
 
 ## マッピング（要件 → 設計） (必須)
-- AC-001 → `_sync()` / `index-*.json` / `tree-*.json`（`src/spec_dock/assets/spec_dock/scripts/spec-dock`）
-- AC-004/005 → `active set` の deps guard（同上）
-- AC-006 → `tree(-all).puml` render（同上）
-- AC-011/012 → `deps-issues.{json,puml}`（同上）
-- AC-013 → `dashboard.md`（同上）
-- AC-002/003/009 → deps compile/validate（同上）
-- AC-007/008 → `--github` と snapshot/cached status（同上）
-- AC-010 → `sync --force` の deps 無効化・stale 防止（同上）
-- EC-001..004 → deps.json schema / unresolved / self / cycle（同上）
-- EC-005 → `gh` 失敗時の warn + unknown=blocked（同上）
-- 非交渉制約（stdlib only / GH更新しない）→ runtime script 内の実装制約として維持
+- entrypoint:
+  - `src/spec_dock/assets/spec_dock/scripts/spec-dock` → `spec_dock_runtime.app:main`（thin wrapper）
+- implementation（分割後の責務割当。`spec_dock_runtime/*`）:
+  - AC-001/002/003/009/010:
+    - `nodes.py`（scan/containment validate）
+    - `deps.py`（compile/derive/cycle/closure/ready）
+    - `github.py`（`--github` enrich、失敗は unknown）
+    - `render_puml.py` / `render_md.py`（生成物）
+  - AC-004/005/007:
+    - `active.py`（active set/show/clear）
+    - `deps.py`（deps guard）
+    - `github.py`（`--github` guard）
+  - AC-006/011/012/013:
+    - `render_puml.py`（Readyボード / deps-issues.puml。`deps-issues.puml` は `linetype ortho` を採用）
+    - `render_md.py`（dashboard）
+  - AC-014:
+    - `spec_dock_runtime/` のモジュール分割（上記のファイル群が存在）
+    - `app.py` は dispatch 中心に薄く保つ（entrypoint は維持）
+  - EC-001..004 → `deps.py`（schema / resolve / self / cycle）
+  - EC-005 → `github.py`（warn + unknown=blocked）
+  - 非交渉制約（stdlib only / GH更新しない）→ runtime 全体の実装制約として維持
 
 ## テスト戦略（最低限ここまで具体化） (任意)
 - 追加/更新するテスト（すべて `python -m unittest discover -v` で回す）:
@@ -641,7 +746,9 @@ ArtHuman --> Util
   - AC-008 → `test_sync_github_limit_warns_incomplete_and_unknown_blocks`（新規）
   - AC-009 → `test_sync_fails_on_deps_structural_error_without_force`（新規）
   - AC-011/012 → `test_sync_emits_deps_issues_json_and_puml_todo_only`（新規）
+  - AC-011 → `test_sync_emits_deps_issues_puml_uses_ortho_linetype`（新規）
   - AC-013 → `test_sync_emits_dashboard_md`（新規）
+  - AC-014 → `test_runtime_is_modularized_and_spec_help_works`（新規）
   - AC-010 → `test_sync_force_sets_deps_valid_false_and_emits_placeholders`（新規/更新）
   - AC-010 → `test_sync_force_removes_legacy_deps_artifacts`（新規）
   - 決定的順序 → `test_sync_outputs_are_deterministically_sorted`（新規）

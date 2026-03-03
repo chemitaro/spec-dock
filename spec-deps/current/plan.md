@@ -3,9 +3,9 @@
 ID: "iss-00010"
 タイトル: "deps v2: shorthand 依存（initiative/epic）を issue 依存へ還元し、Readyボード（矢印なしツリー）で一目瞭然にする"
 関連GitHub: ["TBD"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-03"
+最終更新: "2026-03-04"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -37,6 +37,7 @@ ID: "iss-00010"
 - [ ] S09: `--github` enrich / `--gh-limit` 劣化時の warnings + unknown=blocked が成立する
 - [ ] S10: runtime を `spec_dock_runtime/` に責務分割し、entrypoint を薄く保つ（symlink-safe import）
 - [ ] S11: shipped docs（`reference_sync.md` / `reference_deps.md`）を v2 の生成物/挙動に更新する
+- [ ] S12: runtime の保守性改善（`spec_dock_runtime/app.py` の肥大化解消のため、設計に沿って追加のモジュール分割を行う。外部仕様は不変）
 
 ### UML（任意） (任意)
 ```plantuml
@@ -54,8 +55,9 @@ rectangle "S08\n(sync --force placeholders\n+ remove legacy v1)" as S08
 rectangle "S09\n(--github enrich + warnings)" as S09
 rectangle "S10\n(refactor modules)" as S10
 rectangle "S11\n(update shipped docs)" as S11
+rectangle "S12\n(refactor modules 2)\n(shrink app.py)" as S12
 
-S01 --> S02 --> S03 --> S04 --> S05 --> S06 --> S07 --> S08 --> S09 --> S10 --> S11
+S01 --> S02 --> S03 --> S04 --> S05 --> S06 --> S07 --> S08 --> S09 --> S10 --> S11 --> S12
 @enduml
 ```
 
@@ -70,10 +72,12 @@ S01 --> S02 --> S03 --> S04 --> S05 --> S06 --> S07 --> S08 --> S09 --> S10 --> 
 - AC-010 → S08
 - AC-011/012 → S04
 - AC-013 → S05
+- AC-014 → S12
 - EC-001..004 → S02, S06, S08
 - EC-005 → S09
 - Docs（shipped reference）→ S11
-- 非交渉制約（stdlib only / GH更新しない）→ S01..S11（継続監視）
+- 非交渉制約（stdlib only / GH更新しない）→ S01..S12（継続監視）
+- 内部品質（保守性: モジュール分割）→ S12
 
 ---
 
@@ -168,6 +172,7 @@ S01 --> S02 --> S03 --> S04 --> S05 --> S06 --> S07 --> S08 --> S09 --> S10 --> 
 - 対象: AC-011, AC-012
 - 追加/更新するテスト（案）:
   - `tests/test_cli.py::test_sync_emits_deps_issues_json_and_puml_todo_only`
+  - `tests/test_cli.py::test_sync_emits_deps_issues_puml_uses_ortho_linetype`
 - 主要変更予定ファイル: `src/spec_dock/assets/spec_dock/scripts/spec-dock`, `tests/test_cli.py`
 - 品質ゲート: `python -m unittest discover -v`
 
@@ -221,6 +226,8 @@ S01 --> S02 --> S03 --> S04 --> S05 --> S06 --> S07 --> S08 --> S09 --> S10 --> 
 
 ### S10 — runtime を `spec_dock_runtime/` に責務分割し、entrypoint を薄く保つ（symlink-safe import） (必須)
 - 対象: 非交渉制約（保守性）/ 設計のモジュール方針
+- 位置づけ:
+  - `S10` は「分割の土台（最低限の責務分離 + import 構造）」を導入するステップとし、残った肥大化の解消や最終整理は `S12` で行う。
 - 追加/更新するテスト（案）:
   - `tests/test_cli.py::test_runtime_entrypoint_imports_modules_when_invoked_via_wrapper`（必要なら）
 - 主要変更予定ファイル:
@@ -236,6 +243,45 @@ S01 --> S02 --> S03 --> S04 --> S05 --> S06 --> S07 --> S08 --> S09 --> S10 --> 
 - 検証:
   - `python -m unittest discover -v`
   - docs 内の生成物パス（`.agent/*.json` と `spec-dock/*.puml`/`dashboard.md`）が ADR-00009 と一致する
+
+---
+
+### S12 — runtime の保守性改善（`spec_dock_runtime/app.py` の肥大化解消のため、設計に沿って追加のモジュール分割を行う。外部仕様は不変） (必須)
+- 対象: AC-014（内部品質: 保守性）
+- 目的:
+  - runtime 実装が `spec_dock_runtime/app.py` に集中し過ぎている状態を解消し、保守・理解・レビューコストを下げる。
+  - 外部仕様（CLI / 生成物 / exit code / JSON schema）を不変に保ちつつ、責務ごとにモジュール分割する。
+- 位置づけ:
+  - `S12` は `S10` で導入した分割（骨格）を前提に、残っている肥大化を解消して `app.py` を薄くする「最終整理」のステップとする。
+- 追加/更新するテスト（案）:
+  - `tests/test_cli.py::test_runtime_is_split_into_modules_after_init`（runtime 配置後に `spec_dock_runtime/` のモジュール群が存在する）
+  - `tests/test_cli.py::test_runtime_help_succeeds_after_refactor`（`spec-dock/scripts/spec-dock --help` が exit=0）
+  - 既存回帰（`tests/test_cli.py` の sync/new/active/deps 系）が全て通ること（最重要）
+- 主要変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/nodes.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/deps.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/active.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py`
+  - Add/Modify: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py`
+- 方針（設計からの転記）:
+  - entrypoint は維持: `spec-dock/scripts/spec-dock` → `spec_dock_runtime.app:main`
+  - `app.py` は argparse/dispatch/例外整形を中心に薄くし、ドメインロジックを各モジュールへ移設する
+  - 循環importを避けるため、依存方向（`app` → 各モジュール、各モジュール → `ids`/`io_json`）を固定する
+  - runtime は stdlib only（依存追加なし）
+- 進め方（TDD: 小さな Red → Green → Refactor を回す）:
+  - Red:
+    - まず「期待するモジュール群が存在する」「help が成功する」をテストで固定し、失敗させる
+  - Green:
+    - 1モジュールずつ最小移設（import で動かす）→ 全テスト → コミット
+  - Refactor:
+    - 重複削除・命名整理・責務境界の微調整（外部仕様不変）
+- レビュー/QA（このステップの完了条件に含める）:
+  - reviewer に **今回のリファクタ全体スコープ**でレビューを依頼し、指摘があれば修正→全テスト→再レビュー
+  - QA エンジニアに評価（全テスト + smoke）を依頼し、指摘があれば修正→全テスト→再評価
 
 ---
 
