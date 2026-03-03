@@ -2067,6 +2067,7 @@ def _sync(
     deps_issue_edges_all: list[dict[str, str]] = []
     deps_compile_warnings: list[str] = []
     deps_preflight_failed = False
+    deps_preflight_error: str | None = None
     sync_warnings: list[str] = []
 
     preflight = "ok"
@@ -2077,6 +2078,7 @@ def _sync(
             raise RuntimeError(f"preflight validate failed: {e}") from e
         preflight = "failed(forced)"
         deps_preflight_failed = True
+        deps_preflight_error = f"preflight validate failed: {e}"
         print(
             f"spec-dock: (warn) preflight validate failed; continuing due to --force: {e}",
             file=sys.stderr,
@@ -2095,6 +2097,7 @@ def _sync(
                 raise
             preflight = "failed(forced)"
             deps_preflight_failed = True
+            deps_preflight_error = str(e)
             _warn(f"deps_preflight_failed: deps preflight failed; continuing due to --force. Details: {e}")
             effective_deps_map_all = None
 
@@ -2130,6 +2133,8 @@ def _sync(
     for warning_code in deps_compile_warnings:
         if warning_code not in sync_warnings:
             sync_warnings.append(warning_code)
+    if deps_preflight_failed and "deps_preflight_failed" not in sync_warnings:
+        sync_warnings.append("deps_preflight_failed")
 
     def sort_key(node_id: str) -> tuple[int, int, str]:
         """Deterministic sort key for ids (GitHub ids first, then local)."""
@@ -2337,13 +2342,20 @@ def _sync(
         init_item["epics"] = epics
         tree.append(init_item)
 
+    deps_top_level: dict[str, Any] = {
+        "valid": (not deps_preflight_failed),
+        "error": deps_preflight_error if deps_preflight_failed else None,
+        "issue_edges": list(deps_issue_edges_all if not deps_preflight_failed else []),
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
     state_index_all = {
         "schema_version": 2,
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
         "warnings": list(sync_warnings),
-        "deps": {"issue_edges": list(deps_issue_edges_all)},
+        "deps": dict(deps_top_level),
         "nodes": out_nodes,
     }
     state_tree_all = {
@@ -2351,13 +2363,17 @@ def _sync(
         "generated_at": _now_iso(),
         "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
         "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level),
         "tree": tree,
     }
 
     # S01 contract: emit both `all` and `todo` JSON observation points.
     # TODO projection is introduced in later steps; for now it is equivalent to all.
     state_index_todo = dict(state_index_all)
+    state_index_todo["deps"] = dict(deps_top_level)
     state_tree_todo = dict(state_tree_all)
+    state_tree_todo["deps"] = dict(deps_top_level)
 
     _write_json(state_index_all_path, state_index_all)
     _write_json(state_tree_all_path, state_tree_all)
@@ -2389,9 +2405,18 @@ def _sync(
             encoding="utf-8",
         )
     else:
-        tree_all_puml_path.unlink(missing_ok=True)
-        tree_todo_puml_path.unlink(missing_ok=True)
-        dashboard_path.unlink(missing_ok=True)
+        tree_all_puml_path.write_text(
+            _render_deps_disabled_tree_puml(todo_only=False, error=deps_preflight_error),
+            encoding="utf-8",
+        )
+        tree_todo_puml_path.write_text(
+            _render_deps_disabled_tree_puml(todo_only=True, error=deps_preflight_error),
+            encoding="utf-8",
+        )
+        dashboard_path.write_text(
+            _render_deps_disabled_dashboard_md(error=deps_preflight_error),
+            encoding="utf-8",
+        )
 
     deps_issues_json_path = agent_dir / "deps-issues.json"
     deps_issues_puml_path = specdock_dir / "deps-issues.puml"
@@ -2404,30 +2429,17 @@ def _sync(
         _write_json(deps_issues_json_path, deps_issues_state)
         deps_issues_puml_path.write_text(_render_deps_issues_puml(deps_issues_state), encoding="utf-8")
     else:
-        deps_issues_json_path.unlink(missing_ok=True)
-        deps_issues_puml_path.unlink(missing_ok=True)
-
-    # Deps derived state (optional when preflight failed forced).
-    deps_json_path = agent_dir / "deps.json"
-    deps_puml_path = agent_dir / "deps.puml"
-    deps_todo_puml_path = agent_dir / "deps.todo.puml"
-    if effective_deps_map_all is not None:
-        deps_state = _build_deps_state(
-            repo_root,
-            nodes,
-            effective_deps_map=effective_deps_map_all,
-            github=github,
-            issue_index=issue_index,
-            active=current if isinstance(current, dict) else None,
-            warnings=sync_warnings,
+        deps_issues_state = _build_deps_issues_placeholder_state(error=deps_preflight_error)
+        _write_json(deps_issues_json_path, deps_issues_state)
+        deps_issues_puml_path.write_text(
+            _render_deps_disabled_deps_issues_puml(error=deps_preflight_error),
+            encoding="utf-8",
         )
-        _write_json(deps_json_path, deps_state)
-        deps_puml_path.write_text(_render_deps_puml(deps_state, todo_only=False), encoding="utf-8")
-        deps_todo_puml_path.write_text(_render_deps_puml(deps_state, todo_only=True), encoding="utf-8")
-    elif deps_preflight_failed:
-        deps_json_path.unlink(missing_ok=True)
-        deps_puml_path.unlink(missing_ok=True)
-        deps_todo_puml_path.unlink(missing_ok=True)
+
+    # Legacy v1 deps artifacts are deprecated; always prune to avoid stale misuse.
+    (agent_dir / "deps.json").unlink(missing_ok=True)
+    (agent_dir / "deps.puml").unlink(missing_ok=True)
+    (agent_dir / "deps.todo.puml").unlink(missing_ok=True)
 
     rel_index_all = state_index_all_path.relative_to(repo_root).as_posix()
     rel_tree_all = state_tree_all_path.relative_to(repo_root).as_posix()
@@ -3686,6 +3698,80 @@ def _render_dashboard_md(
     return "\n".join(lines)
 
 
+def _deps_disabled_error_text(error: str | None) -> str:
+    """Return a stable error summary for deps-disabled placeholders."""
+    text = str(error or "").strip()
+    return text if text else "unknown"
+
+
+def _render_deps_disabled_tree_puml(*, todo_only: bool, error: str | None) -> str:
+    """Render placeholder PlantUML when deps preflight failed in `sync --force`."""
+    scope = "todo" if todo_only else "all"
+    err = _deps_disabled_error_text(error)
+    lines: list[str] = []
+    lines.append("@startuml")
+    lines.append("left to right direction")
+    lines.append("skinparam shadowing false")
+    lines.append(f'title Tree Ready Board ({scope}) - DEPS_DISABLED')
+    lines.append(
+        f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled'
+    )
+    lines.append("@enduml")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_deps_disabled_dashboard_md(*, error: str | None) -> str:
+    """Render placeholder dashboard when deps preflight failed in `sync --force`."""
+    err = _deps_disabled_error_text(error)
+    lines: list[str] = []
+    lines.append("# Dashboard (generated)")
+    lines.append("")
+    lines.append("## DEPS_DISABLED")
+    lines.append("- deps_preflight_failed")
+    lines.append("- deps.valid=false")
+    lines.append("- mode: `sync --force`")
+    lines.append(f"- error: `{err}`")
+    lines.append("- ready/blocked 集計は無効です")
+    lines.append("")
+    lines.append("## Observability")
+    lines.append("- index: `spec-dock/.agent/index.json`")
+    lines.append("- ready board: `spec-dock/tree.puml`")
+    lines.append("- deps graph: `spec-dock/deps-issues.puml`")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _build_deps_issues_placeholder_state(*, error: str | None) -> dict[str, Any]:
+    """Build placeholder `.agent/deps-issues.json` when deps are disabled."""
+    err = _deps_disabled_error_text(error)
+    return {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+        "deps": {"valid": False, "error": err},
+        "nodes": {},
+        "edges": [],
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+
+def _render_deps_disabled_deps_issues_puml(*, error: str | None) -> str:
+    """Render placeholder deps-issues PlantUML when deps are disabled."""
+    err = _deps_disabled_error_text(error)
+    lines: list[str] = []
+    lines.append("@startuml")
+    lines.append("left to right direction")
+    lines.append("skinparam shadowing false")
+    lines.append("title deps-issues - DEPS_DISABLED")
+    lines.append(
+        f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled'
+    )
+    lines.append("@enduml")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _build_deps_issues_state(
     index_nodes: dict[str, Any],
     deps_issue_edges: list[dict[str, str]],
@@ -3759,6 +3845,7 @@ def _build_deps_issues_state(
         "schema_version": 1,
         "generated_at": _now_iso(),
         "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+        "deps": {"valid": True, "error": None},
         "nodes": issue_nodes,
         "edges": issue_edges,
         "edge_direction": "depends_on (dependent -> prerequisite)",
