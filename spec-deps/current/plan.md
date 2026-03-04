@@ -28,7 +28,7 @@ ID: "iss-00012"
 - [x] S03: read-only 化に失敗しても warn + exit 0 で継続する（EC-001）
 - [x] S04: （Superseded）レガシー `meta.json` の `.meta.json` への移行（互換要件が撤回されたため、以後はS06へ）
 - [x] S05: wrapper / shipped docs の `meta.json` 参照が `.meta.json` に更新される
-- [ ] S06: レガシー `meta.json` のサポートを削除し、`.meta.json` のみに統一する（EC-002）
+- [x] S06: レガシー `meta.json` のサポートを削除し、`.meta.json` のみに統一する（EC-002）
 
 ### UML（任意） (任意)
 ```plantuml
