@@ -34,6 +34,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
   - `--title` は必須です（GitHub title は取り込みません）
   - ローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します（active は変更しません）
   - `import` は実行前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **副作用（テンプレートコピー/`.meta.json`生成）なし**で失敗します
+  - `meta.json`（レガシー名）が混在しているツリーは非対応です（`.meta.json` へ手動移行後に実行してください）
 
 ### GitHub を呼ばない（ローカルのみ）
 

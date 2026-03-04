@@ -39,15 +39,10 @@ if ! runtime_script="$(find_runtime "$script_dir")"; then
 fi
 
 meta_path="$script_dir/../.meta.json"
-legacy_meta_path="$script_dir/../meta.json"
 if [[ ! -f "$meta_path" ]]; then
-  if [[ -f "$legacy_meta_path" ]]; then
-    meta_path="$legacy_meta_path"
-  else
-    echo "new-issue: missing .meta.json: $meta_path" >&2
-    echo "new-issue: fix ../.meta.json and retry." >&2
-    exit 1
-  fi
+  echo "new-issue: missing .meta.json: $meta_path" >&2
+  echo "new-issue: fix ../.meta.json and retry." >&2
+  exit 1
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
