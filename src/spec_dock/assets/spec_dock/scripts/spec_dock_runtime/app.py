@@ -52,7 +52,7 @@ from .ids import (
     _validate_lowercase,
     _validate_slug,
 )
-from .io_json import _load_json, _now_iso, _today, _warn, _write_json
+from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
 from .render_puml import (
     _deps_disabled_error_text,
@@ -322,7 +322,9 @@ def _write_meta(
     }
     if github_issue_number is not None:
         meta["github"] = {"issue_number": int(github_issue_number)}
-    _write_json(dest_dir / "meta.json", meta)
+    meta_path = dest_dir / "meta.json"
+    _write_json(meta_path, meta)
+    _try_make_readonly(meta_path)
 
 
 def _new_initiative(
