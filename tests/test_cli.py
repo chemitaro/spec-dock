@@ -235,6 +235,14 @@ class TestCli(unittest.TestCase):
         self.assertTrue(version_file.is_file())
         self.assertEqual(version_file.read_text(encoding="utf-8").strip(), _expected_spec_dock_version())
 
+    def _assert_spec_dock_meta_marker(self, meta: dict[str, object]) -> None:
+        marker = meta.get("_spec_dock")
+        self.assertIsInstance(marker, dict)
+        marker_dict = marker
+        self.assertEqual(marker_dict.get("managed"), True)
+        self.assertEqual(marker_dict.get("do_not_edit"), True)
+        self.assertEqual(marker_dict.get("edit_via"), "spec-dock")
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -5574,6 +5582,8 @@ class TestCli(unittest.TestCase):
             self.assertEqual(epic_meta["id"], "epic-local-00001")
             self.assertNotIn("github", init_meta)
             self.assertNotIn("github", epic_meta)
+            self._assert_spec_dock_meta_marker(init_meta)
+            self._assert_spec_dock_meta_marker(epic_meta)
 
     def test_new_initiative_and_epic_github_flags_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5691,9 +5701,10 @@ class TestCli(unittest.TestCase):
                 / "iss-00123-add-refresh-token"
             )
             self.assertTrue(issue_dir.is_dir())
-            meta = (issue_dir / "meta.json").read_text(encoding="utf-8")
-            self.assertIn('\"id\": \"iss-00123\"', meta)
-            self.assertIn('\"issue_number\": 123', meta)
+            meta = json.loads((issue_dir / "meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(meta["id"], "iss-00123")
+            self.assertEqual(meta["github"]["issue_number"], 123)
+            self._assert_spec_dock_meta_marker(meta)
 
     def test_import_aborts_without_local_changes_when_gh_issue_view_fails(self) -> None:
         if os.name == "nt":
@@ -5761,6 +5772,7 @@ class TestCli(unittest.TestCase):
             meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
             self.assertEqual(meta["id"], "init-00010")
             self.assertEqual(meta["github"]["issue_number"], 10)
+            self._assert_spec_dock_meta_marker(meta)
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
             self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
@@ -5794,6 +5806,8 @@ class TestCli(unittest.TestCase):
             self.assertEqual(epic_meta["parent_id"], "init-00010")
             self.assertEqual(epic_meta["initiative_id"], "init-00010")
             self.assertEqual(epic_meta["github"]["issue_number"], 11)
+            self._assert_spec_dock_meta_marker(init_meta)
+            self._assert_spec_dock_meta_marker(epic_meta)
 
     def test_import_issue_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
@@ -5851,6 +5865,7 @@ class TestCli(unittest.TestCase):
             meta = json.loads((issue_dir / "meta.json").read_text(encoding="utf-8"))
             self.assertEqual(meta["id"], "iss-00123")
             self.assertEqual(meta["github"]["issue_number"], 123)
+            self._assert_spec_dock_meta_marker(meta)
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
 

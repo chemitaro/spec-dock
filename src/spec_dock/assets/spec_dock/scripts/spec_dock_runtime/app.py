@@ -314,6 +314,11 @@ def _write_meta(
         "parent_id": parent_id,
         "initiative_id": initiative_id,
         "epic_id": epic_id,
+        "_spec_dock": {
+            "managed": True,
+            "do_not_edit": True,
+            "edit_via": "spec-dock",
+        },
     }
     if github_issue_number is not None:
         meta["github"] = {"issue_number": int(github_issue_number)}
