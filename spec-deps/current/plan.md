@@ -17,17 +17,18 @@ ID: "iss-00012"
 - 対象EC: EC-001, EC-002
 - 対象制約（Always / 非交渉）:
   - stdlib only（依存追加なし）
-  - `.meta.json` は `schema_version=1` を維持し、後方互換な追加のみ
+  - `.meta.json` は `schema_version=1` を維持し、新バージョンは作らない
   - read-only 化は best-effort（失敗時は warn + exit 0）
   - 既存ノードのメタデータ内容（JSONフィールド）は後追い変更しない（sync/validate 等）
-  - レガシー `meta.json` は `.meta.json` へリネーム移行できる（best-effort）
+  - レガシー `meta.json` はサポートしない（読み取り/移行/互換を実装しない）
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
 - [x] S01: `new/import` で生成される `.meta.json` に `_spec_dock` 最小スキーマが含まれる
 - [x] S02: `new/import` で生成される `.meta.json` が read-only になる（best-effort / POSIX では write bit が外れる）
 - [x] S03: read-only 化に失敗しても warn + exit 0 で継続する（EC-001）
-- [x] S04: レガシー `meta.json` が `.meta.json` へ移行され、内容が不変である（backfill/relock しない）（EC-002）
+- [x] S04: （Superseded）レガシー `meta.json` の `.meta.json` への移行（互換要件が撤回されたため、以後はS06へ）
 - [x] S05: wrapper / shipped docs の `meta.json` 参照が `.meta.json` に更新される
+- [ ] S06: レガシー `meta.json` のサポートを削除し、`.meta.json` のみに統一する（EC-002）
 
 ### UML（任意） (任意)
 ```plantuml
@@ -37,13 +38,15 @@ skinparam shadowing false
 rectangle "S01\n(_spec_dock marker)" as S01
 rectangle "S02\n(lock readonly best-effort)" as S02
 rectangle "S03\n(warn+exit0 on lock fail)" as S03
-rectangle "S04\n(migrate legacy meta.json\n-> .meta.json w/o backfill/relock)" as S04
+rectangle "S04\n(superseded)" as S04
 rectangle "S05\n(update wrappers/docs\nfor .meta.json)" as S05
+rectangle "S06\n(drop legacy meta.json\nsupport)" as S06
 
 S01 --> S02
 S02 --> S03
 S03 --> S04
 S04 --> S05
+S05 --> S06
 @enduml
 ```
 
@@ -51,7 +54,7 @@ S04 --> S05
 - AC-001 → S01, S02, S03
 - AC-002 → S01, S02, S03
 - EC-001 → S03
-- EC-002 → S04
+- EC-002 → S06
 - 非交渉制約（stdlib only / schema_version=1）→ S01..S05（継続監視）
 
 ---
@@ -73,7 +76,7 @@ S04 --> S05
   - 対象テスト: `tests/test_cli.py`（既存の `new/import` テストに追記）
 - このステップで「追加しないこと（スコープ固定）」:
   - read-only 化（S02/S03 で実施）
-  - 既存ノードのメタデータ内容の後追い適用（S04 で “やらない” をテストで固定）
+  - 既存ノードのメタデータ内容の後追い適用（やらないことをテストで固定）
 
 #### update_plan（着手時に登録） (必須)
 - [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
@@ -126,7 +129,7 @@ S04 --> S05
   - 対象テスト: `tests/test_cli.py`
 - このステップで「追加しないこと（スコープ固定）」:
   - lock 失敗時の warn/exit0（S03 で確定）
-  - 既存ノードの後追い適用（S04）
+  - 既存ノードの後追い適用（やらない）
 
 #### update_plan（着手時に登録） (必須)
 - [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
@@ -171,7 +174,7 @@ S04 --> S05
   - 対象IF: IF-001（`_write_meta`）, IF-002（`_try_make_readonly`）
   - 対象テスト: `tests/test_cli.py`
 - このステップで「追加しないこと（スコープ固定）」:
-  - 既存ノードの後追い適用（S04）
+  - 既存ノードの後追い適用（やらない）
 
 #### update_plan（着手時に登録） (必須)
 - [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
@@ -210,46 +213,10 @@ S04 --> S05
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
 - [ ] コミットした（エージェント）
 
-### S04 — レガシー `meta.json` が `.meta.json` に移行され、内容が不変である（backfill/relock しない）（EC-002） (必須)
-- 対象: EC-002
-- 設計参照:
-  - 対象IF: `spec-dock/scripts/spec-dock sync` / `validate`（移行はするが、内容は書き換えない）
-  - 対象テスト: `tests/test_cli.py`
-- このステップで「追加しないこと（スコープ固定）」:
-  - 既存ノードへの自己記述追記（`_spec_dock` backfill）
-  - 既存ノードへの後追い lock（read-only 化の付与）
-
-#### update_plan（着手時に登録） (必須)
-- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
-
-#### 期待する振る舞い（テストケース） (必須)
-- Given:
-  - `spec-dock init` 済みの repo
-  - レガシー `meta.json`（fixture）を `spec-dock/initiatives/**/meta.json` として配置する
-- When: `spec-dock sync` / `spec-dock validate` を実行する
-- Then:
-  - レガシー `meta.json` が `.meta.json` に移行（リネーム）される（best-effort）
-  - `.meta.json` が既に存在する場合は上書きせず、`meta.json` は warn して無視/保持する
-  - `.meta.json` の内容が実行前後で一致する（自己記述追記/backfill・後追い lock を行わない）
-  - POSIX では `.meta.json` の mode（少なくとも write bit）が実行前後で不変である（移行時に lock をかけない）
-- 観測点:
-  - `.meta.json` のテキスト比較（before/after）
-  - POSIX: `st_mode & 0o222` の before/after 比較（non-POSIX は skip）
-- 追加/更新するテスト（案）:
-  - `tests/test_cli.py` に新規テスト追加（fixture セットアップ + before/after 比較）
-
-#### Red（失敗するテストを先に書く） (任意)
-- 期待する失敗:
-  - 将来の改修で `sync/validate` が meta を更新してしまった場合に検知できるようにする（現状は Green でもよい）
-
-#### Green（最小実装） (任意)
-- このステップは “回帰テスト追加” に加え、レガシー移行ロジックが未実装なら最小実装を追加する
-
-#### ステップ末尾（省略しない） (必須)
-- [ ] `python -m unittest discover -v` を実行し、成功した
-- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
-- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
-- [ ] コミットした（エージェント）
+### S04 — （Superseded）レガシー `meta.json` の移行（互換要件が撤回されたため実施しない） (必須)
+- 本ステップは旧方針（互換/移行）に基づく。
+- `adr-00003` により「レガシー `meta.json` はサポートしない」へ意思決定が更新されたため、今後は **実装しない**（既存実装があれば削除する）。
+- 後続ステップ: S06（legacy `meta.json` サポート削除）
 
 ---
 
@@ -261,6 +228,16 @@ S04 --> S05
 - 期待する振る舞い（テストケース）:
   - wrapper のエラーメッセージが `.meta.json` を指す（missing/invalid 等）
   - `init` で生成される guide/reference のツリー図が `.meta.json` を指す
+- 品質ゲート:
+  - `python -m unittest discover -v`
+
+---
+
+### S06 — レガシー `meta.json` のサポートを削除し、`.meta.json` のみに統一する（EC-002） (必須)
+- 対象: EC-002
+- 変更内容（要点）:
+  - runtime/wrapper/docs/tests から `meta.json` の読み取り/移行/互換を削除する
+  - `spec-dock sync` / `spec-dock validate` は、レガシー `meta.json` を検出したら **エラーで停止**し、ガイダンス + 該当パスを出す
 - 品質ゲート:
   - `python -m unittest discover -v`
 

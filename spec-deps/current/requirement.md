@@ -18,11 +18,11 @@ ID: "iss-00012"
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
-  - 現状（As-Is / レガシー）:
-    - spec-dock の SSOT は `spec-dock/initiatives/**/meta.json`（initiative/epic/issue）であり、`sync` が `.agent/index*.json` / `.agent/tree*.json` 等を生成する。
-    - `meta.json` は `spec-dock new {initiative,epic,issue}` および `spec-dock import {initiative,epic,issue}` で生成される。
+  - 既存の挙動（As-Is / 参考）:
+    - 旧バージョンでは、SSOT メタファイル名が `meta.json` で運用されていた時期がある。
   - 本 Issue の To-Be:
-    - SSOT メタファイル名を dotfile の `.meta.json` に統一する（`meta.json` は互換・移行対象）。
+    - SSOT メタファイル名を dotfile の `.meta.json` に統一する。
+    - 本プロジェクトはまだ本格稼働していないため、`meta.json` の後方互換性は要求しない（レガシー名は放棄する）。
   - メタファイルは現状「通常の JSON ファイル」であり、エージェント/人間の誤操作で容易に改変できる（ファイル権限のガードが無い）。
 - 現状の課題（困っていること）:
   - コーディングエージェントが `.meta.json` を編集すると、ツリー整合性が壊れやすく、バグの温床になる（例: `id` 重複、`type` 不整合、親子関係の破綻）。
@@ -33,7 +33,6 @@ ID: "iss-00012"
 - 観測点（どこを見て確認するか）:
   - CLI: `spec-dock/scripts/spec-dock`（runtime）
   - SSOT（To-Be）: `spec-dock/initiatives/**/.meta.json`
-  - SSOT（As-Is / legacy input）: `spec-dock/initiatives/**/meta.json`
   - Derived: `spec-dock/.agent/*`（index/tree/deps など）
   - Log: 標準エラー（warn を含む）
 - 実際の観測結果（貼れる範囲で）:
@@ -86,7 +85,7 @@ end
       - `_spec_dock.edit_via`: `"spec-dock"`
   - `spec-dock new {initiative,epic,issue}` / `spec-dock import {initiative,epic,issue}` で生成した `.meta.json` を **read-only 化**する（best-effort）。
   - read-only 化に失敗しても、コマンド自体は失敗させない（warn して継続）。
-  - 既存ノードのレガシー `meta.json` は `.meta.json` に移行（リネーム）できる（best-effort、内容は変更しない）。
+  - レガシー `meta.json` はサポートしない（読み取り/移行/互換を実装しない）。存在する場合は、ユーザーが `.meta.json` へ移行（手動リネーム等）して解消する。
 - MUST NOT（絶対にやらない／追加しない）:
   - CI / CODEOWNERS / pre-commit 等の「混入防止（マージ防壁）」を、この Issue のスコープで追加しない。
   - 既存ノードのメタデータ内容（JSONフィールド）を後追いで自動更新しない（例: `_spec_dock` の backfill）。
@@ -106,8 +105,8 @@ end
 
 ## 非交渉制約（守るべき制約） (必須)
 - 依存追加はしない（runtime は stdlib のみ）。
-- `.meta.json` の `schema_version` は **1 のまま**運用し、本 Issue では後方互換な追加（`_spec_dock` の追加）のみ行う（破壊的変更はしない）。
-- 既存ノードのメタデータ内容には **後追いで自動適用しない**（新規生成経路のみ）。ただしファイル名の dotfile 化（リネーム）は許容する。
+- `.meta.json` の `schema_version` は **1 のまま**運用し、本 Issue では `_spec_dock` の追加のみ行う（新バージョンは作らない）。
+- 既存ノードのメタデータ内容には **後追いで自動適用しない**（新規生成経路のみ）。
 - 生成物の形式は JSON として妥当であること（parse 失敗する形式にしない）。
 
 ## 前提（Assumptions） (必須)
@@ -171,16 +170,13 @@ end
     - Exit code
     - 標準エラー出力（warn）
 - EC-002:
-  - 条件: 既存ノード（レガシー `meta.json`）を `sync` / `validate` する
+  - 条件: 既存ノード（レガシー `meta.json`）が混在した状態で `sync` / `validate` する
   - 期待:
-    - `.meta.json` が未存在で、レガシー `meta.json` が存在する場合は `meta.json` → `.meta.json` に移行（リネーム）される（best-effort）
-    - `.meta.json` が既に存在する場合は、それを正として **上書きしない**（`meta.json` は warn して無視/保持する）
-    - JSON内容は後追い変更されない（自己記述追記/backfill は行わない）
-    - ファイル属性（read-only化）は新規生成時のみに限定する（移行時に後追い lock しない）
+    - レガシー `meta.json` は **サポートしない**（読み取り/移行/互換を実装しない）
+    - `sync` / `validate` はエラーで停止し、標準エラーに「`meta.json` は非対応であり `.meta.json` へ移行が必要」なガイダンスを出す
   - 観測点:
-    - ファイル名: `meta.json` → `.meta.json` の移行
-    - 内容: before/after の JSON テキストが一致する
-    - mode: POSIX では移行前後で write bit が維持される（後追い lock を行わない）
+    - Exit code
+    - 標準エラー出力（ガイダンス + 該当パス）
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: SSOT = spec-dock における source of truth（派生ファイルの元となるデータ）
@@ -188,7 +184,7 @@ end
 - TERM-003: read-only = 書き込み権限を外す（best-effort）
 - TERM-004: `_spec_dock` = `.meta.json` 内の namespace（tool-managed/編集禁止の自己記述）
 - TERM-005: `.meta.json` = node directory に置かれる SSOT メタデータ（dotfile）
-- TERM-006: `meta.json` = レガシー互換の旧ファイル名（`.meta.json` へ移行されうる）
+- TERM-006: `meta.json` = 旧ファイル名（非対応 / `.meta.json` へ移行が必要）
 
 ## 未確定事項（TBD / 要確認） (必須)
 - なし（本 Issue は自己記述 + read-only の最小セットで進める）

@@ -266,6 +266,22 @@ python -m unittest discover -v
 
 ---
 
+### 2026-03-04 (follow-up)
+
+#### 対象
+- Step: design update (breaking change accepted)
+- AC/EC: EC-002
+
+#### 方針変更（決定）
+- 後方互換性が不要という意思決定により、レガシー `meta.json` の互換/移行方針を撤回
+  - runtime / wrapper / docs / tests から `meta.json` の読み取り/移行/互換を削除
+  - `sync` / `validate` はレガシー `meta.json` を検出したらエラーで停止し、移行ガイダンスを出す
+
+#### メモ
+- 直前の「`sync/validate` の best-effort rename 移行」方針は `adr-00003` により Superseded
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...

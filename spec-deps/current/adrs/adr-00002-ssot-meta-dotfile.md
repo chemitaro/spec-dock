@@ -2,13 +2,15 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00002"
 タイトル: "SSOTメタファイルを dotfile（.meta.json）に統一する"
-状態: "accepted"
+状態: "superseded"
 作成者: "Codex CLI"
 最終更新: "2026-03-04"
 親: ["iss-00012"]
 ---
 
 # adr-00002 SSOTメタファイルを dotfile（.meta.json）に統一する
+
+> Superseded by: `adr-00003-drop-legacy-meta-json.md`
 
 ## 結論（Decision） (必須)
 - SSOT メタデータのファイル名は **`.meta.json`（dotfile）を正とする**。
