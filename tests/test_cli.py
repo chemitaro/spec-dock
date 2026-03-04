@@ -6010,6 +6010,57 @@ class TestCli(unittest.TestCase):
             self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
             self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
 
+    def test_new_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Legacy holder"])
+
+            initiatives_root = target / "spec-dock" / "initiatives"
+            parent_init_dir = initiatives_root / "init-local-00001-parent-initiative"
+            parent_epic_dir = parent_init_dir / "epics" / "epic-local-00001-parent-epic"
+            legacy_init_dir = initiatives_root / "init-local-00002-legacy-holder"
+            dot_meta_path = legacy_init_dir / ".meta.json"
+            legacy_meta_path = legacy_init_dir / "meta.json"
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+
+            before_inits = sorted(p.name for p in initiatives_root.glob("init-*"))
+            before_epics = sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*"))
+            before_issues = sorted(p.name for p in (parent_epic_dir / "issues").glob("iss-*"))
+
+            p_init = self._run_runtime_capture(
+                target,
+                ["new", "initiative", "--no-github", "--title", "Should fail initiative"],
+            )
+            self.assertNotEqual(p_init.returncode, 0, p_init.stdout + p_init.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_init.stderr)
+            self.assertIn(str(legacy_meta_path), p_init.stderr)
+
+            p_epic = self._run_runtime_capture(
+                target,
+                ["new", "epic", "--no-github", "--initiative", "1", "--title", "Should fail epic"],
+            )
+            self.assertNotEqual(p_epic.returncode, 0, p_epic.stdout + p_epic.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_epic.stderr)
+            self.assertIn(str(legacy_meta_path), p_epic.stderr)
+
+            p_issue = self._run_runtime_capture(
+                target,
+                ["new", "issue", "--no-github", "--epic", "1", "--title", "Should fail issue"],
+            )
+            self.assertNotEqual(p_issue.returncode, 0, p_issue.stdout + p_issue.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_issue.stderr)
+            self.assertIn(str(legacy_meta_path), p_issue.stderr)
+
+            self.assertEqual(before_inits, sorted(p.name for p in initiatives_root.glob("init-*")))
+            self.assertEqual(before_epics, sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*")))
+            self.assertEqual(before_issues, sorted(p.name for p in (parent_epic_dir / "issues").glob("iss-*")))
+
     def test_import_initiative_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
