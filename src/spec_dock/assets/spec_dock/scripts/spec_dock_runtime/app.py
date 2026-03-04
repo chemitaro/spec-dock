@@ -169,8 +169,8 @@ def _legacy_meta_path(node_dir: Path) -> Path:
     return node_dir / _LEGACY_META_FILENAME
 
 
-def _resolve_node_meta_path(node_dir: Path) -> Path | None:
-    """Resolve node meta path with legacy migration (`meta.json` -> `.meta.json`)."""
+def _resolve_node_meta_path(node_dir: Path, *, migrate: bool) -> Path | None:
+    """Resolve node meta path with optional legacy migration (`meta.json` -> `.meta.json`)."""
     canonical = _meta_path(node_dir)
     legacy = _legacy_meta_path(node_dir)
     canonical_exists = canonical.is_file()
@@ -186,6 +186,9 @@ def _resolve_node_meta_path(node_dir: Path) -> Path | None:
     if not legacy_exists:
         return None
 
+    if not migrate:
+        return legacy
+
     try:
         legacy.rename(canonical)
         return canonical
@@ -194,7 +197,7 @@ def _resolve_node_meta_path(node_dir: Path) -> Path | None:
         return legacy
 
 
-def _iter_node_meta_paths(initiatives_root: Path) -> list[Path]:
+def _iter_node_meta_paths(initiatives_root: Path, *, migrate: bool) -> list[Path]:
     """Collect effective meta paths for nodes under initiatives root."""
     node_dirs: set[Path] = set()
     for path in initiatives_root.rglob(_META_FILENAME):
@@ -204,7 +207,7 @@ def _iter_node_meta_paths(initiatives_root: Path) -> list[Path]:
 
     resolved_paths: list[Path] = []
     for node_dir in sorted(node_dirs, key=lambda p: p.as_posix()):
-        resolved = _resolve_node_meta_path(node_dir)
+        resolved = _resolve_node_meta_path(node_dir, migrate=migrate)
         if resolved is not None:
             resolved_paths.append(resolved)
     return resolved_paths
@@ -296,14 +299,14 @@ def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str
                 pass
 
 
-def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
-    """Scan `spec-dock/initiatives/**/.meta.json` into an id→node map."""
+def _scan_nodes(specdock_dir: Path, *, migrate_legacy_meta: bool = False) -> dict[str, _Node]:
+    """Scan node meta into an id→node map (`.meta.json` preferred, `meta.json` fallback)."""
     initiatives_root = _initiatives_root(specdock_dir)
     nodes: dict[str, _Node] = {}
     if not initiatives_root.exists():
         return nodes
 
-    for meta_path in _iter_node_meta_paths(initiatives_root):
+    for meta_path in _iter_node_meta_paths(initiatives_root, migrate=migrate_legacy_meta):
         meta = _load_json(meta_path)
         if not isinstance(meta, dict):
             raise RuntimeError(
@@ -1369,7 +1372,7 @@ def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], 
 
 def _import_preflight_validate(specdock_dir: Path, *, repo_root: Path) -> dict[str, _Node]:
     """Run import preflight validation before any external call or filesystem generation."""
-    nodes = _scan_nodes(specdock_dir)
+    nodes = _scan_nodes(specdock_dir, migrate_legacy_meta=False)
     try:
         _validate_nodes(nodes, repo_root=repo_root)
     except RuntimeError as e:
@@ -1774,7 +1777,7 @@ def _sync(
     migrate_active: bool = True,
 ) -> None:
     """Generate derived state files under `spec-dock/.agent/` from the local tree (and optionally GitHub)."""
-    nodes = _scan_nodes(specdock_dir)
+    nodes = _scan_nodes(specdock_dir, migrate_legacy_meta=True)
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
 
@@ -3569,7 +3572,7 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
 
 def _validate(specdock_dir: Path) -> None:
     """Validate basic structural integrity of the tree based on `.meta.json`."""
-    nodes = _scan_nodes(specdock_dir)
+    nodes = _scan_nodes(specdock_dir, migrate_legacy_meta=True)
     if not nodes:
         raise RuntimeError("No nodes found.")
 
