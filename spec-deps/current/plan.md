@@ -3,7 +3,7 @@
 ID: "iss-00012"
 タイトル: "メタデータ（.meta.json等）をコーディングエージェントから保護するガードレールを追加する"
 関連GitHub: ["#12", "https://github.com/chemitaro/spec-dock/issues/12"]
-状態: "in_review"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-04"
 依存: ["requirement.md", "design.md"]
@@ -23,11 +23,11 @@ ID: "iss-00012"
   - レガシー `meta.json` は `.meta.json` へリネーム移行できる（best-effort）
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: `new/import` で生成される `.meta.json` に `_spec_dock` 最小スキーマが含まれる
-- [ ] S02: `new/import` で生成される `.meta.json` が read-only になる（best-effort / POSIX では write bit が外れる）
-- [ ] S03: read-only 化に失敗しても warn + exit 0 で継続する（EC-001）
-- [ ] S04: レガシー `meta.json` が `.meta.json` へ移行され、内容が不変である（backfill/relock しない）（EC-002）
-- [ ] S05: wrapper / shipped docs の `meta.json` 参照が `.meta.json` に更新される
+- [x] S01: `new/import` で生成される `.meta.json` に `_spec_dock` 最小スキーマが含まれる
+- [x] S02: `new/import` で生成される `.meta.json` が read-only になる（best-effort / POSIX では write bit が外れる）
+- [x] S03: read-only 化に失敗しても warn + exit 0 で継続する（EC-001）
+- [x] S04: レガシー `meta.json` が `.meta.json` へ移行され、内容が不変である（backfill/relock しない）（EC-002）
+- [x] S05: wrapper / shipped docs の `meta.json` 参照が `.meta.json` に更新される
 
 ### UML（任意） (任意)
 ```plantuml

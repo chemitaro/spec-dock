@@ -2,7 +2,7 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00002"
 タイトル: "SSOTメタファイルを dotfile（.meta.json）に統一する"
-状態: "in_review"
+状態: "accepted"
 作成者: "Codex CLI"
 最終更新: "2026-03-04"
 親: ["iss-00012"]

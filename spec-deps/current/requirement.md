@@ -3,7 +3,7 @@
 ID: "iss-00012"
 タイトル: "メタデータ（.meta.json等）をコーディングエージェントから保護するガードレールを追加する"
 関連GitHub: ["#12", "https://github.com/chemitaro/spec-dock/issues/12"]
-状態: "in_review"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-04"
 親: []
