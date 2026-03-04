@@ -1348,6 +1348,7 @@ def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], 
 
 def _import_preflight_validate(specdock_dir: Path, *, repo_root: Path) -> dict[str, _Node]:
     """Run import preflight validation before any external call or filesystem generation."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     try:
         _validate_nodes(nodes, repo_root=repo_root)
