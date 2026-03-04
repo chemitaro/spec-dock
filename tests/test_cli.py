@@ -243,6 +243,27 @@ class TestCli(unittest.TestCase):
         self.assertEqual(marker_dict.get("do_not_edit"), True)
         self.assertEqual(marker_dict.get("edit_via"), "spec-dock")
 
+    def _assert_readonly_on_posix(self, path: Path) -> None:
+        if os.name != "posix":
+            return
+        mode = path.stat().st_mode
+        self.assertEqual(
+            mode & 0o222,
+            0,
+            f"expected no write bits on POSIX: {path} (mode={oct(mode)})",
+        )
+
+    def _write_text_force(self, path: Path, text: str) -> None:
+        if os.name == "posix" and path.exists():
+            try:
+                path.chmod(path.stat().st_mode | 0o200)
+            except OSError:
+                pass
+        path.write_text(text, encoding="utf-8")
+
+    def _write_json_force(self, path: Path, data: object) -> None:
+        self._write_text_force(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1399,7 +1420,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["id"] = "iss-local-1"  # old-style width (should conflict with iss-local-00001)
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             # Even if the string differs, the numeric suffix must be treated as duplicated.
             self._run_runtime_expect_fail(
@@ -1568,7 +1589,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["validate"])
 
@@ -1595,7 +1616,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["initiative_id"] = "init-local-00002"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["validate"])
 
@@ -1619,7 +1640,7 @@ class TestCli(unittest.TestCase):
                 / "iss-local-00001-add-refresh-token"
                 / "meta.json"
             )
-            issue_meta.write_text("[]\n", encoding="utf-8")
+            self._write_text_force(issue_meta, "[]\n")
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0)
@@ -1656,11 +1677,11 @@ class TestCli(unittest.TestCase):
 
             init_data = json.loads(init_meta.read_text(encoding="utf-8"))
             init_data["github"] = {"issue_number": 1}
-            init_meta.write_text(json.dumps(init_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(init_meta, init_data)
 
             issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
             issue_data["github"] = {"issue_number": 1}
-            issue_meta.write_text(json.dumps(issue_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, issue_data)
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1697,7 +1718,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["sync", "--no-update-active"])
 
@@ -1730,7 +1751,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1792,7 +1813,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["id"] = "broken-id"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             agent_dir = target / "spec-dock" / ".agent"
             (agent_dir / "index.json").unlink(missing_ok=True)
@@ -2083,7 +2104,7 @@ class TestCli(unittest.TestCase):
             self.assertNotEqual(p_missing.returncode, 0)
             self.assertIn("missing meta.json", p_missing.stderr)
 
-            meta_path.write_text("{ invalid json", encoding="utf-8")
+            self._write_text_force(meta_path, "{ invalid json")
             p_invalid = self._run_wrapper_capture(wrapper, ["JWT Auth"])
             self.assertNotEqual(p_invalid.returncode, 0)
             self.assertIn("invalid meta.json", p_invalid.stderr)
@@ -4239,7 +4260,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["slug"] = "refresh-token"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -4329,7 +4350,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["slug"] = "refresh-token"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -4411,7 +4432,7 @@ class TestCli(unittest.TestCase):
             )
             data = json.loads(issue_meta.read_text(encoding="utf-8"))
             data["slug"] = "日本語"
-            issue_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, data)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -4484,7 +4505,7 @@ class TestCli(unittest.TestCase):
             )
             data = json.loads(issue_meta.read_text(encoding="utf-8"))
             data["slug"] = "a..b"
-            issue_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, data)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -5405,7 +5426,7 @@ class TestCli(unittest.TestCase):
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["id"] = "iss-0123"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -5584,6 +5605,8 @@ class TestCli(unittest.TestCase):
             self.assertNotIn("github", epic_meta)
             self._assert_spec_dock_meta_marker(init_meta)
             self._assert_spec_dock_meta_marker(epic_meta)
+            self._assert_readonly_on_posix(init_dir / "meta.json")
+            self._assert_readonly_on_posix(epic_dir / "meta.json")
 
     def test_new_initiative_and_epic_github_flags_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5705,6 +5728,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(meta["id"], "iss-00123")
             self.assertEqual(meta["github"]["issue_number"], 123)
             self._assert_spec_dock_meta_marker(meta)
+            self._assert_readonly_on_posix(issue_dir / "meta.json")
 
     def test_import_aborts_without_local_changes_when_gh_issue_view_fails(self) -> None:
         if os.name == "nt":
@@ -5773,6 +5797,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(meta["id"], "init-00010")
             self.assertEqual(meta["github"]["issue_number"], 10)
             self._assert_spec_dock_meta_marker(meta)
+            self._assert_readonly_on_posix(init_dir / "meta.json")
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
             self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
@@ -5808,6 +5833,8 @@ class TestCli(unittest.TestCase):
             self.assertEqual(epic_meta["github"]["issue_number"], 11)
             self._assert_spec_dock_meta_marker(init_meta)
             self._assert_spec_dock_meta_marker(epic_meta)
+            self._assert_readonly_on_posix(init_dir / "meta.json")
+            self._assert_readonly_on_posix(epic_dir / "meta.json")
 
     def test_import_issue_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
@@ -5866,6 +5893,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(meta["id"], "iss-00123")
             self.assertEqual(meta["github"]["issue_number"], 123)
             self._assert_spec_dock_meta_marker(meta)
+            self._assert_readonly_on_posix(issue_dir / "meta.json")
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
 
@@ -6170,7 +6198,7 @@ class TestCli(unittest.TestCase):
             )
             data = json.loads(init_meta.read_text(encoding="utf-8"))
             data["slug"] = "BrokenSlug"
-            init_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(init_meta, data)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

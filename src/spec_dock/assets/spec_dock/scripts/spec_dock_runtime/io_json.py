@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,24 @@ def _write_json(path: Path, data: Any) -> None:
     """Write `data` as pretty-printed JSON into `path` (UTF-8)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
+    """Try to make `path` read-only (best-effort, never raises)."""
+    try:
+        mode = path.stat().st_mode
+        path.chmod(mode & ~0o222)
+    except OSError as e:
+        return False, str(e)
+
+    if os.name == "posix":
+        try:
+            if path.stat().st_mode & 0o222:
+                return False, "write bit still set after chmod"
+        except OSError as e:
+            return False, str(e)
+
+    return True, None
 
 
 def _warn(message: str) -> None:
