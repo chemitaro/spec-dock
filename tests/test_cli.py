@@ -5970,6 +5970,46 @@ class TestCli(unittest.TestCase):
             self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
             self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
 
+    def test_import_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Import target lineage (canonical .meta.json)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            # Unrelated legacy file to trigger preflight failure.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Legacy holder"])
+
+            legacy_init_dir = target / "spec-dock" / "initiatives" / "init-local-00002-legacy-holder"
+            dot_meta_path = legacy_init_dir / ".meta.json"
+            legacy_meta_path = legacy_init_dir / "meta.json"
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p.stderr)
+            self.assertIn(str(legacy_meta_path), p.stderr)
+
+            imported = list((target / "spec-dock" / "initiatives").rglob("iss-99999-*"))
+            self.assertEqual(imported, [])
+            self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
+            self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+
     def test_import_initiative_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
