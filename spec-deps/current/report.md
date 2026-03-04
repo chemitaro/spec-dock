@@ -84,10 +84,46 @@ python -m unittest discover -v
 - `tests/test_cli.py` - read-only検証追加と、meta編集テストの書き込みヘルパー化
 
 #### コミット
-- (コミット後に追記)
+- 269c642 feat(meta): new/import生成meta.jsonをread-only化
+- 44197fd fix(test): read-onlyメタ書き換えヘルパーをOS非依存化
 
 #### メモ
 - S03 で read-only失敗時の warn + exit 0 を失敗系テストで固定予定
+
+---
+
+### 2026-03-04 07:30 - 07:37
+
+#### 対象
+- Step: S03
+- AC/EC: EC-001
+
+#### 実施内容
+- Red: read-only化失敗をシミュレーションした `new initiative` 実行で warn が出ることを新規テストで先に固定
+- Green: `_write_meta()` で `_try_make_readonly()` の戻り値を評価し、失敗時に `_warn()` を1回出して継続するよう実装
+- Refactor: 失敗理由メッセージ整形を `_write_meta()` 内に最小追加（例外化はしない）
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_cli.TestCli.test_new_initiative_warns_and_continues_when_readonly_lock_fails
+# FAILED (期待どおり Red)
+
+python -m unittest -v tests.test_cli.TestCli.test_new_initiative_warns_and_continues_when_readonly_lock_fails tests.test_cli.TestCli.test_new_initiative_and_epic_default_to_local_even_when_gh_is_available tests.test_cli.TestCli.test_import_issue_creates_node_and_runs_sync_without_updating_active
+# OK
+
+python -m unittest discover -v
+# OK (137 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - read-only化失敗時に `_warn()` を出して継続する処理を追加
+- `tests/test_cli.py` - read-only化失敗時に warn + exit 0 を検証するS03テストを追加
+
+#### コミット
+- (コミット後に追記)
+
+#### メモ
+- warn prefix は `_warn()` 経由で `spec-dock: (warn)` を維持
 
 ---
 
