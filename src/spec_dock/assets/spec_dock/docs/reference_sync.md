@@ -14,6 +14,7 @@
 ## 1. 結論（v2の生成物）
 
 `sync` はローカル SSOT（`spec-dock/initiatives/**/.meta.json`）を走査し、v2 の観測点を生成します（git 管理しない）。
+`meta.json`（レガシー名）はサポート対象外で、検出時はエラー停止します（`.meta.json` へ手動移行してください）。
 
 `.agent/`（機械向け）:
 - `spec-dock/.agent/index-all.json`（全ノード）

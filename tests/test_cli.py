@@ -2109,7 +2109,7 @@ class TestCli(unittest.TestCase):
             self.assertNotEqual(p_invalid.returncode, 0)
             self.assertIn("invalid .meta.json", p_invalid.stderr)
 
-    def test_wrapper_uses_legacy_meta_json_when_dot_meta_missing(self) -> None:
+    def test_wrapper_fails_when_only_legacy_meta_json_exists(self) -> None:
         if os.name == "nt":
             self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
 
@@ -2128,10 +2128,11 @@ class TestCli(unittest.TestCase):
             self.assertFalse(dot_meta_path.exists())
 
             p = self._run_wrapper_capture(wrapper, ["JWT Auth"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertNotEqual(p.returncode, 0)
+            self.assertIn("missing .meta.json", p.stderr)
             self.assertFalse(dot_meta_path.exists())
             self.assertTrue(legacy_meta_path.is_file())
-            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
+            self.assertFalse((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
 
     def test_wrapper_fails_when_runtime_not_found(self) -> None:
         if os.name == "nt":
@@ -4096,7 +4097,7 @@ class TestCli(unittest.TestCase):
                     self.assertEqual(after_mode, before_modes[meta_path])
                     self.assertEqual(after_mode & 0o222, before_modes[meta_path] & 0o222)
 
-    def test_validate_and_sync_migrate_legacy_meta_json_without_backfill_or_relock(self) -> None:
+    def test_validate_and_sync_fail_fast_on_legacy_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -4126,31 +4127,27 @@ class TestCli(unittest.TestCase):
                 dot_meta_path.chmod(dot_meta_path.stat().st_mode | 0o200)
 
             before_text = dot_meta_path.read_text(encoding="utf-8")
-            before_mode = dot_meta_path.stat().st_mode
             dot_meta_path.rename(legacy_meta_path)
             self.assertFalse(dot_meta_path.exists())
             self.assertTrue(legacy_meta_path.is_file())
 
-            self._run_runtime(target, ["validate"])
-            self.assertTrue(dot_meta_path.is_file())
-            self.assertFalse(legacy_meta_path.exists())
-            self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
-            self.assertNotIn("_spec_dock", json.loads(dot_meta_path.read_text(encoding="utf-8")))
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0)
+            self.assertIn("Unsupported legacy meta.json detected", p_validate.stderr)
+            self.assertIn(str(legacy_meta_path), p_validate.stderr)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
 
-            if os.name == "posix":
-                after_validate_mode = dot_meta_path.stat().st_mode
-                self.assertEqual(after_validate_mode, before_mode)
-                self.assertEqual(after_validate_mode & 0o222, before_mode & 0o222)
+            p_sync = self._run_runtime_capture(target, ["sync"])
+            self.assertNotEqual(p_sync.returncode, 0)
+            self.assertIn("Unsupported legacy meta.json detected", p_sync.stderr)
+            self.assertIn(str(legacy_meta_path), p_sync.stderr)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
 
-            self._run_runtime(target, ["sync"])
-            self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
-            self.assertNotIn("_spec_dock", json.loads(dot_meta_path.read_text(encoding="utf-8")))
-            if os.name == "posix":
-                after_sync_mode = dot_meta_path.stat().st_mode
-                self.assertEqual(after_sync_mode, before_mode)
-                self.assertEqual(after_sync_mode & 0o222, before_mode & 0o222)
-
-    def test_validate_prefers_dot_meta_json_and_warns_when_legacy_coexists(self) -> None:
+    def test_validate_and_sync_fail_fast_when_dot_meta_and_legacy_coexist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -4176,17 +4173,17 @@ class TestCli(unittest.TestCase):
             legacy_meta_path.write_text("{ invalid legacy json\n", encoding="utf-8")
 
             p_validate = self._run_runtime_capture(target, ["validate"])
-            self.assertEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
-            self.assertIn("spec-dock: (warn)", p_validate.stderr)
-            self.assertIn("legacy_meta_ignored", p_validate.stderr)
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_validate.stderr)
+            self.assertIn(str(legacy_meta_path), p_validate.stderr)
 
             self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
             self.assertTrue(legacy_meta_path.is_file())
 
             p_sync = self._run_runtime_capture(target, ["sync"])
-            self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
-            self.assertIn("spec-dock: (warn)", p_sync.stderr)
-            self.assertIn("legacy_meta_ignored", p_sync.stderr)
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_sync.stderr)
+            self.assertIn(str(legacy_meta_path), p_sync.stderr)
 
             self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
             self.assertTrue(legacy_meta_path.is_file())
@@ -5972,45 +5969,6 @@ class TestCli(unittest.TestCase):
             self.assertEqual(imported, [])
             self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
             self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
-
-    def test_import_preflight_does_not_migrate_legacy_meta_on_gh_issue_view_failure(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
-
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-parent-initiative"
-            dot_meta_path = init_dir / ".meta.json"
-            legacy_meta_path = init_dir / "meta.json"
-            before_text = dot_meta_path.read_text(encoding="utf-8")
-            dot_meta_path.rename(legacy_meta_path)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
-            before_mode = legacy_meta_path.stat().st_mode
-
-            bin_dir = target / ".bin"
-            bin_dir.mkdir(parents=True, exist_ok=True)
-            self._make_gh_issue_view_stub(bin_dir, failing_numbers={99999})
-            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-            p = self._run_runtime_capture(
-                target,
-                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-local-00001"],
-                env=test_env,
-            )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
-            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
-            if os.name == "posix":
-                after_mode = legacy_meta_path.stat().st_mode
-                self.assertEqual(after_mode, before_mode)
-                self.assertEqual(after_mode & 0o222, before_mode & 0o222)
 
     def test_import_initiative_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
