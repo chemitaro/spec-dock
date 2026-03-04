@@ -65,19 +65,24 @@ After `init`, day-to-day operations are done via the runtime script installed in
 `./spec-dock/scripts/spec-dock`.
 
 ```bash
-# Create nodes (default: create GitHub issues; ids follow GitHub issue numbers)
-# Requires: GitHub CLI `gh` and a GitHub repository.
-./spec-dock/scripts/spec-dock new initiative --title "Auth platform"          # creates GH issue, id=init-00123
-./spec-dock/scripts/spec-dock new epic --initiative 123 --title "JWT auth"    # creates GH issue, id=epic-00124
-./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token"  # creates GH issue, id=iss-00125
+# Create nodes:
+# - initiative/epic default: local-only (no GitHub); ids use `*-local-*`.
+./spec-dock/scripts/spec-dock new initiative --title "Auth platform"     # id=init-local-00001
+./spec-dock/scripts/spec-dock new epic --initiative 1 --title "JWT auth" # id=epic-local-00001
 
-# Local-only (no GitHub): ids are created under the collision-proof `*-local-*` namespace.
-./spec-dock/scripts/spec-dock new initiative --no-github --title "Auth platform"          # id=init-local-00001
-./spec-dock/scripts/spec-dock new epic --no-github --initiative 1 --title "JWT auth"      # id=epic-local-00001
+# - issue default: create and link a GitHub issue; ids follow GitHub issue numbers.
+#   Requires: GitHub CLI `gh` and a GitHub repository.
+./spec-dock/scripts/spec-dock new issue --epic 1 --title "Add refresh token"  # creates GH issue, id=iss-00123
+
+# Optional: create and link GitHub issues for initiative/epic.
+./spec-dock/scripts/spec-dock new initiative --create-github-issue --title "Auth platform"       # id=init-00123
+./spec-dock/scripts/spec-dock new epic --create-github-issue --initiative 123 --title "JWT auth" # id=epic-00124
+
+# Local-only issue creation (no GitHub)
 ./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"  # id=iss-local-00001
 
 # Or: link to an existing GitHub issue number (without creating a new one)
-./spec-dock/scripts/spec-dock new issue --epic 124 --title "Add refresh token" --github-issue 123  # id=iss-00123
+./spec-dock/scripts/spec-dock new issue --epic 1 --title "Add refresh token" --github-issue 123  # id=iss-00123
 ./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation strategy"
 
 # Scope-local wrappers created in generated nodes (single title arg)

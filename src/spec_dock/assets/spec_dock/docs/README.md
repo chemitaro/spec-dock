@@ -19,6 +19,7 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 3. 仕組みを確認したい場合（参照）
    - [reference_github.md](reference_github.md)
    - [reference_naming.md](reference_naming.md)
+   - [reference_deps.md](reference_deps.md)
    - [reference_sync.md](reference_sync.md)
 
 ## 目的別ショートカット
@@ -32,20 +33,23 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 | 議論/意思決定を ADR に切り出す | [workflow_adr.md](workflow_adr.md) |
 | GitHub 連携の前提/副作用を知りたい | [reference_github.md](reference_github.md) |
 | `--title`/`--slug`/ブランチ命名のルールを知りたい | [reference_naming.md](reference_naming.md) |
+| 依存関係（deps check / PlantUML）を知りたい | [reference_deps.md](reference_deps.md) |
 | `sync` の入出力/フラグを知りたい | [reference_sync.md](reference_sync.md) |
 
 ## コマンド早見（最短）
 
 ```bash
-./spec new initiative --title "..."              # デフォルト: GitHub Issue を作る
-./spec new epic --initiative <id> --title "..."
-./spec new issue --epic <id> --title "..."
+./spec new initiative --title "..."              # デフォルト: local-only（gh は呼ばない）
+./spec new epic --initiative <id> --title "..."  # デフォルト: local-only（gh は呼ばない）
+./spec new issue --epic <id> --title "..."       # デフォルト: GitHub Issue を作る（--no-github で local-only）
 
 ./spec import issue <num-or-url> --title "..." --epic <id>  # 既存 GitHub Issue を取り込む（読み取りのみ）
 
 ./spec active set <id|#num|url>               # 作業対象をアクティブ化（デフォルト: no-checkout）
 ./spec active set <id|#num|url> --checkout   # アクティブ化 + ブランチ作成/切替
 ./spec active show
+
+./spec deps check <id|#num|url> --github      # 着手可能か判定（依存がある場合は推奨）
 
 ./spec validate
 ./spec sync
@@ -75,7 +79,8 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 
 ## 重要な注意（事故防止）
 
-- `new {initiative,epic,issue}` はデフォルトで `gh` を呼び、GitHub Issue を自動作成します（GitHub を使わない場合は `--no-github` を付けてください）。
+- `new issue` はデフォルトで `gh` を呼び、GitHub Issue を自動作成します（GitHub を使わない場合は `--no-github` を付けてください）。
+- `new initiative` / `new epic` はデフォルトで `gh` を呼びません（local-only）。必要なら `--create-github-issue` / `--github-issue <n>` で GitHub と紐づけます。
 - `new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 - `import` は GitHub を更新しません（`gh issue view` による **存在確認のみ**）。ただしローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します。
 - `import` の URL 入力は **番号抽出のみ**です（`owner/repo` は無視され、別リポジトリ URL を貼っても「現在の `gh` が見ているリポジトリの同番号」として解釈され得ます）。
