@@ -2129,8 +2129,8 @@ class TestCli(unittest.TestCase):
 
             p = self._run_wrapper_capture(wrapper, ["JWT Auth"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertTrue(dot_meta_path.is_file())
-            self.assertFalse(legacy_meta_path.exists())
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
             self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
 
     def test_wrapper_fails_when_runtime_not_found(self) -> None:
@@ -5972,6 +5972,45 @@ class TestCli(unittest.TestCase):
             self.assertEqual(imported, [])
             self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
             self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+
+    def test_import_preflight_does_not_migrate_legacy_meta_on_gh_issue_view_failure(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-parent-initiative"
+            dot_meta_path = init_dir / ".meta.json"
+            legacy_meta_path = init_dir / "meta.json"
+            before_text = dot_meta_path.read_text(encoding="utf-8")
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            before_mode = legacy_meta_path.stat().st_mode
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir, failing_numbers={99999})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+            if os.name == "posix":
+                after_mode = legacy_meta_path.stat().st_mode
+                self.assertEqual(after_mode, before_mode)
+                self.assertEqual(after_mode & 0o222, before_mode & 0o222)
 
     def test_import_initiative_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":

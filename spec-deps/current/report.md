@@ -225,6 +225,47 @@ python -m unittest discover -v
 
 ---
 
+### 2026-03-04 09:00 - 09:18
+
+#### 対象
+- Step: review follow-up (P1)
+- AC/EC: EC-002
+
+#### 実施内容
+- runtime の legacy rename を migrate モード時だけ有効化
+  - `_resolve_node_meta_path(..., migrate=...)`
+  - `_iter_node_meta_paths(..., migrate=...)`
+  - `_scan_nodes(..., migrate_legacy_meta=False)`（既定）
+- `sync` / `validate` だけ `migrate_legacy_meta=True` で走査するよう変更
+- `import preflight` と通常コマンド経路は `migrate_legacy_meta=False` のまま維持
+- テスト追加/更新:
+  - wrapper/new 実行時は legacy `meta.json` を読めても rename しないことを固定
+  - import の preflight 失敗（`gh issue view` 失敗）時に legacy `meta.json` が rename されないことを固定
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_cli.TestCli.test_wrapper_uses_legacy_meta_json_when_dot_meta_missing tests.test_cli.TestCli.test_import_preflight_does_not_migrate_legacy_meta_on_gh_issue_view_failure
+# FAILED (期待どおり Red)
+
+python -m unittest -v tests.test_cli.TestCli.test_wrapper_uses_legacy_meta_json_when_dot_meta_missing tests.test_cli.TestCli.test_import_preflight_does_not_migrate_legacy_meta_on_gh_issue_view_failure tests.test_cli.TestCli.test_validate_and_sync_migrate_legacy_meta_json_without_backfill_or_relock tests.test_cli.TestCli.test_validate_prefers_dot_meta_json_and_warns_when_legacy_coexists tests.test_cli.TestCli.test_import_aborts_without_local_changes_when_gh_issue_view_fails
+# OK
+
+python -m unittest discover -v
+# OK (142 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+- `tests/test_cli.py`
+
+#### コミット
+- (この追記を含むコミットで反映)
+
+#### メモ
+- preflight の副作用を抑えつつ、`sync/validate` での legacy 移行要件は維持
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
