@@ -46,7 +46,7 @@ v2 では、日常運用（initiative/epic/issue/adr の作成、active 切り�
   - このモードでは `--id` は使えません（GitHub Issue 番号と一致させるため）。
 - `--no-github`（ローカルのみ）
   - `*-local-*` 名前空間で自動連番します（例: `iss-local-00001`）。
-  - 連番は `spec-dock/initiatives/**/meta.json` を走査し、同じ prefix の `*-local-*` の最大値 + 1 を採番します（GitHub 番号とは衝突しません）。
+  - 連番は `spec-dock/initiatives/**/.meta.json` を走査し、同じ prefix の `*-local-*` の最大値 + 1 を採番します（GitHub 番号とは衝突しません）。
 - 親 ID の指定（`--initiative` / `--epic` / `--issue`）
   - 数字だけ（例: `--initiative 123`）も受け付けます。
   - 既存ノードに `init-00123` と `init-local-00123` の両方がある場合は曖昧になるため、完全な ID を指定してください。

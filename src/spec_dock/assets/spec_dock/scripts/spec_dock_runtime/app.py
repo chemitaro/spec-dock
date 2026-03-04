@@ -52,7 +52,7 @@ from .ids import (
     _validate_lowercase,
     _validate_slug,
 )
-from .io_json import _load_json, _now_iso, _today, _warn, _write_json
+from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
 from .render_puml import (
     _deps_disabled_error_text,
@@ -68,6 +68,8 @@ _INITIATIVES_DIRNAME = "initiatives"
 _ACTIVE_DIRNAME = "active"
 _AGENT_DIRNAME = ".agent"
 _LEGACY_WORK_DIRNAME = ".work"
+_META_FILENAME = ".meta.json"
+_LEGACY_META_FILENAME = "meta.json"
 
 _DEFAULT_ID_WIDTH = 5  # minimum width for zero-padded ids (e.g. `iss-00123`)
 
@@ -91,13 +93,14 @@ _LEADING_NUMBER_IN_TEXT_RE = re.compile(r"^(?P<num>[0-9]+)[-_].+")
 
 @dataclass(frozen=True)
 class _Node:
-    """In-memory representation of a spec node loaded from `meta.json`."""
+    """In-memory representation of a spec node loaded from meta JSON."""
 
     type: str
     id: str
     title: str
     slug: str
     path: Path
+    meta_path: Path
     parent_id: str | None
     initiative_id: str | None
     epic_id: str | None
@@ -156,25 +159,55 @@ def _initiatives_root(specdock_dir: Path) -> Path:
     return specdock_dir / _INITIATIVES_DIRNAME
 
 
-def _next_id(specdock_dir: Path, prefix: str, *, local: bool = False) -> str:
+def _meta_path(node_dir: Path) -> Path:
+    """Return canonical meta path for a node directory."""
+    return node_dir / _META_FILENAME
+
+
+def _iter_node_meta_paths(initiatives_root: Path) -> list[Path]:
+    """Collect canonical node meta paths (`.meta.json`) under initiatives root."""
+    return sorted(initiatives_root.rglob(_META_FILENAME), key=lambda p: p.as_posix())
+
+
+def _find_legacy_meta_paths(initiatives_root: Path) -> list[Path]:
+    """Collect unsupported legacy meta paths (`meta.json`) under initiatives root."""
+    return sorted(initiatives_root.rglob(_LEGACY_META_FILENAME), key=lambda p: p.as_posix())
+
+
+def _ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
+    """Fail fast when legacy `meta.json` files are detected."""
+    initiatives_root = _initiatives_root(specdock_dir)
+    if not initiatives_root.exists():
+        return
+    legacy_paths = _find_legacy_meta_paths(initiatives_root)
+    if not legacy_paths:
+        return
+    listed = "\n".join(f"- {p}" for p in legacy_paths)
+    raise RuntimeError(
+        "Unsupported legacy meta.json detected. Rename legacy files to '.meta.json' and retry:\n"
+        f"{listed}"
+    )
+
+
+def _next_id(
+    specdock_dir: Path,
+    prefix: str,
+    *,
+    local: bool = False,
+    nodes: dict[str, _Node] | None = None,
+) -> str:
     """Compute the next available id for a prefix by scanning existing nodes.
 
     Notes:
     - When `local=True`, only ids in the `*-local-*` namespace are considered.
     - When `local=False`, only ids without `-local-` are considered.
     """
-    initiatives_root = _initiatives_root(specdock_dir)
-    if not initiatives_root.exists():
-        return _format_id(prefix, 1, local=local)
+    if nodes is None:
+        nodes = _scan_nodes(specdock_dir)
 
     max_num = 0
-    # Scan all meta.json (initiative/epic/issue) and compute max for the prefix.
-    for meta_path in initiatives_root.rglob("meta.json"):
-        try:
-            meta = _load_json(meta_path)
-        except RuntimeError:
-            continue
-        node_id = str(meta.get("id", ""))
+    for node in nodes.values():
+        node_id = node.id
         try:
             parsed_prefix, is_local, num = _parse_id(node_id)
         except RuntimeError:
@@ -186,7 +219,8 @@ def _next_id(specdock_dir: Path, prefix: str, *, local: bool = False) -> str:
         max_num = max(max_num, num)
 
     if prefix == "adr":
-        # ADRs are files, not nodes with meta.json. Scan filenames as a fallback.
+        initiatives_root = _initiatives_root(specdock_dir)
+        # ADRs are files, not nodes with `.meta.json`. Scan filenames as a fallback.
         for adr_path in initiatives_root.rglob("adrs/adr-*.md"):
             m = re.search(r"\b(adr(?:-local)?-[0-9]+)\b", adr_path.stem)
             if not m:
@@ -242,17 +276,17 @@ def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str
 
 
 def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
-    """Scan `spec-dock/initiatives/**/meta.json` into an id→node map."""
+    """Scan node meta into an id→node map based on canonical `.meta.json` only."""
     initiatives_root = _initiatives_root(specdock_dir)
     nodes: dict[str, _Node] = {}
     if not initiatives_root.exists():
         return nodes
 
-    for meta_path in initiatives_root.rglob("meta.json"):
+    for meta_path in _iter_node_meta_paths(initiatives_root):
         meta = _load_json(meta_path)
         if not isinstance(meta, dict):
             raise RuntimeError(
-                f"Invalid meta.json (expected object): {meta_path} (got {type(meta).__name__})"
+                f"Invalid .meta.json (expected object): {meta_path} (got {type(meta).__name__})"
             )
         node_type = str(meta.get("type", "")).strip()
         node_id = str(meta.get("id", "")).strip()
@@ -275,13 +309,14 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
             except (TypeError, ValueError) as e:
                 raise RuntimeError(f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}") from e
 
-        # Note: `path` points to the directory that contains this node's `meta.json`.
+        # Note: `path` points to the directory that contains this node's meta file.
         nodes[node_id] = _Node(
             type=node_type,
             id=node_id,
             title=title,
             slug=slug,
             path=meta_path.parent,
+            meta_path=meta_path,
             parent_id=str(parent_id) if parent_id else None,
             initiative_id=str(initiative_id) if initiative_id else None,
             epic_id=str(epic_id) if epic_id else None,
@@ -302,7 +337,7 @@ def _write_meta(
     epic_id: str | None = None,
     github_issue_number: int | None = None,
 ) -> None:
-    """Create a minimal, durable `meta.json` for a node."""
+    """Create a minimal, durable `.meta.json` for a node."""
     meta: dict[str, Any] = {
         "schema_version": 1,
         "type": node_type,
@@ -314,10 +349,20 @@ def _write_meta(
         "parent_id": parent_id,
         "initiative_id": initiative_id,
         "epic_id": epic_id,
+        "_spec_dock": {
+            "managed": True,
+            "do_not_edit": True,
+            "edit_via": "spec-dock",
+        },
     }
     if github_issue_number is not None:
         meta["github"] = {"issue_number": int(github_issue_number)}
-    _write_json(dest_dir / "meta.json", meta)
+    meta_path = _meta_path(dest_dir)
+    _write_json(meta_path, meta)
+    readonly_ok, readonly_err = _try_make_readonly(meta_path)
+    if not readonly_ok:
+        reason = readonly_err or "unknown error"
+        _warn(f"readonly_lock_failed: {meta_path} ({reason})")
 
 
 def _new_initiative(
@@ -331,6 +376,7 @@ def _new_initiative(
     no_github: bool,
 ) -> None:
     """Create a new initiative node under `spec-dock/initiatives/`."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
 
     title, slug = _resolve_input_title_and_slug(title, slug)
@@ -366,7 +412,7 @@ def _new_initiative(
     else:
         # Default local-only mode: avoid collisions with GitHub issue numbers.
         if node_id is None:
-            node_id = _next_id(specdock_dir, "init", local=True)
+            node_id = _next_id(specdock_dir, "init", local=True, nodes=nodes)
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="init", field="id")
 
@@ -374,7 +420,7 @@ def _new_initiative(
     existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
     if existing_id:
         existing = nodes[existing_id]
-        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
 
     templates_dir = specdock_dir / "templates" / "initiative"
     initiatives_root = _initiatives_root(specdock_dir)
@@ -406,6 +452,7 @@ def _new_epic(
     no_github: bool,
 ) -> None:
     """Create a new epic node under a given initiative."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
     initiative = nodes.get(initiative_id)
@@ -449,7 +496,7 @@ def _new_epic(
         node_id = _format_id("epic", int(github_issue_number), local=False)
     else:
         if node_id is None:
-            node_id = _next_id(specdock_dir, "epic", local=True)
+            node_id = _next_id(specdock_dir, "epic", local=True, nodes=nodes)
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="epic", field="id")
 
@@ -457,7 +504,7 @@ def _new_epic(
     existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
     if existing_id:
         existing = nodes[existing_id]
-        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
 
     templates_dir = specdock_dir / "templates" / "epic"
     dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
@@ -497,6 +544,7 @@ def _new_issue(
     no_github: bool,
 ) -> None:
     """Create a new issue node under a given epic."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
     epic = nodes.get(epic_id)
@@ -542,7 +590,7 @@ def _new_issue(
         if github_issue_number is not None:
             raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
         if node_id is None:
-            node_id = _next_id(specdock_dir, "iss", local=True)
+            node_id = _next_id(specdock_dir, "iss", local=True, nodes=nodes)
         else:
             node_id = _normalize_local_id_input(str(node_id), prefix="iss", field="id")
 
@@ -550,7 +598,7 @@ def _new_issue(
     existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
     if existing_id:
         existing = nodes[existing_id]
-        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
 
     templates_dir = specdock_dir / "templates" / "issue"
     dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
@@ -599,6 +647,7 @@ def _new_adr(
     scope_prefix: str,
 ) -> None:
     """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)
     scope = nodes.get(scope_id)
@@ -617,7 +666,7 @@ def _new_adr(
     adrs_dir.mkdir(parents=True, exist_ok=True)
 
     if node_id is None:
-        # ADR ids are scoped to `adrs/` (they are not stored in meta.json).
+        # ADR ids are scoped to `adrs/` (they are not stored in `.meta.json`).
         max_num = 0
         for p in adrs_dir.glob("adr-*.md"):
             stem = p.stem
@@ -1172,8 +1221,8 @@ def _parse_github_issue_target(target: str) -> int:
 
 
 def _meta_json_path_for_output(node: _Node, *, repo_root: Path | None = None) -> str:
-    """Return a stable meta.json path for diagnostics (repo-relative when possible)."""
-    meta_path = node.path / "meta.json"
+    """Return a stable meta path for diagnostics (repo-relative when possible)."""
+    meta_path = node.meta_path
     if repo_root is not None:
         try:
             return meta_path.relative_to(repo_root).as_posix()
@@ -1213,7 +1262,7 @@ def _ensure_github_issue_not_linked(
     found = _format_linked_github_nodes(linked, repo_root=repo_root)
     raise RuntimeError(
         f"github.issue_number={issue_number} is already linked: {found}. "
-        "Fix github.issue_number in one of the listed meta.json files, "
+        "Fix github.issue_number in one of the listed .meta.json files, "
         "or choose a different GitHub issue number (target)."
     )
 
@@ -1239,7 +1288,7 @@ def _validate_github_issue_numbers_unique(nodes: dict[str, _Node], *, repo_root:
         raise RuntimeError(
             f"Duplicate github.issue_number detected: github.issue_number={issue_number} "
             f"is linked by multiple nodes: {found}. "
-            "Fix github.issue_number in one of the listed meta.json files to restore uniqueness."
+            "Fix github.issue_number in one of the listed .meta.json files to restore uniqueness."
         )
 
 
@@ -1303,6 +1352,7 @@ def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], 
 
 def _import_preflight_validate(specdock_dir: Path, *, repo_root: Path) -> dict[str, _Node]:
     """Run import preflight validation before any external call or filesystem generation."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     try:
         _validate_nodes(nodes, repo_root=repo_root)
@@ -1331,7 +1381,7 @@ def _import_initiative(
     existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
     if existing_id:
         existing = nodes[existing_id]
-        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
 
     templates_dir = specdock_dir / "templates" / "initiative"
     dest_dir = _initiatives_root(specdock_dir) / f"{node_id}-{slug}"
@@ -1379,7 +1429,7 @@ def _import_epic(
     existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
     if existing_id:
         existing = nodes[existing_id]
-        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
 
     templates_dir = specdock_dir / "templates" / "epic"
     dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
@@ -1439,7 +1489,7 @@ def _import_issue(
     existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
     if existing_id:
         existing = nodes[existing_id]
-        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
 
     templates_dir = specdock_dir / "templates" / "issue"
     dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
@@ -1708,6 +1758,7 @@ def _sync(
     migrate_active: bool = True,
 ) -> None:
     """Generate derived state files under `spec-dock/.agent/` from the local tree (and optionally GitHub)."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
@@ -3451,9 +3502,9 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
         _validate_lowercase(node_id, field="id")
         _parse_id(node_id)
         if not node.title:
-            raise RuntimeError(f"Missing title in meta.json: {node.path / 'meta.json'}")
+            raise RuntimeError(f"Missing title in .meta.json: {node.meta_path}")
         if not node.slug:
-            raise RuntimeError(f"Missing slug in meta.json: {node.path / 'meta.json'}")
+            raise RuntimeError(f"Missing slug in .meta.json: {node.meta_path}")
         _validate_slug(node.slug, field="slug")
 
         if node.type == "initiative":
@@ -3465,9 +3516,9 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
 
         if node.type == "epic":
             if not node.parent_id:
-                raise RuntimeError(f"epic missing parent_id: {node.path / 'meta.json'}")
+                raise RuntimeError(f"epic missing parent_id: {node.meta_path}")
             if not node.initiative_id:
-                raise RuntimeError(f"epic missing initiative_id: {node.path / 'meta.json'}")
+                raise RuntimeError(f"epic missing initiative_id: {node.meta_path}")
             if node.parent_id != node.initiative_id:
                 raise RuntimeError(
                     f"epic parent_id mismatch: {node.id} parent_id={node.parent_id} initiative_id={node.initiative_id}"
@@ -3479,9 +3530,9 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
 
         if node.type == "issue":
             if not node.parent_id:
-                raise RuntimeError(f"issue missing parent_id: {node.path / 'meta.json'}")
+                raise RuntimeError(f"issue missing parent_id: {node.meta_path}")
             if not node.initiative_id or not node.epic_id:
-                raise RuntimeError(f"issue missing initiative_id/epic_id: {node.path / 'meta.json'}")
+                raise RuntimeError(f"issue missing initiative_id/epic_id: {node.meta_path}")
             if node.parent_id != node.epic_id:
                 raise RuntimeError(
                     f"issue parent_id mismatch: {node.id} parent_id={node.parent_id} epic_id={node.epic_id}"
@@ -3498,11 +3549,12 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
                 )
             continue
 
-        raise RuntimeError(f"Unknown node type: {node.type} ({node.path / 'meta.json'})")
+        raise RuntimeError(f"Unknown node type: {node.type} ({node.meta_path})")
 
 
 def _validate(specdock_dir: Path) -> None:
-    """Validate basic structural integrity of the tree based on `meta.json`."""
+    """Validate basic structural integrity of the tree based on `.meta.json`."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     if not nodes:
         raise RuntimeError("No nodes found.")
