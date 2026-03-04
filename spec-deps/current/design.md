@@ -215,7 +215,7 @@ package "spec_dock_runtime" {
 - AC-001 → IF-001, IF-002, `app.py::_write_meta`, `io_json.py::_try_make_readonly`
 - AC-002 → IF-001, IF-002（import も `_write_meta` を通る）
 - EC-001 → `io_json.py::_try_make_readonly`（失敗理由の収集）+ `app.py`（warn と継続）
-- EC-002 → 実装方針（sync/validate はレガシー `meta.json` を検出したらエラーで停止し、ガイダンスを出す）
+- EC-002 → 実装方針（new/import/sync/validate はレガシー `meta.json` を検出したら fail-fast し、副作用前に停止する）
 - 非交渉制約（依存追加なし）→ `io_json.py` に stdlib のみで実装
 
 ## テスト戦略（最低限ここまで具体化） (任意)
