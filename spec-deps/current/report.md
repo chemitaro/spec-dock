@@ -154,10 +154,74 @@ python -m unittest discover -v
 - `tests/test_cli.py` - 既存 `meta.json` が `sync/validate` で後追い変更されないことを固定するS04テストを追加
 
 #### コミット
-- (コミット後に追記)
+- faffc71 test(meta): sync/validateで既存meta.jsonを後追い変更しないことを固定
 
 #### メモ
 - runtime 実装変更は不要（テストのみで EC-002 を固定）
+
+---
+
+### 2026-03-04 08:10 - 08:32
+
+#### 対象
+- Step: Dotfile migration (runtime/wrapper)
+- AC/EC: AC-001, EC-001, EC-002
+
+#### 実施内容
+- `meta.json` 正本を `.meta.json` に切り替えるため、runtime の定数/走査/出力先を更新
+- legacy 互換として `.meta.json` 不在かつ `meta.json` 存在時に best-effort rename 移行を追加
+- `.meta.json` と `meta.json` が共存する場合は `.meta.json` を優先し、legacy は warn して無視
+- wrapper scripts を `.meta.json` 優先 + `meta.json` fallback の導線へ更新
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (140 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `.meta.json` 正本化と legacy `meta.json` 移行/共存warnを追加
+- `src/spec_dock/assets/spec_dock/templates/initiative/epics/new-epic` - `.meta.json` 優先 + legacy fallback を追加
+- `src/spec_dock/assets/spec_dock/templates/epic/issues/new-issue` - `.meta.json` 優先 + legacy fallback を追加
+- `src/spec_dock/assets/spec_dock/templates/initiative/adrs/new-adr` - `.meta.json` 優先 + legacy fallback を追加
+- `src/spec_dock/assets/spec_dock/templates/epic/adrs/new-adr` - `.meta.json` 優先 + legacy fallback を追加
+- `src/spec_dock/assets/spec_dock/templates/issue/adrs/new-adr` - `.meta.json` 優先 + legacy fallback を追加
+
+#### コミット
+- 54912d1 refactor(meta): runtimeとwrapperを.meta.json基準に移行
+
+#### メモ
+- rename は best-effort。失敗時は warn して処理継続（exit code 0）を維持
+
+---
+
+### 2026-03-04 08:32 - 08:38
+
+#### 対象
+- Step: Dotfile migration (docs)
+- AC/EC: AC-001
+
+#### 実施内容
+- shipped docs / scripts README の `meta.json` 表記を `.meta.json` へ更新
+- SSOT の説明、図、エラーメッセージ例の表記を runtime 実装と一致させた
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (140 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/guide.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+- `src/spec_dock/assets/spec_dock/scripts/README.md`
+
+#### コミット
+- 4a54e88 docs(meta): .meta.json への表記統一を反映
+
+#### メモ
+- 振る舞い変更はなく、ドキュメント整合のみ
 
 ---
 
