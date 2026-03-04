@@ -2,13 +2,16 @@
 種別: ADR（Architecture Decision Record）
 ID: "adr-00001"
 タイトル: "meta.json の tool-managed 自己記述と read-only 化（ローカル予防）"
-状態: "accepted"
+状態: "superseded"
 作成者: "Codex CLI"
 最終更新: "2026-03-04"
 親: ["iss-00012"]
 ---
 
 # adr-00001 meta.json の tool-managed 自己記述と read-only 化（ローカル予防）
+
+> NOTE: 本 ADR は、メタファイル名の dotfile 化（`.meta.json`）を採用する意思決定により **adr-00002 に置き換え**られました。  
+>（自己記述 `_spec_dock` と read-only 化の方針自体は維持されますが、最新の結論は adr-00002 を参照してください）
 
 ## 結論（Decision） (必須)
 - `spec-dock/initiatives/**/meta.json` は SSOT であり、コーディングエージェントによる “うっかり編集” を避けるために以下を採用する。
