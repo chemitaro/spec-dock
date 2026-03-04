@@ -282,6 +282,32 @@ python -m unittest discover -v
 
 ---
 
+### 2026-03-04 (implementation)
+
+#### 対象
+- Step: S06（legacy `meta.json` 廃止）
+- AC/EC: EC-002
+
+#### 実施内容
+- legacy `meta.json` の互換/移行/fallback を削除し、`.meta.json` のみに統一
+  - `sync` / `validate` / `import(preflight)` は `spec-dock/initiatives/**/meta.json` を検出したら fail-fast
+  - wrapper templates は `.meta.json` のみ参照（legacy fallback なし）
+- テスト更新:
+  - `validate/sync` の fail-fast を固定
+  - `import` が preflight で fail-fast し、副作用（テンプレートコピー/`.meta.json` 生成）が発生しないことを固定
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (142 tests)
+```
+
+#### コミット
+- dbc043a refactor(meta): legacy meta.json互換を廃止して.meta.jsonへ統一
+- e465dde fix(import): legacy meta.jsonをpreflightでfail-fast化
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
