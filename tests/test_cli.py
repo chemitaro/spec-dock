@@ -254,7 +254,7 @@ class TestCli(unittest.TestCase):
         )
 
     def _write_text_force(self, path: Path, text: str) -> None:
-        if os.name == "posix" and path.exists():
+        if path.exists():
             try:
                 path.chmod(path.stat().st_mode | 0o200)
             except OSError:
