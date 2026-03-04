@@ -18,7 +18,7 @@
 
 spec-dock の SSOT（Source of Truth）は **ローカルのメタデータ**です。
 
-- SSOT（永続）: `spec-dock/initiatives/**/meta.json`
+- SSOT（永続）: `spec-dock/initiatives/**/.meta.json`
 - 生成物（git 管理しない）: `spec-dock/.agent/{active.json,index.json,tree.json,deps.json,deps.puml,deps.todo.puml}`、`spec-dock/active/**`
 
 GitHub は「作業の入口（Issue番号/URL）」として連携できますが、**ローカルの仕様ツリーが正**です。
@@ -50,7 +50,7 @@ Initiative
 spec-dock/
 ├── initiatives/                 # SSOT（常置）
 │   └── init-00001-.../
-│       ├── meta.json
+│       ├── .meta.json
 │       ├── requirement.md
 │       ├── design.md
 │       ├── plan.md
@@ -125,14 +125,14 @@ hide footbox
 
 actor User
 participant "spec-dock\n(runtime script)" as Script
-database "SSOT\nmeta.json" as Meta
+database "SSOT\n.meta.json" as Meta
 participant "git\n(branch)" as Git
 participant "gh\n(GitHub CLI)" as GH
 database "Derived\n.agent/{index,tree}.json" as Derived
 database "Active\nactive/** + context-pack" as Active
 
 User -> Script: new / import
-Script -> Meta: write meta.json\n(+ spec templates)
+Script -> Meta: write .meta.json\n(+ spec templates)
 
 User -> Script: active set <target>
 alt --checkout
