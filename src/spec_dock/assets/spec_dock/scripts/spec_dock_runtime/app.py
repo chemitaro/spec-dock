@@ -376,6 +376,7 @@ def _new_initiative(
     no_github: bool,
 ) -> None:
     """Create a new initiative node under `spec-dock/initiatives/`."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
 
     title, slug = _resolve_input_title_and_slug(title, slug)
@@ -451,6 +452,7 @@ def _new_epic(
     no_github: bool,
 ) -> None:
     """Create a new epic node under a given initiative."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
     initiative = nodes.get(initiative_id)
@@ -542,6 +544,7 @@ def _new_issue(
     no_github: bool,
 ) -> None:
     """Create a new issue node under a given epic."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
     epic = nodes.get(epic_id)
@@ -644,6 +647,7 @@ def _new_adr(
     scope_prefix: str,
 ) -> None:
     """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
+    _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)
     scope = nodes.get(scope_id)
