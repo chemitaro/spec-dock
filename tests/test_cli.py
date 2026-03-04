@@ -1762,6 +1762,50 @@ class TestCli(unittest.TestCase):
             self.assertFalse((agent_dir / "deps.puml").exists())
             self.assertFalse((agent_dir / "deps.todo.puml").exists())
 
+    def test_sync_force_continues_when_meta_id_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["id"] = "broken-id"
+            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            agent_dir = target / "spec-dock" / ".agent"
+            (agent_dir / "index.json").unlink(missing_ok=True)
+            (agent_dir / "tree.json").unlink(missing_ok=True)
+            (agent_dir / "index-all.json").unlink(missing_ok=True)
+            (agent_dir / "tree-all.json").unlink(missing_ok=True)
+
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("deps_preflight_failed", p.stderr)
+            self.assertTrue((agent_dir / "index.json").is_file())
+            self.assertTrue((agent_dir / "tree.json").is_file())
+            self.assertTrue((agent_dir / "index-all.json").is_file())
+            self.assertTrue((agent_dir / "tree-all.json").is_file())
+
+            index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertFalse(index["deps"]["valid"])
+            self.assertIn("deps_preflight_failed", index["warnings"])
+            self.assertEqual(index["deps"]["issue_edges"], [])
+
     def test_sync_force_does_not_update_active_from_branch(self) -> None:
         if shutil.which("git") is None:
             self.skipTest("git not available")
@@ -5177,6 +5221,73 @@ class TestCli(unittest.TestCase):
             self.assertIn("ready=false", p.stderr)
             after = (agent_dir / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after, before)
+
+    def test_active_set_epic_and_initiative_use_v2_deps_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Main epic"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Blocker epic"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target issue"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "2", "--title", "Blocker issue"])
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-main-epic"
+                / "issues"
+                / "iss-local-00001-target-issue"
+            )
+            (target_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["epic-local-00002"]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            self._run_runtime(target, ["sync", "--no-update-active"])
+            agent_dir = target / "spec-dock" / ".agent"
+            self._run_runtime(target, ["active", "clear"])
+
+            before_epic = (agent_dir / "active.json").read_text(encoding="utf-8")
+            blocked_epic = self._run_runtime_capture(target, ["active", "set", "epic-local-00001"])
+            self.assertEqual(blocked_epic.returncode, 1, blocked_epic.stdout + blocked_epic.stderr)
+            self.assertIn("active set blocked", blocked_epic.stderr)
+            self.assertIn("iss-local-00002", blocked_epic.stderr)
+            after_epic = (agent_dir / "active.json").read_text(encoding="utf-8")
+            self.assertEqual(after_epic, before_epic)
+
+            forced_epic = self._run_runtime_capture(target, ["active", "set", "epic-local-00001", "--force"])
+            self.assertEqual(forced_epic.returncode, 0, forced_epic.stdout + forced_epic.stderr)
+            self.assertIn("deps_blocked", forced_epic.stderr)
+            self.assertIn("blocker: iss-local-00002", forced_epic.stderr)
+
+            active_after_epic_force = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active_after_epic_force["initiative"]["id"], "init-local-00001")
+            self.assertEqual(active_after_epic_force["epic"]["id"], "epic-local-00001")
+            self.assertIsNone(active_after_epic_force["issue"])
+
+            self._run_runtime(target, ["active", "clear"])
+            before_init = (agent_dir / "active.json").read_text(encoding="utf-8")
+            blocked_init = self._run_runtime_capture(target, ["active", "set", "init-local-00001"])
+            self.assertEqual(blocked_init.returncode, 1, blocked_init.stdout + blocked_init.stderr)
+            self.assertIn("active set blocked", blocked_init.stderr)
+            self.assertIn("iss-local-00002", blocked_init.stderr)
+            after_init = (agent_dir / "active.json").read_text(encoding="utf-8")
+            self.assertEqual(after_init, before_init)
+
+            forced_init = self._run_runtime_capture(target, ["active", "set", "init-local-00001", "--force"])
+            self.assertEqual(forced_init.returncode, 0, forced_init.stdout + forced_init.stderr)
+            self.assertIn("deps_blocked", forced_init.stderr)
+            self.assertIn("blocker: iss-local-00002", forced_init.stderr)
+
+            active_after_init_force = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active_after_init_force["initiative"]["id"], "init-local-00001")
+            self.assertIsNone(active_after_init_force["epic"])
+            self.assertIsNone(active_after_init_force["issue"])
 
     def test_active_set_issue_auto_checkouts_when_github_linked(self) -> None:
         if os.name == "nt":

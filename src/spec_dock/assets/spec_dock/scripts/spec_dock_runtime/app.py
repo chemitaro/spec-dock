@@ -1510,26 +1510,20 @@ def _active_set(
         raise RuntimeError("Internal error: invalid active target kind")
 
     # Deps guard: refuse blocked targets by default (active.json must not be updated).
-    deps = (
-        _deps_evaluate_v2(
-            specdock_dir,
-            nodes,
-            target_id=node.id,
-            github=github,
-            gh_limit=gh_limit,
-        )
-        if node.type == "issue"
-        else _deps_evaluate(
-            specdock_dir,
-            nodes,
-            target_id=node.id,
-            github=github,
-            gh_limit=gh_limit,
-        )
+    deps = _deps_evaluate_v2(
+        specdock_dir,
+        nodes,
+        target_id=node.id,
+        github=github,
+        gh_limit=gh_limit,
     )
     blockers = list(deps.get("blockers") or [])
     ready = bool(deps.get("ready", False))
-    is_blocked = not ready
+    # For initiative/epic targets, guard by unresolved blockers in descendant issues.
+    # This keeps active-set usable before the first sync snapshot while still refusing
+    # canonical dependency violations.
+    guard_ready = ready if node.type == "issue" else len(blockers) == 0
+    is_blocked = not guard_ready
     if is_blocked:
         if not force:
             lines = [f"active set blocked: target={node.id} ready=false blockers={len(blockers)}"]
@@ -1799,8 +1793,15 @@ def _sync(
         sync_warnings.append("deps_preflight_failed")
 
     def sort_key(node_id: str) -> tuple[int, int, str]:
-        """Deterministic sort key for ids (GitHub ids first, then local)."""
-        _, is_local, num = _parse_id(node_id)
+        """Deterministic sort key for ids (GitHub ids first, then local).
+
+        Keep `sync --force` resilient when preflight validation fails and node ids are malformed.
+        """
+        try:
+            _, is_local, num = _parse_id(node_id)
+        except RuntimeError:
+            # Put malformed ids after normal ids while preserving deterministic output.
+            return (2, 0, node_id)
         return (1 if is_local else 0, num, node_id)
 
     # Build a lightweight parent→children index so callers can traverse the tree.
@@ -1877,18 +1878,18 @@ def _sync(
     issue_deps_fields_by_id: dict[str, dict[str, Any] | None]
     if deps_preflight_failed:
         issue_deps_fields_by_id = {
-            issue_id: None for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key)
+            issue_id: None for issue_id in sorted(issue_status_by_id.keys(), key=sort_key)
         }
     else:
         issue_direct_depends_on_for_derive: dict[str, list[str]]
         if isinstance(issue_direct_depends_on_all, dict):
             issue_direct_depends_on_for_derive = {
-                issue_id: sorted(list(issue_direct_depends_on_all.get(issue_id, [])), key=_deps_node_sort_key)
-                for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key)
+                issue_id: sorted(list(issue_direct_depends_on_all.get(issue_id, [])), key=sort_key)
+                for issue_id in sorted(issue_status_by_id.keys(), key=sort_key)
             }
         else:
             issue_direct_depends_on_for_derive = {
-                issue_id: [] for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key)
+                issue_id: [] for issue_id in sorted(issue_status_by_id.keys(), key=sort_key)
             }
         issue_deps_fields_by_id = _derive_issue_deps_fields(
             issue_direct_depends_on_for_derive,
@@ -2122,7 +2123,7 @@ def _sync(
                 if isinstance(kind, str) and kind:
                     out_edge["kind"] = kind
                 deps_issue_edges_todo.append(out_edge)
-        deps_issue_edges_todo.sort(key=lambda x: (_deps_node_sort_key(x["from"]), _deps_node_sort_key(x["to"])))
+        deps_issue_edges_todo.sort(key=lambda x: (sort_key(x["from"]), sort_key(x["to"])))
 
     deps_top_level_todo: dict[str, Any] = {
         "valid": (not deps_preflight_failed),
