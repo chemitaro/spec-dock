@@ -32,25 +32,25 @@ find_runtime() {
 }
 
 if ! runtime_script="$(find_runtime "$script_dir")"; then
-  echo "new-epic: runtime script not found: spec-dock/scripts/spec-dock" >&2
-  echo "new-epic: search start: $script_dir" >&2
-  echo "new-epic: run 'spec-dock init' or 'spec-dock update' and verify 'spec-dock/' is installed." >&2
+  echo "new-adr: runtime script not found: spec-dock/scripts/spec-dock" >&2
+  echo "new-adr: search start: $script_dir" >&2
+  echo "new-adr: run 'spec-dock init' or 'spec-dock update' and verify 'spec-dock/' is installed." >&2
   exit 1
 fi
 
 meta_path="$script_dir/../meta.json"
 if [[ ! -f "$meta_path" ]]; then
-  echo "new-epic: missing meta.json: $meta_path" >&2
-  echo "new-epic: fix ../meta.json and retry." >&2
+  echo "new-adr: missing meta.json: $meta_path" >&2
+  echo "new-adr: fix ../meta.json and retry." >&2
   exit 1
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "new-epic: python3 is required to parse meta.json." >&2
+  echo "new-adr: python3 is required to parse meta.json." >&2
   exit 1
 fi
 
-if ! parent_id="$(
+if ! meta_pair="$(
   python3 - "$meta_path" <<'PY'
 import json
 import sys
@@ -60,24 +60,42 @@ try:
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 except Exception as exc:
-    print(f"new-epic: invalid meta.json: {path}: {exc}", file=sys.stderr)
+    print(f"new-adr: invalid meta.json: {path}: {exc}", file=sys.stderr)
     raise SystemExit(1)
 
 node_id = data.get("id")
 if not isinstance(node_id, str) or not node_id.strip():
-    print(f"new-epic: missing 'id' in {path}", file=sys.stderr)
+    print(f"new-adr: missing 'id' in {path}", file=sys.stderr)
     raise SystemExit(1)
 
 node_type = data.get("type")
-if node_type != "initiative":
-    print(f"new-epic: expected type='initiative' in {path}, got {node_type!r}", file=sys.stderr)
+if node_type not in {"initiative", "epic", "issue"}:
+    print(f"new-adr: unsupported type in {path}: {node_type!r}", file=sys.stderr)
     raise SystemExit(1)
 
-print(node_id.strip())
+print(f"{node_type}\t{node_id.strip()}")
 PY
 )"; then
-  echo "new-epic: fix ../meta.json and retry." >&2
+  echo "new-adr: fix ../meta.json and retry." >&2
   exit 1
 fi
 
-exec "$runtime_script" new epic --initiative "$parent_id" --title "$title" --no-github
+scope_type="${meta_pair%%$'\t'*}"
+scope_id="${meta_pair#*$'\t'}"
+case "$scope_type" in
+  initiative)
+    scope_flag="--initiative"
+    ;;
+  epic)
+    scope_flag="--epic"
+    ;;
+  issue)
+    scope_flag="--issue"
+    ;;
+  *)
+    echo "new-adr: unsupported type: $scope_type" >&2
+    exit 1
+    ;;
+esac
+
+exec "$runtime_script" new adr "$scope_flag" "$scope_id" --title "$title"

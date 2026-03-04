@@ -1,0 +1,3811 @@
+#!/usr/bin/env python3
+"""
+spec-dock runtime script (repo-local).
+
+This script is installed into a repository by `uvx spec-dock init/update` as:
+
+  `spec-dock/scripts/spec-dock`
+
+It performs day-to-day operations without requiring `uvx` at runtime:
+- Create nodes: initiative / epic / issue / adr
+- Manage the active pointers (symlinks + context-pack)
+- Generate derived state (`spec-dock/.agent/index.json`, `spec-dock/.agent/tree.json`)
+- Validate the spec tree structure
+
+Design goals:
+- Keep dependencies minimal (stdlib only).
+- Use local-only by default for `new initiative`/`new epic`.
+- Keep GitHub-default behavior for `new issue` (opt out with `--no-github`).
+- Keep `sync --github` optional (GitHub state enrichment only when requested).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .github import (
+    _ensure_gh_available,
+    _gh_issue_create,
+    _gh_issue_index,
+    _gh_issue_view_minimal,
+)
+from .ids import (
+    _deps_node_sort_key,
+    _find_existing_id_by_num,
+    _format_id,
+    _normalize_id_input,
+    _normalize_local_id_input,
+    _parse_id,
+    _resolve_id_input,
+    _resolve_input_title_and_slug,
+    _slugify,
+    _validate_input_slug_kebab,
+    _validate_input_title,
+    _validate_lowercase,
+    _validate_slug,
+)
+from .io_json import _load_json, _now_iso, _today, _warn, _write_json
+from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
+from .render_puml import (
+    _deps_disabled_error_text,
+    _render_deps_disabled_deps_issues_puml,
+    _render_deps_disabled_tree_puml,
+    _render_deps_issues_puml,
+    _render_tree_ready_board_puml,
+)
+
+_SPEC_DOCK_DIRNAME = "spec-dock"
+
+_INITIATIVES_DIRNAME = "initiatives"
+_ACTIVE_DIRNAME = "active"
+_AGENT_DIRNAME = ".agent"
+_LEGACY_WORK_DIRNAME = ".work"
+
+_DEFAULT_ID_WIDTH = 5  # minimum width for zero-padded ids (e.g. `iss-00123`)
+
+_ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<num>[0-9]+)$")
+_NUM_RE = re.compile(r"^[0-9]+$")
+_GH_ISSUE_URL_RE = re.compile(r"/issues/(?P<num>[0-9]+)\b")
+_INPUT_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
+_INPUT_SLUG_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_BLOCKERS_TOP_LIMIT = 5
+_TREE_BOARD_BLOCKERS_LABEL_LIMIT = 3
+_DASHBOARD_TOP_LIMIT = 10
+
+# Branch name parsing helpers (best-effort):
+# - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
+# - Fallback to GitHub issue numbers embedded in branch names (e.g. `123-foo`, `issue-123-foo`, `#123`).
+_ID_IN_TEXT_RE = re.compile(r"(?<![a-z0-9])(?P<id>(?:init|epic|iss)(?:-local)?-[0-9]+)(?![a-z0-9])")
+_HASH_ISSUE_IN_TEXT_RE = re.compile(r"#(?P<num>[0-9]+)\b")
+_KEYWORD_ISSUE_IN_TEXT_RE = re.compile(r"(?i)(?:issue|gh)[-_]?(?P<num>[0-9]+)\b")
+_LEADING_NUMBER_IN_TEXT_RE = re.compile(r"^(?P<num>[0-9]+)[-_].+")
+
+
+@dataclass(frozen=True)
+class _Node:
+    """In-memory representation of a spec node loaded from `meta.json`."""
+
+    type: str
+    id: str
+    title: str
+    slug: str
+    path: Path
+    parent_id: str | None
+    initiative_id: str | None
+    epic_id: str | None
+    github_issue_number: int | None
+
+
+@dataclass(frozen=True)
+class _BranchDecision:
+    """Resolved branch naming decision for active set."""
+
+    desired: str
+    candidates: tuple[str, str]
+    warnings: tuple[str, ...]
+
+
+def _find_specdock_dir() -> Path:
+    """Locate the `spec-dock/` directory for the current repository.
+
+    Strategy:
+    1) Prefer the invoked script location: `<repo>/spec-dock/scripts/spec-dock`
+       (`sys.argv[0]`) so module relocation keeps behavior.
+    2) Fallback to this module file location.
+    2) Fallback to walking parents from the current working directory.
+    """
+    # Prefer invoked script location: <repo>/spec-dock/scripts/spec-dock
+    # This stays correct even when implementation moves into a package module.
+    argv0 = str(sys.argv[0]) if sys.argv else ""
+    script_path = Path(argv0).resolve() if argv0 else Path(__file__).resolve()
+    candidate = script_path.parent.parent
+    if candidate.is_dir() and candidate.name == _SPEC_DOCK_DIRNAME:
+        return candidate
+
+    # Fallback for direct module execution:
+    # <repo>/spec-dock/scripts/spec_dock_runtime/app.py -> parent.parent.parent
+    module_path = Path(__file__).resolve()
+    candidate_from_module = module_path.parent.parent.parent
+    if candidate_from_module.is_dir() and candidate_from_module.name == _SPEC_DOCK_DIRNAME:
+        return candidate_from_module
+
+    # Fallback: search from cwd upwards.
+    cur = Path.cwd().resolve()
+    # Keep a hard cap to avoid pathological loops if something goes wrong.
+    for _ in range(50):
+        sd = cur / _SPEC_DOCK_DIRNAME
+        if sd.is_dir():
+            return sd
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+
+    raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' not found. Run 'uvx ... spec-dock init' first.")
+
+
+def _initiatives_root(specdock_dir: Path) -> Path:
+    """Return the spec tree root directory (`spec-dock/initiatives/`)."""
+    return specdock_dir / _INITIATIVES_DIRNAME
+
+
+def _next_id(specdock_dir: Path, prefix: str, *, local: bool = False) -> str:
+    """Compute the next available id for a prefix by scanning existing nodes.
+
+    Notes:
+    - When `local=True`, only ids in the `*-local-*` namespace are considered.
+    - When `local=False`, only ids without `-local-` are considered.
+    """
+    initiatives_root = _initiatives_root(specdock_dir)
+    if not initiatives_root.exists():
+        return _format_id(prefix, 1, local=local)
+
+    max_num = 0
+    # Scan all meta.json (initiative/epic/issue) and compute max for the prefix.
+    for meta_path in initiatives_root.rglob("meta.json"):
+        try:
+            meta = _load_json(meta_path)
+        except RuntimeError:
+            continue
+        node_id = str(meta.get("id", ""))
+        try:
+            parsed_prefix, is_local, num = _parse_id(node_id)
+        except RuntimeError:
+            continue
+        if parsed_prefix != prefix:
+            continue
+        if is_local != local:
+            continue
+        max_num = max(max_num, num)
+
+    if prefix == "adr":
+        # ADRs are files, not nodes with meta.json. Scan filenames as a fallback.
+        for adr_path in initiatives_root.rglob("adrs/adr-*.md"):
+            m = re.search(r"\b(adr(?:-local)?-[0-9]+)\b", adr_path.stem)
+            if not m:
+                continue
+            try:
+                _, is_local, num = _parse_id(m.group(1))
+            except RuntimeError:
+                continue
+            if is_local != local:
+                continue
+            max_num = max(max_num, num)
+
+    return _format_id(prefix, max_num + 1, local=local)
+
+
+def _render_text(text: str, replacements: dict[str, str]) -> str:
+    """Apply simple placeholder replacements to text."""
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    return text
+
+
+def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str, str]) -> None:
+    """Copy a template directory into `dest_dir` and apply text replacements."""
+    if not src_dir.exists() or not src_dir.is_dir():
+        raise RuntimeError(f"Missing template directory: {src_dir}")
+    if dest_dir.exists():
+        raise RuntimeError(f"Destination already exists: {dest_dir}")
+
+    for src_path in sorted(src_dir.rglob("*")):
+        rel = src_path.relative_to(src_dir)
+        dest_path = dest_dir / rel
+        if src_path.is_dir():
+            dest_path.mkdir(parents=True, exist_ok=True)
+            continue
+
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            raw = src_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            # If the template is binary, just copy it as-is.
+            shutil.copy2(src_path, dest_path)
+            continue
+        rendered = _render_text(raw, replacements)
+        dest_path.write_text(rendered, encoding="utf-8")
+        # Keep wrapper scripts executable after text rendering.
+        if rendered.startswith("#!"):
+            try:
+                dest_path.chmod(dest_path.stat().st_mode | 0o111)
+            except OSError:
+                # Best-effort: keep generation working even when chmod is restricted.
+                pass
+
+
+def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
+    """Scan `spec-dock/initiatives/**/meta.json` into an id→node map."""
+    initiatives_root = _initiatives_root(specdock_dir)
+    nodes: dict[str, _Node] = {}
+    if not initiatives_root.exists():
+        return nodes
+
+    for meta_path in initiatives_root.rglob("meta.json"):
+        meta = _load_json(meta_path)
+        if not isinstance(meta, dict):
+            raise RuntimeError(
+                f"Invalid meta.json (expected object): {meta_path} (got {type(meta).__name__})"
+            )
+        node_type = str(meta.get("type", "")).strip()
+        node_id = str(meta.get("id", "")).strip()
+        title = str(meta.get("title", "")).strip()
+        slug = str(meta.get("slug", "")).strip()
+        if not node_type or not node_id:
+            continue
+        if node_id in nodes:
+            raise RuntimeError(f"Duplicate id detected: {node_id} ({meta_path})")
+
+        parent_id = meta.get("parent_id") or None
+        initiative_id = meta.get("initiative_id") or None
+        epic_id = meta.get("epic_id") or None
+
+        github_issue_number: int | None = None
+        github = meta.get("github")
+        if isinstance(github, dict) and github.get("issue_number") is not None:
+            try:
+                github_issue_number = int(github.get("issue_number"))
+            except (TypeError, ValueError) as e:
+                raise RuntimeError(f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}") from e
+
+        # Note: `path` points to the directory that contains this node's `meta.json`.
+        nodes[node_id] = _Node(
+            type=node_type,
+            id=node_id,
+            title=title,
+            slug=slug,
+            path=meta_path.parent,
+            parent_id=str(parent_id) if parent_id else None,
+            initiative_id=str(initiative_id) if initiative_id else None,
+            epic_id=str(epic_id) if epic_id else None,
+            github_issue_number=github_issue_number,
+        )
+    return nodes
+
+
+def _write_meta(
+    dest_dir: Path,
+    *,
+    node_type: str,
+    node_id: str,
+    title: str,
+    slug: str,
+    parent_id: str | None = None,
+    initiative_id: str | None = None,
+    epic_id: str | None = None,
+    github_issue_number: int | None = None,
+) -> None:
+    """Create a minimal, durable `meta.json` for a node."""
+    meta: dict[str, Any] = {
+        "schema_version": 1,
+        "type": node_type,
+        "id": node_id,
+        "title": title,
+        "slug": slug,
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+        "parent_id": parent_id,
+        "initiative_id": initiative_id,
+        "epic_id": epic_id,
+    }
+    if github_issue_number is not None:
+        meta["github"] = {"issue_number": int(github_issue_number)}
+    _write_json(dest_dir / "meta.json", meta)
+
+
+def _new_initiative(
+    specdock_dir: Path,
+    *,
+    title: str,
+    slug: str | None,
+    node_id: str | None,
+    github_issue_number: int | None,
+    create_github_issue: bool,
+    no_github: bool,
+) -> None:
+    """Create a new initiative node under `spec-dock/initiatives/`."""
+    nodes = _scan_nodes(specdock_dir)
+
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
+    use_github = bool(create_github_issue or github_issue_number is not None)
+    if no_github and use_github:
+        raise RuntimeError("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+
+    if use_github:
+        if node_id is not None:
+            raise RuntimeError(
+                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+            )
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
+        if github_issue_number is None:
+            repo_root = specdock_dir.parent
+            print(
+                "spec-dock: (info) creating GitHub issue via gh "
+                "(pass '--no-github' to avoid GitHub side effects)",
+                file=sys.stderr,
+            )
+            github_issue_number = _gh_issue_create(
+                repo_root,
+                title=title,
+                body="Created by spec-dock.\n\nType: initiative\nLocal specs are stored under `spec-dock/initiatives/`.\n",
+            )
+        node_id = _format_id("init", int(github_issue_number), local=False)
+    else:
+        # Default local-only mode: avoid collisions with GitHub issue numbers.
+        if node_id is None:
+            node_id = _next_id(specdock_dir, "init", local=True)
+        else:
+            node_id = _normalize_local_id_input(str(node_id), prefix="init", field="id")
+
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "initiative"
+    initiatives_root = _initiatives_root(specdock_dir)
+    dest_dir = initiatives_root / f"{node_id}-{slug}"
+
+    replacements = {
+        "<INIT_ID>": node_id,
+        "<INIT_TITLE>": title,
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{github_issue_number}" if github_issue_number else "",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(dest_dir, node_type="initiative", node_id=node_id, title=title, slug=slug, github_issue_number=github_issue_number)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    gh = f" github=#{github_issue_number}" if github_issue_number is not None else ""
+    print(f"spec-dock: ok (new initiative) id={node_id} path={rel}{gh}")
+
+
+def _new_epic(
+    specdock_dir: Path,
+    *,
+    initiative_id: str,
+    title: str,
+    slug: str | None,
+    node_id: str | None,
+    github_issue_number: int | None,
+    create_github_issue: bool,
+    no_github: bool,
+) -> None:
+    """Create a new epic node under a given initiative."""
+    nodes = _scan_nodes(specdock_dir)
+    initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
+    initiative = nodes.get(initiative_id)
+    if not initiative or initiative.type != "initiative":
+        raise RuntimeError(f"Initiative not found: {initiative_id}")
+
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
+    use_github = bool(create_github_issue or github_issue_number is not None)
+    if no_github and use_github:
+        raise RuntimeError("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+
+    if use_github:
+        if node_id is not None:
+            raise RuntimeError(
+                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+            )
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
+        if github_issue_number is None:
+            repo_root = specdock_dir.parent
+            print(
+                "spec-dock: (info) creating GitHub issue via gh "
+                "(pass '--no-github' to avoid GitHub side effects)",
+                file=sys.stderr,
+            )
+            github_issue_number = _gh_issue_create(
+                repo_root,
+                title=title,
+                body=(
+                    "Created by spec-dock.\n\n"
+                    "Type: epic\n"
+                    f"Initiative: {initiative.id}\n\n"
+                    "Local specs are stored under `spec-dock/initiatives/`.\n"
+                ),
+            )
+        node_id = _format_id("epic", int(github_issue_number), local=False)
+    else:
+        if node_id is None:
+            node_id = _next_id(specdock_dir, "epic", local=True)
+        else:
+            node_id = _normalize_local_id_input(str(node_id), prefix="epic", field="id")
+
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "epic"
+    dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
+
+    replacements = {
+        "<EPIC_ID>": node_id,
+        "<EPIC_TITLE>": title,
+        "<INIT_ID>": initiative.id,
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{github_issue_number}" if github_issue_number else "",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(
+        dest_dir,
+        node_type="epic",
+        node_id=node_id,
+        title=title,
+        slug=slug,
+        parent_id=initiative.id,
+        initiative_id=initiative.id,
+        github_issue_number=github_issue_number,
+    )
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    gh = f" github=#{github_issue_number}" if github_issue_number is not None else ""
+    print(f"spec-dock: ok (new epic) id={node_id} initiative={initiative.id} path={rel}{gh}")
+
+
+def _new_issue(
+    specdock_dir: Path,
+    *,
+    epic_id: str,
+    title: str,
+    slug: str | None,
+    node_id: str | None,
+    github_issue_number: int | None,
+    no_github: bool,
+) -> None:
+    """Create a new issue node under a given epic."""
+    nodes = _scan_nodes(specdock_dir)
+    epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
+    epic = nodes.get(epic_id)
+    if not epic or epic.type != "epic":
+        raise RuntimeError(f"Epic not found: {epic_id}")
+    if not epic.initiative_id:
+        raise RuntimeError(f"Epic meta missing initiative_id: {epic_id}")
+
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
+    if not no_github:
+        # Default: require GitHub and derive id from the GitHub issue number.
+        if node_id is not None:
+            raise RuntimeError(
+                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+            )
+        if github_issue_number is not None:
+            _ensure_github_issue_not_linked(
+                nodes,
+                issue_number=int(github_issue_number),
+                repo_root=specdock_dir.parent,
+            )
+        if github_issue_number is None:
+            repo_root = specdock_dir.parent
+            print(
+                "spec-dock: (info) creating GitHub issue via gh "
+                "(pass '--no-github' to avoid GitHub side effects)",
+                file=sys.stderr,
+            )
+            github_issue_number = _gh_issue_create(
+                repo_root,
+                title=title,
+                body=(
+                    "Created by spec-dock.\n\n"
+                    "Type: issue\n"
+                    f"Epic: {epic.id}\n"
+                    f"Initiative: {epic.initiative_id}\n\n"
+                    "Local specs are stored under `spec-dock/initiatives/`.\n"
+                ),
+            )
+        node_id = _format_id("iss", int(github_issue_number), local=False)
+    else:
+        if github_issue_number is not None:
+            raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
+        if node_id is None:
+            node_id = _next_id(specdock_dir, "iss", local=True)
+        else:
+            node_id = _normalize_local_id_input(str(node_id), prefix="iss", field="id")
+
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "issue"
+    dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
+
+    replacements = {
+        "<ISS_ID>": node_id,
+        "<ISS_TITLE>": title,
+        # Compatibility: some user-custom templates may use feature-style placeholders.
+        "<FEATURE_ID>": node_id,
+        "<FEATURE_NAME>": title,
+        "<EPIC_ID>": epic.id,
+        "<INIT_ID>": epic.initiative_id,
+        # Compatibility: some templates may use a generic issue link placeholder.
+        "<ISSUE_NUMBER_OR_URL>": f"#{github_issue_number}" if github_issue_number else "",
+        # Backward-compatible placeholder name (kept so older templates still render).
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{github_issue_number}" if github_issue_number else "",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(
+        dest_dir,
+        node_type="issue",
+        node_id=node_id,
+        title=title,
+        slug=slug,
+        parent_id=epic.id,
+        initiative_id=epic.initiative_id,
+        epic_id=epic.id,
+        github_issue_number=github_issue_number,
+    )
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    gh = f" github=#{github_issue_number}" if github_issue_number is not None else ""
+    print(
+        f"spec-dock: ok (new issue) id={node_id} epic={epic.id} initiative={epic.initiative_id} path={rel}{gh}"
+    )
+
+
+def _new_adr(
+    specdock_dir: Path,
+    *,
+    scope_id: str,
+    title: str,
+    slug: str | None,
+    node_id: str | None,
+    scope_prefix: str,
+) -> None:
+    """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
+    nodes = _scan_nodes(specdock_dir)
+    scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)
+    scope = nodes.get(scope_id)
+    if not scope:
+        raise RuntimeError(f"Scope node not found: {scope_id}")
+
+    title = title.strip()
+    if not title:
+        raise RuntimeError("--title is required")
+
+    template_path = specdock_dir / "templates" / "adr.md"
+    if not template_path.exists():
+        raise RuntimeError(f"Missing ADR template: {template_path}")
+
+    adrs_dir = scope.path / "adrs"
+    adrs_dir.mkdir(parents=True, exist_ok=True)
+
+    if node_id is None:
+        # ADR ids are scoped to `adrs/` (they are not stored in meta.json).
+        max_num = 0
+        for p in adrs_dir.glob("adr-*.md"):
+            stem = p.stem
+            m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", stem)
+            if not m:
+                continue
+            try:
+                _, _, n = _parse_id(m.group(1))
+            except RuntimeError:
+                continue
+            max_num = max(max_num, n)
+        node_id = _format_id("adr", max_num + 1, local=False)
+    else:
+        node_id = _normalize_id_input(str(node_id), prefix="adr", field="id")
+
+    if slug is None:
+        slug = _slugify(title)
+    if not slug:
+        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
+    slug = _validate_slug(slug, field="slug")
+
+    # Prevent duplicated ADR ids within the same scope (even with a different slug).
+    want_prefix, want_local, want_num = _parse_id(node_id)
+    for p in sorted(adrs_dir.glob("adr-*.md")):
+        m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", p.stem)
+        if not m:
+            continue
+        try:
+            p_prefix, p_local, p_num = _parse_id(m.group(1))
+        except RuntimeError:
+            continue
+        if p_prefix == want_prefix and p_local == want_local and p_num == want_num:
+            raise RuntimeError(f"ADR id already exists under scope {scope.id}: {node_id} ({p})")
+
+    dest_path = adrs_dir / f"{node_id}-{slug}.md"
+    if dest_path.exists():
+        raise RuntimeError(f"ADR already exists: {dest_path}")
+
+    raw = template_path.read_text(encoding="utf-8")
+    replacements = {
+        "<ADR_ID>": node_id,
+        "<ADR_TITLE>": title,
+        "<SCOPE_ID>": scope.id,
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    dest_path.write_text(_render_text(raw, replacements), encoding="utf-8")
+    rel = dest_path.relative_to(specdock_dir.parent).as_posix()
+    print(f"spec-dock: ok (new adr) id={node_id} scope={scope.id} path={rel}")
+
+
+def _unlink_any(path: Path) -> None:
+    """Delete a file/symlink/directory if it exists (best-effort)."""
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+
+
+def _write_pathfile(active_dir: Path, name: str, target: Path) -> None:
+    """Write a `.path` fallback file when symlinks are not available."""
+    pathfile = active_dir / f"{name}.path"
+    rel_target = os.path.relpath(target, start=active_dir)
+    pathfile.write_text(rel_target + "\n", encoding="utf-8")
+
+
+def _load_active_manifest(specdock_dir: Path) -> dict[str, Any] | None:
+    """Load SSOT active manifest (best-effort migrate legacy `.work/*`)."""
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    active_path = agent_dir / "active.json"
+    legacy_active_path = legacy_work_dir / "active.json"
+    legacy_current_path = legacy_work_dir / "current.json"
+
+    if active_path.exists():
+        current = _load_json(active_path)
+        return current if isinstance(current, dict) else None
+
+    if legacy_active_path.exists():
+        current = _load_json(legacy_active_path)
+        if isinstance(current, dict):
+            _write_json(active_path, current)
+        legacy_active_path.unlink(missing_ok=True)
+        return current if isinstance(current, dict) else None
+
+    if legacy_current_path.exists():
+        current = _load_json(legacy_current_path)
+        if isinstance(current, dict):
+            _write_json(active_path, current)
+        legacy_current_path.unlink(missing_ok=True)
+        return current if isinstance(current, dict) else None
+
+    return None
+
+
+def _load_active_manifest_no_migrate(specdock_dir: Path) -> dict[str, Any] | None:
+    """Load active manifest without migrating legacy `.work/*` files.
+
+    This is used by side-effect-sensitive commands (e.g. `import`) that must not
+    create/update `spec-dock/.agent/active.json` as a byproduct of reading active.
+    """
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    candidates = (
+        agent_dir / "active.json",
+        legacy_work_dir / "active.json",
+        legacy_work_dir / "current.json",
+    )
+    for p in candidates:
+        if not p.exists():
+            continue
+        current = _load_json(p)
+        return current if isinstance(current, dict) else None
+    return None
+
+
+def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
+    """Return the placeholder directory for `layer` (initiative/epic/issue)."""
+    p = specdock_dir / "system" / "active-none" / layer
+    if not p.exists():
+        raise RuntimeError(f"Missing placeholder directory: {p} (run 'spec-dock update')")
+    return p
+
+
+def _active_entry(repo_root: Path, node: _Node | None) -> dict[str, str] | None:
+    """Return an `{id,path}` entry for an active manifest, or None."""
+    if node is None:
+        return None
+    return {"id": node.id, "path": node.path.relative_to(repo_root).as_posix()}
+
+
+def _write_active_manifest(specdock_dir: Path, *, initiative: _Node | None, epic: _Node | None, issue: _Node | None) -> dict[str, Any]:
+    """Write SSOT active manifest (schema v2) and prune legacy files."""
+    repo_root = specdock_dir.parent
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    agent_dir.mkdir(parents=True, exist_ok=True)
+
+    current = {
+        "schema_version": 2,
+        "updated_at": _now_iso(),
+        "initiative": _active_entry(repo_root, initiative),
+        "epic": _active_entry(repo_root, epic),
+        "issue": _active_entry(repo_root, issue),
+    }
+    _write_json(agent_dir / "active.json", current)
+
+    # Prune legacy SSOT files to avoid duplicate manifests in older directories.
+    (legacy_work_dir / "active.json").unlink(missing_ok=True)
+    (legacy_work_dir / "current.json").unlink(missing_ok=True)
+    return current
+
+
+def _active_entry_id(entry: Any) -> str | None:
+    if isinstance(entry, dict):
+        v = entry.get("id")
+        return str(v) if isinstance(v, str) and v.strip() else None
+    return None
+
+
+def _active_entry_path(repo_root: Path, entry: Any) -> Path | None:
+    if isinstance(entry, dict):
+        v = entry.get("path")
+        if isinstance(v, str) and v.strip():
+            p = repo_root / v
+            if p.exists():
+                return p
+    return None
+
+
+def _render_context_pack(current: dict[str, Any] | None) -> str:
+    """Render `spec-dock/active/context-pack.md` based on `current`."""
+    init_entry = current.get("initiative") if isinstance(current, dict) else None
+    epic_entry = current.get("epic") if isinstance(current, dict) else None
+    issue_entry = current.get("issue") if isinstance(current, dict) else None
+
+    init_id = _active_entry_id(init_entry) or "(none)"
+    epic_id = _active_entry_id(epic_entry) or "(none)"
+    issue_id = _active_entry_id(issue_entry) or "(none)"
+
+    has_init = isinstance(init_entry, dict)
+    has_epic = isinstance(epic_entry, dict)
+    has_issue = isinstance(issue_entry, dict)
+
+    lines: list[str] = []
+    lines.append("# Context Pack (generated)")
+    lines.append("")
+    lines.append("## Active")
+    lines.append(f"- initiative: {init_id}")
+    lines.append(f"- epic: {epic_id}")
+    lines.append(f"- issue: {issue_id}")
+    lines.append("")
+    lines.append("## Generated state")
+    lines.append("- index: `spec-dock/.agent/index.json`")
+    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("")
+    lines.append("## Read order")
+    if has_init:
+        lines.append("- `spec-dock/active/initiative/requirement.md`")
+        lines.append("- `spec-dock/active/initiative/design.md`")
+        lines.append("- `spec-dock/active/initiative/plan.md`")
+    else:
+        lines.append("- `spec-dock/active/initiative/README.md`")
+    if has_epic:
+        lines.append("- `spec-dock/active/epic/requirement.md`")
+        lines.append("- `spec-dock/active/epic/design.md`")
+        lines.append("- `spec-dock/active/epic/plan.md`")
+    else:
+        lines.append("- `spec-dock/active/epic/README.md`")
+    if has_issue:
+        lines.append("- `spec-dock/active/issue/requirement.md`")
+        lines.append("- `spec-dock/active/issue/design.md`")
+        lines.append("- `spec-dock/active/issue/plan.md`")
+        lines.append("- `spec-dock/active/issue/report.md`")
+    else:
+        lines.append("- `spec-dock/active/issue/README.md`")
+    lines.append("")
+    lines.append("## Commands")
+    lines.append("- state (local): `./spec-dock/scripts/spec-dock sync`")
+    lines.append("- state (github): `./spec-dock/scripts/spec-dock sync --github`")
+    lines.append("- validate: `./spec-dock/scripts/spec-dock validate`")
+    lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+def _apply_active_pointers(specdock_dir: Path, current: dict[str, Any] | None) -> None:
+    """Update `spec-dock/active/*` pointers (symlink or `.path`) and context-pack."""
+    repo_root = specdock_dir.parent
+    active_dir = specdock_dir / _ACTIVE_DIRNAME
+    active_dir.mkdir(parents=True, exist_ok=True)
+
+    # Remove existing pointers (symlink or fallback pathfiles).
+    for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
+        _unlink_any(active_dir / name)
+
+    def target_dir(layer: str) -> Path:
+        entry = current.get(layer) if isinstance(current, dict) else None
+        return _active_entry_path(repo_root, entry) or _active_placeholder_dir(specdock_dir, layer)
+
+    def symlink(name: str, target: Path) -> None:
+        """Create an active pointer under `spec-dock/active/` (symlink or fallback)."""
+        link = active_dir / name
+        rel_target = os.path.relpath(target, start=active_dir)
+        try:
+            # Prefer symlinks: fixed entry points for both humans and agents.
+            os.symlink(rel_target, link)
+        except OSError:
+            # Fallback: keep it readable even in environments where symlinks are restricted.
+            _write_pathfile(active_dir, name, target)
+
+    symlink("initiative", target_dir("initiative"))
+    symlink("epic", target_dir("epic"))
+    symlink("issue", target_dir("issue"))
+
+    (active_dir / "context-pack.md").write_text(_render_context_pack(current), encoding="utf-8")
+
+
+def _patch_agent_state_active_fields(specdock_dir: Path, current: dict[str, Any]) -> None:
+    """Best-effort: patch cached derived state with the latest `active`."""
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    for name in ("index-all.json", "tree-all.json", "index.json", "tree.json"):
+        path = agent_dir / name
+        if not path.is_file():
+            continue
+        try:
+            data = _load_json(path)
+        except RuntimeError as e:
+            _warn(f"active_patch_failed: failed to read {path}: {e}")
+            continue
+        if not isinstance(data, dict):
+            _warn(f"active_patch_failed: invalid JSON shape (expected object): {path}")
+            continue
+        data["active"] = current
+        try:
+            _write_json(path, data)
+        except OSError as e:
+            _warn(f"active_patch_failed: failed to write {path}: {e}")
+
+
+def _ensure_git_available() -> None:
+    """Raise if `git` is not available in PATH."""
+    if shutil.which("git") is None:
+        raise RuntimeError("'git' CLI not found. Install Git, or disable git-dependent operations.")
+
+
+def _require_clean_working_tree(repo_root: Path) -> None:
+    """Raise if there are uncommitted/untracked changes (safety-first)."""
+    _ensure_git_available()
+    try:
+        p = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: git status --porcelain\n{(e.stderr or '').strip()}") from e
+
+    out = (p.stdout or "").strip()
+    if out:
+        head = "\n".join(out.splitlines()[:20])
+        more = "" if len(out.splitlines()) <= 20 else "\n..."
+        raise RuntimeError(
+            "Working tree is not clean; aborting checkout for safety.\n"
+            "Please commit/stash your changes first.\n\n"
+            f"{head}{more}"
+        )
+
+
+def _gh_issue_checkout(repo_root: Path, *, issue_number: int) -> None:
+    """Create/switch to the branch for the given GitHub issue number via `gh`."""
+    _ensure_gh_available()
+    _require_clean_working_tree(repo_root)
+
+    cmd1 = ["gh", "issue", "checkout", str(issue_number)]
+    try:
+        subprocess.run(cmd1, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        return
+    except subprocess.CalledProcessError as e1:
+        # Fallback: some `gh` versions support `issue develop`.
+        cmd2 = ["gh", "issue", "develop", str(issue_number), "--checkout"]
+        try:
+            subprocess.run(cmd2, cwd=str(repo_root), capture_output=True, text=True, check=True)
+            return
+        except subprocess.CalledProcessError as e2:
+            raise RuntimeError(
+                "Failed to checkout issue branch via gh.\n"
+                f"- tried: {' '.join(cmd1)}\n"
+                f"  stderr: {(e1.stderr or '').strip()}\n"
+                f"- tried: {' '.join(cmd2)}\n"
+                f"  stderr: {(e2.stderr or '').strip()}"
+            ) from e2
+
+
+def _git_current_branch(repo_root: Path) -> str:
+    """Return current branch name (`HEAD` when detached)."""
+    _ensure_git_available()
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: git rev-parse --abbrev-ref HEAD\n{(e.stderr or '').strip()}") from e
+    return (p.stdout or "").strip()
+
+
+def _git_local_branch_exists(repo_root: Path, *, branch: str) -> bool:
+    """Return True when local branch `branch` exists."""
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return p.returncode == 0
+
+
+def _git_checkout_branch(repo_root: Path, *, branch: str) -> None:
+    """Checkout a local branch."""
+    _ensure_git_available()
+    cmd = ["git", "checkout", branch]
+    try:
+        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+
+
+def _git_check_ref_format_branch(repo_root: Path, *, branch: str) -> bool:
+    """Return True when `branch` is valid for `git check-ref-format --branch`."""
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "check-ref-format", "--branch", branch],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return p.returncode == 0
+
+
+def _resolve_active_set_branch_decision(repo_root: Path, *, node: _Node) -> _BranchDecision:
+    """Resolve active-set desired branch as `id-slug`, falling back to `id` when needed."""
+    candidate = f"{node.id}-{node.slug}"
+    fallback = node.id
+    warnings: list[str] = []
+
+    if not candidate.isascii():
+        warnings.append("id-slug is non-ascii; fallback to id")
+        return _BranchDecision(desired=fallback, candidates=(candidate, fallback), warnings=tuple(warnings))
+    if not _git_check_ref_format_branch(repo_root, branch=candidate):
+        warnings.append("id-slug is invalid ref; fallback to id")
+        return _BranchDecision(desired=fallback, candidates=(candidate, fallback), warnings=tuple(warnings))
+    return _BranchDecision(desired=candidate, candidates=(candidate, fallback), warnings=tuple(warnings))
+
+
+def _ensure_active_set_branch_name(repo_root: Path, *, desired: str) -> None:
+    """Ensure current branch matches `desired` (create when missing)."""
+    current = _git_current_branch(repo_root)
+    if current == desired:
+        return
+
+    if _git_local_branch_exists(repo_root, branch=desired):
+        cmd = ["git", "checkout", desired]
+    else:
+        cmd = ["git", "checkout", "-b", desired]
+    try:
+        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+
+
+def _select_active_from_node(nodes: dict[str, _Node], node: _Node) -> tuple[_Node | None, _Node | None, _Node | None]:
+    """Return (initiative, epic, issue) selection derived from a node."""
+    if node.type == "initiative":
+        return (node, None, None)
+    if node.type == "epic":
+        if not node.initiative_id:
+            raise RuntimeError(f"Epic meta missing initiative_id: {node.id}")
+        initiative = nodes.get(node.initiative_id)
+        if not initiative or initiative.type != "initiative":
+            raise RuntimeError(f"Initiative not found: {node.initiative_id}")
+        return (initiative, node, None)
+    if node.type == "issue":
+        if not node.epic_id or not node.initiative_id:
+            raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {node.id}")
+        epic = nodes.get(node.epic_id)
+        initiative = nodes.get(node.initiative_id)
+        if not epic or epic.type != "epic":
+            raise RuntimeError(f"Epic not found: {node.epic_id}")
+        if not initiative or initiative.type != "initiative":
+            raise RuntimeError(f"Initiative not found: {node.initiative_id}")
+        return (initiative, epic, node)
+
+    raise RuntimeError(f"Unsupported node type for active: {node.type} ({node.id})")
+
+
+def _find_node_by_github_issue_number(nodes: dict[str, _Node], *, issue_number: int) -> _Node:
+    """Find a unique node (initiative/epic/issue) by `github.issue_number`."""
+    matches = [
+        n
+        for n in nodes.values()
+        if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    if not matches:
+        raise RuntimeError(f"No node found for github.issue_number={issue_number}. Create/link the node first.")
+    if len(matches) > 1:
+        ids = ", ".join(sorted(f"{m.type}:{m.id}" for m in matches))
+        raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
+    return matches[0]
+
+
+def _find_node_by_github_issue_number_or_none(nodes: dict[str, _Node], *, issue_number: int) -> _Node | None:
+    """Best-effort resolver for github.issue_number; returns None when not found."""
+    try:
+        return _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+    except RuntimeError as e:
+        msg = str(e)
+        if msg.startswith(f"No node found for github.issue_number={issue_number}"):
+            return None
+        raise
+
+
+def _parse_active_set_target(target: str) -> tuple[str, int | str]:
+    """Parse `active set <target>` into either a GitHub issue number or a node id.
+
+    Accepted inputs:
+    - GitHub issue number: `123`
+    - GitHub issue number: `#123`
+    - GitHub issue URL: `https://github.com/<owner>/<repo>/issues/123`
+    - Node id (or anything containing it): `iss-00123`, `iss-00123-foo`, `path/to/iss-00123-foo`
+    """
+    raw = target.strip()
+    if not raw:
+        raise RuntimeError("target is required")
+
+    # 1) GitHub issue URL.
+    m = _GH_ISSUE_URL_RE.search(raw)
+    if m:
+        return ("github_issue", int(m.group("num")))
+
+    # 2) `#123`
+    s = raw.strip()
+    if s.startswith("#") and _NUM_RE.fullmatch(s[1:]):
+        return ("github_issue", int(s[1:]))
+
+    # 3) `123`
+    if _NUM_RE.fullmatch(s):
+        return ("github_issue", int(s))
+
+    # 4) Node id embedded in text (ids are lowercase on disk; accept mixed-case input).
+    lowered = raw.lower()
+    matches = [m.group("id") for m in _ID_IN_TEXT_RE.finditer(lowered)]
+    unique = sorted(set(matches))
+    if len(unique) == 1:
+        prefix, _, _ = _parse_id(unique[0])
+        if prefix not in ("init", "epic", "iss"):
+            raise RuntimeError(f"Unsupported id prefix for active set: {prefix}")
+        return ("node_id", unique[0])
+    if len(unique) > 1:
+        # Practical disambiguation:
+        # When users pass a path/branch name, it may contain multiple ids
+        # (init → epic → iss). Prefer the most specific one.
+        by_prefix: dict[str, list[str]] = {"iss": [], "epic": [], "init": []}
+        for item in unique:
+            for p in ("iss", "epic", "init"):
+                if item.startswith(p + "-"):
+                    by_prefix[p].append(item)
+                    break
+
+        for p in ("iss", "epic", "init"):
+            if len(by_prefix[p]) == 1:
+                _parse_id(by_prefix[p][0])
+                return ("node_id", by_prefix[p][0])
+            if len(by_prefix[p]) > 1:
+                raise RuntimeError(f"Ambiguous target: multiple {p} ids found: {', '.join(sorted(by_prefix[p]))}")
+
+        raise RuntimeError(f"Ambiguous target: multiple ids found: {', '.join(unique)}")
+
+    raise RuntimeError(
+        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL) or a node id (e.g. iss-00123)."
+    )
+
+
+def _parse_github_issue_target(target: str) -> int:
+    """Parse import target into a GitHub issue number (`123` / `#123` / URL)."""
+    raw = target.strip()
+    if not raw:
+        raise RuntimeError("target is required")
+
+    m = _GH_ISSUE_URL_RE.search(raw)
+    if m:
+        return int(m.group("num"))
+
+    if raw.startswith("#") and _NUM_RE.fullmatch(raw[1:]):
+        return int(raw[1:])
+
+    if _NUM_RE.fullmatch(raw):
+        return int(raw)
+
+    raise RuntimeError(
+        "Invalid target. Use a GitHub issue number (e.g. 123 / #123 / URL like .../issues/123)."
+    )
+
+
+def _meta_json_path_for_output(node: _Node, *, repo_root: Path | None = None) -> str:
+    """Return a stable meta.json path for diagnostics (repo-relative when possible)."""
+    meta_path = node.path / "meta.json"
+    if repo_root is not None:
+        try:
+            return meta_path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+    return meta_path.as_posix()
+
+
+def _linked_github_nodes(
+    nodes: dict[str, _Node], *, issue_number: int, repo_root: Path | None = None
+) -> list[_Node]:
+    """Collect nodes linked to `github.issue_number`, sorted for stable diagnostics."""
+    linked = [
+        n for n in nodes.values() if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    return sorted(linked, key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)))
+
+
+def _format_linked_github_nodes(linked: list[_Node], *, repo_root: Path | None = None) -> str:
+    """Format linked nodes for error messages (`type:id (path)` CSV)."""
+    return ", ".join(
+        f"{n.type}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
+        for n in linked
+    )
+
+
+def _ensure_github_issue_not_linked(
+    nodes: dict[str, _Node],
+    *,
+    issue_number: int,
+    repo_root: Path | None = None,
+) -> None:
+    """Reject link operations when github.issue_number is already linked by any node type."""
+    linked = _linked_github_nodes(nodes, issue_number=issue_number, repo_root=repo_root)
+    if not linked:
+        return
+    found = _format_linked_github_nodes(linked, repo_root=repo_root)
+    raise RuntimeError(
+        f"github.issue_number={issue_number} is already linked: {found}. "
+        "Fix github.issue_number in one of the listed meta.json files, "
+        "or choose a different GitHub issue number (target)."
+    )
+
+
+def _validate_github_issue_numbers_unique(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
+    """Ensure github.issue_number is unique across initiative/epic/issue nodes."""
+    by_issue_number: dict[int, list[_Node]] = {}
+    for node in nodes.values():
+        if node.type not in ("initiative", "epic", "issue"):
+            continue
+        if node.github_issue_number is None:
+            continue
+        by_issue_number.setdefault(int(node.github_issue_number), []).append(node)
+
+    for issue_number in sorted(by_issue_number.keys()):
+        linked = sorted(
+            by_issue_number[issue_number],
+            key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
+        )
+        if len(linked) <= 1:
+            continue
+        found = _format_linked_github_nodes(linked, repo_root=repo_root)
+        raise RuntimeError(
+            f"Duplicate github.issue_number detected: github.issue_number={issue_number} "
+            f"is linked by multiple nodes: {found}. "
+            "Fix github.issue_number in one of the listed meta.json files to restore uniqueness."
+        )
+
+
+def _resolve_active_node(nodes: dict[str, _Node], *, entry: Any, expected_type: str) -> _Node | None:
+    """Resolve one active manifest entry to a current node (strict type, width-agnostic id)."""
+    node_id = _active_entry_id(entry)
+    if not node_id:
+        return None
+    try:
+        prefix, is_local, num = _parse_id(node_id.strip().lower())
+    except RuntimeError:
+        return None
+    expected_prefix = {"initiative": "init", "epic": "epic", "issue": "iss"}[expected_type]
+    if prefix != expected_prefix:
+        return None
+    resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if not resolved:
+        return None
+    node = nodes.get(resolved)
+    if not node or node.type != expected_type:
+        return None
+    return node
+
+
+def _resolve_parent_from_active(specdock_dir: Path, *, nodes: dict[str, _Node], child_type: str) -> str:
+    """Resolve parent id from active manifest for `epic` or `issue` imports."""
+    active = _load_active_manifest_no_migrate(specdock_dir)
+    if not isinstance(active, dict):
+        if child_type == "issue":
+            raise RuntimeError("Cannot resolve parent epic from active selection. Pass --epic explicitly.")
+        raise RuntimeError("Cannot resolve parent initiative from active selection. Pass --initiative explicitly.")
+
+    active_init = _resolve_active_node(nodes, entry=active.get("initiative"), expected_type="initiative")
+    active_epic = _resolve_active_node(nodes, entry=active.get("epic"), expected_type="epic")
+    active_issue = _resolve_active_node(nodes, entry=active.get("issue"), expected_type="issue")
+
+    if child_type == "issue":
+        if active_epic:
+            return active_epic.id
+        if active_issue and active_issue.epic_id:
+            epic = nodes.get(active_issue.epic_id)
+            if epic and epic.type == "epic":
+                return epic.id
+        raise RuntimeError("Cannot resolve parent epic from active selection. Pass --epic explicitly.")
+
+    if child_type == "epic":
+        if active_init:
+            return active_init.id
+        if active_epic and active_epic.initiative_id:
+            initiative = nodes.get(active_epic.initiative_id)
+            if initiative and initiative.type == "initiative":
+                return initiative.id
+        if active_issue and active_issue.initiative_id:
+            initiative = nodes.get(active_issue.initiative_id)
+            if initiative and initiative.type == "initiative":
+                return initiative.id
+        raise RuntimeError("Cannot resolve parent initiative from active selection. Pass --initiative explicitly.")
+
+    raise RuntimeError(f"Internal error: unsupported child type for active fallback: {child_type}")
+
+
+def _import_preflight_validate(specdock_dir: Path, *, repo_root: Path) -> dict[str, _Node]:
+    """Run import preflight validation before any external call or filesystem generation."""
+    nodes = _scan_nodes(specdock_dir)
+    try:
+        _validate_nodes(nodes, repo_root=repo_root)
+    except RuntimeError as e:
+        raise RuntimeError(f"preflight validate failed: {e}") from e
+    return nodes
+
+
+def _import_initiative(
+    specdock_dir: Path,
+    *,
+    issue_number: int,
+    title: str,
+    slug: str | None,
+) -> None:
+    """Import an existing GitHub issue into spec-dock as an initiative node."""
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
+    repo_root = specdock_dir.parent
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
+
+    node_id = _format_id("init", issue_number, local=False)
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "initiative"
+    dest_dir = _initiatives_root(specdock_dir) / f"{node_id}-{slug}"
+    replacements = {
+        "<INIT_ID>": node_id,
+        "<INIT_TITLE>": title,
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(dest_dir, node_type="initiative", node_id=node_id, title=title, slug=slug, github_issue_number=issue_number)
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False, migrate_active=False)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    print(f"spec-dock: ok (import initiative) id={node_id} path={rel} github=#{issue_number}")
+
+
+def _import_epic(
+    specdock_dir: Path,
+    *,
+    issue_number: int,
+    title: str,
+    slug: str | None,
+    initiative_id: str | None,
+) -> None:
+    """Import an existing GitHub issue into spec-dock as an epic node."""
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
+    repo_root = specdock_dir.parent
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
+
+    if initiative_id is None:
+        resolved_initiative_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="epic")
+    else:
+        resolved_initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
+
+    initiative = nodes.get(resolved_initiative_id)
+    if not initiative or initiative.type != "initiative":
+        raise RuntimeError(f"Initiative not found: {resolved_initiative_id}")
+
+    node_id = _format_id("epic", issue_number, local=False)
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "epic"
+    dest_dir = initiative.path / "epics" / f"{node_id}-{slug}"
+    replacements = {
+        "<EPIC_ID>": node_id,
+        "<EPIC_TITLE>": title,
+        "<INIT_ID>": initiative.id,
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(
+        dest_dir,
+        node_type="epic",
+        node_id=node_id,
+        title=title,
+        slug=slug,
+        parent_id=initiative.id,
+        initiative_id=initiative.id,
+        github_issue_number=issue_number,
+    )
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False, migrate_active=False)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    print(f"spec-dock: ok (import epic) id={node_id} initiative={initiative.id} path={rel} github=#{issue_number}")
+
+
+def _import_issue(
+    specdock_dir: Path,
+    *,
+    issue_number: int,
+    title: str,
+    slug: str | None,
+    epic_id: str | None,
+) -> None:
+    """Import an existing GitHub issue into spec-dock as an issue node."""
+    title, slug = _resolve_input_title_and_slug(title, slug)
+
+    repo_root = specdock_dir.parent
+    nodes = _import_preflight_validate(specdock_dir, repo_root=repo_root)
+    _ensure_github_issue_not_linked(nodes, issue_number=issue_number, repo_root=repo_root)
+    _gh_issue_view_minimal(repo_root, issue_number=issue_number)
+
+    if epic_id is None:
+        resolved_epic_id = _resolve_parent_from_active(specdock_dir, nodes=nodes, child_type="issue")
+    else:
+        resolved_epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)
+
+    epic = nodes.get(resolved_epic_id)
+    if not epic or epic.type != "epic":
+        raise RuntimeError(f"Epic not found: {resolved_epic_id}")
+    if not epic.initiative_id:
+        raise RuntimeError(f"Epic meta missing initiative_id: {resolved_epic_id}")
+
+    node_id = _format_id("iss", issue_number, local=False)
+    prefix, is_local, num = _parse_id(node_id)
+    existing_id = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+    if existing_id:
+        existing = nodes[existing_id]
+        raise RuntimeError(f"id already exists: {existing_id} ({existing.path / 'meta.json'})")
+
+    templates_dir = specdock_dir / "templates" / "issue"
+    dest_dir = epic.path / "issues" / f"{node_id}-{slug}"
+    replacements = {
+        "<ISS_ID>": node_id,
+        "<ISS_TITLE>": title,
+        "<FEATURE_ID>": node_id,
+        "<FEATURE_NAME>": title,
+        "<EPIC_ID>": epic.id,
+        "<INIT_ID>": epic.initiative_id,
+        "<ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<GITHUB_ISSUE_NUMBER_OR_URL>": f"#{issue_number}",
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": _today(),
+    }
+    _copy_template_tree(templates_dir, dest_dir, replacements=replacements)
+    _write_meta(
+        dest_dir,
+        node_type="issue",
+        node_id=node_id,
+        title=title,
+        slug=slug,
+        parent_id=epic.id,
+        initiative_id=epic.initiative_id,
+        epic_id=epic.id,
+        github_issue_number=issue_number,
+    )
+    _sync(specdock_dir, github=False, gh_limit=10000, update_active=False, migrate_active=False)
+    rel = dest_dir.relative_to(specdock_dir.parent).as_posix()
+    print(
+        f"spec-dock: ok (import issue) id={node_id} epic={epic.id} initiative={epic.initiative_id} "
+        f"path={rel} github=#{issue_number}"
+    )
+
+
+def _active_set(
+    specdock_dir: Path,
+    *,
+    target: str,
+    checkout: bool = False,
+    force: bool = False,
+    github: bool = False,
+    gh_limit: int = 10000,
+) -> None:
+    """Set active pointers (initiative/epic/issue) from a single target."""
+    repo_root = specdock_dir.parent
+
+    kind, value = _parse_active_set_target(target)
+    nodes = _scan_nodes(specdock_dir)
+    if not nodes:
+        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
+
+    if kind == "github_issue":
+        issue_number = int(value)  # type: ignore[arg-type]
+        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+        display_target = f"github#{issue_number}"
+    elif kind == "node_id":
+        raw_id = str(value).lower()
+        prefix, is_local, num = _parse_id(raw_id)
+        resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local) or _format_id(
+            prefix, num, local=is_local
+        )
+        node = nodes.get(resolved)
+        if not node or node.type not in ("initiative", "epic", "issue"):
+            raise RuntimeError(f"Node not found: {resolved}")
+        display_target = node.id
+    else:
+        raise RuntimeError("Internal error: invalid active target kind")
+
+    # Deps guard: refuse blocked targets by default (active.json must not be updated).
+    deps = _deps_evaluate_v2(
+        specdock_dir,
+        nodes,
+        target_id=node.id,
+        github=github,
+        gh_limit=gh_limit,
+    )
+    blockers = list(deps.get("blockers") or [])
+    ready = bool(deps.get("ready", False))
+    # For initiative/epic targets, guard by unresolved blockers in descendant issues.
+    # This keeps active-set usable before the first sync snapshot while still refusing
+    # canonical dependency violations.
+    guard_ready = ready if node.type == "issue" else len(blockers) == 0
+    is_blocked = not guard_ready
+    if is_blocked:
+        if not force:
+            lines = [f"active set blocked: target={node.id} ready=false blockers={len(blockers)}"]
+            for b in blockers:
+                lines.append(f"- {b}")
+            raise RuntimeError("\n".join(lines))
+        _warn(
+            f"deps_blocked: active set target is blocked; continuing due to --force: target={node.id} blockers={len(blockers)}"
+        )
+        for b in blockers:
+            _warn(f"blocker: {b}")
+
+    initiative, epic, issue = _select_active_from_node(nodes, node)
+    branch: str | None = None
+    if checkout:
+        decision = _resolve_active_set_branch_decision(repo_root, node=node)
+        for warning in decision.warnings:
+            _warn(warning)
+        try:
+            _require_clean_working_tree(repo_root)
+            if _git_local_branch_exists(repo_root, branch=decision.desired):
+                _warn("branch already exists; reusing existing branch; content is not verified")
+            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
+        except RuntimeError as e:
+            msg = str(e)
+            if msg.startswith("Working tree is not clean"):
+                raise RuntimeError(
+                    msg
+                    + "\n\nHint: use '--no-checkout' to update active only, or commit/stash before '--checkout'."
+                ) from e
+            raise
+        branch = decision.desired
+
+    current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
+    _apply_active_pointers(specdock_dir, current)
+    _patch_agent_state_active_fields(specdock_dir, current)
+    ini = initiative.id if initiative else "(none)"
+    ep = epic.id if epic else "(none)"
+    iss = issue.id if issue else "(none)"
+    print(f"spec-dock: ok (active set) target={display_target} initiative={ini} epic={ep} issue={iss}")
+    if branch:
+        print(f"spec-dock: ok (active checkout) branch={branch}")
+
+
+def _active_show(specdock_dir: Path) -> None:
+    """Print the current active pointers from `spec-dock/.agent/active.json`."""
+    current = _load_active_manifest(specdock_dir)
+    if not current:
+        print("spec-dock: active: (not set)")
+        return
+
+    def fmt(entry: Any) -> str:
+        if not isinstance(entry, dict):
+            return "(none)"
+        node_id = entry.get("id") if isinstance(entry.get("id"), str) else None
+        node_path = entry.get("path") if isinstance(entry.get("path"), str) else None
+        if node_id and node_path:
+            return f"{node_id} ({node_path})"
+        if node_id:
+            return str(node_id)
+        return "(none)"
+
+    print(f"initiative: {fmt(current.get('initiative'))}")
+    print(f"epic: {fmt(current.get('epic'))}")
+    print(f"issue: {fmt(current.get('issue'))}")
+
+
+def _active_clear(specdock_dir: Path) -> None:
+    """Clear active pointers (set all layers to placeholder)."""
+    current = _write_active_manifest(specdock_dir, initiative=None, epic=None, issue=None)
+    _apply_active_pointers(specdock_dir, current)
+    _patch_agent_state_active_fields(specdock_dir, current)
+    print("spec-dock: ok (active clear)")
+
+
+def _git_current_branch_or_none(repo_root: Path) -> str | None:
+    """Return the current branch name, or None if unavailable/detached."""
+    if shutil.which("git") is None:
+        return None
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+    branch = (p.stdout or "").strip()
+    if not branch or branch == "HEAD":
+        return None
+    return branch
+
+
+def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> tuple[_Node | None, str | None]:
+    """Infer a unique node from a branch name (best-effort)."""
+    s = branch.strip().lower()
+    if not s:
+        return (None, None)
+
+    # 1) Prefer explicit node ids embedded in the branch name.
+    id_candidates: list[str] = []
+    for m in _ID_IN_TEXT_RE.finditer(s):
+        raw = m.group("id")
+        try:
+            prefix, is_local, num = _parse_id(raw)
+        except RuntimeError:
+            continue
+        existing = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+        if existing:
+            id_candidates.append(existing)
+    id_candidates = sorted(set(id_candidates))
+    if len(id_candidates) == 1:
+        return (nodes[id_candidates[0]], f"matched id in branch: {id_candidates[0]}")
+    if len(id_candidates) > 1:
+        # Practical disambiguation:
+        # If the branch embeds multiple ids (init → epic → iss), prefer the most specific.
+        by_prefix: dict[str, list[str]] = {"iss": [], "epic": [], "init": []}
+        for item in id_candidates:
+            try:
+                p, _, _ = _parse_id(item)
+            except RuntimeError:
+                continue
+            if p in by_prefix:
+                by_prefix[p].append(item)
+
+        for p in ("iss", "epic", "init"):
+            if len(by_prefix[p]) == 1:
+                chosen = by_prefix[p][0]
+                return (nodes[chosen], f"matched id in branch: {chosen} (picked most specific)")
+            if len(by_prefix[p]) > 1:
+                return (None, f"ambiguous {p} ids in branch: {', '.join(sorted(by_prefix[p]))}")
+
+        return (None, f"ambiguous ids in branch: {', '.join(id_candidates)}")
+
+    # 2) Fallback: GitHub issue number embedded in the branch name.
+    leaf = s.split("/")[-1]
+    nums: set[int] = set()
+    for m in _HASH_ISSUE_IN_TEXT_RE.finditer(s):
+        try:
+            nums.add(int(m.group("num")))
+        except (TypeError, ValueError):
+            continue
+    for m in _KEYWORD_ISSUE_IN_TEXT_RE.finditer(s):
+        try:
+            nums.add(int(m.group("num")))
+        except (TypeError, ValueError):
+            continue
+    m = _LEADING_NUMBER_IN_TEXT_RE.match(leaf)
+    if m:
+        try:
+            nums.add(int(m.group("num")))
+        except (TypeError, ValueError):
+            pass
+
+    if not nums:
+        # No signal: keep active unchanged silently (common on `main`, `develop`, etc.).
+        return (None, None)
+
+    matches = [
+        n
+        for n in nodes.values()
+        if n.github_issue_number in nums and n.type in ("initiative", "epic", "issue")
+    ]
+    if len(matches) == 1:
+        n = matches[0]
+        return (n, f"matched github.issue_number={n.github_issue_number} from branch")
+    if not matches:
+        return (None, f"no node matches github issue numbers {sorted(nums)}")
+    ids = ", ".join(sorted(f"{m.type}:{m.id}" for m in matches))
+    return (None, f"ambiguous github issue numbers {sorted(nums)}: {ids}")
+
+
+def _sync(
+    specdock_dir: Path,
+    *,
+    github: bool,
+    gh_limit: int,
+    update_active: bool,
+    force: bool = False,
+    migrate_active: bool = True,
+) -> None:
+    """Generate derived state files under `spec-dock/.agent/` from the local tree (and optionally GitHub)."""
+    nodes = _scan_nodes(specdock_dir)
+    if not nodes:
+        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
+
+    repo_root = specdock_dir.parent
+
+    # `--force` is a debugging escape hatch. Keep it side-effect-light by disabling
+    # active auto update regardless of preflight result.
+    if force:
+        update_active = False
+
+    effective_deps_map_all: dict[str, list[str]] | None = None
+    issue_direct_depends_on_all: dict[str, list[str]] | None = None
+    deps_issue_edges_all: list[dict[str, str]] = []
+    deps_compile_warnings: list[str] = []
+    deps_preflight_failed = False
+    deps_preflight_error: str | None = None
+    sync_warnings: list[str] = []
+
+    preflight = "ok"
+    try:
+        _validate_nodes(nodes, repo_root=repo_root)
+    except RuntimeError as e:
+        if not force:
+            raise RuntimeError(f"preflight validate failed: {e}") from e
+        preflight = "failed(forced)"
+        deps_preflight_failed = True
+        deps_preflight_error = f"preflight validate failed: {e}"
+        _warn(f"deps_preflight_failed: preflight validate failed; continuing due to --force. Details: {e}")
+        if "deps_preflight_failed" not in sync_warnings:
+            sync_warnings.append("deps_preflight_failed")
+    else:
+        # Validate deps cycles across the whole graph (sync=global scope).
+        try:
+            issue_direct_depends_on_all, deps_compile_warnings = _compile_issue_direct_depends_on_map(nodes)
+            _validate_deps_cycles(issue_direct_depends_on_all)
+            deps_issue_edges_all = _issue_depends_on_edges(issue_direct_depends_on_all)
+
+            effective_deps_map_all = _build_effective_deps_map_all(nodes)
+            _validate_deps_cycles(effective_deps_map_all)
+        except RuntimeError as e:
+            if not force:
+                raise
+            preflight = "failed(forced)"
+            deps_preflight_failed = True
+            deps_preflight_error = str(e)
+            _warn(f"deps_preflight_failed: deps preflight failed; continuing due to --force. Details: {e}")
+            effective_deps_map_all = None
+
+    issue_index: dict[int, dict[str, Any]] = {}
+    if github:
+        try:
+            issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+        except RuntimeError as e:
+            _warn(
+                "gh_fetch_failed: failed to fetch GitHub issue states; treating as unknown. "
+                f"Hint: check `gh auth status`, or re-run without --github. Details: {e}"
+            )
+            sync_warnings.append("gh_fetch_failed")
+            issue_index = {}
+        else:
+            linked_numbers = sorted(
+                {
+                    int(n.github_issue_number)
+                    for n in nodes.values()
+                    if n.github_issue_number is not None and n.type in ("initiative", "epic", "issue")
+                }
+            )
+            missing = [n for n in linked_numbers if n not in issue_index]
+            if missing:
+                examples = ", ".join(str(n) for n in missing[:5])
+                suffix = "..." if len(missing) > 5 else ""
+                _warn(
+                    "gh_index_incomplete: gh issue list does not include some linked issues; treating missing as unknown. "
+                    f"missing={len(missing)} examples=[{examples}{suffix}] (hint: increase --gh-limit; current: {gh_limit})"
+                )
+                sync_warnings.append("gh_index_incomplete")
+
+    for warning_code in deps_compile_warnings:
+        if warning_code not in sync_warnings:
+            sync_warnings.append(warning_code)
+    if deps_preflight_failed and "deps_preflight_failed" not in sync_warnings:
+        sync_warnings.append("deps_preflight_failed")
+
+    def sort_key(node_id: str) -> tuple[int, int, str]:
+        """Deterministic sort key for ids (GitHub ids first, then local).
+
+        Keep `sync --force` resilient when preflight validation fails and node ids are malformed.
+        """
+        try:
+            _, is_local, num = _parse_id(node_id)
+        except RuntimeError:
+            # Put malformed ids after normal ids while preserving deterministic output.
+            return (2, 0, node_id)
+        return (1 if is_local else 0, num, node_id)
+
+    # Build a lightweight parent→children index so callers can traverse the tree.
+    children: dict[str, list[str]] = {node_id: [] for node_id in nodes}
+    for node in nodes.values():
+        if node.parent_id and node.parent_id in children:
+            children[node.parent_id].append(node.id)
+
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    state_index_todo_path = agent_dir / "index.json"
+    state_tree_todo_path = agent_dir / "tree.json"
+    state_index_all_path = agent_dir / "index-all.json"
+    state_tree_all_path = agent_dir / "tree-all.json"
+
+    cached_issue_status_by_id: dict[str, str] = {}
+    cached_github_by_id: dict[str, dict[str, Any]] = {}
+    if not github:
+        cached_index: dict[str, Any] | None = None
+        for state_index_path in (state_index_all_path, state_index_todo_path):
+            if not state_index_path.is_file():
+                continue
+            try:
+                loaded = _load_json(state_index_path)
+            except RuntimeError:
+                continue
+            if isinstance(loaded, dict):
+                cached_index = loaded
+                break
+
+        if isinstance(cached_index, dict):
+            raw_nodes = cached_index.get("nodes")
+            if isinstance(raw_nodes, dict):
+                for node_id, item in raw_nodes.items():
+                    if not isinstance(node_id, str) or not isinstance(item, dict):
+                        continue
+                    raw_status = item.get("status")
+                    if isinstance(raw_status, str):
+                        status = raw_status.strip().lower()
+                        if status in ("done", "open", "unknown"):
+                            cached_issue_status_by_id[node_id] = status
+                    raw_github = item.get("github")
+                    if isinstance(raw_github, dict):
+                        cached_github_by_id[node_id] = raw_github
+
+    # Progress is derived data: initiative/epic aggregate counts of their descendant issues.
+    progress: dict[str, dict[str, int]] = {}
+    for node in nodes.values():
+        if node.type in ("initiative", "epic"):
+            progress[node.id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
+
+    issue_status_by_id: dict[str, str] = {}
+    for node in nodes.values():
+        if node.type != "issue":
+            continue
+
+        # When GitHub enrichment is enabled, map GH state to done/open.
+        # Otherwise, preserve the cached status from `.agent/index.json` when available
+        # (snapshot; may be stale), falling back to unknown.
+        status = "unknown"
+        if github and node.github_issue_number is not None:
+            gh = issue_index.get(node.github_issue_number)
+            if gh:
+                status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+        elif not github:
+            status = cached_issue_status_by_id.get(node.id, "unknown")
+        issue_status_by_id[node.id] = status
+
+        for parent in filter(None, (node.epic_id, node.initiative_id)):
+            if parent not in progress:
+                continue
+            progress[parent]["total"] += 1
+            progress[parent][status] += 1
+
+    issue_deps_fields_by_id: dict[str, dict[str, Any] | None]
+    if deps_preflight_failed:
+        issue_deps_fields_by_id = {
+            issue_id: None for issue_id in sorted(issue_status_by_id.keys(), key=sort_key)
+        }
+    else:
+        issue_direct_depends_on_for_derive: dict[str, list[str]]
+        if isinstance(issue_direct_depends_on_all, dict):
+            issue_direct_depends_on_for_derive = {
+                issue_id: sorted(list(issue_direct_depends_on_all.get(issue_id, [])), key=sort_key)
+                for issue_id in sorted(issue_status_by_id.keys(), key=sort_key)
+            }
+        else:
+            issue_direct_depends_on_for_derive = {
+                issue_id: [] for issue_id in sorted(issue_status_by_id.keys(), key=sort_key)
+            }
+        issue_deps_fields_by_id = _derive_issue_deps_fields(
+            issue_direct_depends_on_for_derive,
+            issue_status_by_id,
+        )
+
+    legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    current = _load_active_manifest(specdock_dir) if migrate_active else _load_active_manifest_no_migrate(specdock_dir)
+    before = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
+
+    # Default behavior: infer active target from current git branch (best-effort).
+    if update_active:
+        branch = _git_current_branch_or_none(repo_root)
+        if branch:
+            inferred, reason = _infer_active_node_from_branch(nodes, branch=branch)
+            if inferred:
+                initiative, epic, issue = _select_active_from_node(nodes, inferred)
+                current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
+                if reason:
+                    print(f"spec-dock: sync: active updated ({reason})", file=sys.stderr)
+            else:
+                # Keep the existing active selection unchanged (warning only).
+                if reason:
+                    print(f"spec-dock: sync: active unchanged ({reason})", file=sys.stderr)
+
+    # Keep `spec-dock/active/*` always usable (placeholder when unset).
+    _apply_active_pointers(specdock_dir, current if isinstance(current, dict) else None)
+
+    # Flatten nodes so tools/agents can query by id without traversing the FS again.
+    out_nodes: dict[str, Any] = {}
+    for node_id in sorted(nodes.keys(), key=sort_key):
+        node = nodes[node_id]
+        item: dict[str, Any] = {
+            "type": node.type,
+            "id": node.id,
+            "title": node.title,
+            "path": node.path.relative_to(repo_root).as_posix(),
+            "parent_id": node.parent_id,
+            "initiative_id": node.initiative_id,
+            "epic_id": node.epic_id,
+            "children": sorted(children.get(node.id, []), key=sort_key),
+        }
+
+        if node.type == "issue":
+            item["status"] = issue_status_by_id.get(node.id, "unknown")
+            issue_deps = issue_deps_fields_by_id.get(node.id)
+            item["deps"] = dict(issue_deps) if isinstance(issue_deps, dict) else None
+
+        if node.github_issue_number is not None:
+            item["github"] = {"issue_number": node.github_issue_number}
+            if github:
+                gh = issue_index.get(node.github_issue_number)
+                if gh:
+                    item["github"].update(
+                        {
+                            "state": gh.get("state"),
+                            "url": gh.get("url"),
+                            "updated_at": gh.get("updatedAt"),
+                            "labels": [lbl.get("name") for lbl in (gh.get("labels") or []) if isinstance(lbl, dict)],
+                        }
+                    )
+            else:
+                cached = cached_github_by_id.get(node.id)
+                if isinstance(cached, dict) and cached.get("issue_number") == node.github_issue_number:
+                    for k, v in cached.items():
+                        if k == "issue_number":
+                            continue
+                        item["github"][k] = v
+
+        if node.id in progress:
+            item["progress"] = progress[node.id]
+
+        out_nodes[node.id] = item
+
+    # Human-friendly tree view: keep the layer structure as nested lists.
+    #
+    # Unlike `index.json`, this representation is nested as:
+    # initiative -> epics[] -> issues[]
+    #
+    # Note:
+    # - Each node item is the same shape as `index.json`'s `nodes[<id>]`.
+    #   This intentionally duplicates fields between files, but avoids forcing
+    #   tools/agents to join `tree.json` with `index.json` at runtime.
+    def tree_item(node_id: str) -> dict[str, Any]:
+        """Return a full node item for `tree.json` (same schema as index nodes)."""
+        base = out_nodes.get(node_id)
+        if not isinstance(base, dict):
+            raise RuntimeError(f"Internal error: missing node in index: {node_id}")
+        # Shallow copy so we can add nested arrays without mutating the index view.
+        return dict(base)
+
+    initiative_ids = [node_id for node_id, node in nodes.items() if node.type == "initiative"]
+    initiative_ids.sort(key=sort_key)
+
+    tree: list[dict[str, Any]] = []
+    for init_id in initiative_ids:
+        init_item = tree_item(init_id)
+
+        epic_ids = [cid for cid in children.get(init_id, []) if nodes.get(cid) and nodes[cid].type == "epic"]
+        epic_ids.sort(key=sort_key)
+        epics: list[dict[str, Any]] = []
+
+        for epic_id in epic_ids:
+            epic_item = tree_item(epic_id)
+
+            issue_ids = [cid for cid in children.get(epic_id, []) if nodes.get(cid) and nodes[cid].type == "issue"]
+            issue_ids.sort(key=sort_key)
+            epic_item["issues"] = [tree_item(cid) for cid in issue_ids]
+
+            epics.append(epic_item)
+
+        init_item["epics"] = epics
+        tree.append(init_item)
+
+    deps_top_level: dict[str, Any] = {
+        "valid": (not deps_preflight_failed),
+        "error": deps_preflight_error if deps_preflight_failed else None,
+        "issue_edges": list(deps_issue_edges_all if not deps_preflight_failed else []),
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+    state_index_all = {
+        "schema_version": 2,
+        "generated_at": _now_iso(),
+        "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
+        "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level),
+        "nodes": out_nodes,
+    }
+    state_tree_all = {
+        "schema_version": 2,
+        "generated_at": _now_iso(),
+        "root": f"{_SPEC_DOCK_DIRNAME}/{_INITIATIVES_DIRNAME}",
+        "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level),
+        "tree": tree,
+    }
+
+    # Build todo projection:
+    # - exclude done issues
+    # - prune epic/initiative branches with zero remaining todo issues
+    todo_issue_ids = sorted(
+        [
+            node_id
+            for node_id, item in out_nodes.items()
+            if isinstance(item, dict)
+            and item.get("type") == "issue"
+            and str(item.get("status") or "unknown").lower() != "done"
+        ],
+        key=sort_key,
+    )
+    todo_issue_set = set(todo_issue_ids)
+
+    todo_epic_ids: list[str] = []
+    for node_id, node in nodes.items():
+        if node.type != "epic":
+            continue
+        issue_ids = [
+            cid for cid in children.get(node_id, [])
+            if cid in todo_issue_set and nodes.get(cid) and nodes[cid].type == "issue"
+        ]
+        if issue_ids:
+            todo_epic_ids.append(node_id)
+    todo_epic_ids.sort(key=sort_key)
+    todo_epic_set = set(todo_epic_ids)
+
+    todo_init_ids: list[str] = []
+    for node_id, node in nodes.items():
+        if node.type != "initiative":
+            continue
+        epic_ids = [
+            cid for cid in children.get(node_id, [])
+            if cid in todo_epic_set and nodes.get(cid) and nodes[cid].type == "epic"
+        ]
+        if epic_ids:
+            todo_init_ids.append(node_id)
+    todo_init_ids.sort(key=sort_key)
+    todo_init_set = set(todo_init_ids)
+
+    todo_node_ids = todo_init_set | todo_epic_set | todo_issue_set
+    todo_nodes: dict[str, Any] = {}
+    for node_id in sorted(todo_node_ids, key=sort_key):
+        base = out_nodes.get(node_id)
+        if not isinstance(base, dict):
+            continue
+        item = dict(base)
+        item["children"] = sorted([cid for cid in children.get(node_id, []) if cid in todo_node_ids], key=sort_key)
+        todo_nodes[node_id] = item
+
+    tree_todo: list[dict[str, Any]] = []
+    for init_id in todo_init_ids:
+        init_base = todo_nodes.get(init_id)
+        if not isinstance(init_base, dict):
+            continue
+        init_item = dict(init_base)
+        epics: list[dict[str, Any]] = []
+        for epic_id in sorted([cid for cid in children.get(init_id, []) if cid in todo_epic_set], key=sort_key):
+            epic_base = todo_nodes.get(epic_id)
+            if not isinstance(epic_base, dict):
+                continue
+            epic_item = dict(epic_base)
+            issue_items: list[dict[str, Any]] = []
+            for issue_id in sorted([cid for cid in children.get(epic_id, []) if cid in todo_issue_set], key=sort_key):
+                issue_base = todo_nodes.get(issue_id)
+                if isinstance(issue_base, dict):
+                    issue_items.append(dict(issue_base))
+            if not issue_items:
+                continue
+            epic_item["issues"] = issue_items
+            epics.append(epic_item)
+        if not epics:
+            continue
+        init_item["epics"] = epics
+        tree_todo.append(init_item)
+
+    deps_issue_edges_todo: list[dict[str, str]] = []
+    if not deps_preflight_failed:
+        for edge in deps_issue_edges_all:
+            if not isinstance(edge, dict):
+                continue
+            from_id = edge.get("from")
+            to_id = edge.get("to")
+            if not isinstance(from_id, str) or not isinstance(to_id, str):
+                continue
+            if from_id in todo_issue_set and to_id in todo_issue_set:
+                out_edge: dict[str, str] = {"from": from_id, "to": to_id}
+                kind = edge.get("kind")
+                if isinstance(kind, str) and kind:
+                    out_edge["kind"] = kind
+                deps_issue_edges_todo.append(out_edge)
+        deps_issue_edges_todo.sort(key=lambda x: (sort_key(x["from"]), sort_key(x["to"])))
+
+    deps_top_level_todo: dict[str, Any] = {
+        "valid": (not deps_preflight_failed),
+        "error": deps_preflight_error if deps_preflight_failed else None,
+        "issue_edges": list(deps_issue_edges_todo if not deps_preflight_failed else []),
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+    state_index_todo = {
+        "schema_version": 2,
+        "generated_at": state_index_all["generated_at"],
+        "root": state_index_all["root"],
+        "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level_todo),
+        "nodes": todo_nodes,
+    }
+    state_tree_todo = {
+        "schema_version": 2,
+        "generated_at": state_tree_all["generated_at"],
+        "root": state_tree_all["root"],
+        "active": current,
+        "warnings": list(sync_warnings),
+        "deps": dict(deps_top_level_todo),
+        "tree": tree_todo,
+    }
+
+    _write_json(state_index_all_path, state_index_all)
+    _write_json(state_tree_all_path, state_tree_all)
+    _write_json(state_index_todo_path, state_index_todo)
+    _write_json(state_tree_todo_path, state_tree_todo)
+
+    tree_all_puml_path = specdock_dir / "tree-all.puml"
+    tree_todo_puml_path = specdock_dir / "tree.puml"
+    dashboard_path = specdock_dir / "dashboard.md"
+    if not deps_preflight_failed:
+        tree_all_puml_path.write_text(
+            _render_tree_ready_board_puml(
+                state_tree_all,
+                active=current if isinstance(current, dict) else None,
+                todo_only=False,
+            ),
+            encoding="utf-8",
+        )
+        tree_todo_puml_path.write_text(
+            _render_tree_ready_board_puml(
+                state_tree_all,
+                active=current if isinstance(current, dict) else None,
+                todo_only=True,
+            ),
+            encoding="utf-8",
+        )
+        dashboard_path.write_text(
+            _render_dashboard_md(out_nodes, active=current if isinstance(current, dict) else None),
+            encoding="utf-8",
+        )
+    else:
+        tree_all_puml_path.write_text(
+            _render_deps_disabled_tree_puml(todo_only=False, error=deps_preflight_error),
+            encoding="utf-8",
+        )
+        tree_todo_puml_path.write_text(
+            _render_deps_disabled_tree_puml(todo_only=True, error=deps_preflight_error),
+            encoding="utf-8",
+        )
+        dashboard_path.write_text(
+            _render_deps_disabled_dashboard_md(error=deps_preflight_error),
+            encoding="utf-8",
+        )
+
+    deps_issues_json_path = agent_dir / "deps-issues.json"
+    deps_issues_puml_path = specdock_dir / "deps-issues.puml"
+    if not deps_preflight_failed:
+        deps_issues_state = _build_deps_issues_state(
+            state_index_todo["nodes"],
+            deps_issue_edges_todo,
+            active=current if isinstance(current, dict) else None,
+        )
+        _write_json(deps_issues_json_path, deps_issues_state)
+        deps_issues_puml_path.write_text(_render_deps_issues_puml(deps_issues_state), encoding="utf-8")
+    else:
+        deps_issues_state = _build_deps_issues_placeholder_state(error=deps_preflight_error)
+        _write_json(deps_issues_json_path, deps_issues_state)
+        deps_issues_puml_path.write_text(
+            _render_deps_disabled_deps_issues_puml(error=deps_preflight_error),
+            encoding="utf-8",
+        )
+
+    # Legacy v1 deps artifacts are deprecated; always prune to avoid stale misuse.
+    (agent_dir / "deps.json").unlink(missing_ok=True)
+    (agent_dir / "deps.puml").unlink(missing_ok=True)
+    (agent_dir / "deps.todo.puml").unlink(missing_ok=True)
+
+    rel_index_all = state_index_all_path.relative_to(repo_root).as_posix()
+    rel_tree_all = state_tree_all_path.relative_to(repo_root).as_posix()
+    rel_index_todo = state_index_todo_path.relative_to(repo_root).as_posix()
+    rel_tree_todo = state_tree_todo_path.relative_to(repo_root).as_posix()
+    mode = "github" if github else "local"
+    after = json.dumps(current, ensure_ascii=False, sort_keys=True) if isinstance(current, dict) else None
+    changed = " active=updated" if (before is not None and after is not None and before != after) else ""
+    print(
+        "spec-dock: ok (sync) "
+        f"mode={mode} preflight={preflight} "
+        f"wrote={rel_index_all},{rel_tree_all},{rel_index_todo},{rel_tree_todo}{changed}"
+    )
+
+    # Prune legacy v2 directory/file names to avoid duplicates.
+    (legacy_work_dir / "state.json").unlink(missing_ok=True)
+    (legacy_work_dir / "index.json").unlink(missing_ok=True)
+    (legacy_work_dir / "tree.json").unlink(missing_ok=True)
+
+
+def _deps_check(
+    specdock_dir: Path,
+    *,
+    target: str,
+    github: bool,
+    gh_limit: int,
+    json_output: bool,
+) -> int:
+    """Check whether `target` is ready to start based on dependencies.
+
+    Rules:
+    - ready = all effective dependencies are Done
+    - Unknown is treated as not Done (safe default)
+    """
+    nodes = _scan_nodes(specdock_dir)
+    if not nodes:
+        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
+
+    kind, value = _parse_active_set_target(target)
+    if kind == "github_issue":
+        issue_number = int(value)  # type: ignore[arg-type]
+        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
+        target_id = node.id
+    elif kind == "node_id":
+        raw_id = str(value).lower()
+        prefix, is_local, num = _parse_id(raw_id)
+        resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local) or _format_id(
+            prefix, num, local=is_local
+        )
+        node = nodes.get(resolved)
+        if not node or node.type not in ("initiative", "epic", "issue"):
+            raise RuntimeError(f"Node not found: {resolved}")
+        target_id = node.id
+    else:
+        raise RuntimeError("Internal error: invalid deps target kind")
+
+    result = _deps_evaluate_v2(
+        specdock_dir,
+        nodes,
+        target_id=target_id,
+        github=github,
+        gh_limit=gh_limit,
+    )
+    ready = bool(result["ready"])
+
+    if json_output:
+        payload = {
+            "schema_version": 1,
+            "target": target_id,
+            "ready": bool(result["ready"]),
+            "effective_depends_on": list(result["effective_depends_on"]),
+            "blockers": list(result["blockers"]),
+            "nodes": dict(result["nodes"]),
+            "warnings": list(result["warnings"]),
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        blockers = list(result["blockers"])
+        if bool(result["ready"]):
+            print(f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0")
+        else:
+            print(
+                f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
+                file=sys.stderr,
+            )
+            for b in blockers:
+                print(f"- {b}", file=sys.stderr)
+
+    return 0 if ready else 3
+
+
+def _deps_target_issue_ids(nodes: dict[str, _Node], *, target_id: str) -> list[str]:
+    """Resolve a deps-check target into issue ids for canonical issue graph evaluation."""
+    target = nodes.get(target_id)
+    if not target:
+        raise RuntimeError(f"Node not found: {target_id}")
+
+    if target.type == "issue":
+        return [target.id]
+    if target.type == "epic":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.epic_id == target.id],
+            key=_deps_node_sort_key,
+        )
+    if target.type == "initiative":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.initiative_id == target.id],
+            key=_deps_node_sort_key,
+        )
+    raise RuntimeError(f"Unsupported node type for deps check: {target.type} ({target_id})")
+
+
+def _deps_check_snapshot_issue_statuses(specdock_dir: Path) -> dict[str, str]:
+    """Load issue statuses from sync snapshots (`index-all.json` preferred)."""
+    out: dict[str, str] = {}
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    state_index: dict[str, Any] | None = None
+    for state_index_path in (agent_dir / "index-all.json", agent_dir / "index.json"):
+        if not state_index_path.is_file():
+            continue
+        try:
+            loaded = _load_json(state_index_path)
+        except RuntimeError:
+            continue
+        if isinstance(loaded, dict):
+            state_index = loaded
+            break
+
+    if not isinstance(state_index, dict):
+        return out
+
+    raw_nodes = state_index.get("nodes")
+    if not isinstance(raw_nodes, dict):
+        return out
+
+    for issue_id, item in raw_nodes.items():
+        if not isinstance(issue_id, str) or not isinstance(item, dict):
+            continue
+        raw_status = item.get("status")
+        if not isinstance(raw_status, str):
+            continue
+        status = raw_status.strip().lower()
+        if status in ("done", "open", "unknown"):
+            out[issue_id] = status
+    return out
+
+
+def _deps_check_active_issue_id(specdock_dir: Path) -> str | None:
+    """Return active issue id when present."""
+    current = _load_active_manifest_no_migrate(specdock_dir)
+    if not isinstance(current, dict):
+        return None
+    return _active_entry_id(current.get("issue"))
+
+
+def _deps_evaluate_v2(
+    specdock_dir: Path,
+    nodes: dict[str, _Node],
+    *,
+    target_id: str,
+    github: bool,
+    gh_limit: int,
+) -> dict[str, Any]:
+    """Evaluate deps readiness using canonical issue-only dependency graph (v2)."""
+    issue_direct_depends_on, compile_warnings = _compile_issue_direct_depends_on_map(nodes)
+    target_issue_ids = _deps_target_issue_ids(nodes, target_id=target_id)
+
+    reachable_issue_ids: set[str] = set()
+    stack: list[str] = list(reversed(target_issue_ids))
+    while stack:
+        issue_id = stack.pop()
+        if issue_id in reachable_issue_ids:
+            continue
+        reachable_issue_ids.add(issue_id)
+        for dep_id in reversed(sorted(issue_direct_depends_on.get(issue_id, []), key=_deps_node_sort_key)):
+            if dep_id not in reachable_issue_ids:
+                stack.append(dep_id)
+
+    reachable_depends_on = {
+        issue_id: sorted(list(issue_direct_depends_on.get(issue_id, [])), key=_deps_node_sort_key)
+        for issue_id in sorted(reachable_issue_ids, key=_deps_node_sort_key)
+    }
+    _validate_deps_cycles(reachable_depends_on)
+
+    warnings: list[str] = []
+    for code in compile_warnings:
+        if code not in warnings:
+            warnings.append(code)
+
+    repo_root = specdock_dir.parent
+    issue_status_by_id: dict[str, str] = {}
+    if github:
+        issue_index: dict[int, dict[str, Any]] = {}
+        try:
+            issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+        except RuntimeError as e:
+            if "gh_fetch_failed" not in warnings:
+                warnings.append("gh_fetch_failed")
+            _warn(
+                "gh_fetch_failed: failed to fetch GitHub issue states; treating as unknown. "
+                f"Hint: check `gh auth status`, or re-run without --github. Details: {e}"
+            )
+            issue_index = {}
+        else:
+            linked_numbers = sorted(
+                {
+                    int(n.github_issue_number)
+                    for n in nodes.values()
+                    if n.type == "issue" and n.github_issue_number is not None
+                }
+            )
+            missing = [n for n in linked_numbers if n not in issue_index]
+            if missing:
+                if "gh_index_incomplete" not in warnings:
+                    warnings.append("gh_index_incomplete")
+                examples = ", ".join(str(n) for n in missing[:5])
+                suffix = "..." if len(missing) > 5 else ""
+                _warn(
+                    "gh_index_incomplete: gh issue list does not include some linked issues; treating missing as unknown. "
+                    f"missing={len(missing)} examples=[{examples}{suffix}] (hint: increase --gh-limit; current: {gh_limit})"
+                )
+
+        for n in nodes.values():
+            if n.type != "issue":
+                continue
+            status = "unknown"
+            if n.github_issue_number is not None:
+                gh = issue_index.get(n.github_issue_number)
+                if gh:
+                    status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+            issue_status_by_id[n.id] = status
+    else:
+        snapshot_statuses = _deps_check_snapshot_issue_statuses(specdock_dir)
+        for n in nodes.values():
+            if n.type != "issue":
+                continue
+            issue_status_by_id[n.id] = snapshot_statuses.get(n.id, "unknown")
+
+    derived_issue_deps = _derive_issue_deps_fields(issue_direct_depends_on, issue_status_by_id)
+
+    effective_set: set[str] = set()
+    for issue_id in target_issue_ids:
+        deps = derived_issue_deps.get(issue_id) or {}
+        for dep_id in deps.get("depends_on") or []:
+            if isinstance(dep_id, str):
+                effective_set.add(dep_id)
+
+    effective_depends_on = sorted(list(effective_set), key=_deps_node_sort_key)
+    blockers = list(effective_depends_on)
+
+    target_node = nodes.get(target_id)
+    if not target_node:
+        raise RuntimeError(f"Node not found: {target_id}")
+    if target_node.type == "issue":
+        target_ready = bool((derived_issue_deps.get(target_id) or {}).get("ready", False))
+    else:
+        target_ready = all(bool((derived_issue_deps.get(issue_id) or {}).get("ready", False)) for issue_id in target_issue_ids)
+
+    active_issue_id = _deps_check_active_issue_id(specdock_dir)
+    out_node_ids = sorted(set(target_issue_ids) | set(reachable_issue_ids), key=_deps_node_sort_key)
+    out_nodes: dict[str, Any] = {}
+    for issue_id in out_node_ids:
+        status = issue_status_by_id.get(issue_id, "unknown")
+        info = derived_issue_deps.get(issue_id) or {"ready": False}
+        ready = bool(info.get("ready", False))
+        if status == "done":
+            state = "done"
+        elif issue_id == active_issue_id:
+            state = "doing"
+        elif status == "unknown":
+            state = "unknown"
+        elif ready:
+            state = "ready"
+        else:
+            state = "blocked"
+        out_nodes[issue_id] = {"state": state, "ready": ready}
+
+    return {
+        "target": target_id,
+        "ready": target_ready,
+        "effective_depends_on": effective_depends_on,
+        "blockers": blockers,
+        "nodes": out_nodes,
+        "warnings": warnings,
+    }
+
+
+def _deps_evaluate(
+    specdock_dir: Path,
+    nodes: dict[str, _Node],
+    *,
+    target_id: str,
+    github: bool,
+    gh_limit: int,
+) -> dict[str, Any]:
+    """Evaluate deps readiness and node states for `target_id` (no printing; warnings may be emitted)."""
+    deps_map = _build_reachable_effective_deps_map(nodes, target_id)
+    _validate_deps_cycles(deps_map)
+    effective_depends_on = deps_map.get(target_id, [])
+
+    repo_root = specdock_dir.parent
+    issue_index: dict[int, dict[str, Any]] = {}
+    warnings: list[str] = []
+
+    def active_leaf_id() -> str | None:
+        current = _load_active_manifest_no_migrate(specdock_dir)
+        if not isinstance(current, dict):
+            return None
+        for key in ("issue", "epic", "initiative"):
+            node_id = _active_entry_id(current.get(key))
+            if node_id:
+                return node_id
+        return None
+
+    leaf_id = active_leaf_id()
+
+    if github:
+        try:
+            issue_index = _gh_issue_index(repo_root, limit=gh_limit)
+        except RuntimeError as e:
+            warnings.append("gh_fetch_failed")
+            _warn(
+                "gh_fetch_failed: failed to fetch GitHub issue states; treating as unknown. "
+                f"Hint: check `gh auth status`, or re-run without --github. Details: {e}"
+            )
+            issue_index = {}
+        else:
+            # Warn when relevant linked issues are not included in the gh index.
+            relevant_numbers: set[int] = set()
+            for node_id in deps_map.keys():
+                n = nodes.get(node_id)
+                if not n:
+                    continue
+                # Only issue GitHub states affect Done/ready evaluation.
+                if n.type == "issue" and n.github_issue_number is not None:
+                    relevant_numbers.add(int(n.github_issue_number))
+                if n.type == "initiative":
+                    for iss in nodes.values():
+                        if iss.type == "issue" and iss.initiative_id == n.id and iss.github_issue_number is not None:
+                            relevant_numbers.add(int(iss.github_issue_number))
+                if n.type == "epic":
+                    for iss in nodes.values():
+                        if iss.type == "issue" and iss.epic_id == n.id and iss.github_issue_number is not None:
+                            relevant_numbers.add(int(iss.github_issue_number))
+
+            missing = [n for n in sorted(relevant_numbers) if n not in issue_index]
+            if missing:
+                warnings.append("gh_index_incomplete")
+                examples = ", ".join(str(n) for n in missing[:5])
+                suffix = "..." if len(missing) > 5 else ""
+                _warn(
+                    "gh_index_incomplete: gh issue list does not include some linked issues; treating missing as unknown. "
+                    f"missing={len(missing)} examples=[{examples}{suffix}] (hint: increase --gh-limit; current: {gh_limit})"
+                )
+
+    index_issue_status_by_id: dict[str, str] = {}
+    if not github:
+        agent_dir = specdock_dir / _AGENT_DIRNAME
+        state_index: dict[str, Any] | None = None
+        for state_index_path in (agent_dir / "index-all.json", agent_dir / "index.json"):
+            if not state_index_path.is_file():
+                continue
+            try:
+                loaded = _load_json(state_index_path)
+            except RuntimeError:
+                continue
+            if isinstance(loaded, dict):
+                state_index = loaded
+                break
+
+        if isinstance(state_index, dict):
+            raw_nodes = state_index.get("nodes")
+            if isinstance(raw_nodes, dict):
+                for issue_id, item in raw_nodes.items():
+                    if not isinstance(issue_id, str) or not isinstance(item, dict):
+                        continue
+                    raw_status = item.get("status")
+                    if not isinstance(raw_status, str):
+                        continue
+                    status = raw_status.strip().lower()
+                    if status in ("done", "open", "unknown"):
+                        index_issue_status_by_id[issue_id] = status
+
+    # Map issue GitHub state (OPEN/CLOSED) to a minimal done/open/unknown status.
+    issue_status_by_id: dict[str, str] = {}
+    for n in nodes.values():
+        if n.type != "issue":
+            continue
+        status = "unknown"
+        if github and n.github_issue_number is not None:
+            gh = issue_index.get(n.github_issue_number)
+            if gh:
+                status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+        elif not github:
+            status = index_issue_status_by_id.get(n.id, "unknown")
+        issue_status_by_id[n.id] = status
+
+    # Progress for epic/initiative: derived from descendant issue statuses.
+    progress: dict[str, dict[str, int]] = {}
+    for n in nodes.values():
+        if n.type in ("initiative", "epic"):
+            progress[n.id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
+
+    for issue_id, status in issue_status_by_id.items():
+        issue = nodes.get(issue_id)
+        if not issue:
+            continue
+        for parent in filter(None, (issue.epic_id, issue.initiative_id)):
+            if parent not in progress:
+                continue
+            progress[parent]["total"] += 1
+            progress[parent][status] += 1
+
+    def is_done(node_id: str) -> bool:
+        n = nodes.get(node_id)
+        if not n:
+            return False
+
+        if n.type == "issue":
+            return issue_status_by_id.get(node_id) == "done"
+
+        if n.type in ("epic", "initiative"):
+            counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
+            return int(counts.get("open", 0)) == 0 and int(counts.get("unknown", 0)) == 0
+
+        return False
+
+    done_by_id: dict[str, bool] = {node_id: is_done(node_id) for node_id in deps_map.keys()}
+
+    blockers_by_id: dict[str, list[str]] = {}
+    ready_by_id: dict[str, bool] = {}
+    for node_id, eff in deps_map.items():
+        blockers_by_id[node_id] = [dep_id for dep_id in eff if not done_by_id.get(dep_id, False)]
+        ready_by_id[node_id] = len(blockers_by_id[node_id]) == 0
+
+    blockers = blockers_by_id.get(target_id, [])
+    ready = ready_by_id.get(target_id, len(blockers) == 0)
+
+    def base_state(node_id: str) -> str:
+        n = nodes.get(node_id)
+        if not n:
+            return "unknown"
+
+        if done_by_id.get(node_id, False):
+            return "done"
+
+        if n.type == "issue":
+            return "todo" if issue_status_by_id.get(node_id) == "open" else "unknown"
+
+        if n.type in ("epic", "initiative"):
+            counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
+            if int(counts.get("unknown", 0)) > 0:
+                return "unknown"
+            return "todo"
+
+        return "unknown"
+
+    def is_active_scope(node_id: str) -> bool:
+        if not leaf_id:
+            return False
+        if leaf_id == node_id:
+            return True
+        active_leaf = nodes.get(leaf_id)
+        node = nodes.get(node_id)
+        if not active_leaf or not node:
+            return False
+        if node.type == "epic":
+            return active_leaf.type == "issue" and active_leaf.epic_id == node.id
+        if node.type == "initiative":
+            return active_leaf.type in ("epic", "issue") and active_leaf.initiative_id == node.id
+        return False
+
+    def derived_state(node_id: str) -> str:
+        base = base_state(node_id)
+        if base == "done":
+            return "done"
+        if not ready_by_id.get(node_id, False):
+            return "blocked"
+        if is_active_scope(node_id):
+            return "doing"
+        if base == "todo":
+            return "todo"
+        return "unknown"
+
+    out_nodes: dict[str, Any] = {}
+    for node_id in sorted(deps_map.keys()):
+        item: dict[str, Any] = {"state": derived_state(node_id), "ready": ready_by_id.get(node_id, False)}
+        if node_id in progress:
+            item["progress"] = dict(progress[node_id])
+        out_nodes[node_id] = item
+
+    return {
+        "target": target_id,
+        "ready": ready,
+        "effective_depends_on": effective_depends_on,
+        "blockers": blockers,
+        "nodes": out_nodes,
+        "warnings": warnings,
+    }
+
+
+def _build_deps_state(
+    repo_root: Path,
+    nodes: dict[str, _Node],
+    *,
+    effective_deps_map: dict[str, list[str]],
+    github: bool,
+    issue_index: dict[int, dict[str, Any]],
+    active: dict[str, Any] | None,
+    warnings: list[str],
+) -> dict[str, Any]:
+    """Build `.agent/deps.json` state for all nodes."""
+
+    def sort_key(node_id: str) -> tuple[int, int, str]:
+        """Deterministic sort key for ids (GitHub ids first, then local)."""
+        _, is_local, num = _parse_id(node_id)
+        return (1 if is_local else 0, num, node_id)
+
+    def active_leaf_id(current: dict[str, Any] | None) -> str | None:
+        if not isinstance(current, dict):
+            return None
+        for key in ("issue", "epic", "initiative"):
+            node_id = _active_entry_id(current.get(key))
+            if node_id:
+                return node_id
+        return None
+
+    leaf_id = active_leaf_id(active)
+
+    # Map issue GitHub state (OPEN/CLOSED) to a minimal done/open/unknown status.
+    issue_status_by_id: dict[str, str] = {}
+    for n in nodes.values():
+        if n.type != "issue":
+            continue
+        status = "unknown"
+        if github and n.github_issue_number is not None:
+            gh = issue_index.get(n.github_issue_number)
+            if gh:
+                status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+        issue_status_by_id[n.id] = status
+
+    # Progress for epic/initiative: derived from descendant issue statuses.
+    progress: dict[str, dict[str, int]] = {}
+    for n in nodes.values():
+        if n.type in ("initiative", "epic"):
+            progress[n.id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
+
+    for issue_id, status in issue_status_by_id.items():
+        issue = nodes.get(issue_id)
+        if not issue:
+            continue
+        for parent in filter(None, (issue.epic_id, issue.initiative_id)):
+            if parent not in progress:
+                continue
+            progress[parent]["total"] += 1
+            progress[parent][status] += 1
+
+    def is_done(node_id: str) -> bool:
+        n = nodes.get(node_id)
+        if not n:
+            return False
+
+        if n.type == "issue":
+            return issue_status_by_id.get(node_id) == "done"
+
+        if n.type in ("epic", "initiative"):
+            counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
+            return int(counts.get("open", 0)) == 0 and int(counts.get("unknown", 0)) == 0
+
+        return False
+
+    done_by_id: dict[str, bool] = {node_id: is_done(node_id) for node_id in effective_deps_map.keys()}
+
+    blockers_by_id: dict[str, list[str]] = {}
+    ready_by_id: dict[str, bool] = {}
+    for node_id, eff in effective_deps_map.items():
+        blockers_by_id[node_id] = [dep_id for dep_id in eff if not done_by_id.get(dep_id, False)]
+        ready_by_id[node_id] = len(blockers_by_id[node_id]) == 0
+
+    def base_state(node_id: str) -> str:
+        n = nodes.get(node_id)
+        if not n:
+            return "unknown"
+
+        if done_by_id.get(node_id, False):
+            return "done"
+
+        if n.type == "issue":
+            return "todo" if issue_status_by_id.get(node_id) == "open" else "unknown"
+
+        if n.type in ("epic", "initiative"):
+            counts = progress.get(node_id) or {"total": 0, "done": 0, "open": 0, "unknown": 0}
+            if int(counts.get("unknown", 0)) > 0:
+                return "unknown"
+            return "todo"
+
+        return "unknown"
+
+    def is_active_scope(node_id: str) -> bool:
+        if not leaf_id:
+            return False
+        if leaf_id == node_id:
+            return True
+        active_leaf = nodes.get(leaf_id)
+        node = nodes.get(node_id)
+        if not active_leaf or not node:
+            return False
+        if node.type == "epic":
+            return active_leaf.type == "issue" and active_leaf.epic_id == node.id
+        if node.type == "initiative":
+            return active_leaf.type in ("epic", "issue") and active_leaf.initiative_id == node.id
+        return False
+
+    def derived_state(node_id: str) -> str:
+        base = base_state(node_id)
+        if base == "done":
+            return "done"
+        if not ready_by_id.get(node_id, False):
+            return "blocked"
+        if is_active_scope(node_id):
+            return "doing"
+        if base == "todo":
+            return "todo"
+        return "unknown"
+
+    out_nodes: dict[str, Any] = {}
+    for node_id in sorted(effective_deps_map.keys(), key=sort_key):
+        n = nodes.get(node_id)
+        if not n:
+            continue
+        out_nodes[node_id] = {
+            "type": n.type,
+            "id": n.id,
+            "title": n.title,
+            "path": n.path.relative_to(repo_root).as_posix(),
+            "state": derived_state(node_id),
+            "ready": ready_by_id.get(node_id, False),
+            "effective_depends_on": list(effective_deps_map.get(node_id, [])),
+            "blockers": list(blockers_by_id.get(node_id, [])),
+        }
+        if node_id in progress:
+            out_nodes[node_id]["progress"] = dict(progress[node_id])
+
+    return {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "active": active,
+        "warnings": list(warnings),
+        "nodes": out_nodes,
+    }
+
+
+def _render_deps_puml(deps_state: dict[str, Any], *, todo_only: bool) -> str:
+    """Render deps PlantUML (todo_only excludes done nodes/edges)."""
+    nodes = deps_state.get("nodes")
+    if not isinstance(nodes, dict):
+        raise RuntimeError("Invalid deps_state: nodes must be an object")
+
+    state_color = {
+        "done": "#D5E8D4",
+        "doing": "#DAE8FC",
+        "todo": "#FFF2CC",
+        "unknown": "#EEEEEE",
+        "blocked": "#F8CECC",
+    }
+
+    def sort_key(node_id: str) -> tuple[int, int, str]:
+        _, is_local, num = _parse_id(node_id)
+        return (1 if is_local else 0, num, node_id)
+
+    def alias(node_id: str) -> str:
+        safe = re.sub(r"[^0-9A-Za-z_]", "_", node_id)
+        if not safe or safe[0].isdigit():
+            safe = "_" + safe
+        return f"N{safe}"
+
+    include_ids: list[str] = []
+    for node_id, item in nodes.items():
+        if not isinstance(item, dict):
+            continue
+        state = str(item.get("state") or "unknown")
+        if todo_only and state == "done":
+            continue
+        include_ids.append(str(node_id))
+    include_set = set(include_ids)
+    include_ids.sort(key=sort_key)
+
+    lines: list[str] = []
+    lines.append("@startuml")
+    lines.append("left to right direction")
+    lines.append("skinparam shadowing false")
+    lines.append("")
+    lines.append("legend right")
+    lines.append("|= State |= Color |")
+    for state, color in (("done", "#D5E8D4"), ("doing", "#DAE8FC"), ("todo", "#FFF2CC"), ("unknown", "#EEEEEE"), ("blocked", "#F8CECC")):
+        lines.append(f"| {state} |<{color}> |")
+    lines.append("endlegend")
+    lines.append("")
+
+    # Nodes
+    for node_id in include_ids:
+        item = nodes.get(node_id)
+        if not isinstance(item, dict):
+            continue
+        state = str(item.get("state") or "unknown")
+        color = state_color.get(state, state_color["unknown"])
+        label = f"{node_id}\\n{state.capitalize()}"
+        if item.get("ready") is False:
+            label += "\\nready=false"
+        lines.append(f'rectangle "{label}" as {alias(node_id)} {color}')
+    lines.append("")
+
+    # Edges (node -> effective deps)
+    edges: list[tuple[str, str]] = []
+    for node_id in include_ids:
+        item = nodes.get(node_id)
+        if not isinstance(item, dict):
+            continue
+        eff = item.get("effective_depends_on") or []
+        if not isinstance(eff, list):
+            continue
+        for dep_id in eff:
+            dep = str(dep_id)
+            if dep in include_set:
+                edges.append((node_id, dep))
+    edges.sort(key=lambda x: (sort_key(x[0]), sort_key(x[1])))
+    for src, dst in edges:
+        lines.append(f"{alias(src)} --> {alias(dst)} : depends_on")
+
+    lines.append("@enduml")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _load_deps_json(path: Path) -> dict[str, Any]:
+    """Load and validate `deps.json` (missing file is treated as empty).
+
+    Schema (MVP):
+    - schema_version: 1
+    - depends_on: list[str|int]
+    """
+    if not path.exists():
+        return {"schema_version": 1, "depends_on": []}
+
+    data = _load_json(path)
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Invalid deps.json schema: {path}: expected a JSON object")
+
+    schema_version = data.get("schema_version")
+    if schema_version != 1:
+        raise RuntimeError(f"Invalid deps.json schema: {path}: schema_version must be 1")
+
+    depends_on = data.get("depends_on")
+    if not isinstance(depends_on, list):
+        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on must be a list")
+
+    for i, ref in enumerate(depends_on):
+        # Note: bool is a subclass of int in Python; reject explicitly.
+        if isinstance(ref, bool):
+            raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on[{i}] must be a string or int")
+        if isinstance(ref, (str, int)):
+            continue
+        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on[{i}] must be a string or int")
+
+    # Keep unknown keys for forward-compatibility, but return a stable shape.
+    return {"schema_version": 1, "depends_on": depends_on}
+
+
+def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> str:
+    """Resolve a dependency reference into a canonical node id.
+
+    Supported ref forms:
+    - node id string: `init-*` / `epic-*` / `iss-*` (width variants are canonicalized)
+    - GitHub issue number: int or digits-only string (must resolve to exactly one imported node)
+    """
+    if isinstance(ref, bool):
+        # Defensive: should be rejected by schema validation already.
+        raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
+
+    if isinstance(ref, int):
+        try:
+            node = _find_node_by_github_issue_number(nodes, issue_number=int(ref))
+        except RuntimeError as e:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+        return node.id
+
+    if isinstance(ref, str):
+        raw = ref.strip()
+        if not raw:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
+        if _NUM_RE.fullmatch(raw):
+            num = int(raw)
+            try:
+                node = _find_node_by_github_issue_number(nodes, issue_number=num)
+            except RuntimeError as e:
+                raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+            return node.id
+
+        try:
+            prefix, is_local, num = _parse_id(raw.lower())
+        except RuntimeError as e:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+
+        if prefix not in ("init", "epic", "iss"):
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported id prefix: {prefix}")
+
+        existing = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local)
+        if not existing:
+            raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): node not found")
+        return existing
+
+    raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported type: {type(ref).__name__}")
+
+
+def _resolved_direct_depends_on(nodes: dict[str, _Node], node_id: str) -> list[str]:
+    """Return resolved direct dependencies for `node_id` (stable order)."""
+    node = nodes.get(node_id)
+    if not node:
+        raise RuntimeError(f"Internal error: missing node: {node_id}")
+
+    deps_path = node.path / "deps.json"
+    deps = _load_deps_json(deps_path)
+    direct = [
+        _resolve_dep_ref(nodes, ref, src_path=deps_path)
+        for ref in (deps.get("depends_on") or [])
+    ]
+
+    def is_descendant(dep_id: str) -> bool:
+        current_id = dep_id
+        visited: set[str] = set()
+        while True:
+            current = nodes.get(current_id)
+            if not current or not current.parent_id:
+                return False
+            parent_id = current.parent_id
+            if parent_id == node_id:
+                return True
+            if parent_id in visited:
+                # Broken parent chains are validated elsewhere.
+                return False
+            visited.add(parent_id)
+            current_id = parent_id
+
+    for dep_id in direct:
+        if is_descendant(dep_id):
+            raise RuntimeError(f"Invalid dependency: {node_id} cannot depend on its descendant {dep_id} (in {deps_path})")
+
+    return sorted(set(direct))
+
+
+def _effective_depends_on(
+    nodes: dict[str, _Node],
+    node_id: str,
+    direct_map: dict[str, list[str]],
+) -> list[str]:
+    """Compute effective dependencies by merging parents (initiative/epic/issue rules)."""
+    node = nodes.get(node_id)
+    if not node:
+        raise RuntimeError(f"Node not found: {node_id}")
+
+    deps: set[str] = set(direct_map.get(node_id, []))
+
+    if node.type == "issue":
+        if not node.epic_id or not node.initiative_id:
+            raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {node_id}")
+        deps.update(direct_map.get(node.epic_id, []))
+        deps.update(direct_map.get(node.initiative_id, []))
+    elif node.type == "epic":
+        if not node.initiative_id:
+            raise RuntimeError(f"Epic meta missing initiative_id: {node_id}")
+        deps.update(direct_map.get(node.initiative_id, []))
+    elif node.type == "initiative":
+        # No parent merge.
+        pass
+    else:
+        raise RuntimeError(f"Unsupported node type for deps check: {node.type} ({node_id})")
+
+    return sorted(deps)
+
+
+def _build_effective_deps_map_all(nodes: dict[str, _Node]) -> dict[str, list[str]]:
+    """Build an effective dependency map for all nodes (sync=global scope)."""
+    dep_node_ids = sorted(
+        node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")
+    )
+    direct_map: dict[str, list[str]] = {}
+    for node_id in dep_node_ids:
+        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+
+    effective_map: dict[str, list[str]] = {}
+    for node_id in dep_node_ids:
+        effective_map[node_id] = _effective_depends_on(nodes, node_id, direct_map)
+    return effective_map
+
+
+def _issue_ids_for_dep_node(nodes: dict[str, _Node], node_id: str) -> list[str]:
+    """Expand one dependency node id into canonical issue ids."""
+    node = nodes.get(node_id)
+    if not node:
+        raise RuntimeError(f"Node not found: {node_id}")
+
+    if node.type == "issue":
+        return [node.id]
+    if node.type == "epic":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.epic_id == node.id],
+            key=_deps_node_sort_key,
+        )
+    if node.type == "initiative":
+        return sorted(
+            [n.id for n in nodes.values() if n.type == "issue" and n.initiative_id == node.id],
+            key=_deps_node_sort_key,
+        )
+    raise RuntimeError(f"Unsupported dependency node type: {node.type} ({node_id})")
+
+
+def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[str, list[str]], list[str]]:
+    """Compile deps shorthand into canonical issue->issue direct dependencies."""
+    dep_node_ids = sorted(
+        [node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")],
+        key=_deps_node_sort_key,
+    )
+    issue_ids = sorted([node_id for node_id, node in nodes.items() if node.type == "issue"], key=_deps_node_sort_key)
+    issue_depends_on: dict[str, set[str]] = {issue_id: set() for issue_id in issue_ids}
+
+    warning_codes: list[str] = []
+    warned_empty_refs: set[tuple[str, str]] = set()
+
+    for src_id in dep_node_ids:
+        src_node = nodes[src_id]
+        src_issue_ids = _issue_ids_for_dep_node(nodes, src_id)
+        if not src_issue_ids:
+            continue
+
+        deps_path = src_node.path / "deps.json"
+        direct_dep_node_ids = _resolved_direct_depends_on(nodes, src_id)
+
+        for dep_node_id in direct_dep_node_ids:
+            dep_issue_ids = _issue_ids_for_dep_node(nodes, dep_node_id)
+            if not dep_issue_ids:
+                key = (src_id, dep_node_id)
+                if key not in warned_empty_refs:
+                    warned_empty_refs.add(key)
+                    if "deps_ref_expanded_to_empty" not in warning_codes:
+                        warning_codes.append("deps_ref_expanded_to_empty")
+                    _warn(
+                        "deps_ref_expanded_to_empty: "
+                        f"{src_id} depends_on={dep_node_id} expanded_to=0 (in {deps_path})"
+                    )
+                continue
+
+            for src_issue_id in src_issue_ids:
+                for dep_issue_id in dep_issue_ids:
+                    if dep_issue_id == src_issue_id:
+                        raise RuntimeError(
+                            "Invalid dependency: self edge produced: "
+                            f"{src_issue_id} depends_on={dep_node_id} (in {deps_path})"
+                        )
+                    issue_depends_on[src_issue_id].add(dep_issue_id)
+
+    compiled = {
+        issue_id: sorted(list(issue_depends_on.get(issue_id, set())), key=_deps_node_sort_key)
+        for issue_id in issue_ids
+    }
+    return compiled, warning_codes
+
+
+def _issue_depends_on_edges(issue_depends_on: dict[str, list[str]]) -> list[dict[str, str]]:
+    """Render canonical issue direct dependencies into edge objects."""
+    edges: list[dict[str, str]] = []
+    for src_id in sorted(issue_depends_on.keys(), key=_deps_node_sort_key):
+        for dst_id in sorted(issue_depends_on.get(src_id, []), key=_deps_node_sort_key):
+            edges.append({"from": src_id, "to": dst_id, "kind": "depends_on"})
+    return edges
+
+
+def _derive_issue_deps_fields(
+    issue_direct_depends_on: dict[str, list[str]],
+    issue_status_by_id: dict[str, str],
+    *,
+    blockers_top_limit: int = _BLOCKERS_TOP_LIMIT,
+) -> dict[str, dict[str, Any]]:
+    """Derive per-issue deps fields for index/tree issue nodes."""
+
+    def closure_excluding_done(start_issue_id: str) -> list[str]:
+        seen: set[str] = set()
+        stack = list(reversed(sorted(issue_direct_depends_on.get(start_issue_id, []), key=_deps_node_sort_key)))
+        while stack:
+            dep_id = stack.pop()
+            if dep_id in seen:
+                continue
+
+            dep_status = issue_status_by_id.get(dep_id, "unknown")
+            if dep_status == "done":
+                continue
+
+            seen.add(dep_id)
+            next_ids = sorted(issue_direct_depends_on.get(dep_id, []), key=_deps_node_sort_key)
+            for next_id in reversed(next_ids):
+                if next_id not in seen:
+                    stack.append(next_id)
+
+        return sorted(seen, key=_deps_node_sort_key)
+
+    derived: dict[str, dict[str, Any]] = {}
+    for issue_id in sorted(issue_status_by_id.keys(), key=_deps_node_sort_key):
+        status = issue_status_by_id.get(issue_id, "unknown")
+        if status == "done":
+            depends_on: list[str] = []
+            ready = True
+        else:
+            depends_on = closure_excluding_done(issue_id)
+            ready = False if status == "unknown" else len(depends_on) == 0
+
+        derived[issue_id] = {
+            "ready": ready,
+            "depends_on": depends_on,
+            "blockers_top": depends_on[:blockers_top_limit],
+        }
+
+    return derived
+
+
+def _build_deps_issues_placeholder_state(*, error: str | None) -> dict[str, Any]:
+    """Build placeholder `.agent/deps-issues.json` when deps are disabled."""
+    err = _deps_disabled_error_text(error)
+    return {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+        "deps": {"valid": False, "error": err},
+        "nodes": {},
+        "edges": [],
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+
+def _build_deps_issues_state(
+    index_nodes: dict[str, Any],
+    deps_issue_edges: list[dict[str, str]],
+    *,
+    active: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Build todo-only issue projection for `.agent/deps-issues.json`."""
+    active_issue_id = _active_entry_id(active.get("issue")) if isinstance(active, dict) else None
+
+    issue_nodes: dict[str, Any] = {}
+    for node_id in sorted(index_nodes.keys(), key=_deps_node_sort_key):
+        item = index_nodes.get(node_id)
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "issue":
+            continue
+
+        status = str(item.get("status") or "unknown")
+        if status == "done":
+            continue
+
+        deps = item.get("deps")
+        ready = False
+        depends_on: list[str] = []
+        if isinstance(deps, dict):
+            raw_ready = deps.get("ready")
+            if isinstance(raw_ready, bool):
+                ready = raw_ready
+            raw_depends_on = deps.get("depends_on")
+            if isinstance(raw_depends_on, list):
+                depends_on = [str(dep_id) for dep_id in raw_depends_on if isinstance(dep_id, str)]
+
+        if active_issue_id == node_id:
+            state = "doing"
+        elif status == "unknown":
+            state = "unknown"
+        elif ready:
+            state = "ready"
+        else:
+            state = "blocked"
+
+        issue_nodes[node_id] = {
+            "id": node_id,
+            "title": item.get("title"),
+            "status": status,
+            "ready": ready,
+            "depends_on": depends_on,
+            "state": state,
+        }
+
+    issue_id_set = set(issue_nodes.keys())
+    issue_edges: list[dict[str, str]] = []
+    for edge in deps_issue_edges:
+        if not isinstance(edge, dict):
+            continue
+        from_id = edge.get("from")
+        to_id = edge.get("to")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            continue
+        if from_id not in issue_id_set or to_id not in issue_id_set:
+            continue
+        out_edge: dict[str, str] = {"from": from_id, "to": to_id}
+        kind = edge.get("kind")
+        if isinstance(kind, str) and kind:
+            out_edge["kind"] = kind
+        issue_edges.append(out_edge)
+
+    issue_edges.sort(key=lambda x: (_deps_node_sort_key(x["from"]), _deps_node_sort_key(x["to"])))
+
+    return {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+        "deps": {"valid": True, "error": None},
+        "nodes": issue_nodes,
+        "edges": issue_edges,
+        "edge_direction": "depends_on (dependent -> prerequisite)",
+    }
+
+
+def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) -> dict[str, list[str]]:
+    """Build an effective dependency map for the reachable subgraph from `start_id` (deps check scope)."""
+    if start_id not in nodes:
+        raise RuntimeError(f"Node not found: {start_id}")
+
+    direct_map: dict[str, list[str]] = {}
+    effective_map: dict[str, list[str]] = {}
+
+    def ensure_direct(node_id: str) -> None:
+        if node_id in direct_map:
+            return
+        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+
+    def get_effective(node_id: str) -> list[str]:
+        cached = effective_map.get(node_id)
+        if cached is not None:
+            return cached
+
+        node = nodes.get(node_id)
+        if not node or node.type not in ("initiative", "epic", "issue"):
+            raise RuntimeError(f"Unsupported node type for deps check: {node.type if node else '(missing)'} ({node_id})")
+
+        ensure_direct(node_id)
+        if node.type == "issue":
+            if not node.epic_id or not node.initiative_id:
+                raise RuntimeError(f"Issue meta missing epic_id/initiative_id: {node_id}")
+            ensure_direct(node.epic_id)
+            ensure_direct(node.initiative_id)
+        elif node.type == "epic":
+            if not node.initiative_id:
+                raise RuntimeError(f"Epic meta missing initiative_id: {node_id}")
+            ensure_direct(node.initiative_id)
+
+        eff = _effective_depends_on(nodes, node_id, direct_map)
+        effective_map[node_id] = eff
+        return eff
+
+    reachable: set[str] = set()
+    stack: list[str] = [start_id]
+    while stack:
+        node_id = stack.pop()
+        if node_id in reachable:
+            continue
+        reachable.add(node_id)
+        for dep_id in get_effective(node_id):
+            stack.append(dep_id)
+
+    return {node_id: get_effective(node_id) for node_id in sorted(reachable)}
+
+
+def _validate_deps_cycles(deps_map: dict[str, list[str]]) -> None:
+    """Detect dependency cycles and raise with at least one `A -> B -> ... -> A` path."""
+    visited: set[str] = set()
+    in_stack: set[str] = set()
+    path: list[str] = []
+
+    # Iterative DFS to avoid `RecursionError` on deep dependency chains.
+    for start_id in sorted(deps_map.keys()):
+        if start_id in visited:
+            continue
+
+        stack: list[tuple[str, int]] = [(start_id, 0)]
+        while stack:
+            node_id, next_index = stack[-1]
+
+            if node_id not in visited:
+                visited.add(node_id)
+                in_stack.add(node_id)
+                path.append(node_id)
+
+            deps = deps_map.get(node_id, [])
+            if next_index >= len(deps):
+                stack.pop()
+                in_stack.remove(node_id)
+                path.pop()
+                continue
+
+            dep_id = deps[next_index]
+            stack[-1] = (node_id, next_index + 1)
+
+            if dep_id in in_stack:
+                try:
+                    start_index = path.index(dep_id)
+                except ValueError:
+                    start_index = 0
+                cycle = path[start_index:] + [dep_id]
+                raise RuntimeError("Dependency cycle detected: " + " -> ".join(cycle))
+
+            if dep_id not in visited:
+                stack.append((dep_id, 0))
+
+
+def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
+    """Validate basic structural integrity for a pre-scanned node map.
+
+    This is used by:
+    - `validate` (full validation command)
+    - `sync` preflight (to avoid generating index/tree from an invalid tree)
+    """
+    numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
+    for node_id in nodes.keys():
+        prefix, is_local, num = _parse_id(str(node_id))
+        numeric_ids.setdefault((prefix, is_local, num), []).append(str(node_id))
+
+    for (prefix, is_local, num), ids in sorted(numeric_ids.items()):
+        uniq = sorted(set(ids))
+        if len(uniq) > 1:
+            marker = "-local" if is_local else ""
+            raise RuntimeError(
+                f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
+            )
+
+    _validate_github_issue_numbers_unique(nodes, repo_root=repo_root)
+
+    for node_id, node in nodes.items():
+        _validate_lowercase(node_id, field="id")
+        _parse_id(node_id)
+        if not node.title:
+            raise RuntimeError(f"Missing title in meta.json: {node.path / 'meta.json'}")
+        if not node.slug:
+            raise RuntimeError(f"Missing slug in meta.json: {node.path / 'meta.json'}")
+        _validate_slug(node.slug, field="slug")
+
+        if node.type == "initiative":
+            if node.parent_id is not None:
+                raise RuntimeError(f"initiative parent_id must be null: {node.id}")
+            if node.initiative_id is not None or node.epic_id is not None:
+                raise RuntimeError(f"initiative must not have initiative_id/epic_id: {node.id}")
+            continue
+
+        if node.type == "epic":
+            if not node.parent_id:
+                raise RuntimeError(f"epic missing parent_id: {node.path / 'meta.json'}")
+            if not node.initiative_id:
+                raise RuntimeError(f"epic missing initiative_id: {node.path / 'meta.json'}")
+            if node.parent_id != node.initiative_id:
+                raise RuntimeError(
+                    f"epic parent_id mismatch: {node.id} parent_id={node.parent_id} initiative_id={node.initiative_id}"
+                )
+            parent = nodes.get(node.parent_id)
+            if not parent or parent.type != "initiative":
+                raise RuntimeError(f"epic points to invalid parent initiative: {node.parent_id}")
+            continue
+
+        if node.type == "issue":
+            if not node.parent_id:
+                raise RuntimeError(f"issue missing parent_id: {node.path / 'meta.json'}")
+            if not node.initiative_id or not node.epic_id:
+                raise RuntimeError(f"issue missing initiative_id/epic_id: {node.path / 'meta.json'}")
+            if node.parent_id != node.epic_id:
+                raise RuntimeError(
+                    f"issue parent_id mismatch: {node.id} parent_id={node.parent_id} epic_id={node.epic_id}"
+                )
+            epic = nodes.get(node.epic_id)
+            if not epic or epic.type != "epic":
+                raise RuntimeError(f"issue points to invalid epic_id: {node.epic_id}")
+            initiative = nodes.get(node.initiative_id)
+            if not initiative or initiative.type != "initiative":
+                raise RuntimeError(f"issue points to invalid initiative_id: {node.initiative_id}")
+            if epic.initiative_id and epic.initiative_id != node.initiative_id:
+                raise RuntimeError(
+                    f"issue initiative_id mismatch: {node.id} initiative_id={node.initiative_id} but epic {epic.id} initiative_id={epic.initiative_id}"
+                )
+            continue
+
+        raise RuntimeError(f"Unknown node type: {node.type} ({node.path / 'meta.json'})")
+
+
+def _validate(specdock_dir: Path) -> None:
+    """Validate basic structural integrity of the tree based on `meta.json`."""
+    nodes = _scan_nodes(specdock_dir)
+    if not nodes:
+        raise RuntimeError("No nodes found.")
+
+    _validate_nodes(nodes, repo_root=specdock_dir.parent)
+    print(f"spec-dock: ok (validate) nodes={len(nodes)}")
+
+
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    """Parse CLI arguments for the repo-local runtime script."""
+    class _Parser(argparse.ArgumentParser):
+        def error(self, message: str) -> None:  # noqa: A003 - argparse API
+            legacy_flags = ("--initiative", "--epic", "--issue", "--github-issue")
+            hint = ""
+            if "unrecognized arguments" in message and any(f in message for f in legacy_flags):
+                hint = (
+                    "\n\nHint:\n"
+                    "  'active set' is now: active set <target>\n"
+                    "  - target: GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-00123)\n"
+                    "\n"
+                    "Examples:\n"
+                    "  spec-dock/scripts/spec-dock active set 123\n"
+                    "  spec-dock/scripts/spec-dock active set iss-00123\n"
+                    "  spec-dock/scripts/spec-dock active set iss-local-00001\n"
+                )
+            super().error(message + hint)
+
+    parser = _Parser(prog="spec-dock/scripts/spec-dock")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/adr)")
+    new_sub = p_new.add_subparsers(dest="new_kind", required=True)
+
+    p_new_init = new_sub.add_parser("initiative", help="Create a new initiative")
+    p_new_init.add_argument("--title", required=True)
+    p_new_init.add_argument("--slug")
+    p_new_init.add_argument("--id")
+    gh_init = p_new_init.add_mutually_exclusive_group()
+    gh_init.add_argument("--create-github-issue", action="store_true", help="Create and link a new GitHub issue (id becomes init-NNNN)")
+    gh_init.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes init-NNNN)")
+    gh_init.add_argument("--no-github", action="store_true", help="Explicit local-only mode (default; id becomes init-local-NNNN)")
+
+    p_new_epic = new_sub.add_parser("epic", help="Create a new epic under an initiative")
+    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. 123 / init-00123 / init-local-00001)")
+    p_new_epic.add_argument("--title", required=True)
+    p_new_epic.add_argument("--slug")
+    p_new_epic.add_argument("--id")
+    gh_epic = p_new_epic.add_mutually_exclusive_group()
+    gh_epic.add_argument("--create-github-issue", action="store_true", help="Create and link a new GitHub issue (id becomes epic-NNNN)")
+    gh_epic.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes epic-NNNN)")
+    gh_epic.add_argument("--no-github", action="store_true", help="Explicit local-only mode (default; id becomes epic-local-NNNN)")
+
+    p_new_issue = new_sub.add_parser("issue", help="Create a new issue under an epic")
+    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001)")
+    p_new_issue.add_argument("--title", required=True)
+    p_new_issue.add_argument("--slug")
+    p_new_issue.add_argument("--id")
+    gh_issue = p_new_issue.add_mutually_exclusive_group()
+    gh_issue.add_argument(
+        "--github-issue",
+        type=int,
+        help="Existing GitHub issue number to link (id becomes iss-NNNN)",
+    )
+    gh_issue.add_argument(
+        "--no-github",
+        action="store_true",
+        help="Do not use GitHub (default is to create a new GitHub issue; id becomes iss-local-NNNN)",
+    )
+
+    p_new_adr = new_sub.add_parser("adr", help="Create a new ADR under a scope (initiative/epic/issue)")
+    scope = p_new_adr.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-00123 / init-local-00001)")
+    scope.add_argument("--epic", help="Scope epic (e.g. 123 / epic-00123 / epic-local-00001)")
+    scope.add_argument("--issue", help="Scope issue (e.g. 123 / iss-00123 / iss-local-00001)")
+    p_new_adr.add_argument("--title", required=True)
+    p_new_adr.add_argument("--slug")
+    p_new_adr.add_argument("--id")
+
+    p_active = sub.add_parser("active", help="Manage the active pointers")
+    active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
+
+    p_active_set = active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)")
+    p_active_set.add_argument(
+        "target",
+        help="GitHub issue number (digits only: 123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
+    )
+    checkout = p_active_set.add_mutually_exclusive_group()
+    checkout.add_argument(
+        "--checkout",
+        action="store_true",
+        help="After setting active, create/switch to the desired branch (<id>-<slug>, fallback: <id>).",
+    )
+    checkout.add_argument(
+        "--no-checkout",
+        dest="checkout",
+        action="store_false",
+        help="Set active only and skip branch operations (default).",
+    )
+    p_active_set.set_defaults(checkout=False)
+    p_active_set.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI (deps guard)")
+    p_active_set.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
+    p_active_set.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Ignore deps guard and set active anyway (prints blockers as warnings)",
+    )
+
+    active_sub.add_parser("show", help="Show current active pointers")
+    active_sub.add_parser("clear", help="Clear active pointers")
+
+    p_sync = sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)")
+    p_sync.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
+    p_sync.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
+    p_sync.add_argument(
+        "--no-update-active",
+        action="store_true",
+        help="Do not update active pointers from current git branch (index/tree generation only)",
+    )
+    p_sync.add_argument(
+        "--force",
+        action="store_true",
+        help="Continue even if preflight validation fails (writes index/tree; disables active auto update)",
+    )
+
+    p_deps = sub.add_parser("deps", help="Check and visualize issue/epic/initiative dependencies")
+    deps_sub = p_deps.add_subparsers(dest="deps_cmd", required=True)
+
+    p_deps_check = deps_sub.add_parser("check", help="Check whether a target is ready based on dependencies")
+    p_deps_check.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
+    )
+    p_deps_check.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
+    p_deps_check.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
+    p_deps_check.add_argument("--json", action="store_true", help="Output JSON to stdout only")
+
+    p_import = sub.add_parser("import", help="Import an existing GitHub issue as a spec node")
+    import_sub = p_import.add_subparsers(dest="import_kind", required=True)
+
+    p_import_init = import_sub.add_parser("initiative", help="Import a GitHub issue as an initiative")
+    p_import_init.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+    )
+    p_import_init.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
+    p_import_init.add_argument("--slug")
+
+    p_import_epic = import_sub.add_parser("epic", help="Import a GitHub issue as an epic")
+    p_import_epic.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+    )
+    p_import_epic.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
+    p_import_epic.add_argument("--slug")
+    p_import_epic.add_argument(
+        "--initiative",
+        help="Parent initiative (e.g. 123 / init-00123 / init-local-00001). Omit to resolve from active.",
+    )
+
+    p_import_issue = import_sub.add_parser("issue", help="Import a GitHub issue as an issue")
+    p_import_issue.add_argument(
+        "target",
+        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+    )
+    p_import_issue.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
+    p_import_issue.add_argument("--slug")
+    p_import_issue.add_argument(
+        "--epic",
+        help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001). Omit to resolve from active.",
+    )
+
+    sub.add_parser("validate", help="Validate the spec tree structure")
+
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Entry point. Returns a process exit code (0=success)."""
+    ns = _parse_args(sys.argv[1:] if argv is None else argv)
+
+    exit_code: int | None = None
+    try:
+        specdock_dir = _find_specdock_dir()
+
+        if ns.command == "new":
+            if ns.new_kind == "initiative":
+                _new_initiative(
+                    specdock_dir,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    node_id=getattr(ns, "id", None),
+                    github_issue_number=getattr(ns, "github_issue", None),
+                    create_github_issue=bool(getattr(ns, "create_github_issue", False)),
+                    no_github=bool(getattr(ns, "no_github", False)),
+                )
+            elif ns.new_kind == "epic":
+                _new_epic(
+                    specdock_dir,
+                    initiative_id=str(ns.initiative),
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    node_id=getattr(ns, "id", None),
+                    github_issue_number=getattr(ns, "github_issue", None),
+                    create_github_issue=bool(getattr(ns, "create_github_issue", False)),
+                    no_github=bool(getattr(ns, "no_github", False)),
+                )
+            elif ns.new_kind == "issue":
+                _new_issue(
+                    specdock_dir,
+                    epic_id=str(ns.epic),
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    node_id=getattr(ns, "id", None),
+                    github_issue_number=getattr(ns, "github_issue", None),
+                    no_github=bool(getattr(ns, "no_github", False)),
+                )
+            elif ns.new_kind == "adr":
+                # The scope flag determines the prefix, so we can accept shorthand numeric ids.
+                scope_id = getattr(ns, "initiative", None) or getattr(ns, "epic", None) or getattr(ns, "issue", None)
+                scope_prefix = "init" if getattr(ns, "initiative", None) is not None else ("epic" if getattr(ns, "epic", None) is not None else "iss")
+                _new_adr(
+                    specdock_dir,
+                    scope_id=str(scope_id),
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    node_id=getattr(ns, "id", None),
+                    scope_prefix=scope_prefix,
+                )
+            else:
+                raise RuntimeError(f"Unknown new kind: {ns.new_kind}")
+        elif ns.command == "active":
+            if ns.active_cmd == "set":
+                _active_set(
+                    specdock_dir,
+                    target=str(ns.target),
+                    checkout=bool(getattr(ns, "checkout", False)),
+                    force=bool(getattr(ns, "force", False)),
+                    github=bool(getattr(ns, "github", False)),
+                    gh_limit=int(getattr(ns, "gh_limit", 10000)),
+                )
+            elif ns.active_cmd == "show":
+                _active_show(specdock_dir)
+            elif ns.active_cmd == "clear":
+                _active_clear(specdock_dir)
+            else:
+                raise RuntimeError(f"Unknown active command: {ns.active_cmd}")
+        elif ns.command == "deps":
+            if ns.deps_cmd == "check":
+                exit_code = _deps_check(
+                    specdock_dir,
+                    target=str(ns.target),
+                    github=bool(getattr(ns, "github", False)),
+                    gh_limit=int(getattr(ns, "gh_limit", 10000)),
+                    json_output=bool(getattr(ns, "json", False)),
+                )
+            else:
+                raise RuntimeError(f"Unknown deps command: {ns.deps_cmd}")
+        elif ns.command == "sync":
+            _sync(
+                specdock_dir,
+                github=bool(ns.github),
+                gh_limit=int(ns.gh_limit),
+                update_active=not bool(getattr(ns, "no_update_active", False)),
+                force=bool(getattr(ns, "force", False)),
+            )
+        elif ns.command == "import":
+            issue_number = _parse_github_issue_target(str(ns.target))
+            if ns.import_kind == "initiative":
+                _import_initiative(
+                    specdock_dir,
+                    issue_number=issue_number,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                )
+            elif ns.import_kind == "epic":
+                _import_epic(
+                    specdock_dir,
+                    issue_number=issue_number,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    initiative_id=getattr(ns, "initiative", None),
+                )
+            elif ns.import_kind == "issue":
+                _import_issue(
+                    specdock_dir,
+                    issue_number=issue_number,
+                    title=str(ns.title),
+                    slug=getattr(ns, "slug", None),
+                    epic_id=getattr(ns, "epic", None),
+                )
+            else:
+                raise RuntimeError(f"Unknown import kind: {ns.import_kind}")
+        elif ns.command == "validate":
+            _validate(specdock_dir)
+        else:
+            raise RuntimeError(f"Unknown command: {ns.command}")
+    except Exception as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+
+    return int(exit_code) if exit_code is not None else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

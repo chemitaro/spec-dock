@@ -9,58 +9,94 @@
 関連:
 - 入口: [README.md](README.md)
 - 総合: [guide.md](guide.md)
+- deps: [reference_deps.md](reference_deps.md)
 
-## 1. 結論（何をしているか）
+## 1. 結論（v2の生成物）
 
-`sync` はローカル SSOT（`spec-dock/initiatives/**/meta.json`）を走査し、以下を生成します（git 管理しない）:
+`sync` はローカル SSOT（`spec-dock/initiatives/**/meta.json`）を走査し、v2 の観測点を生成します（git 管理しない）。
 
-- `spec-dock/.agent/index.json`
-- `spec-dock/.agent/tree.json`
+`.agent/`（機械向け）:
+- `spec-dock/.agent/index-all.json`（全ノード）
+- `spec-dock/.agent/tree-all.json`（全ノードのツリー）
+- `spec-dock/.agent/index.json`（todo projection）
+- `spec-dock/.agent/tree.json`（todo projection のツリー）
+- `spec-dock/.agent/deps-issues.json`（todo issue-only 依存グラフ）
 
-加えて、デフォルトでは **現在ブランチ名から active を推定して更新**します（best-effort）。
+`spec-dock/` 直下（人間向け）:
+- `spec-dock/tree-all.puml`（Readyボード, all）
+- `spec-dock/tree.puml`（Readyボード, todo）
+- `spec-dock/deps-issues.puml`（todo issue-only 依存図）
+- `spec-dock/dashboard.md`（todo要約）
 
-- `sync --no-update-active`: ブランチ名からの active 更新をしません（生成物のみ）
-- `sync` は実行前に preflight validate を行い、致命的不整合がある場合は失敗します
-  - `sync --force`: validate NG でも警告して継続します（デバッグ用途）
+legacy v1 生成物（廃止）:
+- `spec-dock/.agent/deps.json`
+- `spec-dock/.agent/deps.puml`
+- `spec-dock/.agent/deps.todo.puml`
 
-### preflight validate で弾かれる代表例
+上記3つは `sync` 実行時に常に削除されます（stale防止）。
 
-- `github.issue_number` の重複（同じ Issue番号が複数 node にリンクされている）
-  - 復旧手順は [reference_github.md](reference_github.md) の「github.issue_number のリンクと一意性」を参照してください
+## 2. all / todo projection
 
-### active 推定の例（2〜3例）
+`*-all.json` は全件を保持します。
 
-`sync` は「ブランチ名に含まれる id / GitHub Issue番号」を手がかりに、仕様ツリー内のノードへ **一意に対応**する場合のみ active を更新します（曖昧なら更新しません）。
+`index.json` / `tree.json` は todo projection です:
+- `status==done` の issue を除外
+- todo issue が0件の epic / initiative を除外（empty枝除外）
+- `deps.issue_edges` は端点が todo issue の edge のみ保持
+- `index.json` と `tree.json` のノード集合は一致
 
-例:
-- `feature/iss-00123-add-refresh` → `iss-00123` が存在すれば、その issue を active に更新
-- `feature/issue-123-add-refresh` / `feature/gh-123-add-refresh` → `github.issue_number=123` のノードが 1つなら active を更新
-- `feature/123-add-refresh` → 末尾が `123-...` なら GitHub Issue番号候補として扱い、1つに解決できれば更新
+## 3. deps情報の埋め込み
 
-補足:
-- `main` / `develop` など「手がかりが無い」ブランチでは、active は変更されません（静かに維持されます）
-- この挙動を避けたい場合は `sync --no-update-active` を使ってください
+`index-*.json` / `tree-*.json` のトップレベルには `deps` が入り、少なくとも以下を持ちます:
+- `valid: bool`
+- `error: string | null`
+- `issue_edges: [{from,to,kind?}]`
+- `edge_direction: "depends_on (dependent -> prerequisite)"`
 
-## 2. `--github`（GitHub enrich）
+issueノードには `deps`（`ready`, `depends_on`, `blockers_top`）を統合します。
 
-`sync --github` を付けた場合のみ、`gh issue list ...` を用いて GitHub 側の状態を取得し、ローカル集計に補強します。
+## 4. `sync --force`（deps preflight失敗時）
 
-- 読み取りのみ（GitHub への更新はしません）
-- `github.issue_number` が無いノードは enrich できません（`unknown` のまま）
+deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schema不正など）がある場合:
+- 通常 `sync`: 失敗（非0）
+- `sync --force`: index/tree 更新は継続し、`deps_preflight_failed` を warn + warnings に出力
 
-## 3. 入出力（まとめ）
+`--force` で deps 無効化時の挙動:
+- `index-*.json` / `tree-*.json`: `deps.valid=false`, `deps.issue_edges=[]`, `deps.error` を設定
+- issueノードの `deps` は `null`（未計算扱い）
+- `spec-dock/.agent/deps-issues.json` は placeholder（`deps.valid=false`, `nodes={}`, `edges=[]`）で上書き
+- `spec-dock/deps-issues.puml`, `spec-dock/tree*.puml`, `spec-dock/dashboard.md` も placeholder内容で上書き
+- `--force` はデバッグ/リカバリ用途のため、depsの成否に関わらず active auto-update を無効化（`--no-update-active` 相当）
 
-入力:
-- ローカル: `spec-dock/initiatives/**/meta.json`（常に）
-- active SSOT: `spec-dock/.agent/active.json`（存在すれば）
-- 任意: GitHub（`--github` の場合のみ）
+削除ではなく上書きにすることで、stale 参照を防ぎます。
+`--force` 実行後に active を更新したい場合は、`./spec active set <target>` を使って明示更新してください。
 
-出力:
-- `spec-dock/.agent/index.json`（フラット索引 + progress）
-- `spec-dock/.agent/tree.json`（ツリー表示）
-- `spec-dock/active/**`（active pointer + `context-pack.md`、ただし `--no-update-active` では更新しない）
+## 5. `--github` とスナップショット
 
-## 4. PlantUML（処理フロー）
+`sync --github`:
+- `gh issue list` の読み取り結果で issue status を enrich（OPEN/CLOSED -> open/done）
+
+`sync`（`--github` なし）:
+- GitHubへアクセスしない
+- 既存スナップショットを使う場合は `index-all.json` を優先し、無ければ `index.json` へ fallback
+- どちらも無ければ issue status は `unknown`
+
+## 6. active更新
+
+デフォルトでは、ブランチ名から active を best-effort 推定して更新します。
+
+- `sync --no-update-active`: active を更新しない
+- `sync --force`: `--no-update-active` 相当として扱い、active auto-update を行わない
+- `main` / `develop` など手がかりが無いブランチでは active は維持
+
+## 7. 矢印方向（JSONとPlantUML）
+
+- JSON（`deps.issue_edges`）: `depends_on` 方向（`dependent -> prerequisite`）
+- `deps-issues.puml`: blocks 表示（`prerequisite -> dependent`）
+
+同じ依存を、機械向けと可視化向けで向きを分けて表現しています。
+
+## 8. PlantUML（処理フロー）
 
 ```plantuml
 @startuml
@@ -72,12 +108,14 @@ participant "spec-dock\n(runtime script)" as Script
 participant "Local FS\n(meta.json)" as FS
 participant "git\n(branch)" as Git
 participant "gh\n(GitHub CLI)" as GH
-database ".agent/index.json" as Index
-database ".agent/tree.json" as Tree
+database ".agent/index-all.json" as IndexAll
+database ".agent/index.json" as IndexTodo
+database ".agent/deps-issues.json" as DepsIssues
 
 User -> Script: sync [flags]
 Script -> FS: scan meta.json
-Script -> Script: preflight validate\n(fail unless --force)
+Script -> Script: preflight validate
+Script -> Script: deps preflight
 
 alt update_active (default)
   Script -> Git: current branch
@@ -86,10 +124,19 @@ end
 
 alt --github
   Script -> GH: gh issue list ...
-  Script -> Script: enrich states
+  Script -> Script: enrich statuses
+else local snapshot mode
+  Script -> Script: use index-all -> index snapshot
 end
 
-Script -> Index: write
-Script -> Tree: write
+alt deps preflight ok
+  Script -> IndexAll: write(all)
+  Script -> IndexTodo: write(todo)
+  Script -> DepsIssues: write(valid=true)
+else deps preflight failed and --force
+  Script -> IndexAll: write(deps.valid=false)
+  Script -> IndexTodo: write(deps.valid=false)
+  Script -> DepsIssues: write(placeholder)
+end
 @enduml
 ```

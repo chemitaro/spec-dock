@@ -80,18 +80,14 @@ PY
   exit 1
 fi
 
-extra_args=()
-if [[ "$parent_id" == *"-local-"* ]]; then
-  extra_args+=(--no-github)
+if "$runtime_script" new issue --epic "$parent_id" --title "$title"; then
+  exit 0
 else
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "new-issue: 'gh' CLI is required for GitHub-mode parent: $parent_id" >&2
-    echo "new-issue: option 1) install GitHub CLI (gh) and retry." >&2
-    echo "new-issue: option 2) intentionally create a local child via direct command:" >&2
-    echo "new-issue:   $runtime_script new issue --epic \"$parent_id\" --title \"$title\" --no-github" >&2
-    echo "new-issue: note) option 2 creates a local child under a GitHub parent (mixed mode)." >&2
-    exit 1
-  fi
+  status=$?
+  echo "new-issue: runtime command failed while creating a GitHub-linked issue." >&2
+  echo "new-issue: option 1) install/authenticate GitHub CLI (gh) and retry (e.g. 'gh auth login')." >&2
+  echo "new-issue: option 2) create a local-only issue explicitly:" >&2
+  echo "new-issue:   $runtime_script new issue --epic \"$parent_id\" --title \"$title\" --no-github" >&2
+  echo "new-issue: note) depending on the failure reason, a GitHub issue may already have been created. Check GitHub before retrying." >&2
+  exit "$status"
 fi
-
-exec "$runtime_script" new issue --epic "$parent_id" --title "$title" "${extra_args[@]}"

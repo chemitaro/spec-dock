@@ -11,16 +11,20 @@ Initiative は「投資単位」です。
 
 ## 1. 作成（new / import）
 
-### 1.1 new（デフォルト: GitHub）
+### 1.1 new（デフォルト: local-only）
 
 ```bash
 ./spec new initiative --title "..."
 ```
 
-GitHub を使わない場合:
+GitHub Issue とリンクしたい場合（任意）:
 
 ```bash
-./spec new initiative --no-github --title "..."
+# 既存の GitHub Issue 番号へリンク（GitHub Issue は作りません）
+./spec new initiative --github-issue <n> --title "..."
+
+# GitHub Issue を新規作成してリンク（gh が必要）
+./spec new initiative --create-github-issue --title "..."
 ```
 
 注意:
@@ -45,7 +49,7 @@ Initiative 作成後は、対象ノード配下の wrapper で Epic を追加で
 
 補足:
 - 引数はタイトル1つのみです。
-- 親が local (`init-local-*`) の場合、子も自動で local として作成されます。
+- wrapper `epics/new-epic` は常に local-only epic を作成します。
 
 ## 2. 記述（requirement/design/plan）
 
