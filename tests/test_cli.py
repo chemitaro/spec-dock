@@ -4003,6 +4003,75 @@ class TestCli(unittest.TestCase):
             after = issue_meta.read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
+    def test_sync_and_validate_do_not_backfill_or_relock_existing_meta_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "meta.json"
+            )
+            epic_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "meta.json"
+            )
+            issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "meta.json"
+            )
+            meta_paths = [init_meta_path, epic_meta_path, issue_meta_path]
+
+            before_texts: dict[Path, str] = {}
+            before_modes: dict[Path, int] = {}
+
+            for meta_path in meta_paths:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                meta.pop("_spec_dock", None)
+                self._write_json_force(meta_path, meta)
+                if os.name == "posix":
+                    try:
+                        meta_path.chmod(meta_path.stat().st_mode | 0o200)
+                    except OSError:
+                        pass
+
+                before_text = meta_path.read_text(encoding="utf-8")
+                before_texts[meta_path] = before_text
+                self.assertNotIn("_spec_dock", json.loads(before_text))
+                if os.name == "posix":
+                    before_modes[meta_path] = meta_path.stat().st_mode
+
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync"])
+
+            for meta_path in meta_paths:
+                after_text = meta_path.read_text(encoding="utf-8")
+                self.assertEqual(after_text, before_texts[meta_path])
+                self.assertNotIn("_spec_dock", json.loads(after_text))
+                if os.name == "posix":
+                    after_mode = meta_path.stat().st_mode
+                    self.assertEqual(after_mode, before_modes[meta_path])
+                    self.assertEqual(after_mode & 0o222, before_modes[meta_path] & 0o222)
+
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
