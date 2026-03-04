@@ -14,7 +14,7 @@ ID: "adr-00003"
 - SSOT メタデータのファイル名は **`.meta.json` のみをサポート**する。
   - `spec-dock/initiatives/**/.meta.json` を spec-dock の SSOT として扱う。
   - runtime / wrapper / docs / tests から、レガシー `meta.json` の読み取り/移行/互換を削除する。
-- `spec-dock sync` / `spec-dock validate` は、`spec-dock/initiatives/**/meta.json`（レガシー）を検出したら **エラーで停止**し、`.meta.json` へ移行が必要である旨と該当パスを提示する。
+- `spec-dock new/import/sync/validate` は、`spec-dock/initiatives/**/meta.json`（レガシー）を検出したら **副作用前にエラーで停止**し、`.meta.json` へ移行が必要である旨と該当パスを提示する。
 
 ## 背景（Context） (必須)
 - 本プロジェクトはまだ本格稼働しておらず、後方互換性（旧ファイル名 `meta.json` の維持）は要求しない。
@@ -32,7 +32,7 @@ participant "spec-dock\n(runtime)" as Script
 database "SSOT\n.\\nmeta.json" as Meta
 database "legacy\nmeta.json" as Legacy
 
-User -> Script: sync / validate
+User -> Script: new/import/sync/validate
 Script -> Legacy: scan legacy meta.json
 alt legacy exists
   Script --> User: error\n(\"meta.json is unsupported; migrate to .meta.json\")\n(+ paths)

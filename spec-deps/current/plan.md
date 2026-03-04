@@ -237,7 +237,7 @@ S05 --> S06
 - 対象: EC-002
 - 変更内容（要点）:
   - runtime/wrapper/docs/tests から `meta.json` の読み取り/移行/互換を削除する
-  - `spec-dock sync` / `spec-dock validate` は、レガシー `meta.json` を検出したら **エラーで停止**し、ガイダンス + 該当パスを出す
+  - `spec-dock new/import/sync/validate` は、レガシー `meta.json` を検出したら **副作用前にエラーで停止**し、ガイダンス + 該当パスを出す
 - 品質ゲート:
   - `python -m unittest discover -v`
 

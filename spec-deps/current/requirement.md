@@ -170,10 +170,11 @@ end
     - Exit code
     - 標準エラー出力（warn）
 - EC-002:
-  - 条件: 既存ノード（レガシー `meta.json`）が混在した状態で `sync` / `validate` する
+  - 条件: 既存ノード（レガシー `meta.json`）が混在した状態で `new` / `import` / `sync` / `validate` を実行する
   - 期待:
     - レガシー `meta.json` は **サポートしない**（読み取り/移行/互換を実装しない）
-    - `sync` / `validate` はエラーで停止し、標準エラーに「`meta.json` は非対応であり `.meta.json` へ移行が必要」なガイダンスを出す
+    - `new` / `import` / `sync` / `validate` はエラーで停止し、標準エラーに「`meta.json` は非対応であり `.meta.json` へ移行が必要」なガイダンスと該当パスを出す
+    - `new` / `import` は **副作用（テンプレートコピー/`.meta.json` 生成/`.agent` 生成等）なし**で失敗する
   - 観測点:
     - Exit code
     - 標準エラー出力（ガイダンス + 該当パス）
