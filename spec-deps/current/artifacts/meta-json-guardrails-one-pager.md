@@ -12,7 +12,8 @@
 ## 3. スコープ（今回やる / やらない）
 - 対象:
   - `spec-dock new {initiative,epic,issue}` / `spec-dock import {initiative,epic,issue}` で **新規生成**される `.meta.json`
-  - レガシー `meta.json` の `.meta.json` への移行（リネーム、best-effort、内容は変更しない）
+- 付記:
+  - レガシー `meta.json` は非対応（読み取り/移行/互換は実装しない）
 - 対象外（やらない）:
   - CI / CODEOWNERS / pre-commit 等の “混入防止（マージ防壁）”
   - 既存ノードのメタデータ内容への後追い適用（例: `_spec_dock` backfill / 後追い lock）

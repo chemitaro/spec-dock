@@ -20,13 +20,13 @@ ID: "iss-00012"
   - `.meta.json` に `_spec_dock` を追加し、最小スキーマ（`managed/do_not_edit/edit_via`）を満たす。
   - `new/import` で `.meta.json` を生成した直後に read-only 化を試行する（best-effort）。
   - read-only 化が失敗しても warn のみで継続（exit code 0）。
-  - レガシー `meta.json` は `.meta.json` に移行（リネーム）できる（best-effort、内容は変更しない）。
+  - レガシー `meta.json` はサポートしない（読み取り/移行/互換を実装しない）。
 - MUST NOT / OUT OF SCOPE:
   - CI / CODEOWNERS / pre-commit 等は追加しない（別 Issue）。
   - 既存ノードのメタデータ内容（JSONフィールド）を後追いで書き換えない（例: `_spec_dock` の backfill）。
 - 非交渉制約:
   - 依存追加なし（stdlib only）。
-  - `schema_version=1` を維持し、本 Issue は後方互換な追加のみ。
+  - `schema_version=1` を維持し、新バージョンは作らない（`_spec_dock` 追加のみ）。
 - 前提:
   - POSIX では write bit の除去を確認可能。
   - non-POSIX は best-effort の試行＋warn による可視化で良い。
@@ -103,7 +103,7 @@ end
   - Validation:
     - `_spec_dock` は “存在するだけ” ではなく、上記キー/値を満たすこと（受け入れ条件で検証）。
   - Legacy:
-    - `meta.json`（旧ファイル名）は移行対象（`.meta.json` にリネームされうる）。内容は同一スキーマ。
+    - `meta.json`（旧ファイル名）はサポートしない（読み取り/移行/互換を実装しない）。
 
 ### UML（任意） (任意)
 ```plantuml
@@ -204,9 +204,10 @@ package "spec_dock_runtime" {
 - 削除（Delete）:
   - なし
 - 移動/リネーム（Move/Rename）:
-  - SSOT: node directory の `meta.json` → `.meta.json`（best-effort の移行を追加）
+  - なし（後方互換を要求しないため、レガシー `meta.json` の自動移行は行わない）
 - 参照（Read only / context）:
   - `spec-deps/current/requirement.md`: 受け入れ条件・スコープの SSOT
+  - `spec-deps/current/adrs/adr-00003-drop-legacy-meta-json.md`: 意思決定（legacy `meta.json` 廃止）
   - `spec-deps/current/adrs/adr-00002-ssot-meta-dotfile.md`: 意思決定（dotfile 化 + 自己記述 + read-only）
   - `spec-deps/current/adrs/adr-00001-meta-json-tool-managed-readonly.md`: 旧ADR（superseded、経緯参照）
 
@@ -214,7 +215,7 @@ package "spec_dock_runtime" {
 - AC-001 → IF-001, IF-002, `app.py::_write_meta`, `io_json.py::_try_make_readonly`
 - AC-002 → IF-001, IF-002（import も `_write_meta` を通る）
 - EC-001 → `io_json.py::_try_make_readonly`（失敗理由の収集）+ `app.py`（warn と継続）
-- EC-002 → 実装方針（sync/validate はレガシーのリネーム移行のみ行い、内容/backfill/relock は行わない）
+- EC-002 → 実装方針（sync/validate はレガシー `meta.json` を検出したらエラーで停止し、ガイダンスを出す）
 - 非交渉制約（依存追加なし）→ `io_json.py` に stdlib のみで実装
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -223,12 +224,11 @@ package "spec_dock_runtime" {
     - `new issue` 等の生成結果として `.meta.json` が `_spec_dock` を含むこと
     - （POSIX）`.meta.json` の write bit が外れていること（環境差がある場合は skip か best-effort）
     - read-only 化が失敗した場合に warn が出ること（prefix: `spec-dock: (warn)` / モックで `chmod` を失敗させる）
-    - レガシー `meta.json` が `.meta.json` へ移行され、内容が不変であること（移行時に後追い lock/backfill をしない）
-    - `.meta.json` と `meta.json` が共存する場合に `.meta.json` を正として扱い、`.meta.json` を上書きしないこと（warn を出す）
+    - レガシー `meta.json` が存在する場合に、`sync/validate` がエラーで停止すること（ガイダンス + 該当パス）
 - どのAC/ECをどのテストで保証するか:
   - AC-001/AC-002 → `tests/*`（runtime 生成物検証）
   - EC-001 → `tests/*`（chmod 失敗時 warn + exit code 0 の検証）
-  - EC-002 → `tests/*`（既存 `meta.json` が `.meta.json` へ移行され、内容と write bit が不変であること）
+  - EC-002 → `tests/*`（レガシー `meta.json` 検出時の fail-fast）
 
 ### テストマトリクス（AC/EC → テスト） (任意)
 - AC-001:
@@ -239,8 +239,7 @@ package "spec_dock_runtime" {
   - Unit: chmod 失敗をモックし、warn（prefix: `spec-dock: (warn)`）+ exit 0 を検証
 - EC-002:
   - Unit:
-    - Case1: レガシー `meta.json` のみ存在する場合に、`sync/validate` により `.meta.json` へ移行されること、かつ内容/backfill/relock が発生しないことを検証
-    - Case2: `.meta.json` と `meta.json` が共存する場合に、`.meta.json` を上書きしないこと + warn が出ることを検証
+    - Case1: レガシー `meta.json` が存在する場合に、`sync/validate` が fail-fast し、ガイダンス + 該当パスを出すことを検証
 - 非交渉制約（requirement.md）をどう検証するか:
   - 制約: 依存追加なし
     - 検証方法: `pyproject.toml` の依存増加が無いことをレビューで確認
