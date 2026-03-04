@@ -324,7 +324,10 @@ def _write_meta(
         meta["github"] = {"issue_number": int(github_issue_number)}
     meta_path = dest_dir / "meta.json"
     _write_json(meta_path, meta)
-    _try_make_readonly(meta_path)
+    readonly_ok, readonly_err = _try_make_readonly(meta_path)
+    if not readonly_ok:
+        reason = readonly_err or "unknown error"
+        _warn(f"readonly_lock_failed: {meta_path} ({reason})")
 
 
 def _new_initiative(

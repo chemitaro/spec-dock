@@ -5608,6 +5608,33 @@ class TestCli(unittest.TestCase):
             self._assert_readonly_on_posix(init_dir / "meta.json")
             self._assert_readonly_on_posix(epic_dir / "meta.json")
 
+    def test_new_initiative_warns_and_continues_when_readonly_lock_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            runtime_io_json = (
+                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "io_json.py"
+            )
+            self.assertTrue(runtime_io_json.is_file())
+            runtime_io_json.write_text(
+                runtime_io_json.read_text(encoding="utf-8")
+                + "\n\n"
+                + "def _try_make_readonly(path):\n"
+                + '    return False, "simulated"\n',
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "initiative", "--no-github", "--title", "Auth platform"],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: (warn)", p.stderr)
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            self.assertTrue((init_dir / "meta.json").is_file())
+
     def test_new_initiative_and_epic_github_flags_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
