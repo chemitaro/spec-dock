@@ -120,10 +120,44 @@ python -m unittest discover -v
 - `tests/test_cli.py` - read-only化失敗時に warn + exit 0 を検証するS03テストを追加
 
 #### コミット
-- (コミット後に追記)
+- 0f2b52e fix(meta): read-only失敗時もwarnしてnew/importを継続
 
 #### メモ
 - warn prefix は `_warn()` 経由で `spec-dock: (warn)` を維持
+
+---
+
+### 2026-03-04 07:40 - 07:48
+
+#### 対象
+- Step: S04
+- AC/EC: EC-002
+
+#### 実施内容
+- Red: 既存ノード化した `meta.json` に対して `sync/validate` 後の期待をわざと誤らせ、失敗を確認
+- Green: `sync/validate` 実行前後で `meta.json` の text/mode が不変、かつ `_spec_dock` が復活しないことを新規テストで固定
+- Refactor: mode比較を POSIX 限定にして、write bit 状態が変化していないことも追加検証
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_cli.TestCli.test_sync_and_validate_do_not_backfill_or_relock_existing_meta_json
+# FAILED (期待どおり Red)
+
+python -m unittest -v tests.test_cli.TestCli.test_sync_and_validate_do_not_backfill_or_relock_existing_meta_json
+# OK
+
+python -m unittest discover -v
+# OK (138 tests)
+```
+
+#### 変更したファイル
+- `tests/test_cli.py` - 既存 `meta.json` が `sync/validate` で後追い変更されないことを固定するS04テストを追加
+
+#### コミット
+- (コミット後に追記)
+
+#### メモ
+- runtime 実装変更は不要（テストのみで EC-002 を固定）
 
 ---
 
