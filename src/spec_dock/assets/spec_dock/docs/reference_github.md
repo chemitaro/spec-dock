@@ -33,7 +33,8 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
   - `gh issue view` で存在確認するだけで、GitHub の Issue 本体（title/body/labels 等）を更新しません
   - `--title` は必須です（GitHub title は取り込みません）
   - ローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します（active は変更しません）
-  - `import` は実行前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **副作用（テンプレートコピー/`meta.json`生成）なし**で失敗します
+  - `import` は実行前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **副作用（テンプレートコピー/`.meta.json`生成）なし**で失敗します
+  - `meta.json`（レガシー名）が混在しているツリーは非対応です（`.meta.json` へ手動移行後に実行してください）
 
 ### GitHub を呼ばない（ローカルのみ）
 
@@ -56,7 +57,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 - デフォルトは **no-checkout**（active 更新のみ）です
 - checkout は `active set <target> --checkout` を明示したときだけ実行します
-- target 解決はローカル node（`meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
+- target 解決はローカル node（`.meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
 - `--checkout` 時に作業ツリーが dirty の場合は安全のため checkout を中断します
 - `--checkout` を伴う場合、ブランチ名は `<id>-<slug>`（不適合なら `<id>`）へ正規化されます（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 
@@ -75,7 +76,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
   - `validate` / `sync` の preflight validate でも重複は検知され、エラーになります
 
 重複が検出された場合（復旧）:
-- エラーメッセージに `type:id (meta.json path)` の競合一覧が出るので、どれか1つだけが `github.issue_number` を保持するように `meta.json` を修正してください（他は削除/変更）
+- エラーメッセージに `type:id (.meta.json path)` の競合一覧が出るので、どれか1つだけが `github.issue_number` を保持するように `.meta.json` を修正してください（他は削除/変更）
 - 修正後に `./spec validate` / `./spec sync` を再実行してください
 
 ## 6. よくある失敗

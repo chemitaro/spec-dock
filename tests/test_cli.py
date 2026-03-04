@@ -235,6 +235,35 @@ class TestCli(unittest.TestCase):
         self.assertTrue(version_file.is_file())
         self.assertEqual(version_file.read_text(encoding="utf-8").strip(), _expected_spec_dock_version())
 
+    def _assert_spec_dock_meta_marker(self, meta: dict[str, object]) -> None:
+        marker = meta.get("_spec_dock")
+        self.assertIsInstance(marker, dict)
+        marker_dict = marker
+        self.assertEqual(marker_dict.get("managed"), True)
+        self.assertEqual(marker_dict.get("do_not_edit"), True)
+        self.assertEqual(marker_dict.get("edit_via"), "spec-dock")
+
+    def _assert_readonly_on_posix(self, path: Path) -> None:
+        if os.name != "posix":
+            return
+        mode = path.stat().st_mode
+        self.assertEqual(
+            mode & 0o222,
+            0,
+            f"expected no write bits on POSIX: {path} (mode={oct(mode)})",
+        )
+
+    def _write_text_force(self, path: Path, text: str) -> None:
+        if path.exists():
+            try:
+                path.chmod(path.stat().st_mode | 0o200)
+            except OSError:
+                pass
+        path.write_text(text, encoding="utf-8")
+
+    def _write_json_force(self, path: Path, data: object) -> None:
+        self._write_text_force(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1387,11 +1416,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["id"] = "iss-local-1"  # old-style width (should conflict with iss-local-00001)
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             # Even if the string differs, the numeric suffix must be treated as duplicated.
             self._run_runtime_expect_fail(
@@ -1428,7 +1457,7 @@ class TestCli(unittest.TestCase):
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("github.issue_number=1", p.stderr)
             self.assertIn("initiative:init-00001", p.stderr)
-            self.assertIn("spec-dock/initiatives/init-00001-linked-initiative/meta.json", p.stderr)
+            self.assertIn("spec-dock/initiatives/init-00001-linked-initiative/.meta.json", p.stderr)
             self.assertIn("different GitHub issue number", p.stderr)
             self.assertNotIn("--github-issue", p.stderr)
 
@@ -1488,7 +1517,7 @@ class TestCli(unittest.TestCase):
             )
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-add-refresh-token"
             self.assertTrue(init_dir.is_dir())
-            meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
+            meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
             self.assertEqual(meta["slug"], "add-refresh-token")
 
     def test_new_rejects_invalid_slug_before_gh_issue_create(self) -> None:
@@ -1556,11 +1585,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["validate"])
 
@@ -1583,11 +1612,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["initiative_id"] = "init-local-00002"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["validate"])
 
@@ -1609,13 +1638,13 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
-            issue_meta.write_text("[]\n", encoding="utf-8")
+            self._write_text_force(issue_meta, "[]\n")
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0)
-            self.assertIn("Invalid meta.json", p.stderr)
+            self.assertIn("Invalid .meta.json", p.stderr)
             self.assertIn(str(issue_meta), p.stderr)
 
     def test_validate_detects_duplicate_github_issue_numbers_with_paths(self) -> None:
@@ -1632,7 +1661,7 @@ class TestCli(unittest.TestCase):
                 / "spec-dock"
                 / "initiatives"
                 / "init-local-00001-auth-platform"
-                / "meta.json"
+                / ".meta.json"
             )
             issue_meta = (
                 target
@@ -1643,16 +1672,16 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
 
             init_data = json.loads(init_meta.read_text(encoding="utf-8"))
             init_data["github"] = {"issue_number": 1}
-            init_meta.write_text(json.dumps(init_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(init_meta, init_data)
 
             issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
             issue_data["github"] = {"issue_number": 1}
-            issue_meta.write_text(json.dumps(issue_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, issue_data)
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1660,9 +1689,9 @@ class TestCli(unittest.TestCase):
             self.assertIn("github.issue_number=1", p.stderr)
             self.assertIn("initiative:init-local-00001", p.stderr)
             self.assertIn("issue:iss-local-00001", p.stderr)
-            self.assertIn("spec-dock/initiatives/init-local-00001-auth-platform/meta.json", p.stderr)
+            self.assertIn("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json", p.stderr)
             self.assertIn(
-                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/meta.json",
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json",
                 p.stderr,
             )
             self.assertIn("Fix github.issue_number", p.stderr)
@@ -1685,11 +1714,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["sync", "--no-update-active"])
 
@@ -1718,11 +1747,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["parent_id"] = "epic-local-99999"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1780,11 +1809,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["id"] = "broken-id"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
 
             agent_dir = target / "spec-dock" / ".agent"
             (agent_dir / "index.json").unlink(missing_ok=True)
@@ -1951,7 +1980,7 @@ class TestCli(unittest.TestCase):
 
             p = self._run_wrapper_capture(wrapper, ["JWT Auth"], env={"PATH": str(bin_dir)})
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / "meta.json").is_file())
+            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
 
     def test_new_issue_wrapper_creates_github_issue_by_default(self) -> None:
         if os.name == "nt":
@@ -1995,7 +2024,7 @@ class TestCli(unittest.TestCase):
                 env={"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"},
             )
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            issue_meta_path = epic_dir / "issues" / "iss-00123-add-refresh-token" / "meta.json"
+            issue_meta_path = epic_dir / "issues" / "iss-00123-add-refresh-token" / ".meta.json"
             self.assertTrue(issue_meta_path.is_file())
             issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
             self.assertEqual(issue_meta["id"], "iss-00123")
@@ -2068,17 +2097,42 @@ class TestCli(unittest.TestCase):
 
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             wrapper = init_dir / "epics" / "new-epic"
-            meta_path = init_dir / "meta.json"
+            meta_path = init_dir / ".meta.json"
 
             meta_path.unlink()
             p_missing = self._run_wrapper_capture(wrapper, ["JWT Auth"])
             self.assertNotEqual(p_missing.returncode, 0)
-            self.assertIn("missing meta.json", p_missing.stderr)
+            self.assertIn("missing .meta.json", p_missing.stderr)
 
-            meta_path.write_text("{ invalid json", encoding="utf-8")
+            self._write_text_force(meta_path, "{ invalid json")
             p_invalid = self._run_wrapper_capture(wrapper, ["JWT Auth"])
             self.assertNotEqual(p_invalid.returncode, 0)
-            self.assertIn("invalid meta.json", p_invalid.stderr)
+            self.assertIn("invalid .meta.json", p_invalid.stderr)
+
+    def test_wrapper_fails_when_only_legacy_meta_json_exists(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            wrapper = init_dir / "epics" / "new-epic"
+            dot_meta_path = init_dir / ".meta.json"
+            legacy_meta_path = init_dir / "meta.json"
+
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertFalse(dot_meta_path.exists())
+
+            p = self._run_wrapper_capture(wrapper, ["JWT Auth"])
+            self.assertNotEqual(p.returncode, 0)
+            self.assertIn("missing .meta.json", p.stderr)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertFalse((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
 
     def test_wrapper_fails_when_runtime_not_found(self) -> None:
         if os.name == "nt":
@@ -2140,7 +2194,7 @@ class TestCli(unittest.TestCase):
 
             p = self._run_wrapper_capture(wrapper, ["JWT Auth"], env={"PATH": str(bin_dir)})
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / "meta.json").is_file())
+            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
 
     def test_new_issue_wrapper_fails_without_gh_and_shows_guidance(self) -> None:
         if os.name == "nt":
@@ -3966,13 +4020,173 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             before = issue_meta.read_text(encoding="utf-8")
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             after = issue_meta.read_text(encoding="utf-8")
             self.assertEqual(after, before)
+
+    def test_sync_and_validate_do_not_backfill_or_relock_existing_meta_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / ".meta.json"
+            )
+            epic_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / ".meta.json"
+            )
+            issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / ".meta.json"
+            )
+            meta_paths = [init_meta_path, epic_meta_path, issue_meta_path]
+
+            before_texts: dict[Path, str] = {}
+            before_modes: dict[Path, int] = {}
+
+            for meta_path in meta_paths:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                meta.pop("_spec_dock", None)
+                self._write_json_force(meta_path, meta)
+                if os.name == "posix":
+                    try:
+                        meta_path.chmod(meta_path.stat().st_mode | 0o200)
+                    except OSError:
+                        pass
+
+                before_text = meta_path.read_text(encoding="utf-8")
+                before_texts[meta_path] = before_text
+                self.assertNotIn("_spec_dock", json.loads(before_text))
+                if os.name == "posix":
+                    before_modes[meta_path] = meta_path.stat().st_mode
+
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync"])
+
+            for meta_path in meta_paths:
+                after_text = meta_path.read_text(encoding="utf-8")
+                self.assertEqual(after_text, before_texts[meta_path])
+                self.assertNotIn("_spec_dock", json.loads(after_text))
+                if os.name == "posix":
+                    after_mode = meta_path.stat().st_mode
+                    self.assertEqual(after_mode, before_modes[meta_path])
+                    self.assertEqual(after_mode & 0o222, before_modes[meta_path] & 0o222)
+
+    def test_validate_and_sync_fail_fast_on_legacy_meta_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            dot_meta_path = issue_dir / ".meta.json"
+            legacy_meta_path = issue_dir / "meta.json"
+            self.assertTrue(dot_meta_path.is_file())
+
+            meta = json.loads(dot_meta_path.read_text(encoding="utf-8"))
+            meta.pop("_spec_dock", None)
+            self._write_json_force(dot_meta_path, meta)
+            if os.name == "posix":
+                dot_meta_path.chmod(dot_meta_path.stat().st_mode | 0o200)
+
+            before_text = dot_meta_path.read_text(encoding="utf-8")
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0)
+            self.assertIn("Unsupported legacy meta.json detected", p_validate.stderr)
+            self.assertIn(str(legacy_meta_path), p_validate.stderr)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+
+            p_sync = self._run_runtime_capture(target, ["sync"])
+            self.assertNotEqual(p_sync.returncode, 0)
+            self.assertIn("Unsupported legacy meta.json detected", p_sync.stderr)
+            self.assertIn(str(legacy_meta_path), p_sync.stderr)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+            self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+
+    def test_validate_and_sync_fail_fast_when_dot_meta_and_legacy_coexist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            dot_meta_path = issue_dir / ".meta.json"
+            legacy_meta_path = issue_dir / "meta.json"
+
+            before_text = dot_meta_path.read_text(encoding="utf-8")
+            legacy_meta_path.write_text("{ invalid legacy json\n", encoding="utf-8")
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_validate.stderr)
+            self.assertIn(str(legacy_meta_path), p_validate.stderr)
+
+            self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
+            self.assertTrue(legacy_meta_path.is_file())
+
+            p_sync = self._run_runtime_capture(target, ["sync"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_sync.stderr)
+            self.assertIn(str(legacy_meta_path), p_sync.stderr)
+
+            self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
+            self.assertTrue(legacy_meta_path.is_file())
 
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4215,7 +4429,7 @@ class TestCli(unittest.TestCase):
                 ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
             )
 
-            # Prepare an existing desired branch whose meta.json.slug differs from the base branch.
+            # Prepare an existing desired branch whose .meta.json.slug differs from the base branch.
             desired_before = "iss-00123-add-refresh-token"
             self._run_git(target, ["checkout", "-b", desired_before])
             issue_meta = (
@@ -4227,11 +4441,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["slug"] = "refresh-token"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -4305,7 +4519,7 @@ class TestCli(unittest.TestCase):
                 ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
             )
 
-            # Prepare an existing desired branch whose meta.json.slug differs from the base branch.
+            # Prepare an existing desired branch whose .meta.json.slug differs from the base branch.
             desired_before = "iss-00123-add-refresh-token"
             self._run_git(target, ["checkout", "-b", desired_before])
             issue_meta = (
@@ -4317,11 +4531,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["slug"] = "refresh-token"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -4399,11 +4613,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             data = json.loads(issue_meta.read_text(encoding="utf-8"))
             data["slug"] = "日本語"
-            issue_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, data)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -4472,11 +4686,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             data = json.loads(issue_meta.read_text(encoding="utf-8"))
             data["slug"] = "a..b"
-            issue_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, data)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -5393,11 +5607,11 @@ class TestCli(unittest.TestCase):
                 / "epic-local-00001-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
-                / "meta.json"
+                / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
             meta["id"] = "iss-0123"
-            issue_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(issue_meta, meta)
             self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
@@ -5568,12 +5782,43 @@ class TestCli(unittest.TestCase):
             self.assertTrue(epic_dir.is_dir())
             self.assertFalse(called_path.exists(), f"gh was invoked unexpectedly: {called_path}")
 
-            init_meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
-            epic_meta = json.loads((epic_dir / "meta.json").read_text(encoding="utf-8"))
+            init_meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
+            epic_meta = json.loads((epic_dir / ".meta.json").read_text(encoding="utf-8"))
             self.assertEqual(init_meta["id"], "init-local-00001")
             self.assertEqual(epic_meta["id"], "epic-local-00001")
             self.assertNotIn("github", init_meta)
             self.assertNotIn("github", epic_meta)
+            self._assert_spec_dock_meta_marker(init_meta)
+            self._assert_spec_dock_meta_marker(epic_meta)
+            self._assert_readonly_on_posix(init_dir / ".meta.json")
+            self._assert_readonly_on_posix(epic_dir / ".meta.json")
+
+    def test_new_initiative_warns_and_continues_when_readonly_lock_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            runtime_io_json = (
+                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "io_json.py"
+            )
+            self.assertTrue(runtime_io_json.is_file())
+            runtime_io_json.write_text(
+                runtime_io_json.read_text(encoding="utf-8")
+                + "\n\n"
+                + "def _try_make_readonly(path):\n"
+                + '    return False, "simulated"\n',
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "initiative", "--no-github", "--title", "Auth platform"],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: (warn)", p.stderr)
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            self.assertTrue((init_dir / ".meta.json").is_file())
 
     def test_new_initiative_and_epic_github_flags_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5691,9 +5936,11 @@ class TestCli(unittest.TestCase):
                 / "iss-00123-add-refresh-token"
             )
             self.assertTrue(issue_dir.is_dir())
-            meta = (issue_dir / "meta.json").read_text(encoding="utf-8")
-            self.assertIn('\"id\": \"iss-00123\"', meta)
-            self.assertIn('\"issue_number\": 123', meta)
+            meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(meta["id"], "iss-00123")
+            self.assertEqual(meta["github"]["issue_number"], 123)
+            self._assert_spec_dock_meta_marker(meta)
+            self._assert_readonly_on_posix(issue_dir / ".meta.json")
 
     def test_import_aborts_without_local_changes_when_gh_issue_view_fails(self) -> None:
         if os.name == "nt":
@@ -5722,6 +5969,97 @@ class TestCli(unittest.TestCase):
             self.assertEqual(imported, [])
             self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
             self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+
+    def test_import_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            # Import target lineage (canonical .meta.json)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            # Unrelated legacy file to trigger preflight failure.
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Legacy holder"])
+
+            legacy_init_dir = target / "spec-dock" / "initiatives" / "init-local-00002-legacy-holder"
+            dot_meta_path = legacy_init_dir / ".meta.json"
+            legacy_meta_path = legacy_init_dir / "meta.json"
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p.stderr)
+            self.assertIn(str(legacy_meta_path), p.stderr)
+
+            imported = list((target / "spec-dock" / "initiatives").rglob("iss-99999-*"))
+            self.assertEqual(imported, [])
+            self.assertFalse((target / "spec-dock" / ".agent" / "index.json").exists())
+            self.assertFalse((target / "spec-dock" / ".agent" / "tree.json").exists())
+
+    def test_new_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Legacy holder"])
+
+            initiatives_root = target / "spec-dock" / "initiatives"
+            parent_init_dir = initiatives_root / "init-local-00001-parent-initiative"
+            parent_epic_dir = parent_init_dir / "epics" / "epic-local-00001-parent-epic"
+            legacy_init_dir = initiatives_root / "init-local-00002-legacy-holder"
+            dot_meta_path = legacy_init_dir / ".meta.json"
+            legacy_meta_path = legacy_init_dir / "meta.json"
+            dot_meta_path.rename(legacy_meta_path)
+            self.assertFalse(dot_meta_path.exists())
+            self.assertTrue(legacy_meta_path.is_file())
+
+            before_inits = sorted(p.name for p in initiatives_root.glob("init-*"))
+            before_epics = sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*"))
+            before_issues = sorted(p.name for p in (parent_epic_dir / "issues").glob("iss-*"))
+
+            p_init = self._run_runtime_capture(
+                target,
+                ["new", "initiative", "--no-github", "--title", "Should fail initiative"],
+            )
+            self.assertNotEqual(p_init.returncode, 0, p_init.stdout + p_init.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_init.stderr)
+            self.assertIn(str(legacy_meta_path), p_init.stderr)
+
+            p_epic = self._run_runtime_capture(
+                target,
+                ["new", "epic", "--no-github", "--initiative", "1", "--title", "Should fail epic"],
+            )
+            self.assertNotEqual(p_epic.returncode, 0, p_epic.stdout + p_epic.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_epic.stderr)
+            self.assertIn(str(legacy_meta_path), p_epic.stderr)
+
+            p_issue = self._run_runtime_capture(
+                target,
+                ["new", "issue", "--no-github", "--epic", "1", "--title", "Should fail issue"],
+            )
+            self.assertNotEqual(p_issue.returncode, 0, p_issue.stdout + p_issue.stderr)
+            self.assertIn("Unsupported legacy meta.json detected", p_issue.stderr)
+            self.assertIn(str(legacy_meta_path), p_issue.stderr)
+
+            self.assertEqual(before_inits, sorted(p.name for p in initiatives_root.glob("init-*")))
+            self.assertEqual(before_epics, sorted(p.name for p in (parent_init_dir / "epics").glob("epic-*")))
+            self.assertEqual(before_issues, sorted(p.name for p in (parent_epic_dir / "issues").glob("iss-*")))
 
     def test_import_initiative_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
@@ -5758,9 +6096,11 @@ class TestCli(unittest.TestCase):
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00010-auth-platform"
             self.assertTrue(init_dir.is_dir())
-            meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
+            meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
             self.assertEqual(meta["id"], "init-00010")
             self.assertEqual(meta["github"]["issue_number"], 10)
+            self._assert_spec_dock_meta_marker(meta)
+            self._assert_readonly_on_posix(init_dir / ".meta.json")
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
             self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
@@ -5786,14 +6126,18 @@ class TestCli(unittest.TestCase):
             self.assertTrue(init_dir.is_dir())
             self.assertTrue(epic_dir.is_dir())
 
-            init_meta = json.loads((init_dir / "meta.json").read_text(encoding="utf-8"))
-            epic_meta = json.loads((epic_dir / "meta.json").read_text(encoding="utf-8"))
+            init_meta = json.loads((init_dir / ".meta.json").read_text(encoding="utf-8"))
+            epic_meta = json.loads((epic_dir / ".meta.json").read_text(encoding="utf-8"))
             self.assertEqual(init_meta["id"], "init-00010")
             self.assertEqual(init_meta["github"]["issue_number"], 10)
             self.assertEqual(epic_meta["id"], "epic-00011")
             self.assertEqual(epic_meta["parent_id"], "init-00010")
             self.assertEqual(epic_meta["initiative_id"], "init-00010")
             self.assertEqual(epic_meta["github"]["issue_number"], 11)
+            self._assert_spec_dock_meta_marker(init_meta)
+            self._assert_spec_dock_meta_marker(epic_meta)
+            self._assert_readonly_on_posix(init_dir / ".meta.json")
+            self._assert_readonly_on_posix(epic_dir / ".meta.json")
 
     def test_import_issue_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
@@ -5848,9 +6192,11 @@ class TestCli(unittest.TestCase):
                 / "iss-00123-add-refresh-token"
             )
             self.assertTrue(issue_dir.is_dir())
-            meta = json.loads((issue_dir / "meta.json").read_text(encoding="utf-8"))
+            meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
             self.assertEqual(meta["id"], "iss-00123")
             self.assertEqual(meta["github"]["issue_number"], 123)
+            self._assert_spec_dock_meta_marker(meta)
+            self._assert_readonly_on_posix(issue_dir / ".meta.json")
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
 
@@ -6151,11 +6497,11 @@ class TestCli(unittest.TestCase):
                 / "spec-dock"
                 / "initiatives"
                 / "init-local-00001-auth-platform"
-                / "meta.json"
+                / ".meta.json"
             )
             data = json.loads(init_meta.read_text(encoding="utf-8"))
             data["slug"] = "BrokenSlug"
-            init_meta.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._write_json_force(init_meta, data)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

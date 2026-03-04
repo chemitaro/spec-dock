@@ -13,7 +13,8 @@
 
 ## 1. 結論（v2の生成物）
 
-`sync` はローカル SSOT（`spec-dock/initiatives/**/meta.json`）を走査し、v2 の観測点を生成します（git 管理しない）。
+`sync` はローカル SSOT（`spec-dock/initiatives/**/.meta.json`）を走査し、v2 の観測点を生成します（git 管理しない）。
+`meta.json`（レガシー名）はサポート対象外で、検出時はエラー停止します（`.meta.json` へ手動移行してください）。
 
 `.agent/`（機械向け）:
 - `spec-dock/.agent/index-all.json`（全ノード）
@@ -105,7 +106,7 @@ hide footbox
 
 actor User
 participant "spec-dock\n(runtime script)" as Script
-participant "Local FS\n(meta.json)" as FS
+participant "Local FS\n(.meta.json)" as FS
 participant "git\n(branch)" as Git
 participant "gh\n(GitHub CLI)" as GH
 database ".agent/index-all.json" as IndexAll
@@ -113,7 +114,7 @@ database ".agent/index.json" as IndexTodo
 database ".agent/deps-issues.json" as DepsIssues
 
 User -> Script: sync [flags]
-Script -> FS: scan meta.json
+Script -> FS: scan .meta.json
 Script -> Script: preflight validate
 Script -> Script: deps preflight
 

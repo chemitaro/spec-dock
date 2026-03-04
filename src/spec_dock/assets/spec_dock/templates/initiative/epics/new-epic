@@ -38,15 +38,15 @@ if ! runtime_script="$(find_runtime "$script_dir")"; then
   exit 1
 fi
 
-meta_path="$script_dir/../meta.json"
+meta_path="$script_dir/../.meta.json"
 if [[ ! -f "$meta_path" ]]; then
-  echo "new-epic: missing meta.json: $meta_path" >&2
-  echo "new-epic: fix ../meta.json and retry." >&2
+  echo "new-epic: missing .meta.json: $meta_path" >&2
+  echo "new-epic: fix ../.meta.json and retry." >&2
   exit 1
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "new-epic: python3 is required to parse meta.json." >&2
+  echo "new-epic: python3 is required to parse .meta.json." >&2
   exit 1
 fi
 
@@ -60,7 +60,7 @@ try:
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 except Exception as exc:
-    print(f"new-epic: invalid meta.json: {path}: {exc}", file=sys.stderr)
+    print(f"new-epic: invalid .meta.json: {path}: {exc}", file=sys.stderr)
     raise SystemExit(1)
 
 node_id = data.get("id")
@@ -76,7 +76,7 @@ if node_type != "initiative":
 print(node_id.strip())
 PY
 )"; then
-  echo "new-epic: fix ../meta.json and retry." >&2
+  echo "new-epic: fix ../.meta.json and retry." >&2
   exit 1
 fi
 

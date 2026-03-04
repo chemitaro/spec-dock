@@ -1,8 +1,8 @@
 ---
 種別: 設計書（Issue）
-ID: "iss-00010"
-タイトル: "deps v2: shorthand 依存（initiative/epic）を issue 依存へ還元し、Readyボード（矢印なしツリー）で一目瞭然にする"
-関連GitHub: ["TBD"]
+ID: "iss-00012"
+タイトル: "メタデータ（.meta.json等）をコーディングエージェントから保護するガードレールを追加する"
+関連GitHub: ["#12", "https://github.com/chemitaro/spec-dock/issues/12"]
 状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-04"
@@ -10,74 +10,59 @@ ID: "iss-00010"
 親: []
 ---
 
-# iss-00010 deps v2: shorthand 依存（initiative/epic）を issue 依存へ還元し、Readyボード（矢印なしツリー）で一目瞭然にする — 設計（HOW）
+# iss-00012 メタデータ（.meta.json等）をコーディングエージェントから保護するガードレールを追加する — 設計（HOW）
 
 ## 目的・制約（要件から転記・圧縮） (必須)
 - 目的:
-  - 依存関係を “実作業単位=issue” に正規化し、`sync` の生成物から「次にやれる issue / ブロッカー」を即判断できるようにする。
-- MUST（要件の圧縮）:
-  - `deps.json` の shorthand（initiative/epic 指定）を **canonical issue→issue** へ compile し、ready 判定に使う（`deps check` / `active set` guard / `sync`）。
-  - `sync` は以下の成果物を生成する（命名は ADR 準拠）:
-    - 機械可読（agent / all）: `.agent/index-all.json`, `.agent/tree-all.json`
-    - 機械可読（agent / todo）: `.agent/index.json`, `.agent/tree.json`, `.agent/deps-issues.json`
-    - 人間向け（quick view）: `spec-dock/tree-all.puml`, `spec-dock/tree.puml`, `spec-dock/deps-issues.puml`, `spec-dock/dashboard.md`
-  - issue の派生状態（ready/blocked、ブロッカー、推移依存=closure、Done除外）を `index*.json` / `tree*.json` に統合する。
-  - unknown は安全側（blocked）に倒す。出力順序は決定的（ソート）にする。
-- MUST NOT:
-  - `meta.json` のスキーマ拡張（依存は `deps.json` に分離）
-  - runtime script に stdlib 以外の依存追加
-  - GitHub Issue の更新操作（ラベル/本文/クローズ等）
+  - SSOT の `spec-dock/initiatives/**/.meta.json` を tool-managed と自己記述し、かつ read-only（best-effort）にすることで、ローカルでの誤編集事故率を下げる。
+  - メタファイルを dotfile 化（`.meta.json`）し、ユーザー操作ファイルと混ざりにくくする。
+- MUST:
+  - `.meta.json` に `_spec_dock` を追加し、最小スキーマ（`managed/do_not_edit/edit_via`）を満たす。
+  - `new/import` で `.meta.json` を生成した直後に read-only 化を試行する（best-effort）。
+  - read-only 化が失敗しても warn のみで継続（exit code 0）。
+  - レガシー `meta.json` はサポートしない（読み取り/移行/互換を実装しない）。
+- MUST NOT / OUT OF SCOPE:
+  - CI / CODEOWNERS / pre-commit 等は追加しない（別 Issue）。
+  - 既存ノードのメタデータ内容（JSONフィールド）を後追いで書き換えない（例: `_spec_dock` の backfill）。
+- 非交渉制約:
+  - 依存追加なし（stdlib only）。
+  - `schema_version=1` を維持し、新バージョンは作らない（`_spec_dock` 追加のみ）。
 - 前提:
-  - “エージェントが読む主観測点” は `spec-dock/.agent/index.json`（todo）とする（PlantUML を仕様としてパースしない）。
+  - POSIX では write bit の除去を確認可能。
+  - non-POSIX は best-effort の試行＋warn による可視化で良い。
 
 ---
 
 ## 既存実装/規約の調査結果（As-Is / 99.9%理解） (必須)
 - 参照した規約/実装（根拠）:
-  - `AGENTS.md`（repo root）: 会話日本語 / git操作制約 / commitメッセージ規約
-  - runtime:
-    - entrypoint: `src/spec_dock/assets/spec_dock/scripts/spec-dock`（thin wrapper）
-    - implementation: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`（現状monolithic。分割は本設計で実施）
-      - `sync`: `_sync()`
-      - deps: `_load_deps_json()` / `_resolve_dep_ref()` / compile/derive/render（v2）
-      - deps check: `_deps_check()` / `_deps_evaluate()`
-  - docs: `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `reference_sync.md`
-  - tests: `tests/test_cli.py`（runtime script の生成物や挙動を回帰で担保）
+  - `AGENTS.md`: runtime は stdlib only、tests は `unittest`、assets は scaffold API として扱う。
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
+    - `_write_meta()`（.meta.json 生成箇所）
+    - `_new_{initiative,epic,issue}()` / `_import_{initiative,epic,issue}()`（生成フロー）
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py`:
+    - `_write_json()`（JSON write、現状は権限操作なし）
 - 観測した現状（事実）:
-  - `sync` は `.agent/index.json` / `.agent/tree.json`（schema_version=2）を生成する（現状は **all 相当**）。
-  - deps v1 はノード直下の `deps.json` をロードし、`deps check` / `sync` が `.agent/deps.json` と `.agent/deps.puml` / `.agent/deps.todo.puml` を生成する。
-  - deps v1 の可視化は “包含（initiative/epic/issue）” と “依存（矢印）” が混在し、Ready/Blocked の直感が崩れやすい。
-  - `--github` を付けない場合、`.agent/index.json` のスナップショットから issue の `status` を best-effort で読み、unknown を補う。
-- 採用するパターン:
-  - 依存の入力は `deps.json` に集約し、派生SSOTを増やさない（派生の主観測点は `index*.json`）。
-  - 決定的順序（既存の `sort_key()` の方針に準拠）。
-  - `sync --force` は index/tree の更新を継続しつつ、deps派生物の stale 誤用を防ぐ（無効プレースホルダで上書き）。
-- 採用しない/変更しない:
-  - GUI/TUI は追加しない（生成物 + CLI で完結）。
-  - PlantUML を “機械判定の正” にしない（JSON を正とする）。
-- 影響範囲:
-  - runtime script の `sync` / `deps check` / `active set` guard（依存判定の根拠が変わる）
-  - docs（生成物と意味の更新）
-  - tests（生成物名・スキーマ・exit code の回帰更新）
+  - `.meta.json` は通常の JSON として作られ、read-only 化などのガードはない。
+  - warn の標準フォーマットは `_warn()` が担っている（`spec-dock: (warn) ...`）。
+- 採用するパターン（命名/責務/例外/DI/テストなど）:
+  - best-effort で OS 依存操作を行う場合は、例外で落とさず warn を出して継続する。
+  - runtime script の “安定した warn prefix” を守る（`_warn()` を利用）。
+- 採用しない/変更しない（理由）:
+  - 既存ノードのメタデータ内容の後追い更新（sync/validate での強制修正）は採用しない（スコープ外 + 予期せぬ副作用）。
+  - CI / フック / CODEOWNERS の追加は採用しない（スコープ外）。
+- 影響範囲（呼び出し元/関連コンポーネント）:
+  - runtime asset の `app.py`（meta 生成）と `io_json.py`（I/O 補助）。
+  - `uvx spec-dock init/update` でインストールされる runtime に影響するため、生成物のテストで差分検証が必要。
 
 ## 主要フロー（テキスト：AC単位で短く） (任意)
-- Flow（sync / AC-001, 006, 011-013）:
-  1) scan: `meta.json` を走査してノード索引（initiative/epic/issue）を構築
-  2) load: 各ノード直下の `deps.json` をロード
-  3) compile: shorthand を展開し、canonical issue→issue グラフ（direct edges）を生成
-  4) validate: descendant/self/cycle を検出（`--force` の場合は deps 無効扱い）
-  5) enrich: `--github` のときだけ GitHub state を取得（失敗は unknown）
-  6) derive: issue ごとに `ready` / `deps.depends_on(closure, Done除外)` を計算
-  7) emit:
-     - `index-all.json` / `tree-all.json`（all）
-     - `index.json` / `tree.json`（todo = Done issue 除外）
-     - `tree(-all).puml`（Readyボード）
-     - `deps-issues.json` / `deps-issues.puml`（issue-only, todo-only）
-     - `dashboard.md`（todo-only）
-- Flow（deps check / AC-002, 003, 007-009）:
-  1) target 解決（node id / GitHub issue number / URL）
-  2) compile + validate + enrich（必要なら）
-  3) `ready` と blockers を返す（`--json` は構造化出力）
+- Flow for AC-001:
+  1) `new initiative|epic|issue` がノード用テンプレートをコピーする
+  2) `_write_meta()` が meta dict を構築し、`.meta.json` を書き出す（`_spec_dock` を含む）
+  3) `_write_meta()` が read-only 化を試行し、失敗時は warn のみで継続する
+- Flow for AC-002:
+  1) `import initiative|epic|issue` がテンプレートをコピーする
+  2) `_write_meta()` が meta dict を構築し、`.meta.json` を書き出す（`_spec_dock` を含む）
+  3) AC-001 と同様に read-only 化を試行する
 
 ### UML（任意） (任意)
 ```plantuml
@@ -87,718 +72,209 @@ skinparam shadowing false
 
 actor User
 participant "spec-dock\n(runtime)" as Script
-participant "SSOT\nmeta.json" as Meta
-participant "SSOT\ndeps.json" as Deps
-participant "gh\n(optional)" as GH
-participant ".agent\nindex-all.json\ntree-all.json" as All
-participant ".agent\nindex.json\ntree.json" as Todo
-participant "spec-dock\ntree-all.puml" as TreeAllPuml
-participant "spec-dock\ntree.puml" as TreeTodoPuml
-participant ".agent\ndeps-issues.json" as DepsIssuesJson
-participant "spec-dock\ndeps-issues.puml" as DepsIssuesPuml
-participant "spec-dock\ndashboard.md" as Dashboard
+database "SSOT\n.\\nmeta.json" as Meta
 
-== sync ==
-User -> Script: sync [--github] [--force]
-Script -> Meta: scan nodes (containment)
-Script -> Deps: load deps.json (shorthand)
-Script -> Script: compile to canonical\n(issue->issue direct edges)
-opt GitHub enabled
-  Script -> GH: gh issue list/view (enrich)
+== new/import ==
+User -> Script: new / import (initiative/epic/issue)
+Script -> Meta: write .meta.json\n(+ _spec_dock)
+Script -> Meta: set read-only\n(best-effort)
+alt lock ok
+  Script --> User: ok
+else lock failed
+  Script --> User: warn\n(continue, exit 0)
 end
-Script -> Script: derive ready/closure\n(Done excluded)
-Script -> All: emit all
-All -> Todo: filter Done issues
-All -> TreeAllPuml: render Ready board (all)
-Todo -> TreeTodoPuml: render Ready board (todo)
-Todo -> DepsIssuesJson: project (issue-only)
-DepsIssuesJson -> DepsIssuesPuml: render (blocks view)
-Todo -> Dashboard: render summary
 @enduml
 ```
-
-## モジュール設計（runtime 分割 / リファクタリング） (必須)
-- 背景:
-  - 現状 `spec_dock_runtime/app.py` が単一ファイルで肥大化しており、機能追加（deps v2 / 可視化 / GitHub連携 / active）に対して理解・変更コストが上がっている。
-- 目的:
-  - **外部仕様（CLI / 生成物 / exit code / JSON schema）を不変**のまま、責務ごとに分割して保守性を上げる。
-  - 既存の `unittest` 回帰（`tests/test_cli.py`）を安全網にし、段階的に移設する。
-- 方針:
-  - runtime は stdlib only（依存追加なし）
-  - entrypoint は維持:
-    - `spec-dock/scripts/spec-dock` → `spec_dock_runtime.app:main`（変更しない）
-  - `app.py` は「argparse + コマンドdispatch + 例外整形」に寄せ、ドメインロジックはモジュールへ移す
-  - 移設は “小さく・頻繁にテスト” を回し、循環importを避ける（依存方向を固定）
-
-### 提案するファイル分割（案）
-- `spec_dock_runtime/app.py`
-  - `main()` / argparse / subcommand wiring（薄く保つ）
-- `spec_dock_runtime/ids.py`
-  - id 正規化・パース（`init/epic/iss/adr`）、入力解釈（`#123`/URL 等）、ソートキー
-- `spec_dock_runtime/io_json.py`
-  - JSON load/write（安定フォーマット）、エラー整形
-- `spec_dock_runtime/nodes.py`
-  - node scan / meta 読み取り / 構造validate（containment）
-- `spec_dock_runtime/deps.py`
-  - `deps.json` schema / ref resolve / shorthand compile（issue graph）/ cycle 検出 / closure / ready 判定
-- `spec_dock_runtime/github.py`
-  - `gh issue list/view/create` ラッパ、index 化、失敗時の扱い（unknown）
-- `spec_dock_runtime/active.py`
-  - active manifest / pointer apply / index/tree への active patch（必要最小）
-- `spec_dock_runtime/render_puml.py`
-  - `tree*.puml`（Readyボード）/ `deps-issues.puml`（blocks view）/ DEPS_DISABLED placeholder
-  - **`deps-issues.puml` は `skinparam linetype ortho` を標準採用**（矢印を直交にして可読性を上げる）
-- `spec_dock_runtime/render_md.py`
-  - `dashboard.md` 生成（todo-only 集計）
-
-### 依存方向（循環を避ける）
-```plantuml
-@startuml
-skinparam shadowing false
-skinparam linetype ortho
-
-package spec_dock_runtime {
-  [app] --> [active]
-  [app] --> [nodes]
-  [app] --> [deps]
-  [app] --> [github]
-  [app] --> [render_puml]
-  [app] --> [render_md]
-
-  [active] --> [io_json]
-  [nodes] --> [io_json]
-  [deps] --> [io_json]
-  [github] --> [io_json]
-
-  [active] --> [ids]
-  [nodes] --> [ids]
-  [deps] --> [ids]
-  [github] --> [ids]
-  [render_puml] --> [ids]
-  [render_md] --> [ids]
-}
-@enduml
-```
-
-### 移設順序（推奨: 小さく安全に）
-- 原則: 1回の変更で「移す責務」を小さくし、毎回 `unittest` 回帰で外部仕様不変を確認する。
-- 推奨順:
-  1) `ids.py` / `io_json.py`（横断ユーティリティ）を抽出
-  2) `github.py`（subprocess/gh 周辺）を抽出
-  3) `nodes.py`（scan/validate）を抽出
-  4) `deps.py`（compile/derive/cycle）を抽出
-  5) `render_puml.py` / `render_md.py`（可視化）を抽出（`deps-issues.puml` の `ortho` もここで固定）
-  6) `active.py`（active/pointer/patch）を抽出
-  7) `app.py` を dispatch 中心に薄くし、旧関数/重複を削除
-
-### 要件 → モジュール対応（案）
-- AC-001/002/003/009/010:
-  - `nodes.py`（scan/containment validate）
-  - `deps.py`（shorthand compile / cycle / closure / ready）
-  - `github.py`（`--github` enrich、失敗は unknown）
-  - `render_puml.py` / `render_md.py`（生成物）
-- AC-004/005/007:
-  - `active.py`（active set/show/clear、manifest/pointer/patch）
-  - `deps.py`（deps guard の判定ロジック）
-  - `github.py`（`--github` guard の status 取得）
-- AC-006/011/012/013:
-  - `render_puml.py`（Readyボード / deps-issues.puml）
-  - `render_md.py`（dashboard）
 
 ## データ・バリデーション（必要最小限） (任意)
-### MODEL-001: 入力 `deps.json`（SSOT / schema_version=1）
-- 目的: 依存の宣言をメタデータ（`meta.json`）と分離し、ノード単位で管理する。
-- Schema:
-  - `schema_version`: `1`（固定。v2 は作らない）
-  - `depends_on`: `list[str | int]`
-    - `str`: node id（`init-*`/`epic-*`/`iss-*`）または digits-only（GitHub issue number として解決）
-    - `int`: GitHub issue number として解決
-- Validation:
-  - `schema_version!=1` は構造エラー（exit=1）
-  - 参照が解決不能（node 不在 / GitHub番号が複数/未import等）は構造エラー（exit=1）
-  - descendant 依存（親→配下）は構造エラー（exit=1）
-  - shorthand 展開結果が空（epic/initiative配下 issue=0）は **エラーにしない**（warning を出す）
-
-### MODEL-002: 依存グラフ（canonical issue graph）
-- 内部表現（実装都合）:
-  - `depends_on_edges`: `dict[issue_id, set[issue_id]]`（dependent -> prerequisites）
-- 出力表現（観測点: `index*.json`）:
-  - `deps.issue_edges`: `list[{\"from\": <issue_id>, \"to\": <issue_id>, \"kind\": \"depends_on\"}]`
-    - 方向: **dependent -> prerequisite**（depends_on edge）
-    - 理由: 要件の語彙（depends_on）と一致し、エージェントが `issue -> prerequisites` を素直に辿れるため（機械判定の正は JSON）
-    - 備考:
-      - PlantUML（`deps-issues.puml`）では見やすさのため **反転して描画**する（prereq -> dependent / blocks 表示。ADR-00007）
-      - `depends_on_edges` は内部で保持し、描画時に反転できる
-
-#### UML（shorthand 展開と矢印方向の対応） (任意)
-```plantuml
-@startuml
-left to right direction
-skinparam shadowing false
-
-rectangle "iss-A (dependent)" as A
-package "epic-00020 (contains)" as Epic20 {
-  rectangle "iss-B (prereq)" as B
-  rectangle "iss-C (prereq)" as C
-}
-
-note right of A
-deps.json on iss-A:
-depends_on=["epic-00020"]
-end note
-
-' JSON（機械可読）: depends_on 方向（dependent -> prerequisite）
-A --> B : depends_on
-A --> C : depends_on
-@enduml
-```
-
-```plantuml
-@startuml
-top to bottom direction
-skinparam shadowing false
-
-rectangle "iss-A (blocked)" as A
-rectangle "iss-B (ready)" as B
-rectangle "iss-C (ready)" as C
-
-' PlantUML（人間向け）: blocks 表示（prereq -> dependent）に反転して描く（ADR-00007）
-B --> A : blocks
-C --> A : blocks
-@enduml
-```
-
-### MODEL-003: issue の派生 deps（`index*.json` / `tree*.json`）
-- issue ノードに追加するフィールド（例）:
-  - `deps.ready`: `bool`
-  - `deps.depends_on`: `list[issue_id]`（推移依存 closure、Done除外、決定的順序）
-  - `deps.blockers_top`: `list[issue_id]`（最大N。表示用）
-- 不変条件（混乱回避）:
-  - `status == \"done\"` の issue は、`deps.ready=true` / `deps.depends_on=[]` とする（“着手可否”の観点では trivially ready）
-  - `unknown` は `deps.ready=false` の評価に倒れる（依存先の unknown も Done ではない扱い）
-
-#### UML（ready / state の導出） (任意)
-```plantuml
-@startuml
-skinparam shadowing false
-
-start
-
-if (status == done?) then (yes)
-  :deps.ready = true;
-  :deps.depends_on = [];
-  :state = done;
-  stop
-endif
-
-:deps.depends_on = closure(issue -> prerequisites)\n(Done excluded);
-if (status == unknown?) then (yes)
-  :deps.ready = false;
-else (no)
-  :deps.ready = (deps.depends_on is empty);
-endif
-
-if (active leaf?) then (yes)
-  :state = doing;
-else (no)
-  if (status == unknown?) then (yes)
-    :state = unknown;
-  else (no)
-    if (deps.ready?) then (yes)
-      :state = ready;
-    else (no)
-      :state = blocked;
-    endif
-  endif
-endif
-
-stop
-@enduml
-```
-
-### MODEL-004: `.agent/*` 生成物スキーマ（MVP）
-> エージェントが読むのは `index.json`（todo）を第一とし、`deps-issues.json` は issue-only 投影として “読みやすさ” のために用意する。
-
-#### `run_id` / `inputs_fingerprint`（取り違え防止）
-- `run_id`: `uuid4` を採用する（1回の `sync` を一意に識別）
-- `inputs_fingerprint`: `sha256` を採用し、少なくとも以下を含めて安定化する:
-  - `meta.json`（全件）と `deps.json`（全件）の “内容ハッシュ” の集合（パスでソートして結合）
-  - `sync` 実行時フラグ（`--github`, `--gh-limit`）
-  - runtime script のバージョン識別子（例: `spec-dock` の `__version__` か git sha。無い場合は省略）
-
-#### `spec-dock/.agent/index-all.json`（all）
-```jsonc
-{
-  "schema_version": 3,
-  "generated_at": "2026-03-01T00:00:00+00:00",
-  "run_id": "uuid",
-  "inputs_fingerprint": "sha256:....",
-  "root": "spec-dock/initiatives",
-  "active": { /* active.json と同型 */ },
-  "warnings": ["gh_fetch_failed", "gh_index_incomplete", "deps_ref_expanded_to_empty"],
-  "deps": {
-    "valid": true,
-    "issue_edges": [{ "from": "iss-00001", "to": "iss-00002", "kind": "depends_on" }],
-    "edge_direction": "depends_on (dependent -> prerequisite)"
-  },
-  "nodes": {
-    "iss-00001": {
-      "type": "issue",
-      "id": "iss-00001",
-      "title": "...",
-      "path": "...",
-      "parent_id": "epic-...",
-      "initiative_id": "init-...",
-      "epic_id": "epic-...",
-      "children": [],
-      "status": "open|done|unknown",
-      "deps": {
-        "ready": false,
-        "depends_on": ["iss-00002", "iss-00003"],
-        "blockers_top": ["iss-00002", "iss-00003"]
-      }
-    }
-  }
-}
-```
-
-#### `spec-dock/.agent/index.json`（todo = Done issue 除外）
-- `index-all.json` から以下を除外した投影（todo 観測点）:
-  - `status=="done"` の issue
-  - 配下に todo issue が 1件も残らない epic/initiative（MODEL-005 と同一）
-- `deps.issue_edges` も todo-only にフィルタする（from/to が双方とも todo issue の edge のみ残す）。
-- `index.json` と `tree.json` のノード集合（todo 集合）は一致させる（参照先により判断がぶれないため）。
-
-#### `spec-dock/.agent/tree-all.json` / `tree.json`
-- `tree*.json` は `index*.json` のビュー（投影）であり、追加情報は持たせない（同じ node item をネストした形）。
-
-#### `spec-dock/.agent/deps-issues.json`（todo-only / issue-only）
-- `deps-issues.json` は `index.json`（todo）の issue だけを抜き出した投影（epic/initiative は含めない）。
-- `nodes` の集合は **`index.json` に含まれる todo issue 全件**と一致させる（孤立 issue を落とさない）。
-- `edges` は todo issue 間の canonical issue 依存（depends_on edge）を載せる（端点が todo issue のもののみ）。
-```jsonc
-{
-  "schema_version": 1,
-  "generated_at": "2026-03-01T00:00:00+00:00",
-  "run_id": "uuid",
-  "source": { "index": "spec-dock/.agent/index.json", "schema_version": 3 },
-  "deps": { "valid": true },
-  "nodes": {
-    "iss-00001": {
-      "id": "iss-00001",
-      "title": "...",
-      "status": "open|unknown",
-      "ready": true,
-      "depends_on": [],
-      "state": "doing|ready|blocked|unknown"
-    }
-  },
-	  "edges": [{ "from": "iss-00010", "to": "iss-00020" }],
-	  "edge_direction": "depends_on (dependent -> prerequisite)"
-	}
-	```
-
-#### `spec-dock/dashboard.md`（todo-only）
-- 少なくとも以下を含める:
-  - “観測点” への導線（`index.json`, `tree.puml`, `deps-issues.puml`）
-  - Ready（`ready=true`）の issue 上位 N 件（id/title）
-  - Blocked の issue 上位 N 件（id/title + `blockers_top`）
-  - Unknown（status=unknown）の issue 上位 N 件（id/title）
-
-#### UML（生成物の派生関係） (任意)
-```plantuml
-@startuml
-skinparam shadowing false
-
-file "spec-dock/.agent/index-all.json" as IndexAll
-file "spec-dock/.agent/tree-all.json" as TreeAll
-file "spec-dock/tree-all.puml" as TreeAllPuml
-
-file "spec-dock/.agent/index.json" as IndexTodo
-file "spec-dock/.agent/tree.json" as TreeTodo
-file "spec-dock/tree.puml" as TreeTodoPuml
-
-file "spec-dock/.agent/deps-issues.json" as DepsIssuesJson
-file "spec-dock/deps-issues.puml" as DepsIssuesPuml
-file "spec-dock/dashboard.md" as Dashboard
-
-IndexAll --> TreeAll : view
-IndexAll --> IndexTodo : todo projection\n(filter Done + empty branches)
-IndexTodo --> TreeTodo : view
-
-TreeAll --> TreeAllPuml : render Ready board\n(all)
-TreeTodo --> TreeTodoPuml : render Ready board\n(todo)
-
-IndexTodo --> DepsIssuesJson : project issue-only\n(todo-only)
-DepsIssuesJson --> DepsIssuesPuml : render graph\n(blocks view)
-
-IndexTodo --> Dashboard : render summary
-@enduml
-```
-
-### MODEL-005: todo フィルタ（Done 除外）のルール
-- “Done” 判定は issue の `status=="done"` のみで行う（epic/initiative は progress で集計するが、todo 生成の除外判定には使わない）。
-- todo 投影で除外するもの:
-  - issue: `status=="done"` のもの
-  - epic/initiative: 配下に todo issue が 1件も残らない場合は、`index.json` / `tree.json` の双方から除外する（todo 集合を一致させる）。
-    - `index-all.json` / `tree-all.json` には残る（監査/完了済み含むビュー）。
-
-### MODEL-006: deps 無効（`sync --force`）の扱い
-- `deps.valid=false` を `index*.json` に明示する（例: `deps: { \"valid\": false, \"error\": \"...\" }`）。
-- `sync --force` により deps が無効になった場合でも、MUST 生成物は **無効プレースホルダで上書き**して stale を残さない（ファイルの存在契約を安定化する）。
-  - `.agent/index*.json` / `.agent/tree*.json`:
-    - トップレベル `deps.valid=false` と `deps.error` を必ず出力する
-    - `deps.valid=false` のときは `deps.issue_edges=[]`（空配列）を必ず出力し、直前実行の stale edge を残さない
-    - issue ノードの `deps` は `null` を許容し、ready/closure を未計算として表現する（`deps.valid=true` のときのみ `deps.ready` 等が必須）
-  - `spec-dock/tree*.puml`:
-    - ヘッダに `DEPS_DISABLED` の note を表示する
-    - issue の state は `done/doing/unknown` のみを用いる（ready/blocked は出さない）
-  - `.agent/deps-issues.json` / `spec-dock/deps-issues.puml`:
-    - `deps.valid=false` と error 要約のみを出し、`nodes/edges` は空で上書きする
-  - `spec-dock/dashboard.md`:
-    - `DEPS_DISABLED` と error 要約のみを出し、利用者が誤解しないよう「ready/blocked 集計は無効」と明記する
-
-#### UML（`sync --force` の分岐と stale 防止） (任意)
-```plantuml
-@startuml
-hide footbox
-skinparam shadowing false
-
-actor User
-participant "spec-dock\n(runtime)" as Script
-participant "SSOT\ndeps.json" as Deps
-participant ".agent\nindex(-all).json, index.json\ntree(-all).json, tree.json" as IndexTree
-participant "spec-dock\ntree(-all).puml, tree.puml" as TreePuml
-participant ".agent\ndeps-issues.json" as DepsIssuesJson
-participant "spec-dock\ndeps-issues.puml" as DepsIssuesPuml
-participant "spec-dock\ndashboard.md" as Dashboard
-participant ".agent\ndeps.json, deps.puml, deps.todo.puml\n(legacy v1)" as Legacy
-
-User -> Script: sync --force
-Script -> Deps: compile + validate
-
-alt deps valid
-  Script -> IndexTree: emit (deps.valid=true)\n+ deps.issue_edges
-  Script -> TreePuml: render normal
-  Script -> DepsIssuesJson: render normal
-  Script -> DepsIssuesPuml: render normal
-  Script -> Dashboard: render normal
-else deps invalid
-  Script -> IndexTree: emit (deps.valid=false)\n+ deps.issue_edges=[]
-  Script -> TreePuml: overwrite placeholder\n(DEPS_DISABLED)
-  Script -> DepsIssuesJson: overwrite placeholder\n(nodes/edges empty)
-  Script -> DepsIssuesPuml: overwrite placeholder\n(nodes/edges empty)
-  Script -> Dashboard: overwrite placeholder\n(DEPS_DISABLED + error summary)
-end
-
-Script -> Legacy: delete if exists\n(stale v1 artifacts)
-@enduml
-```
+- MODEL-001: `.meta.json`（dotfile）
+  - Fields（既存）:
+    - `schema_version`（=1）
+    - `type`（initiative|epic|issue）
+    - `id` / `title` / `slug`
+    - `created_at` / `updated_at`
+    - `parent_id` / `initiative_id` / `epic_id`
+    - `github.issue_number`（任意）
+  - Fields（追加）:
+    - `_spec_dock`（object）
+      - `managed: true`（MUST）
+      - `do_not_edit: true`（MUST）
+      - `edit_via: "spec-dock"`（MUST）
+  - Validation:
+    - `_spec_dock` は “存在するだけ” ではなく、上記キー/値を満たすこと（受け入れ条件で検証）。
+  - Legacy:
+    - `meta.json`（旧ファイル名）はサポートしない（読み取り/移行/互換を実装しない）。
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
 skinparam shadowing false
 
-package "SSOT" {
-  class "deps.json" as DepsJson {
-    schema_version: 1
-    depends_on: list[str|int]
-  }
+class MetaJson {
+  schema_version: int (=1)
+  type: str
+  id: str
+  title: str
+  slug: str
+  created_at: str
+  updated_at: str
+  parent_id: str?
+  initiative_id: str?
+  epic_id: str?
+  github: object?
+  _spec_dock: object
 }
 
-package "Derived (index/tree)" {
-  class "issue node" as Issue {
-    id: iss-*
-    status: open|done|unknown
-    deps.ready: bool
-    deps.depends_on: list[iss-*]  ' closure (Done excluded)
-  }
-  class "index.json" as Index {
-    deps.issue_edges: list[edge]
-    warnings: list[str]
-    nodes: map[id -> node]
-  }
-}
+note right of MetaJson
+MUST:
+  managed=true
+  do_not_edit=true
+  edit_via="spec-dock"
+end note
 @enduml
 ```
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
-- 論点: issue-only 依存グラフを all も出すか？
-  - 決定: **todo-only のみ**出す（ADR-00008/00007）
-  - 理由: 目的が “今やる順序” の把握であり、Done を混ぜるとノイズが増える。監査は `index-all.json` で担保する。
-- 論点: focus 図（per issue）を生成物として常設するか？
-  - 決定: 出さない（ADR-00008）
-  - 理由: 生成物の種類増加は運用コスト/誤用（stale）を増やす。詳細は `deps check --json` に寄せる。
-- 論点: エージェントが読む形式は？
-  - 決定: JSON（`index.json` / `deps-issues.json`）を正とし、PlantUML は人間向けビューとする（ADR-00008）
+- 論点: read-only の “成功判定” をどう扱うか（POSIX vs non-POSIX）
+  - 選択肢A: `chmod` が例外を投げなければ成功扱い（検証しない）
+    - Pros: 実装が単純、OS/FS 差を吸収しやすい
+    - Cons: POSIX でも実際に write bit が残る可能性を見逃す
+  - 選択肢B: POSIX のみ、chmod 後に write bit が外れたか検証する（外れていなければ warn）
+    - Pros: POSIX での要件（write bit 除去）を確実に満たす
+    - Cons: 実装が少し増える
+  - 決定: **選択肢B**
+  - 理由: 要件が POSIX では write bit 除去を観測可能としているため
+
+- 論点: read-only 失敗時の扱い
+  - 決定: warn のみで継続（exit code 0）
+  - 理由: best-effort を要件で固定しているため
 
 ## インターフェース契約（ここで固定） (任意)
-### CLI（重要なものだけ）
-- CLI-001: `sync [--github] [--gh-limit N] [--force]`
-  - Success:
-    - `.agent/index-all.json`, `.agent/tree-all.json`, `.agent/index.json`, `.agent/tree.json` を生成
-    - `.agent/deps-issues.json` を生成（deps 無効時はプレースホルダで上書き）
-    - `spec-dock/tree*.puml`, `spec-dock/deps-issues.puml`, `spec-dock/dashboard.md` を生成（deps 無効時はプレースホルダで上書き）
-  - Failure:
-    - deps の構造エラー（未解決参照/self/cycle 等）は exit=1（`--force` なら exit=0 で継続し、deps派生物は無効化プレースホルダにする）
-- CLI-002: `deps check <target> [--github] [--gh-limit N] [--json]`
-  - Success:
-    - exit=0（ready） / exit=3（blocked）
-    - `--json` は `ready`, `blockers`, `effective_depends_on`（closure）, `warnings` を返す（warnings は空配列を含め常に出す）
-  - Failure:
-    - deps の構造エラーは exit=1（原因と provenance を出す）
-- CLI-003: `active set <target> [--github] [--gh-limit N] [--force]`
-  - Success:
-    - exit=0
-    - `spec-dock/.agent/active.json` が更新される
-    - blocked な target でも `--force` があれば警告（blockers）付きで更新する
-  - Failure:
-    - deps guard により blocked の target は exit=1（`--force` が無い場合）
-    - このとき `spec-dock/.agent/active.json` は更新しない
+### API（ある場合）
+- （なし）runtime CLI の外部インターフェース追加は行わない。
 
 ### 関数・クラス境界（重要なものだけ）
-- IF-001: `spec-dock::_compile_issue_graph(nodes) -> (depends_on_edges, warnings, provenance)`
-  - Input: `_Node` map + `deps.json`
+- IF-001: `spec_dock_runtime/app.py::_write_meta(dest_dir: Path, ...) -> None`
+  - 役割: meta dict の構築、`.meta.json` 書き込み、read-only 化（best-effort）
+  - Errors/Exceptions:
+    - JSON write（I/O）で失敗する場合は現状どおり例外（新規作成の根幹のため）
+    - read-only 化の失敗は例外にしない（warn）
+- IF-002: `spec_dock_runtime/io_json.py::_try_make_readonly(path: Path) -> tuple[bool, str | None]`
+  - Input: `.meta.json` の `Path`
   - Output:
-    - internal: `depends_on_edges`（dependent->prereq）
-    - output: `deps.issue_edges` は depends_on edge（dependent->prereq）として生成物に載せる
-    - view: PlantUML 描画では blocks edge（prereq->dependent）へ反転して描画できる（ADR-00007）
-  - Errors: unresolved ref / descendant / self / cycle
-- IF-002: `spec-dock::_derive_issue_deps(nodes, issue_status_by_id, depends_on_edges) -> per_issue_deps`
-  - Output: `ready`, `depends_on(closure, Done除外)` 等
-- IF-003: `spec-dock::_emit_agent_artifacts(...)`
-  - Output:
-    - 機械可読: `.agent/index-*.json`, `.agent/tree-*.json`, `.agent/deps-issues.json`
-    - 人間向け: `spec-dock/tree*.puml`, `spec-dock/deps-issues.puml`, `spec-dock/dashboard.md`
+    - `ok`: read-only 化が成功した
+      - POSIX（Linux/macOS 等）: write bit が外れた（`chmod a-w` 相当）
+      - non-POSIX（Windows 等）: read-only 化を試行し、例外なく完了した（検証不能な場合は “試行できた” を成功扱い）
+    - `error_message`: 失敗時の原因（OSError 等の文字列）
+  - Errors/Exceptions: 例外は外に投げず、呼び出し側が warn を出せる形で返す
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
 skinparam shadowing false
 
-rectangle "_sync" as Sync
-rectangle "_compile_issue_graph" as Compile
-rectangle "_derive_issue_deps" as Derive
-rectangle "_render_tree_puml" as RenderTree
-rectangle "_render_deps_issues_puml" as RenderGraph
-rectangle "_render_dashboard_md" as RenderDash
-
-Sync --> Compile
-Compile --> Derive
-Derive --> RenderTree
-Derive --> RenderGraph
-Derive --> RenderDash
+package "spec_dock_runtime" {
+  [app.py] --> [io_json.py] : _write_json/_warn\n+ _try_make_readonly
+}
 @enduml
 ```
 
 ### クラス/インターフェース詳細設計（主要なもの） (任意)
 > この Issue を “単独の作業単位” として完結させるために、必要な範囲だけ詳細化する。
 
-- runtime は target repo にコピーされる Python（stdlib only）として運用する。
-  - `spec-dock/scripts/spec-dock` は **薄い CLI エントリポイント**に留める
-  - 主要ロジックは `spec-dock/scripts/spec_dock_runtime/` に責務分割し、肥大化を抑える（モジュール設計）
-  - 起動経路（`./spec` wrapper / symlink 等）に依存せず import できるよう、entrypoint は `Path(__file__).resolve().parent` を基準に `sys.path` を固定した上で `spec_dock_runtime` を import する（`spec_dock_runtime/__init__.py` を置き package として扱う）
-
-#### UML（任意） (任意)
-```plantuml
-@startuml
-skinparam shadowing false
-
-rectangle "scan/load" as Scan
-rectangle "compile\n(shorthand->issue)" as Compile
-rectangle "validate\n(desc/self/cycle)" as Validate
-rectangle "enrich\n(--github)" as Enrich
-rectangle "derive\n(ready/closure)" as Derive
-rectangle "emit\n(json -> .agent/\n(puml, md) -> spec-dock/" as Emit
-
-Scan --> Compile
-Compile --> Validate
-Validate --> Enrich
-Enrich --> Derive
-Derive --> Emit
-@enduml
-```
-
-#### UML（モジュール構成） (任意)
-```plantuml
-@startuml
-skinparam shadowing false
-
-rectangle "spec-dock/scripts/spec-dock\n(entrypoint)" as Entry
-
-package "spec-dock/scripts/spec_dock_runtime" {
-  rectangle "cli\n(argparse / dispatch)" as CLI
-  rectangle "sync\n(pipeline orchestrator)" as Sync
-  rectangle "deps\n(load/compile/validate/closure)" as Deps
-  rectangle "github\n(enrich via gh)" as GH
-  rectangle "derive\n(ready/state/blockers)" as Derive
-  rectangle "artifacts_json\n(.agent/*.json)" as ArtJson
-  rectangle "artifacts_human\n(spec-dock/*.puml, dashboard.md)" as ArtHuman
-  rectangle "util\n(sort/hash/fs)" as Util
-}
-
-Entry --> CLI
-CLI --> Sync
-
-Sync --> Deps
-Sync --> GH
-Sync --> Derive
-
-Derive --> ArtJson
-Derive --> ArtHuman
-
-Deps --> Util
-GH --> Util
-ArtJson --> Util
-ArtHuman --> Util
-@enduml
-```
+- この Issue は既存の関数追加/変更で完結する（新規クラス/Protocol は追加しない）。
 
 ### 例外/エラー契約（重要なものだけ） (任意)
-- ERR-001: `Unresolved dependency ref`
-  - 発生条件: `deps.json` の参照が node/GitHub issue として解決できない
-  - 返し方: exit=1（stderr に `deps.json` パスと ref を含める）
-- ERR-002: `Descendant dependency forbidden`
-  - 発生条件: 親→配下（descendant）依存が発生（shorthand 展開後も含む）
-  - 返し方: exit=1（fail-fast）
-- ERR-003: `Dependency cycle detected`
-  - 発生条件: canonical issue グラフに cycle
-  - 返し方: exit=1（代表 cycle と provenance）
-- WARN-001: `deps_ref_expanded_to_empty`
-  - 発生条件: `epic/init` shorthand の展開が空（配下 issue=0）
-  - 返し方: warnings に追加（ブロックしない）
-- WARN-002: `gh_fetch_failed`
-  - 発生条件: `--github` 時に GitHub 取得（`gh`）が失敗
-  - 返し方: warnings に追加し、該当 issue は `status=unknown` として安全側（blocked）に倒す
-- WARN-003: `gh_index_incomplete`
-  - 発生条件: `--github` 時に `--gh-limit` 等により linked issue の一部が取得できない
-  - 返し方: warnings に追加し、missing は `status=unknown` として安全側（blocked）に倒す
-- WARN-004: `deps_preflight_failed`
-  - 発生条件: `sync --force` で deps の構造エラーを検出し、deps を無効化して継続
-  - 返し方: warnings に追加し、deps 派生物は無効プレースホルダで上書きする（MODEL-006）
+- ERR-001: `.meta.json` write 失敗
+  - 発生条件: `Path.write_text` などが失敗（ディスク/権限/パス不正）
+  - 返し方: 既存どおり例外でコマンド失敗（生成そのものが成立しないため）
+- ERR-002: read-only 化 失敗（best-effort）
+  - 発生条件: `chmod` が失敗、または（POSIX）chmod 後も write bit が残る
+  - 返し方: warn のみで継続（exit code 0）
+  - ログ: `spec-dock: (warn) ...`（read-only 化失敗を示す文言を含める）
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/nodes.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/deps.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/active.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py`
+  - なし
 - 変更（Modify）:
-  - `src/spec_dock/assets/spec_dock/.gitignore`
-    - 人間向け生成物（`tree*.puml`, `deps-issues.puml`, `dashboard.md`）を ignore に追加（この `.gitignore` 自体が `spec-dock/` 直下に配置される前提）
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
-    - 現状の monolithic 実装を薄くし、責務を追加モジュールへ移設する（外部仕様は不変）
-  - `src/spec_dock/assets/spec_dock/scripts/spec-dock`
-    - entrypoint は維持（thin wrapper）。必要最小の整形以外は原則変更しない
-  - `src/spec_dock/assets/spec_dock/docs/reference_sync.md` / `reference_deps.md`
-    - v2 の生成物と意味を反映（実装と同時に更新）
-  - `tests/test_cli.py`
-    - `sync` の生成物/スキーマ変更に追従
-    - `deps check` / `active set` guard / `sync --force` の境界を回帰で担保
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`: `_write_meta()` に `_spec_dock` を追加し、read-only 化を試行する（`.meta.json` へ出力）
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py`: read-only 化ヘルパー（例: `_try_make_readonly`）を追加し、warn に必要な情報を返す
+  - `src/spec_dock/assets/spec_dock/templates/**`: wrapper が参照するメタファイル名を `.meta.json` に更新する
+  - `src/spec_dock/assets/spec_dock/docs/**`: `meta.json` 表記を `.meta.json` に更新する
 - 削除（Delete）:
-  - （なし。legacy の削除は runtime output（`spec-dock/.agent/`）側で行う）
-- 参照（Read only）:
-  - `spec-deps/current/requirement.md`
-  - `spec-deps/current/adrs/*.md`
+  - なし
+- 移動/リネーム（Move/Rename）:
+  - なし（後方互換を要求しないため、レガシー `meta.json` の自動移行は行わない）
+- 参照（Read only / context）:
+  - `spec-deps/current/requirement.md`: 受け入れ条件・スコープの SSOT
+  - `spec-deps/current/adrs/adr-00003-drop-legacy-meta-json.md`: 意思決定（legacy `meta.json` 廃止）
+  - `spec-deps/current/adrs/adr-00002-ssot-meta-dotfile.md`: 意思決定（dotfile 化 + 自己記述 + read-only）
+  - `spec-deps/current/adrs/adr-00001-meta-json-tool-managed-readonly.md`: 旧ADR（superseded、経緯参照）
 
 ## マッピング（要件 → 設計） (必須)
-- entrypoint:
-  - `src/spec_dock/assets/spec_dock/scripts/spec-dock` → `spec_dock_runtime.app:main`（thin wrapper）
-- implementation（分割後の責務割当。`spec_dock_runtime/*`）:
-  - AC-001/002/003/009/010:
-    - `nodes.py`（scan/containment validate）
-    - `deps.py`（compile/derive/cycle/closure/ready）
-    - `github.py`（`--github` enrich、失敗は unknown）
-    - `render_puml.py` / `render_md.py`（生成物）
-  - AC-004/005/007:
-    - `active.py`（active set/show/clear）
-    - `deps.py`（deps guard）
-    - `github.py`（`--github` guard）
-  - AC-006/011/012/013:
-    - `render_puml.py`（Readyボード / deps-issues.puml。`deps-issues.puml` は `linetype ortho` を採用）
-    - `render_md.py`（dashboard）
-  - AC-014:
-    - `spec_dock_runtime/` のモジュール分割（上記のファイル群が存在）
-    - `app.py` は dispatch 中心に薄く保つ（entrypoint は維持）
-  - EC-001..004 → `deps.py`（schema / resolve / self / cycle）
-  - EC-005 → `github.py`（warn + unknown=blocked）
-  - 非交渉制約（stdlib only / GH更新しない）→ runtime 全体の実装制約として維持
+- AC-001 → IF-001, IF-002, `app.py::_write_meta`, `io_json.py::_try_make_readonly`
+- AC-002 → IF-001, IF-002（import も `_write_meta` を通る）
+- EC-001 → `io_json.py::_try_make_readonly`（失敗理由の収集）+ `app.py`（warn と継続）
+- EC-002 → 実装方針（new/import/sync/validate はレガシー `meta.json` を検出したら fail-fast し、副作用前に停止する）
+- 非交渉制約（依存追加なし）→ `io_json.py` に stdlib のみで実装
 
 ## テスト戦略（最低限ここまで具体化） (任意)
-- 追加/更新するテスト（すべて `python -m unittest discover -v` で回す）:
-  - `tests/test_cli.py` を拡張し、temp repo 上で runtime `spec-dock/scripts/spec-dock` を実行して成果物を検証する。
-  - `generated_at` / `run_id` などの非決定値は “存在と形式” のみを検証し、値一致のアサートはしない（フレーク防止）。
-  - “決定的順序” の担保として、配列フィールド（`warnings`, `deps.issue_edges`, `deps.depends_on`, `deps.blockers_top` 等）が安定ソートされることをテストで検証する。
-- どのAC/ECをどのテストで保証するか（案）:
-  - AC-001 → `test_sync_emits_index_all_and_todo_views_and_contains_deps_fields`（新規）
-  - AC-002 → `test_deps_check_expands_shorthand_to_issue_edges`（新規）
-  - AC-003 → `test_deps_check_warnings_include_expanded_to_empty`（新規）
-  - AC-003 → `test_sync_warnings_include_expanded_to_empty`（新規）
-  - AC-004 → `test_active_set_is_blocked_when_deps_not_ready`（新規）
-  - AC-005 → `test_active_set_force_overrides_deps_guard`（新規）
-  - AC-006 → `test_sync_emits_tree_puml_ready_board`（新規）
-  - AC-007 → `test_sync_without_github_uses_index_snapshot_for_status`（新規/更新）
-  - AC-008 → `test_sync_github_limit_warns_incomplete_and_unknown_blocks`（新規）
-  - AC-009 → `test_sync_fails_on_deps_structural_error_without_force`（新規）
-  - AC-011/012 → `test_sync_emits_deps_issues_json_and_puml_todo_only`（新規）
-  - AC-011 → `test_sync_emits_deps_issues_puml_uses_ortho_linetype`（新規）
-  - AC-013 → `test_sync_emits_dashboard_md`（新規）
-  - AC-014 → `test_runtime_is_modularized_and_spec_help_works`（新規）
-  - AC-010 → `test_sync_force_sets_deps_valid_false_and_emits_placeholders`（新規/更新）
-  - AC-010 → `test_sync_force_removes_legacy_deps_artifacts`（新規）
-  - 決定的順序 → `test_sync_outputs_are_deterministically_sorted`（新規）
-  - EC-001 → `test_deps_json_schema_version_must_be_1`（新規）
-  - EC-002 → `test_deps_unresolved_ref_is_error`（新規）
-  - EC-003/004 → `test_deps_self_edge_and_cycle_are_errors`（新規）
-  - EC-005 → `test_github_fetch_failed_warns_and_unknown_blocks`（新規）
+- 追加/更新するテスト:
+  - Unit（unittest）:
+    - `new issue` 等の生成結果として `.meta.json` が `_spec_dock` を含むこと
+    - （POSIX）`.meta.json` の write bit が外れていること（環境差がある場合は skip か best-effort）
+    - read-only 化が失敗した場合に warn が出ること（prefix: `spec-dock: (warn)` / モックで `chmod` を失敗させる）
+    - レガシー `meta.json` が存在する場合に、`sync/validate` がエラーで停止すること（ガイダンス + 該当パス）
+- どのAC/ECをどのテストで保証するか:
+  - AC-001/AC-002 → `tests/*`（runtime 生成物検証）
+  - EC-001 → `tests/*`（chmod 失敗時 warn + exit code 0 の検証）
+  - EC-002 → `tests/*`（レガシー `meta.json` 検出時の fail-fast）
 
 ### テストマトリクス（AC/EC → テスト） (任意)
-- 実行コマンド:
+- AC-001:
+  - Unit: meta の `_spec_dock` 検証 + （POSIX）mode 検証
+- AC-002:
+  - Unit: import 経由でも `_spec_dock` 検証
+- EC-001:
+  - Unit: chmod 失敗をモックし、warn（prefix: `spec-dock: (warn)`）+ exit 0 を検証
+- EC-002:
+  - Unit:
+    - Case1: レガシー `meta.json` が存在する場合に、`sync/validate` が fail-fast し、ガイダンス + 該当パスを出すことを検証
+- 非交渉制約（requirement.md）をどう検証するか:
+  - 制約: 依存追加なし
+    - 検証方法: `pyproject.toml` の依存増加が無いことをレビューで確認
+  - 制約: schema_version=1 維持
+    - 検証方法: meta の出力をテストで確認
+- 実行コマンド（該当するものを記載）:
   - `python -m unittest discover -v`
+- 変更後の運用（必要なら）:
+  - ロールバック: read-only 化処理を無効化する（コード側の revert）
 
 ## リスク/懸念（Risks） (任意)
-- R-001: shorthand 展開でエッジ数が増える
-  - 対応: 出力は “todo-only” を主にし、図は issue-only と Readyボードに分離する。`deps-issues.json` は投影として最小化する。
-- R-002: shorthand 展開で自己依存/循環が暗黙に生まれる
-  - 対応: compile 後の canonical issue グラフで fail-fast（`--force` は deps 無効化で継続）
-- R-003: `sync --force` 時の stale 誤用
-  - 対応: deps 派生物を無効プレースホルダで上書きし、`index*.json` に `deps.valid=false` を明示する
+- R-001: read-only が正当な修正の妨げになる
+  - 影響: ユーザーが `.meta.json` を更新できず混乱する可能性
+  - 対応: 本 Issue では unlock/lock CLI は追加しないが、必要なら別 Issue で導線を追加する
+- R-002: 環境差で read-only の保証が弱い
+  - 影響: 事故を完全には防げない
+  - 対応: best-effort を前提に、自己記述 + warn で可視化する
 
 ## 未確定事項（TBD） (必須)
-- 該当なし（本設計の論点は ADR 群で確定済み）
+- なし（requirement.md / ADR で意思決定済み）
 
 ---
 
 ## ディレクトリ/ファイル構成図（変更点の見取り図） (任意)
 ```text
 <repo-root>/
-├── src/spec_dock/assets/spec_dock/.gitignore                # Modify (ignore human-facing generated artifacts)
-├── src/spec_dock/assets/spec_dock/scripts/spec-dock          # Modify (thin CLI entrypoint)
-├── src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ # Add (runtime modules; stdlib only)
-├── src/spec_dock/assets/spec_dock/docs/reference_sync.md     # Modify (artifacts)
-├── src/spec_dock/assets/spec_dock/docs/reference_deps.md     # Modify (deps v2)
-├── tests/test_cli.py                                         # Modify (regression)
-└── spec-deps/current/design.md                               # Modify (this doc)
-
-# runtime outputs (generated; not committed)
-<target-repo>/spec-dock/.agent/
-├── index-all.json
-├── tree-all.json
-├── index.json
-├── tree.json
-├── deps-issues.json
-└── active.json
-
-<target-repo>/spec-dock/
-├── tree-all.puml
-├── tree.puml
-├── deps-issues.puml
-└── dashboard.md
+├── src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
+│   ├── app.py                         # Modify: _write_meta に _spec_dock + lock 追加
+│   └── io_json.py                     # Modify: _try_make_readonly を追加
+└── spec-deps/current/
+    ├── requirement.md                 # Read only (SSOT)
+    ├── design.md                      # This
+    └── adrs/
+        ├── adr-00001-*.md             # Read only (decision; superseded)
+        └── adr-00002-*.md             # Read only (decision; current)
 ```
 
 ## 省略/例外メモ (必須)
