@@ -110,6 +110,47 @@ python -m unittest discover -v
 #### メモ
 - これで `spec-dock new adr` は `discussions/adr-xxxxx-<slug>.md` に生成される。
 
+---
+
+### 2026-03-06 16:35 - 16:40
+
+#### 対象
+- Step: S05
+- AC/EC: AC-005（導線固定）
+
+#### 実施内容
+- `src/spec_dock/assets/spec_dock/docs/*.md` と skill を `discussions/` 運用へ統一
+  - `adrs/` / `artifacts/` / `new-adr` wrapper 前提の記述を除去
+  - ADR 導線を `./spec-dock/scripts/spec-dock new adr --{issue|epic|initiative} ...` へ置換
+  - `discussions/rules.md` と `spec-dock/templates/discussions/*.md` を参照する説明に統一
+- `docs/discussion-sheets/01_tree_root_location.md` の構成例を `discussions/` 表記へ更新
+- `tests/test_cli.py` の skill アサートを更新
+  - `artifacts/` 前提を削除
+  - `discussions/` と runtime `new adr` 導線を検証
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (Ran 144 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/guide.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`
+- `src/spec_dock/assets/spec_dock/docs/README.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`
+- `docs/discussion-sheets/01_tree_root_location.md`
+- `tests/test_cli.py`
+
+#### コミット
+- なし（コミット前）
+
+#### メモ
+- S05 のドキュメント導線は `discussions/` 1本で整合した。
+
 ## 遭遇した問題と解決 (任意)
 - 問題: `init/update` 後に `templates/**/discussions/` が消えるため、S02要件を満たせなかった
   - 解決: `_prune_legacy_scaffold` が `discussions` を legacy 扱いで削除していたため、削除対象を `adrs` / `artifacts` に置換した
@@ -119,8 +160,8 @@ python -m unittest discover -v
 - 空ディレクトリは git 管理されないため、`rules.md` 同梱は仕様・実装の両面で有効だった。
 
 ## 今後の推奨事項 (任意)
-- S04実施有無（`new doc`）を判断したら、typeごとの採番テストを追加して固定する。
-- S05/S06で docs 追随と最終品質ゲート（main差分レビュー）を実施する。
+- （将来）採番衝突の自動回避が必要になったら、`new doc` を別Issueで追加し、typeごとの採番テストで固定する。
+- S06で最終品質ゲート（main差分レビュー）を実施する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
