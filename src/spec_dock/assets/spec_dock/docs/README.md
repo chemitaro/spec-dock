@@ -68,13 +68,14 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 
 # epic配下で issue を追加
 <epic-dir>/issues/new-issue "..."
-
-# initiative / epic / issue 配下の adrs で ADR を追加
-<scope-dir>/adrs/new-adr "..."
 ```
 
 補足:
-- 補足資料は `artifacts/` に置き、初期ファイルとして `artifacts/_template.md` が入ります。
+- ADR は runtime command で追加します:
+  - `./spec-dock/scripts/spec-dock new adr --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new adr --initiative <initiative-id> --title "..."`
+- 補足資料（メモ/調査/議論）も `discussions/` に置きます。`discussions/rules.md` と `spec-dock/templates/discussions/*.md` を参照してください。
 - 新規ノードにはテンプレ由来の `README.md` は生成されません。
 
 ## 重要な注意（事故防止）

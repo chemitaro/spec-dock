@@ -62,7 +62,7 @@ spec-dock/
   initiatives/
     INIT-0001-.../
       epics/
-      adrs/
+      discussions/
 ```
 
 **意味**

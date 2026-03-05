@@ -376,9 +376,9 @@ class TestCli(unittest.TestCase):
                 / "spec-driven-tdd-workflow"
                 / "SKILL.md"
             ).read_text(encoding="utf-8")
-            self.assertIn("`artifacts/`", skill_text)
             self.assertIn("`discussions/`", skill_text)
-            self.assertIn("legacy", skill_text)
+            self.assertIn("./spec-dock/scripts/spec-dock new adr --issue", skill_text)
+            self.assertNotIn("adrs/new-adr", skill_text)
             self.assertFalse(
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )

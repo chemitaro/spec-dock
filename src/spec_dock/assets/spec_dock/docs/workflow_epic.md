@@ -59,7 +59,9 @@ Epic 作成後は、対象ノード配下の wrapper で Issue を追加でき�
 - `requirement.md`: 期待する価値 / 受け入れ条件（AC）/ 非機能（NFR）/ スコープ
 - `design.md`: 変更方針 / インタフェース契約 / 移行 / 観測性 / リスク
 - `plan.md`: Issue 分割（粒度）/ 依存順序 / 品質ゲート
-- `artifacts/`: 補足資料（調査メモ/図/ログ断片）。`_template.md` をコピーして利用する
+- `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
+  - ADR: `./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "..."`
+  - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
 
 補足:
 - ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
