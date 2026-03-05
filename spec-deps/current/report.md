@@ -67,10 +67,12 @@ python -m unittest discover -v
 
 #### コミット
 - なし（コミット前）
+- 追記: a139aba feat(templates): discussions/ へ統一したスキャフォールドを追加
 
 #### メモ
 - S02スコープの実装とテスト通過まで完了。
 - `spec-dock new adr` は S03 未着手のため現状は失敗する（`templates/adr.md` 参照のまま）。S03で `templates/discussions/adr.md` へ追随させる。
+- 追記: S03（e4c84fc）で `spec-dock new adr` の `discussions/` 追随が完了した。
 - 次は reviewer レビュー（指摘対応→再レビュー）を経て S02コミットへ進む。
 
 ---
@@ -103,6 +105,7 @@ python -m unittest discover -v
 
 #### コミット
 - なし（コミット前）
+- 追記: e4c84fc fix(runtime): ADR を discussions/ に作成する
 
 #### メモ
 - これで `spec-dock new adr` は `discussions/adr-xxxxx-<slug>.md` に生成される。
