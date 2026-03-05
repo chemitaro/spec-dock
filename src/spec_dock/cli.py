@@ -160,15 +160,18 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 
     templates_dir = specdock_dir / "templates"
 
-    # Defensive: node templates should not generate README.md or legacy discussions/.
+    # Defensive: node templates should not generate nested README.md files.
     # These can reappear if a local clone has stale `build/` artifacts that get packaged.
     for p in templates_dir.rglob("README.md"):
         if p == templates_dir / "README.md":
             continue
         p.unlink(missing_ok=True)
-    for d in sorted(templates_dir.rglob("discussions"), key=lambda x: len(str(x)), reverse=True):
-        if d.is_dir():
-            shutil.rmtree(d, ignore_errors=True)
+
+    # Legacy node templates used per-scope `adrs/` and `artifacts/`; prune them.
+    for legacy_dir in ("adrs", "artifacts"):
+        for d in sorted(templates_dir.rglob(legacy_dir), key=lambda x: len(str(x)), reverse=True):
+            if d.is_dir():
+                shutil.rmtree(d, ignore_errors=True)
 
     # v1 used top-level templates/*.md; v2 uses templates/{initiative,epic,issue}/.
     for name in ("requirement.md", "design.md", "plan.md", "report.md"):
@@ -179,11 +182,6 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
         for d in sorted(templates_dir.rglob(dirname), key=lambda x: len(str(x)), reverse=True):
             if d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
-
-    # v2 doesn't use a top-level templates/discussions directory.
-    discussions_dir = templates_dir / "discussions"
-    if discussions_dir.exists():
-        shutil.rmtree(discussions_dir, ignore_errors=True)
 
     # v1 installed a workflow that moved `current/` -> `completed/` on issue close.
     legacy_workflow = specdock_dir.parent / ".github" / "workflows" / "spec-dock-close.yml"

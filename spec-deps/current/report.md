@@ -1,72 +1,89 @@
 ---
 種別: 実装報告書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "iss-00014"
+タイトル: "ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合）"
+関連GitHub: ["#14", "https://github.com/chemitaro/spec-dock/issues/14"]
+状態: "draft"
+作成者: "Codex CLI"
+最終更新: "2026-03-06"
 依存: ["requirement.md", "design.md", "plan.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: []
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装報告（LOG）
+# iss-00014 ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合） — 実装報告（LOG）
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S02として、テンプレ生成物を `adrs/` + `artifacts/` から `discussions/` に統合した。
+- `spec-dock/templates/discussions/` に `adr/note/disc/research` テンプレを同梱し、各scopeに `discussions/rules.md` を追加した。
+- `init/update` 後に `discussions/` が削除される不具合（legacy prune）を修正し、回帰テストを更新した。
 
 ## 実装記録（セッションログ） (必須)
 
-### YYYY-MM-DD HH:MM - HH:MM
+### 2026-03-06 15:50 - 16:35
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S02
+- AC/EC: AC-001, AC-003, AC-005, AC-006, EC-002
 
 #### 実施内容
-- ...
+- テンプレート変更:
+  - `templates/adr.md` を `templates/discussions/adr.md` へ移動
+  - `templates/discussions/{note,disc,research}.md` を追加
+  - `templates/{initiative,epic,issue}/discussions/rules.md` を追加
+  - `templates/{initiative,epic,issue}/{adrs,artifacts}` を削除
+  - `templates/README.md` のマッピングと注意書きを更新
+- 追加修正:
+  - `src/spec_dock/cli.py` の `_prune_legacy_scaffold` を更新し、`discussions/` を削除しないよう修正
+  - 代わりに legacy の `adrs/` / `artifacts/` を prune するよう変更
+- テスト更新:
+  - `tests/test_cli.py` を S02 要件に追随（`discussions/rules.md`、`adrs/artifacts` 不在、`new-adr` ラッパ不在、typeテンプレ同梱）
 
 #### 実行コマンド / 結果
 ```bash
-<command>
-
-<result>
+python -m unittest discover -v
+# 1回目: FAIL (3件)
+# - discussions が生成されない/保持されない
+# - new node 配下に adrs が残る
+#
+# 修正後
+python -m unittest discover -v
+# OK (Ran 142 tests)
 ```
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/templates/README.md` - discussions統合に合わせた説明へ更新
+- `src/spec_dock/assets/spec_dock/templates/discussions/adr.md` - ADRテンプレ移設
+- `src/spec_dock/assets/spec_dock/templates/discussions/note.md` - noteテンプレ追加
+- `src/spec_dock/assets/spec_dock/templates/discussions/disc.md` - discテンプレ追加
+- `src/spec_dock/assets/spec_dock/templates/discussions/research.md` - researchテンプレ追加
+- `src/spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md` - initiative用 rules 追加
+- `src/spec_dock/assets/spec_dock/templates/epic/discussions/rules.md` - epic用 rules 追加
+- `src/spec_dock/assets/spec_dock/templates/issue/discussions/rules.md` - issue用 rules 追加
+- `src/spec_dock/assets/spec_dock/templates/adr.md` - 削除（discussions配下へ移動）
+- `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/adrs/new-adr` - 削除
+- `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/artifacts/_template.md` - 削除
+- `src/spec_dock/cli.py` - legacy prune 条件を S02仕様に修正
+- `tests/test_cli.py` - S02 要件アサートへ更新
 
 #### コミット
-- <hash> <message>
+- なし（コミット前）
 
 #### メモ
-- ...
-
----
-
-### YYYY-MM-DD HH:MM - HH:MM
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
+- S02スコープの実装とテスト通過まで完了。
+- `spec-dock new adr` は S03 未着手のため現状は失敗する（`templates/adr.md` 参照のまま）。S03で `templates/discussions/adr.md` へ追随させる。
+- 次は reviewer レビュー（指摘対応→再レビュー）を経て S02コミットへ進む。
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `init/update` 後に `templates/**/discussions/` が消えるため、S02要件を満たせなかった
+  - 解決: `_prune_legacy_scaffold` が `discussions` を legacy 扱いで削除していたため、削除対象を `adrs` / `artifacts` に置換した
 
 ## 学んだこと (任意)
-- ...
-- ...
+- `S02` はテンプレ差し替えだけでなく、installer 側の legacy prune ルール更新が必須だった。
+- 空ディレクトリは git 管理されないため、`rules.md` 同梱は仕様・実装の両面で有効だった。
 
 ## 今後の推奨事項 (任意)
-- ...
-- ...
+- S03で `spec-dock new adr` の出力先/テンプレ参照（`discussions/adr.md`）を runtime 側へ反映する。
+- S04実施有無（`new doc`）を判断したら、同じく typeごとの採番テストを追加して固定する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
