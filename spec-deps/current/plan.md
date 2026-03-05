@@ -29,8 +29,8 @@ ID: "iss-00014"
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
 - [x] S01: `discussions/` 運用仕様（命名/連番/rules/テンプレ位置・種類/ラッパ廃止）を確定する
-- [ ] S02: 新規テンプレ生成物が `discussions/` と `rules.md` を作る（`adrs/`, `artifacts/` を生成しない）
-- [ ] S03: `spec-dock new adr` の出力先が `discussions/` になり、走査/採番も追随する（後方互換なし）
+- [x] S02: 新規テンプレ生成物が `discussions/` と `rules.md` を作る（`adrs/`, `artifacts/` を生成しない）
+- [x] S03: `spec-dock new adr` の出力先が `discussions/` になり、走査/採番も追随する（後方互換なし）
 - [ ] S04: （任意）`spec-dock new doc` を追加し、`note/disc/research` を連番で作成できる
 - [ ] S05: docs/tests を更新し、運用ルールと導線を固定する
 - [ ] S06: 最終品質ゲート（main 差分レビュー + 承認）を通す
