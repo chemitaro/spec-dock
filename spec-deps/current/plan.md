@@ -1,50 +1,69 @@
 ---
 種別: 実装計画書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "iss-00014"
+タイトル: "ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合）"
+関連GitHub: ["#14", "https://github.com/chemitaro/spec-dock/issues/14"]
+状態: "draft"
+作成者: "Codex CLI"
+最終更新: "2026-03-05"
 依存: ["requirement.md", "design.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: []
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装計画（TDD: Red → Green → Refactor）
+# iss-00014 ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合） — 実装計画（TDD: Red → Green → Refactor）
 
 ## この計画で満たす要件ID (必須)
-- 対象AC: AC-001, AC-002, ...
-- 対象EC: EC-001, ...
-- 対象制約（該当があれば）: ...
+- 対象AC: AC-001, AC-002, AC-003, AC-004
+- 対象EC: EC-001, EC-002
+- 対象制約（Always / 非交渉）:
+  - ADR 採番（`adr-00001-...`）を維持
+  - 後方互換性は維持しない（破壊的変更を許容）
 
 ## ステップ一覧（観測可能な振る舞い） (必須)
-- [ ] S01: ...
-- [ ] Sxx: ... (任意: 必要に応じて追加)
+- [ ] S01: `discussions/` 運用仕様（命名/連番/rules/テンプレ位置・種類/ラッパ廃止）を確定する
+- [ ] S02: 新規テンプレ生成物が `discussions/` と `rules.md` を作る（`adrs/`, `artifacts/` を生成しない）
+- [ ] S03: `spec-dock new adr` の出力先が `discussions/` になり、走査/採番も追随する（後方互換なし）
+- [ ] S04: （任意）`spec-dock new doc` を追加し、`note/disc/research` を連番で作成できる
+- [ ] S05: docs/tests を更新し、運用ルールと導線を固定する
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+skinparam monochrome true
+title Implementation steps (iss-00014)
+
+rectangle "S01\n(spec decision)" as S01
+rectangle "S02\n(templates)" as S02
+rectangle "S03\n(runtime new adr + scan)" as S03
+rectangle "S04\n(optional: new doc)" as S04
+rectangle "S05\n(docs + tests)" as S05
+
+S01 --> S02
+S02 --> S03
+S03 --> S04
+S04 --> S05
 @enduml
 ```
 
 ### 要件 ↔ ステップ対応表 (必須)
-- AC-001 → S01
-- AC-___ → Sxx (任意: 必要に応じて追加)
-- EC-___ → Sxx (任意: 必要に応じて追加)
-- （任意）非交渉制約 → Sxx（どのステップで担保/検証するか）
+- AC-001 → S02
+- AC-002 → S03
+- AC-003 → S02
+- AC-004 → S02（テンプレ位置の案内）/ S04（生成する場合）
+- EC-001/EC-002 → S03, S04
+- 非交渉制約（採番維持/後方互換なし）→ S03
 
 ---
 
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
 ### S01 — <観測可能な振る舞い> (必須)
-- 対象: AC-___ / EC-___
+- 対象: AC-001, AC-002, AC-003, AC-004 / EC-001, EC-002
 - 設計参照:
-  - 対象IF/API: IF-___ / API-___
-  - 対象テスト: `<test_file_path>::<test_name>`
+  - 対象ドキュメント: `spec-deps/current/requirement.md`, `spec-deps/current/design.md`
+  - 議論シート（作成予定）: `spec-deps/current/artifacts/` 配下
 - このステップで「追加しないこと（スコープ固定）」:
-  - ...
+  - 実装（テンプレ/ランタイム）の先走り（S02 以降で実施）
 
 #### update_plan（着手時に登録） (必須)
 - [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/品質ゲート/報告/コミット）を登録した
@@ -58,11 +77,11 @@ ID: "<ISS_ID>"
   - （コミット）このステップの区切りでコミット
 
 #### 期待する振る舞い（テストケース） (必須)
-- Given: ...
-- When: ...
-- Then: ...
-- 観測点（UI/HTTP/DB/Log など）: ...
-- 追加/更新するテスト: `<test_file_path>::<test_name>`
+- Given: Issue #14 の合意済み仕様（命名/連番/rules/テンプレ位置/後方互換なし/ラッパ廃止）がドキュメントに反映されている
+- When: 実装ステップ（S02〜）を開始する
+- Then: 迷わずテンプレ/ランタイム/ドキュメントの実装に落とせる
+- 観測点: `spec-deps/current/requirement.md` / `design.md` / `artifacts` の議論シート
+- 追加/更新するテスト: なし（仕様確定ステップ）
 
 #### Red（失敗するテストを先に書く） (任意)
 - 期待する失敗:
