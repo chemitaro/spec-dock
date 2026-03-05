@@ -220,6 +220,7 @@ User -> D: edit content
 - AC-003 → `discussions/rules.md` の同梱（テンプレ）+ `rules.md` に導線を固定
 - AC-004 → type テンプレ（`templates/discussions/<type>.md`）+ 命名規約（prefix+連番）
 - AC-005 → `discussions/` 配下にラッパスクリプトを含めない（テンプレから `adrs/new-adr` を削除し、`discussions/` は markdown のみ）
+- AC-006 → `spec-dock/templates/discussions/{adr,note,disc,research}.md` を同梱し、コピー導線を成立させる
 - EC-001/EC-002 → 連番衝突時の挙動（採番・エラー）+ rules での手動運用ルール
 - 非交渉制約（採番維持） → `_new_adr` の既存ロジック流用（走査パスのみ変更）
 
@@ -232,6 +233,7 @@ User -> D: edit content
   - AC-002 → `new adr` の生成先・採番（`discussions/adr-*.md`）
   - AC-003 → `discussions/rules.md` が生成される
   - AC-005 → `discussions/` 配下にラッパスクリプトが存在しない（`new-*` 不在、markdown のみ）
+  - AC-006 → `spec-dock/templates/discussions/` と type テンプレが同梱されている
   - EC-001 → `--id` 省略時は max+1 採番、`--id` 明示時の重複は非0で失敗（挙動をテストで固定）
 
 - 実行コマンド: `python -m unittest discover -v`
