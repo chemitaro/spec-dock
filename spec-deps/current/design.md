@@ -131,9 +131,10 @@ Discussions -down- Rules
   - Output: `<scope>/discussions/adr-xxxxx-<slug>.md`
   - Notes:
     - 採番/重複チェックは `<scope>/discussions/adr-*.md` を走査（後方互換なし）
-- CLI-002（任意）: `spec-dock new doc --{initiative|epic|issue} <id> --type {note|disc|research} --title "<title>" [--slug <slug>]`
+- CLI-002（将来検討）: `spec-dock new doc --{initiative|epic|issue} <id> --type {note|disc|research} --title "<title>" [--slug <slug>]`
   - Output: `<scope>/discussions/<type>-00001-<slug>.md`
   - Notes:
+    - 本Issueでは実装しない（非ADRはテンプレの手動コピー運用を正とする）
     - 非ADRも連番に統一する（typeごとに `00001` から採番）
     - テンプレは `spec-dock/templates/discussions/<type>.md` を用意し、type で選択して生成する（無ければ `note.md` にフォールバック）
 
@@ -205,7 +206,7 @@ User -> D: edit content
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
     - `_new_adr`: `scope.path / "adrs"` → `scope.path / "discussions"`
     - `_next_id`: `rglob("adrs/adr-*.md")` → `rglob("discussions/adr-*.md")`
-    - （任意）`new doc` の追加（type テンプレ + typeごとの連番採番）
+    - （将来）`new doc` の追加（type テンプレ + typeごとの連番採番）は別Issueで検討
 - 削除（Delete）:
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/{adrs,artifacts}/`（新規テンプレからは削除）
 - 移動/リネーム（Move/Rename）:
@@ -241,7 +242,7 @@ User -> D: edit content
 ## リスク/懸念（Risks） (任意)
 - R-001: 破壊的変更で旧ツリーが動かなくなる（影響: 既存利用者 / 対応: 後方互換は提供しない。`rules.md` に最小の手動移行手順を記載）
 - R-002: `discussions/` が “何でも置き場” 化する（影響: 探索性低下 / 対応: `rules.md` に命名規約と type 定義、テンプレ導線を固定）
-- R-003: 手動運用で連番衝突が起きる（影響: 作成時の手戻り / 対応: optional の `new doc` で採番自動化、少なくとも `rules.md` に衝突時の手順を明記）
+- R-003: 手動運用で連番衝突が起きる（影響: 作成時の手戻り / 対応: `rules.md` に衝突時の手順を明記。必要性が顕在化したら `new doc` を別Issueで追加）
 
 ## 未確定事項（TBD） (必須)
 - Q-001:
@@ -253,7 +254,7 @@ User -> D: edit content
   - 選択肢:
     - A: `spec-dock/templates/discussions/<type>.md` を手動コピーして作成（最小）
     - B: `spec-dock new doc --type {note|disc|research} ...` で生成（採番・衝突回避をツールで担保）
-  - 推奨案（暫定）: TBD（コンサルタント意見を踏まえて決定）
+  - 回答: A（決定。今Issueでは手動コピー運用）
   - 影響範囲: ランタイム実装/テスト/運用負荷
 - Q-003:
   - 質問: 非ADRドキュメントの連番は「typeごと」か「discussions全体で共通」か

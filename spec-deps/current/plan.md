@@ -31,7 +31,7 @@ ID: "iss-00014"
 - [x] S01: `discussions/` 運用仕様（命名/連番/rules/テンプレ位置・種類/ラッパ廃止）を確定する
 - [x] S02: 新規テンプレ生成物が `discussions/` と `rules.md` を作る（`adrs/`, `artifacts/` を生成しない）
 - [x] S03: `spec-dock new adr` の出力先が `discussions/` になり、走査/採番も追随する（後方互換なし）
-- [ ] S04: （任意）`spec-dock new doc` を追加し、`note/disc/research` を連番で作成できる
+- [x] S04: （見送り）`spec-dock new doc` は追加せず、テンプレコピー運用を正とする
 - [ ] S05: docs/tests を更新し、運用ルールと導線を固定する
 - [ ] S06: 最終品質ゲート（main 差分レビュー + 承認）を通す
 
@@ -133,6 +133,7 @@ S05 --> S06
 - Decision gate:
   - 実装する: `spec-dock new doc --{initiative|epic|issue} <id> --type {note|disc|research} --title ...`
   - 実装しない: `rules.md` の「テンプレコピー運用」を正とし、採番衝突時の手順を明記する
+- 決定: 実装しない（`rules.md` のテンプレコピー運用を正とする）
 - Red（実装する場合）:
   - `tests/test_cli.py` に `new doc` の生成テストを追加する
     - 出力先: `<scope>/discussions/<type>-xxxxx-<slug>.md`
@@ -185,7 +186,7 @@ S05 --> S06
   - 選択肢:
     - A: 実装しない（手動コピー + `rules.md` で運用固定）
     - B: 実装する（採番衝突をツールで回避）
-  - 推奨案（暫定）: B（ただし最小I/Fで）
+  - 回答: A（決定。今Issueでは実装しない）
   - 影響範囲: S04 / `design.md` / tests / 運用コスト
 
 ## 完了条件（Definition of Done） (必須)
