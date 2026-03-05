@@ -3,9 +3,9 @@
 ID: "iss-00014"
 タイトル: "ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合）"
 関連GitHub: ["#14", "https://github.com/chemitaro/spec-dock/issues/14"]
-状態: "draft"
+状態: "approved"
 作成者: "chemitaro"
-最終更新: "2026-03-05"
+最終更新: "2026-03-06"
 親: []
 ---
 
@@ -69,7 +69,7 @@ package "To-Be" {
   - 新規生成テンプレート（initiative/epic/issue）から `adrs/` と `artifacts/` をなくし、`discussions/` を生成する。
   - `discussions/` は **空ディレクトリにならない**ように、運用ガイド（例: `discussions/rules.md`）を必ず配置する（Git で管理できる状態にする）。
   - ADR 作成コマンド（`spec-dock new adr`）は `discussions/` 配下へ作成するようにする。
-  - `discussions/` 配下のファイルは **種類（prefix）+ 連番**で管理する（例: `adr-00001-...`, `note-00001-...`）。
+  - `discussions/` 配下のファイルは **種類（prefix）+ 連番**で管理する（例: `adr-00001-...`, `disc-00001-...`, `research-00001-...`, `note-00001-...`）。
   - テンプレートは **1つのテンプレディレクトリ**に集約し、そこに type ごとのテンプレを置く（最小セットで開始する）:
     - `spec-dock/templates/discussions/`
     - 例: `adr.md`, `note.md`, `disc.md`, `research.md`
@@ -86,8 +86,7 @@ package "To-Be" {
   - ディレクトリ/ファイル命名は小文字（macOS case-insensitive 対策）
   - 人間が手で編集する資料は `discussions/` に集約（生成物ディレクトリとは分離）
 - Ask（迷ったら相談）:
-  - `discussions/` の名称を `discussion/` にするか、他の名称にするか
-  - ADR 以外の資料タイプ（テンプレ種類）をどこまで標準搭載するか
+  - ADR 以外の資料タイプ（テンプレ種類）を追加するか（最小セットは `note/disc/research`）
 - Never（絶対にしない）:
   - デフォルトで多数のテンプレを生成してツリーを汚す（必要最小限に絞る）
 
@@ -102,10 +101,10 @@ package "To-Be" {
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: `discussions/` に統一すると「意思決定（ADR）」と「補足資料」が混在する
-  - 選択肢A: ファイル名 prefix（`adr-`, `note-`, `research-`）で識別（Pros: 単純 / Cons: 命名規約が必要）
+  - 選択肢A: ファイル名 prefix（`adr-`, `disc-`, `research-`, `note-`）で識別（Pros: 単純 / Cons: 命名規約が必要）
   - 選択肢B: frontmatter `種別:` を必須化して識別（Pros: 文章側で完結 / Cons: 運用の徹底が必要）
   - 選択肢C: サブディレクトリで分類（Pros: 分かりやすい / Cons: 「1ディレクトリ」要望に反する）
-  - 決定: TBD（議論シートで比較して確定）
+  - 決定: A（prefix を主）+ frontmatter は “任意〜推奨” として補助的に使う
 
 ## リスク/懸念（Risks） (任意)
 - R-001: 破壊的変更により旧ツリーがそのままでは動かなくなる（影響: 既存利用者 / 対応: `rules.md` に手動移行の最小手順を記載）
@@ -137,6 +136,12 @@ package "To-Be" {
   - When: テンプレをコピーして軽量資料を作成する
   - Then: 命名規約（`<type>-00001-<slug>.md`）に従って追加できる
   - 観測点: `discussions/` 配下のファイル名と内容
+- AC-005:
+  - Actor/Role: ユーザー
+  - Given: `spec-dock new {initiative,epic,issue}` でノードを新規作成する
+  - When: `discussions/` ディレクトリを確認する
+  - Then: `discussions/` 配下に `new-adr` 等のラッパスクリプト（実行スクリプト）が存在しない
+  - 観測点: 生成物ツリー（ファイルシステム）
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -146,8 +151,10 @@ package "To-Be" {
 ## 例外・エッジケース（仕様として固定） (必須)
 - EC-001:
   - 条件: `discussions/` 配下に同一連番のファイルが既に存在する（例: `note-00001-...` がある）
-  - 期待: 作成時に衝突を検出し、次の番号へ繰り上げる（または明示的にエラーにする。挙動は設計で固定）
-  - 観測点: `spec-dock new ...` の出力、作成されたファイル名
+  - 期待:
+    - `--id` を **省略**した作成（例: `spec-dock new adr ...`）では、既存の最大番号を走査して **次番号（max+1）** を採番し、衝突を回避する
+    - `--id` を **明示**した作成で既に同一IDが存在する場合は、**非0で失敗**し、作成しない
+  - 観測点: `spec-dock new ...` の出力、作成されたファイル名、終了コード
 - EC-002:
   - 条件: `discussions/` を “空ディレクトリ” として残したい
   - 期待: `discussions/rules.md` が常に存在するため、空ディレクトリ問題は発生しない
@@ -156,6 +163,9 @@ package "To-Be" {
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: `discussions/` = ADR を含むディスカッション関連ドキュメント置き場（検討/調査/説明/決定の記録）
 - TERM-002: ADR = Architecture Decision Record（意思決定の記録、採番・状態管理を伴う）
+- TERM-003: `note-` = 軽量メモ（会議メモ/思考メモ/作業メモ。必要なら `disc`/`adr` に昇格）
+- TERM-004: `disc-` = 議論シート（選択肢/Pros/Cons/未決事項を整理し、推奨案まで置く）
+- TERM-005: `research-` = 調査メモ（調査目的・方法・結果・結論・参照リンク/実験ログ）
 
 ## 未確定事項（TBD / 要確認） (必須)
 - Q-001:

@@ -3,9 +3,9 @@
 ID: "iss-00014"
 タイトル: "ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合）"
 関連GitHub: ["#14", "https://github.com/chemitaro/spec-dock/issues/14"]
-状態: "draft"
+状態: "approved"
 作成者: "chemitaro"
-最終更新: "2026-03-05"
+最終更新: "2026-03-06"
 依存: ["requirement.md"]
 親: []
 ---
@@ -18,7 +18,7 @@ ID: "iss-00014"
   - 新規生成テンプレートは `discussions/` のみを作る
   - `discussions/` は `rules.md` を必ず含む（空ディレクトリにしない）
   - `spec-dock new adr` は `discussions/` に出力する
-  - `discussions/` 配下のファイルは「種類（prefix）+ 連番」で運用する（`adr-00001-...`, `note-00001-...`）
+  - `discussions/` 配下のファイルは「種類（prefix）+ 連番」で運用する（`adr-00001-...`, `disc-00001-...`, `research-00001-...`, `note-00001-...`）
   - テンプレは 1つのテンプレディレクトリ（複数ファイル）に集約し、type ごとのテンプレをコピー運用する旨を `rules.md` に明記する
   - `discussions/` 配下にスクリプト（`new-adr` 等）を置かない（ラッパ廃止）
 - MUST NOT:
@@ -37,8 +37,8 @@ ID: "iss-00014"
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/`: 各スコープ配下に `adrs/`, `artifacts/` が存在
   - `src/spec_dock/assets/spec_dock/templates/adr.md`: ADR テンプレ（frontmatter と構成）
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
-    - `_new_adr`: `scope.path / "adrs"` に出力
-    - `_next_id`: `initiatives_root.rglob("adrs/adr-*.md")` で ADR の最大値を走査
+    - `_new_adr`: `scope.path / "adrs"` に出力（採番: `adrs/adr-*.md` を走査して max+1）
+    - `_next_id`: `initiatives_root.rglob("adrs/adr-*.md")` で ADR の最大値を走査（prefix=="adr" の fallback）
 - 観測した現状（事実）:
   - `artifacts/` はユーザー運用（テンプレ `_template.md` のコピー）で、ランタイムに強い依存はない
   - ADR は `spec-dock new adr` によって生成され、ランタイムの走査対象になっている
@@ -73,7 +73,7 @@ database "scope/discussions/" as D
 User -> RT: new adr --scope <id> --title ...
 RT -> RT: resolve scope path
 RT -> D: scan adr-*.md (max id)
-RT -> D: write adr-<next>-<slug>.md\n(from templates/adr.md)
+RT -> D: write adr-<next>-<slug>.md\n(from templates/discussions/adr.md)
 RT --> User: ok (path=...)
 @enduml
 ```
@@ -95,12 +95,14 @@ folder "<scope>/" as Scope
 folder "discussions/" as Discussions
 file "adr-00001-..." as ADR
 file "note-00001-..." as Note
+file "disc-00001-..." as Disc
 file "research-00001-..." as Research
 file "rules.md" as Rules
 
 Scope -down- Discussions
 Discussions -down- ADR
 Discussions -down- Note
+Discussions -down- Disc
 Discussions -down- Research
 Discussions -down- Rules
 @enduml
@@ -108,7 +110,7 @@ Discussions -down- Rules
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: `discussions/` 内の分類をどう担保するか
-  - 選択肢A: ファイル名 prefix（`adr-`, `note-`, `research-`, `log-`）で識別（主ルール）
+  - 選択肢A: ファイル名 prefix（`adr-`, `disc-`, `research-`, `note-`）で識別（主ルール）
     - Pros: 検索性が高い、ツール側で扱いやすい、混在でも破綻しにくい
     - Cons: 命名規約の教育が必要
   - 選択肢B: frontmatter `種別:` を必須化（主ルールにする）
@@ -128,8 +130,8 @@ Discussions -down- Rules
 - CLI-001: `spec-dock new adr --{initiative|epic|issue} <id> --title "<title>" [--slug <slug>] [--id <adr-id>]`
   - Output: `<scope>/discussions/adr-xxxxx-<slug>.md`
   - Notes:
-    - 採番/重複チェックは `discussions/adr-*.md` を走査（後方互換なし）
-- CLI-002（任意）: `spec-dock new doc --{initiative|epic|issue} <id> --type {note|research} --title "<title>" [--slug <slug>]`
+    - 採番/重複チェックは `<scope>/discussions/adr-*.md` を走査（後方互換なし）
+- CLI-002（任意）: `spec-dock new doc --{initiative|epic|issue} <id> --type {note|disc|research} --title "<title>" [--slug <slug>]`
   - Output: `<scope>/discussions/<type>-00001-<slug>.md`
   - Notes:
     - 非ADRも連番に統一する（typeごとに `00001` から採番）
@@ -140,11 +142,11 @@ Discussions -down- Rules
   - Input: scope_id, title, slug, (optional) node_id
   - Output: `<scope>/discussions/adr-...md`
   - Errors/Exceptions: スコープ不存在、重複 id、slug 不正
-- IF-002: `spec_dock_runtime.app::_next_id(..., prefix="adr")`
-  - Input: specdock_dir, local
-  - Output: 次の ADR id（走査パスは `discussions/adr-*.md`）
+- IF-002（internal / 保険）: `spec_dock_runtime.app::_next_id(specdock_dir, "adr", ...)`
+  - Input: specdock_dir, local, (optional) nodes
+  - Output: 次の ADR id（走査パスは `**/discussions/adr-*.md`）
 - IF-003（任意）: `spec_dock_runtime.app::_new_doc(...)`（新設する場合）
-  - Input: scope_id, type(note/research), title, slug
+  - Input: scope_id, type(note/disc/research), title, slug
   - Output: `<scope>/discussions/<type>-00001-<slug>.md`
 
 ### UML（任意） (任意)
@@ -163,39 +165,32 @@ User -> D: edit content
 @enduml
 ```
 
-### クラス/インターフェース詳細設計（主要なもの） (任意)
-> この Issue を “単独の作業単位” として完結させるために、必要な範囲だけ詳細化する。
+### 実装詳細（重要部分だけ固定） (任意)
+- 追加のクラス/モジュールは不要（既存 runtime 関数の改修で対応する）
+- `_new_adr`（`spec_dock_runtime.app`）:
+  - Template: `spec-dock/templates/discussions/adr.md`
+  - Output: `<scope>/discussions/adr-xxxxx-<slug>.md`
+  - 採番/衝突: `requirement.md` の EC-001 を満たす（`--id` 省略時は max+1、明示時の重複は非0で失敗）
+- `_next_id`（prefix=="adr" の保険）:
+  - `initiatives_root.rglob("discussions/adr-*.md")` に更新する（現状未使用だが将来の安全のため）
+- （任意）`_new_doc`（追加する場合）:
+  - Template: `spec-dock/templates/discussions/<type>.md`（無ければ `note.md`）
+  - Output: `<scope>/discussions/<type>-xxxxx-<slug>.md`
+  - 採番: type ごとに `discussions/<type>-*.md` を走査して max+1
 
-- Class: `<ClassName>`
-  - Responsibility（責務）:
-    - ...
-  - Public methods（公開メソッド）:
-    - `method(arg: Type) -> Return`
-  - Invariants（不変条件）:
-    - ...
-  - Collaboration（協調関係）:
-    - `<OtherClass>`（理由: ...）
-- Interface / Protocol: `<InterfaceName>`
-  - Contract（契約）:
-    - ...
-  - 実装候補:
-    - `<ImplClass>`
-
-#### UML（任意） (任意)
-```plantuml
-@startuml
-' TODO: 必要なら UML を追加する（形式は自由）
-@enduml
-```
-
-### 例外/エラー契約（重要なものだけ） (任意)
-- ERR-001: <エラー名/コード>
-  - 発生条件:
-    - ...
-  - 呼び出し元への返し方（例: 例外/戻り値/HTTP）:
-    - ...
-  - ログ/監視:
-    - ...
+### 例外/エラー契約（主要なものだけ） (任意)
+- ERR-ADR-001: scope 不存在
+  - 条件: 指定した scope_id が解決できない
+  - 振る舞い: 非0で失敗、ファイルは作成しない
+- ERR-ADR-002: テンプレ不足
+  - 条件: `spec-dock/templates/discussions/adr.md` が存在しない
+  - 振る舞い: 非0で失敗、ファイルは作成しない
+- ERR-ADR-003: ID 重複
+  - 条件: `--id` を明示し、同一IDの ADR が既に存在する
+  - 振る舞い: 非0で失敗、ファイルは作成しない（EC-001）
+- ERR-SLUG-001: slug 不正
+  - 条件: `--slug` が kebab-case に合致しない、または空になる
+  - 振る舞い: 非0で失敗、ファイルは作成しない
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
@@ -210,7 +205,7 @@ User -> D: edit content
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
     - `_new_adr`: `scope.path / "adrs"` → `scope.path / "discussions"`
     - `_next_id`: `rglob("adrs/adr-*.md")` → `rglob("discussions/adr-*.md")`
-    - （任意）`new doc` の追加（共通テンプレ + typeごとの連番採番）
+    - （任意）`new doc` の追加（type テンプレ + typeごとの連番採番）
 - 削除（Delete）:
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/{adrs,artifacts}/`（新規テンプレからは削除）
 - 移動/リネーム（Move/Rename）:
@@ -224,6 +219,7 @@ User -> D: edit content
 - AC-002 → `_new_adr`（`app.py`）と `templates/discussions/adr.md`
 - AC-003 → `discussions/rules.md` の同梱（テンプレ）+ `rules.md` に導線を固定
 - AC-004 → type テンプレ（`templates/discussions/<type>.md`）+ 命名規約（prefix+連番）
+- AC-005 → `discussions/` 配下にラッパスクリプトを含めない（テンプレから `adrs/new-adr` を削除し、`discussions/` は markdown のみ）
 - EC-001/EC-002 → 連番衝突時の挙動（採番・エラー）+ rules での手動運用ルール
 - 非交渉制約（採番維持） → `_new_adr` の既存ロジック流用（走査パスのみ変更）
 
@@ -235,30 +231,15 @@ User -> D: edit content
   - AC-001 → init/update の scaffold 検証（`discussions/` があり `adrs/`/`artifacts/` が無い）
   - AC-002 → `new adr` の生成先・採番（`discussions/adr-*.md`）
   - AC-003 → `discussions/rules.md` が生成される
-  - EC-001 → 連番衝突時の挙動（繰り上げ or エラー）をテストで固定
+  - AC-005 → `discussions/` 配下にラッパスクリプトが存在しない（`new-*` 不在、markdown のみ）
+  - EC-001 → `--id` 省略時は max+1 採番、`--id` 明示時の重複は非0で失敗（挙動をテストで固定）
 
-### テストマトリクス（AC/EC → テスト） (任意)
-- AC-001:
-  - Unit: ...
-  - Integration: ...
-  - E2E: ...
-- EC-001:
-  - Unit: ...
-  - Integration: ...
-  - E2E: ...
-- 非交渉制約（requirement.md）をどう検証するか:
-  - 制約: ...
-    - 検証方法（テスト/計測点/ログ/運用確認など）: ...
-- 実行コマンド（該当するものを記載）:
-  - ...
-- 変更後の運用（必要なら）:
-  - 移行手順: N/A（後方互換なし）
-  - ロールバック: ...
-  - Feature flag: ...
+- 実行コマンド: `python -m unittest discover -v`
 
 ## リスク/懸念（Risks） (任意)
-- R-001: <リスク>（影響: ... / 対応: ...）
-- R-002: ...
+- R-001: 破壊的変更で旧ツリーが動かなくなる（影響: 既存利用者 / 対応: 後方互換は提供しない。`rules.md` に最小の手動移行手順を記載）
+- R-002: `discussions/` が “何でも置き場” 化する（影響: 探索性低下 / 対応: `rules.md` に命名規約と type 定義、テンプレ導線を固定）
+- R-003: 手動運用で連番衝突が起きる（影響: 作成時の手戻り / 対応: optional の `new doc` で採番自動化、少なくとも `rules.md` に衝突時の手順を明記）
 
 ## 未確定事項（TBD） (必須)
 - Q-001:
@@ -269,15 +250,15 @@ User -> D: edit content
   - 質問: ADR 以外の作成導線をどこまで標準搭載するか（CLI vs 手動コピー）
   - 選択肢:
     - A: `spec-dock/templates/discussions/<type>.md` を手動コピーして作成（最小）
-    - B: `spec-dock new doc --type {note|research} ...` で生成（採番・衝突回避をツールで担保）
+    - B: `spec-dock new doc --type {note|disc|research} ...` で生成（採番・衝突回避をツールで担保）
   - 推奨案（暫定）: TBD（コンサルタント意見を踏まえて決定）
   - 影響範囲: ランタイム実装/テスト/運用負荷
 - Q-003:
   - 質問: 非ADRドキュメントの連番は「typeごと」か「discussions全体で共通」か
-  - 選択肢:
-    - A: typeごと（`note-00001`, `research-00001`）: 直感的、衝突が減る
+  - 回答: A（決定）
+  - 選択肢（記録）:
+    - A: typeごと（`note-00001`, `disc-00001`, `research-00001`）: 直感的、衝突が減る
     - B: 共通（`doc-00001` + frontmatter で type）: 作成順で並ぶが識別が弱い
-  - 推奨案（暫定）: A
   - 影響範囲: 命名規約/採番ロジック/探索性
 
 ---
@@ -289,6 +270,7 @@ User -> D: edit content
 │   ├── rules.md                 # Add
 │   ├── adr-00001-....md         # New
 │   ├── note-00001-....md        # Add (optional)
+│   ├── disc-00001-....md        # Add (optional)
 │   └── research-00001-....md    # Add (optional)
 ```
 
