@@ -147,6 +147,7 @@ python -m unittest discover -v
 
 #### コミット
 - なし（コミット前）
+- 追記: 2aeec32 docs(scaffold): discussions 導線へ統一
 
 #### メモ
 - S05 のドキュメント導線は `discussions/` 1本で整合した。
