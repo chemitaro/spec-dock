@@ -197,7 +197,10 @@ package "To-Be" {
   - 選択肢:
     - A: しない（手動コピー運用。最小）
     - B: する（`new doc` を追加し、typeごとの連番を採番する）
-  - 推奨案（暫定）: B（ただし最小I/Fで）
+  - 回答: A（決定。今Issueでは実装しない）
+  - 理由:
+    - まずは `discussions/rules.md` + `spec-dock/templates/discussions/*.md` の導線（コピー運用）で運用を固定し、ロジックを最小化する。
+    - 採番衝突の自動回避は必要性が顕在化した時点で別Issueとして追加する（拡張余地は残す）。
   - 影響範囲: ランタイム実装/テスト/ユーザー導線
 
 ## Definition of Ready（着手可能条件） (必須)
