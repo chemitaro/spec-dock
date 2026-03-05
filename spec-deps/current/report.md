@@ -73,6 +73,40 @@ python -m unittest discover -v
 - `spec-dock new adr` は S03 未着手のため現状は失敗する（`templates/adr.md` 参照のまま）。S03で `templates/discussions/adr.md` へ追随させる。
 - 次は reviewer レビュー（指摘対応→再レビュー）を経て S02コミットへ進む。
 
+---
+
+### 2026-03-06 16:35 - 16:55
+
+#### 対象
+- Step: S03
+- AC/EC: AC-002, EC-001
+
+#### 実施内容
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+  - `_new_adr` の出力先を `adrs/` から `discussions/` に変更
+  - `_new_adr` のテンプレ参照を `templates/adr.md` から `templates/discussions/adr.md` に変更
+  - ADR採番/重複判定コメントを `discussions/` 前提へ更新
+  - `_next_id` の ADR fallback scan を `rglob("discussions/adr-*.md")` に変更
+- `tests/test_cli.py`
+  - `new adr` の生成テストを `discussions/` 前提で追加
+  - EC-001（`--id` 明示重複は非0失敗）テストを追加
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (Ran 144 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - S03 runtime 変更
+- `tests/test_cli.py` - S03 テスト追加
+
+#### コミット
+- なし（コミット前）
+
+#### メモ
+- これで `spec-dock new adr` は `discussions/adr-xxxxx-<slug>.md` に生成される。
+
 ## 遭遇した問題と解決 (任意)
 - 問題: `init/update` 後に `templates/**/discussions/` が消えるため、S02要件を満たせなかった
   - 解決: `_prune_legacy_scaffold` が `discussions` を legacy 扱いで削除していたため、削除対象を `adrs` / `artifacts` に置換した
@@ -82,8 +116,8 @@ python -m unittest discover -v
 - 空ディレクトリは git 管理されないため、`rules.md` 同梱は仕様・実装の両面で有効だった。
 
 ## 今後の推奨事項 (任意)
-- S03で `spec-dock new adr` の出力先/テンプレ参照（`discussions/adr.md`）を runtime 側へ反映する。
-- S04実施有無（`new doc`）を判断したら、同じく typeごとの採番テストを追加して固定する。
+- S04実施有無（`new doc`）を判断したら、typeごとの採番テストを追加して固定する。
+- S05/S06で docs 追随と最終品質ゲート（main差分レビュー）を実施する。
 
 ## 省略/例外メモ (必須)
 - 該当なし

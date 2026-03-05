@@ -1895,6 +1895,72 @@ class TestCli(unittest.TestCase):
                 self.assertFalse((scope_dir / "artifacts").exists())
                 self.assertEqual(list((scope_dir / "discussions").glob("new-*")), [])
 
+    def test_new_adr_increments_id_within_scope_discussions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision two"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            self.assertNotEqual(sorted(discussions_dir.glob("adr-00001-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("adr-00002-*.md")), [])
+            self.assertEqual(list(issue_dir.glob("adrs")), [])
+
+    def test_new_adr_rejects_duplicate_explicit_id_in_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "adr",
+                    "--issue",
+                    "iss-local-00001",
+                    "--id",
+                    "adr-00001",
+                    "--title",
+                    "Duplicate decision",
+                ],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("ADR id already exists", p.stderr)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            self.assertEqual(len(list(discussions_dir.glob("adr-00001-*.md"))), 1)
+            self.assertEqual(list(discussions_dir.glob("adr-00002-*.md")), [])
+
     def test_new_nodes_do_not_generate_readme_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
