@@ -3,7 +3,7 @@
 ID: "iss-00014"
 タイトル: "ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合）"
 関連GitHub: ["#14", "https://github.com/chemitaro/spec-dock/issues/14"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-06"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -151,6 +151,33 @@ python -m unittest discover -v
 
 #### メモ
 - S05 のドキュメント導線は `discussions/` 1本で整合した。
+
+---
+
+### 2026-03-06 16:40 - 17:10
+
+#### 対象
+- Step: S06
+- 品質ゲート: `main...HEAD` 差分（最終）
+
+#### 実施内容
+- 品質ゲート:
+  - `python -m unittest discover -v`
+  - `git diff main...HEAD --stat`（スコープ外の混入が無いことを確認）
+- レビューゲート（最終）:
+  - reviewer に `main...HEAD` 差分レビューを依頼し、Approved を得た
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (Ran 144 tests)
+
+git diff main...HEAD --stat
+# OK（スコープ内のみ）
+```
+
+#### レビュー
+- reviewer: Approved（最終）
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `init/update` 後に `templates/**/discussions/` が消えるため、S02要件を満たせなかった
