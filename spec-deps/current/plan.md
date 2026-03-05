@@ -32,7 +32,7 @@ ID: "iss-00014"
 - [x] S02: 新規テンプレ生成物が `discussions/` と `rules.md` を作る（`adrs/`, `artifacts/` を生成しない）
 - [x] S03: `spec-dock new adr` の出力先が `discussions/` になり、走査/採番も追随する（後方互換なし）
 - [x] S04: （見送り）`spec-dock new doc` は追加せず、テンプレコピー運用を正とする
-- [ ] S05: docs/tests を更新し、運用ルールと導線を固定する
+- [x] S05: docs/tests を更新し、運用ルールと導線を固定する
 - [ ] S06: 最終品質ゲート（main 差分レビュー + 承認）を通す
 
 ### UML（任意） (任意)
