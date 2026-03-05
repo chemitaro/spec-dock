@@ -142,6 +142,12 @@ package "To-Be" {
   - When: `discussions/` ディレクトリを確認する
   - Then: `discussions/` 配下に `new-adr` 等のラッパスクリプト（実行スクリプト）が存在しない
   - 観測点: 生成物ツリー（ファイルシステム）
+- AC-006:
+  - Actor/Role: ユーザー
+  - Given: 対象リポジトリに `spec-dock/` がインストールされている（`spec-dock init/update` 済み）
+  - When: `spec-dock/templates/discussions/` を確認する
+  - Then: type テンプレ（`adr.md`, `note.md`, `disc.md`, `research.md`）が存在する
+  - 観測点: 生成物ツリー（ファイルシステム）
 
 ### 入力→出力例 (任意)
 - EX-001:
