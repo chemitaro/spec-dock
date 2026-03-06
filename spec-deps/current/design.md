@@ -17,6 +17,7 @@ ID: "iss-00014"
 - MUST:
   - 新規生成テンプレートは `discussions/` のみを作る
   - `discussions/` は `rules.md` を必ず含む（空ディレクトリにしない）
+  - 配布パッケージ（`pip install .` / wheel / sdist）にも `discussions/rules.md` と `templates/discussions/*.md` が含まれる
   - `spec-dock new adr` は `discussions/` に出力する
   - `discussions/` 配下のファイルは「種類（prefix）+ 連番」で運用する（`adr-00001-...`, `disc-00001-...`, `research-00001-...`, `note-00001-...`）
   - テンプレは 1つのテンプレディレクトリ（複数ファイル）に集約し、type ごとのテンプレをコピー運用する旨を `rules.md` に明記する
@@ -24,6 +25,7 @@ ID: "iss-00014"
 - MUST NOT:
   - トップレベルの用途別ディレクトリを増やさない（`discussions/` で固定）
   - 後方互換性のための併走サポート・自動移行・レガシー走査を入れない
+  - 旧 `adrs/` を採番・重複判定・集計対象として読み戻さない
 - 非交渉制約:
   - ADR の採番（`adr-00001-...`）は維持
 - 前提:
@@ -39,6 +41,8 @@ ID: "iss-00014"
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
     - `_new_adr`: `scope.path / "adrs"` に出力（採番: `adrs/adr-*.md` を走査して max+1）
     - `_next_id`: `initiatives_root.rglob("adrs/adr-*.md")` で ADR の最大値を走査（prefix=="adr" の fallback）
+  - `pyproject.toml`:
+    - `tool.setuptools.exclude-package-data` が `assets/spec_dock/templates/**/discussions/**` を除外しており、配布物から `rules.md` が落ちる
 - 観測した現状（事実）:
   - `artifacts/` はユーザー運用（テンプレ `_template.md` のコピー）で、ランタイムに強い依存はない
   - ADR は `spec-dock new adr` によって生成され、ランタイムの走査対象になっている
@@ -50,6 +54,7 @@ ID: "iss-00014"
 - 影響範囲（呼び出し元/関連コンポーネント）:
   - テンプレ: `src/spec_dock/assets/spec_dock/templates/**`
   - ランタイム: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+  - Packaging: `pyproject.toml`
   - ドキュメント/サンプルツリー: `docs/discussion-sheets/**`, `spec-deps/**`（記述更新が必要になる可能性）
 
 ## 主要フロー（テキスト：AC単位で短く） (任意)
@@ -172,8 +177,12 @@ User -> D: edit content
   - Template: `spec-dock/templates/discussions/adr.md`
   - Output: `<scope>/discussions/adr-xxxxx-<slug>.md`
   - 採番/衝突: `requirement.md` の EC-001 を満たす（`--id` 省略時は max+1、明示時の重複は非0で失敗）
+  - 旧 `<scope>/adrs/adr-*.md` は読まない（後方互換なしを維持）
 - `_next_id`（prefix=="adr" の保険）:
   - `initiatives_root.rglob("discussions/adr-*.md")` に更新する（現状未使用だが将来の安全のため）
+- Packaging:
+  - `pyproject.toml` の `exclude-package-data` から `assets/spec_dock/templates/**/discussions/**` を除去する
+  - `assets/**/*` の package-data と整合させ、scope 配下の `discussions/rules.md` を wheel / sdist に含める
 - （任意）`_new_doc`（追加する場合）:
   - Template: `spec-dock/templates/discussions/<type>.md`（無ければ `note.md`）
   - Output: `<scope>/discussions/<type>-xxxxx-<slug>.md`
@@ -200,6 +209,8 @@ User -> D: edit content
   - `src/spec_dock/assets/spec_dock/templates/discussions/{note,disc,research}.md`:
     - `discussions/` 用テンプレ（type ごと / 最小セット）
 - 変更（Modify）:
+  - `pyproject.toml`:
+    - `exclude-package-data` から `assets/spec_dock/templates/**/discussions/**` を除去
   - `src/spec_dock/assets/spec_dock/templates/README.md`: 出力先マッピング（`adrs/`/`artifacts/` → `discussions/`）
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/`:
     - `adrs/`, `artifacts/` を `discussions/` に置換
@@ -222,7 +233,8 @@ User -> D: edit content
 - AC-004 → type テンプレ（`templates/discussions/<type>.md`）+ 命名規約（prefix+連番）
 - AC-005 → `discussions/` 配下にラッパスクリプトを含めない（テンプレから `adrs/new-adr` を削除し、`discussions/` は markdown のみ）
 - AC-006 → `spec-dock/templates/discussions/{adr,note,disc,research}.md` を同梱し、コピー導線を成立させる
-- EC-001/EC-002 → 連番衝突時の挙動（採番・エラー）+ rules での手動運用ルール
+- AC-007 → `pyproject.toml` の packaging 設定を修正し、`pip install .` 後も `rules.md` / templates が欠落しないことを保証
+- EC-001/EC-002/EC-003 → 連番衝突時の挙動（採番・エラー）+ rules での手動運用ルール + legacy `adrs/` 非走査
 - 非交渉制約（採番維持） → `_new_adr` の既存ロジック流用（走査パスのみ変更）
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -235,7 +247,9 @@ User -> D: edit content
   - AC-003 → `discussions/rules.md` が生成される
   - AC-005 → `discussions/` 配下にラッパスクリプトが存在しない（`new-*` 不在、markdown のみ）
   - AC-006 → `spec-dock/templates/discussions/` と type テンプレが同梱されている
+  - AC-007 → `pip install .` 相当の配布経路でも `discussions/rules.md` が利用可能
   - EC-001 → `--id` 省略時は max+1 採番、`--id` 明示時の重複は非0で失敗（挙動をテストで固定）
+  - EC-003 → 旧 `adrs/` を読まない方針を runtime 実装のまま維持し、回帰を入れない
 
 - 実行コマンド: `python -m unittest discover -v`
 
@@ -243,6 +257,7 @@ User -> D: edit content
 - R-001: 破壊的変更で旧ツリーが動かなくなる（影響: 既存利用者 / 対応: 後方互換は提供しない。`rules.md` に最小の手動移行手順を記載）
 - R-002: `discussions/` が “何でも置き場” 化する（影響: 探索性低下 / 対応: `rules.md` に命名規約と type 定義、テンプレ導線を固定）
 - R-003: 手動運用で連番衝突が起きる（影響: 作成時の手戻り / 対応: `rules.md` に衝突時の手順を明記。必要性が顕在化したら `new doc` を別Issueで追加）
+- R-004: packaging の除外設定が新 assets と衝突すると、ローカル開発では再現せず CI / 配布後にだけ欠落が起こる（影響: 発見遅延 / 対応: `pip install .` 経路の検証を追加）
 
 ## 未確定事項（TBD） (必須)
 - Q-001:

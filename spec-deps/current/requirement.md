@@ -68,6 +68,7 @@ package "To-Be" {
 - MUST（必ずやる）:
   - 新規生成テンプレート（initiative/epic/issue）から `adrs/` と `artifacts/` をなくし、`discussions/` を生成する。
   - `discussions/` は **空ディレクトリにならない**ように、運用ガイド（例: `discussions/rules.md`）を必ず配置する（Git で管理できる状態にする）。
+  - `pip install .` 等で配布パッケージから導入された `spec-dock/` にも、`discussions/rules.md` と `spec-dock/templates/discussions/*.md` が欠落せず含まれるようにする。
   - ADR 作成コマンド（`spec-dock new adr`）は `discussions/` 配下へ作成するようにする。
   - `discussions/` 配下のファイルは **種類（prefix）+ 連番**で管理する（例: `adr-00001-...`, `disc-00001-...`, `research-00001-...`, `note-00001-...`）。
   - テンプレートは **1つのテンプレディレクトリ**に集約し、そこに type ごとのテンプレを置く（最小セットで開始する）:
@@ -78,6 +79,7 @@ package "To-Be" {
 - MUST NOT（絶対にやらない／追加しない）:
   - ディレクトリを用途別に増殖させない（トップレベルは `discussions/` のみ）。
   - 後方互換性のための併走サポート・自動移行・レガシー走査を入れない（必要になったら別Issueで検討する）。
+  - 旧 `adrs/` 配下の ADR を採番・重複判定・状態集計の入力として扱わない。
 - OUT OF SCOPE:
   - spec ツリー全体（v1→v2）の移行戦略の全面再設計（この Issue は「ディスカッション資料の格納と導線」に限定）
 
@@ -110,6 +112,7 @@ package "To-Be" {
 - R-001: 破壊的変更により旧ツリーがそのままでは動かなくなる（影響: 既存利用者 / 対応: `rules.md` に手動移行の最小手順を記載）
 - R-002: `discussions/` の運用ルールが曖昧だと “何でも置き場” 化する（影響: 探索性低下 / 対応: 最低限の命名規約・テンプレ・rules.md）
 - R-003: 連番運用が手動だと衝突しやすい（影響: 作成時の手戻り / 対応: `spec-dock new ...` が採番する or `rules.md` で衝突時の対処を明記）
+- R-004: packaging 設定で `discussions/` 関連 assets が wheel/sdist から抜けると、CI や利用者環境で `rules.md` 欠落が起こる（影響: init/new の生成物不足 / 対応: package-data / exclude-package-data を見直し、`pip install .` 後の挙動をテストで固定）
 
 ## 受け入れ条件（観測可能な振る舞い） (必須)
 - AC-001:
@@ -148,6 +151,12 @@ package "To-Be" {
   - When: `spec-dock/templates/discussions/` を確認する
   - Then: type テンプレ（`adr.md`, `note.md`, `disc.md`, `research.md`）が存在する
   - 観測点: 生成物ツリー（ファイルシステム）
+- AC-007:
+  - Actor/Role: ユーザー
+  - Given: `pip install .` でインストールした `spec-dock` を用いて `spec-dock init` を実行する
+  - When: 生成されたテンプレ/ノードを確認する
+  - Then: `spec-dock/templates/discussions/*.md` と各 scope の `discussions/rules.md` が欠落せず利用できる
+  - 観測点: `site-packages` 内の assets、`init` 後の生成物ツリー
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -165,6 +174,10 @@ package "To-Be" {
   - 条件: `discussions/` を “空ディレクトリ” として残したい
   - 期待: `discussions/rules.md` が常に存在するため、空ディレクトリ問題は発生しない
   - 観測点: 生成物
+- EC-003:
+  - 条件: 旧 repo に `<scope>/adrs/adr-*.md` が残っている
+  - 期待: `spec-dock new adr` はそれらを読まず、`discussions/adr-*.md` のみを採番・重複判定対象とする
+  - 観測点: `spec-dock new adr` の挙動、runtime 実装
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: `discussions/` = ADR を含むディスカッション関連ドキュメント置き場（検討/調査/説明/決定の記録）

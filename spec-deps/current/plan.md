@@ -34,6 +34,8 @@ ID: "iss-00014"
 - [x] S04: （見送り）`spec-dock new doc` は追加せず、テンプレコピー運用を正とする
 - [x] S05: docs/tests を更新し、運用ルールと導線を固定する
 - [x] S06: 最終品質ゲート（main 差分レビュー + 承認）を通す
+- [ ] S07: packaging 設定を修正し、`pip install .` 経路でも `discussions/` assets が欠落しないようにする
+- [ ] S08: 追補品質ゲート（CI 失敗修正 + 差分レビュー）を通す
 
 ### UML（任意） (任意)
 ```plantuml
@@ -63,8 +65,10 @@ S05 --> S06
 - AC-004 → S02（テンプレ位置の案内）/ S04（生成する場合）
 - AC-005 → S02, S05
 - AC-006 → S02
+- AC-007 → S07
 - EC-001 → S03, S04
 - EC-002 → S02
+- EC-003 → S03, S08
 - 非交渉制約（採番維持/後方互換なし）→ S03
 
 ---
@@ -176,6 +180,42 @@ S05 --> S06
   - `git diff main...HEAD`（または `origin/main...HEAD`）で差分を確認し、スコープ外の変更が混入していないことを確認する
 - レビューゲート（最終）:
   - reviewer に **main 差分**レビューを依頼し、指摘対応→再レビューを繰り返して Approved を得る
+- 記録:
+  - `spec-deps/current/report.md` に最終レビュー結果と修正履歴を追記する
+
+---
+
+### S07 — packaging 設定を修正して `discussions/` assets の欠落を防ぐ (必須)
+- 対象: AC-003, AC-006, AC-007
+- 背景:
+  - CI は `pip install .` 後のテストで `discussions/rules.md` 不在により失敗した
+  - 原因は `pyproject.toml` の `exclude-package-data` が `assets/spec_dock/templates/**/discussions/**` を除外していたこと
+- Red:
+  - `pip install .` 相当の経路で `spec-dock/templates/discussions/*.md` と各 scope の `discussions/rules.md` が利用できることを再現テスト/確認で固定する
+  - インストール済み CLI で `spec-dock init` を実行し、生成物に `discussions/rules.md` が含まれることを確認する
+- Green:
+  - `pyproject.toml` の package-data / exclude-package-data を修正し、`discussions/` 関連 assets が wheel / sdist に含まれるようにする
+- Refactor:
+  - packaging の除外コメントを現仕様に合わせて整理する
+- 品質ゲート:
+  - `python -m unittest discover -v`
+  - `python -m pip install .` 相当の導入経路で `discussions/` assets の存在を確認する
+  - インストール済み CLI で `spec-dock init` を実行し、生成物に `discussions/rules.md` があることを確認する
+- レビューゲート:
+  - reviewer に差分レビューを依頼し、指摘対応→再レビューで Approved を得る
+- 記録/コミット:
+  - `spec-deps/current/report.md` にログを追記する
+  - S07 の作業をコミットする
+
+---
+
+### S08 — 追補品質ゲート（CI 失敗修正 + 差分レビュー）を通す (必須)
+- 対象: S07 の追補修正差分
+- 品質ゲート:
+  - `python -m unittest discover -v`
+  - `git diff origin/main...HEAD` でスコープ外の変更が混入していないことを確認する
+- レビューゲート:
+  - reviewer に追補差分レビューを依頼し、指摘対応→再レビューで Approved を得る
 - 記録:
   - `spec-deps/current/report.md` に最終レビュー結果と修正履歴を追記する
 
