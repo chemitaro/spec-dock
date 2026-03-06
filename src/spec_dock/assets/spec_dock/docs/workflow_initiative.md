@@ -58,7 +58,9 @@ Initiative 作成後は、対象ノード配下の wrapper で Epic を追加で
 - `requirement.md`: なぜやるか / 成功条件 / スコープ
 - `design.md`: 方針 / 境界 / 依存 / リスク
 - `plan.md`: 実行計画（Epic への分解を含む）
-- `artifacts/`: 補足資料（調査メモ/図/ログ断片）。`_template.md` をコピーして利用する
+- `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
+  - ADR: `./spec-dock/scripts/spec-dock new adr --initiative <initiative-id> --title "..."`
+  - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
 
 補足:
 - ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
