@@ -258,6 +258,53 @@ git diff origin/main...HEAD --stat
 #### メモ
 - PR 上の Codex コメントは確認済みだが、ユーザー判断に従い legacy `adrs/` の読み戻し対応は行わない。
 
+---
+
+### 2026-03-06 18:00 - 18:20
+
+#### 対象
+- Step: S09
+- AC/EC: AC-004
+
+#### 実施内容
+- Codex review の新規指摘を分析
+  - `legacy adrs` を採番へ戻す指摘は、既存要件（後方互換なし）に反するため不採用
+  - `rules.md` の非ADRコピー例が相対パスとして破綻している指摘は採用
+- 文書契約を追補
+  - `requirement.md` に、非ADRサンプルコマンドは repo root で実行可能な形にする要件を追記
+  - `design.md` / `plan.md` に、`rules.md` 3ファイル + internal artifact doc を更新対象として明記
+- 実装
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/discussions/rules.md` の非ADR例を修正
+  - `spec-deps/current/artifacts/20260305-discussions-best-practice.md` の同種の誤例を修正
+  - すべて「リポジトリルートで実行」を前提にし、scope directory を明示した destination に統一
+
+#### 実行コマンド / 結果
+```bash
+rg -n "cp spec-dock/templates/discussions/(note|disc|research)\\.md discussions/" \
+  src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/discussions/rules.md \
+  spec-deps/current/artifacts/20260305-discussions-best-practice.md
+# 出力なし
+```
+
+#### 変更したファイル
+- `spec-deps/current/requirement.md`
+- `spec-deps/current/design.md`
+- `spec-deps/current/plan.md`
+- `src/spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md`
+- `src/spec_dock/assets/spec_dock/templates/epic/discussions/rules.md`
+- `src/spec_dock/assets/spec_dock/templates/issue/discussions/rules.md`
+- `spec-deps/current/artifacts/20260305-discussions-best-practice.md`
+
+#### コミット
+- なし（コミット前）
+
+#### レビュー
+- reviewer: Approved
+
+#### メモ
+- runtime / CLI の挙動変更はなく、テンプレ文言の有効パス化に限定した。
+- legacy `adrs/` 非対応の方針は維持した。
+
 ## 遭遇した問題と解決 (任意)
 - 問題: `init/update` 後に `templates/**/discussions/` が消えるため、S02要件を満たせなかった
   - 解決: `_prune_legacy_scaffold` が `discussions` を legacy 扱いで削除していたため、削除対象を `adrs` / `artifacts` に置換した

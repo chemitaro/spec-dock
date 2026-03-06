@@ -75,6 +75,7 @@ package "To-Be" {
     - `spec-dock/templates/discussions/`
     - 例: `adr.md`, `note.md`, `disc.md`, `research.md`
     - `discussions/rules.md` から上記パスを案内して「コピーして使う」運用にする。
+  - `discussions/rules.md` の非ADRサンプルコマンドは、**リポジトリルートでそのまま実行できる形**で記述し、コピー先の scope directory を明示する。
   - `discussions/` 配下にスクリプト（`new-adr` 等）を置かない（完全廃止）。
 - MUST NOT（絶対にやらない／追加しない）:
   - ディレクトリを用途別に増殖させない（トップレベルは `discussions/` のみ）。
@@ -135,7 +136,7 @@ package "To-Be" {
   - 観測点: 生成物ツリー（ファイルシステム）
 - AC-004:
   - Actor/Role: ユーザー
-  - Given: `discussions/rules.md` にテンプレパス（`spec-dock/templates/discussions/<type>.md`）が記載されている
+  - Given: `discussions/rules.md` にテンプレパス（`spec-dock/templates/discussions/<type>.md`）と、リポジトリルート基準のコピー例が記載されている
   - When: テンプレをコピーして軽量資料を作成する
   - Then: 命名規約（`<type>-00001-<slug>.md`）に従って追加できる
   - 観測点: `discussions/` 配下のファイル名と内容
