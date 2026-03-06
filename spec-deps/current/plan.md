@@ -36,6 +36,7 @@ ID: "iss-00014"
 - [x] S06: 最終品質ゲート（main 差分レビュー + 承認）を通す
 - [ ] S07: packaging 設定を修正し、`pip install .` 経路でも `discussions/` assets が欠落しないようにする
 - [ ] S08: 追補品質ゲート（CI 失敗修正 + 差分レビュー）を通す
+- [ ] S09: `discussions/rules.md` の非ADRコピー例を repo root 基準の有効パスへ修正する
 
 ### UML（任意） (任意)
 ```plantuml
@@ -63,6 +64,7 @@ S05 --> S06
 - AC-002 → S03
 - AC-003 → S02
 - AC-004 → S02（テンプレ位置の案内）/ S04（生成する場合）
+- AC-004 → S09（コピー例の実行可能性）
 - AC-005 → S02, S05
 - AC-006 → S02
 - AC-007 → S07
@@ -218,6 +220,25 @@ S05 --> S06
   - reviewer に追補差分レビューを依頼し、指摘対応→再レビューで Approved を得る
 - 記録:
   - `spec-deps/current/report.md` に最終レビュー結果と修正履歴を追記する
+
+---
+
+### S09 — `discussions/rules.md` のコピー例を実行可能なパスへ修正する (必須)
+- 対象: AC-004
+- 背景:
+  - Codex review で、`rules.md` の非ADRコピー例が source/destination の相対パスとして破綻していると指摘された
+  - 現状の `cp spec-dock/templates/discussions/<type>.md discussions/...` は、実行ディレクトリにより source または destination が解決できない
+- Green:
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/discussions/rules.md` の非ADRコピー例を修正する
+  - 実行前提を「リポジトリルートで実行」に固定し、コピー先 scope directory を明示する
+  - `spec-deps/current/artifacts/20260305-discussions-best-practice.md` の同種の誤例も追随修正する
+- 品質ゲート:
+  - 3つの `rules.md` で source/destination が一貫しており、コマンド例として読んで破綻しないことを確認する
+- レビューゲート:
+  - reviewer に差分レビューを依頼し、指摘対応→再レビューで Approved を得る
+- 記録/コミット:
+  - `spec-deps/current/report.md` にログを追記する
+  - S09 の作業をコミットする
 
 ---
 

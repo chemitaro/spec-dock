@@ -206,12 +206,15 @@ User -> D: edit content
 - 追加（Add）:
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/discussions/rules.md`:
     - 最小ルール（分類/命名/ADR昇格基準/テンプレの場所）
+    - 非ADR のコピー例は「リポジトリルートで実行する」前提で、source/destination の両方が解決可能な明示パスにする
   - `src/spec_dock/assets/spec_dock/templates/discussions/{note,disc,research}.md`:
     - `discussions/` 用テンプレ（type ごと / 最小セット）
 - 変更（Modify）:
   - `pyproject.toml`:
     - `exclude-package-data` から `assets/spec_dock/templates/**/discussions/**` を除去
   - `src/spec_dock/assets/spec_dock/templates/README.md`: 出力先マッピング（`adrs/`/`artifacts/` → `discussions/`）
+  - `spec-deps/current/artifacts/20260305-discussions-best-practice.md`:
+    - `rules.md` と同じ前提で、非ADRコピー例を repo root 基準の有効パスへ更新
   - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/`:
     - `adrs/`, `artifacts/` を `discussions/` に置換
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
@@ -230,7 +233,7 @@ User -> D: edit content
 - AC-001 → テンプレ差し替え（`src/spec_dock/assets/spec_dock/templates/**`）
 - AC-002 → `_new_adr`（`app.py`）と `templates/discussions/adr.md`
 - AC-003 → `discussions/rules.md` の同梱（テンプレ）+ `rules.md` に導線を固定
-- AC-004 → type テンプレ（`templates/discussions/<type>.md`）+ 命名規約（prefix+連番）
+- AC-004 → type テンプレ（`templates/discussions/<type>.md`）+ 命名規約（prefix+連番）+ `rules.md` の repo root 基準コピー例
 - AC-005 → `discussions/` 配下にラッパスクリプトを含めない（テンプレから `adrs/new-adr` を削除し、`discussions/` は markdown のみ）
 - AC-006 → `spec-dock/templates/discussions/{adr,note,disc,research}.md` を同梱し、コピー導線を成立させる
 - AC-007 → `pyproject.toml` の packaging 設定を修正し、`pip install .` 後も `rules.md` / templates が欠落しないことを保証

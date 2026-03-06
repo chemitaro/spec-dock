@@ -20,9 +20,10 @@
 - ADR:
   - `./spec-dock/scripts/spec-dock new adr --epic <id> --title "<title>"`
 - 非ADR（コピー運用）:
-  - `cp spec-dock/templates/discussions/note.md discussions/note-00001-<slug>.md`
-  - `cp spec-dock/templates/discussions/disc.md discussions/disc-00001-<slug>.md`
-  - `cp spec-dock/templates/discussions/research.md discussions/research-00001-<slug>.md`
+  - 前提: リポジトリルートで実行する
+  - `cp spec-dock/templates/discussions/note.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/discussions/note-00001-<doc-slug>.md`
+  - `cp spec-dock/templates/discussions/disc.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/discussions/disc-00001-<doc-slug>.md`
+  - `cp spec-dock/templates/discussions/research.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/discussions/research-00001-<doc-slug>.md`
 
 ## 4. ルール
 - `discussions/` 配下に `new-*` などのラッパスクリプトを置かない。

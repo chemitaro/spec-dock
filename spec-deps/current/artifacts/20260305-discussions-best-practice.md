@@ -125,9 +125,10 @@ ID: "<type>-00001"
 
 例:
 ```bash
-cp spec-dock/templates/discussions/note.md discussions/note-00001-dir-layout.md
-cp spec-dock/templates/discussions/research.md discussions/research-00001-naming-taxonomy.md
-cp spec-dock/templates/discussions/disc.md discussions/disc-00001-doc-types.md
+# リポジトリルートで実行（issue scope の例）
+cp spec-dock/templates/discussions/note.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/issues/<issue-id>-<slug>/discussions/note-00001-dir-layout.md
+cp spec-dock/templates/discussions/research.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/issues/<issue-id>-<slug>/discussions/research-00001-naming-taxonomy.md
+cp spec-dock/templates/discussions/disc.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/issues/<issue-id>-<slug>/discussions/disc-00001-doc-types.md
 ```
 
 （補足）衝突しない運用:
