@@ -44,6 +44,4 @@ spec_dock = [
   "assets/spec_dock/templates/plan.md",
   "assets/spec_dock/templates/report.md",
   "assets/spec_dock/templates/requirement.md",
-  # discussions/ is legacy; do not package it even if stale build artifacts exist.
-  "assets/spec_dock/templates/**/discussions/**",
 ]

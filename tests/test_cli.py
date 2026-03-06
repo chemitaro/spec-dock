@@ -326,13 +326,24 @@ class TestCli(unittest.TestCase):
             epic_templates_dir = templates_dir / "epic"
             issue_templates_dir = templates_dir / "issue"
 
-            self.assertTrue((initiative_templates_dir / "artifacts" / "_template.md").is_file())
-            self.assertTrue((epic_templates_dir / "artifacts" / "_template.md").is_file())
             req_text = (issue_templates_dir / "requirement.md").read_text(encoding="utf-8")
             self.assertIn("## 対象ユーザー / 利用シナリオ", req_text)
             self.assertIn("## 用語（ドメイン語彙）", req_text)
-            self.assertTrue((issue_templates_dir / "artifacts" / "_template.md").is_file())
-            self.assertFalse((issue_templates_dir / "discussions").exists())
+            for scope_templates in (
+                initiative_templates_dir,
+                epic_templates_dir,
+                issue_templates_dir,
+            ):
+                self.assertTrue((scope_templates / "discussions" / "rules.md").is_file())
+                self.assertFalse((scope_templates / "adrs").exists())
+                self.assertFalse((scope_templates / "artifacts").exists())
+                self.assertEqual(list((scope_templates / "discussions").glob("new-*")), [])
+
+            discussions_templates_dir = templates_dir / "discussions"
+            self.assertTrue((discussions_templates_dir / "adr.md").is_file())
+            self.assertTrue((discussions_templates_dir / "note.md").is_file())
+            self.assertTrue((discussions_templates_dir / "disc.md").is_file())
+            self.assertTrue((discussions_templates_dir / "research.md").is_file())
             self.assertEqual(list(initiative_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(epic_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(issue_templates_dir.rglob("README.md")), [])
@@ -365,9 +376,9 @@ class TestCli(unittest.TestCase):
                 / "spec-driven-tdd-workflow"
                 / "SKILL.md"
             ).read_text(encoding="utf-8")
-            self.assertIn("`artifacts/`", skill_text)
             self.assertIn("`discussions/`", skill_text)
-            self.assertIn("legacy", skill_text)
+            self.assertIn("./spec-dock/scripts/spec-dock new adr --issue", skill_text)
+            self.assertNotIn("adrs/new-adr", skill_text)
             self.assertFalse(
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
@@ -1866,34 +1877,7 @@ class TestCli(unittest.TestCase):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsNone(active.get("issue"))
 
-    def test_new_adr_increments_id_within_scope(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-
-            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision two"])
-
-            adrs_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-local-00001-auth-platform"
-                / "epics"
-                / "epic-local-00001-jwt-auth"
-                / "issues"
-                / "iss-local-00001-add-refresh-token"
-                / "adrs"
-            )
-            self.assertTrue(adrs_dir.is_dir())
-            self.assertNotEqual(sorted(adrs_dir.glob("adr-00001-*.md")), [])
-            self.assertNotEqual(sorted(adrs_dir.glob("adr-00002-*.md")), [])
-
-    def test_new_nodes_include_artifacts_dir(self) -> None:
+    def test_new_nodes_include_discussions_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1905,14 +1889,77 @@ class TestCli(unittest.TestCase):
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+            for scope_dir in (init_dir, epic_dir, issue_dir):
+                self.assertTrue((scope_dir / "discussions" / "rules.md").is_file())
+                self.assertFalse((scope_dir / "adrs").exists())
+                self.assertFalse((scope_dir / "artifacts").exists())
+                self.assertEqual(list((scope_dir / "discussions").glob("new-*")), [])
 
-            self.assertTrue((init_dir / "artifacts").is_dir())
-            self.assertTrue((epic_dir / "artifacts").is_dir())
-            self.assertTrue((issue_dir / "artifacts").is_dir())
-            self.assertTrue((init_dir / "artifacts" / "_template.md").is_file())
-            self.assertTrue((epic_dir / "artifacts" / "_template.md").is_file())
-            self.assertTrue((issue_dir / "artifacts" / "_template.md").is_file())
-            self.assertFalse((issue_dir / "discussions").exists())
+    def test_new_adr_increments_id_within_scope_discussions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision two"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            self.assertNotEqual(sorted(discussions_dir.glob("adr-00001-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("adr-00002-*.md")), [])
+            self.assertEqual(list(issue_dir.glob("adrs")), [])
+
+    def test_new_adr_rejects_duplicate_explicit_id_in_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "adr",
+                    "--issue",
+                    "iss-local-00001",
+                    "--id",
+                    "adr-00001",
+                    "--title",
+                    "Duplicate decision",
+                ],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("ADR id already exists", p.stderr)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            self.assertEqual(len(list(discussions_dir.glob("adr-00001-*.md"))), 1)
+            self.assertEqual(list(discussions_dir.glob("adr-00002-*.md")), [])
 
     def test_new_nodes_do_not_generate_readme_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1945,10 +1992,7 @@ class TestCli(unittest.TestCase):
 
             wrappers = [
                 init_dir / "epics" / "new-epic",
-                init_dir / "adrs" / "new-adr",
                 epic_dir / "issues" / "new-issue",
-                epic_dir / "adrs" / "new-adr",
-                issue_dir / "adrs" / "new-adr",
             ]
             for wrapper in wrappers:
                 self.assertTrue(wrapper.is_file(), f"missing wrapper: {wrapper}")
@@ -2030,10 +2074,7 @@ class TestCli(unittest.TestCase):
             self.assertEqual(issue_meta["id"], "iss-00123")
             self.assertEqual(issue_meta["github"]["issue_number"], 123)
 
-    def test_new_adr_wrapper_creates_adr(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
+    def test_new_nodes_do_not_include_new_adr_wrapper(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -2051,11 +2092,8 @@ class TestCli(unittest.TestCase):
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
             )
-            wrapper = issue_dir / "adrs" / "new-adr"
-
-            p = self._run_wrapper_capture(wrapper, ["Token rotation strategy"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertNotEqual(sorted((issue_dir / "adrs").glob("adr-00001-*.md")), [])
+            self.assertFalse((issue_dir / "adrs").exists())
+            self.assertFalse((issue_dir / "discussions" / "new-adr").exists())
 
     def test_wrappers_reject_invalid_args(self) -> None:
         if os.name == "nt":
@@ -2074,7 +2112,6 @@ class TestCli(unittest.TestCase):
             wrappers = [
                 init_dir / "epics" / "new-epic",
                 epic_dir / "issues" / "new-issue",
-                issue_dir / "adrs" / "new-adr",
             ]
 
             for wrapper in wrappers:

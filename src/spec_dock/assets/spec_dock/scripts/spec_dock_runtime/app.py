@@ -221,7 +221,7 @@ def _next_id(
     if prefix == "adr":
         initiatives_root = _initiatives_root(specdock_dir)
         # ADRs are files, not nodes with `.meta.json`. Scan filenames as a fallback.
-        for adr_path in initiatives_root.rglob("adrs/adr-*.md"):
+        for adr_path in initiatives_root.rglob("discussions/adr-*.md"):
             m = re.search(r"\b(adr(?:-local)?-[0-9]+)\b", adr_path.stem)
             if not m:
                 continue
@@ -658,17 +658,17 @@ def _new_adr(
     if not title:
         raise RuntimeError("--title is required")
 
-    template_path = specdock_dir / "templates" / "adr.md"
+    template_path = specdock_dir / "templates" / "discussions" / "adr.md"
     if not template_path.exists():
         raise RuntimeError(f"Missing ADR template: {template_path}")
 
-    adrs_dir = scope.path / "adrs"
-    adrs_dir.mkdir(parents=True, exist_ok=True)
+    discussions_dir = scope.path / "discussions"
+    discussions_dir.mkdir(parents=True, exist_ok=True)
 
     if node_id is None:
-        # ADR ids are scoped to `adrs/` (they are not stored in `.meta.json`).
+        # ADR ids are scoped to `discussions/` (they are not stored in `.meta.json`).
         max_num = 0
-        for p in adrs_dir.glob("adr-*.md"):
+        for p in discussions_dir.glob("adr-*.md"):
             stem = p.stem
             m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", stem)
             if not m:
@@ -690,7 +690,7 @@ def _new_adr(
 
     # Prevent duplicated ADR ids within the same scope (even with a different slug).
     want_prefix, want_local, want_num = _parse_id(node_id)
-    for p in sorted(adrs_dir.glob("adr-*.md")):
+    for p in sorted(discussions_dir.glob("adr-*.md")):
         m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", p.stem)
         if not m:
             continue
@@ -701,7 +701,7 @@ def _new_adr(
         if p_prefix == want_prefix and p_local == want_local and p_num == want_num:
             raise RuntimeError(f"ADR id already exists under scope {scope.id}: {node_id} ({p})")
 
-    dest_path = adrs_dir / f"{node_id}-{slug}.md"
+    dest_path = discussions_dir / f"{node_id}-{slug}.md"
     if dest_path.exists():
         raise RuntimeError(f"ADR already exists: {dest_path}")
 
