@@ -179,6 +179,85 @@ git diff main...HEAD --stat
 #### レビュー
 - reviewer: Approved（最終）
 
+---
+
+### 2026-03-06 17:15 - 17:40
+
+#### 対象
+- Step: S07
+- AC/EC: AC-003, AC-006, AC-007, EC-003
+
+#### 実施内容
+- `pyproject.toml`
+  - `exclude-package-data` から `assets/spec_dock/templates/**/discussions/**` の除外設定を削除
+  - `discussions/` が現行 canonical layout であることに合わせ、コメントを更新
+- 文書契約（`requirement.md` / `design.md` / `plan.md`）を追補更新
+  - 配布パッケージにも `discussions/rules.md` と `templates/discussions/*.md` を含める要件を明記
+  - 旧 `adrs/` は採番・重複判定に読まない方針を明文化
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (Ran 144 tests)
+
+python -m pip install .
+# OK
+
+spec-dock init /tmp/spec-dock-installed-check
+# OK
+```
+
+#### 検証結果
+- `site-packages/spec_dock/assets/spec_dock/templates/discussions/{adr,note,disc,research}.md` がすべて存在
+- `site-packages/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/discussions/rules.md` がすべて存在
+- インストール済み `spec-dock init` で生成された `spec-dock/templates/{initiative,epic,issue}/discussions/rules.md` がすべて存在
+
+#### 変更したファイル
+- `pyproject.toml`
+- `spec-deps/current/requirement.md`
+- `spec-deps/current/design.md`
+- `spec-deps/current/plan.md`
+
+#### コミット
+- なし（コミット前）
+
+#### レビュー
+- reviewer: Approved
+
+#### メモ
+- CI 失敗の直接原因は packaging 設定だったため、runtime 変更なしの最小差分で解消した。
+- legacy `adrs/` を読む後方互換は追加していない。
+
+---
+
+### 2026-03-06 17:40 - 17:45
+
+#### 対象
+- Step: S08
+- 品質ゲート: 追補差分（CI 失敗修正 + 差分レビュー）
+
+#### 実施内容
+- 品質ゲート:
+  - `python -m unittest discover -v`
+  - `git diff origin/main...HEAD --stat` でブランチ差分のスコープを再確認
+- レビューゲート:
+  - reviewer に追補差分（`pyproject.toml`）をレビュー依頼し、Approved を得た
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+# OK (Ran 144 tests)
+
+git diff origin/main...HEAD --stat
+# OK（issue #14 のスコープ内）
+```
+
+#### レビュー
+- reviewer: Approved（追補）
+
+#### メモ
+- PR 上の Codex コメントは確認済みだが、ユーザー判断に従い legacy `adrs/` の読み戻し対応は行わない。
+
 ## 遭遇した問題と解決 (任意)
 - 問題: `init/update` 後に `templates/**/discussions/` が消えるため、S02要件を満たせなかった
   - 解決: `_prune_legacy_scaffold` が `discussions` を legacy 扱いで削除していたため、削除対象を `adrs` / `artifacts` に置換した
