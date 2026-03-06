@@ -9,5 +9,5 @@
 ## 運用ルール（最小）
 - 仕様確定・完了したら `current/` を `completed/<name>/` に移動します。
 - `completed/<name>/` は `YYYYMMDDTHHMMSSZ-issue-queue-iss-xxxxx` のように、日時と種別/IDが分かる名前を推奨します。
-- 補足資料（検証ログ/議論メモ）は `current/artifacts/` に追加します。
-- 意思決定は `current/adrs/` に ADR として残します。
+- ADR / 議論 / 調査 / メモは `current/discussions/` に追加します。
+- `current/discussions/rules.md` と `spec-dock/templates/discussions/*.md` を基準に運用します。
