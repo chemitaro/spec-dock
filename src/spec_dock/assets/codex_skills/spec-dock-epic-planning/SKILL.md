@@ -6,5 +6,7 @@ description: Leaf skill for epic planning tasks in spec-dock.
 # Spec-dock Epic Planning
 
 - Use this skill for epic planning work.
-- Primary doc: `spec-dock/docs/workflow_epic.md`.
-- Detailed routing and references are expanded in a later step.
+- Primary workflow: `spec-dock/docs/workflow_epic.md`.
+- `spec-dock/docs/reference_github.md`
+- `spec-dock/docs/reference_sync.md`
+- `spec-dock/docs/reference_naming.md`

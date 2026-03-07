@@ -91,11 +91,51 @@ OK
 - `tests/test_cli.py` - migration / convergence / parser rejection の回帰テスト追加
 
 #### コミット
-- pending
+- `2509881 feat(skills): skill 同期の所有境界を実装`
 
 #### メモ
 - reviewer 結果: `overall_correctness = patch is correct`, findings なし（static diff inspection）
 - legacy managed 名は現時点で `spec-driven-tdd-workflow` のみを ownership set に含める実装とした
+
+---
+
+### 2026-03-08 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, AC-004, AC-005, AC-005b, AC-007, EC-002, EC-004
+
+#### 実施内容
+- hub skill を entry/routing 専用文面へ更新し、4 leaf と 4 reference docs を直接列挙した。
+- 4 つの leaf skill に primary workflow と direct references を反映した。
+- `tests/test_cli.py` に bundled skill routing contract テストを追加し、`runtime-operations` standalone 参照がないことも検証した。
+- `code_reviewer` に S03 差分をレビュー依頼し、ブロッカーなしの承認レベル判定を得た。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_cli.TestCli.test_bundled_skill_assets_cover_managed_manifest \
+  tests.test_cli.TestCli.test_bundled_skill_routing_contract \
+  tests.test_cli.TestCli.test_init_creates_expected_structure
+
+Ran 3 tests in 0.025s
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md` - hub routing 文面へ更新
+- `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md` - initiative leaf routing を確定
+- `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md` - epic leaf routing を確定
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md` - issue leaf routing を確定
+- `src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md` - ADR leaf routing を確定
+- `tests/test_cli.py` - bundled skill routing contract の回帰テスト追加
+
+#### コミット
+- pending
+
+#### メモ
+- reviewer 結果: `overall_correctness = patch is correct`, findings なし
+- hub の簡潔さを優先し、詳細仕様は docs 正本へ残した
 
 ---
 

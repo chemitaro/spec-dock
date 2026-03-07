@@ -6,5 +6,7 @@ description: Leaf skill for initiative planning tasks in spec-dock.
 # Spec-dock Initiative Planning
 
 - Use this skill for initiative planning work.
-- Primary doc: `spec-dock/docs/workflow_initiative.md`.
-- Detailed routing and references are expanded in a later step.
+- Primary workflow: `spec-dock/docs/workflow_initiative.md`.
+- `spec-dock/docs/reference_github.md`
+- `spec-dock/docs/reference_sync.md`
+- `spec-dock/docs/reference_naming.md`
