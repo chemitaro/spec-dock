@@ -131,11 +131,51 @@ OK
 - `tests/test_cli.py` - bundled skill routing contract の回帰テスト追加
 
 #### コミット
-- pending
+- `085e280 feat(skills): hub と leaf の routing を確定`
 
 #### メモ
 - reviewer 結果: `overall_correctness = patch is correct`, findings なし
 - hub の簡潔さを優先し、詳細仕様は docs 正本へ残した
+
+---
+
+### 2026-03-08 00:00 - 00:00
+
+#### 対象
+- Step: S04
+- AC/EC: AC-002, AC-002b, AC-006, AC-007, AC-008, EC-001, EC-001b, EC-003
+
+#### 実施内容
+- root `README.md` を multi-skill 導線へ更新し、`--no-skill` / `adrs/new-adr` / `artifacts/_template.md` の旧記述を除去した。
+- 配布 docs `README.md` を hub + 4 leaf + reference layer の入口説明へ更新した。
+- `workflow_{initiative,epic,issue,adr}.md` 冒頭に対応 leaf skill を追記し、docs と skills の導線を相互参照にした。
+- `tests/test_cli.py` に導入後 docs 内容の回帰アサートを追加し、`code_reviewer` 承認を得た。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_cli.TestCli.test_init_creates_expected_structure \
+  tests.test_cli.TestCli.test_no_skill_option_is_rejected
+
+Ran 2 tests in 0.013s
+OK
+```
+
+#### 変更したファイル
+- `README.md` - root 利用案内を multi-skill / discussions 前提へ更新
+- `src/spec_dock/assets/spec_dock/docs/README.md` - hub + 4 leaf の入口説明を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md` - initiative leaf skill 参照を追記
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` - epic leaf skill 参照を追記
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - issue leaf skill 参照を追記
+- `src/spec_dock/assets/spec_dock/docs/workflow_adr.md` - ADR leaf skill 参照を追記
+- `tests/test_cli.py` - docs 導線の回帰アサートを追加
+
+#### コミット
+- pending
+
+#### メモ
+- reviewer 結果: `Approved`
+- root `README.md` 本体はテスト対象外とし、配布 docs 側の内容を回帰テストで固定した
 
 ---
 

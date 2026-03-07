@@ -2,6 +2,9 @@
 
 ADR（Architecture Decision Record）は、意思決定を仕様（requirement/design/plan）から **切り離して**記録するための仕組みです。
 
+対応 leaf skill:
+- `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
+
 関連:
 - 総合: [guide.md](guide.md)
 - Initiative: [workflow_initiative.md](workflow_initiative.md)

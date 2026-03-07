@@ -3,6 +3,9 @@
 Initiative は「投資単位」です。  
 このワークフローは、Initiative を **単独で完結**させ、後続（Epic/Issue）へ安全に分解できる状態を作ります。
 
+対応 leaf skill:
+- `.agents/skills/spec-dock-initiative-planning/SKILL.md`
+
 関連:
 - 総合: [guide.md](guide.md)
 - Epic: [workflow_epic.md](workflow_epic.md)

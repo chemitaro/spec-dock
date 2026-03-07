@@ -3,6 +3,9 @@
 Issue は「実装の最小単位」です。  
 このワークフローは、active issue を入口に **Red→Green→Refactor** を回し、Issue を単独完結させます。
 
+対応 leaf skill:
+- `.agents/skills/spec-dock-issue-execution/SKILL.md`
+
 関連:
 - 総合: [guide.md](guide.md)
 - Epic: [workflow_epic.md](workflow_epic.md)
