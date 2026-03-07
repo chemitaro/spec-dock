@@ -171,11 +171,48 @@ OK
 - `tests/test_cli.py` - docs 導線の回帰アサートを追加
 
 #### コミット
-- pending
+- `53fe799 docs(skills): multi-skill 導線へ案内を更新`
 
 #### メモ
 - reviewer 結果: `Approved`
 - root `README.md` 本体はテスト対象外とし、配布 docs 側の内容を回帰テストで固定した
+
+---
+
+### 2026-03-08 00:00 - 00:00
+
+#### 対象
+- Step: S05
+- AC/EC: AC-007, AC-010, EC-006
+
+#### 実施内容
+- `python -m unittest discover -v` を実行し、全件回帰テストを通した。
+- `python -m pip install --target` ベースの packaging check を実施し、bundled skill/docs asset がインストール物に含まれることを確認した。
+- `git diff main...HEAD` をスコープに `code_reviewer` へ最終レビューを依頼し、差分全体で Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Ran 149 tests in 18.638s
+OK
+
+rm -rf /tmp/specdock-pkgcheck && \
+python -m pip install -q --target /tmp/specdock-pkgcheck . && \
+PYTHONPATH=/tmp/specdock-pkgcheck python -c "<asset existence check>"
+
+missing=[]
+```
+
+#### 変更したファイル
+- `spec-deps/current/report.md` - S04/S05 の記録と品質ゲート結果を追記
+
+#### コミット
+- pending
+
+#### メモ
+- reviewer 結果: `Approved`（`main...HEAD` 差分全体、findings なし）
+- packaging check では `spec-driven-tdd-workflow` / `spec-dock-initiative-planning` / `spec_dock/docs/README.md` の収載を確認した
 
 ---
 
