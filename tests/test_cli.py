@@ -29,6 +29,15 @@ def _expected_spec_dock_version() -> str:
         return match.group(1)
 
 
+_EXPECTED_MANAGED_SKILL_NAMES = (
+    "spec-driven-tdd-workflow",
+    "spec-dock-initiative-planning",
+    "spec-dock-epic-planning",
+    "spec-dock-issue-execution",
+    "spec-dock-adr-facilitation",
+)
+
+
 class TestCli(unittest.TestCase):
     def _can_create_symlink(self, target: Path) -> bool:
         if not hasattr(os, "symlink"):
@@ -360,22 +369,16 @@ class TestCli(unittest.TestCase):
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
 
-            self.assertTrue(
-                (
-                    target
-                    / ".agents"
-                    / "skills"
-                    / "spec-driven-tdd-workflow"
-                    / "SKILL.md"
-                ).is_file()
+            skills_root = target / ".agents" / "skills"
+            installed_skill_files = sorted(
+                p.relative_to(skills_root).as_posix() for p in skills_root.glob("*/SKILL.md")
             )
-            skill_text = (
-                target
-                / ".agents"
-                / "skills"
-                / "spec-driven-tdd-workflow"
-                / "SKILL.md"
-            ).read_text(encoding="utf-8")
+            self.assertEqual(
+                installed_skill_files,
+                sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
+            )
+
+            skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("`discussions/`", skill_text)
             self.assertIn("./spec-dock/scripts/spec-dock new adr --issue", skill_text)
             self.assertNotIn("adrs/new-adr", skill_text)
@@ -409,16 +412,18 @@ class TestCli(unittest.TestCase):
 
             self._assert_version_file(target)
 
-            self.assertFalse(
-                (
-                    target
-                    / ".agents"
-                    / "skills"
-                    / "spec-driven-tdd-workflow"
-                    / "SKILL.md"
-                ).exists()
-            )
+            skills_root = target / ".agents" / "skills"
+            self.assertEqual(list(skills_root.glob("*/SKILL.md")), [])
             self.assertFalse((target / ".github" / "workflows" / "spec-dock-close.yml").exists())
+
+    def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
+        import spec_dock.cli as cli
+
+        self.assertEqual(cli._managed_skill_names(), _EXPECTED_MANAGED_SKILL_NAMES)
+        with cli._assets_dir() as assets_dir:
+            for skill_name in cli._managed_skill_names():
+                skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+                self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
 
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

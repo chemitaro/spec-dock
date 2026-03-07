@@ -25,6 +25,13 @@ from spec_dock import __version__
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
+_MANAGED_SKILL_NAMES = (
+    "spec-driven-tdd-workflow",
+    "spec-dock-initiative-planning",
+    "spec-dock-epic-planning",
+    "spec-dock-issue-execution",
+    "spec-dock-adr-facilitation",
+)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "# spec-dock runtime (generated)\n"
     "# v2 generated state for agents (SSOT + derived views)\n"
@@ -256,26 +263,32 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         _install_repo_root_shortcut(target_root)
 
 
+def _managed_skill_names() -> tuple[str, ...]:
+    """Return the managed bundled skill set."""
+    return _MANAGED_SKILL_NAMES
+
+
 def _install_skill(target_root: Path, *, force: bool) -> None:
-    """Install/update the bundled agent skill into `.agents/skills/`.
+    """Install/update bundled agent skills into `.agents/skills/`.
 
     Notes:
     - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
     - Other agents may adopt the same convention (Agent Skills open standard).
     """
     with _assets_dir() as assets_dir:
-        src_skill = assets_dir / "codex_skills" / "spec-driven-tdd-workflow" / "SKILL.md"
-        if not src_skill.exists():
-            raise RuntimeError(f"Missing asset file: {src_skill}")
+        for skill_name in _managed_skill_names():
+            src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+            if not src_skill.exists():
+                raise RuntimeError(f"Missing asset file: {src_skill}")
 
-        dest_skill = target_root / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
-        if dest_skill.exists() and not force:
-            print(
-                f"spec-dock: skill already exists (skipped): {dest_skill} (use --force to overwrite)",
-                file=sys.stderr,
-            )
-            return
-        _copy_file(src_skill, dest_skill)
+            dest_skill = target_root / ".agents" / "skills" / skill_name / "SKILL.md"
+            if dest_skill.exists() and not force:
+                print(
+                    f"spec-dock: skill already exists (skipped): {dest_skill} (use --force to overwrite)",
+                    file=sys.stderr,
+                )
+                continue
+            _copy_file(src_skill, dest_skill)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
