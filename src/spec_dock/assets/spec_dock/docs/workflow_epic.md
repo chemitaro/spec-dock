@@ -3,6 +3,9 @@
 Epic は「設計の背骨」です。  
 このワークフローは、Epic を **単独で完結**させ、Issue を安全に分割できる状態を作ります。
 
+対応 leaf skill:
+- `.agents/skills/spec-dock-epic-planning/SKILL.md`
+
 関連:
 - 総合: [guide.md](guide.md)
 - Initiative: [workflow_initiative.md](workflow_initiative.md)

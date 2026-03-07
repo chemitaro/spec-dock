@@ -5,8 +5,18 @@
 
 ## エージェント起点（Codex CLI）
 
-Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven-tdd-workflow/SKILL.md` を起点に運用できます。  
-`spec-dock init/update` はこの skill をデフォルトで導入します。
+`spec-dock init/update` は、次の 5 skill（hub + 4 leaf）を導入します。  
+運用は hub skill を入口にし、対象スコープに応じて leaf skill へ進む形です。
+
+- Hub（入口）: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- Leaf（Initiative）: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
+- Leaf（Epic）: `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- Leaf（Issue）: `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- Leaf（ADR）: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
+
+補足:
+- workflow ドキュメント（`workflow_*.md`）が実務導線です。
+- `reference_*.md` は制約/仕様確認のための reference レイヤです。
 
 ## まず読む（全員）
 

@@ -3,7 +3,7 @@
 `spec-dock` scaffolds a lightweight spec-driven documentation workspace into an existing repository.
 
 It is designed to be executed via `uvx` (ephemeral install). After scaffolding, your project uses the
-generated files (Markdown templates, scripts, agent skill); the `spec-dock` package itself is not
+generated files (Markdown templates, scripts, agent skills); the `spec-dock` package itself is not
 required at runtime.
 
 ## Usage (uvx)
@@ -18,10 +18,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/pr
 # Overwrite managed files if 'spec-dock' already exists
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
 
-# Skip installing the agent skill (optional)
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --no-skill
-
-# Update managed files (docs/templates/scripts/skill)
+# Update managed files (docs/templates/scripts/skills)
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
 ```
 
@@ -83,12 +80,13 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 # Or: link to an existing GitHub issue number (without creating a new one)
 ./spec-dock/scripts/spec-dock new issue --epic 1 --title "Add refresh token" --github-issue 123  # id=iss-00123
-./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation strategy"
 
 # Scope-local wrappers created in generated nodes (single title arg)
 <initiative-dir>/epics/new-epic "JWT auth"
 <epic-dir>/issues/new-issue "Add refresh token"
-<scope-dir>/adrs/new-adr "Token rotation strategy"
+
+# ADRs are created via runtime command (no scope-local ADR wrapper)
+./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation strategy"
 
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
@@ -115,7 +113,10 @@ Notes:
 - `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
 - With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
-- Generated initiative/epic/issue nodes include `artifacts/_template.md` (supplemental materials) and do not include template-derived `README.md`.
+- Generated initiative/epic/issue nodes include `discussions/` (`rules.md` included).
+- For non-ADR notes/discussions/research docs, copy templates from `spec-dock/templates/discussions/{note,disc,research}.md`.
+- ADR docs are created by `./spec-dock/scripts/spec-dock new adr --{initiative|epic|issue} <id> --title "..."`.
+- Generated nodes do not include template-derived `README.md`.
 
 See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
 
@@ -127,11 +128,16 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `templates/` (initiative/epic/issue/adr templates)
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
-    - generated nodes include wrappers (`epics/new-epic`, `issues/new-issue`, `adrs/new-adr`) and `artifacts/_template.md`
+    - generated nodes include wrappers (`epics/new-epic`, `issues/new-issue`) and `discussions/` (`rules.md`)
   - `active/` (generated pointers; gitignored)
   - `.agent/` (generated agent state; gitignored)
   - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))
-- `.agents/skills/spec-driven-tdd-workflow/` (agent skill; Codex-compatible)
+- `.agents/skills/` (Codex-compatible multi-skill set)
+  - `spec-driven-tdd-workflow/` (hub; entry point)
+  - `spec-dock-initiative-planning/` (leaf: initiative workflow)
+  - `spec-dock-epic-planning/` (leaf: epic workflow)
+  - `spec-dock-issue-execution/` (leaf: issue workflow)
+  - `spec-dock-adr-facilitation/` (leaf: ADR workflow)
 
 ## Testing
 
@@ -144,7 +150,7 @@ python -m unittest discover -v
 ## 日本語（概要）
 
 `spec-dock` は、既存リポジトリに `spec-dock/`（仕様書駆動開発のためのドキュメント一式）と
-Agent Skill（Codex 互換）を生成するためのスキャフォルディングツールです。
+Codex 互換 Skill セット（hub + 4 leaf）を生成するためのスキャフォルディングツールです。
 
 実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。
 

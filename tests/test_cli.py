@@ -327,6 +327,23 @@ class TestCli(unittest.TestCase):
             self.assertTrue((docs_dir / "reference_naming.md").is_file())
             self.assertTrue((docs_dir / "reference_sync.md").is_file())
 
+            docs_readme = (docs_dir / "README.md").read_text(encoding="utf-8")
+            self.assertIn("spec-driven-tdd-workflow", docs_readme)
+            self.assertIn("spec-dock-initiative-planning", docs_readme)
+            self.assertIn("spec-dock-epic-planning", docs_readme)
+            self.assertIn("spec-dock-issue-execution", docs_readme)
+            self.assertIn("spec-dock-adr-facilitation", docs_readme)
+            self.assertIn("reference レイヤ", docs_readme)
+
+            workflow_initiative = (docs_dir / "workflow_initiative.md").read_text(encoding="utf-8")
+            workflow_epic = (docs_dir / "workflow_epic.md").read_text(encoding="utf-8")
+            workflow_issue = (docs_dir / "workflow_issue.md").read_text(encoding="utf-8")
+            workflow_adr = (docs_dir / "workflow_adr.md").read_text(encoding="utf-8")
+            self.assertIn("spec-dock-initiative-planning", workflow_initiative)
+            self.assertIn("spec-dock-epic-planning", workflow_epic)
+            self.assertIn("spec-dock-issue-execution", workflow_issue)
+            self.assertIn("spec-dock-adr-facilitation", workflow_adr)
+
             # v2 does not ship legacy docs/old/ (keep the published docs minimal).
             self.assertFalse((docs_dir / "old").exists())
 
