@@ -51,11 +51,51 @@ OK
 - `src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md` - leaf skill 骨格追加
 
 #### コミット
-- pending
+- `330d0a0 feat(skills): full set 導入の土台を追加`
 
 #### メモ
 - reviewer 結果: `overall_correctness = patch is correct`, findings なし（要約ベースの S01 スコープ確認）
 - `--no-skill` 廃止、migration / ownership boundary、routing 文面完成、README/docs 更新は S02 以降へ意図的に deferred
+
+---
+
+### 2026-03-08 00:00 - 00:00
+
+#### 対象
+- Step: S02
+- AC/EC: AC-002, AC-002b, AC-007, AC-008, AC-009, AC-010, EC-001, EC-001b, EC-005, EC-006
+
+#### 実施内容
+- `src/spec_dock/cli.py` で `--no-skill` を削除し、`init/update` が常に skill sync を実行するように変更した。
+- managed skill ownership を導入し、`copy/update -> verify -> prune` 順で managed skill だけを同期するようにした。
+- `tests/test_cli.py` に legacy single-skill / legacy no-skill / interrupted sync convergence / parser rejection の回帰テストを追加した。
+- `code_reviewer` に S02 差分をレビュー依頼し、静的 diff 観点でブロッカーなしの承認レベル判定を得た。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_cli.TestCli.test_no_skill_option_is_rejected \
+  tests.test_cli.TestCli.test_update_migrates_legacy_single_skill_and_preserves_custom_skill \
+  tests.test_cli.TestCli.test_update_installs_full_skill_set_for_legacy_no_skill_repo \
+  tests.test_cli.TestCli.test_update_skill_sync_converges_after_interrupted_run \
+  tests.test_cli.TestCli.test_init_creates_expected_structure \
+  tests.test_cli.TestCli.test_update_keeps_initiatives_by_default \
+  tests.test_cli.TestCli.test_bundled_skill_assets_cover_managed_manifest
+
+Ran 7 tests in 0.133s
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/cli.py` - ownership boundary 付き skill sync と `--no-skill` 廃止
+- `tests/test_cli.py` - migration / convergence / parser rejection の回帰テスト追加
+
+#### コミット
+- pending
+
+#### メモ
+- reviewer 結果: `overall_correctness = patch is correct`, findings なし（static diff inspection）
+- legacy managed 名は現時点で `spec-driven-tdd-workflow` のみを ownership set に含める実装とした
 
 ---
 
