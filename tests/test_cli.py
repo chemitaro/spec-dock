@@ -499,6 +499,61 @@ class TestCli(unittest.TestCase):
                 skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
                 self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
 
+    def test_bundled_skill_routing_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            skills_dir = assets_dir / "codex_skills"
+            hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
+            initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
+            epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
+            issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+            adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-epic-planning`: epic-level requirement/design/plan planning.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-issue-execution`: issue-level TDD execution and report updates.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.",
+            hub_text,
+        )
+        self.assertIn("`spec-dock/docs/reference_github.md`", hub_text)
+        self.assertIn("`spec-dock/docs/reference_deps.md`", hub_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
+
+        self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", initiative_text)
+
+        self.assertIn("`spec-dock/docs/workflow_epic.md`", epic_text)
+        self.assertIn("`spec-dock/docs/reference_github.md`", epic_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", epic_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", epic_text)
+
+        self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_github.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", issue_text)
+
+        self.assertIn("`spec-dock/docs/workflow_adr.md`", adr_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", adr_text)
+        self.assertIn("Return to the current parent workflow", adr_text)
+
+        for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
+            self.assertNotIn("runtime-operations", skill_text)
+
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
