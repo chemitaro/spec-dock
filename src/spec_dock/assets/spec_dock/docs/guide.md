@@ -19,7 +19,7 @@
 spec-dock の SSOT（Source of Truth）は **ローカルのメタデータ**です。
 
 - SSOT（永続）: `spec-dock/initiatives/**/.meta.json`
-- 生成物（git 管理しない）: `spec-dock/.agent/{active.json,index.json,tree.json,deps.json,deps.puml,deps.todo.puml}`、`spec-dock/active/**`
+- 生成物（git 管理しない）: `spec-dock/.agent/{active.json,index-all.json,tree-all.json,index.json,tree.json,deps-issues.json}`、`spec-dock/{tree-all.puml,tree.puml,deps-issues.puml,dashboard.md}`、`spec-dock/active/**`
 
 GitHub は「作業の入口（Issue番号/URL）」として連携できますが、**ローカルの仕様ツリーが正**です。
 
@@ -94,6 +94,8 @@ spec-dock/
   - issue は（デフォルトで）GitHub Issue も作ります（`--no-github` で local-only）
   - initiative/epic は（デフォルトで）local-only です（必要なら `--create-github-issue` / `--github-issue <n>` で GitHub と紐づけ）
 - `import`: 既存 GitHub Issue を **読み取り確認**した上で、ローカルノードを作ります
+  - `import epic` は `--initiative` を省略すると、current active から親 initiative を解決します
+  - `import issue` は `--epic` を省略すると、current active から親 epic を解決します
   - `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
 - 生成済みノード配下では、親IDを省略できる wrapper が使えます（引数はタイトル1つのみ）。
   - initiative 配下: `epics/new-epic "<title>"`
@@ -115,7 +117,7 @@ spec-dock/
 ### 4.3 観測できる状態へ（validate / sync）
 
 - `validate`: 仕様ツリーの整合性（メタデータ）を検証します
-- `sync`: 集計物（`.agent/index.json` / `.agent/tree.json` / `.agent/deps.json` / PlantUML）を生成します
+- `sync`: 集計物（`.agent/index-all.json` / `.agent/tree-all.json` / `.agent/index.json` / `.agent/tree.json` / `.agent/deps-issues.json`）と可視化ファイル（`tree*.puml` / `deps-issues.puml` / `dashboard.md`）を生成します
 
 ## 5. PlantUML（全体のイメージ）
 

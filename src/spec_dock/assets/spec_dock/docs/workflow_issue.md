@@ -34,11 +34,14 @@ GitHub を使わない場合:
 ### 1.2 import（既存 GitHub Issue を取り込む）
 
 ```bash
-./spec import issue <num|#num|url> --title "..." --epic <epic-id>
+./spec import issue <num|#num|url> --title "..." [--epic <epic-id>]
 ```
 
 注意:
 - `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
+- `--epic` を省略すると、current active から親 epic を解決します。
+  - active epic があればそれを使います。
+  - active issue のみでも、そこから親 epic を解決できれば使います。
 
 ## 2. active set（作業対象を固定する）
 

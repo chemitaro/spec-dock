@@ -547,26 +547,32 @@ class TestCli(unittest.TestCase):
         self.assertIn("`spec-dock/docs/reference_deps.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
+        self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
 
         self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", initiative_text)
+        self.assertIn("create/import an initiative", initiative_text)
 
         self.assertIn("`spec-dock/docs/workflow_epic.md`", epic_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", epic_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", epic_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", epic_text)
+        self.assertIn("create/import an epic", epic_text)
 
         self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", issue_text)
+        self.assertIn("`spec-dock/active/context-pack.md`", issue_text)
+        self.assertIn("implement the active issue via TDD", issue_text)
 
         self.assertIn("`spec-dock/docs/workflow_adr.md`", adr_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", adr_text)
         self.assertIn("Return to the current parent workflow", adr_text)
+        self.assertIn("create/update an ADR", adr_text)
 
         for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
             self.assertNotIn("runtime-operations", skill_text)

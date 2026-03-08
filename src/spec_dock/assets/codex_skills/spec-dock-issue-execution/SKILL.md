@@ -6,6 +6,8 @@ description: Leaf skill for issue execution tasks in spec-dock.
 # Spec-dock Issue Execution
 
 - Use this skill for issue execution work.
+- Typical fit: implement the active issue via TDD and update `report.md`.
+- Start from `spec-dock/active/context-pack.md`, then follow the issue workflow.
 - Primary workflow: `spec-dock/docs/workflow_issue.md`.
 - `spec-dock/docs/reference_deps.md`
 - `spec-dock/docs/reference_sync.md`
