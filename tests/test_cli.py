@@ -579,6 +579,9 @@ class TestCli(unittest.TestCase):
         self.assertIn("`spec-dock/docs/reference_naming.md`", issue_text)
         self.assertIn("`spec-dock/active/context-pack.md`", issue_text)
         self.assertIn("implement the active issue via TDD", issue_text)
+        self.assertIn("source of truth", issue_text)
+        self.assertIn("docs impact resolution step", issue_text)
+        self.assertIn("final diff review quality gate", issue_text)
 
         self.assertIn("`spec-dock/docs/workflow_adr.md`", adr_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", adr_text)
