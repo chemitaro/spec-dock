@@ -258,6 +258,74 @@ OK
 
 ---
 
+### 2026-03-08 13:20 - 14:10
+
+#### 対象
+- Step: issue governance template follow-up
+- AC/EC: AC-011, AC-012, AC-013, AC-014 / EC-007, EC-008, EC-009
+
+#### 実施内容
+- issue 実装 governance の追補方針を `research-00002` / `disc-00003` に整理し、`requirement.md` / `design.md` / `plan.md` に契約として反映した。
+- spec reviewer 指摘で「最終品質ゲートが二重化している」論点が出たため、`plan.md` の最終ゲートを `S08` に一本化した。
+- `workflow_issue.md` に plan upfront approval / step result approval / docs impact / final diff review quality gate を正本ルールとして追加した。
+- `templates/issue/plan.md` に全 step 共通ルール、`S90 docs impact resolution / docs refresh`、`S99 final diff review quality gate` を追加した。
+- `spec-dock-issue-execution/SKILL.md` に、docs を正本として扱うことと docs impact / final gate を飛ばさない reminder を追加した。
+- `tests/test_cli.py` に workflow / template / skill wording の回帰アサートを追加した。
+- 差分確認では、`workflow_issue.md` / `templates/issue/plan.md` / `SKILL.md` / `tests/test_cli.py` の整合を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Ran 149 tests in 18.651s
+OK
+
+rm -rf /tmp/specdock-pkgcheck && \
+python -m pip install -q --target /tmp/specdock-pkgcheck . && \
+PYTHONPATH=/tmp/specdock-pkgcheck python - <<'PY'
+from pathlib import Path
+root = Path('/tmp/specdock-pkgcheck/spec_dock/assets')
+checks = [
+    root / 'spec_dock/docs/workflow_issue.md',
+    root / 'spec_dock/templates/issue/plan.md',
+    root / 'codex_skills/spec-dock-issue-execution/SKILL.md',
+]
+missing = [str(p) for p in checks if not p.exists()]
+print({'missing': missing})
+PY
+
+{'missing': []}
+
+git diff origin/chemitaro/issue16...HEAD -- \
+  src/spec_dock/assets/spec_dock/docs/workflow_issue.md \
+  src/spec_dock/assets/spec_dock/templates/issue/plan.md \
+  src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md \
+  tests/test_cli.py
+```
+
+#### 変更したファイル
+- `spec-deps/current/discussions/research-00002-issue-plan-governance-analysis.md` - issue plan governance の分析と論点を記録
+- `spec-deps/current/discussions/disc-00003-issue-plan-governance-best-practice.md` - 運用ルールのベストプラクティス提案を記録
+- `spec-deps/current/requirement.md` - governance 標準化の AC/EC と制約を追加
+- `spec-deps/current/design.md` - issue governance contract と変更対象ファイルを設計へ反映
+- `spec-deps/current/plan.md` - review loop / docs refresh / final gate の実装計画を追加し、最終品質ゲートを一本化
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - issue execution governance の正本ルールを追加
+- `src/spec_dock/assets/spec_dock/templates/issue/plan.md` - 共通実行ルール、`S90`、`S99` を追加
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md` - governance reminder を追加
+- `tests/test_cli.py` - governance wording の回帰アサートを追加
+
+#### コミット
+- `2a092ef docs(issue): issue governance の正本を追加`
+- `ced27b6 docs(plan): issue 計画テンプレートに governance を追加`
+- `f9f7d3a docs(skill): issue execution の governance reminder を追加`
+
+#### メモ
+- spec reviewer 結果: `Approved`（issue docs 契約の一貫性確認）
+- code reviewer 結果: `Approved`（`git diff main...HEAD` スコープ、blocking finding なし）
+- packaging check では `workflow_issue.md` / `templates/issue/plan.md` / `spec-dock-issue-execution/SKILL.md` の収載を確認した
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
