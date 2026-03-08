@@ -53,7 +53,8 @@
 ./spec new epic --initiative <id> --title "..."  # デフォルト: local-only（gh は呼ばない）
 ./spec new issue --epic <id> --title "..."       # デフォルト: GitHub Issue を作る（--no-github で local-only）
 
-./spec import issue <num-or-url> --title "..." --epic <id>  # 既存 GitHub Issue を取り込む（読み取りのみ）
+./spec import epic <num-or-url> --title "..." [--initiative <id>]  # 既存 GitHub Issue を取り込む（読み取りのみ）
+./spec import issue <num-or-url> --title "..." [--epic <id>]       # 既存 GitHub Issue を取り込む（読み取りのみ）
 
 ./spec active set <id|#num|url>               # 作業対象をアクティブ化（デフォルト: no-checkout）
 ./spec active set <id|#num|url> --checkout   # アクティブ化 + ブランチ作成/切替
@@ -67,6 +68,7 @@
 
 補足:
 - `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカット（symlink）です。無い場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
+- `import epic` / `import issue` の親指定は、current active から解決できる場合に限って省略できます。
 
 ## スコープ内ショートカット（生成後ノード）
 

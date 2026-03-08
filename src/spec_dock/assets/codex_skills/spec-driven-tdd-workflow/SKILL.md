@@ -7,6 +7,7 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 - Use this as the entry/routing skill for spec-dock work.
 - Keep `spec-dock/docs/` as the source of truth; skills stay concise.
+- Route once the main output is clear; leaf skills own the workflow details.
 
 ## Route to leaf skills
 
@@ -25,4 +26,5 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 ## Quick reminders
 
 - Put interview and investigation notes under `discussions/` in the active node.
+- `spec-dock/active/context-pack.md` is the execution entrypoint for active issue work.
 - ADR creation example: `./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "..."`

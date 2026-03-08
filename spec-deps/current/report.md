@@ -208,7 +208,7 @@ missing=[]
 - `spec-deps/current/report.md` - S04/S05 の記録と品質ゲート結果を追記
 
 #### コミット
-- pending
+- `04fa9c2 docs(report): 品質ゲート結果を記録`
 
 #### メモ
 - reviewer 結果: `Approved`（`main...HEAD` 差分全体、findings なし）
@@ -216,14 +216,45 @@ missing=[]
 
 ---
 
-### 2026-03-06 HH:MM - HH:MM
+### 2026-03-08 00:00 - 00:00
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: follow-up docs audit
+- AC/EC: docs/skill correctness follow-up
 
 #### 実施内容
-- ...
+- `doc_writer` に docs / distributed docs / bundled `SKILL.md` の監査と必要最小限の整備を依頼した。
+- stale だった `guide.md` の `sync` 生成物説明を現行挙動へ更新した。
+- `workflow_epic.md` / `workflow_issue.md` に、`import` 時の親解決（current active fallback）を追記した。
+- `SKILL.md` 群には、典型タスクと active issue の入口 (`spec-dock/active/context-pack.md`) のような最小限の agent-facing 情報だけを補強した。
+- `code_reviewer` に実差分レビューを依頼し、docs を正本・skill を簡潔ルーターとする方針を維持したまま Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Ran 149 tests in 18.638s
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/README.md` - import 親解決の補足を追加
+- `src/spec_dock/assets/spec_dock/docs/guide.md` - `sync` 生成物の説明を現行挙動へ修正
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` - `import epic` の親解決 fallback を追記
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - `import issue` の親解決 fallback を追記
+- `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md` - hub の最小 agent-facing 導線を補強
+- `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md` - 典型タスクを補強
+- `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md` - 典型タスクを補強
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md` - active issue の入口と典型タスクを補強
+- `src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md` - 典型タスクを補強
+- `tests/test_cli.py` - docs/skill wording の回帰アサートを追加
+
+#### コミット
+- pending
+
+#### メモ
+- `README.md` は今回の時点で致命的な誤記なしと判断され、未変更
+- reviewer 結果: `Approved`
 
 ---
 
