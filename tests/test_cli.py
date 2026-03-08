@@ -405,6 +405,12 @@ class TestCli(unittest.TestCase):
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             self.assertIn("#### update_plan（着手時に登録）", plan_text)
             self.assertIn("./spec-dock/active/issue/report.md", plan_text)
+            self.assertIn("## 実行ルール（全ステップ共通）", plan_text)
+            self.assertIn("Red → Green → Refactor → review → fix → re-review → report → commit/no-op", plan_text)
+            self.assertIn("S90 — docs impact resolution / docs refresh", plan_text)
+            self.assertIn("S99 — final diff review quality gate", plan_text)
+            self.assertIn("`git diff <base>...HEAD`", plan_text)
+            self.assertIn("reviewer verdict", plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
