@@ -29,6 +29,15 @@ def _expected_spec_dock_version() -> str:
         return match.group(1)
 
 
+_EXPECTED_MANAGED_SKILL_NAMES = (
+    "spec-driven-tdd-workflow",
+    "spec-dock-initiative-planning",
+    "spec-dock-epic-planning",
+    "spec-dock-issue-execution",
+    "spec-dock-adr-facilitation",
+)
+
+
 class TestCli(unittest.TestCase):
     def _can_create_symlink(self, target: Path) -> bool:
         if not hasattr(os, "symlink"):
@@ -264,6 +273,24 @@ class TestCli(unittest.TestCase):
     def _write_json_force(self, path: Path, data: object) -> None:
         self._write_text_force(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
+    def _installed_skill_files(self, target: Path) -> list[str]:
+        skills_root = target / ".agents" / "skills"
+        if not skills_root.exists():
+            return []
+        return sorted(p.relative_to(skills_root).as_posix() for p in skills_root.glob("*/SKILL.md"))
+
+    def _assert_managed_skills_installed(self, target: Path) -> None:
+        managed_names = set(_EXPECTED_MANAGED_SKILL_NAMES)
+        installed_managed = sorted(
+            skill_file
+            for skill_file in self._installed_skill_files(target)
+            if skill_file.split("/", 1)[0] in managed_names
+        )
+        self.assertEqual(
+            installed_managed,
+            sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
+        )
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -299,6 +326,28 @@ class TestCli(unittest.TestCase):
             self.assertTrue((docs_dir / "reference_github.md").is_file())
             self.assertTrue((docs_dir / "reference_naming.md").is_file())
             self.assertTrue((docs_dir / "reference_sync.md").is_file())
+
+            docs_readme = (docs_dir / "README.md").read_text(encoding="utf-8")
+            self.assertIn("spec-driven-tdd-workflow", docs_readme)
+            self.assertIn("spec-dock-initiative-planning", docs_readme)
+            self.assertIn("spec-dock-epic-planning", docs_readme)
+            self.assertIn("spec-dock-issue-execution", docs_readme)
+            self.assertIn("spec-dock-adr-facilitation", docs_readme)
+            self.assertIn("reference レイヤ", docs_readme)
+
+            workflow_initiative = (docs_dir / "workflow_initiative.md").read_text(encoding="utf-8")
+            workflow_epic = (docs_dir / "workflow_epic.md").read_text(encoding="utf-8")
+            workflow_issue = (docs_dir / "workflow_issue.md").read_text(encoding="utf-8")
+            workflow_adr = (docs_dir / "workflow_adr.md").read_text(encoding="utf-8")
+            self.assertIn("spec-dock-initiative-planning", workflow_initiative)
+            self.assertIn("spec-dock-epic-planning", workflow_epic)
+            self.assertIn("spec-dock-issue-execution", workflow_issue)
+            self.assertIn("spec-dock-adr-facilitation", workflow_adr)
+            self.assertIn("plan upfront approval", workflow_issue)
+            self.assertIn("step result approval", workflow_issue)
+            self.assertIn("docs impact", workflow_issue)
+            self.assertIn("final diff review quality gate", workflow_issue)
+            self.assertIn("reviewer approval", workflow_issue)
 
             # v2 does not ship legacy docs/old/ (keep the published docs minimal).
             self.assertFalse((docs_dir / "old").exists())
@@ -356,26 +405,20 @@ class TestCli(unittest.TestCase):
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             self.assertIn("#### update_plan（着手時に登録）", plan_text)
             self.assertIn("./spec-dock/active/issue/report.md", plan_text)
+            self.assertIn("## 実行ルール（全ステップ共通）", plan_text)
+            self.assertIn("Red → Green → Refactor → review → fix → re-review → report → commit/no-op", plan_text)
+            self.assertIn("S90 — docs impact resolution / docs refresh", plan_text)
+            self.assertIn("S99 — final diff review quality gate", plan_text)
+            self.assertIn("`git diff <base>...HEAD`", plan_text)
+            self.assertIn("reviewer verdict", plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
 
-            self.assertTrue(
-                (
-                    target
-                    / ".agents"
-                    / "skills"
-                    / "spec-driven-tdd-workflow"
-                    / "SKILL.md"
-                ).is_file()
-            )
-            skill_text = (
-                target
-                / ".agents"
-                / "skills"
-                / "spec-driven-tdd-workflow"
-                / "SKILL.md"
-            ).read_text(encoding="utf-8")
+            skills_root = target / ".agents" / "skills"
+            self._assert_managed_skills_installed(target)
+
+            skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("`discussions/`", skill_text)
             self.assertIn("./spec-dock/scripts/spec-dock new adr --issue", skill_text)
             self.assertNotIn("adrs/new-adr", skill_text)
@@ -400,25 +443,153 @@ class TestCli(unittest.TestCase):
             if old_file is not None:
                 cli.__file__ = old_file
 
-    def test_init_no_skill_skips_skill_install(self) -> None:
+    def test_no_skill_option_is_rejected(self) -> None:
+        import spec_dock.cli as cli
+
+        with self.assertRaises(SystemExit) as cm:
+            cli._parse_args(["init", "--no-skill", "."])
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_update_migrates_legacy_single_skill_and_preserves_custom_skill(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
 
-            exit_code = main(["init", "--no-skill", str(target)])
-            self.assertEqual(exit_code, 0)
+            skills_root = target / ".agents" / "skills"
+            for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
+                if skill_name == "spec-driven-tdd-workflow":
+                    continue
+                shutil.rmtree(skills_root / skill_name)
 
-            self._assert_version_file(target)
+            custom_dir = skills_root / "my-custom-skill"
+            custom_dir.mkdir(parents=True, exist_ok=True)
+            (custom_dir / "SKILL.md").write_text("# custom\n", encoding="utf-8")
+            (custom_dir / "notes.txt").write_text("keep\n", encoding="utf-8")
 
-            self.assertFalse(
-                (
-                    target
-                    / ".agents"
-                    / "skills"
-                    / "spec-driven-tdd-workflow"
-                    / "SKILL.md"
-                ).exists()
-            )
-            self.assertFalse((target / ".github" / "workflows" / "spec-dock-close.yml").exists())
+            self.assertEqual(main(["update", str(target)]), 0)
+            self._assert_managed_skills_installed(target)
+            self.assertTrue((custom_dir / "SKILL.md").is_file())
+            self.assertTrue((custom_dir / "notes.txt").is_file())
+
+    def test_update_installs_full_skill_set_for_legacy_no_skill_repo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            skills_root = target / ".agents" / "skills"
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            shutil.rmtree(skills_root)
+            self.assertFalse(skills_root.exists())
+            self.assertEqual(main(["update", str(target)]), 0)
+            self._assert_managed_skills_installed(target)
+
+            for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
+                shutil.rmtree(skills_root / skill_name)
+            self.assertEqual(list(skills_root.glob("*")), [])
+            self.assertEqual(main(["update", str(target)]), 0)
+            self._assert_managed_skills_installed(target)
+
+    def test_update_skill_sync_converges_after_interrupted_run(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            original_copy_file = cli._copy_file
+            failed_once = False
+
+            def interrupted_copy(src: Path, dest: Path) -> None:
+                nonlocal failed_once
+                if (
+                    not failed_once
+                    and dest.as_posix().endswith("/.agents/skills/spec-dock-epic-planning/SKILL.md")
+                ):
+                    failed_once = True
+                    raise RuntimeError("simulated skill sync interruption")
+                original_copy_file(src, dest)
+
+            cli._copy_file = interrupted_copy
+            try:
+                self.assertEqual(main(["update", str(target)]), 1)
+            finally:
+                cli._copy_file = original_copy_file
+
+            self.assertTrue(failed_once)
+            self.assertEqual(main(["update", str(target)]), 0)
+            self._assert_managed_skills_installed(target)
+
+    def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
+        import spec_dock.cli as cli
+
+        self.assertEqual(cli._managed_skill_names(), _EXPECTED_MANAGED_SKILL_NAMES)
+        with cli._assets_dir() as assets_dir:
+            for skill_name in cli._managed_skill_names():
+                skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+                self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
+
+    def test_bundled_skill_routing_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            skills_dir = assets_dir / "codex_skills"
+            hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
+            initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
+            epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
+            issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+            adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-epic-planning`: epic-level requirement/design/plan planning.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-issue-execution`: issue-level TDD execution and report updates.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.",
+            hub_text,
+        )
+        self.assertIn("`spec-dock/docs/reference_github.md`", hub_text)
+        self.assertIn("`spec-dock/docs/reference_deps.md`", hub_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
+        self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
+
+        self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", initiative_text)
+        self.assertIn("create/import an initiative", initiative_text)
+
+        self.assertIn("`spec-dock/docs/workflow_epic.md`", epic_text)
+        self.assertIn("`spec-dock/docs/reference_github.md`", epic_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", epic_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", epic_text)
+        self.assertIn("create/import an epic", epic_text)
+
+        self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_github.md`", issue_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", issue_text)
+        self.assertIn("`spec-dock/active/context-pack.md`", issue_text)
+        self.assertIn("implement the active issue via TDD", issue_text)
+        self.assertIn("source of truth", issue_text)
+        self.assertIn("docs impact resolution step", issue_text)
+        self.assertIn("final diff review quality gate", issue_text)
+
+        self.assertIn("`spec-dock/docs/workflow_adr.md`", adr_text)
+        self.assertIn("`spec-dock/docs/reference_naming.md`", adr_text)
+        self.assertIn("Return to the current parent workflow", adr_text)
+        self.assertIn("create/update an ADR", adr_text)
+
+        for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
+            self.assertNotIn("runtime-operations", skill_text)
 
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

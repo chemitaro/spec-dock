@@ -25,6 +25,14 @@ from spec_dock import __version__
 _SPEC_DOCK_DIRNAME = "spec-dock"
 _LEGACY_SPEC_DOCK_DIRNAME = ".spec-dock"
 _MANAGED_DIRS = ("docs", "templates", "scripts", "system")
+_MANAGED_SKILL_NAMES = (
+    "spec-driven-tdd-workflow",
+    "spec-dock-initiative-planning",
+    "spec-dock-epic-planning",
+    "spec-dock-issue-execution",
+    "spec-dock-adr-facilitation",
+)
+_LEGACY_MANAGED_SKILL_NAMES = ("spec-driven-tdd-workflow",)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "# spec-dock runtime (generated)\n"
     "# v2 generated state for agents (SSOT + derived views)\n"
@@ -256,26 +264,57 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
         _install_repo_root_shortcut(target_root)
 
 
-def _install_skill(target_root: Path, *, force: bool) -> None:
-    """Install/update the bundled agent skill into `.agents/skills/`.
+def _managed_skill_names() -> tuple[str, ...]:
+    """Return the managed bundled skill set."""
+    return _MANAGED_SKILL_NAMES
+
+
+def _managed_skill_ownership_names() -> tuple[str, ...]:
+    """Return skill directory names owned by the installer for pruning decisions."""
+    return tuple(dict.fromkeys((*_managed_skill_names(), *_LEGACY_MANAGED_SKILL_NAMES)))
+
+
+def _install_skill(target_root: Path) -> None:
+    """Install/update managed agent skills into `.agents/skills/`.
 
     Notes:
     - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
     - Other agents may adopt the same convention (Agent Skills open standard).
     """
     with _assets_dir() as assets_dir:
-        src_skill = assets_dir / "codex_skills" / "spec-driven-tdd-workflow" / "SKILL.md"
-        if not src_skill.exists():
-            raise RuntimeError(f"Missing asset file: {src_skill}")
+        skills_root = target_root / ".agents" / "skills"
+        managed_skill_names = _managed_skill_names()
 
-        dest_skill = target_root / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
-        if dest_skill.exists() and not force:
-            print(
-                f"spec-dock: skill already exists (skipped): {dest_skill} (use --force to overwrite)",
-                file=sys.stderr,
-            )
-            return
-        _copy_file(src_skill, dest_skill)
+        # 1) Copy/update target managed skills.
+        for skill_name in managed_skill_names:
+            src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+            if not src_skill.exists():
+                raise RuntimeError(f"Missing asset file: {src_skill}")
+
+            dest_skill = skills_root / skill_name / "SKILL.md"
+            _copy_file(src_skill, dest_skill)
+
+        # 2) Verify target managed skills were all installed before pruning.
+        missing_skills = [
+            skill_name
+            for skill_name in managed_skill_names
+            if not (skills_root / skill_name / "SKILL.md").is_file()
+        ]
+        if missing_skills:
+            joined = ", ".join(sorted(missing_skills))
+            raise RuntimeError(f"managed skill sync incomplete (missing SKILL.md): {joined}")
+
+        # 3) Prune obsolete managed skills only; preserve unknown custom dirs.
+        managed_ownership = set(_managed_skill_ownership_names())
+        target_managed = set(managed_skill_names)
+        for skill_dir in skills_root.iterdir():
+            if not skill_dir.is_dir():
+                continue
+            if skill_dir.name not in managed_ownership:
+                continue
+            if skill_dir.name in target_managed:
+                continue
+            shutil.rmtree(skill_dir, ignore_errors=True)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -286,11 +325,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
     def add_init_update_common(p: argparse.ArgumentParser) -> None:
         p.add_argument("path", nargs="?", default=".", help="Target project path (default: current directory)")
-        p.add_argument(
-            "--no-skill",
-            action="store_true",
-            help="Do not install the agent skill into '.agents/skills/'",
-        )
 
     p_init = sub.add_parser("init", help="Scaffold spec-dock into a project")
     add_init_update_common(p_init)
@@ -314,13 +348,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if ns.command == "init":
             _install_spec_dock(target_root, force=bool(ns.force))
-            if not ns.no_skill:
-                _install_skill(target_root, force=bool(ns.force))
+            _install_skill(target_root)
         elif ns.command == "update":
             _require_specdock(target_root)
             _install_spec_dock(target_root, force=True)
-            if not ns.no_skill:
-                _install_skill(target_root, force=True)
+            _install_skill(target_root)
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:

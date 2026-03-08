@@ -3,6 +3,9 @@
 Issue は「実装の最小単位」です。  
 このワークフローは、active issue を入口に **Red→Green→Refactor** を回し、Issue を単独完結させます。
 
+対応 leaf skill:
+- `.agents/skills/spec-dock-issue-execution/SKILL.md`
+
 関連:
 - 総合: [guide.md](guide.md)
 - Epic: [workflow_epic.md](workflow_epic.md)
@@ -31,11 +34,14 @@ GitHub を使わない場合:
 ### 1.2 import（既存 GitHub Issue を取り込む）
 
 ```bash
-./spec import issue <num|#num|url> --title "..." --epic <epic-id>
+./spec import issue <num|#num|url> --title "..." [--epic <epic-id>]
 ```
 
 注意:
 - `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
+- `--epic` を省略すると、current active から親 epic を解決します。
+  - active epic があればそれを使います。
+  - active issue のみでも、そこから親 epic を解決できれば使います。
 
 ## 2. active set（作業対象を固定する）
 
@@ -70,13 +76,39 @@ active issue 配下の仕様を埋めます:
 - design は「何を変えるか/壊れるか/どう守るか」を先に書く
 - plan は “テストで観測できる粒度” のステップに分ける
 
-## 4. 実装（TDD: Red → Green → Refactor）
+## 4. 実装（TDD + review loop）
 
 `plan.md` のステップを 1 つずつ、次の順で進めます:
 
 1. Red: 失敗するテストを書く
 2. Green: 最小の実装で通す
 3. Refactor: 可読性/重複/命名を整える（テストは維持）
+4. review: reviewer に step result approval を依頼する
+5. fix: 指摘があれば最小差分で修正する
+6. re-review: 承認レベルまで再レビューする
+7. report: 実行コマンド/結果/変更ファイルを `report.md` に残す
+8. commit / no-op: step-scoped commit を行う。実差分がない場合のみ no-op 理由を記録する
+
+### 4.1 plan 承認と step result approval
+
+- plan upfront approval:
+  - 実装着手前に、`requirement.md` / `design.md` / `plan.md` の整合を確認し、作業方針として承認を得る
+  - 目的は「どの順序で何を実装するか」を固定することです
+- step result approval:
+  - 各 step の実装結果に対して reviewer が確認する承認です
+  - 目的は、次の step に欠陥やズレを持ち越さないことです
+
+### 4.2 docs impact と docs refresh
+
+- docs impact は、今回の差分が README / workflow / distributed docs / skill reminder の更新要否を持つかを判定するための分類です
+- docs impact が `none` でない場合は、最終品質ゲートの前に docs refresh / docs impact resolution step を置きます
+- docs は規範の正本です。skill は reminder なので、詳細ルールは docs 側で更新します
+
+### 4.3 final diff review quality gate
+
+- 最後に、`git diff <base>...HEAD` を対象に branch 全体の差分を確認します
+- ここでは tests / packaging / docs / diff 全体をまとめて確認し、reviewer approval まで終える必要があります
+- この最終品質ゲートは最後の feature step に埋め込まず、独立 step として置きます
 
 ## 5. 記録（report.md）
 
@@ -98,6 +130,9 @@ active issue 配下の仕様を埋めます:
 ### plan
 - [ ] ステップが Red/Green/Refactor の単位に分割されている
 - [ ] 各ステップで回す “1本のコマンド” がある（例: `python -m unittest ...`）
+- [ ] 各ステップに review -> fix -> re-review -> report -> commit/no-op がある
+- [ ] docs impact / docs refresh step が final quality gate 前に置かれている
+- [ ] final diff review quality gate が独立 step になっている
 
 ### report
 - [ ] 実行したコマンドと結果が残っている
