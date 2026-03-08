@@ -17,10 +17,12 @@ ID: "iss-00016"
   - Codex CLI 向け skill を 1 本構成から **hub + 4 leaf** へ再編し、routing を単純化する
   - 共通運用ルールは独立 skill にせず、**reference layer** として docs 正本へ集約する
   - `init/update` で常に skill を導入し、`--no-skill` を廃止する
+  - issue 実装 governance を docs / template / skill に分担配置し、review loop / docs refresh / final diff gate を標準化する
 - MUST:
   - 初期 full set を 5 skill に固定する
   - hub / leaf の routing 契約を満たす
   - `update` の `.agents/skills/` 所有境界を守る
+  - issue plan template に review/fix/re-review と docs impact / final gate を実行可能な形で持たせる
 - MUST NOT:
   - `runtime-operations` のような抽象 skill を追加しない
   - unknown custom skill を `update` で削除しない
@@ -28,6 +30,7 @@ ID: "iss-00016"
   - hub 名は `spec-driven-tdd-workflow` を維持する
   - docs は正本、skill はルーターとする
   - `workflow_*` / `reference_*` は安定層として再利用する
+  - governance の規範本体は docs、実行形は template、short reminder は skill に置く
 - 前提:
   - この issue では Codex CLI の外部仕様変更は扱わない
   - 複数 skill 併存時の Codex 側解決順は repo 外仕様であり、本設計では「hub を主入口として配布する」前提で扱う
@@ -49,6 +52,8 @@ ID: "iss-00016"
   - docs はすでに workflow / reference に責務分離済みで、skill だけが巨大入口になっている
   - tests は単一 skill と `--no-skill` を前提にしている
   - `update` は managed file を上書きするが、skill については unknown custom skill との境界が未定義
+  - `templates/issue/plan.md` には step ごとのテスト/報告/コミットはあるが、review ループ・docs refresh step・final diff gate は標準化されていない
+  - `workflow_issue.md` は TDD の流れを持つが、plan upfront approval と step result approval の役割分担、branch 全体 final gate の規範は未定義
 - 採用するパターン（命名/責務/例外/DI/テストなど）:
   - assets 配下に配布正本を置き、installer が repo へ同期する既存方式を維持する
   - docs ファイル自体は極力移動せず、skill 側の routing と README 導線で責務を明確化する
@@ -77,6 +82,10 @@ ID: "iss-00016"
   1) leaf skill が自身の主要 workflow doc を先頭導線として示す
   2) 操作トリガーに応じて必要な `reference_*` を直接列挙する
   3) 利用者/Codex は詳細仕様を docs 正本で確認する
+- Flow for AC-011 / AC-012 / AC-014:
+  1) 開発者/Codex が `workflow_issue.md` と `templates/issue/plan.md` を開く
+  2) 各 step は review loop と docs impact 判定を持つ形で記述される
+  3) 終盤で docs refresh step と final diff review quality gate が独立 step として実行される
 
 ### UML（任意） (任意)
 ```plantuml
@@ -128,6 +137,18 @@ CLI -> Skills: keep unknown custom skills
     - hub は 4 leaf + 4 reference docs を持つ
     - leaf は requirement の routing 契約を満たす
     - 本設計で固定するのは **trigger group -> 最小完全 direct doc set** の対応である
+- MODEL-003: Issue governance contract
+  - Entity: issue execution における step governance
+  - Fields:
+    - `review_verdict`
+    - `docs_impact`
+    - `base_branch`
+    - `final_gate_scope`
+  - Constraints/Validation:
+    - `review_verdict` は `approved | changes_requested | waived_by_user` を基本語彙とする
+    - `docs_impact` は `none | user-facing | shipped-assets | workflow` のいずれかとする
+    - `final_gate_scope` は `git diff <base>...HEAD` 相当の branch 全体 diff を指す
+    - 実差分がない step は commit の代わりに report no-op 記録を許可する
 
 ### routing trigger matrix
 
@@ -261,6 +282,9 @@ cli --> ".agents/skills/*/SKILL.md"
   - `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`: ADR leaf 導線に合わせて整理
   - `README.md`: `--no-skill` 削除、生成物、複数 skill 導線へ更新
   - `tests/test_cli.py`: multi-skill 導入・migration・custom skill 保持テストへ更新
+  - `src/spec_dock/assets/spec_dock/templates/issue/plan.md`: issue execution governance を標準化
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`: issue governance の正本ルールを追加
+  - `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`: docs impact と final gate の reminder を追加
 - 削除（Delete）:
   - なし（skill の置換は削除ではなく managed sync による再構成で扱う）
 - 移動/リネーム（Move/Rename）:
@@ -278,6 +302,9 @@ cli --> ".agents/skills/*/SKILL.md"
 - AC-005 / AC-005b → initiative/epic/adr leaf skill 設計, `workflow_*`, `reference_*`
 - AC-006 / AC-008 → `README.md`, `src/spec_dock/assets/spec_dock/docs/README.md`, `_parse_args`
 - AC-009 / EC-005 → IF-003, ownership boundary 設計, `tests/test_cli.py`
+- AC-011 / AC-014 → `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-012 → `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-013 → `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
 - 非交渉制約（hub 名維持 / docs 正本 / custom skill 保持） → skill asset 配置方針, manifest 設計, docs stable 設計
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -293,6 +320,9 @@ cli --> ".agents/skills/*/SKILL.md"
     - leaf skill が requirement の routing 契約と **trigger group -> 最小完全 direct doc set** 対応を満たす
     - root `README.md` と配布 docs `README.md` から single-skill / `--no-skill` の旧導線が除去されている
     - old single-skill repo / old `--no-skill` repo へ `update` した後の配布 docs 導線が new skill set と整合する
+    - issue plan template が review loop / docs refresh / final diff gate を持つ
+    - workflow_issue が governance の正本として template と整合する
+    - issue-execution skill が docs 正本を崩さず short reminder に留まる
   - Migration safety:
     - copy/update の途中失敗を模擬したあと `update` を再実行すると target state に収束する
 - どのAC/ECをどのテストで保証するか:
@@ -362,6 +392,9 @@ cli --> ".agents/skills/*/SKILL.md"
 - R-005: update 中断時の部分更新
   - 影響: skill セットが一時的に中途半端になる
   - 対応: copy/update -> verify -> prune の順序に固定し、再実行で収束する設計にする
+- R-006: governance 規範が docs / template / skill で drift する
+  - 影響: agent と人間で参照先がズレる
+  - 対応: docs を正本、template を実行形、skill を reminder に限定する
 
 ## 未確定事項（TBD） (必須)
 - 現時点では、設計着手に必要な重大な未確定事項はない。

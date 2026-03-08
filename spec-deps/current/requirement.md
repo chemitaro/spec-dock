@@ -16,6 +16,7 @@ ID: "iss-00016"
 - 現時点で必要な skill は **最初から full set で導入**し、`README` / docs / installer / tests を含めて一貫した入口を提供する。
 - hub は既存名 `spec-driven-tdd-workflow` を維持しつつ、責務を「入口 / routing」に絞り、詳細実務は leaf に分離する。
 - 共通運用ルール（GitHub / deps / sync / active など）は独立 skill 化せず、reference docs を正本として hub / leaf から案内する。
+- あわせて、issue 実装計画の governance を標準化し、各 step の reviewer 承認ループ、docs impact 判定、branch 全体の最終品質ゲートを template / docs / skill に一貫して反映する。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -117,12 +118,18 @@ Hub --> Ref
   - `--no-skill` を廃止し、skill 常時導入前提の CLI / docs / tests へ揃える
   - hub / leaf ごとの必須参照先と参照トリガーを固定する
   - `update` 時の `.agents/skills/` 所有境界を固定する
+  - issue 実装計画 template に、各 step 共通の `review -> fix -> re-review -> report -> commit` governance を標準化する
+  - `workflow_issue.md` に issue execution governance の正本ルールを追加する
+  - docs impact を判定し、必要時だけ docs refresh step を final quality gate 前に置く運用を標準化する
+  - `git diff <base>...HEAD` を対象にした branch 全体の final diff review quality gate を標準 step として定義する
 - MUST NOT（絶対にやらない／追加しない）:
   - 1 本巨大 skill 構成へ戻さない
   - 現時点で必要な skill を「後で追加」で先送りしない
   - reference docs をそのまま大量の micro-skill に分割しない
   - scope 名だけの曖昧な leaf 名（`spec-dock-issue` など）へ寄せない
   - `runtime-operations` のような責務境界が曖昧な抽象 skill を初期導入しない
+  - review ループの規範を skill だけに閉じ込めない
+  - docs refresh を「毎 step 必ず全件更新」のような儀式化したルールにしない
 - OUT OF SCOPE:
   - Codex 以外のエージェント向け最適化
   - 将来の plugin/marketplace/skill bundle 選択 UI
@@ -150,6 +157,7 @@ Hub --> Ref
 - `README.md` の skill 導線と矛盾する旧記述は同じ issue で修正する
 - 既存 docs（`workflow_*`, `reference_*`）を正本として再利用し、skill 側に詳細仕様を複製しない
 - `update` が上書き・削除してよいのは、spec-dock 管理対象 skill ディレクトリに限る
+- governance の規範本体は docs に置き、template は実行形、skill は短い reminder に留める
 
 ## 前提（Assumptions） (必須)
 - 現在の主利用者は Codex CLI である
@@ -157,6 +165,7 @@ Hub --> Ref
 - `workflow_*` と `reference_*` は skill 再編後も中核 docs として維持する
 - `spec-dock` はまだ本格公開前であり、構造改善を優先できる
 - 既存 single-skill 導入済み repo には `update` で新 skill セットを配布する想定である
+- issue 実装は multi-agent review を前提に進めるケースが増えており、template 側で reviewer 承認ループを標準化する価値が高い
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: 共通運用ルールを独立 skill にするか
@@ -316,6 +325,30 @@ Hub --> Ref
   - When: `spec-dock update` を再実行する
   - Then: hub + 4 leaf の target set に収束し、未知の custom skill は保持される
   - 観測点: `.agents/skills/` の再実行後状態
+- AC-011:
+  - Actor/Role: issue 実装を行う開発者 / coding agent
+  - Given: `templates/issue/plan.md` から issue plan を起こす
+  - When: 各 step を記述する
+  - Then: 各 step 共通の review loop、docs impact 判定、report 更新、step-scoped commit/no-op 記録が template として用意されている
+  - 観測点: `src/spec_dock/assets/spec_dock/templates/issue/plan.md`
+- AC-012:
+  - Actor/Role: issue 実装を行う開発者 / coding agent
+  - Given: `workflow_issue.md` を読む
+  - When: issue 実装の進め方を確認する
+  - Then: plan upfront approval、step result approval、docs refresh step、final diff review quality gate の役割が正本として明記されている
+  - 観測点: `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-013:
+  - Actor/Role: Codex CLI
+  - Given: `spec-dock-issue-execution` を読む
+  - When: active issue の plan に従って作業する
+  - Then: docs が SSOT であること、docs impact step と final quality gate を飛ばさないことが短い reminder として案内されている
+  - 観測点: `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- AC-014:
+  - Actor/Role: reviewer / 開発者
+  - Given: branch 全体の実装差分を評価する
+  - When: issue plan の最終 step を確認する
+  - Then: `git diff <base>...HEAD` を対象にした final diff review quality gate が独立 step として定義されている
+  - 観測点: `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `workflow_issue.md`
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -357,12 +390,26 @@ Hub --> Ref
   - 条件: `update` の途中失敗後、再実行しても target state へ収束しない
   - 期待: その状態は受け入れない（migration safety 違反）
   - 観測点: `.agents/skills/` の再実行後状態
+- EC-007:
+  - 条件: issue plan に review loop がなく、step 完了後に reviewer 承認を経ずに次 step へ進めてしまう
+  - 期待: その状態は受け入れない（governance 標準化違反）
+  - 観測点: `templates/issue/plan.md`, `workflow_issue.md`
+- EC-008:
+  - 条件: docs impact があるのに docs refresh step が存在しない
+  - 期待: その状態は受け入れない（docs 陳腐化リスク）
+  - 観測点: `templates/issue/plan.md`, `workflow_issue.md`
+- EC-009:
+  - 条件: final gate が最後の feature step に埋め込まれ、branch 全体 diff review が独立していない
+  - 期待: その状態は受け入れない（cross-step 整合性を保証できない）
+  - 観測点: `templates/issue/plan.md`, `workflow_issue.md`
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: hub skill = 入口 / task routing / 共通 safety を担う skill
 - TERM-002: leaf skill = 特定責務に特化した実行用 skill
 - TERM-003: full set = 現時点で必要と判断した skill 群を最初から全部導入する方針
 - TERM-004: reference layer = `new/import/active/deps/sync/validate` と GitHub safety を支える共通運用 docs 群
+- TERM-005: docs impact = 実装差分により README / workflow / distributed docs / skill reminder の更新要否を判定するための分類
+- TERM-006: final diff review quality gate = `git diff <base>...HEAD` を対象に、tests / packaging / docs / diff 全体を reviewer が確認する最終 step
 
 ## 未確定事項 / 要確認 (任意)
 - 現時点では、主要な判断はユーザー確認済みである。
@@ -381,6 +428,8 @@ Hub --> Ref
 - installer / update / tests / README / docs の整合が取れている
 - `runtime-operations` を独立 skill にせず、reference layer として hub / leaf から辿れる
 - `--no-skill` 廃止方針が CLI / docs / tests に反映されている
+- issue 実装 governance が docs / template / skill に一貫して反映されている
+- final diff review quality gate と docs refresh step が issue execution の標準運用として定義されている
 - MUST NOT / OUT OF SCOPE を破っていない
 
 ## 省略/例外メモ (必須)
