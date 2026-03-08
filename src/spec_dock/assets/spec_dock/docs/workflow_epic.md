@@ -3,6 +3,9 @@
 Epic は「設計の背骨」です。  
 このワークフローは、Epic を **単独で完結**させ、Issue を安全に分割できる状態を作ります。
 
+対応 leaf skill:
+- `.agents/skills/spec-dock-epic-planning/SKILL.md`
+
 関連:
 - 総合: [guide.md](guide.md)
 - Initiative: [workflow_initiative.md](workflow_initiative.md)
@@ -35,11 +38,14 @@ GitHub Issue とリンクしたい場合（任意）:
 ### 1.2 import（既存 GitHub Issue を取り込む）
 
 ```bash
-./spec import epic <num|#num|url> --title "..." --initiative <initiative-id>
+./spec import epic <num|#num|url> --title "..." [--initiative <initiative-id>]
 ```
 
 注意:
 - `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
+- `--initiative` を省略すると、current active から親 initiative を解決します。
+  - active initiative があればそれを使います。
+  - active epic / active issue のみでも、そこから親 initiative を解決できれば使います。
 
 ### 1.3 Epic 配下で Issue を追加（wrapper）
 

@@ -1,299 +1,429 @@
 ---
 種別: 設計書（Issue）
-ID: "iss-00014"
-タイトル: "ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合）"
-関連GitHub: ["#14", "https://github.com/chemitaro/spec-dock/issues/14"]
-状態: "approved"
+ID: "iss-00016"
+タイトル: "Codex skills を hub + leaf 構成へ再編する"
+関連GitHub: ["#16", "https://github.com/chemitaro/spec-dock/issues/16"]
+状態: "draft"
 作成者: "chemitaro"
-最終更新: "2026-03-06"
+最終更新: "2026-03-08"
 依存: ["requirement.md"]
 親: []
 ---
 
-# iss-00014 ディスカッション資料の格納先を discussions/ に統一（adrs/artifacts の統合） — 設計（HOW）
+# iss-00016 Codex skills を hub + leaf 構成へ再編する — 設計（HOW）
 
 ## 目的・制約（要件から転記・圧縮） (必須)
-- 目的: `adrs/` + `artifacts/` を `discussions/` に統合し、運用と導線を単純化する
+- 目的:
+  - Codex CLI 向け skill を 1 本構成から **hub + 4 leaf** へ再編し、routing を単純化する
+  - 共通運用ルールは独立 skill にせず、**reference layer** として docs 正本へ集約する
+  - `init/update` で常に skill を導入し、`--no-skill` を廃止する
+  - issue 実装 governance を docs / template / skill に分担配置し、review loop / docs refresh / final diff gate を標準化する
 - MUST:
-  - 新規生成テンプレートは `discussions/` のみを作る
-  - `discussions/` は `rules.md` を必ず含む（空ディレクトリにしない）
-  - 配布パッケージ（`pip install .` / wheel / sdist）にも `discussions/rules.md` と `templates/discussions/*.md` が含まれる
-  - `spec-dock new adr` は `discussions/` に出力する
-  - `discussions/` 配下のファイルは「種類（prefix）+ 連番」で運用する（`adr-00001-...`, `disc-00001-...`, `research-00001-...`, `note-00001-...`）
-  - テンプレは 1つのテンプレディレクトリ（複数ファイル）に集約し、type ごとのテンプレをコピー運用する旨を `rules.md` に明記する
-  - `discussions/` 配下にスクリプト（`new-adr` 等）を置かない（ラッパ廃止）
+  - 初期 full set を 5 skill に固定する
+  - hub / leaf の routing 契約を満たす
+  - `update` の `.agents/skills/` 所有境界を守る
+  - issue plan template に review/fix/re-review と docs impact / final gate を実行可能な形で持たせる
 - MUST NOT:
-  - トップレベルの用途別ディレクトリを増やさない（`discussions/` で固定）
-  - 後方互換性のための併走サポート・自動移行・レガシー走査を入れない
-  - 旧 `adrs/` を採番・重複判定・集計対象として読み戻さない
+  - `runtime-operations` のような抽象 skill を追加しない
+  - unknown custom skill を `update` で削除しない
 - 非交渉制約:
-  - ADR の採番（`adr-00001-...`）は維持
+  - hub 名は `spec-driven-tdd-workflow` を維持する
+  - docs は正本、skill はルーターとする
+  - `workflow_*` / `reference_*` は安定層として再利用する
+  - governance の規範本体は docs、実行形は template、short reminder は skill に置く
 - 前提:
-  - `discussions/` 内の分類は「ファイル名規約」と「frontmatter」のどちらか/併用で成立させる
+  - この issue では Codex CLI の外部仕様変更は扱わない
+  - 複数 skill 併存時の Codex 側解決順は repo 外仕様であり、本設計では「hub を主入口として配布する」前提で扱う
 
 ---
 
 ## 既存実装/規約の調査結果（As-Is / 99.9%理解） (必須)
 - 参照した規約/実装（根拠）:
-  - `src/spec_dock/assets/spec_dock/templates/README.md`: テンプレの出力先マッピング（`adr.md` → `<scope>/adrs/...`）
-  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/`: 各スコープ配下に `adrs/`, `artifacts/` が存在
-  - `src/spec_dock/assets/spec_dock/templates/adr.md`: ADR テンプレ（frontmatter と構成）
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
-    - `_new_adr`: `scope.path / "adrs"` に出力（採番: `adrs/adr-*.md` を走査して max+1）
-    - `_next_id`: `initiatives_root.rglob("adrs/adr-*.md")` で ADR の最大値を走査（prefix=="adr" の fallback）
-  - `pyproject.toml`:
-    - `tool.setuptools.exclude-package-data` が `assets/spec_dock/templates/**/discussions/**` を除外しており、配布物から `rules.md` が落ちる
+  - `src/spec_dock/cli.py`: installer の管理対象同期、skill 導入、CLI オプションの正本
+  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: 現行 single-skill の内容と安全注意の置き方
+  - `src/spec_dock/assets/spec_dock/docs/README.md`: 配布 docs の入口構造
+  - `src/spec_dock/assets/spec_dock/docs/workflow_*.md`: workflow 単位の正本 docs
+  - `src/spec_dock/assets/spec_dock/docs/reference_*.md`: 共通運用ルールの正本 docs
+  - `tests/test_cli.py`: `init/update` と skill 配布の現行観測点
+  - `README.md`: 利用者向け導入手順と生成物一覧
 - 観測した現状（事実）:
-  - `artifacts/` はユーザー運用（テンプレ `_template.md` のコピー）で、ランタイムに強い依存はない
-  - ADR は `spec-dock new adr` によって生成され、ランタイムの走査対象になっている
+  - skill 配布は `src/spec_dock/cli.py` の `_install_skill()` が 1 本だけをコピーする
+  - `init/update` は `--no-skill` を持ち、skill 無効状態を許容する
+  - docs はすでに workflow / reference に責務分離済みで、skill だけが巨大入口になっている
+  - tests は単一 skill と `--no-skill` を前提にしている
+  - `update` は managed file を上書きするが、skill については unknown custom skill との境界が未定義
+  - `templates/issue/plan.md` には step ごとのテスト/報告/コミットはあるが、review ループ・docs refresh step・final diff gate は標準化されていない
+  - `workflow_issue.md` は TDD の流れを持つが、plan upfront approval と step result approval の役割分担、branch 全体 final gate の規範は未定義
 - 採用するパターン（命名/責務/例外/DI/テストなど）:
-  - 生成物は小文字ディレクトリ/ファイル名（既存テンプレの規約に合わせる）
-  - 後方互換は維持しない（`adrs/` / `artifacts/` のレガシーはサポートしない）
+  - assets 配下に配布正本を置き、installer が repo へ同期する既存方式を維持する
+  - docs ファイル自体は極力移動せず、skill 側の routing と README 導線で責務を明確化する
+  - テストは `unittest` の temp dir ベースを継続し、FS 観測で skill 導入結果を保証する
 - 採用しない/変更しない（理由）:
-  - `discussions/` を type ごとのサブディレクトリに分割（「1ディレクトリ」要望に反する）
+  - runtime script (`./spec-dock/scripts/spec-dock`) のコマンド体系変更は行わない
+  - `workflow_*` / `reference_*` のファイル名変更は行わない
+  - 外部の Codex skill 解決アルゴリズムには依存しない設計にする
 - 影響範囲（呼び出し元/関連コンポーネント）:
-  - テンプレ: `src/spec_dock/assets/spec_dock/templates/**`
-  - ランタイム: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
-  - Packaging: `pyproject.toml`
-  - ドキュメント/サンプルツリー: `docs/discussion-sheets/**`, `spec-deps/**`（記述更新が必要になる可能性）
+  - installer CLI: `src/spec_dock/cli.py`
+  - skill assets: `src/spec_dock/assets/codex_skills/**`
+  - 配布 docs: `src/spec_dock/assets/spec_dock/docs/**`
+  - 利用者 README: `README.md`
+  - テスト: `tests/test_cli.py`
 
 ## 主要フロー（テキスト：AC単位で短く） (任意)
-- Flow for AC-001（新規スコープ作成）:
-  1) `new {initiative,epic,issue}` がテンプレをコピー
-  2) `discussions/` が生成される（`adrs/`, `artifacts/` は生成しない）
-- Flow for AC-002（ADR 作成）:
-  1) `new adr` がスコープの `discussions/` を解決
-  2) `adr-xxxxx-<slug>.md` を作成（採番は既存走査ロジックを流用）
+- Flow for AC-001 / AC-003:
+  1) `init` が spec-dock 管理ファイルを同期する
+  2) installer が managed skill manifest を走査して hub + 4 leaf を `.agents/skills/` へ配置する
+  3) hub skill が 4 leaf と 4 つの `reference_*` を直接列挙する
+- Flow for AC-002 / AC-002b / AC-009:
+  1) `update` が `spec-dock/` 管理対象を上書き更新する
+  2) skill 同期処理が managed target set を再構成する
+  3) spec-dock 管理対象の旧 skill は除去し、unknown custom skill は保持する
+- Flow for AC-004 / AC-005 / AC-005b:
+  1) leaf skill が自身の主要 workflow doc を先頭導線として示す
+  2) 操作トリガーに応じて必要な `reference_*` を直接列挙する
+  3) 利用者/Codex は詳細仕様を docs 正本で確認する
+- Flow for AC-011 / AC-012 / AC-014:
+  1) 開発者/Codex が `workflow_issue.md` と `templates/issue/plan.md` を開く
+  2) 各 step は review loop と docs impact 判定を持つ形で記述される
+  3) 終盤で docs refresh step と final diff review quality gate が独立 step として実行される
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
 skinparam monochrome true
-title File creation flow (new adr)
+title Installer flow for managed skills
 
 actor User
-participant "spec-dock runtime" as RT
-database "scope/discussions/" as D
+participant "spec-dock CLI" as CLI
+participant "assets/codex_skills" as Assets
+database ".agents/skills" as Skills
 
-User -> RT: new adr --scope <id> --title ...
-RT -> RT: resolve scope path
-RT -> D: scan adr-*.md (max id)
-RT -> D: write adr-<next>-<slug>.md\n(from templates/discussions/adr.md)
-RT --> User: ok (path=...)
+User -> CLI: init/update
+CLI -> Assets: enumerate managed skills
+CLI -> Skills: copy/update target set
+CLI -> Skills: prune obsolete managed skills
+CLI -> Skills: keep unknown custom skills
 @enduml
 ```
 
 ## データ・バリデーション（必要最小限） (任意)
-- 追加データは無し（既存のファイル走査/採番のみ変更）
-- バリデーション:
-  - `discussions/` のディレクトリ名は固定
-  - ADR のファイル名は `adr-*.md` を維持
-  - 非ADRのファイル名は `<type>-00001-<slug>.md`（typeごとの連番）を推奨
+- MODEL-001: Managed skill manifest
+  - Entity: installer が管理する skill 名の集合
+  - Fields:
+    - `target_skill_names: tuple[str, ...]`
+    - `legacy_managed_skill_names: tuple[str, ...]`
+  - Constraints/Validation:
+    - `target_skill_names` は requirement に定義した 5 skill と一致する
+    - `legacy_managed_skill_names` は spec-dock が過去に配布した skill 名のみを含む
+  - Concrete values:
+    - `target_skill_names = (`
+      - `"spec-driven-tdd-workflow",`
+      - `"spec-dock-initiative-planning",`
+      - `"spec-dock-epic-planning",`
+      - `"spec-dock-issue-execution",`
+      - `"spec-dock-adr-facilitation",`
+      - `)`
+    - `legacy_managed_skill_names = ("spec-driven-tdd-workflow",)`
+    - したがって、この issue の migration では **obsolete legacy managed skill は実質 0 件**であり、主要な移行は「leaf の追加」と「unknown custom の保持」である
+- MODEL-002: Skill routing contract
+  - Entity: 各 skill が直接列挙すべき docs 群
+  - Fields:
+    - `skill_name`
+    - `primary_workflow_doc`
+    - `reference_docs`
+    - `trigger_groups`
+    - `usage_description`
+  - Constraints/Validation:
+    - hub は 4 leaf + 4 reference docs を持つ
+    - leaf は requirement の routing 契約を満たす
+    - 本設計で固定するのは **trigger group -> 最小完全 direct doc set** の対応である
+- MODEL-003: Issue governance contract
+  - Entity: issue execution における step governance
+  - Fields:
+    - `review_verdict`
+    - `docs_impact`
+    - `base_branch`
+    - `final_gate_scope`
+  - Constraints/Validation:
+    - `review_verdict` は `approved | changes_requested | waived_by_user` を基本語彙とする
+    - `docs_impact` は `none | user-facing | shipped-assets | workflow` のいずれかとする
+    - `final_gate_scope` は `git diff <base>...HEAD` 相当の branch 全体 diff を指す
+    - 実差分がない step は commit の代わりに report no-op 記録を許可する
+
+### routing trigger matrix
+
+| skill | primary | trigger group | direct references |
+|---|---|---|---|
+| `spec-driven-tdd-workflow` | なし（hub） | 初回 routing / 共通運用ルール確認 | 4 leaf 全て + `reference_github.md` + `reference_deps.md` + `reference_sync.md` + `reference_naming.md` |
+| `spec-dock-initiative-planning` | `workflow_initiative.md` | GitHub 連携 / import / naming / sync が必要 | `reference_github.md` + `reference_sync.md` + `reference_naming.md` |
+| `spec-dock-epic-planning` | `workflow_epic.md` | GitHub 連携 / import / naming / sync が必要 | `reference_github.md` + `reference_sync.md` + `reference_naming.md` |
+| `spec-dock-issue-execution` | `workflow_issue.md` | `active set` / `deps check` / `sync` / `validate` / issue GitHub 操作が必要 | `reference_deps.md` + `reference_sync.md` + `reference_github.md` + `reference_naming.md` |
+| `spec-dock-adr-facilitation` | `workflow_adr.md` | ADR の配置 / 命名 / 親ノードとの関係確認が必要 | `reference_naming.md` + 親 workflow への戻り導線 |
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
 skinparam monochrome true
-title Discussions directory (per scope)
+rectangle "Managed skill manifest" as Manifest
+rectangle "Hub skill" as Hub
+rectangle "Leaf skills" as Leaf
+rectangle "workflow_*.md" as Workflow
+rectangle "reference_*.md" as Ref
 
-folder "<scope>/" as Scope
-folder "discussions/" as Discussions
-file "adr-00001-..." as ADR
-file "note-00001-..." as Note
-file "disc-00001-..." as Disc
-file "research-00001-..." as Research
-file "rules.md" as Rules
-
-Scope -down- Discussions
-Discussions -down- ADR
-Discussions -down- Note
-Discussions -down- Disc
-Discussions -down- Research
-Discussions -down- Rules
+Manifest --> Hub
+Manifest --> Leaf
+Hub --> Ref
+Leaf --> Workflow
+Leaf --> Ref
 @enduml
 ```
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
-- 論点: `discussions/` 内の分類をどう担保するか
-  - 選択肢A: ファイル名 prefix（`adr-`, `disc-`, `research-`, `note-`）で識別（主ルール）
-    - Pros: 検索性が高い、ツール側で扱いやすい、混在でも破綻しにくい
-    - Cons: 命名規約の教育が必要
-  - 選択肢B: frontmatter `種別:` を必須化（主ルールにする）
-    - Pros: ドキュメント単体で完結
-    - Cons: 記入漏れが起きると分類不能、強制するほど運用負荷が上がる
-  - 選択肢C: サブディレクトリで分類（`discussions/adr/`, `discussions/research/`）
-    - Pros: 直感的
-    - Cons: 「トップレベル1ディレクトリ」要望に反する
-  - 決定（推奨）: A（prefix を主）+ frontmatter は “任意〜推奨” として補助的に使う
-  - 理由: 1ディレクトリ制約と探索性の両立。将来の機械集計余地も残せる。
+- 論点: skill 配布同期を 1 本ずつ個別コピーするか、manifest ベースで集合同期するか
+  - 選択肢A: `_install_skill()` を 5 回呼ぶ
+    - Pros:
+      - 差分が小さく見える
+    - Cons:
+      - ownership boundary や obsolete managed skill の除去が表現しにくい
+  - 選択肢B: managed skill manifest を導入して集合同期する
+    - Pros:
+      - target set / legacy set / unknown custom の境界を設計に落としやすい
+      - `update` の prune 方針を実装しやすい
+    - Cons:
+      - `_install_skill` より少し抽象度が上がる
+  - 決定: B
+  - 理由: 今回の本質は single file copy ではなく managed set の再構成だから
+- 論点: docs ファイルを skill 名に合わせて新設/分割するか
+  - 選択肢A: leaf ごとに専用 docs を増やす
+  - 選択肢B: 既存 `workflow_*` / `reference_*` を維持し、skill 側の導線だけ変更する
+  - 決定: B
+  - 理由: docs 正本の変更面積を抑え、reference layer の安定性を保つ
 
 ## インターフェース契約（ここで固定） (任意)
-### API（ある場合）
-- N/A（HTTP API は無し。CLI を契約として扱う）
-
-### CLI（ユーザー導線）
-- CLI-001: `spec-dock new adr --{initiative|epic|issue} <id> --title "<title>" [--slug <slug>] [--id <adr-id>]`
-  - Output: `<scope>/discussions/adr-xxxxx-<slug>.md`
-  - Notes:
-    - 採番/重複チェックは `<scope>/discussions/adr-*.md` を走査（後方互換なし）
-- CLI-002（将来検討）: `spec-dock new doc --{initiative|epic|issue} <id> --type {note|disc|research} --title "<title>" [--slug <slug>]`
-  - Output: `<scope>/discussions/<type>-00001-<slug>.md`
-  - Notes:
-    - 本Issueでは実装しない（非ADRはテンプレの手動コピー運用を正とする）
-    - 非ADRも連番に統一する（typeごとに `00001` から採番）
-    - テンプレは `spec-dock/templates/discussions/<type>.md` を用意し、type で選択して生成する（無ければ `note.md` にフォールバック）
-
 ### 関数・クラス境界（重要なものだけ）
-- IF-001: `spec_dock_runtime.app::_new_adr(...)`
-  - Input: scope_id, title, slug, (optional) node_id
-  - Output: `<scope>/discussions/adr-...md`
-  - Errors/Exceptions: スコープ不存在、重複 id、slug 不正
-- IF-002（internal / 保険）: `spec_dock_runtime.app::_next_id(specdock_dir, "adr", ...)`
-  - Input: specdock_dir, local, (optional) nodes
-  - Output: 次の ADR id（走査パスは `**/discussions/adr-*.md`）
-- IF-003（任意）: `spec_dock_runtime.app::_new_doc(...)`（新設する場合）
-  - Input: scope_id, type(note/disc/research), title, slug
-  - Output: `<scope>/discussions/<type>-00001-<slug>.md`
+- IF-001: `src/spec_dock/cli.py::_managed_skill_names() -> tuple[str, ...]`
+  - Input: なし
+  - Output: target set の skill 名一覧
+  - Errors/Exceptions: なし
+- IF-002: `src/spec_dock/cli.py::_legacy_managed_skill_names() -> tuple[str, ...]`
+  - Input: なし
+  - Output: 過去に spec-dock が管理対象として配布していた skill 名一覧
+  - Errors/Exceptions: なし
+  - Concrete value:
+    - この issue 時点では `("spec-driven-tdd-workflow",)` に固定する
+- IF-003: `src/spec_dock/cli.py::_sync_bundled_skills(target_root: Path, *, force: bool) -> None`
+  - Input:
+    - `target_root`: 導入先 repo
+    - `force`: `init --force` または `update` で上書き許可
+  - Output: `.agents/skills/` が managed target set と整合する
+  - Errors/Exceptions:
+    - asset 欠損時は `RuntimeError`
+    - コピー失敗時は例外を上位へ伝播
+  - Contract:
+    - target set の skill は導入/更新する
+    - obsolete managed skill は除去する（ただし本 issue の legacy set では実質 0 件）
+    - unknown custom skill は保持する
+    - 実行順序は **copy/update -> verify target presence -> prune managed obsolete** とする
+    - 中断時は自動 rollback しないが、`spec-dock update` の再実行で target state に収束させる
+- IF-004: `src/spec_dock/cli.py::_parse_args(argv: list[str]) -> argparse.Namespace`
+  - Input: CLI 引数
+  - Output: `init/update` の引数 namespace
+  - Errors/Exceptions: argparse 標準
+  - Contract:
+    - `--no-skill` は削除する
+    - help は skill 常時導入前提になる
 
 ### UML（任意） (任意)
 ```plantuml
 @startuml
 skinparam monochrome true
-title Template copy flow (non-ADR)
 
-actor User
-file "spec-dock/templates/discussions/<type>.md" as T
-folder "<scope>/discussions/" as D
+class cli {
+  _managed_skill_names()
+  _legacy_managed_skill_names()
+  _sync_bundled_skills(target_root, force)
+  _parse_args(argv)
+}
 
-User -> T: copy
-User -> D: paste as\n<type>-00001-<slug>.md
-User -> D: edit content
+cli --> "codex_skills/*/SKILL.md"
+cli --> ".agents/skills/*/SKILL.md"
 @enduml
 ```
 
-### 実装詳細（重要部分だけ固定） (任意)
-- 追加のクラス/モジュールは不要（既存 runtime 関数の改修で対応する）
-- `_new_adr`（`spec_dock_runtime.app`）:
-  - Template: `spec-dock/templates/discussions/adr.md`
-  - Output: `<scope>/discussions/adr-xxxxx-<slug>.md`
-  - 採番/衝突: `requirement.md` の EC-001 を満たす（`--id` 省略時は max+1、明示時の重複は非0で失敗）
-  - 旧 `<scope>/adrs/adr-*.md` は読まない（後方互換なしを維持）
-- `_next_id`（prefix=="adr" の保険）:
-  - `initiatives_root.rglob("discussions/adr-*.md")` に更新する（現状未使用だが将来の安全のため）
-- Packaging:
-  - `pyproject.toml` の `exclude-package-data` から `assets/spec_dock/templates/**/discussions/**` を除去する
-  - `assets/**/*` の package-data と整合させ、scope 配下の `discussions/rules.md` を wheel / sdist に含める
-- （任意）`_new_doc`（追加する場合）:
-  - Template: `spec-dock/templates/discussions/<type>.md`（無ければ `note.md`）
-  - Output: `<scope>/discussions/<type>-xxxxx-<slug>.md`
-  - 採番: type ごとに `discussions/<type>-*.md` を走査して max+1
-
-### 例外/エラー契約（主要なものだけ） (任意)
-- ERR-ADR-001: scope 不存在
-  - 条件: 指定した scope_id が解決できない
-  - 振る舞い: 非0で失敗、ファイルは作成しない
-- ERR-ADR-002: テンプレ不足
-  - 条件: `spec-dock/templates/discussions/adr.md` が存在しない
-  - 振る舞い: 非0で失敗、ファイルは作成しない
-- ERR-ADR-003: ID 重複
-  - 条件: `--id` を明示し、同一IDの ADR が既に存在する
-  - 振る舞い: 非0で失敗、ファイルは作成しない（EC-001）
-- ERR-SLUG-001: slug 不正
-  - 条件: `--slug` が kebab-case に合致しない、または空になる
-  - 振る舞い: 非0で失敗、ファイルは作成しない
+### 例外/エラー契約（重要なものだけ） (任意)
+- ERR-001: Missing bundled skill asset
+  - 発生条件:
+    - manifest にある skill ディレクトリまたは `SKILL.md` が assets に存在しない
+  - 呼び出し元への返し方:
+    - `RuntimeError` として `main()` まで伝播し、exit code 1
+  - ログ/監視:
+    - stderr に asset path を含むエラーを出す
+- ERR-002: Managed skill sync interrupted
+  - 発生条件:
+    - copy/remove 中の OS エラー
+  - 呼び出し元への返し方:
+    - 例外として終了
+  - ログ/監視:
+    - 自動 rollback は持たないので、report/plan で明記する
 
 ## 変更計画（ファイルパス単位） (必須)
 - 追加（Add）:
-  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/discussions/rules.md`:
-    - 最小ルール（分類/命名/ADR昇格基準/テンプレの場所）
-    - 非ADR のコピー例は「リポジトリルートで実行する」前提で、source/destination の両方が解決可能な明示パスにする
-  - `src/spec_dock/assets/spec_dock/templates/discussions/{note,disc,research}.md`:
-    - `discussions/` 用テンプレ（type ごと / 最小セット）
+  - `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md`: initiative leaf skill
+  - `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md`: epic leaf skill
+  - `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`: issue leaf skill
+  - `src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md`: ADR leaf skill
 - 変更（Modify）:
-  - `pyproject.toml`:
-    - `exclude-package-data` から `assets/spec_dock/templates/**/discussions/**` を除去
-  - `src/spec_dock/assets/spec_dock/templates/README.md`: 出力先マッピング（`adrs/`/`artifacts/` → `discussions/`）
-  - `spec-deps/current/artifacts/20260305-discussions-best-practice.md`:
-    - `rules.md` と同じ前提で、非ADRコピー例を repo root 基準の有効パスへ更新
-  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/`:
-    - `adrs/`, `artifacts/` を `discussions/` に置換
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`:
-    - `_new_adr`: `scope.path / "adrs"` → `scope.path / "discussions"`
-    - `_next_id`: `rglob("adrs/adr-*.md")` → `rglob("discussions/adr-*.md")`
-    - （将来）`new doc` の追加（type テンプレ + typeごとの連番採番）は別Issueで検討
+  - `src/spec_dock/cli.py`: managed skill manifest と multi-skill sync を実装、`--no-skill` 削除
+  - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: hub 化
+  - `src/spec_dock/assets/spec_dock/docs/README.md`: multi-skill 入口へ更新
+  - `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`: initiative leaf から参照される前提に沿って導線を明確化
+  - `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`: epic leaf から参照される前提に沿って導線を明確化
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`: issue leaf の運用導線に合わせて整理
+  - `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`: ADR leaf 導線に合わせて整理
+  - `README.md`: `--no-skill` 削除、生成物、複数 skill 導線へ更新
+  - `tests/test_cli.py`: multi-skill 導入・migration・custom skill 保持テストへ更新
+  - `src/spec_dock/assets/spec_dock/templates/issue/plan.md`: issue execution governance を標準化
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`: issue governance の正本ルールを追加
+  - `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`: docs impact と final gate の reminder を追加
 - 削除（Delete）:
-  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/{adrs,artifacts}/`（新規テンプレからは削除）
+  - なし（skill の置換は削除ではなく managed sync による再構成で扱う）
 - 移動/リネーム（Move/Rename）:
-  - `src/spec_dock/assets/spec_dock/templates/adr.md` → `src/spec_dock/assets/spec_dock/templates/discussions/adr.md`
+  - なし（docs ファイル名は維持）
 - 参照（Read only / context）:
-  - `docs/discussion-sheets/01_tree_root_location.md`: v2 ツリー例に `adrs/` が含まれるため追随が必要
-  - `spec-deps/README.md`: v1 の運用説明（`adrs/`, `artifacts/` 記述）
+  - `pyproject.toml`: package-data に assets が含まれる前提確認
+  - `spec-deps/current/requirement.md`: routing / ownership boundary の契約正本
+  - `spec-deps/current/discussions/disc-00002-skills-full-set-composition.md`: skill 構成判断の背景
 
 ## マッピング（要件 → 設計） (必須)
-- AC-001 → テンプレ差し替え（`src/spec_dock/assets/spec_dock/templates/**`）
-- AC-002 → `_new_adr`（`app.py`）と `templates/discussions/adr.md`
-- AC-003 → `discussions/rules.md` の同梱（テンプレ）+ `rules.md` に導線を固定
-- AC-004 → type テンプレ（`templates/discussions/<type>.md`）+ 命名規約（prefix+連番）+ `rules.md` の repo root 基準コピー例
-- AC-005 → `discussions/` 配下にラッパスクリプトを含めない（テンプレから `adrs/new-adr` を削除し、`discussions/` は markdown のみ）
-- AC-006 → `spec-dock/templates/discussions/{adr,note,disc,research}.md` を同梱し、コピー導線を成立させる
-- AC-007 → `pyproject.toml` の packaging 設定を修正し、`pip install .` 後も `rules.md` / templates が欠落しないことを保証
-- EC-001/EC-002/EC-003 → 連番衝突時の挙動（採番・エラー）+ rules での手動運用ルール + legacy `adrs/` 非走査
-- 非交渉制約（採番維持） → `_new_adr` の既存ロジック流用（走査パスのみ変更）
+- AC-001 → IF-001, IF-003, `src/spec_dock/cli.py`, `tests/test_cli.py`
+- AC-002 / AC-002b → IF-002, IF-003, `src/spec_dock/cli.py`, `tests/test_cli.py`, `README.md`, `src/spec_dock/assets/spec_dock/docs/README.md`, `src/spec_dock/assets/spec_dock/docs/workflow_*.md`
+- AC-003 → hub skill 設計, `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`
+- AC-004 → issue leaf skill 設計, `workflow_issue.md`, `reference_*`
+- AC-005 / AC-005b → initiative/epic/adr leaf skill 設計, `workflow_*`, `reference_*`
+- AC-006 / AC-008 → `README.md`, `src/spec_dock/assets/spec_dock/docs/README.md`, `_parse_args`
+- AC-009 / EC-005 → IF-003, ownership boundary 設計, `tests/test_cli.py`
+- AC-011 / AC-014 → `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-012 → `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-013 → `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- 非交渉制約（hub 名維持 / docs 正本 / custom skill 保持） → skill asset 配置方針, manifest 設計, docs stable 設計
 
 ## テスト戦略（最低限ここまで具体化） (任意)
 - 追加/更新するテスト:
-  - Unit: `tests/test_cli.py`（init/update の生成物差分、runtime の新規作成コマンド）
-  - Integration: なし（ネットワークなし、`gh` は stub で代替）
+  - Unit/installer:
+    - `init` が 5 skill を配置する
+    - `update` が旧 single-skill repo を 5 skill へ移行する
+    - `update` が旧 `--no-skill` repo に 5 skill を導入する
+    - `update` が unknown custom skill を保持する
+    - CLI help / parser から `--no-skill` が消える
+  - Docs/asset validation:
+    - hub skill が 4 leaf + 4 reference docs + 各 leaf の説明を含む
+    - leaf skill が requirement の routing 契約と **trigger group -> 最小完全 direct doc set** 対応を満たす
+    - root `README.md` と配布 docs `README.md` から single-skill / `--no-skill` の旧導線が除去されている
+    - old single-skill repo / old `--no-skill` repo へ `update` した後の配布 docs 導線が new skill set と整合する
+    - issue plan template が review loop / docs refresh / final diff gate を持つ
+    - workflow_issue が governance の正本として template と整合する
+    - issue-execution skill が docs 正本を崩さず short reminder に留まる
+  - Migration safety:
+    - copy/update の途中失敗を模擬したあと `update` を再実行すると target state に収束する
 - どのAC/ECをどのテストで保証するか:
-  - AC-001 → init/update の scaffold 検証（`discussions/` があり `adrs/`/`artifacts/` が無い）
-  - AC-002 → `new adr` の生成先・採番（`discussions/adr-*.md`）
-  - AC-003 → `discussions/rules.md` が生成される
-  - AC-005 → `discussions/` 配下にラッパスクリプトが存在しない（`new-*` 不在、markdown のみ）
-  - AC-006 → `spec-dock/templates/discussions/` と type テンプレが同梱されている
-  - AC-007 → `pip install .` 相当の配布経路でも `discussions/rules.md` が利用可能
-  - EC-001 → `--id` 省略時は max+1 採番、`--id` 明示時の重複は非0で失敗（挙動をテストで固定）
-  - EC-003 → 旧 `adrs/` を読まない方針を runtime 実装のまま維持し、回帰を入れない
+  - AC-001 → `tests/test_cli.py::test_init_creates_expected_structure`
+  - AC-002 → `tests/test_cli.py::test_update_keeps_initiatives_by_default` の拡張または後継テスト
+  - AC-002b → 新規 `update_from_no_skill_repo_installs_full_set`
+  - AC-003 → hub skill content assertion
+  - AC-004 / AC-005 / AC-005b → leaf skill content assertion（trigger group -> 最小完全 direct doc set 対応を含む）
+  - AC-006 / AC-008 → parser/help assertion + README 文面 assertion
+  - AC-009 / EC-005 → custom skill preserve test
+  - AC-010 / EC-006 → failure-injection 後の `update` 再実行 convergence test
 
-- 実行コマンド: `python -m unittest discover -v`
+### テストマトリクス（AC/EC → テスト） (任意)
+- AC-001:
+  - Integration: temp repo に対する `init`
+- AC-002 / EC-001:
+  - Integration: 旧 single-skill repo へ `update` し、`.agents/skills/` と配布 docs の両方を観測
+- AC-002b / EC-001b:
+  - Integration: `.agents/skills` 不在 repo へ `update` し、`.agents/skills/` と配布 docs の両方を観測
+- AC-003:
+  - Asset assertion: hub `SKILL.md`
+- AC-004:
+  - Asset assertion: issue leaf `SKILL.md`（`active/GitHub`, `deps`, `sync/validate` の各 trigger group の参照先）
+- AC-005:
+  - Asset assertion: initiative/epic leaf `SKILL.md`（`GitHub/import` と `naming/sync` の trigger group の参照先）
+- AC-005b:
+  - Asset assertion: ADR leaf `SKILL.md`（`配置/命名` と `親 workflow` の trigger group の参照先）
+- AC-006:
+  - Doc assertion: `README.md` と `src/spec_dock/assets/spec_dock/docs/README.md`
+- AC-008:
+  - CLI parser assertion: `--help` / parse failure
+- AC-009 / EC-005:
+  - Integration: unknown custom skill 付き repo へ `update`
+- Migration safety:
+  - Failure injection: skill copy 途中で例外を発生させ、その後 `update` を再実行して target set 収束と custom skill 保持を確認する
+- 非交渉制約（requirement.md）をどう検証するか:
+  - 制約: docs 正本・skill ルーター
+    - 検証方法: leaf skill が docs 参照を持ち、詳細説明を複製しすぎていないことを reviewer とテストで確認
+  - 制約: custom skill 保持
+    - 検証方法: `.agents/skills/custom-*` が update 後も存在
+- 実行コマンド:
+  - `python -m unittest discover -v`
+- 変更後の運用（必要なら）:
+  - 移行手順:
+    - 旧 single-skill repo / 旧 `--no-skill` repo / custom skill 混在 repo いずれも `spec-dock update` で target state へ収束させる
+  - ロールバック:
+    - 自動 rollback は持たない
+    - managed skill 変更は Git 差分または更新前バックアップで復元する
+  - 中断時の回復契約:
+    - `_sync_bundled_skills` は **copy/update を先に完了**してから managed obsolete の prune に進む
+    - そのため失敗時は「不要 skill が残る」ことはあっても、copy 済み target skill を prune で失う順序にはしない
+    - recovery の正式手段は `spec-dock update` の再実行とする
 
 ## リスク/懸念（Risks） (任意)
-- R-001: 破壊的変更で旧ツリーが動かなくなる（影響: 既存利用者 / 対応: 後方互換は提供しない。`rules.md` に最小の手動移行手順を記載）
-- R-002: `discussions/` が “何でも置き場” 化する（影響: 探索性低下 / 対応: `rules.md` に命名規約と type 定義、テンプレ導線を固定）
-- R-003: 手動運用で連番衝突が起きる（影響: 作成時の手戻り / 対応: `rules.md` に衝突時の手順を明記。必要性が顕在化したら `new doc` を別Issueで追加）
-- R-004: packaging の除外設定が新 assets と衝突すると、ローカル開発では再現せず CI / 配布後にだけ欠落が起こる（影響: 発見遅延 / 対応: `pip install .` 経路の検証を追加）
+- R-001: skill manifest と assets 実体の不一致
+  - 影響: init/update が失敗する
+  - 対応: asset existence check を実装し、テストでも skill 数を固定観測する
+- R-002: docs 導線更新漏れ
+  - 影響: routing 契約違反
+  - 対応: hub/leaf content assertion と reviewer で検出する
+- R-003: ownership boundary 実装ミス
+  - 影響: custom skill 削除、または旧 managed skill 取り残し
+  - 対応: unknown preserve test と managed prune test を入れる
+- R-004: `--no-skill` 削除漏れ
+  - 影響: requirement と CLI/doc が不整合になる
+  - 対応: parser/help/README を同時に更新し、テストで確認する
+- R-005: update 中断時の部分更新
+  - 影響: skill セットが一時的に中途半端になる
+  - 対応: copy/update -> verify -> prune の順序に固定し、再実行で収束する設計にする
+- R-006: governance 規範が docs / template / skill で drift する
+  - 影響: agent と人間で参照先がズレる
+  - 対応: docs を正本、template を実行形、skill を reminder に限定する
 
 ## 未確定事項（TBD） (必須)
-- Q-001:
-  - 質問: 後方互換性を維持するか
-  - 回答: No（決定。破壊的変更を許容）
-  - 影響範囲: ランタイム走査/テンプレ/ドキュメント
-- Q-002:
-  - 質問: ADR 以外の作成導線をどこまで標準搭載するか（CLI vs 手動コピー）
-  - 選択肢:
-    - A: `spec-dock/templates/discussions/<type>.md` を手動コピーして作成（最小）
-    - B: `spec-dock new doc --type {note|disc|research} ...` で生成（採番・衝突回避をツールで担保）
-  - 回答: A（決定。今Issueでは手動コピー運用）
-  - 影響範囲: ランタイム実装/テスト/運用負荷
-- Q-003:
-  - 質問: 非ADRドキュメントの連番は「typeごと」か「discussions全体で共通」か
-  - 回答: A（決定）
-  - 選択肢（記録）:
-    - A: typeごと（`note-00001`, `disc-00001`, `research-00001`）: 直感的、衝突が減る
-    - B: 共通（`doc-00001` + frontmatter で type）: 作成順で並ぶが識別が弱い
-  - 影響範囲: 命名規約/採番ロジック/探索性
+- 現時点では、設計着手に必要な重大な未確定事項はない。
+- design は requirement に定義済みの routing 契約と ownership boundary を具体的なファイル/関数/テストへ落とし込むことに専念する。
 
 ---
 
 ## ディレクトリ/ファイル構成図（変更点の見取り図） (任意)
 ```text
-<scope>/
-├── discussions/                 # Add (new)
-│   ├── rules.md                 # Add
-│   ├── adr-00001-....md         # New
-│   ├── note-00001-....md        # Add (optional)
-│   ├── disc-00001-....md        # Add (optional)
-│   └── research-00001-....md    # Add (optional)
+<repo-root>/
+├── src/spec_dock/
+│   ├── cli.py                                     # Modify
+│   └── assets/
+│       ├── codex_skills/
+│       │   ├── spec-driven-tdd-workflow/SKILL.md  # Modify (hub)
+│       │   ├── spec-dock-initiative-planning/SKILL.md   # Add
+│       │   ├── spec-dock-epic-planning/SKILL.md         # Add
+│       │   ├── spec-dock-issue-execution/SKILL.md       # Add
+│       │   └── spec-dock-adr-facilitation/SKILL.md      # Add
+│       └── spec_dock/docs/
+│           ├── README.md                          # Modify
+│           ├── workflow_initiative.md            # Modify
+│           ├── workflow_epic.md                  # Modify
+│           ├── workflow_issue.md                 # Modify
+│           └── workflow_adr.md                   # Modify
+├── tests/
+│   └── test_cli.py                               # Modify
+└── README.md                                     # Modify
 ```
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- Codex 側の複数 skill 解決順そのものは repo 外仕様のため、本設計では skill 配布と routing 記述の品質に責務を限定する。

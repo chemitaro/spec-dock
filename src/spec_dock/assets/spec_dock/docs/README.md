@@ -5,8 +5,18 @@
 
 ## エージェント起点（Codex CLI）
 
-Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven-tdd-workflow/SKILL.md` を起点に運用できます。  
-`spec-dock init/update` はこの skill をデフォルトで導入します。
+`spec-dock init/update` は、次の 5 skill（hub + 4 leaf）を導入します。  
+運用は hub skill を入口にし、対象スコープに応じて leaf skill へ進む形です。
+
+- Hub（入口）: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- Leaf（Initiative）: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
+- Leaf（Epic）: `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- Leaf（Issue）: `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- Leaf（ADR）: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
+
+補足:
+- workflow ドキュメント（`workflow_*.md`）が実務導線です。
+- `reference_*.md` は制約/仕様確認のための reference レイヤです。
 
 ## まず読む（全員）
 
@@ -43,7 +53,8 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 ./spec new epic --initiative <id> --title "..."  # デフォルト: local-only（gh は呼ばない）
 ./spec new issue --epic <id> --title "..."       # デフォルト: GitHub Issue を作る（--no-github で local-only）
 
-./spec import issue <num-or-url> --title "..." --epic <id>  # 既存 GitHub Issue を取り込む（読み取りのみ）
+./spec import epic <num-or-url> --title "..." [--initiative <id>]  # 既存 GitHub Issue を取り込む（読み取りのみ）
+./spec import issue <num-or-url> --title "..." [--epic <id>]       # 既存 GitHub Issue を取り込む（読み取りのみ）
 
 ./spec active set <id|#num|url>               # 作業対象をアクティブ化（デフォルト: no-checkout）
 ./spec active set <id|#num|url> --checkout   # アクティブ化 + ブランチ作成/切替
@@ -57,6 +68,7 @@ Codex CLI を使う場合、このリポジトリは `.agents/skills/spec-driven
 
 補足:
 - `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカット（symlink）です。無い場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
+- `import epic` / `import issue` の親指定は、current active から解決できる場合に限って省略できます。
 
 ## スコープ内ショートカット（生成後ノード）
 
