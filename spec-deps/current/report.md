@@ -250,7 +250,7 @@ OK
 - `tests/test_cli.py` - docs/skill wording の回帰アサートを追加
 
 #### コミット
-- pending
+- `0d7e5f6 docs(skills): 事実情報と agent 導線を補強`
 
 #### メモ
 - `README.md` は今回の時点で致命的な誤記なしと判断され、未変更
