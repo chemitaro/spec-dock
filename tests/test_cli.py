@@ -343,6 +343,11 @@ class TestCli(unittest.TestCase):
             self.assertIn("spec-dock-epic-planning", workflow_epic)
             self.assertIn("spec-dock-issue-execution", workflow_issue)
             self.assertIn("spec-dock-adr-facilitation", workflow_adr)
+            self.assertIn("plan upfront approval", workflow_issue)
+            self.assertIn("step result approval", workflow_issue)
+            self.assertIn("docs impact", workflow_issue)
+            self.assertIn("final diff review quality gate", workflow_issue)
+            self.assertIn("reviewer approval", workflow_issue)
 
             # v2 does not ship legacy docs/old/ (keep the published docs minimal).
             self.assertFalse((docs_dir / "old").exists())

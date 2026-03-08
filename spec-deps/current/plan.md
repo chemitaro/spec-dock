@@ -14,9 +14,9 @@ ID: "iss-00016"
 
 ## この計画で満たす要件ID (必須)
 - 対象AC:
-  - AC-001, AC-002, AC-002b, AC-003, AC-004, AC-005, AC-005b, AC-006, AC-007, AC-008, AC-009, AC-010
+  - AC-001, AC-002, AC-002b, AC-003, AC-004, AC-005, AC-005b, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014
 - 対象EC:
-  - EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005, EC-006
+  - EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005, EC-006, EC-007, EC-008, EC-009
 - 対象制約:
   - hub 名維持
   - `--no-skill` 廃止
@@ -29,7 +29,10 @@ ID: "iss-00016"
 - [ ] S02: `update` migration が old single-skill / old no-skill / custom skill 混在 repo を ownership boundary つきで収束させ、`--no-skill` を廃止する
 - [ ] S03: hub / leaf skill assets が routing 契約どおりに docs を直接案内する
 - [ ] S04: root README / 配布 docs README / workflow docs が multi-skill 導線へ整合する
-- [ ] S05: main ブランチとの差分全体を対象に品質ゲートを実施し、reviewer 承認レベルへ収束させる
+- [ ] S05: `workflow_issue.md` が issue governance の正本として review loop / docs impact / final gate を定義する
+- [ ] S06: `templates/issue/plan.md` が review ループ、docs refresh step、final diff gate を実行可能な template として提供する
+- [ ] S07: `spec-dock-issue-execution` skill と回帰テストが governance reminder を保持する
+- [ ] S08: main ブランチとの差分全体を対象に最終品質ゲートを実施し、reviewer 承認レベルへ収束させる
 
 ### UML（任意） (任意)
 ```plantuml
@@ -41,14 +44,21 @@ rectangle "S01\ninstall + packaging" as S01
 rectangle "S02\nmigration + ownership" as S02
 rectangle "S03\nskill routing assets" as S03
 rectangle "S04\ndocs alignment" as S04
-rectangle "S05\nfinal quality gate" as S05
+rectangle "S05\nworkflow governance docs" as S05
+rectangle "S06\nissue plan template" as S06
+rectangle "S07\nissue skill reminder" as S07
+rectangle "S08\nfinal quality gate" as S08
 
 S01 --> S02
 S01 --> S03
 S01 --> S04
-S02 --> S05
-S03 --> S05
 S04 --> S05
+S05 --> S06
+S06 --> S07
+S02 --> S08
+S03 --> S08
+S04 --> S08
+S07 --> S08
 @enduml
 ```
 
@@ -61,18 +71,26 @@ S04 --> S05
 - AC-005 → S03
 - AC-005b → S03
 - AC-006 → S04
-- AC-007 → S01, S02, S03, S04, S05
+- AC-007 → S01, S02, S03, S04, S08
 - AC-008 → S02, S04
 - AC-009 → S02
-- AC-010 → S02, S05
+- AC-010 → S02, S08
+- AC-011 → S06
+- AC-012 → S05
+- AC-013 → S07
+- AC-014 → S06, S08
 - EC-001 → S02, S04
 - EC-001b → S02, S04
 - EC-002 → S03
 - EC-003 → S04
 - EC-004 → S03
 - EC-005 → S02
-- EC-006 → S02, S05
-- 非交渉制約（hub 名維持 / ownership boundary / `--no-skill` 廃止 / custom skill 保持 / package assets） → S01, S02, S03, S04, S05
+- EC-006 → S02, S08
+- EC-007 → S05, S06
+- EC-008 → S05, S06, S08
+- EC-009 → S06, S08
+- 非交渉制約（hub 名維持 / ownership boundary / `--no-skill` 廃止 / custom skill 保持 / package assets） → S01, S02, S03, S04, S08
+- 非交渉制約（docs 正本 / template 実行形 / skill reminder / final diff gate） → S05, S06, S07, S08
 
 ---
 
@@ -325,14 +343,136 @@ S04 --> S05
 
 ---
 
-### S05 — main ブランチとの差分全体を対象に品質ゲートを実施し、reviewer 承認レベルへ収束させる (必須)
-- 対象: AC-007, AC-010 / EC-006
+### S05 — `workflow_issue.md` が issue governance の正本として review loop / docs impact / final gate を定義する (必須)
+- 対象: AC-012 / EC-007, EC-008
 - 設計参照:
-  - 対象IF/API: IF-003
-  - 対象テスト: 全体テストスイート、差分レビュー
+  - 対象IF/API: MODEL-003
+  - 対象テスト:
+    - `tests/test_cli.py` の workflow_issue wording assertion
 - このステップで「追加しないこと（スコープ固定）」:
-  - scope 外の改善
-  - unrelated test fix
+  - runtime command の仕様変更
+  - template への具体 checklists 反映
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/レビュー/品質ゲート/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `workflow_issue.md` を読む
+- When: issue execution governance を確認する
+- Then:
+  - plan upfront approval と step result approval の役割が区別されている
+  - docs impact step と final diff review quality gate の意味が明記されている
+  - reviewer verdict / no-op 記録の考え方が docs 正本として辿れる
+- 観測点: `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- 追加/更新するテスト: `tests/test_cli.py`
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - Modify: `tests/test_cli.py`
+- 実装方針（最小で。余計な最適化は禁止）:
+  - governance の正本は workflow_issue に置き、template や skill には同じ長文を複製しない
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] code_reviewer にこのステップ差分をレビュー依頼し、指摘があれば修正した
+- [ ] reviewer の再レビューで承認レベルに達した
+- [ ] 期待するテストを実行し、成功した
+- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] Conventional Commits（日本語・複数行）でコミットした
+
+---
+
+### S06 — `templates/issue/plan.md` が review ループ、docs refresh step、final diff gate を実行可能な template として提供する (必須)
+- 対象: AC-011, AC-014 / EC-007, EC-008, EC-009
+- 設計参照:
+  - 対象IF/API: MODEL-003
+  - 対象テスト:
+    - `tests/test_cli.py` の plan template wording assertion
+- このステップで「追加しないこと（スコープ固定）」:
+  - issue docs 以外の workflow 文面拡張
+  - skill reminder の追加
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/レビュー/品質ゲート/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `templates/issue/plan.md` から新しい issue plan を起こす
+- When: step 定義と終盤固定 step を確認する
+- Then:
+  - 全 step 共通ルールとして review loop / docs impact / report / step-scoped commit/no-op が定義されている
+  - `S90 docs refresh` と `S99 final diff review quality gate` に相当する固定 step がある
+  - final gate のスコープが `git diff <base>...HEAD` 相当であると読める
+- 観測点: `src/spec_dock/assets/spec_dock/templates/issue/plan.md`
+- 追加/更新するテスト: `tests/test_cli.py`
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/spec_dock/templates/issue/plan.md`
+  - Modify: `tests/test_cli.py`
+- 実装方針（最小で。余計な最適化は禁止）:
+  - 既存 template を全面再設計せず、共通ルール節・step footer・終盤固定 step を追加する
+  - `exactly 1 commit` のような過剰制約は導入しない
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] code_reviewer にこのステップ差分をレビュー依頼し、指摘があれば修正した
+- [ ] reviewer の再レビューで承認レベルに達した
+- [ ] 期待するテストを実行し、成功した
+- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] Conventional Commits（日本語・複数行）でコミットした
+
+---
+
+### S07 — `spec-dock-issue-execution` skill と回帰テストが governance reminder を保持する (必須)
+- 対象: AC-013 / EC-007
+- 設計参照:
+  - 対象IF/API: MODEL-003
+  - 対象テスト:
+    - `tests/test_cli.py` の issue skill wording assertion
+- このステップで「追加しないこと（スコープ固定）」:
+  - skill に governance の長文規範を複製すること
+  - hub skill の役割変更
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/レビュー/品質ゲート/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: `spec-dock-issue-execution/SKILL.md` を読む
+- When: active issue の execution guidance を確認する
+- Then:
+  - docs が SSOT であること
+  - docs impact step と final diff gate を飛ばさないこと
+  - active issue work は `context-pack.md` を入口にすること
+  - ただし長文規範は workflow docs へ委ねていること
+- 観測点: `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- 追加/更新するテスト: `tests/test_cli.py`
+
+#### Green（最小実装） (任意)
+- 変更予定ファイル:
+  - Modify: `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+  - Modify: `tests/test_cli.py`
+- 実装方針（最小で。余計な最適化は禁止）:
+  - reminder は短く保ち、規範の本体は `workflow_issue.md` に寄せる
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] code_reviewer にこのステップ差分をレビュー依頼し、指摘があれば修正した
+- [ ] reviewer の再レビューで承認レベルに達した
+- [ ] 期待するテストを実行し、成功した
+- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] Conventional Commits（日本語・複数行）でコミットした
+
+---
+
+### S08 — main ブランチとの差分全体を対象に最終品質ゲートを実施し、reviewer 承認レベルへ収束させる (必須)
+- 対象: AC-007, AC-010, AC-011, AC-012, AC-013, AC-014 / EC-006, EC-007, EC-008, EC-009
+- 設計参照:
+  - 対象IF/API: MODEL-003
+  - 対象テスト: governance 関連回帰テスト、全体テストスイート、差分レビュー
+- このステップで「追加しないこと（スコープ固定）」:
+  - unrelated doc cleanup
+  - scope 外の workflow 追加
 
 #### update_plan（着手時に登録） (必須)
 - [ ] `update_plan` に、このステップの作業ステップ（調査/品質ゲート/レビュー/修正/再レビュー/報告/コミット）を登録した
@@ -340,16 +480,15 @@ S04 --> S05
 #### 期待する振る舞い（テストケース） (必須)
 - Given: このブランチの実装差分全体
 - When:
-  - `python -m unittest discover -v` を実行する
-  - packaging 観点を含めた配布確認を行う
-  - `git diff main...HEAD` をスコープに reviewer がレビューする
+  - governance 関連回帰テストと全体テストを実行する
+  - packaging / shipped asset 観点を確認する
+  - `git diff main...HEAD` を reviewer が確認する
 - Then:
-  - テストが通る
-  - 配布観点の取りこぼしがない
-  - reviewer の指摘が解消される
-  - 最終的に reviewer 承認レベルのクオリティに収束する
-- 観測点: test output, packaging check, `git diff main...HEAD`, reviewer verdict
-- 追加/更新するテスト: なし（既存追加済みテストを実行）
+  - multi-skill 本体と governance 更新差分を含む branch 全体が整合する
+  - template / docs / skill の wording が整合する
+  - governance ルールと配布観点の取りこぼしがない
+  - reviewer の指摘が解消され、承認レベルへ収束する
+- 観測点: test output, `git diff main...HEAD`, reviewer verdict, packaged assets
 
 #### 品質ゲート（最終） (必須)
 - 実行項目:
@@ -364,7 +503,7 @@ S04 --> S05
 
 #### ステップ末尾（省略しない） (必須)
 - [ ] 全体テストが成功した
-- [ ] 配布確認が成功した
+- [ ] packaging / shipped asset 確認が成功した
 - [ ] main との差分レビューを実施した
 - [ ] 指摘修正と再レビューを繰り返し、承認レベルに達した
 - [ ] `spec-deps/current/report.md` に最終コマンド/結果/変更ファイルを記録した
@@ -380,8 +519,9 @@ S04 --> S05
 ## 完了条件（Definition of Done） (必須)
 - 対象AC/ECがすべて満たされ、テストで保証されている
 - 各ステップで **実装 → review → 修正 → 再レビュー → report 更新 → commit** が完了している
-- S05 の最終品質ゲートで、`git diff main...HEAD` を対象にした reviewer 承認レベルへ到達している
-- S05 で修正がなかった場合のみ、commit の代わりに no-op を report へ記録してよい
+- S08 の最終品質ゲートで、`git diff main...HEAD` を対象にした reviewer 承認レベルへ到達している
+- multi-skill 本体と governance 更新差分を含む template / docs / skill / packaging の整合が reviewer 承認レベルへ到達している
+- S08 で修正がなかった場合のみ、commit の代わりに no-op を report へ記録してよい
 - MUST NOT / OUT OF SCOPE を破っていない
 - 品質ゲート（テスト + 配布確認 + 差分レビュー）が満たされている
 
