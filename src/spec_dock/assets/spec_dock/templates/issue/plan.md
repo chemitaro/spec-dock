@@ -36,6 +36,18 @@ ID: "<ISS_ID>"
 
 ---
 
+## 実行ルール（全ステップ共通） (必須)
+- plan 全体は実装着手前に承認する。
+- 各ステップは 1 つの観測可能な振る舞いを単位とする。
+- 各ステップは **Red → Green → Refactor → review → fix → re-review → report → commit/no-op** の順で完了する。
+- reviewer の blocking 指摘が残っている間は、そのステップを完了扱いにしない。
+- 実差分があるステップは、承認済み状態を step-scoped commit として記録する。
+- 実差分がないステップは、commit の代わりに no-op 理由を `report.md` に記録する。
+- docs impact を issue ごとに判定し、必要なら `S90 docs impact resolution / docs refresh` を final quality gate 前に置く。
+- 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施し、reviewer が承認するまで終了しない。
+
+---
+
 ## 実装ステップ（各ステップは“観測可能な振る舞い”を1つ） (必須)
 
 ### S01 — <観測可能な振る舞い> (必須)
@@ -53,9 +65,10 @@ ID: "<ISS_ID>"
   - （Red）失敗するテストの追加/修正
   - （Green）最小実装
   - （Refactor）整理
-  - （品質ゲート）format/lint/test
+  - （レビュー）review / fix / re-review
+  - （品質ゲート）format/lint/test / docs impact 判定
   - （報告）`./spec-dock/active/issue/report.md` 更新
-  - （コミット）このステップの区切りでコミット
+  - （コミット）このステップの区切りで commit または no-op 記録
 
 #### 期待する振る舞い（テストケース） (必須)
 - Given: ...
@@ -84,16 +97,48 @@ ID: "<ISS_ID>"
   - ...
 
 #### ステップ末尾（省略しない） (必須)
+- [ ] step diff を reviewer にレビュー依頼した
+- [ ] blocking 指摘を解消した、または no-op / 却下理由を `./spec-dock/active/issue/report.md` に記録して承認された
+- [ ] reviewer verdict を `./spec-dock/active/issue/report.md` に記録した
 - [ ] 期待するテスト（必要ならフォーマット/リンタ）を実行し、成功した
+- [ ] docs impact を確認し、必要なら `S90` の対象へ追加した
 - [ ] `./spec-dock/active/issue/report.md` に実行コマンド/結果/変更ファイルを記録した
 - [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
-- [ ] コミットした（エージェント）
+- [ ] 実差分がある場合は step-scoped commit を作成し、実差分がない場合は no-op を記録した
 
 ---
 
 ### Sxx — <追加の観測可能な振る舞い> (任意)
 - （上の S01 と同じ構成で記載する。update_plan / 期待する振る舞い / ステップ末尾 は省略しない）
   ...
+
+---
+
+### S90 — docs impact resolution / docs refresh を行う (条件付き必須)
+- 条件: docs impact が `none` でない
+- 対象: 関連する docs / workflow / shipped assets / skill reminder
+- Given: この issue で変更した CLI / API / workflow / template / 配布 assets
+- When: 対象 docs を更新する、または no-op 理由を明記する
+- Then: 利用者向け説明と配布物の文面が現行挙動と一致する
+- ステップ末尾:
+  - [ ] docs impact の判定結果を `report.md` に記録した
+  - [ ] 必要な docs / shipped assets を更新した、または no-op 理由を記録した
+  - [ ] reviewer に確認を依頼し、承認レベルに達した
+
+### S99 — final diff review quality gate を通す (必須)
+- 対象: このブランチの差分全体
+- Given: 実装ステップと必要な docs refresh が完了している
+- When:
+  - `python -m unittest discover -v` など全体テストを実行する
+  - packaging / shipped asset check を行う
+  - `git diff <base>...HEAD` を reviewer が確認する
+- Then:
+  - test / packaging / docs / diff 全体で blocking finding が残っていない
+  - reviewer が承認するまで修正と再レビューを反復する
+- ステップ末尾:
+  - [ ] 全体テストと必要な packaging check が成功した
+  - [ ] reviewer の最終 verdict を `report.md` に記録した
+  - [ ] 修正があれば commit し、修正がなければ no-op を記録した
 
 ---
 
@@ -117,6 +162,8 @@ ID: "<ISS_ID>"
 - 対象AC/ECがすべて満たされ、テストで保証されている
 - MUST NOT / OUT OF SCOPE を破っていない
 - 品質ゲート（フォーマット/リント/テストのうち該当するもの）が満たされている
+- docs impact が解決され、必要な docs refresh が完了している
+- `S99 final diff review quality gate` で reviewer 承認レベルに達している
 
 ## 省略/例外メモ (必須)
 - 該当なし
