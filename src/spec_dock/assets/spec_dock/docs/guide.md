@@ -102,6 +102,9 @@ spec-dock/
 
 ### 4.1 作る（new / import）
 
+- initiative / epic は、`new` / `import` の前に既存ノードの requirement / design / plan を確認し、適合するなら既存ノードを更新します。
+- 新規作成は、既存ノードに収めると投資判断や Done 定義が崩れる場合だけ行います。
+- 新規作成した理由や既存ノードに収めない理由は、作成後の対象ノード配下 `discussions/` の最初の `disc` に残します。
 - `new`: spec-dock がローカルノードを作ります
   - issue は（デフォルトで）GitHub Issue も作ります（`--no-github` で local-only）
   - initiative/epic は（デフォルトで）local-only です（必要なら `--create-github-issue` / `--github-issue <n>` で GitHub と紐づけ）
