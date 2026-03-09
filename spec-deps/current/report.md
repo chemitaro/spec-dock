@@ -390,6 +390,49 @@ code reviewer verdict: pass
 
 ---
 
+### 2026-03-09 11:25 - 12:10
+
+#### 対象
+- Step: S11 skill reminder + docs 入口 + regression tests
+- AC/EC: AC-017 / EC-010, EC-011
+
+#### 実施内容
+- `spec-dock-initiative-planning`, `spec-dock-epic-planning`, `spec-dock-issue-execution` の各 `SKILL.md` に、`phase_requirement.md` / `phase_design.md` / `phase_plan.md` への concise な reminder を追加した。
+- initiative / epic skill では、scope 固有の制約と判断は `workflow_*.md` を正本にする責務分離を明記した。
+- `docs/README.md` に phase playbook セクションとショートカットを追加し、`guide.md` に共通作法としての playbook 入口を追加した。
+- `tests/test_cli.py` に playbook ファイル存在、README / guide の導線、leaf skill の reminder と責務分離を検証する回帰アサートを追加した。
+- `code_reviewer` に S11 差分レビューを依頼し、Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_cli.TestCli.test_init_creates_expected_structure \
+  tests.test_cli.TestCli.test_bundled_skill_routing_contract
+
+Ran 2 tests in ...
+OK
+
+python -m unittest discover -v
+
+Ran 149 tests in ...
+OK
+
+code reviewer verdict: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md` - phase playbook reminder と責務分離文言を追加
+- `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md` - phase playbook reminder と責務分離文言を追加
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md` - issue governance reminder を維持したまま phase playbook reminder を追加
+- `src/spec_dock/assets/spec_dock/docs/README.md` - phase playbook 入口とショートカットを追加
+- `src/spec_dock/assets/spec_dock/docs/guide.md` - 共通作法としての phase playbook セクションを追加
+- `tests/test_cli.py` - playbook discoverability と skill reminder の回帰アサートを追加
+
+#### メモ
+- S11 では playbook 本文を workflow や skill に複製せず、docs 正本への導線と concise reminder のみに留めた。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...

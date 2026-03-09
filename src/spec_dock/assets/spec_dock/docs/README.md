@@ -16,6 +16,7 @@
 
 補足:
 - workflow ドキュメント（`workflow_*.md`）が実務導線です。
+- phase playbook（`phase_*.md`）は requirement / design / plan の共通作法です。
 - `reference_*.md` は制約/仕様確認のための reference レイヤです。
 
 ## まず読む（全員）
@@ -32,6 +33,16 @@
    - [reference_deps.md](reference_deps.md)
    - [reference_sync.md](reference_sync.md)
 
+## phase 別の共通作法（playbook）
+
+- requirement: [phase_requirement.md](phase_requirement.md)
+- design: [phase_design.md](phase_design.md)
+- plan: [phase_plan.md](phase_plan.md)
+
+補足:
+- playbook は共通作法の正本です。
+- scope 固有の制約や判断は `workflow_*.md` 側で扱います。
+
 ## 目的別ショートカット
 
 | やりたいこと | 参照 |
@@ -45,6 +56,9 @@
 | `--title`/`--slug`/ブランチ命名のルールを知りたい | [reference_naming.md](reference_naming.md) |
 | 依存関係（deps check / PlantUML）を知りたい | [reference_deps.md](reference_deps.md) |
 | `sync` の入出力/フラグを知りたい | [reference_sync.md](reference_sync.md) |
+| requirement の作り方（共通）を確認したい | [phase_requirement.md](phase_requirement.md) |
+| design の作り方（共通）を確認したい | [phase_design.md](phase_design.md) |
+| plan の作り方（共通）を確認したい | [phase_plan.md](phase_plan.md) |
 
 ## コマンド早見（最短）
 
