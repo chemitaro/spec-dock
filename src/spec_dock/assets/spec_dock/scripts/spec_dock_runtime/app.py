@@ -81,6 +81,10 @@ _INPUT_SLUG_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _BLOCKERS_TOP_LIMIT = 5
 _TREE_BOARD_BLOCKERS_LABEL_LIMIT = 3
 _DASHBOARD_TOP_LIMIT = 10
+_DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
+_DISCUSSION_DOC_FILENAME_RE = re.compile(
+    r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+)
 
 # Branch name parsing helpers (best-effort):
 # - Prefer explicit ids embedded in branch names (e.g. `feature/iss-00123-foo`).
@@ -637,16 +641,56 @@ def _new_issue(
     )
 
 
-def _new_adr(
+def _scan_discussion_sequence_sources(discussions_dir: Path) -> list[tuple[int, str, Path]]:
+    """Collect recognized discussion docs (`NNN-type-slug.md`) from a scope directory."""
+    refs: list[tuple[int, str, Path]] = []
+    for path in sorted(discussions_dir.glob("*.md")):
+        m = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
+        if not m:
+            continue
+        refs.append((int(m.group("seq")), str(m.group("doc_type")), path))
+    return refs
+
+
+def _next_discussion_doc_seq(discussions_dir: Path) -> int:
+    """Return the next shared sequence number for discussion docs in a scope directory."""
+    refs = _scan_discussion_sequence_sources(discussions_dir)
+    if not refs:
+        return 1
+
+    max_seq = 0
+    by_seq: dict[int, list[Path]] = {}
+    for seq, _doc_type, path in refs:
+        max_seq = max(max_seq, seq)
+        by_seq.setdefault(seq, []).append(path)
+
+    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
+    if duplicate_seqs:
+        seq = duplicate_seqs[0]
+        files = ", ".join(p.name for p in sorted(by_seq[seq], key=lambda p: p.as_posix()))
+        raise RuntimeError(
+            f"Duplicate discussion sequence detected under {discussions_dir}: seq={seq:03d} files=[{files}]"
+        )
+
+    next_seq = max_seq + 1
+    if next_seq > 999:
+        raise RuntimeError(
+            "Discussion sequence overflow: next sequence would exceed 999. "
+            "Create a follow-up issue to decide whether to archive old discussion docs or extend sequence width."
+        )
+    return next_seq
+
+
+def _new_doc(
     specdock_dir: Path,
     *,
+    doc_type: str,
     scope_id: str,
     title: str,
     slug: str | None,
-    node_id: str | None,
     scope_prefix: str,
 ) -> None:
-    """Create a new ADR markdown under the given scope node (initiative/epic/issue)."""
+    """Create a new discussion markdown under the given scope node."""
     _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)
@@ -654,68 +698,51 @@ def _new_adr(
     if not scope:
         raise RuntimeError(f"Scope node not found: {scope_id}")
 
+    if doc_type not in _DISCUSSION_DOC_TYPES:
+        allowed = ", ".join(_DISCUSSION_DOC_TYPES)
+        raise RuntimeError(f"Unknown discussion doc type: {doc_type} (allowed: {allowed})")
+
     title = title.strip()
     if not title:
         raise RuntimeError("--title is required")
 
-    template_path = specdock_dir / "templates" / "discussions" / "adr.md"
+    template_path = specdock_dir / "templates" / "discussions" / f"{doc_type}.md"
     if not template_path.exists():
-        raise RuntimeError(f"Missing ADR template: {template_path}")
+        raise RuntimeError(f"Missing discussion template: {template_path}")
 
     discussions_dir = scope.path / "discussions"
     discussions_dir.mkdir(parents=True, exist_ok=True)
-
-    if node_id is None:
-        # ADR ids are scoped to `discussions/` (they are not stored in `.meta.json`).
-        max_num = 0
-        for p in discussions_dir.glob("adr-*.md"):
-            stem = p.stem
-            m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", stem)
-            if not m:
-                continue
-            try:
-                _, _, n = _parse_id(m.group(1))
-            except RuntimeError:
-                continue
-            max_num = max(max_num, n)
-        node_id = _format_id("adr", max_num + 1, local=False)
-    else:
-        node_id = _normalize_id_input(str(node_id), prefix="adr", field="id")
 
     if slug is None:
         slug = _slugify(title)
     if not slug:
         raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
-    slug = _validate_slug(slug, field="slug")
+    slug = _validate_input_slug_kebab(slug, field="--slug")
 
-    # Prevent duplicated ADR ids within the same scope (even with a different slug).
-    want_prefix, want_local, want_num = _parse_id(node_id)
-    for p in sorted(discussions_dir.glob("adr-*.md")):
-        m = re.match(r"^(adr(?:-local)?-[0-9]+)(?:-|$)", p.stem)
-        if not m:
-            continue
-        try:
-            p_prefix, p_local, p_num = _parse_id(m.group(1))
-        except RuntimeError:
-            continue
-        if p_prefix == want_prefix and p_local == want_local and p_num == want_num:
-            raise RuntimeError(f"ADR id already exists under scope {scope.id}: {node_id} ({p})")
-
-    dest_path = discussions_dir / f"{node_id}-{slug}.md"
+    seq = _next_discussion_doc_seq(discussions_dir)
+    seq_text = f"{seq:03d}"
+    doc_id = f"{seq_text}-{doc_type}"
+    dest_path = discussions_dir / f"{seq_text}-{doc_type}-{slug}.md"
     if dest_path.exists():
-        raise RuntimeError(f"ADR already exists: {dest_path}")
+        raise RuntimeError(f"Discussion doc already exists: {dest_path}")
 
     raw = template_path.read_text(encoding="utf-8")
     replacements = {
-        "<ADR_ID>": node_id,
+        "<ADR_ID>": doc_id,
         "<ADR_TITLE>": title,
+        "<DISC_ID>": doc_id,
+        "<DISC_TITLE>": title,
+        "<RESEARCH_ID>": doc_id,
+        "<RESEARCH_TITLE>": title,
+        "<NOTE_ID>": doc_id,
+        "<NOTE_TITLE>": title,
         "<SCOPE_ID>": scope.id,
         "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
         "YYYY-MM-DD": _today(),
     }
     dest_path.write_text(_render_text(raw, replacements), encoding="utf-8")
     rel = dest_path.relative_to(specdock_dir.parent).as_posix()
-    print(f"spec-dock: ok (new adr) id={node_id} scope={scope.id} path={rel}")
+    print(f"spec-dock: ok (new doc) type={doc_type} id={doc_id} scope={scope.id} path={rel}")
 
 
 def _unlink_any(path: Path) -> None:
@@ -3585,7 +3612,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = _Parser(prog="spec-dock/scripts/spec-dock")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/adr)")
+    p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/doc)")
     new_sub = p_new.add_subparsers(dest="new_kind", required=True)
 
     p_new_init = new_sub.add_parser("initiative", help="Create a new initiative")
@@ -3624,14 +3651,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Do not use GitHub (default is to create a new GitHub issue; id becomes iss-local-NNNN)",
     )
 
-    p_new_adr = new_sub.add_parser("adr", help="Create a new ADR under a scope (initiative/epic/issue)")
-    scope = p_new_adr.add_mutually_exclusive_group(required=True)
+    p_new_doc = new_sub.add_parser("doc", help="Create a discussion doc under a scope (initiative/epic/issue)")
+    p_new_doc.add_argument("doc_type", choices=_DISCUSSION_DOC_TYPES)
+    scope = p_new_doc.add_mutually_exclusive_group(required=True)
     scope.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-00123 / init-local-00001)")
     scope.add_argument("--epic", help="Scope epic (e.g. 123 / epic-00123 / epic-local-00001)")
     scope.add_argument("--issue", help="Scope issue (e.g. 123 / iss-00123 / iss-local-00001)")
-    p_new_adr.add_argument("--title", required=True)
-    p_new_adr.add_argument("--slug")
-    p_new_adr.add_argument("--id")
+    p_new_doc.add_argument("--title", required=True)
+    p_new_doc.add_argument("--slug")
 
     p_active = sub.add_parser("active", help="Manage the active pointers")
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
@@ -3772,16 +3799,17 @@ def main(argv: list[str] | None = None) -> int:
                     github_issue_number=getattr(ns, "github_issue", None),
                     no_github=bool(getattr(ns, "no_github", False)),
                 )
-            elif ns.new_kind == "adr":
+            elif ns.new_kind == "doc":
+                doc_type = str(getattr(ns, "doc_type"))
                 # The scope flag determines the prefix, so we can accept shorthand numeric ids.
                 scope_id = getattr(ns, "initiative", None) or getattr(ns, "epic", None) or getattr(ns, "issue", None)
                 scope_prefix = "init" if getattr(ns, "initiative", None) is not None else ("epic" if getattr(ns, "epic", None) is not None else "iss")
-                _new_adr(
+                _new_doc(
                     specdock_dir,
+                    doc_type=doc_type,
                     scope_id=str(scope_id),
                     title=str(ns.title),
                     slug=getattr(ns, "slug", None),
-                    node_id=getattr(ns, "id", None),
                     scope_prefix=scope_prefix,
                 )
             else:

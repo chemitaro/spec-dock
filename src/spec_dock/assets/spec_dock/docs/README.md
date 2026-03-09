@@ -97,11 +97,14 @@
 ```
 
 補足:
-- ADR は runtime command で追加します:
-  - `./spec-dock/scripts/spec-dock new adr --issue <issue-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new adr --initiative <initiative-id> --title "..."`
+- discussion docs は runtime command で追加します:
+  - `./spec-dock/scripts/spec-dock new doc adr --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc disc --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc research --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc note --issue <issue-id> --title "..."`
+  - epic/initiative スコープでも同様に `--issue` を `--epic` / `--initiative` に置き換えて使います。
 - 補足資料（メモ/調査/議論）も `discussions/` に置きます。`discussions/rules.md` と `spec-dock/templates/discussions/*.md` を参照してください。
+- discussion docs の命名は `NNN-type-slug.md`（3桁固定）です。`rules.md` と nonconforming files は採番対象外です。
 - 新規ノードにはテンプレ由来の `README.md` は生成されません。
 
 ## 重要な注意（事故防止）

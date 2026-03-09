@@ -69,20 +69,20 @@ spec-dock/
 │       ├── report.md
 │       ├── discussions/
 │       │   ├── rules.md
-│       │   └── adr-00001-....md
+│       │   └── 001-adr-....md
 │       └── epics/
 │           ├── new-epic
 │           └── epic-00001-.../
 │               ├── discussions/
 │               │   ├── rules.md
-│               │   └── disc-00001-....md
+│               │   └── 002-disc-....md
 │               └── issues/
 │                   ├── new-issue
 │                   └── iss-00001-.../
 │                       └── discussions/
 │                           ├── rules.md
-│                           ├── adr-00001-....md
-│                           └── research-00001-....md
+│                           ├── 003-adr-....md
+│                           └── 004-research-....md
 ├── templates/                   # テンプレ（導入物）
 ├── scripts/                     # runtime script（導入物）
 ├── system/                      # placeholders 等（導入物）
@@ -112,13 +112,16 @@ spec-dock/
 - 生成済みノード配下では、親IDを省略できる wrapper が使えます（引数はタイトル1つのみ）。
   - initiative 配下: `epics/new-epic "<title>"`
   - epic 配下: `issues/new-issue "<title>"`
-- ADR は runtime command で作成します（scope を明示）。
-  - `./spec-dock/scripts/spec-dock new adr --issue <issue-id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new adr --initiative <initiative-id> --title "<title>"`
+- discussion docs は runtime command で作成します（scope を明示）。
+  - `./spec-dock/scripts/spec-dock new doc adr --issue <issue-id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc disc --issue <issue-id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc research --issue <issue-id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc note --issue <issue-id> --title "<title>"`
+  - epic/initiative スコープでも同様に `--issue` を `--epic` / `--initiative` に置き換えて使います。
 
 補足:
 - Initiative/Epic/Issue ノード直下や `epics/` / `issues/` / `discussions/` に、テンプレ由来の `README.md` は生成されません。
+- discussion docs の命名は `NNN-type-slug.md`（3桁固定）です。`rules.md` と nonconforming files は採番対象外です。
 
 ### 4.2 アクティブにする（active set）
 
