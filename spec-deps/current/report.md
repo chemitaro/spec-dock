@@ -358,6 +358,38 @@ code reviewer verdict: pass
 
 ---
 
+### 2026-03-09 10:45 - 11:20
+
+#### 対象
+- Step: S10 workflow direct links + phase progression rule
+- AC/EC: AC-016, AC-018 / EC-010, EC-011, EC-012
+
+#### 実施内容
+- `workflow_initiative.md`, `workflow_epic.md`, `workflow_issue.md` の requirement / design / plan 節から、それぞれ `phase_requirement.md` / `phase_design.md` / `phase_plan.md` へ直接リンクする導線を追加した。
+- 各 workflow に、requirement 承認前に design へ進まず、design 承認前に plan へ進まない phase progression rule を明記した。
+- issue workflow では既存の review loop / docs impact / final quality gate を維持したまま、shared playbook への責務分離だけを追加した。
+- `code_reviewer` に S10 差分レビューを依頼し、Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+git diff -- \
+  src/spec_dock/assets/spec_dock/docs/workflow_initiative.md \
+  src/spec_dock/assets/spec_dock/docs/workflow_epic.md \
+  src/spec_dock/assets/spec_dock/docs/workflow_issue.md
+
+code reviewer verdict: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md` - phase playbook への直接リンクと phase progression rule を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` - phase playbook への直接リンクと phase progression rule を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - playbook への直接リンクと phase progression rule を追加
+
+#### メモ
+- S10 では workflow 正本の整理に集中し、docs README / guide / leaf skill reminder / 回帰テストは S11 で扱う。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
