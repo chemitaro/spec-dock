@@ -29,7 +29,7 @@ ID: "iss-00019"
 - [x] S02: `new doc <type>` が新標準ファイルだけを採番対象にして共通連番 `NNN-type-slug.md` を作成する
 - [x] S03: duplicate / overflow / unknown type を明示的に失敗させ、overflow では follow-up guidance を返す
 - [x] S90: docs impact resolution と asset/current guidance refresh を完了する
-- [ ] S99: final diff review quality gate を通す（フルテストと手動 diff review は完了、fresh reviewer verdict 待ち）
+- [x] S99: final diff review quality gate を通す（reviewer は blocking issue なし、full suite も green）
 
 ### UML（任意） (任意)
 ```plantuml
