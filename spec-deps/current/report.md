@@ -326,6 +326,38 @@ git diff origin/chemitaro/issue16...HEAD -- \
 
 ---
 
+### 2026-03-09 10:00 - 10:40
+
+#### 対象
+- Step: S09 shared phase playbook docs
+- AC/EC: AC-015, AC-018 / EC-010, EC-011, EC-012
+
+#### 実施内容
+- `phase_requirement.md`, `phase_design.md`, `phase_plan.md` を docs 正本として追加した。
+- 各 playbook に、目的 / 出力 / 非ゴール、調査・分析、ヒアリング、discussion sheet 条件、ADR 条件、review 前 exit criteria、次 phase へ進める条件、subagent 活用ガイダンスを整理した。
+- source repo 前提の template パスになっていないことを確認し、runtime 側の `spec-dock/templates/...` を参照する形で揃っていることを確認した。
+- `code_reviewer` に S09 差分をレビュー依頼し、Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "templates/|src/spec_dock" \
+  src/spec_dock/assets/spec_dock/docs/phase_requirement.md \
+  src/spec_dock/assets/spec_dock/docs/phase_design.md \
+  src/spec_dock/assets/spec_dock/docs/phase_plan.md
+
+code reviewer verdict: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/phase_requirement.md` - requirement authoring playbook を追加
+- `src/spec_dock/assets/spec_dock/docs/phase_design.md` - design authoring playbook を追加
+- `src/spec_dock/assets/spec_dock/docs/phase_plan.md` - plan authoring playbook を追加
+
+#### メモ
+- S09 では docs 正本の追加に集中し、workflow からの直接リンクと docs 入口の導線は S10 / S11 で扱う。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
