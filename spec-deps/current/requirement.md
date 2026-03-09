@@ -17,6 +17,7 @@ ID: "iss-00016"
 - hub は既存名 `spec-driven-tdd-workflow` を維持しつつ、責務を「入口 / routing」に絞り、詳細実務は leaf に分離する。
 - 共通運用ルール（GitHub / deps / sync / active など）は独立 skill 化せず、reference docs を正本として hub / leaf から案内する。
 - あわせて、issue 実装計画の governance を標準化し、各 step の reviewer 承認ループ、docs impact 判定、branch 全体の最終品質ゲートを template / docs / skill に一貫して反映する。
+- さらに、現行の skill 構成は維持したまま、Initiative / Epic / Issue の requirement / design / plan を高い再現性で作成できるよう、shared phase playbook と authoring rulebook を docs 側へ導入する。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -31,6 +32,7 @@ ID: "iss-00016"
   - Codex CLI にとって、Issue 実装と Initiative/Epic/ADR が同じ入口に集約され、読解コストが高い
   - `active set`, `deps check`, `sync`, `import`, GitHub 副作用などの高リスク操作が、workflow skill と docs のどこで扱うか曖昧で、案内がぶれやすい
   - docs / skill / README の入口整合が崩れているため、誤案内が再発しやすい
+  - initiative / epic / issue の template は豊富だが、「どう埋めるか」「いつ discussion / ADR / ヒアリング / review を挟むか」という共通 authoring guidance が shared playbook として抽出されていない
 - 再現手順（最小で）:
   1) `src/spec_dock/assets/codex_skills/` を見ると `spec-driven-tdd-workflow` 1 本しかない
   2) `src/spec_dock/assets/spec_dock/docs/` を見ると workflow / reference は複数責務に分割されている
@@ -122,6 +124,11 @@ Hub --> Ref
   - `workflow_issue.md` に issue execution governance の正本ルールを追加する
   - docs impact を判定し、必要時だけ docs refresh step を final quality gate 前に置く運用を標準化する
   - `git diff <base>...HEAD` を対象にした branch 全体の final diff review quality gate を標準 step として定義する
+  - top-level skill は `hub + 4 leaf` を維持したまま、shared phase playbook `phase_requirement.md`, `phase_design.md`, `phase_plan.md` を docs として追加する
+  - Initiative / Epic / Issue の workflow docs から、対応する phase playbook へ導線を張る
+  - phase playbook に、調査・分析・ユーザーヒアリング・discussion sheet・ADR 分岐・review / re-review・subagent 活用・template の使い方を再利用可能な rulebook として整理する
+  - leaf skill には phase-specific top-level routing を増やさず、必要な phase playbook への短い reminder のみを持たせる
+  - requirement 承認前に design へ進まず、design 承認前に plan へ進まない phase-to-phase approval gate を rulebook と workflow の両方に定義する
 - MUST NOT（絶対にやらない／追加しない）:
   - 1 本巨大 skill 構成へ戻さない
   - 現時点で必要な skill を「後で追加」で先送りしない
@@ -130,11 +137,15 @@ Hub --> Ref
   - `runtime-operations` のような責務境界が曖昧な抽象 skill を初期導入しない
   - review ループの規範を skill だけに閉じ込めない
   - docs refresh を「毎 step 必ず全件更新」のような儀式化したルールにしない
+  - `initiative-requirement` / `epic-design` / `issue-plan` のような `scope × phase` top-level skill を追加しない
+  - interview script / review gate / template 本文を `SKILL.md` に長文複製しない
+  - workflow / playbook / template / skill の 4 層に同じ規範を重複記載しない
 - OUT OF SCOPE:
   - Codex 以外のエージェント向け最適化
   - 将来の plugin/marketplace/skill bundle 選択 UI
   - runtime コマンド体系自体の再設計
   - docs/reference の全面的な情報刷新（skill 導線と矛盾する箇所の修正は scope 内）
+  - `scope × phase` skill の pilot 実験
 
 ## 境界（Always / Ask / Never） (必須)
 - Always（常に守る）:
@@ -158,6 +169,7 @@ Hub --> Ref
 - 既存 docs（`workflow_*`, `reference_*`）を正本として再利用し、skill 側に詳細仕様を複製しない
 - `update` が上書き・削除してよいのは、spec-dock 管理対象 skill ディレクトリに限る
 - governance の規範本体は docs に置き、template は実行形、skill は短い reminder に留める
+- phase playbook は shared docs として設計し、scope ごとの workflow と template の間に置く
 
 ## 前提（Assumptions） (必須)
 - 現在の主利用者は Codex CLI である
@@ -166,6 +178,7 @@ Hub --> Ref
 - `spec-dock` はまだ本格公開前であり、構造改善を優先できる
 - 既存 single-skill 導入済み repo には `update` で新 skill セットを配布する想定である
 - issue 実装は multi-agent review を前提に進めるケースが増えており、template 側で reviewer 承認ループを標準化する価値が高い
+- Anthropic 公式 guidance でも、skill は concise な task-specific workflow に保ち、詳細 guidance は references / assets / scripts に逃がす設計が推奨されている
 
 ## 判断材料/トレードオフ（Decision / Trade-offs） (任意)
 - 論点: 共通運用ルールを独立 skill にするか
@@ -349,6 +362,33 @@ Hub --> Ref
   - When: issue plan の最終 step を確認する
   - Then: `git diff <base>...HEAD` を対象にした final diff review quality gate が独立 step として定義されている
   - 観測点: `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `workflow_issue.md`
+- AC-015:
+  - Actor/Role: initiative / epic / issue の仕様書を作成する開発者 / coding agent
+  - Given: requirement / design / plan の作成方法を確認したい
+  - When: docs を参照する
+  - Then: shared phase playbook `phase_requirement.md`, `phase_design.md`, `phase_plan.md` が存在し、phase ごとの作法を共通 guidance として参照できる
+  - 観測点: `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`, `src/spec_dock/assets/spec_dock/docs/phase_design.md`, `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+- AC-016:
+  - Actor/Role: initiative / epic / issue の仕様書を作成する開発者 / coding agent
+  - Given: scope workflow doc を読んでいる
+  - When: requirement / design / plan のいずれかの phase に進む
+  - Then: 各 workflow の phase 節から対応する phase playbook への**直接リンク**が存在し、scope 固有ノートは workflow 側、phase の共通作法は playbook 側に残る
+  - 観測点: `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`, `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-017:
+  - Actor/Role: Codex CLI
+  - Given: scope leaf skill を読んで作業に入る
+  - When: requirement / design / plan のどこを進めるか判断する
+  - Then: skill は concise なまま、必要な phase playbook への reminder を持ち、playbook 本文は docs 側へ委ねている
+  - 観測点: `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md`, `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md`, `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- AC-018:
+  - Actor/Role: requirement / design / plan を作成する開発者 / coding agent
+  - Given: phase playbook を使って仕様書を作成する
+  - When: 情報不足や論点が存在する
+  - Then:
+    - playbook は、追加調査、ユーザーヒアリング、discussion sheet 作成、必要なら ADR 起票、review / re-review のループ、適切な subagent 活用を促す rulebook として機能する
+    - requirement は reviewer 合格前に design へ進まず、design は reviewer 合格前に plan へ進まない
+    - phase ごとに exit criteria と next-phase entry 条件が明示される
+  - 観測点: `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`, `src/spec_dock/assets/spec_dock/docs/phase_design.md`, `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
 
 ### 入力→出力例 (任意)
 - EX-001:
@@ -402,6 +442,18 @@ Hub --> Ref
   - 条件: final gate が最後の feature step に埋め込まれ、branch 全体 diff review が独立していない
   - 期待: その状態は受け入れない（cross-step 整合性を保証できない）
   - 観測点: `templates/issue/plan.md`, `workflow_issue.md`
+- EC-010:
+  - 条件: `scope × phase` top-level skill を追加しないと playbook 導入要件を満たせない設計になっている
+  - 期待: その状態は受け入れない（routing 軸を二重化してはならない）
+  - 観測点: skill 構成、docs 入口、workflow 導線
+- EC-011:
+  - 条件: 同じ規範が playbook / workflow / template / skill の複数レイヤへ複製され、どこが正本か判断できない
+  - 期待: その状態は受け入れない（playbook は作法、template は型、skill は reminder、workflow は scope flow に責務分離されている必要がある）
+  - 観測点: `docs/phase_*.md`, `templates/**`, `codex_skills/**/SKILL.md`
+- EC-012:
+  - 条件: requirement / design / plan の authoring を進める際、論点が残っているのに discussion sheet / user hearing / review loop へ進む pause が playbook に存在しない
+  - 期待: その状態は受け入れない（再現可能な rulebook になっていない）
+  - 観測点: `docs/phase_*.md`
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: hub skill = 入口 / task routing / 共通 safety を担う skill
@@ -410,6 +462,8 @@ Hub --> Ref
 - TERM-004: reference layer = `new/import/active/deps/sync/validate` と GitHub safety を支える共通運用 docs 群
 - TERM-005: docs impact = 実装差分により README / workflow / distributed docs / skill reminder の更新要否を判定するための分類
 - TERM-006: final diff review quality gate = `git diff <base>...HEAD` を対象に、tests / packaging / docs / diff 全体を reviewer が確認する最終 step
+- TERM-007: phase playbook = requirement / design / plan の「どう作るか」を共通 guidance として定義する docs
+- TERM-008: authoring rulebook = 調査、ヒアリング、discussion sheet、ADR、review gate、subagent 活用を再現可能にする作法の集合
 
 ## 未確定事項 / 要確認 (任意)
 - 現時点では、主要な判断はユーザー確認済みである。
@@ -430,6 +484,8 @@ Hub --> Ref
 - `--no-skill` 廃止方針が CLI / docs / tests に反映されている
 - issue 実装 governance が docs / template / skill に一貫して反映されている
 - final diff review quality gate と docs refresh step が issue execution の標準運用として定義されている
+- shared phase playbook が docs に追加され、scope workflow から参照されている
+- requirement / design / plan の authoring rulebook が skill を増やさず docs / workflow / template に分離して定義されている
 - MUST NOT / OUT OF SCOPE を破っていない
 
 ## 省略/例外メモ (必須)
