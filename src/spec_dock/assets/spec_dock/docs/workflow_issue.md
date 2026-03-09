@@ -71,8 +71,11 @@ active issue 配下の仕様を埋めます:
 - `spec-dock/active/issue/plan.md`
   - 共通の進め方: [phase_plan.md](phase_plan.md)
 - `spec-dock/active/issue/discussions/`（ADR / 議論 / 調査 / メモ）
-  - ADR: `./spec-dock/scripts/spec-dock new adr --issue <issue-id> --title "..."`
-  - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
+  - `./spec-dock/scripts/spec-dock new doc adr --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc disc --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc research --issue <issue-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc note --issue <issue-id> --title "..."`
+  - 命名/採番は `NNN-type-slug.md`（3桁固定・shared sequence）です。詳細は [reference_naming.md](reference_naming.md)。
 
 方針:
 - requirement は AC/EC（観測可能な振る舞い）に落とす

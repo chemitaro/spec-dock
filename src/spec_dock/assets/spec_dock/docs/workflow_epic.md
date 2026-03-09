@@ -69,8 +69,11 @@ Epic 作成後は、対象ノード配下の wrapper で Issue を追加でき�
 - `plan.md`: Issue 分割（粒度）/ 依存順序 / 品質ゲート
   - 共通の進め方: [phase_plan.md](phase_plan.md)
 - `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
-  - ADR: `./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "..."`
-  - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
+  - `./spec-dock/scripts/spec-dock new doc adr --epic <epic-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc disc --epic <epic-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc research --epic <epic-id> --title "..."`
+  - `./spec-dock/scripts/spec-dock new doc note --epic <epic-id> --title "..."`
+  - 命名/採番は `NNN-type-slug.md`（3桁固定・shared sequence）です。詳細は [reference_naming.md](reference_naming.md)。
 
 補足:
 - ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。

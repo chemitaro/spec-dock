@@ -9,23 +9,23 @@
 - `note`: 軽量メモ（会議・作業・思考）
 
 ## 2. 命名規約
-- ファイル名は `<type>-00001-<slug>.md`
+- ファイル名は `NNN-type-slug.md`（`NNN` は 3 桁固定）
 - 例:
-  - `adr-00001-token-rotation.md`
-  - `disc-00001-doc-structure.md`
-  - `research-00001-naming-rules.md`
-  - `note-00001-kickoff-memo.md`
+  - `001-adr-token-rotation.md`
+  - `002-disc-doc-structure.md`
+  - `003-research-naming-rules.md`
+  - `004-note-kickoff-memo.md`
 
-## 3. 作成方法
-- ADR:
-  - `./spec-dock/scripts/spec-dock new adr --issue <id> --title "<title>"`
-- 非ADR（コピー運用）:
-  - 前提: リポジトリルートで実行する
-  - `cp spec-dock/templates/discussions/note.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/issues/<issue-id>-<slug>/discussions/note-00001-<doc-slug>.md`
-  - `cp spec-dock/templates/discussions/disc.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/issues/<issue-id>-<slug>/discussions/disc-00001-<doc-slug>.md`
-  - `cp spec-dock/templates/discussions/research.md spec-dock/initiatives/<initiative-id>-<slug>/epics/<epic-id>-<slug>/issues/<issue-id>-<slug>/discussions/research-00001-<doc-slug>.md`
+## 3. 作成方法（runtime command）
+- `./spec-dock/scripts/spec-dock new doc adr --issue <id> --title "<title>"`
+- `./spec-dock/scripts/spec-dock new doc disc --issue <id> --title "<title>"`
+- `./spec-dock/scripts/spec-dock new doc research --issue <id> --title "<title>"`
+- `./spec-dock/scripts/spec-dock new doc note --issue <id> --title "<title>"`
 
 ## 4. ルール
 - `discussions/` 配下に `new-*` などのラッパスクリプトを置かない。
-- 連番は type ごとに採番し、既存の最大番号 +1 を使う。
+- 採番は type ごとではなく `discussions/` 全体で共有します（new-format files の最大 `NNN` + 1）。
+- 採番対象は `NNN-type-slug.md` に一致する new-format files のみです。
+- `rules.md` と legacy/nonconforming files（例: `adr-00001-...`, `foo.md`）は採番対象外です。既存ファイルは rename しません。
+- `999` を超える採番は失敗します。follow-up issue を作成し、archive または桁拡張を判断してください。
 - 公開済みファイルの番号を振り直さない。
