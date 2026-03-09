@@ -3,7 +3,7 @@
 ID: "iss-00019"
 タイトル: "discussions 配下の資料命名を時系列順に並ぶ形式へ統一し、全種別を共通採番できるようにする"
 関連GitHub: ["#19", "https://github.com/chemitaro/spec-dock/issues/19"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex"
 最終更新: "2026-03-09"
 親: []
@@ -14,7 +14,7 @@ ID: "iss-00019"
 ## 目的（ユーザーに見える成果 / To-Be） (必須)
 - Initiative / Epic / Issue の各 `discussions/` ディレクトリで、ADR / 議論 / 調査 / メモのファイルが **名前順のまま作成順に並ぶ** ようになる。
 - `discussions/` に置かれる全種別の資料が、`001-adr-...`, `002-disc-...` のような **3 桁ゼロ埋め共通連番**で管理される。
-- rules / templates / runtime / docs / tests が同じ命名規約を共有し、ADR だけでなく非 ADR も同じ並び順原則で運用できる。
+- rules / templates / runtime / docs / tests が同じ命名規約を共有し、discussion 資料の公開インターフェイスとして `new doc <type>` を提供できる。
 
 ## 背景・現状（As-Is / 調査メモ） (必須)
 - 現状の挙動（事実）:
@@ -78,9 +78,9 @@ ID: "iss-00019"
   - `spec-dock` の runtime / templates / docs / tests を保守する開発者
 - 代表的なシナリオ:
   - Issue の `discussions/` に note → research → disc → adr を順に置き、一覧順だけで思考の流れを追いたい
-  - 既存 scope に新しい ADR を追加したとき、他 type を含めた最後尾の番号で自動採番されてほしい
-  - 非 ADR の資料も rules や supported workflow に従って同じ並び順で作りたい
-  - `init` / `update` 後の配布 docs と templates が、古い命名例を含まない状態で揃っていてほしい
+  - 既存 scope に新しい ADR を追加したとき、`new doc adr` で他 type を含めた最後尾の番号が自動採番されてほしい
+  - 非 ADR の資料も `new doc disc|research|note` で同じ並び順で作りたい
+  - `init` / `update` 後の配布 docs と templates が、古い命名例や旧公開導線を primary interface として含まない状態で揃っていてほしい
 
 ### UML（任意） (任意)
 ```plantuml
@@ -116,8 +116,10 @@ end note
   - `discussions/` 配下の命名規約を `<nnn>-<type>-<slug>.md` に統一する
   - `nnn` は `001` から始まる 3 桁ゼロ埋め連番とする
   - 採番スコープを type ごとではなく、各 `discussions/` ディレクトリ単位の全種別共通連番へ変更する
-  - ADR の自動作成フローが、同一 `discussions/` 内の全資料を前提に次番号を決めるようにする
-  - 非 ADR の資料についても、`spec-dock` が提供する supported workflow が番号計算・衝突検出・許容 type 判定を保証し、同じ連番原則に従えるようにする
+  - discussion 資料の公開インターフェイスを `new doc <type>` に統一する
+  - `type` は option ではなく位置引数とし、`adr | disc | research | note` を指定できる
+  - `new doc <type>` が、同一 `discussions/` 内の全資料を前提に次番号を決めるようにする
+  - `new doc <type>` を含む `spec-dock` 提供の supported workflow が番号計算・衝突検出・許容 type 判定を保証し、同じ連番原則に従えるようにする
   - rules / templates / runtime / docs / tests / `spec-deps/current/discussions/rules.md` / `spec-deps/README.md` を新ルールへ整合させる
   - 3 桁上限（999）を超える場合は、4 桁へ進まず明示的に失敗し、follow-up issue で archive または桁拡張を判断する契約に固定する
   - legacy 混在ディレクトリでは、旧 `<type>-00001-...` 形式の数値部を次番号計算対象に含め、日付先頭ファイルは採番基準に含めない
@@ -125,6 +127,7 @@ end note
   - 日時 prefix を新標準として採用しない
   - type ごとの独立連番を残したまま「時系列に並ぶ」と見なさない
   - `discussions/` を type ごとのサブディレクトリへ再分割しない
+  - `new adr`, `new note`, `new research` のような discussion 資料ごとの個別公開コマンドを primary interface にしない
   - `init` / `update` 時に、既存ユーザー repo の discussion 資料を自動一括 rename しない
   - 3 桁と 4 桁を無秩序に混在させない
 - OUT OF SCOPE:
@@ -141,7 +144,7 @@ end note
   - rules / templates / runtime / docs / tests を一つの契約として扱う
   - 既存ユーザー資料の安全性を優先し、破壊的な自動 rename を避ける
 - Ask（迷ったら相談）:
-  - 非 ADR の supported workflow を独立 subcommand として見せるか、内部 helper を既存導線から呼ぶか
+  - なし
 - Never（絶対にしない）:
   - 一部の docs や templates だけを更新して runtime / tests と食い違わせる
   - legacy 混在ディレクトリに対して、利用者に無断で rename をかける
@@ -150,15 +153,17 @@ end note
 ## 非交渉制約（守るべき制約） (必須)
 - 標準命名は `001-adr-...`, `002-disc-...` のような **3 桁ゼロ埋め + type + slug** とする
 - type は `adr`, `disc`, `research`, `note` を基本語彙として維持する
+- discussion 資料の公開インターフェイスは `new doc <type>` とし、`type` は位置引数とする
 - 採番は `discussions/` ディレクトリ単位の全種別共通連番とする
 - `rules.md` は採番対象外とする
-- 非 ADR も `spec-dock` 提供の supported workflow が番号計算・衝突検出・type 判定を保証する
+- `new doc <type>` を含む `spec-dock` 提供の supported workflow が番号計算・衝突検出・type 判定を保証する
 - legacy 混在ディレクトリでは、`adr-00001-...`, `disc-00001-...`, `research-00001-...`, `note-00001-...` の数値部だけを次番号計算に利用し、日付先頭ファイルは数値源として扱わない
 - 日時はファイル名ではなく frontmatter / 本文に保持する
 - 連番は再利用しない
 - 新規/変更する path は lowercase を維持し、`A-Z` を含む新規 path を作らない
 - 既存ユーザー repo の資料は自動 rename しない
 - `999` 超過時は 4 桁へ進まず失敗する
+- `new adr` は互換のために残してもよいが、現行 docs / workflow の primary interface は `new doc adr` とする
 - Python 標準ライブラリ主体の現行 runtime 方針を崩さず、不要な依存追加を前提にしない
 
 ## 前提（Assumptions） (必須)
@@ -220,30 +225,37 @@ end note
 - AC-002:
   - Actor/Role: `spec-dock` 利用者
   - Given: ある scope の `discussions/` に `001-note-...`, `002-research-...` が既に存在する
-  - When: supported workflow で新しい ADR を作成する
-  - Then: 生成される ADR ファイル名は `003-adr-<slug>.md` となり、ADR だけのローカル連番には戻らない
-  - 観測点（UI/HTTP/DB/Log など）: FS 上の生成ファイル名, runtime stdout/stderr, 回帰テスト
+  - When: `new doc adr` を実行する
+  - Then: 生成される ADR ファイル名は `003-adr-<slug>.md` となり、discussion docs layer の公開インターフェイスが `new doc <type>` であることが docs / tests と一致している
+  - 観測点（UI/HTTP/DB/Log など）: FS 上の生成ファイル名, runtime stdout/stderr, docs, 回帰テスト
   - 権限/認可条件（ある場合）: なし
 - AC-003:
   - Actor/Role: `spec-dock` 利用者
   - Given: ある scope の `discussions/` に `003-adr-...` までの資料が存在する
-  - When: `disc` / `research` / `note` のいずれかを `spec-dock` 提供の supported workflow で追加する
-  - Then: 追加されるファイル名は次の共通番号（例: `004-disc-...`）となり、supported workflow が番号計算と衝突検出を保証する
-  - 観測点（UI/HTTP/DB/Log など）: FS 上の生成ファイル名, runtime / helper の stdout/stderr, 回帰テスト
+  - When: `new doc disc|research|note` のいずれかを実行する
+  - Then: 追加されるファイル名は次の共通番号（例: `004-disc-...`）となり、`new doc <type>` が番号計算と衝突検出を保証する
+  - 観測点（UI/HTTP/DB/Log など）: FS 上の生成ファイル名, runtime / helper の stdout/stderr, docs, 回帰テスト
   - 権限/認可条件（ある場合）: なし
 - AC-004:
   - Actor/Role: `spec-dock` メンテナ
   - Given: リポジトリで `init` / `update` / テストを実行する
   - When: scaffold と package assets と docs を確認する
-  - Then: 古い命名例（`adr-00001-...`, `<type>-00001-...`, 日時先頭例）が配布正本と現行ガイダンス資料（`spec-deps/current/discussions/rules.md`, `spec-deps/README.md`）では「現行ルール」として残らず、テストも新ルールを観測している
+  - Then: 古い命名例（`adr-00001-...`, `<type>-00001-...`, 日時先頭例）や旧公開導線が、配布正本と現行ガイダンス資料では「現行ルール / primary interface」として残らず、テストも `new doc <type>` 前提の新ルールを観測している
   - 観測点（UI/HTTP/DB/Log など）: templates, shipped docs, runtime assets, `spec-deps/current/discussions/rules.md`, `spec-deps/README.md`, `tests/test_cli.py`
   - 権限/認可条件（ある場合）: なし
 - AC-005:
   - Actor/Role: 既存 `spec-dock` 利用者
   - Given: 既存 repo の `discussions/` に旧命名（例: `adr-00001-...`, `20260306-...`）が残っている
   - When: `init` / `update` を実行する
-  - Then: 既存ファイルは自動 rename されず、`spec-dock` 提供の supported workflow は旧 `<type>-00001-...` の数値部を採番基準に含めて次番号を決め、新規作成される資料だけが新ルールに従う
-  - 観測点（UI/HTTP/DB/Log など）: update 後の FS 差分, runtime / helper stdout/stderr, docs / migration guidance
+  - Then: 既存ファイルは自動 rename されず、`init` / `update` は legacy discussion 資料を非破壊で維持する
+  - 観測点（UI/HTTP/DB/Log など）: update 後の FS 差分, docs / migration guidance
+  - 権限/認可条件（ある場合）: なし
+- AC-005b:
+  - Actor/Role: 既存 `spec-dock` 利用者
+  - Given: 既存 repo の `discussions/` に旧命名（例: `adr-00001-...`, `20260306-...`）が残り、`init` / `update` 後も非破壊で維持されている
+  - When: `new doc <type>` を実行する
+  - Then: `new doc <type>` は旧 `<type>-00001-...` の数値部を採番基準に含めて次番号を決め、新規作成される資料だけが新ルールに従う
+  - 観測点（UI/HTTP/DB/Log など）: runtime / helper stdout/stderr, 生成ファイル名, docs / migration guidance
   - 権限/認可条件（ある場合）: なし
 - AC-006:
   - Actor/Role: `spec-dock` 利用者 / メンテナ
@@ -293,24 +305,19 @@ end note
   - 観測点（UI/HTTP/DB/Log など）: update 後の FS 差分, runtime stdout/stderr, migration guidance
 - EC-005:
   - 条件: `disc`, `research`, `note`, `adr` 以外の未知 type を扱おうとする
-  - 期待: `spec-dock` 提供の supported workflow が許容 type を検証し、未知 type は明示的に失敗する
+  - 期待: `new doc <type>` が許容 type を検証し、未知 type は明示的に失敗する
   - 観測点（UI/HTTP/DB/Log など）: rules/docs, runtime / helper stderr
 
 ## 用語（ドメイン語彙） (必須)
 - TERM-001: `discussion 資料` = `discussions/` 配下に置く ADR / 議論 / 調査 / メモの総称
-- TERM-002: `supported workflow` = `spec-dock` が提供・案内する資料作成手順。実装表面は command でも helper 呼び出しでもよいが、番号計算・衝突検出・type 判定をシステムが保証する
+- TERM-002: `supported workflow` = `spec-dock` が提供・案内する資料作成手順。本 issue の primary interface は `new doc <type>` であり、番号計算・衝突検出・type 判定をシステムが保証する
 - TERM-003: `legacy 命名` = `<type>-00001-<slug>.md` や `YYYYMMDD-...` のような旧来または混在中の命名
 - TERM-004: `共通連番` = `discussions/` ディレクトリ単位で、type を問わず共有する `001`, `002`, `003` ... の順序番号
 - TERM-005: `legacy 採番基準` = legacy 混在ディレクトリで次番号を求める際に参照する数値源。旧 `<type>-00001-...` の数値部は含めるが、日付先頭ファイルは含めない
 
 ## 未確定事項（TBD / 要確認） (必須)
-- Q-001:
-  - 質問: 非 ADR の supported workflow を利用者へどの形で公開するか
-  - 選択肢:
-    - A: `new doc` 相当の明示 command を用意する
-    - B: 既存コマンドや wrapper から内部 helper を呼び、利用者には最小の導線だけ見せる
-  - 推奨案（暫定）: A か B のどちらでもよい。ただし requirement では「システムが番号計算・衝突検出・type 判定を保証する」ことまで固定し、表面 API は design で決める
-  - 影響範囲: AC-003 / EC-001 / EC-005 / スコープ / テスト
+- なし
+- 2026-03-09 にユーザー回答として、Option A を採用し、公開インターフェイスは `new doc <type>`（`type` は位置引数）に確定した。
 
 ## Definition of Ready（着手可能条件） (必須)
 - [x] 目的が 1〜3行で明確になっている
@@ -318,16 +325,16 @@ end note
 - [x] Always/Ask/Never が書けている
 - [x] AC/EC が観測可能（テスト可能）な形になっている
 - [x] 観測点（UI/HTTP/DB/Log など）または確認方法が明記されている
-- [x] 未確定事項が「質問/選択肢/推奨案/影響範囲」で整理されている
+- [x] 未確定事項が解消済み、または必要な場合は「質問/選択肢/推奨案/影響範囲」で整理されている
 
 ## 完了条件（Definition of Done） (必須)
 - すべての AC / EC を満たす実装・docs・tests が揃う
 - 3 桁ゼロ埋め + type + slug の命名規約が、rules / templates / runtime / docs / tests で矛盾なく共有される
-- 非 ADR も `spec-dock` 提供の supported workflow で番号計算・衝突検出・type 判定が保証される
+- `new doc <type>` を primary interface とする supported workflow で番号計算・衝突検出・type 判定が保証される
 - legacy 資料の自動 rename を行わず、安全な移行方針が明示される
 - `999` 超過時は失敗して停止する契約が docs / runtime / tests で一致している
 - legacy 混在ディレクトリでの採番基準が docs / runtime / tests で一致している
-- 未確定事項が解消される（残す場合は、残す理由と合意を記録する）
+- `new doc <type>` の公開方針が docs / runtime / tests / design 入力で一致している
 - MUST NOT / OUT OF SCOPE を破っていない
 
 ## 省略/例外メモ (必須)
