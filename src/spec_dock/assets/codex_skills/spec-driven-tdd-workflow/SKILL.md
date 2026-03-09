@@ -27,4 +27,4 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 - Put interview and investigation notes under `discussions/` in the active node.
 - `spec-dock/active/context-pack.md` is the execution entrypoint for active issue work.
-- ADR creation example: `./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "..."`
+- Discussion doc example: `./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "..."`

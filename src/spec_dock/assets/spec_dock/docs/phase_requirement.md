@@ -17,8 +17,8 @@
 
 ### 出力
 - 承認可能な `requirement.md`
-- 必要に応じて `discussions/` 配下の `disc-*` / `research-*` / `note-*`
-- 必要に応じて `discussions/` 配下の `adr-*`
+- 必要に応じて `discussions/` 配下の `NNN-disc-*` / `NNN-research-*` / `NNN-note-*`
+- 必要に応じて `discussions/` 配下の `NNN-adr-*`
 
 ### 非ゴール
 - 実装方式を先回りして固定すること
@@ -83,9 +83,9 @@ template 参照先:
 - reviewer へ判断材料を渡したい
 
 使い分けの目安:
-- `research-*`: 事実収集、現状分析、外部調査
-- `disc-*`: 論点整理、選択肢比較、合意形成の叩き台
-- `note-*`: 軽量メモ、一時的な整理
+- `NNN-research-*`: 事実収集、現状分析、外部調査
+- `NNN-disc-*`: 論点整理、選択肢比較、合意形成の叩き台
+- `NNN-note-*`: 軽量メモ、一時的な整理
 
 ## 6. ADR を切る条件
 

@@ -1,6 +1,6 @@
-# reference: naming（`--title` / `--slug` / branch）
+# reference: naming（`--title` / `--slug` / branch / discussions）
 
-このドキュメントは、spec-dock が扱う **命名**（title/slug と、checkout 後のブランチ名）をまとめた参照です。
+このドキュメントは、spec-dock が扱う **命名**（title/slug、discussion docs のファイル名、checkout 後のブランチ名）をまとめた参照です。
 
 関連:
 - 入口: [README.md](README.md)
@@ -10,15 +10,16 @@
 
 ## 1. 対象（どのコマンドに効くか）
 
-### 1.1 `--title` / `--slug` の入力制約があるコマンド
+### 1.1 `--title` / `--slug` の入力制約
 
 - `new {initiative,epic,issue}`
 - `import {initiative,epic,issue}`
+- `new doc <type>`（`type = adr|disc|research|note`）
 
 補足:
-- `new adr` はこの制約対象ではありません（ADR は title/slug ルールが別です）。
+- `new doc <type>` は explicit sequence override（`--id` / `--seq`）を提供しません。
 
-### 1.2 ブランチ命名（checkout 後の正規化）が効くコマンド
+### 1.2 ブランチ命名（checkout 後の正規化）
 
 - `active set <target> --checkout`
   - デフォルト（`active set <target>`）は no-checkout のため、ブランチ操作は行いません
@@ -48,11 +49,14 @@
 目的:
 - title から slug を決定的に生成できるようにし、パス/ブランチ名を安全に保つためです。
 
+補足:
+- `new doc <type>` の `--title` は、discussion markdown 本文に埋め込むためのタイトルです（node title 制約とは別系統）。
+
 ---
 
 ## 3. `--slug`（kebab-case 制約）
 
-`new/import {initiative,epic,issue}` の `--slug` は、**trim 後**に次を満たす必要があります。
+`new/import {initiative,epic,issue}` と `new doc <type>` の `--slug` は、**trim 後**に次を満たす必要があります。
 
 - 正規表現: `^[a-z0-9]+(?:-[a-z0-9]+)*$`
 - 意味: 「小文字英数字トークンを `-` で区切った列（kebab-case）」
@@ -71,26 +75,60 @@
 
 `--slug` を省略した場合、slug は title から自動生成されます。
 
-- ルール: `slug = lower(title).replace(" ", "-")`
-
-（title 側が ASCII + 半角スペース 1 個区切りに制約されているため、決定的に kebab-case 化できます）
+- ルール（node系）: `slug = lower(title).replace(" ", "-")`
+- ルール（discussion docs）: `_slugify(title)` で候補を作り、最終的に kebab-case 制約で検証
 
 ---
 
-## 4. `active set --checkout` のブランチ命名（日本語ブランチを避ける）
+## 4. discussion docs の命名と採番（`new doc <type>`）
 
-### 4.1 目的
+### 4.1 ファイル名
+
+- 形式: `NNN-type-slug.md`
+- `NNN`: 3 桁固定（`001`..`999`）
+- `type`: `adr|disc|research|note`
+
+例:
+- `001-adr-token-rotation.md`
+- `002-disc-api-options.md`
+- `003-research-benchmark-summary.md`
+- `004-note-kickoff-memo.md`
+
+### 4.2 採番対象
+
+`discussions/` 配下で採番対象になるのは、recognized format（`NNN-type-slug.md`）に一致するファイルのみです。
+
+- `rules.md` は採番対象外
+- legacy/nonconforming files（例: `adr-00001-...`, `foo.md`, `1000-adr-...`）は採番対象外
+- 既存ファイルの rename は行いません（そのまま残し、採番時に無視）
+
+### 4.3 失敗条件（明示的に停止）
+
+- unknown type
+- invalid slug
+- duplicate sequence（recognized files 内で同じ `NNN` が複数）
+- sequence overflow（次番号が `999` を超える）
+
+overflow 時の guidance:
+- `1000-...` へ進まず失敗します。
+- follow-up issue を作成し、archive または桁拡張を判断してください。
+
+---
+
+## 5. `active set --checkout` のブランチ命名（日本語ブランチを避ける）
+
+### 5.1 目的
 
 `active set --checkout` では、ブランチ名を **ASCII かつ git 的に妥当**な形式へ寄せます。  
 これにより、非ASCII名や不正ref名による運用トラブルを避けます。
 
-### 4.2 対象
+### 5.2 対象
 
 - `active set <target> --checkout` を明示した場合のみ
 - target の node 種別（initiative / epic / issue）や GitHub 紐づき有無は問いません
 - `--checkout` を付けない場合は **ブランチ操作しません**
 
-### 4.3 望ましいブランチ名（desired）
+### 5.3 望ましいブランチ名（desired）
 
 基本:
 - desired = `<id>-<slug>`
@@ -101,7 +139,7 @@
   - **非 ASCII**（`isascii()` 相当で判定）
   - `git check-ref-format --branch` を満たさない
 
-### 4.4 既存ブランチがある場合（衝突）
+### 5.4 既存ブランチがある場合（衝突）
 
 desired ブランチが既に存在する場合:
 - 既存ブランチを checkout して **再利用**します（上書き/削除/強制更新はしません）
@@ -114,7 +152,7 @@ desired ブランチが存在しない場合:
 - `active` の解決は checkout 前に確定しており、checkout 後に node を再解決しません
 - spec-dock は `git branch -D` / `git reset --hard` / `git checkout -B` / `git branch -M` 等の破壊的/強制操作は行いません
 
-### 4.5 警告（stderr）の安定トークン
+### 5.5 警告（stderr）の安定トークン
 
 warning は stderr に `spec-dock: (warn)` プレフィクスで出力されます。  
 運用/テストでは全文一致ではなく、このプレフィクスやキーフレーズ（例: `fallback to id`, `reusing existing branch`）の **包含**で検証するのが安全です。

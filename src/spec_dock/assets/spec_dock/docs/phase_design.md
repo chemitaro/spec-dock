@@ -18,8 +18,8 @@
 ### 出力
 - 承認可能な `design.md`
 - 必要に応じた UML
-- 必要に応じて `discussions/` 配下の `disc-*` / `research-*`
-- 必要に応じて `discussions/` 配下の `adr-*`
+- 必要に応じて `discussions/` 配下の `NNN-disc-*` / `NNN-research-*`
+- 必要に応じて `discussions/` 配下の `NNN-adr-*`
 
 ### 非ゴール
 - 変更ファイルや実装手順の全詳細を先に plan 化すること
@@ -76,9 +76,9 @@ template 参照先:
 - reviewer やユーザーと論点を切り分けて議論したい
 
 目安:
-- `research-*`: 既存実装調査、類似機能比較、外部仕様調査
-- `disc-*`: 設計案比較、トレードオフ整理、採否判断の前段
-- `note-*`: 図の叩き台、軽量メモ
+- `NNN-research-*`: 既存実装調査、類似機能比較、外部仕様調査
+- `NNN-disc-*`: 設計案比較、トレードオフ整理、採否判断の前段
+- `NNN-note-*`: 図の叩き台、軽量メモ
 
 ## 6. ADR を切る条件
 

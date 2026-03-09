@@ -10,4 +10,5 @@
 - 仕様確定・完了したら `current/` を `completed/<name>/` に移動します。
 - `completed/<name>/` は `YYYYMMDDTHHMMSSZ-issue-queue-iss-xxxxx` のように、日時と種別/IDが分かる名前を推奨します。
 - ADR / 議論 / 調査 / メモは `current/discussions/` に追加します。
+- discussion docs の命名は `NNN-type-slug.md`（3 桁固定）です。
 - `current/discussions/rules.md` と `spec-dock/templates/discussions/*.md` を基準に運用します。

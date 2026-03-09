@@ -18,8 +18,8 @@
 ### 出力
 - 承認可能な `plan.md`
 - 必要に応じた順序図や構成図
-- 必要に応じて `discussions/` 配下の `disc-*` / `research-*`
-- 必要に応じて `discussions/` 配下の `adr-*`
+- 必要に応じて `discussions/` 配下の `NNN-disc-*` / `NNN-research-*`
+- 必要に応じて `discussions/` 配下の `NNN-adr-*`
 
 ### 非ゴール
 - 設計不足を計画の細かさで補うこと

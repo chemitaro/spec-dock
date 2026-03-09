@@ -10,6 +10,7 @@ ADR（Architecture Decision Record）は、意思決定を仕様（requirement/d
 - Initiative: [workflow_initiative.md](workflow_initiative.md)
 - Epic: [workflow_epic.md](workflow_epic.md)
 - Issue: [workflow_issue.md](workflow_issue.md)
+- 命名と採番: [reference_naming.md](reference_naming.md)
 
 ## 1. いつ ADR を起こすか
 
@@ -27,18 +28,23 @@ runtime command（scope を明示）:
 
 ```bash
 # issue スコープ
-./spec-dock/scripts/spec-dock new adr --issue <issue-id> --title "..."
+./spec-dock/scripts/spec-dock new doc adr --issue <issue-id> --title "..."
 
 # epic スコープ
-./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "..."
+./spec-dock/scripts/spec-dock new doc adr --epic <epic-id> --title "..."
 
 # initiative スコープ
-./spec-dock/scripts/spec-dock new adr --initiative <initiative-id> --title "..."
+./spec-dock/scripts/spec-dock new doc adr --initiative <initiative-id> --title "..."
 ```
 
 生成先:
 - scope ノード配下の `discussions/`（例: `.../init-.../discussions/` / `.../epic-.../discussions/` / `.../iss-.../discussions/`）
-- ファイル名: `adr-xxxxx-<slug>.md`
+- ファイル名: `NNN-adr-<slug>.md`（`NNN` は 3 桁固定）
+
+補足:
+- `new doc` の採番は `discussions/` 配下の recognized format（`NNN-type-slug.md`）だけを対象にします。
+- `rules.md` と legacy/nonconforming files は採番対象外です（rename せず無視）。
+- `999` を超える採番は失敗します。follow-up issue で archive または桁拡張を判断してください。
 
 方針:
 - Decision は最初は **TBD** で良い（議論の叩き台として先に置く）
