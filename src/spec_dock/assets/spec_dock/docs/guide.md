@@ -14,6 +14,18 @@
 - deps: [reference_deps.md](reference_deps.md)
 - sync: [reference_sync.md](reference_sync.md)
 
+## 0. phase playbook（共通の作り方）
+
+scope（initiative / epic / issue）をまたいで再利用する requirement / design / plan の作法は、次の playbook を参照してください。
+
+- requirement: [phase_requirement.md](phase_requirement.md)
+- design: [phase_design.md](phase_design.md)
+- plan: [phase_plan.md](phase_plan.md)
+
+補足:
+- scope 固有の制約や分解方針は `workflow_*.md` を正本にします。
+- playbook 本文を workflow に複製せず、導線で結ぶ構成を維持します。
+
 ## 1. spec-dock が管理するもの（SSOT と生成物）
 
 spec-dock の SSOT（Source of Truth）は **ローカルのメタデータ**です。
