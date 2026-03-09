@@ -291,6 +291,30 @@ class TestCli(unittest.TestCase):
             sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
         )
 
+    def _read_text_map(self, base: Path, rel_paths: list[str]) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for rel in rel_paths:
+            path = base / rel
+            self.assertTrue(path.is_file(), f"missing guidance file: {path}")
+            out[rel] = path.read_text(encoding="utf-8")
+        return out
+
+    def _assert_discussion_guidance_contract(self, text_map: dict[str, str]) -> None:
+        combined = "\n".join(text_map.values())
+
+        self.assertIn("new doc adr", combined)
+        self.assertIn("new doc disc", combined)
+        self.assertIn("new doc research", combined)
+        self.assertIn("new doc note", combined)
+        self.assertIn("NNN-type-slug.md", combined)
+        self.assertIn("nonconforming", combined)
+        self.assertIn("follow-up issue", combined)
+        self.assertIn("archive", combined)
+
+        self.assertNotIn("new adr --", combined)
+        self.assertNotIn("<type>-00001-<slug>.md", combined)
+        self.assertNotIn("<type>-xxxxx-<slug>.md", combined)
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -432,11 +456,107 @@ class TestCli(unittest.TestCase):
 
             skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("`discussions/`", skill_text)
-            self.assertIn("./spec-dock/scripts/spec-dock new adr --issue", skill_text)
+            self.assertIn("./spec-dock/scripts/spec-dock new doc adr --issue", skill_text)
             self.assertNotIn("adrs/new-adr", skill_text)
             self.assertFalse(
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
+
+    def test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            guidance_paths = [
+                "spec-dock/templates/README.md",
+                "spec-dock/templates/initiative/discussions/rules.md",
+                "spec-dock/templates/epic/discussions/rules.md",
+                "spec-dock/templates/issue/discussions/rules.md",
+                "spec-dock/docs/reference_naming.md",
+                "spec-dock/docs/workflow_adr.md",
+                "spec-dock/docs/workflow_issue.md",
+                "spec-dock/docs/workflow_epic.md",
+                "spec-dock/docs/workflow_initiative.md",
+                "spec-dock/docs/phase_requirement.md",
+                "spec-dock/docs/phase_design.md",
+                "spec-dock/docs/phase_plan.md",
+                "spec-dock/docs/README.md",
+                "spec-dock/docs/guide.md",
+                "spec-dock/scripts/README.md",
+                ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            ]
+            text_map = self._read_text_map(target, guidance_paths)
+            self._assert_discussion_guidance_contract(text_map)
+
+    def test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._write_text_force(
+                target / "spec-dock" / "docs" / "workflow_adr.md",
+                "./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title \"...\"\n",
+            )
+            self._write_text_force(
+                target / "spec-dock" / "templates" / "initiative" / "discussions" / "rules.md",
+                "legacy naming: <type>-00001-<slug>.md\n",
+            )
+            self._write_text_force(
+                target / "spec-dock" / "scripts" / "README.md",
+                "legacy example: new adr --issue ...\n",
+            )
+            self._write_text_force(
+                target / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md",
+                "legacy skill example: new adr --issue ...\n",
+            )
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            guidance_paths = [
+                "spec-dock/templates/README.md",
+                "spec-dock/templates/initiative/discussions/rules.md",
+                "spec-dock/templates/epic/discussions/rules.md",
+                "spec-dock/templates/issue/discussions/rules.md",
+                "spec-dock/docs/reference_naming.md",
+                "spec-dock/docs/workflow_adr.md",
+                "spec-dock/docs/workflow_issue.md",
+                "spec-dock/docs/workflow_epic.md",
+                "spec-dock/docs/workflow_initiative.md",
+                "spec-dock/docs/phase_requirement.md",
+                "spec-dock/docs/phase_design.md",
+                "spec-dock/docs/phase_plan.md",
+                "spec-dock/docs/README.md",
+                "spec-dock/docs/guide.md",
+                "spec-dock/scripts/README.md",
+                ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            ]
+            text_map = self._read_text_map(target, guidance_paths)
+            self._assert_discussion_guidance_contract(text_map)
+
+    def test_current_guidance_documents_match_discussion_numbering_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        guidance_paths = [
+            "src/spec_dock/assets/spec_dock/templates/README.md",
+            "src/spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md",
+            "src/spec_dock/assets/spec_dock/templates/epic/discussions/rules.md",
+            "src/spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
+            "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
+            "src/spec_dock/assets/spec_dock/docs/workflow_adr.md",
+            "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
+            "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
+            "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md",
+            "src/spec_dock/assets/spec_dock/docs/phase_requirement.md",
+            "src/spec_dock/assets/spec_dock/docs/phase_design.md",
+            "src/spec_dock/assets/spec_dock/docs/phase_plan.md",
+            "src/spec_dock/assets/spec_dock/docs/README.md",
+            "src/spec_dock/assets/spec_dock/docs/guide.md",
+            "src/spec_dock/assets/spec_dock/scripts/README.md",
+            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
+            "spec-deps/current/discussions/rules.md",
+            "spec-deps/README.md",
+        ]
+        text_map = self._read_text_map(repo_root, guidance_paths)
+        self._assert_discussion_guidance_contract(text_map)
 
     def test_tool_version_fallback_reads_pyproject(self) -> None:
         import spec_dock.cli as cli
@@ -2089,7 +2209,7 @@ class TestCli(unittest.TestCase):
                 self.assertFalse((scope_dir / "artifacts").exists())
                 self.assertEqual(list((scope_dir / "discussions").glob("new-*")), [])
 
-    def test_new_adr_increments_id_within_scope_discussions(self) -> None:
+    def test_new_doc_adr_increments_id_within_scope_discussions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -2097,8 +2217,8 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision two"])
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-local-00001", "--title", "Decision two"])
 
             issue_dir = (
                 target
@@ -2111,11 +2231,11 @@ class TestCli(unittest.TestCase):
                 / "iss-local-00001-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            self.assertNotEqual(sorted(discussions_dir.glob("adr-00001-*.md")), [])
-            self.assertNotEqual(sorted(discussions_dir.glob("adr-00002-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("001-adr-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("002-adr-*.md")), [])
             self.assertEqual(list(issue_dir.glob("adrs")), [])
 
-    def test_new_adr_rejects_duplicate_explicit_id_in_scope(self) -> None:
+    def test_new_doc_adr_uses_shared_sequence_across_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -2123,23 +2243,173 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-            self._run_runtime(target, ["new", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--issue", "iss-local-00001", "--title", "Discussion one"])
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "research", "--issue", "iss-local-00001", "--title", "Research one"])
+            self._run_runtime(target, ["new", "doc", "note", "--issue", "iss-local-00001", "--title", "Note one"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            self.assertNotEqual(sorted(discussions_dir.glob("001-disc-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("002-adr-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("003-research-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("004-note-*.md")), [])
+
+    def test_new_doc_disc_increments_after_adr(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--issue", "iss-local-00001", "--title", "Discussion one"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            self.assertNotEqual(sorted(discussions_dir.glob("001-adr-*.md")), [])
+            self.assertNotEqual(sorted(discussions_dir.glob("002-disc-*.md")), [])
+
+    def test_new_doc_ignores_nonconforming_files_for_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            (discussions_dir / "adr-00001-legacy.md").write_text("legacy\n", encoding="utf-8")
+            (discussions_dir / "foo.md").write_text("nonconforming\n", encoding="utf-8")
+            (discussions_dir / "002-bogus-random.md").write_text("nonconforming type\n", encoding="utf-8")
+            (discussions_dir / "009-disc-migrated.md").write_text("existing new format\n", encoding="utf-8")
+            (discussions_dir / "1000-adr-legacy-overflow.md").write_text("4-digit should be ignored\n", encoding="utf-8")
+
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-local-00001", "--title", "Decision one"])
+
+            self.assertNotEqual(sorted(discussions_dir.glob("010-adr-*.md")), [])
+            self.assertEqual(list(discussions_dir.glob("001-adr-*.md")), [])
+
+    def test_new_doc_fails_on_duplicate_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "note", "--issue", "iss-local-00001", "--title", "Note one"],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Duplicate discussion sequence", p.stderr)
+            self.assertEqual(list(discussions_dir.glob("002-note-*.md")), [])
+
+    def test_new_doc_fails_on_sequence_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            (discussions_dir / "999-disc-capacity-limit.md").write_text("maxed\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "adr", "--issue", "iss-local-00001", "--title", "Decision one"],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Discussion sequence overflow", p.stderr)
+            self.assertIn("follow-up issue", p.stderr)
+            self.assertIn("archive", p.stderr)
+            self.assertIn("extend sequence width", p.stderr)
+            self.assertEqual(list(discussions_dir.glob("1000-adr-*.md")), [])
+
+    def test_new_doc_rejects_invalid_slug(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(
                 target,
                 [
                     "new",
+                    "doc",
                     "adr",
                     "--issue",
                     "iss-local-00001",
-                    "--id",
-                    "adr-00001",
                     "--title",
-                    "Duplicate decision",
+                    "Decision one",
+                    "--slug",
+                    "Bad!Slug",
                 ],
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("ADR id already exists", p.stderr)
+            self.assertIn("--slug", p.stderr)
+            self.assertIn("expected regex", p.stderr)
 
             issue_dir = (
                 target
@@ -2152,8 +2422,76 @@ class TestCli(unittest.TestCase):
                 / "iss-local-00001-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            self.assertEqual(len(list(discussions_dir.glob("adr-00001-*.md"))), 1)
-            self.assertEqual(list(discussions_dir.glob("adr-00002-*.md")), [])
+            self.assertEqual(list(discussions_dir.glob("001-adr-*.md")), [])
+
+    def test_new_doc_rejects_unexpected_sequence_override_option(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "doc",
+                    "adr",
+                    "--issue",
+                    "iss-local-00001",
+                    "--seq",
+                    "1",
+                    "--title",
+                    "Decision one",
+                ],
+            )
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("unrecognized arguments: --seq 1", p.stderr)
+
+    def test_new_discussion_per_type_commands_are_not_available(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            for per_type in ("adr", "disc", "research", "note"):
+                p = self._run_runtime_capture(
+                    target,
+                    ["new", per_type, "--issue", "iss-local-00001", "--title", "Doc title"],
+                )
+                self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+                self.assertIn(f"invalid choice: '{per_type}'", p.stderr)
+
+    def test_new_help_exposes_only_doc_discussion_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            p_new = self._run_runtime_capture(target, ["new", "--help"])
+            self.assertEqual(p_new.returncode, 0, p_new.stdout + p_new.stderr)
+            self.assertIn(" doc ", p_new.stdout)
+            self.assertNotIn("\n    adr", p_new.stdout)
+            self.assertNotIn("\n    disc", p_new.stdout)
+            self.assertNotIn("\n    research", p_new.stdout)
+            self.assertNotIn("\n    note", p_new.stdout)
+
+            p_doc = self._run_runtime_capture(target, ["new", "doc", "--help"])
+            self.assertEqual(p_doc.returncode, 0, p_doc.stdout + p_doc.stderr)
+            self.assertIn("adr", p_doc.stdout)
+            self.assertIn("disc", p_doc.stdout)
+            self.assertIn("research", p_doc.stdout)
+            self.assertIn("note", p_doc.stdout)
+            self.assertNotIn("--id", p_doc.stdout)
+            self.assertNotIn("--seq", p_doc.stdout)
+
+    def test_new_doc_rejects_unknown_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "unknown", "--issue", "iss-local-00001", "--title", "Doc title"],
+            )
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("invalid choice: 'unknown'", p.stderr)
 
     def test_new_nodes_do_not_generate_readme_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
