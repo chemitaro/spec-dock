@@ -65,8 +65,11 @@ GitHub を使わない場合:
 active issue 配下の仕様を埋めます:
 
 - `spec-dock/active/issue/requirement.md`
+  - 共通の進め方: [phase_requirement.md](phase_requirement.md)
 - `spec-dock/active/issue/design.md`
+  - 共通の進め方: [phase_design.md](phase_design.md)
 - `spec-dock/active/issue/plan.md`
+  - 共通の進め方: [phase_plan.md](phase_plan.md)
 - `spec-dock/active/issue/discussions/`（ADR / 議論 / 調査 / メモ）
   - ADR: `./spec-dock/scripts/spec-dock new adr --issue <issue-id> --title "..."`
   - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
@@ -75,6 +78,10 @@ active issue 配下の仕様を埋めます:
 - requirement は AC/EC（観測可能な振る舞い）に落とす
 - design は「何を変えるか/壊れるか/どう守るか」を先に書く
 - plan は “テストで観測できる粒度” のステップに分ける
+- Issue 固有の観点（active issue 起点 / TDD 実行 / docs impact / final quality gate）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
+- phase progression rule:
+  - requirement が reviewer 承認される前に design へ進みません。
+  - design が reviewer 承認される前に plan へ進みません。
 
 ## 4. 実装（TDD + review loop）
 

@@ -8,6 +8,11 @@ description: Leaf skill for initiative planning tasks in spec-dock.
 - Use this skill for initiative planning work.
 - Typical fit: create/import an initiative, or update initiative-level requirement/design/plan docs.
 - Primary workflow: `spec-dock/docs/workflow_initiative.md`.
+- For shared phase authoring method, use:
+  - `spec-dock/docs/phase_requirement.md`
+  - `spec-dock/docs/phase_design.md`
+  - `spec-dock/docs/phase_plan.md`
+- Keep scope-specific constraints and decisions in `workflow_initiative.md`.
 - `spec-dock/docs/reference_github.md`
 - `spec-dock/docs/reference_sync.md`
 - `spec-dock/docs/reference_naming.md`
