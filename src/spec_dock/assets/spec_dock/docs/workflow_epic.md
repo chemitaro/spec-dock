@@ -12,6 +12,13 @@ Epic は「設計の背骨」です。
 - Issue: [workflow_issue.md](workflow_issue.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
 
+## 0. 新規作成前の再利用判定
+
+- まず親 initiative 配下の既存 epic の `requirement.md` / `design.md` / `plan.md` / `discussions/` を確認します。
+- 契約・移行・観測性・Done 定義が既存 epic に収まるなら、新規作成せず既存 epic を更新します。
+- 既存 epic に収めると設計の背骨や rollout 順が崩れる場合だけ、`new` / `import` を使います。
+- 新規 epic を作る理由や、既存 epic に収めない理由は、作成後の対象 epic 配下 `discussions/` の最初の `disc` に残します。
+
 ## 1. 作成（new / import）
 
 Epic は必ず Initiative 配下に作成します。
@@ -87,6 +94,7 @@ Epic 作成後は、対象ノード配下の wrapper で Issue を追加でき�
 ### requirement
 - [ ] 「何を満たせば Done か」が観測可能になっている（AC/NFR）
 - [ ] スコープ（やる/やらない）が明確
+- [ ] 新規 epic が必要な場合、その理由を作成後の対象 epic 配下の最初の `disc` で追える
 
 ### design
 - [ ] 契約（API/Schema/IF）が明記されている

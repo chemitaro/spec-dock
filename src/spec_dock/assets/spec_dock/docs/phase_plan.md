@@ -33,6 +33,7 @@
   - Initiative: roadmap / epic decomposition
   - Epic: issue decomposition / rollout order
   - Issue: implementation steps / review loop / quality gate
+- 分解で新しい epic / issue を増やす前に、既存ノードの plan / Done 定義 / 依存順に収まるかを確認する
 - 依存、ブロッカー、外部調整の有無を確認する
 
 template 参照先:
@@ -48,6 +49,7 @@ template 参照先:
 - 依存順序
 - 並行可能な作業
 - 各ステップ/各 issue/各 epic の完了判定
+- 新規ノードを増やさずに進められる分解案
 - レビュー、テスト、docs 更新、品質ゲートの位置
 
 ### 3.2 粒度の目安
@@ -78,6 +80,7 @@ template 参照先:
 - quality gate や docs impact の扱いを事前合意したい
 - reviewer へ「なぜこの順番か」を説明する材料が必要
 - 外部依存やリリース順が複雑で、計画本文だけでは追いにくい
+- 既存 epic / issue に収める案と、新規ノードを増やす案を比較したい
 
 ## 6. ADR を切る条件
 
@@ -121,6 +124,7 @@ plan phase で ADR を切るのは例外的です。
 - 順序の理由が説明できる
 - 粒度が大きすぎず、review / test / commit / report が回る
 - 依存とブロッカーが plan に露出している
+- 新規ノードを増やす場合、その理由を作成後の対象ノード配下の最初の `disc` で追える
 - Issue plan では step 末尾の review / fix / re-review が明示されている
 - docs impact と final quality gate の扱いが抜けていない
 

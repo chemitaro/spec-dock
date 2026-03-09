@@ -12,6 +12,13 @@ Initiative は「投資単位」です。
 - GitHub 連携: [reference_github.md](reference_github.md)
 - sync: [reference_sync.md](reference_sync.md)
 
+## 0. 新規作成前の再利用判定
+
+- まず既存 initiative の `requirement.md` / `design.md` / `plan.md` / `discussions/` と current active を確認します。
+- 目的・成功条件・スコープ・責任主体が既存 initiative に自然に収まるなら、新規作成せず既存 initiative を更新します。
+- 既存 initiative に収めると投資判断の単位や success metrics が崩れる場合だけ、`new` / `import` を使います。
+- 新規 initiative を作る理由や、既存 initiative を使わない理由は、作成後の対象 initiative 配下 `discussions/` の最初の `disc` に残します。
+
 ## 1. 作成（new / import）
 
 ### 1.1 new（デフォルト: local-only）
@@ -86,6 +93,7 @@ Initiative 作成後は、対象ノード配下の wrapper で Epic を追加で
 - [ ] 背景/目的が 1〜3 行で言える
 - [ ] 成功条件（観測可能な指標）がある
 - [ ] スコープ（やる/やらない）が明記されている
+- [ ] 新規 initiative が必要な場合、その理由を作成後の対象 initiative 配下の最初の `disc` で追える
 
 ### design
 - [ ] 依存関係（組織/システム/権限/データ）が列挙されている
