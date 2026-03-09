@@ -63,14 +63,21 @@ Epic 作成後は、対象ノード配下の wrapper で Issue を追加でき�
 ## 2. 記述（requirement/design/plan）
 
 - `requirement.md`: 期待する価値 / 受け入れ条件（AC）/ 非機能（NFR）/ スコープ
+  - 共通の進め方: [phase_requirement.md](phase_requirement.md)
 - `design.md`: 変更方針 / インタフェース契約 / 移行 / 観測性 / リスク
+  - 共通の進め方: [phase_design.md](phase_design.md)
 - `plan.md`: Issue 分割（粒度）/ 依存順序 / 品質ゲート
+  - 共通の進め方: [phase_plan.md](phase_plan.md)
 - `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
   - ADR: `./spec-dock/scripts/spec-dock new adr --epic <epic-id> --title "..."`
   - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
 
 補足:
 - ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
+- Epic 固有の観点（契約 / 移行 / Issue 分割の妥当性）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
+- phase progression rule:
+  - requirement が reviewer 承認される前に design へ進みません。
+  - design が reviewer 承認される前に plan へ進みません。
 
 ## 3. 品質ゲート（Epic）
 
