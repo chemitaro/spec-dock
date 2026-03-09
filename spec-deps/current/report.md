@@ -326,6 +326,163 @@ git diff origin/chemitaro/issue16...HEAD -- \
 
 ---
 
+### 2026-03-09 10:00 - 10:40
+
+#### 対象
+- Step: S09 shared phase playbook docs
+- AC/EC: AC-015, AC-018 / EC-010, EC-011, EC-012
+
+#### 実施内容
+- `phase_requirement.md`, `phase_design.md`, `phase_plan.md` を docs 正本として追加した。
+- 各 playbook に、目的 / 出力 / 非ゴール、調査・分析、ヒアリング、discussion sheet 条件、ADR 条件、review 前 exit criteria、次 phase へ進める条件、subagent 活用ガイダンスを整理した。
+- source repo 前提の template パスになっていないことを確認し、runtime 側の `spec-dock/templates/...` を参照する形で揃っていることを確認した。
+- `code_reviewer` に S09 差分をレビュー依頼し、Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "templates/|src/spec_dock" \
+  src/spec_dock/assets/spec_dock/docs/phase_requirement.md \
+  src/spec_dock/assets/spec_dock/docs/phase_design.md \
+  src/spec_dock/assets/spec_dock/docs/phase_plan.md
+
+code reviewer verdict: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/phase_requirement.md` - requirement authoring playbook を追加
+- `src/spec_dock/assets/spec_dock/docs/phase_design.md` - design authoring playbook を追加
+- `src/spec_dock/assets/spec_dock/docs/phase_plan.md` - plan authoring playbook を追加
+
+#### メモ
+- S09 では docs 正本の追加に集中し、workflow からの直接リンクと docs 入口の導線は S10 / S11 で扱う。
+
+---
+
+### 2026-03-09 10:45 - 11:20
+
+#### 対象
+- Step: S10 workflow direct links + phase progression rule
+- AC/EC: AC-016, AC-018 / EC-010, EC-011, EC-012
+
+#### 実施内容
+- `workflow_initiative.md`, `workflow_epic.md`, `workflow_issue.md` の requirement / design / plan 節から、それぞれ `phase_requirement.md` / `phase_design.md` / `phase_plan.md` へ直接リンクする導線を追加した。
+- 各 workflow に、requirement 承認前に design へ進まず、design 承認前に plan へ進まない phase progression rule を明記した。
+- issue workflow では既存の review loop / docs impact / final quality gate を維持したまま、shared playbook への責務分離だけを追加した。
+- `code_reviewer` に S10 差分レビューを依頼し、Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+git diff -- \
+  src/spec_dock/assets/spec_dock/docs/workflow_initiative.md \
+  src/spec_dock/assets/spec_dock/docs/workflow_epic.md \
+  src/spec_dock/assets/spec_dock/docs/workflow_issue.md
+
+code reviewer verdict: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md` - phase playbook への直接リンクと phase progression rule を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` - phase playbook への直接リンクと phase progression rule を追加
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - playbook への直接リンクと phase progression rule を追加
+
+#### メモ
+- S10 では workflow 正本の整理に集中し、docs README / guide / leaf skill reminder / 回帰テストは S11 で扱う。
+
+---
+
+### 2026-03-09 11:25 - 12:10
+
+#### 対象
+- Step: S11 skill reminder + docs 入口 + regression tests
+- AC/EC: AC-017 / EC-010, EC-011
+
+#### 実施内容
+- `spec-dock-initiative-planning`, `spec-dock-epic-planning`, `spec-dock-issue-execution` の各 `SKILL.md` に、`phase_requirement.md` / `phase_design.md` / `phase_plan.md` への concise な reminder を追加した。
+- initiative / epic skill では、scope 固有の制約と判断は `workflow_*.md` を正本にする責務分離を明記した。
+- `docs/README.md` に phase playbook セクションとショートカットを追加し、`guide.md` に共通作法としての playbook 入口を追加した。
+- `tests/test_cli.py` に playbook ファイル存在、README / guide の導線、leaf skill の reminder と責務分離を検証する回帰アサートを追加した。
+- `code_reviewer` に S11 差分レビューを依頼し、Approved を取得した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_cli.TestCli.test_init_creates_expected_structure \
+  tests.test_cli.TestCli.test_bundled_skill_routing_contract
+
+Ran 2 tests in ...
+OK
+
+python -m unittest discover -v
+
+Ran 149 tests in ...
+OK
+
+code reviewer verdict: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md` - phase playbook reminder と責務分離文言を追加
+- `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md` - phase playbook reminder と責務分離文言を追加
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md` - issue governance reminder を維持したまま phase playbook reminder を追加
+- `src/spec_dock/assets/spec_dock/docs/README.md` - phase playbook 入口とショートカットを追加
+- `src/spec_dock/assets/spec_dock/docs/guide.md` - 共通作法としての phase playbook セクションを追加
+- `tests/test_cli.py` - playbook discoverability と skill reminder の回帰アサートを追加
+
+#### メモ
+- S11 では playbook 本文を workflow や skill に複製せず、docs 正本への導線と concise reminder のみに留めた。
+
+---
+
+### 2026-03-09 12:15 - 12:35
+
+#### 対象
+- Step: S12 final quality gate for playbook follow-up
+- AC/EC: AC-018 / EC-011, EC-012
+
+#### 実施内容
+- `python -m unittest discover -v` を実行し、全 149 tests が成功することを確認した。
+- `pip install --target` による配布物チェックを実施し、`phase_requirement.md`, `phase_design.md`, `phase_plan.md`, `workflow_*.md`, `README.md`, `guide.md` が package assets に収載されることを確認した。
+- `code_reviewer` に `git diff main...HEAD` スコープで最終品質ゲートレビューを依頼し、playbook / workflow / docs 入口 / skill / tests の layering と phase progression rule の一貫性について Approved を取得した。
+- 品質ゲート結果を report に記録し、今回の追補実装を完了可能な状態にした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Ran 149 tests in 19.101s
+OK
+
+rm -rf /tmp/specdock-pkgcheck && python -m pip install -q --target /tmp/specdock-pkgcheck .
+PYTHONPATH=/tmp/specdock-pkgcheck python - <<'PY'
+from pathlib import Path
+root = Path('/tmp/specdock-pkgcheck/spec_dock/assets/spec_dock/docs')
+checks = [
+    root / 'phase_requirement.md',
+    root / 'phase_design.md',
+    root / 'phase_plan.md',
+    root / 'workflow_initiative.md',
+    root / 'workflow_epic.md',
+    root / 'workflow_issue.md',
+    root / 'README.md',
+    root / 'guide.md',
+]
+missing = [str(p) for p in checks if not p.exists()]
+print({'missing': missing})
+PY
+
+{'missing': []}
+
+code reviewer verdict: pass (`git diff main...HEAD`)
+```
+
+#### 変更したファイル
+- `spec-deps/current/report.md` - S12 の品質ゲート結果と検証コマンドを追記
+
+#### メモ
+- 最終 reviewer は `git diff main...HEAD` を対象に確認し、blocking finding なしで pass と判断した。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...

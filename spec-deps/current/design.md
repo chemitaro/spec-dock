@@ -18,19 +18,23 @@ ID: "iss-00016"
   - 共通運用ルールは独立 skill にせず、**reference layer** として docs 正本へ集約する
   - `init/update` で常に skill を導入し、`--no-skill` を廃止する
   - issue 実装 governance を docs / template / skill に分担配置し、review loop / docs refresh / final diff gate を標準化する
+  - 追加で、requirement / design / plan の shared phase playbook を docs として導入し、authoring rulebook を再利用可能にする
 - MUST:
   - 初期 full set を 5 skill に固定する
   - hub / leaf の routing 契約を満たす
   - `update` の `.agents/skills/` 所有境界を守る
   - issue plan template に review/fix/re-review と docs impact / final gate を実行可能な形で持たせる
+  - shared phase playbook を 3 本に固定し、scope workflow から導線を張る
 - MUST NOT:
   - `runtime-operations` のような抽象 skill を追加しない
   - unknown custom skill を `update` で削除しない
+  - `scope × phase` top-level skill を追加しない
 - 非交渉制約:
   - hub 名は `spec-driven-tdd-workflow` を維持する
   - docs は正本、skill はルーターとする
   - `workflow_*` / `reference_*` は安定層として再利用する
   - governance の規範本体は docs、実行形は template、short reminder は skill に置く
+  - phase playbook は workflow と template の中間層として置き、template 骨子や skill 本文を複製しない
 - 前提:
   - この issue では Codex CLI の外部仕様変更は扱わない
   - 複数 skill 併存時の Codex 側解決順は repo 外仕様であり、本設計では「hub を主入口として配布する」前提で扱う
@@ -54,6 +58,7 @@ ID: "iss-00016"
   - `update` は managed file を上書きするが、skill については unknown custom skill との境界が未定義
   - `templates/issue/plan.md` には step ごとのテスト/報告/コミットはあるが、review ループ・docs refresh step・final diff gate は標準化されていない
   - `workflow_issue.md` は TDD の流れを持つが、plan upfront approval と step result approval の役割分担、branch 全体 final gate の規範は未定義
+  - initiative / epic / issue の template は豊富だが、phase 横断の authoring method は shared playbook として存在しない
 - 採用するパターン（命名/責務/例外/DI/テストなど）:
   - assets 配下に配布正本を置き、installer が repo へ同期する既存方式を維持する
   - docs ファイル自体は極力移動せず、skill 側の routing と README 導線で責務を明確化する
@@ -86,6 +91,11 @@ ID: "iss-00016"
   1) 開発者/Codex が `workflow_issue.md` と `templates/issue/plan.md` を開く
   2) 各 step は review loop と docs impact 判定を持つ形で記述される
   3) 終盤で docs refresh step と final diff review quality gate が独立 step として実行される
+- Flow for AC-015 / AC-016 / AC-018:
+  1) 開発者/Codex が scope workflow を起点に `phase_requirement.md` / `phase_design.md` / `phase_plan.md` のいずれかを開く
+  2) workflow の requirement / design / plan 各節が、対応する `phase_*.md` へ直接リンクし、phase progression rule を明示する
+  3) playbook が調査、ヒアリング、discussion sheet、ADR 分岐、review / re-review、subagent 活用、exit criteria を案内する
+  4) playbook を使って scope-specific template を埋め、reviewer approval を得た phase だけが次 phase へ進む
 
 ### UML（任意） (任意)
 ```plantuml
@@ -149,6 +159,38 @@ CLI -> Skills: keep unknown custom skills
     - `docs_impact` は `none | user-facing | shipped-assets | workflow` のいずれかとする
     - `final_gate_scope` は `git diff <base>...HEAD` 相当の branch 全体 diff を指す
     - 実差分がない step は commit の代わりに report no-op 記録を許可する
+- MODEL-004: Shared phase playbook contract
+  - Entity: requirement / design / plan の共通 authoring guidance
+  - Fields:
+    - `phase_name`
+    - `purpose`
+    - `inputs`
+    - `mandatory_checkpoints`
+    - `discussion_triggers`
+    - `adr_triggers`
+    - `review_exit_criteria`
+    - `next_phase_entry_rule`
+    - `subagent_guidance`
+    - `template_targets`
+  - Constraints/Validation:
+    - playbook は `requirement | design | plan` の 3 本に限定する
+    - playbook は template の骨子を再定義せず、「どう作るか」に集中する
+    - playbook は user hearing / discussion / review loop の pause 条件を明示する
+    - 各 playbook は `exit criteria` 節を持ち、次 phase へ進める条件を明示する
+    - playbook は scope 固有事項を最小化し、共通 guidance として再利用可能である
+- MODEL-005: Scope workflow to playbook mapping
+  - Entity: initiative / epic / issue workflow から phase playbook への導線
+  - Fields:
+    - `workflow_doc`
+    - `phase_playbooks`
+    - `phase_direct_links`
+    - `phase_progression_rule`
+    - `scope_specific_notes`
+  - Constraints/Validation:
+    - initiative / epic / issue の各 workflow は `phase_requirement.md`, `phase_design.md`, `phase_plan.md` への導線を持つ
+    - 各 workflow の `requirement`, `design`, `plan` 節は、対応する `phase_*.md` への**直接リンク**を持つ
+    - workflow は `requirement 承認前に design へ進まない`, `design 承認前に plan へ進まない` progression rule を明示する
+    - workflow 自身は scope 固有フローを保持し、phase の詳細作法は playbook へ委譲する
 
 ### routing trigger matrix
 
@@ -159,6 +201,14 @@ CLI -> Skills: keep unknown custom skills
 | `spec-dock-epic-planning` | `workflow_epic.md` | GitHub 連携 / import / naming / sync が必要 | `reference_github.md` + `reference_sync.md` + `reference_naming.md` |
 | `spec-dock-issue-execution` | `workflow_issue.md` | `active set` / `deps check` / `sync` / `validate` / issue GitHub 操作が必要 | `reference_deps.md` + `reference_sync.md` + `reference_github.md` + `reference_naming.md` |
 | `spec-dock-adr-facilitation` | `workflow_adr.md` | ADR の配置 / 命名 / 親ノードとの関係確認が必要 | `reference_naming.md` + 親 workflow への戻り導線 |
+
+### workflow to playbook matrix
+
+| workflow | requirement 節 | design 節 | plan 節 | phase progression rule | scope-specific notes |
+|---|---|---|---|---|---|
+| `workflow_initiative.md` | `phase_requirement.md` へ直接リンク | `phase_design.md` へ直接リンク | `phase_plan.md` へ直接リンク | requirement 承認前に design へ進まない / design 承認前に plan へ進まない | discovery / success metrics / epic decomposition を特に強く扱う |
+| `workflow_epic.md` | `phase_requirement.md` へ直接リンク | `phase_design.md` へ直接リンク | `phase_plan.md` へ直接リンク | requirement 承認前に design へ進まない / design 承認前に plan へ進まない | issue decomposition / E2E acceptance / integration boundary を特に強く扱う |
+| `workflow_issue.md` | `phase_requirement.md` へ直接リンク | `phase_design.md` へ直接リンク | `phase_plan.md` へ直接リンク | requirement 承認前に design へ進まない / design 承認前に plan へ進まない | TDD / docs impact / final diff gate を特に強く扱う |
 
 ### UML（任意） (任意)
 ```plantuml
@@ -272,14 +322,20 @@ cli --> ".agents/skills/*/SKILL.md"
   - `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md`: epic leaf skill
   - `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`: issue leaf skill
   - `src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md`: ADR leaf skill
+  - `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`: requirement authoring playbook
+  - `src/spec_dock/assets/spec_dock/docs/phase_design.md`: design authoring playbook
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`: plan authoring playbook
 - 変更（Modify）:
   - `src/spec_dock/cli.py`: managed skill manifest と multi-skill sync を実装、`--no-skill` 削除
   - `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`: hub 化
   - `src/spec_dock/assets/spec_dock/docs/README.md`: multi-skill 入口へ更新
-  - `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`: initiative leaf から参照される前提に沿って導線を明確化
-  - `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`: epic leaf から参照される前提に沿って導線を明確化
-  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`: issue leaf の運用導線に合わせて整理
+  - `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`: initiative leaf 導線に合わせつつ、requirement/design/plan 各節から phase playbook への直接リンクと phase progression rule を追加
+  - `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`: epic leaf 導線に合わせつつ、requirement/design/plan 各節から phase playbook への直接リンクと phase progression rule を追加
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`: issue leaf 導線に合わせつつ、requirement/design/plan 各節から phase playbook への直接リンクと phase progression rule を追加
   - `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`: ADR leaf 導線に合わせて整理
+  - `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md`: phase playbook reminder を追加
+  - `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md`: phase playbook reminder を追加
+  - `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`: phase playbook reminder を追加
   - `README.md`: `--no-skill` 削除、生成物、複数 skill 導線へ更新
   - `tests/test_cli.py`: multi-skill 導入・migration・custom skill 保持テストへ更新
   - `src/spec_dock/assets/spec_dock/templates/issue/plan.md`: issue execution governance を標準化
@@ -305,6 +361,10 @@ cli --> ".agents/skills/*/SKILL.md"
 - AC-011 / AC-014 → `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
 - AC-012 → `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
 - AC-013 → `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- AC-015 → `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`, `src/spec_dock/assets/spec_dock/docs/phase_design.md`, `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+- AC-016 → `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`, `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- AC-017 → `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md`, `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md`, `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- AC-018 → `src/spec_dock/assets/spec_dock/docs/phase_*.md`, `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`, `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
 - 非交渉制約（hub 名維持 / docs 正本 / custom skill 保持） → skill asset 配置方針, manifest 設計, docs stable 設計
 
 ## テスト戦略（最低限ここまで具体化） (任意)
@@ -323,6 +383,10 @@ cli --> ".agents/skills/*/SKILL.md"
     - issue plan template が review loop / docs refresh / final diff gate を持つ
     - workflow_issue が governance の正本として template と整合する
     - issue-execution skill が docs 正本を崩さず short reminder に留まる
+    - `phase_requirement.md`, `phase_design.md`, `phase_plan.md` が package assets と配布 repo の両方に存在する
+    - initiative / epic / issue workflow から phase playbook へ導線がある
+    - initiative / epic / issue workflow が phase progression rule（requirement 承認前に design へ進まない / design 承認前に plan へ進まない）を持つ
+    - initiative / epic / issue leaf skill が concise なまま phase playbook reminder を持つ
   - Migration safety:
     - copy/update の途中失敗を模擬したあと `update` を再実行すると target state に収束する
 - どのAC/ECをどのテストで保証するか:
@@ -334,6 +398,11 @@ cli --> ".agents/skills/*/SKILL.md"
   - AC-006 / AC-008 → parser/help assertion + README 文面 assertion
   - AC-009 / EC-005 → custom skill preserve test
   - AC-010 / EC-006 → failure-injection 後の `update` 再実行 convergence test
+  - AC-015 → phase playbook existence assertion
+  - AC-016 → workflow docs to phase playbook link assertion
+  - AC-017 → leaf skill phase reminder assertion
+  - AC-018 / EC-012 → playbook content assertion（hearing / discussion / ADR / review / subagent guidance）
+  - AC-018 → workflow progression rule assertion + playbook exit criteria assertion
 
 ### テストマトリクス（AC/EC → テスト） (任意)
 - AC-001:
@@ -395,6 +464,12 @@ cli --> ".agents/skills/*/SKILL.md"
 - R-006: governance 規範が docs / template / skill で drift する
   - 影響: agent と人間で参照先がズレる
   - 対応: docs を正本、template を実行形、skill を reminder に限定する
+- R-007: phase playbook が workflow / template の中間層として肥大化する
+  - 影響: guidance の重複と docs drift が増える
+  - 対応: playbook は「どう作るか」に限定し、template 骨子や skill 本文を複製しない
+- R-008: `scope × phase` skill を追加したくなる圧力
+  - 影響: routing 軸が二重化し、discoverability と運用コストが悪化する
+  - 対応: top-level skill 追加基準を requirement に固定し、playbook で先に吸収する
 
 ## 未確定事項（TBD） (必須)
 - 現時点では、設計着手に必要な重大な未確定事項はない。
@@ -410,12 +485,16 @@ cli --> ".agents/skills/*/SKILL.md"
 │   └── assets/
 │       ├── codex_skills/
 │       │   ├── spec-driven-tdd-workflow/SKILL.md  # Modify (hub)
-│       │   ├── spec-dock-initiative-planning/SKILL.md   # Add
-│       │   ├── spec-dock-epic-planning/SKILL.md         # Add
-│       │   ├── spec-dock-issue-execution/SKILL.md       # Add
+│       │   ├── spec-dock-initiative-planning/SKILL.md   # Modify (playbook reminder)
+│       │   ├── spec-dock-epic-planning/SKILL.md         # Modify (playbook reminder)
+│       │   ├── spec-dock-issue-execution/SKILL.md       # Modify (playbook reminder)
 │       │   └── spec-dock-adr-facilitation/SKILL.md      # Add
 │       └── spec_dock/docs/
 │           ├── README.md                          # Modify
+│           ├── guide.md                           # Modify
+│           ├── phase_requirement.md               # Add
+│           ├── phase_design.md                    # Add
+│           ├── phase_plan.md                      # Add
 │           ├── workflow_initiative.md            # Modify
 │           ├── workflow_epic.md                  # Modify
 │           ├── workflow_issue.md                 # Modify

@@ -14,9 +14,9 @@ ID: "iss-00016"
 
 ## この計画で満たす要件ID (必須)
 - 対象AC:
-  - AC-001, AC-002, AC-002b, AC-003, AC-004, AC-005, AC-005b, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014
+  - AC-001, AC-002, AC-002b, AC-003, AC-004, AC-005, AC-005b, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-012, AC-013, AC-014, AC-015, AC-016, AC-017, AC-018
 - 対象EC:
-  - EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005, EC-006, EC-007, EC-008, EC-009
+  - EC-001, EC-001b, EC-002, EC-003, EC-004, EC-005, EC-006, EC-007, EC-008, EC-009, EC-010, EC-011, EC-012
 - 対象制約:
   - hub 名維持
   - `--no-skill` 廃止
@@ -33,6 +33,10 @@ ID: "iss-00016"
 - [ ] S06: `templates/issue/plan.md` が review ループ、docs refresh step、final diff gate を実行可能な template として提供する
 - [ ] S07: `spec-dock-issue-execution` skill と回帰テストが governance reminder を保持する
 - [ ] S08: main ブランチとの差分全体を対象に最終品質ゲートを実施し、reviewer 承認レベルへ収束させる
+- [ ] S09: shared phase playbook `phase_requirement.md` / `phase_design.md` / `phase_plan.md` を docs 正本として追加する
+- [ ] S10: initiative / epic / issue workflow が各 phase 節から playbook へ直接リンクし、phase progression rule を定義する
+- [ ] S11: leaf skill / docs 入口 / 回帰テストが phase playbook 導線と責務分離を保持する
+- [ ] S12: playbook 追補差分全体を対象に最終品質ゲートを実施し、reviewer 承認レベルへ収束させる
 
 ### UML（任意） (任意)
 ```plantuml
@@ -48,6 +52,10 @@ rectangle "S05\nworkflow governance docs" as S05
 rectangle "S06\nissue plan template" as S06
 rectangle "S07\nissue skill reminder" as S07
 rectangle "S08\nfinal quality gate" as S08
+rectangle "S09\nshared phase playbooks" as S09
+rectangle "S10\nworkflow direct links" as S10
+rectangle "S11\nskill reminders + tests" as S11
+rectangle "S12\nplaybook quality gate" as S12
 
 S01 --> S02
 S01 --> S03
@@ -59,6 +67,10 @@ S02 --> S08
 S03 --> S08
 S04 --> S08
 S07 --> S08
+S08 --> S09
+S09 --> S10
+S10 --> S11
+S11 --> S12
 @enduml
 ```
 
@@ -79,6 +91,10 @@ S07 --> S08
 - AC-012 → S05
 - AC-013 → S07
 - AC-014 → S06, S08
+- AC-015 → S09
+- AC-016 → S10
+- AC-017 → S11
+- AC-018 → S09, S10, S12
 - EC-001 → S02, S04
 - EC-001b → S02, S04
 - EC-002 → S03
@@ -89,8 +105,12 @@ S07 --> S08
 - EC-007 → S05, S06
 - EC-008 → S05, S06, S08
 - EC-009 → S06, S08
+- EC-010 → S09, S10, S11
+- EC-011 → S09, S10, S11, S12
+- EC-012 → S09, S10, S12
 - 非交渉制約（hub 名維持 / ownership boundary / `--no-skill` 廃止 / custom skill 保持 / package assets） → S01, S02, S03, S04, S08
 - 非交渉制約（docs 正本 / template 実行形 / skill reminder / final diff gate） → S05, S06, S07, S08
+- 非交渉制約（shared phase playbook / phase progression rule / scope×phase skill 不採用） → S09, S10, S11, S12
 
 ---
 
@@ -512,6 +532,147 @@ S07 --> S08
 
 ---
 
+### S09 — shared phase playbook `phase_requirement.md` / `phase_design.md` / `phase_plan.md` を docs 正本として追加する (必須)
+- 対象: AC-015, AC-018 / EC-010, EC-011, EC-012
+- 設計参照:
+  - 対象IF/API: MODEL-004
+  - 対象テスト:
+    - phase playbook existence assertion
+    - playbook content assertion（hearing / discussion / ADR / review / subagent guidance / exit criteria）
+- このステップで「追加しないこと（スコープ固定）」:
+  - `scope × phase` top-level skill の追加
+  - workflow 側の詳細ルール増殖
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/レビュー/品質ゲート/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: requirement / design / plan の authoring method を共通化したい
+- When: docs 配下の phase playbook を確認する
+- Then:
+  - `phase_requirement.md`, `phase_design.md`, `phase_plan.md` が存在する
+  - 各 playbook は調査、ヒアリング、discussion sheet、ADR 分岐、review / re-review、subagent 活用、exit criteria を持つ
+  - template 骨子や skill 本文を丸ごと複製しない
+- 観測点: `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`, `src/spec_dock/assets/spec_dock/docs/phase_design.md`, `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+- 追加/更新するテスト: `tests/test_cli.py`
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] code_reviewer にこのステップ差分をレビュー依頼し、指摘があれば修正した
+- [ ] reviewer の再レビューで承認レベルに達した
+- [ ] 期待するテストを実行し、成功した
+- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] Conventional Commits（日本語・複数行）でコミットした
+
+---
+
+### S10 — initiative / epic / issue workflow が各 phase 節から playbook へ直接リンクし、phase progression rule を定義する (必須)
+- 対象: AC-016, AC-018 / EC-010, EC-011, EC-012
+- 設計参照:
+  - 対象IF/API: MODEL-005
+  - 対象テスト:
+    - workflow docs to phase playbook link assertion
+    - workflow progression rule assertion
+- このステップで「追加しないこと（スコープ固定）」:
+  - scope 固有フローを playbook 側へ移しすぎること
+  - requirement/design/plan の phase 以外の導線追加
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/レビュー/品質ゲート/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: initiative / epic / issue workflow doc
+- When: requirement / design / plan の各節を確認する
+- Then:
+  - 各 phase 節から対応する `phase_*.md` へ直接リンクできる
+  - `requirement 承認前に design へ進まない`, `design 承認前に plan へ進まない` progression rule が明記されている
+  - scope 固有ノートは workflow 側へ残り、共通作法は playbook 側へ委譲されている
+- 観測点: `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`, `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- 追加/更新するテスト: `tests/test_cli.py`
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] code_reviewer にこのステップ差分をレビュー依頼し、指摘があれば修正した
+- [ ] reviewer の再レビューで承認レベルに達した
+- [ ] 期待するテストを実行し、成功した
+- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] Conventional Commits（日本語・複数行）でコミットした
+
+---
+
+### S11 — leaf skill / docs README / guide / 回帰テストが phase playbook 導線と責務分離を保持する (必須)
+- 対象: AC-017 / EC-010, EC-011
+- 設計参照:
+  - 対象IF/API: MODEL-005
+  - 対象テスト:
+    - leaf skill phase reminder assertion
+    - docs README / guide の導線 assertion
+- このステップで「追加しないこと（スコープ固定）」:
+  - skill に長文 rulebook を複製すること
+  - user-facing の top-level skill 数を増やすこと
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/Red/Green/Refactor/レビュー/品質ゲート/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: initiative / epic / issue の leaf skill と docs 入口
+- When: skill 本文と docs 入口を確認する
+- Then:
+  - skill は concise なまま phase playbook reminder を持つ
+  - docs README / guide からも phase playbook の存在が辿れる
+  - skill は rulebook 本文を複製せず、routing / reminder に留まる
+- 観測点: `src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md`, `src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md`, `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`, `src/spec_dock/assets/spec_dock/docs/README.md`, `src/spec_dock/assets/spec_dock/docs/guide.md`
+- 追加/更新するテスト: `tests/test_cli.py`
+
+#### 境界メモ (必須)
+- S10 は `workflow_*.md` 内の direct links と phase progression rule を扱う
+- S11 は `SKILL.md` / `docs/README.md` / `guide.md` の discoverability と concise reminder を扱う
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] code_reviewer にこのステップ差分をレビュー依頼し、指摘があれば修正した
+- [ ] reviewer の再レビューで承認レベルに達した
+- [ ] 期待するテストを実行し、成功した
+- [ ] `spec-deps/current/report.md` に実行コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] Conventional Commits（日本語・複数行）でコミットした
+
+---
+
+### S12 — S09-S11 を含む今回の追補差分全体を対象に最終品質ゲートを実施し、reviewer 承認レベルへ収束させる (必須)
+- 対象: AC-015, AC-016, AC-017, AC-018 / EC-010, EC-011, EC-012
+- 設計参照:
+  - 対象IF/API: MODEL-004, MODEL-005
+  - 対象テスト: playbook 関連回帰テスト、全体テスト、差分レビュー
+- このステップで「追加しないこと（スコープ固定）」:
+  - scope 外の docs cleanup
+  - phase skill の pilot 追加
+
+#### update_plan（着手時に登録） (必須)
+- [ ] `update_plan` に、このステップの作業ステップ（調査/品質ゲート/レビュー/修正/再レビュー/報告/コミット）を登録した
+
+#### 期待する振る舞い（テストケース） (必須)
+- Given: S09-S11 を含む今回の追補のブランチ差分全体
+- When:
+  - playbook 関連回帰テストと全体テストを実行する
+  - packaging / shipped asset 観点を確認する
+  - `git diff main...HEAD` を reviewer が確認する
+- Then:
+  - playbook / workflow / template / skill / docs 入口 / tests の layering が崩れていない
+  - phase progression rule と direct links の取りこぼしがない
+  - reviewer の指摘が解消され、承認レベルへ収束する
+- 観測点: test output, packaged assets, `git diff main...HEAD`, reviewer verdict
+
+#### ステップ末尾（省略しない） (必須)
+- [ ] 全体テストが成功した
+- [ ] packaging / shipped asset 確認が成功した
+- [ ] main との差分レビューを実施した
+- [ ] 指摘修正と再レビューを繰り返し、承認レベルに達した
+- [ ] `spec-deps/current/report.md` に最終コマンド/結果/変更ファイルを記録した
+- [ ] `update_plan` を更新し、このステップの作業ステップを完了にした
+- [ ] 修正があった場合は Conventional Commits（日本語・複数行）でコミットし、修正がなかった場合は no-op を report に記録した
+
+---
+
 ## 未確定事項（TBD） (必須)
 - 現時点では、実装着手に必要な重大な未確定事項はない。
 - 想定外のトラブルでユーザー判断が必要になった場合のみ、実装を停止して確認する。
@@ -519,9 +680,10 @@ S07 --> S08
 ## 完了条件（Definition of Done） (必須)
 - 対象AC/ECがすべて満たされ、テストで保証されている
 - 各ステップで **実装 → review → 修正 → 再レビュー → report 更新 → commit** が完了している
-- S08 の最終品質ゲートで、`git diff main...HEAD` を対象にした reviewer 承認レベルへ到達している
+- S08 は既存実装の完了済み最終ゲートとして維持し、今回の追補に対する現時点の最終出口は S12 とする
 - multi-skill 本体と governance 更新差分を含む template / docs / skill / packaging の整合が reviewer 承認レベルへ到達している
 - S08 で修正がなかった場合のみ、commit の代わりに no-op を report へ記録してよい
+- S12 の playbook 更新品質ゲートで、playbook / workflow / template / skill / docs 入口 / tests の layering と phase progression rule が reviewer 承認レベルへ到達している
 - MUST NOT / OUT OF SCOPE を破っていない
 - 品質ゲート（テスト + 配布確認 + 差分レビュー）が満たされている
 

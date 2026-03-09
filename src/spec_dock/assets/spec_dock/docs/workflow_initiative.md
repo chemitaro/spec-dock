@@ -59,14 +59,21 @@ Initiative 作成後は、対象ノード配下の wrapper で Epic を追加で
 作成後、以下のファイルを埋めます（配置は `spec-dock/initiatives/**`）。
 
 - `requirement.md`: なぜやるか / 成功条件 / スコープ
+  - 共通の進め方: [phase_requirement.md](phase_requirement.md)
 - `design.md`: 方針 / 境界 / 依存 / リスク
+  - 共通の進め方: [phase_design.md](phase_design.md)
 - `plan.md`: 実行計画（Epic への分解を含む）
+  - 共通の進め方: [phase_plan.md](phase_plan.md)
 - `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
   - ADR: `./spec-dock/scripts/spec-dock new adr --initiative <initiative-id> --title "..."`
   - 非ADR: `spec-dock/templates/discussions/{note,disc,research}.md` をコピーして利用
 
 補足:
 - ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
+- Initiative 固有の観点（投資判断 / Epic 分解 / 依存整理）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
+- phase progression rule:
+  - requirement が reviewer 承認される前に design へ進みません。
+  - design が reviewer 承認される前に plan へ進みません。
 
 ## 3. 品質ゲート（Initiative）
 
