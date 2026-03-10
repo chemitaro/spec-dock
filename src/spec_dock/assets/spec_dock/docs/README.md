@@ -1,124 +1,58 @@
 # spec-dock docs（入口）
 
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
-人間もコーディングエージェントも、まずはここから参照してください。
+まず `guide.md` で全体像を掴み、その後は対象 scope の `workflow_*.md` を入口にしてください。
 
-## エージェント起点（Codex CLI）
+## エージェント起点
 
-`spec-dock init/update` は、次の 5 skill（hub + 4 leaf）を導入します。  
-運用は hub skill を入口にし、対象スコープに応じて leaf skill へ進む形です。
+`spec-dock init/update` は次の skill を導入します。
 
-- Hub（入口）: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
-- Leaf（Initiative）: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
-- Leaf（Epic）: `.agents/skills/spec-dock-epic-planning/SKILL.md`
-- Leaf（Issue）: `.agents/skills/spec-dock-issue-execution/SKILL.md`
-- Leaf（ADR）: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
+- Hub: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- Initiative: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
+- Epic: `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- Issue: `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- ADR: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
 
-補足:
-- workflow ドキュメント（`workflow_*.md`）が実務導線です。
-- phase playbook（`phase_*.md`）は requirement / design / plan の共通作法です。
-- `reference_*.md` は制約/仕様確認のための reference レイヤです。
+## 読み順
 
-## まず読む（全員）
-
-1. [guide.md](guide.md)（全体像・概念・生成物・ディレクトリ構成）
-2. 実施する作業のワークフロー
+1. [guide.md](guide.md)
+2. 対象 scope の workflow
    - [workflow_initiative.md](workflow_initiative.md)
    - [workflow_epic.md](workflow_epic.md)
    - [workflow_issue.md](workflow_issue.md)
    - [workflow_adr.md](workflow_adr.md)
-3. 仕組みを確認したい場合（参照）
+3. phase の shared playbook
+   - [phase_requirement.md](phase_requirement.md)
+   - [phase_design.md](phase_design.md)
+   - [phase_plan.md](phase_plan.md)
+4. 参照仕様
    - [reference_github.md](reference_github.md)
    - [reference_naming.md](reference_naming.md)
    - [reference_deps.md](reference_deps.md)
    - [reference_sync.md](reference_sync.md)
 
-## phase 別の共通作法（playbook）
-
-- requirement: [phase_requirement.md](phase_requirement.md)
-- design: [phase_design.md](phase_design.md)
-- plan: [phase_plan.md](phase_plan.md)
-
-補足:
-- playbook は共通作法の正本です。
-- scope 固有の制約や判断は `workflow_*.md` 側で扱います。
-- 実務では、先に対象 scope の `workflow_*.md` を確認し、その後に `phase_*.md` 冒頭の workflow に沿って requirement / design / plan を進めます。
-
-## 作成前の原則
-
-- initiative / epic は、新規作成より既存ノードの再利用を優先します。
-- `new` / `import` を使う前に、既存ノードの requirement / design / plan と active node を確認し、収まり先があるかを見ます。
-- 既存ノードに収めると目的・成功条件・スコープ・契約境界が崩れる場合だけ、新規作成します。
-- 新規作成した理由や既存ノードに収めない理由は、作成後の対象ノード配下 `discussions/` の最初の `disc` に残します。
-
-## 目的別ショートカット
-
-| やりたいこと | 参照 |
-|---|---|
-| まず概念を把握したい | [guide.md](guide.md) |
-| Initiative を作る/運用する | [workflow_initiative.md](workflow_initiative.md) |
-| Epic を作る/運用する | [workflow_epic.md](workflow_epic.md) |
-| Issue を実装する（TDD） | [workflow_issue.md](workflow_issue.md) |
-| 議論/意思決定を ADR に切り出す | [workflow_adr.md](workflow_adr.md) |
-| GitHub 連携の前提/副作用を知りたい | [reference_github.md](reference_github.md) |
-| `--title`/`--slug`/ブランチ命名のルールを知りたい | [reference_naming.md](reference_naming.md) |
-| 依存関係（deps check / PlantUML）を知りたい | [reference_deps.md](reference_deps.md) |
-| `sync` の入出力/フラグを知りたい | [reference_sync.md](reference_sync.md) |
-| requirement の作り方（共通）を確認したい | [phase_requirement.md](phase_requirement.md) |
-| design の作り方（共通）を確認したい | [phase_design.md](phase_design.md) |
-| plan の作り方（共通）を確認したい | [phase_plan.md](phase_plan.md) |
-
-## コマンド早見（最短）
+## 最短コマンド
 
 ```bash
-./spec new initiative --title "..."              # デフォルト: local-only（gh は呼ばない）
-./spec new epic --initiative <id> --title "..."  # デフォルト: local-only（gh は呼ばない）
-./spec new issue --epic <id> --title "..."       # デフォルト: GitHub Issue を作る（--no-github で local-only）
+./spec new initiative --title "..."
+./spec new epic --initiative <initiative-id> --title "..."
+./spec new issue --epic <epic-id> --title "..."
 
-./spec import epic <num-or-url> --title "..." [--initiative <id>]  # 既存 GitHub Issue を取り込む（読み取りのみ）
-./spec import issue <num-or-url> --title "..." [--epic <id>]       # 既存 GitHub Issue を取り込む（読み取りのみ）
+./spec import epic <num-or-url> --title "..." [--initiative <id>]
+./spec import issue <num-or-url> --title "..." [--epic <id>]
 
-./spec active set <id|#num|url>               # 作業対象をアクティブ化（デフォルト: no-checkout）
-./spec active set <id|#num|url> --checkout   # アクティブ化 + ブランチ作成/切替
+./spec active set <id|#num|url>
+./spec active set <id|#num|url> --checkout
 ./spec active show
-
-./spec deps check <id|#num|url> --github      # 着手可能か判定（依存がある場合は推奨）
 
 ./spec validate
 ./spec sync
 ```
 
-補足:
-- `./spec` は `spec-dock init/update` が repo root に best-effort で作成するショートカット（symlink）です。無い場合は `./spec-dock/scripts/spec-dock ...` を使ってください。
-- `import epic` / `import issue` の親指定は、current active から解決できる場合に限って省略できます。
+## 高頻度ルール
 
-## スコープ内ショートカット（生成後ノード）
-
-ノード生成後は、各スコープ配下に wrapper が配置されます（引数はタイトル1つのみ）。
-
-```bash
-# initiative配下で epic を追加
-<initiative-dir>/epics/new-epic "..."
-
-# epic配下で issue を追加
-<epic-dir>/issues/new-issue "..."
-```
-
-補足:
-- discussion docs は runtime command で追加します:
-  - `./spec-dock/scripts/spec-dock new doc adr --issue <issue-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc disc --issue <issue-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc research --issue <issue-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc note --issue <issue-id> --title "..."`
-  - epic/initiative スコープでも同様に `--issue` を `--epic` / `--initiative` に置き換えて使います。
-- 補足資料（メモ/調査/議論）も `discussions/` に置きます。`discussions/rules.md` と `spec-dock/templates/discussions/*.md` を参照してください。
-- discussion docs の命名は `NNN-type-slug.md`（3桁固定）です。`rules.md` と nonconforming files は採番対象外です。
-- 新規ノードにはテンプレ由来の `README.md` は生成されません。
-
-## 重要な注意（事故防止）
-
-- `new issue` はデフォルトで `gh` を呼び、GitHub Issue を自動作成します（GitHub を使わない場合は `--no-github` を付けてください）。
-- `new initiative` / `new epic` はデフォルトで `gh` を呼びません（local-only）。必要なら `--create-github-issue` / `--github-issue <n>` で GitHub と紐づけます。
-- `new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
-- `import` は GitHub を更新しません（`gh issue view` による **存在確認のみ**）。ただしローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します。
-- `import` の URL 入力は **番号抽出のみ**です（`owner/repo` は無視され、別リポジトリ URL を貼っても「現在の `gh` が見ているリポジトリの同番号」として解釈され得ます）。
+- Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
+- `new issue` はデフォルトで GitHub Issue を作る。local-only は `--no-github`
+- `new initiative` / `new epic` はデフォルトで local-only。GitHub 連携は opt-in
+- `import` は読み取り確認のみで、GitHub を更新しない
+- naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する
