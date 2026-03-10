@@ -1,7 +1,8 @@
 # workflow: initiative
 
-Initiative は「投資単位」です。  
-このワークフローは、Initiative を **単独で完結**させ、後続（Epic/Issue）へ安全に分解できる状態を作ります。
+Initiative は投資単位です。
+この workflow は、Initiative 固有の再利用判定、作成、Epic 分解、品質ゲートを正本として扱います。
+この workflow の品質ゲートは scope 固有の additive gate であり、`phase_*.md` の shared minimum gate 通過を前提とします。
 
 対応 leaf skill:
 - `.agents/skills/spec-dock-initiative-planning/SKILL.md`
@@ -10,107 +11,53 @@ Initiative は「投資単位」です。
 - 総合: [guide.md](guide.md)
 - Epic: [workflow_epic.md](workflow_epic.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
-- sync: [reference_sync.md](reference_sync.md)
+- 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 
-## 0. 新規作成前の再利用判定
+## 再利用判定
 
-- まず既存 initiative の `requirement.md` / `design.md` / `plan.md` / `discussions/` と current active を確認します。
-- 目的・成功条件・スコープ・責任主体が既存 initiative に自然に収まるなら、新規作成せず既存 initiative を更新します。
-- 既存 initiative に収めると投資判断の単位や success metrics が崩れる場合だけ、`new` / `import` を使います。
-- 新規 initiative を作る理由や、既存 initiative を使わない理由は、作成後の対象 initiative 配下 `discussions/` の最初の `disc` に残します。
+- まず既存 initiative の `requirement.md` / `design.md` / `plan.md` / `discussions/` と current active を確認する
+- 目的、成功条件、スコープ、責任主体が既存 initiative に自然に収まるなら、新規作成せず既存 initiative を更新する
+- 投資判断の単位や success metrics が崩れる場合だけ `new` / `import` を使う
+- 新規作成した理由や既存 initiative を使わない理由は、作成後の対象 initiative 配下の最初の `disc` に残す
 
-## 1. 作成（new / import）
-
-### 1.1 new（デフォルト: local-only）
+## 作成
 
 ```bash
 ./spec new initiative --title "..."
-```
-
-GitHub Issue とリンクしたい場合（任意）:
-
-```bash
-# 既存の GitHub Issue 番号へリンク（GitHub Issue は作りません）
 ./spec new initiative --github-issue <n> --title "..."
-
-# GitHub Issue を新規作成してリンク（gh が必要）
 ./spec new initiative --create-github-issue --title "..."
-```
 
-注意:
-- `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
-
-### 1.2 import（既存 GitHub Issue を取り込む）
-
-```bash
 ./spec import initiative <num|#num|url> --title "..."
 ```
 
-注意:
-- `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
+- naming 制約と GitHub 振る舞いは [reference_naming.md](reference_naming.md), [reference_github.md](reference_github.md) を参照する
+- Initiative 配下では wrapper `epics/new-epic "<title>"` で local-only Epic を追加できる
 
-### 1.3 Initiative 配下で Epic を追加（wrapper）
+## 記述
 
-Initiative 作成後は、対象ノード配下の wrapper で Epic を追加できます。
+- `requirement.md`: 投資理由、成功条件、スコープ
+- `design.md`: 方針、境界、依存、リスク
+- `plan.md`: Epic 分解、順序、ブロッカー
+- `discussions/`: `new doc {adr|disc|research|note} --initiative <initiative-id> --title "..."`
+- shared な書き方は `phase_*.md`、Initiative 固有の分解判断はこの workflow を正本とする
 
-```bash
-<initiative-dir>/epics/new-epic "..."
-```
+## 品質ゲート
 
-補足:
-- 引数はタイトル1つのみです。
-- wrapper `epics/new-epic` は常に local-only epic を作成します。
+- requirement:
+  - 背景 / 目的が 1〜3 行で言える
+  - 成功条件が観測可能
+  - スコープと非スコープが明確
+  - 新規 initiative が必要な理由を最初の `disc` で追える
+- design:
+  - 依存関係が列挙されている
+  - リスクと軽減策がある
+- plan:
+  - Epic への分解方針がある
+  - 大まかな順序とブロッカーが見える
 
-## 2. 記述（requirement/design/plan）
-
-作成後、以下のファイルを埋めます（配置は `spec-dock/initiatives/**`）。
-
-- `requirement.md`: なぜやるか / 成功条件 / スコープ
-  - 共通の進め方: [phase_requirement.md](phase_requirement.md)
-- `design.md`: 方針 / 境界 / 依存 / リスク
-  - 共通の進め方: [phase_design.md](phase_design.md)
-- `plan.md`: 実行計画（Epic への分解を含む）
-  - 共通の進め方: [phase_plan.md](phase_plan.md)
-- `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
-  - `./spec-dock/scripts/spec-dock new doc adr --initiative <initiative-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc disc --initiative <initiative-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc research --initiative <initiative-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc note --initiative <initiative-id> --title "..."`
-  - 命名/採番は `NNN-type-slug.md`（3桁固定・shared sequence）です。詳細は [reference_naming.md](reference_naming.md)。
-
-補足:
-- ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
-- Initiative 固有の再利用判定、作成、Epic 分解、品質ゲートはこの workflow を正本とします。
-- requirement / design / plan の書き方自体は `phase_*.md` を正本とし、phase 内の標準順は各 playbook 冒頭を参照します。
-- Initiative 固有の観点（投資判断 / Epic 分解 / 依存整理）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
-- phase progression は各 `phase_*.md` の条件を参照します。
-
-## 3. 品質ゲート（Initiative）
-
-最低限、以下を満たしてから次（Epic）へ進みます。
-
-### requirement
-- [ ] 背景/目的が 1〜3 行で言える
-- [ ] 成功条件（観測可能な指標）がある
-- [ ] スコープ（やる/やらない）が明記されている
-- [ ] 新規 initiative が必要な場合、その理由を作成後の対象 initiative 配下の最初の `disc` で追える
-
-### design
-- [ ] 依存関係（組織/システム/権限/データ）が列挙されている
-- [ ] リスクと打ち手が書かれている
-
-### plan
-- [ ] Epic への分解方針がある（どこで切るか）
-- [ ] 大まかな順序（先にやること/後にやること）がある
-
-## 4. 観測可能にする（validate / sync）
+## 仕上げ
 
 ```bash
 ./spec validate
 ./spec sync
 ```
-
-## 5. よくある失敗
-
-- 「成功」が定義されていない（進捗が議論だけになる）
-- スコープが無限に広がる（Epic/Issue が爆発する）

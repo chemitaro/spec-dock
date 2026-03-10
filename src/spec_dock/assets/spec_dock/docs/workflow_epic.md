@@ -1,7 +1,8 @@
 # workflow: epic
 
-Epic は「設計の背骨」です。  
-このワークフローは、Epic を **単独で完結**させ、Issue を安全に分割できる状態を作ります。
+Epic は設計の背骨です。
+この workflow は、Epic 固有の再利用判定、作成、Issue 分割、品質ゲートを正本として扱います。
+この workflow の品質ゲートは scope 固有の additive gate であり、`phase_*.md` の shared minimum gate 通過を前提とします。
 
 対応 leaf skill:
 - `.agents/skills/spec-dock-epic-planning/SKILL.md`
@@ -11,108 +12,54 @@ Epic は「設計の背骨」です。
 - Initiative: [workflow_initiative.md](workflow_initiative.md)
 - Issue: [workflow_issue.md](workflow_issue.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
+- 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 
-## 0. 新規作成前の再利用判定
+## 再利用判定
 
-- まず親 initiative 配下の既存 epic の `requirement.md` / `design.md` / `plan.md` / `discussions/` を確認します。
-- 契約・移行・観測性・Done 定義が既存 epic に収まるなら、新規作成せず既存 epic を更新します。
-- 既存 epic に収めると設計の背骨や rollout 順が崩れる場合だけ、`new` / `import` を使います。
-- 新規 epic を作る理由や、既存 epic に収めない理由は、作成後の対象 epic 配下 `discussions/` の最初の `disc` に残します。
+- まず親 initiative 配下の既存 epic の `requirement.md` / `design.md` / `plan.md` / `discussions/` を確認する
+- 契約、移行、観測性、Done 定義が既存 epic に収まるなら、新規作成せず既存 epic を更新する
+- 設計の背骨や rollout 順が崩れる場合だけ `new` / `import` を使う
+- 新規作成した理由や既存 epic に収めない理由は、作成後の対象 epic 配下の最初の `disc` に残す
 
-## 1. 作成（new / import）
-
-Epic は必ず Initiative 配下に作成します。
-
-### 1.1 new（デフォルト: local-only）
+## 作成
 
 ```bash
 ./spec new epic --initiative <initiative-id> --title "..."
-```
-
-GitHub Issue とリンクしたい場合（任意）:
-
-```bash
-# 既存の GitHub Issue 番号へリンク（GitHub Issue は作りません）
 ./spec new epic --initiative <initiative-id> --github-issue <n> --title "..."
-
-# GitHub Issue を新規作成してリンク（gh が必要）
 ./spec new epic --initiative <initiative-id> --create-github-issue --title "..."
-```
 
-注意:
-- `--title` / `--slug` には入力制約があります（ASCII / kebab-case）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
-
-### 1.2 import（既存 GitHub Issue を取り込む）
-
-```bash
 ./spec import epic <num|#num|url> --title "..." [--initiative <initiative-id>]
 ```
 
-注意:
-- `import` の共通仕様/注意（読み取りのみ、`--title` 必須、URL は番号抽出のみ、など）は [reference_github.md](reference_github.md) を参照してください。
-- `--initiative` を省略すると、current active から親 initiative を解決します。
-  - active initiative があればそれを使います。
-  - active epic / active issue のみでも、そこから親 initiative を解決できれば使います。
+- `import epic` で `--initiative` を省略した場合は current active から親 initiative を解決する
+- naming 制約と GitHub 振る舞いは [reference_naming.md](reference_naming.md), [reference_github.md](reference_github.md) を参照する
+- Epic 配下では wrapper `issues/new-issue "<title>"` を使える。local-only issue が必要なら direct command で `--no-github` を付ける
 
-### 1.3 Epic 配下で Issue を追加（wrapper）
+## 記述
 
-Epic 作成後は、対象ノード配下の wrapper で Issue を追加できます。
+- `requirement.md`: 期待する価値、受け入れ条件、非機能、スコープ
+- `design.md`: 契約、移行、観測性、リスク
+- `plan.md`: Issue 分割、依存順、品質ゲート
+- `discussions/`: `new doc {adr|disc|research|note} --epic <epic-id> --title "..."`
+- shared な書き方は `phase_*.md`、Epic 固有の分割判断はこの workflow を正本とする
 
-```bash
-<epic-dir>/issues/new-issue "..."
-```
+## 品質ゲート
 
-補足:
-- 引数はタイトル1つのみです。
-- wrapper `issues/new-issue` は親 epic が local-only でも、**デフォルトでは GitHub Issue を作成**します。
-  - local-only issue を作りたい場合は direct command: `./spec new issue --no-github --epic <epic-id> --title \"...\"`
+- requirement:
+  - Done 条件が観測可能
+  - スコープと非スコープが明確
+  - 新規 epic が必要な理由を最初の `disc` で追える
+- design:
+  - 契約が明記されている
+  - 移行 / 互換 / ロールバックが整理されている
+  - 観測性の方針がある
+- plan:
+  - Issue へ分割できている
+  - 依存順が現実的
 
-## 2. 記述（requirement/design/plan）
-
-- `requirement.md`: 期待する価値 / 受け入れ条件（AC）/ 非機能（NFR）/ スコープ
-  - 共通の進め方: [phase_requirement.md](phase_requirement.md)
-- `design.md`: 変更方針 / インタフェース契約 / 移行 / 観測性 / リスク
-  - 共通の進め方: [phase_design.md](phase_design.md)
-- `plan.md`: Issue 分割（粒度）/ 依存順序 / 品質ゲート
-  - 共通の進め方: [phase_plan.md](phase_plan.md)
-- `discussions/`: ADR / 議論 / 調査 / メモ（`rules.md` を参照）
-  - `./spec-dock/scripts/spec-dock new doc adr --epic <epic-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc disc --epic <epic-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc research --epic <epic-id> --title "..."`
-  - `./spec-dock/scripts/spec-dock new doc note --epic <epic-id> --title "..."`
-  - 命名/採番は `NNN-type-slug.md`（3桁固定・shared sequence）です。詳細は [reference_naming.md](reference_naming.md)。
-
-補足:
-- ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
-- Epic 固有の再利用判定、作成、Issue 分割、品質ゲートはこの workflow を正本とします。
-- requirement / design / plan の書き方自体は `phase_*.md` を正本とし、phase 内の標準順は各 playbook 冒頭を参照します。
-- Epic 固有の観点（契約 / 移行 / Issue 分割の妥当性）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
-- phase progression は各 `phase_*.md` の条件を参照します。
-
-## 3. 品質ゲート（Epic）
-
-### requirement
-- [ ] 「何を満たせば Done か」が観測可能になっている（AC/NFR）
-- [ ] スコープ（やる/やらない）が明確
-- [ ] 新規 epic が必要な場合、その理由を作成後の対象 epic 配下の最初の `disc` で追える
-
-### design
-- [ ] 契約（API/Schema/IF）が明記されている
-- [ ] 移行（段階移行/互換/ロールバック）が書かれている
-- [ ] 観測性（ログ/メトリクス/アラート）の方針がある
-
-### plan
-- [ ] Issue へ分割できている（各 Issue が単独で完了する粒度）
-- [ ] 依存順が現実的（先に壊れるところから潰す）
-
-## 4. 観測可能にする（validate / sync）
+## 仕上げ
 
 ```bash
 ./spec validate
 ./spec sync
 ```
-
-## 5. よくある失敗
-
-- Issue へ降ろす前に “契約/移行/観測性” を書かない（後で手戻り）
-- 1 Epic に詰め込みすぎて “設計” が破綻する

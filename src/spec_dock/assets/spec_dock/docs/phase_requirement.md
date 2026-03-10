@@ -1,218 +1,95 @@
 # phase playbook: requirement
 
-このドキュメントは、Initiative / Epic / Issue に共通する **要件定義書の作り方** をまとめた shared playbook です。  
-各スコープ固有の操作や品質ゲートは `workflow_*.md` を正本とし、ここでは **要件をどう詰めるか** に集中します。
+Initiative / Epic / Issue に共通する requirement の shared playbook です。
+scope 固有の entry / quality gate は `workflow_*.md` が additive に定義します。議論資料の置き方は対象 scope 配下の `discussions/rules.md`、命名は [reference_naming.md](reference_naming.md) を参照してください。
 
 関連:
 - 全体像: [guide.md](guide.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
-- 議論資料の置き方: `discussions/rules.md`
+- 議論資料の置き方と命名: 対象 scope 配下の `discussions/rules.md`, [reference_naming.md](reference_naming.md)
 
-## 1. requirement phase の全体 workflow
+## phase contract
 
-requirement phase は、全体 workflow の **調査分析 → requirement → design → plan → 実装/品質ゲート** のうち、`requirement` を扱います。  
-この phase では、調査分析で集めた事実をもとに、何を解くか、なぜ今やるか、どこまでを対象にするかを固定します。  
-Initiative / Epic / Issue のどれでも、まず対象 scope の `workflow_*.md` で前後の流れと品質ゲートを確認し、そのうえでこの playbook に沿って requirement を詰めます。
+- 位置: 全体 workflow の `調査分析 → requirement → design → plan → 実装/品質ゲート` の `requirement`
+- 責務: 調査分析の結果を `WHAT / WHY / scope / success` に固定する
+- 前提入力: 対象 scope、As-Is の一次情報、対象 `workflow_*.md`、既存 `discussions/` / ADR
+- 固定すること: 目的、背景・現状、成功条件、スコープ / 非スコープ、主要 TBD の置き場
+- 出力: reviewer が design へ送れる `requirement.md` と必要な `research` / `disc` / `adr`
+- 非ゴール: HOW の先取り、source のない断定、未確定論点の隠蔽
+- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有の操作と品質ゲートは `workflow_*.md` が additive に定義する
 
-- この phase の位置づけ:
-  - 調査分析の結果を、WHAT / WHY / scope / success として固定する
-- 前段で揃っている前提:
-  - 対象 scope が明確になっている
-  - 関連 docs / 実装 / 周辺情報を調べ始められる状態になっている
-- この phase で固定すること:
-  - 目的
-  - 背景・現状
-  - 成功条件
-  - スコープと非スコープ
-- この phase の完了条件:
-  - reviewer が「design へ進めてよい」と判断できること
+## 標準順
 
-標準順:
-1. 目的理解
-2. 徹底調査
-3. 調査結果の docs 化（`research` / `disc` / `note` / `adr`）
-4. discussion / ADR 準備
-5. 必要ならヒアリング
-6. 本文作成
-7. reviewer loop
-8. handoff
+1. 対象 scope の workflow と template を開く
+2. As-Is / 観測点 / 制約を集める
+3. requirement に上げる前の事実や比較を `research` / `disc` に残す
+4. 必要ならヒアリングし、反映前に docs に整理する
+5. `requirement.md` を固めて reviewer loop を回す
+6. 関連 docs を束ねて design へ handoff する
 
-注意:
-- 情報が揃う前に requirement 本文を書き始めません。
-- source のない断定や HOW に踏み込みすぎた内容は requirement 本文へ入れません。
-- scope 固有の操作、entry 条件、品質ゲートは `workflow_*.md` を正本とします。
+## entry checklist
 
-## 2. この phase の目的 / 出力 / 非ゴール
+- 対象が Initiative / Epic / Issue のどれかを `workflow_*.md` で確認した
+- 対応 template を開き、先に埋める節を把握した
+- 既存 `discussions/` と ADR を見て、過去判断と衝突しないことを確認した
+- ヒアリング前に docs へ残す前提を整理した
+  - 決めたいこと / 聞きたいこと
+  - 確定事実
+  - 未確定事項 / 仮説
+  - 選択肢と推奨案
+  - 反映先の本文節
+- template:
+  - Initiative: `spec-dock/templates/initiative/requirement.md`
+  - Epic: `spec-dock/templates/epic/requirement.md`
+  - Issue: `spec-dock/templates/issue/requirement.md`
 
-### 目的
-- 何を解決するのか、なぜ今やるのか、どこまでを対象にするのかを観測可能な形で固定する
-- 分からないことを隠したまま先へ進まず、論点を `discussion` / `TBD` / `ADR` に分離する
-- reviewer が「設計へ進めてよい」と判断できる土台を作る
+## requirement checklist
 
-### 出力
-- 承認可能な `requirement.md`
-- 必要に応じて `discussions/` 配下の `NNN-disc-*` / `NNN-research-*` / `NNN-note-*`
-- 必要に応じて `discussions/` 配下の `NNN-adr-*`
+- As-Is は一次情報を根拠にし、事実 / 推測 / 未確定を混ぜない
+- `WHAT / WHY / scope / success` を先に固め、HOW は入れすぎない
+- `MUST / MUST NOT / OUT OF SCOPE` を早めに仮置きし、主要 TBD の位置を決める
+- requirement 本文には結論と制約を残し、長い比較や調査ログは `discussions/` へ逃がす
+- 先に埋める節:
+  - Initiative: `目的`, `背景・現状`, `成功指標`, `スコープ`, `非交渉制約`, `未確定事項`
+  - Epic: `目的`, `ユースケース`, `要求`, `受け入れ条件`, `依存 / 影響範囲`, `未確定事項`
+  - Issue: `目的`, `背景・現状`, `スコープ`, `境界`, `受け入れ条件`, `例外・エッジケース`, `未確定事項`
 
-### 非ゴール
-- 実装方式を先回りして固定すること
-- template の節を機械的に全部埋めること自体を目的化すること
-- 未確定論点を曖昧な文章で包んで設計へ送ること
+## 論点の逃がし先
 
-## 3. workflow 開始前に確認すること
+- `research`: 事実収集、現状分析、外部調査
+- `disc`: 論点整理、選択肢比較、合意形成の叩き台
+- `note`: 軽量メモ、一時整理
+- `adr`: 後続へ残る方針決定
+- 次なら先に docs 化する:
+  - 2 案以上あり比較が要る
+  - ヒアリング前に仮説整理が要る
+  - requirement に直接書くには早い調査結果を保持したい
+  - reviewer へ判断材料を渡したい
+- 次ならヒアリングを挟む:
+  - 一次情報が docs / code だけでは足りない
+  - success が利用者体験や運用判断に依存する
+  - 解釈差で scope が変わる
+  - reviewer が利用者理解不足と判断しうる
+- 次なら ADR を検討する:
+  - スコープ境界や方針が後続全体へ影響する
+  - 非交渉制約や運用ルールを固定しないと success が閉じない
+  - 将来参照したい採択理由を残す必要がある
+- 追加調査で閉じる話や作業メモは ADR にしない
 
-- 対象スコープの workflow を開き、いま扱うのが Initiative / Epic / Issue のどれかを明確にする
-- 対応する template を開き、最低限どの節があるかを把握する
-- 既存の `discussions/` と ADR index を確認し、過去判断と衝突しないかを見る
-- すでに論点が不明確なら、先に discussion sheet を作る前提で着手する
+## review / handoff gate
 
-template 参照先:
-- Initiative: `spec-dock/templates/initiative/requirement.md`
-- Epic: `spec-dock/templates/epic/requirement.md`
-- Issue: `spec-dock/templates/issue/requirement.md`
+この節は shared minimum gate です。通過後も scope 固有 gate は対応する `workflow_*.md` に追加で従います。
 
-## 4. requirement workflow の進め方
-
-要件定義では、最初に「結論」を書くのではなく、**事実と解釈を分けて集める**のが基本です。
-
-### 4.1 最初に集めるもの
-- 現状の困りごとを示す一次情報
-  - 既存ドキュメント
-  - コードや設定
-  - 画面、ログ、DB、監視、問い合わせ、GitHub Issue
-- 影響範囲の見取り図
-  - 誰が困るか
-  - どのフローで困るか
-  - 何を壊しうるか
-- 成功を判断する観測点
-  - UI / HTTP / DB / Log / dashboard / 運用手順 など
-
-### 4.2 調査の進め方
-- まず As-Is を箇条書きで固め、To-Be はその後に書く
-- 「事実」「推測」「未確定」を混ぜない
-- 分からないことは `TBD` へ逃がす前に、追加調査で潰せるかを一度確認する
-- スコープが広がりそうなら、早めに MUST / MUST NOT / OUT OF SCOPE を仮置きする
-- requirement 本文へ昇格させる前に、主要な事実・比較・未確定論点を `research` / `disc` / `note` に残す
-- requirement 本文には結論・制約・未決を残し、調査ログや長い比較表は discussion 系 docs へ分離する
-
-## 5. ユーザーヒアリングを挟む条件
-
-次のどれかに当てはまる場合、ヒアリングは事実上必須です。
-- 困りごとの一次情報がドキュメントやコードだけでは足りない
-- 成功条件が利用者体験や運用判断に依存する
-- 複数の解釈が成り立ち、どれを優先するかで scope が変わる
-- reviewer から「利用者理解が不足している」と見なされうる
-
-進め方:
-- 先に仮説を整理してから聞く
-- 「どう実装するか」ではなく「何が困るか / 何なら成功か」を確認する
-- 回答は requirement 本文に直接埋め込まず、先に discussion sheet へ整理してから反映する
-
-## 6. discussion / docs 化の使い分け
-
-次の条件のいずれかを満たしたら、`discussions/` に sheet を作ります。
-- 論点が 2 つ以上あり、会話だけでは追跡しにくい
-- ユーザーヒアリング前に仮説整理が必要
-- 選択肢比較や trade-off を明示したい
-- requirement に直接書くには早すぎる調査結果を保持したい
-- reviewer へ判断材料を渡したい
-
-使い分けの目安:
-- `NNN-research-*`: 事実収集、現状分析、外部調査
-- `NNN-disc-*`: 論点整理、選択肢比較、合意形成の叩き台
-- `NNN-note-*`: 軽量メモ、一時的な整理
-
-ヒアリングや意思決定依頼へ進む前に、少なくとも次を sheet 上で見えるようにします。
-- 今回決めたいこと / 聞きたいこと
-- 確定した事実
-- 未確定事項 / 仮説
-- 選択肢と比較
-- 推奨案
-- 反映先の本文節
-
-## 7. ADR を切る条件
-
-要件 phase では ADR は乱用しません。  
-ただし、次のような **意思決定を固定しないと要件が閉じない** 場合は ADR を検討します。
-
-- スコープ境界や方針の選択が後続全体へ影響する
-- 非交渉制約や運用ルールを決めないと success metrics が定義できない
-- 複数案のうち 1 つを選ぶ理由を将来参照できる形で残したい
-
-逆に、追加調査で解けるもの、単なる作業メモ、未整理の疑問は ADR ではなく discussion sheet に置きます。
-
-## 8. template で先に埋める節
-
-この playbook は骨子そのものを再掲しません。  
-代わりに、各 template で特に先に埋める節を示します。
-
-### Initiative requirement
-- `目的`
-- `背景・現状`
-- `成功指標`
-- `スコープ`
-- `非交渉制約`
-- `未確定事項`
-
-### Epic requirement
-- `目的`
-- `ユースケース`
-- `要求`
-- `受け入れ条件`
-- `依存 / 影響範囲`
-- `未確定事項`
-
-### Issue requirement
-- `目的`
-- `背景・現状`
-- `スコープ`
-- `境界`
-- `受け入れ条件`
-- `例外・エッジケース`
-- `未確定事項`
-
-## 9. reviewer に渡す前の exit criteria
-
-次を満たしてから reviewer へ渡します。
 - 目的が 1〜3 行で説明できる
-- As-Is の根拠があり、主要な観測点が書けている
-- MUST / MUST NOT / OUT OF SCOPE が曖昧でない
-- 主要な TBD が列挙され、放置理由ではなく「質問 / 選択肢 / 推奨案」がある
-- discussion / ADR が必要な論点を requirement 本文へ押し込んでいない
-- 設計の話に踏み込みすぎず、WHAT / WHY に留まっている
-- `requirement.md` 単体ではなく、必要な `research` / `disc` / `adr` を束で渡せる
-- reviewer コメント反映後に re-review し、提出可能状態まで戻せる
+- As-Is の根拠と主要観測点がある
+- `MUST / MUST NOT / OUT OF SCOPE` が曖昧でない
+- 主要 TBD に `質問 / 選択肢 / 推奨案` がある
+- design 論点と追加調査 / ヒアリング論点が仕分けできている
+- `requirement.md` と必要な `research` / `disc` / `adr` を束で渡せる
+- reviewer が「design へ進めてよい」と判断できる
 
-## 10. 次の phase へ進める条件
+## short rules
 
-要件定義は reviewer 承認前に次 phase へ進めません。  
-次の条件を満たしたときだけ design へ進みます。
-
-- requirement.md が reviewer 承認レベルに達している
-- 重要な未確定事項が「design で扱う論点」なのか「追加調査 / ヒアリングが必要」なのか仕分けできている
-- 必要な discussion / ADR が `discussions/` に残っている
-- success metrics または受け入れ条件が、後続設計で参照できる粒度になっている
-- `requirement.md` と関連 docs を handoff 単位としてまとめられる
-
-## 11. subagent 活用ガイダンス
-
-shared playbook の前提は「自分で全部抱え込まない」です。
-
-- researcher / consultant 系:
-  - 外部調査、比較観点、論点整理に使う
-- doc writer:
-  - 既存 docs との整合確認や文面の磨き込みに使う
-- reviewer:
-  - requirement が WHAT / WHY から逸脱していないかを見る
-
-注意:
-- subagent に渡す前に、対象スコープ、未確定論点、期待する出力を 3 点セットで明記する
-- subagent の出力をそのまま requirement に貼らず、採用判断を人間可読な形で整理する
-
-## 12. 迷ったときの判断順
-
-1. 追加調査で事実を増やせるか
-2. ユーザーヒアリングで判断できるか
-3. discussion sheet で論点を分離すべきか
-4. ADR で意思決定を固定すべきか
-5. それでも unresolved なら、設計へ送らず pause する
+- subagent は `researcher / consultant = 調査比較`, `doc writer = 文面整合`, `reviewer = WHAT / WHY 逸脱検出` で使い分ける
+- subagent には `対象 scope / 未確定論点 / 欲しい出力` を最小セットで渡す
+- 迷ったら `追加調査 → ヒアリング → disc → adr → pause` の順で判断する
