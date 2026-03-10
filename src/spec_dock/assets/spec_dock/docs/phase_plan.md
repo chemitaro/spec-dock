@@ -8,7 +8,41 @@
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - 議論資料の置き方: `discussions/rules.md`
 
-## 1. この phase の目的 / 出力 / 非ゴール
+## 1. plan phase の全体 workflow
+
+plan phase は、全体 workflow の **調査分析 → requirement → design → plan → 実装/品質ゲート** のうち、`plan` を扱います。  
+この phase では、requirement / design で確定した内容を、実行可能な順序と粒度、停止点、品質ゲートに落とします。  
+Initiative / Epic / Issue のどれでも、まず対象 scope の `workflow_*.md` で前後の流れと品質ゲートを確認し、そのうえでこの playbook に沿って計画を組み立てます。
+
+- この phase の位置づけ:
+  - 確定した要求と設計を、実行順・分解単位・停止点・品質ゲートへ変換する
+- 前段で揃っている前提:
+  - requirement と design が reviewer 承認レベルに達している
+  - 依存とブロッカーを見積もれるだけの情報がある
+- この phase で固定すること:
+  - 分解単位
+  - 順序
+  - 完了判定
+  - review / docs / quality gate の置き方
+- この phase の完了条件:
+  - reviewer が「この計画で実行してよい」と判断できること
+
+標準順:
+1. 目的理解
+2. 徹底調査
+3. 調査結果の docs 化（`research` / `disc` / `note` / `adr`）
+4. discussion / ADR 準備
+5. 必要ならヒアリング
+6. 本文作成
+7. reviewer loop
+8. handoff
+
+注意:
+- requirement / design の再議論を plan 本文へ持ち込みません。
+- 分割案や順序案の比較が長くなる場合は `disc` に分離します。
+- scope 固有の操作、entry 条件、品質ゲートは `workflow_*.md` を正本とします。
+
+## 2. この phase の目的 / 出力 / 非ゴール
 
 ### 目的
 - requirement / design で確定した内容を、実行可能な順序と単位へ落とす
@@ -26,7 +60,7 @@
 - 実行中に守るべき review / docs / quality gate を曖昧にすること
 - 将来の全作業を過剰に先読みして plan を巨大化させること
 
-## 2. 着手前に確認すること
+## 3. workflow 開始前に確認すること
 
 - requirement と design が reviewer 承認レベルにあることを確認する
 - plan が扱う単位を明確にする
@@ -41,26 +75,28 @@ template 参照先:
 - Epic: `spec-dock/templates/epic/plan.md`
 - Issue: `spec-dock/templates/issue/plan.md`
 
-## 3. 調査・分析の進め方
+## 4. plan workflow の進め方
 
 計画 phase では、**何をいつやるか** だけでなく、**どこで止まるか** まで明確にします。
 
-### 3.1 先に固めるもの
+### 4.1 先に固めるもの
 - 依存順序
 - 並行可能な作業
 - 各ステップ/各 issue/各 epic の完了判定
 - 新規ノードを増やさずに進められる分解案
 - レビュー、テスト、docs 更新、品質ゲートの位置
 
-### 3.2 粒度の目安
+### 4.2 粒度の目安
 - Initiative plan:
   - Epic 単位で価値のまとまりと順序を示す
 - Epic plan:
   - Issue 単位で縦切りと依存を示す
 - Issue plan:
   - 1 ステップ = 1 つの観測可能な振る舞いを原則にする
+- 分割案や順序案の比較が必要なら、plan 本文へ押し込まず先に `disc` / `note` に残す
+- plan 本文には実行順、停止点、完了判定を残し、長い比較や作業メモは discussion 系 docs へ分離する
 
-## 4. ユーザーヒアリングの進め方
+## 5. ユーザーヒアリングを挟む条件
 
 計画 phase でも、次の条件ではヒアリングを行います。
 - ロールアウト日程や調整先が順序に影響する
@@ -72,8 +108,9 @@ template 参照先:
 - どこまで並行できるか
 - 何を先に出すと価値があるか
 - どの品質ゲートが必須か
+- 回答は先に discussion sheet へ整理し、その後に plan 本文へ反映する
 
-## 5. discussion sheet を作る条件
+## 6. discussion / docs 化の使い分け
 
 次の条件では discussion sheet を作ります。
 - 分割案や順序案が複数あり、比較が必要
@@ -82,7 +119,15 @@ template 参照先:
 - 外部依存やリリース順が複雑で、計画本文だけでは追いにくい
 - 既存 epic / issue に収める案と、新規ノードを増やす案を比較したい
 
-## 6. ADR を切る条件
+ヒアリングや reviewer へ渡す前に、少なくとも次を見えるようにします。
+- 今回決めたい分解 / 順序 / 停止点
+- 確定した依存と制約
+- 未確定事項 / ブロッカー
+- 選択肢と比較
+- 推奨案
+- 反映先の本文節
+
+## 7. ADR を切る条件
 
 plan phase で ADR を切るのは例外的です。  
 ただし、計画自体が次のような **運用方針の決定** を含むなら ADR を検討します。
@@ -93,7 +138,7 @@ plan phase で ADR を切るのは例外的です。
 
 通常の step 分解、実装順序、作業メモは ADR ではなく plan 本文または discussion sheet に置きます。
 
-## 7. template のどこを埋めるか
+## 8. template で先に埋める節
 
 ### Initiative plan
 - `ロードマップ`
@@ -116,19 +161,19 @@ plan phase で ADR を切るのは例外的です。
 - `要件 ↔ ステップ対応表`
 - `実行ルール`
 - 各ステップの `期待する振る舞い`
-- `S90 docs impact resolution / docs refresh`
-- `S99 final diff review quality gate`
+- Issue 固有の実行/品質ゲートは `workflow_issue.md` の要求を plan に反映する
 
-## 8. reviewer に渡す前の exit criteria
+## 9. reviewer に渡す前の exit criteria
 
 - 順序の理由が説明できる
 - 粒度が大きすぎず、review / test / commit / report が回る
 - 依存とブロッカーが plan に露出している
 - 新規ノードを増やす場合、その理由を作成後の対象ノード配下の最初の `disc` で追える
-- Issue plan では step 末尾の review / fix / re-review が明示されている
-- docs impact と final quality gate の扱いが抜けていない
+- scope 固有の実行ルールや品質ゲートは対応する `workflow_*.md` の要求を plan に反映できている
+- `plan.md` 単体ではなく、必要な `disc` / `research` / `adr` を束で渡せる
+- reviewer コメント反映後に re-review し、提出可能状態まで戻せる
 
-## 9. 次 phase へ進める条件
+## 10. 実行へ進める条件
 
 plan の次は authoring phase ではなく実行です。  
 次の条件を満たしたら実装/遂行へ進みます。
@@ -136,9 +181,10 @@ plan の次は authoring phase ではなく実行です。
 - plan.md が reviewer 承認レベルに達している
 - requirement / design / plan のあいだで矛盾がない
 - 依存と順序に関する blocking 論点が管理可能になっている
-- Issue plan なら、各ステップの review / commit / docs / quality gate の運用が明示されている
+- scope 固有の実行ルールや品質ゲートが対応する `workflow_*.md` と矛盾していない
+- `plan.md` と関連 docs を handoff 単位としてまとめられる
 
-## 10. subagent 活用ガイダンス
+## 11. subagent 活用ガイダンス
 
 - researcher / consultant 系:
   - 分割案、順序比較、外部ベストプラクティス確認に使う
@@ -149,9 +195,9 @@ plan の次は authoring phase ではなく実行です。
 
 注意:
 - subagent には、対象スコープ、依存関係、求める粒度を明示する
-- Issue plan では、review loop と final quality gate を省略しない前提を共有する
+- scope 固有の実行ルールや品質ゲート確認が必要なら、対応する `workflow_*.md` を前提として共有する
 
-## 11. 迷ったときの判断順
+## 12. 迷ったときの判断順
 
 1. requirement / design の不足が原因でないか確認する
 2. 価値単位または観測可能な振る舞いで分割できるかを見る

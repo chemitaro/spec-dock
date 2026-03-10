@@ -81,10 +81,10 @@ active issue 配下の仕様を埋めます:
 - requirement は AC/EC（観測可能な振る舞い）に落とす
 - design は「何を変えるか/壊れるか/どう守るか」を先に書く
 - plan は “テストで観測できる粒度” のステップに分ける
-- Issue 固有の観点（active issue 起点 / TDD 実行 / docs impact / final quality gate）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
-- phase progression rule:
-  - requirement が reviewer 承認される前に design へ進みません。
-  - design が reviewer 承認される前に plan へ進みません。
+- Issue 固有の active issue 起点、TDD 実行、step review loop、docs impact、final quality gate はこの workflow を正本とします。
+- requirement / design / plan の書き方自体は `phase_*.md` を正本とし、phase 内の標準順と文書作成時の reviewer loop は各 playbook 冒頭を参照します。
+- Issue 固有の観点（active issue 起点 / TDD 実行 / step review loop / docs impact / final quality gate）はこの workflow に残し、ヒアリング・discussion sheet・ADR などの共通作法は各 phase playbook を正本として参照します。
+- phase progression は各 `phase_*.md` の条件を参照します。
 
 ## 4. 実装（TDD + review loop）
 

@@ -84,10 +84,10 @@ Epic 作成後は、対象ノード配下の wrapper で Issue を追加でき�
 
 補足:
 - ノード直下や配下ディレクトリにテンプレ由来の `README.md` は生成されません。
+- Epic 固有の再利用判定、作成、Issue 分割、品質ゲートはこの workflow を正本とします。
+- requirement / design / plan の書き方自体は `phase_*.md` を正本とし、phase 内の標準順は各 playbook 冒頭を参照します。
 - Epic 固有の観点（契約 / 移行 / Issue 分割の妥当性）はこの workflow に残し、ヒアリング・discussion sheet・ADR・review loop などの共通作法は各 phase playbook を正本として参照します。
-- phase progression rule:
-  - requirement が reviewer 承認される前に design へ進みません。
-  - design が reviewer 承認される前に plan へ進みません。
+- phase progression は各 `phase_*.md` の条件を参照します。
 
 ## 3. 品質ゲート（Epic）
 
