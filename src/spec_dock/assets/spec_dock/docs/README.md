@@ -25,7 +25,7 @@
    - [phase_requirement.md](phase_requirement.md)
    - [phase_design.md](phase_design.md)
    - [phase_plan.md](phase_plan.md)
-4. 参照仕様
+4. reference レイヤ
    - [reference_github.md](reference_github.md)
    - [reference_naming.md](reference_naming.md)
    - [reference_deps.md](reference_deps.md)

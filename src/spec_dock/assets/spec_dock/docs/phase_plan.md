@@ -16,7 +16,7 @@ scope 固有の実行ルールと品質ゲートは `workflow_*.md` が additive
 - 固定すること: 分解単位、順序、完了判定、review / docs / quality gate の位置
 - 出力: reviewer が実行へ送れる `plan.md` と必要な `disc` / `research` / `adr`
 - 非ゴール: requirement / design の再議論、設計不足の隠蔽、将来作業の過剰先読み
-- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有の実行ルールと品質ゲートは `workflow_*.md` が additive に定義する
+- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有 gate は `workflow_*.md` が additive に定義する
 
 ## 標準順
 
@@ -53,18 +53,18 @@ scope 固有の実行ルールと品質ゲートは `workflow_*.md` が additive
   - 依存順序
   - 並行可能な作業
   - 各単位の完了判定
-  - 新規ノードを増やさずに進められる分解案
   - review / test / docs 更新 / quality gate の位置
+- 語彙は `shared minimum gate` と `scope-specific readiness contract` / `final exit contract` に揃える
 - 粒度の目安:
   - Initiative: Epic 単位で価値のまとまりと順序を示す
   - Epic: Issue 単位で縦切りと依存を示す
   - Issue: `1 step = 1 つの観測可能な振る舞い` を原則にする
-- Issue plan では `workflow_issue.md` の TDD / step review / docs impact / final diff review gate を plan に反映する
+- Issue plan では nested `block` / `iteration` を必要な時だけ使う
 - plan 本文には実行順、停止点、完了判定を残し、長い比較や作業メモは `discussions/` へ逃がす
 - 先に埋める節:
-  - Initiative: `ロードマップ`, `Epic 分解`, `順序と理由`, `計測計画`, `ロールアウト計画`, `依存関係 / ブロッカー`
-  - Epic: `Issue 分割`, `Issue 一覧`, `品質ゲート`, `ロールアウト / 移行`, `Issue Definition of Ready`
-  - Issue: `この計画で満たす要件ID`, `ステップ一覧`, `要件 ↔ ステップ対応表`, `実行ルール`, `期待する振る舞い`
+  - Initiative: `この計画が達成する Goal / Metric`, `マイルストーン`, `Epic ポートフォリオ`, `順序と理由`, `意思決定ゲート`, `指標レビュー計画`, `Epic readiness contract`, `依存 / ブロッカー`
+  - Epic: `この計画で閉じる E-RQ / E-AC`, `Issue 分割方針`, `Issue 一覧（順序 / tranche 付き）`, `統合チェックポイント`, `ロールアウト / docs impact`, `Issue readiness contract`
+  - Issue: `この計画で満たす要件ID`, `マイルストーン一覧`, `ステップ一覧`, `要件 ↔ ステップ対応`, `レビュー / QA ゲート方針`, `実装ステップ`, `docs impact gate`, `final diff review gate`, `final exit contract`
 
 ## 論点の逃がし先
 
@@ -76,7 +76,6 @@ scope 固有の実行ルールと品質ゲートは `workflow_*.md` が additive
   - 分割案や順序案が複数ある
   - quality gate や docs impact の扱いを事前合意したい
   - 外部依存やリリース順が複雑で plan 本文だけでは追いにくい
-  - 既存ノードへ収める案と新規ノード案の比較が要る
 - 次ならヒアリングを挟む:
   - ロールアウト日程や調整先が順序に影響する
   - 運用停止時間帯やリリース制約がある
@@ -84,7 +83,6 @@ scope 固有の実行ルールと品質ゲートは `workflow_*.md` が additive
 - 次なら ADR を検討する:
   - 反復レビューや品質ゲートの運用ルールを恒久化したい
   - ロールアウト戦略や切替方式が単なる順序ではなく方針決定になる
-- 通常の step 分解、実装順序、作業メモは ADR にしない
 
 ## review / handoff gate
 
@@ -93,8 +91,7 @@ scope 固有の実行ルールと品質ゲートは `workflow_*.md` が additive
 - 順序の理由が説明できる
 - 粒度が大きすぎず、review / test / commit / report が回る
 - 依存とブロッカーが plan に露出している
-- 新規ノードを増やす場合、その理由を対象ノード配下の最初の `disc` で追える
-- scope 固有の実行ルールや品質ゲートを対応する `workflow_*.md` に沿って反映できている
+- scope 固有の readiness contract と final exit contract を対応する template / workflow に沿って反映できている
 - `plan.md` と必要な `disc` / `research` / `adr` を束で渡せる
 - reviewer が「この計画で実行してよい」と判断できる
 

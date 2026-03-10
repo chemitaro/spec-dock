@@ -12,140 +12,117 @@ ID: "<EPIC_ID>"
 
 # <EPIC_ID> <EPIC_TITLE> — 設計（HOW）
 
-## 全体像（Context / Scope） (必須)
-- 対象境界（モジュール/責務/データ境界）:
+## 全体像
+- target boundary:
   - ...
-- 既存フローとの関係:
+- impacted area:
   - ...
-- 影響範囲（FE/BE/DB/ジョブ/外部連携）:
+- existing relation:
   - ...
 
-### UML（任意） (任意)
+### UML（推奨: module / context）
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+' module / context diagram
 @enduml
 ```
 
-## 契約（API/イベント/データ境界） (必須)
-### API（ある場合）
-- API-001: `<METHOD> <PATH>`
-  - 認証/認可:
-    - ...
+## 契約
+### API（必要時）
+- API-001:
   - Request:
-    - ...
   - Response:
-    - ...
   - Errors:
-    - ...
 
-### Event（ある場合）
-- EVT-001: `<event_name>`
+### Event（必要時）
+- EVT-001:
   - Producer:
-    - ...
   - Consumer:
-    - ...
   - Payload:
-    - ...
-  - 発行タイミング:
-    - ...
 
-### データ境界（System of Record / 整合性）
-- SoR（正のデータ）:
+### Data boundary
+- SoR:
   - ...
-- 整合性モデル（強整合/結果整合）:
+- consistency model:
   - ...
 
-## データモデル設計 (必須)
-- 変更点（テーブル/カラム/インデックス）:
+## データモデル
+- model / table changes:
   - ...
-- バリデーション/不変条件（Invariant）:
+- invariants:
   - ...
 
-### UML（任意） (任意)
+### UML（任意: data model）
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+' data / entity diagram
 @enduml
 ```
 
-## 主要フロー（高レベル） (必須)
-- Flow A（E-AC-001）:
-  1) ...
-  2) ...
-  3) ...
-- Flow B（E-AC-002）:
+## 主要フロー
+- Flow-A:
+  1. ...
+  2. ...
+  3. ...
+- Flow-B:
   - ...
 
-### UML（任意） (任意)
+### UML（任意: sequence / flow）
 ```plantuml
 @startuml
-' TODO: 必要なら UML を追加する（形式は自由）
+' sequence / flow diagram
 @enduml
 ```
 
-## 失敗設計（Error handling / Retry / Idempotency） (必須)
-- 想定故障モード:
+## 失敗設計
+- failure mode:
   - ...
-- リトライ方針:
+- retry:
   - ...
-- 冪等性/重複排除:
+- idempotency:
   - ...
-- 部分失敗の扱い（補償/再実行/整合性）:
-  - ...
-
-## 移行戦略（Migration / Rollout） (必須)
-- 戦略（例: expand → backfill → switch → contract）:
-  - ...
-- 二重書き/読み替え（必要なら）:
-  - ...
-- ロールバック方針:
+- partial failure:
   - ...
 
-## 観測性（Observability） (必須)
-- ログ（必須キー、マスキング、サンプリング）:
+## 移行戦略
+- migration strategy:
   - ...
-- メトリクス（成功/失敗/レイテンシ/処理件数）:
+- dual write/read if needed:
   - ...
-- アラート（しきい値/対応導線）:
-  - ...
-
-## セキュリティ / 権限 / 監査 (必須)
-- 役割モデル:
-  - ...
-- 監査ログ:
-  - ...
-- PII/機微情報の扱い:
+- rollback:
   - ...
 
-## テスト戦略（Epic） (必須)
+## 観測性 / セキュリティ
+- observability:
+  - ...
+- role / auth:
+  - ...
+- audit / pii:
+  - ...
+
+## テスト戦略
 - Unit:
   - ...
 - Integration:
   - ...
 - E2E:
   - ...
-- 回帰/負荷:
+- E-AC mapping:
+  - E-AC-001 -> ...
+
+## 関連 ADR
+- adr-...:
   - ...
 
-### E-AC → テスト対応 (必須)
-- E-AC-001 → `<test_file_path>::<test_name>` / `<scenario>`
-- E-AC-002 → ...
-
-## ADR index（重要な決定は ADR に寄せる） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
-
-## 未確定事項（TBD） (必須)
+## 未確定事項
 - Q-001:
-  - 質問: TBD ...
+  - 質問:
   - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）:
+    - A:
+      - ...
+    - B:
+      - ...
+  - 推奨案:
     - ...
   - 影響範囲:
-    - API / EVT / データモデル / 移行 / 観測性 / テスト / ...
-
-## 省略/例外メモ (必須)
-- 該当なし
+    - ...

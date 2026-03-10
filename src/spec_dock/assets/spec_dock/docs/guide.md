@@ -6,9 +6,14 @@ scope 固有の手順は `workflow_*.md`、shared な requirement / design / pla
 ## docs の読み分け
 
 - `workflow_*.md`: Initiative / Epic / Issue / ADR の scope 固有 workflow
-- `phase_*.md`: requirement / design / plan の shared playbook
+- `phase_*.md`: phase playbook（共通の作り方）
 - `reference_*.md`: GitHub / naming / deps / sync などの参照仕様
 - `discussions/`: 調査、議論、メモ、ADR の置き場
+
+phase playbook:
+- [phase_requirement.md](phase_requirement.md)
+- [phase_design.md](phase_design.md)
+- [phase_plan.md](phase_plan.md)
 
 入口:
 - Initiative: [workflow_initiative.md](workflow_initiative.md)
