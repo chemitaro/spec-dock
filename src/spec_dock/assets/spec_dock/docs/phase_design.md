@@ -16,7 +16,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - 固定すること: 方針、境界 / 契約、SoR / 依存、移行、観測性、テスト戦略
 - 出力: reviewer が plan へ送れる `design.md` と必要な `research` / `disc` / `adr`
 - 非ゴール: requirement の不足のごまかし、比較表の本文への押し込み、実装手順の plan 化
-- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有の操作と品質ゲートは `workflow_*.md` が additive に定義する
+- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有 gate は `workflow_*.md` が additive に定義する
 
 ## 標準順
 
@@ -53,11 +53,12 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 既存テストの守備範囲
   - 移行 / 運用 / 監視で壊しうる点
 - 本文には採用結論と guardrails を残し、長い比較や生の調査ログは `discussions/` へ逃がす
-- 図は複雑さが高いときだけ補助に使い、本文なしでは読めない図にしない
+- UML は用途付き placeholder だけを残す
+- initiative では高レベル図を 1 箇所まで、epic / issue では module / context や class / interface の置き場を明示する
 - 先に埋める節:
-  - Initiative: `アーキテクチャ上の狙い`, `現状の把握`, `目指す姿`, `システム境界 / 依存`, `ガードレール`, `移行 / ロールアウト方針`, `主要リスクと軽減策`
-  - Epic: `全体像`, `契約`, `データモデル設計`, `主要フロー`, `失敗設計`, `移行戦略`, `観測性`, `テスト戦略`
-  - Issue: `既存実装/規約の調査結果`, `主要フロー`, `判断材料/トレードオフ`, `インターフェース契約`, `変更計画`, `マッピング（要件 → 設計）`, `テスト戦略`
+  - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
+  - Epic: `全体像`, `契約`, `データモデル`, `主要フロー`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
+  - Issue: `既存実装 / 規約の理解`, `採用方針 / トレードオフ`, `インターフェース契約`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
 
 ## 論点の逃がし先
 
@@ -77,7 +78,6 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 境界、契約、整合性、移行戦略の採択が後続へ長く効く
   - 代替案を比較したうえで 1 案を明示的に選ぶ
   - 将来の変更者が「なぜこうしたか」を参照する必要がある
-- 単なる実装メモや未整理の比較は ADR にしない
 
 ## review / handoff gate
 

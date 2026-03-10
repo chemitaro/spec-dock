@@ -1,14 +1,23 @@
 # guide（全体像 / 導線）
 
 spec-dock の docs レイヤ、概念、生成物を最短で把握するための入口です。
-scope 固有の手順は `workflow_*.md`、shared な requirement / design / plan の作法は `phase_*.md`、コマンドや制約は `reference_*.md` を正本とします。
+scope 固有の手順は `workflow_*.md`、shared な requirement / design の作法は `phase_*.md`、plan は `phase_plan.md` と `phase_plan_<scope>.md` の二段構成、コマンドや制約は `reference_*.md` を正本とします。
 
 ## docs の読み分け
 
 - `workflow_*.md`: Initiative / Epic / Issue / ADR の scope 固有 workflow
-- `phase_*.md`: requirement / design / plan の shared playbook
+- `phase_*.md`: shared phase playbook（共通の作り方）
+- `phase_plan_<scope>.md`: scope 固有の plan authoring rule
 - `reference_*.md`: GitHub / naming / deps / sync などの参照仕様
 - `discussions/`: 調査、議論、メモ、ADR の置き場
+
+phase playbook:
+- [phase_requirement.md](phase_requirement.md)
+- [phase_design.md](phase_design.md)
+- [phase_plan.md](phase_plan.md)
+- [phase_plan_initiative.md](phase_plan_initiative.md)
+- [phase_plan_epic.md](phase_plan_epic.md)
+- [phase_plan_issue.md](phase_plan_issue.md)
 
 入口:
 - Initiative: [workflow_initiative.md](workflow_initiative.md)
@@ -71,8 +80,8 @@ spec-dock/
 
 1. 既存ノードに収まるか確認し、必要なら `new` / `import` する
 2. `active set` で作業対象を固定する
-3. 対象 scope の `workflow_*.md` を正本にし、requirement / design / plan は `phase_*.md` に沿って書く
-4. Initiative は Epic 分解、Epic は Issue 分割、Issue は TDD + review loop を進める
+3. 対象 scope の `workflow_*.md` を正本にし、requirement / design は shared playbook、plan は `phase_plan.md` → `phase_plan_<scope>.md` の順で書く
+4. Initiative は Epic 分解、Epic は Issue 分割、Issue は TDD ベースの execution contract を plan に落とす
 5. `validate` / `sync` で整合性と生成物を更新する
 
 ## 次に読む
