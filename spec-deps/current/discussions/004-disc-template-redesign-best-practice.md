@@ -31,6 +31,7 @@ ID: "004-disc-template-redesign-best-practice"
 - 最善案は、**共通プロトコルは phase playbook に残し、template は scope × phase ごとの最適 schema に振り切る** こと。
 - その前提として、generic な `Definition of Ready/Done` や長い運用説明は template から外し、shared gate は `phase_*.md` / `workflow_*.md` に戻す。
 - とくに plan は、Issue だけでなく Initiative / Epic も含めて「review / decision gate を埋め込む template」へ進化させるべきである。
+- 用語は `shared minimum gate` と `scope-specific readiness/exit contract` に固定する。
 
 ## 前提
 - 責務分離の前提は [002-disc-document-responsibility-redefinition.md](/srv/mount/spec-dock/spec-deps/current/discussions/002-disc-document-responsibility-redefinition.md) に従う。

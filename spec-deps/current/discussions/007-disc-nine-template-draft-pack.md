@@ -81,6 +81,14 @@ ID: "<INIT_ID>"
 - OUT OF SCOPE:
   - ...
 
+## 境界
+- Always:
+  - ...
+- Ask:
+  - ...
+- Never:
+  - ...
+
 ## ステークホルダー / 影響範囲
 - 利用者:
   - ...
@@ -342,6 +350,14 @@ ID: "<EPIC_ID>"
 - MUST NOT:
   - ...
 - OUT OF SCOPE:
+  - ...
+
+## 境界
+- Always:
+  - ...
+- Ask:
+  - ...
+- Never:
   - ...
 
 ## 非機能要件
@@ -779,6 +795,11 @@ ID: "<ISS_ID>"
 - migration / rollback / feature flag if needed:
   - ...
 
+## 要件 / 例外 -> verification mapping
+- AC-001 -> ...
+- EC-001 -> ...
+- constraint -> ...
+
 ## リスク / 移行 / ロールバック（必要時）
 - ...
 
@@ -889,6 +910,11 @@ ID: "<ISS_ID>"
 
 ### Sxx — <next observable behavior>
 - ...
+
+### nested の使い方
+- `step` は常に使う
+- `block` は必要な時だけ使う
+- `iteration` は複雑な step で必要な時だけ使う
 
 ## docs impact gate
 - 対象:
