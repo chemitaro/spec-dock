@@ -178,7 +178,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / governan
 
 ## execution axioms
 
-- `1 step = 1 observable behavior`
+- `workflow_issue.md` が `1 step = 1 observable behavior` invariant を所有する
 - `block` は optional concern group とする
 - `iteration` は 1 回の完全な TDD cycle とする
 - `Red / Green / Refactor` は iteration の内部フェーズとする
