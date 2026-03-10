@@ -151,6 +151,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 
 ### 役割
 - issue plan を TDD ベースの execution contract として書くための playbook
+- nested semantics の正本は [013-disc-issue-plan-tdd-embedding-best-practice.md](/srv/mount/spec-dock/spec-deps/current/discussions/013-disc-issue-plan-tdd-embedding-best-practice.md) を採用する
 
 ### 提案する本文構成
 
@@ -178,10 +179,13 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / governan
 ## execution axioms
 
 - `1 step = 1 observable behavior`
-- nested は `step` を基本とし、`block / iteration` は必要時のみ使う
+- `block` は optional concern group とする
+- `iteration` は 1 回の完全な TDD cycle とする
+- `Red / Green / Refactor` は iteration の内部フェーズとする
 - `workflow_issue.md` が定義する execution cadence を plan に反映する
 - cadence そのものは workflow の正本であり、この playbook では gate / step / report / commit decision を plan.md にどう埋め込むかを扱う
 - レビューは sub-step ごとではなく、step / milestone / final gate の粒度で設計する
+- 最初にその step の test を全部書かず、iteration ごとに failing test を 1 本ずつ進める
 
 ## entry focus
 
@@ -196,6 +200,8 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / governan
 - `ステップ一覧` と `要件 ↔ ステップ対応` を置く
 - `レビュー / QA ゲート方針` を置く
 - `実装ステップ` を step / block / iteration で書く
+  - 単純な step では `block` は最小 1 個の wrapper でよい
+  - 複雑な step では `block` で concern group を分ける
 - `S90 docs impact resolution / docs refresh` を必要時に入れる
 - `S99 final diff review quality gate` を必須で置く
 - `final exit contract` を置く
@@ -213,6 +219,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / governan
 - ただし detail を無制限に増やさず、block / iteration は必要時だけ使う
 - quality gate は本文の後置き補足ではなく、計画そのものとして埋め込む
 - cadence の正本は `workflow_issue.md` に置き、この playbook では cadence を plan に埋め込む粒度と配置を決める
+- TDD の nested semantics は `block = optional concern group`, `iteration = 1 tdd cycle`, `Red / Green / Refactor = iteration 内部フェーズ` で統一する
 
 ## 比較図
 
