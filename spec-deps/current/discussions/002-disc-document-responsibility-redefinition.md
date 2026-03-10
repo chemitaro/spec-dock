@@ -27,6 +27,14 @@ ID: "002-disc-document-responsibility-redefinition"
 
 ## 再定義の原則
 
+### 用語固定
+- `shared minimum gate`:
+  - `phase_*.md` / `workflow_*.md` が持つ共通または scope 固有の gate
+- `scope-specific readiness contract`:
+  - 下流 scope や次工程に渡すために template 側へ残す最小契約
+- `final exit contract`:
+  - plan template が持つ完了条件の最小契約
+
 ### 原則 1. 1 文書 1 責務
 - 文書は「案内」「ルール」「フォーム」「参照仕様」を混ぜない。
 - 1 文書が複数の役割を持つと、LLM がどの解釈を優先すべきか曖昧になる。

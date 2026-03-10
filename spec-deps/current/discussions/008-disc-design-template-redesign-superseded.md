@@ -1,7 +1,7 @@
 ---
 種別: disc
-ID: "004-disc-design-template-redesign"
-タイトル: "initiative epic issue design template の再分析と再設計方針"
+ID: "008-disc-design-template-redesign-superseded"
+タイトル: "initiative epic issue design template の再分析と再設計方針（superseded）"
 状態: "proposed"
 作成者: "Codex"
 最終更新: "2026-03-10"
@@ -9,7 +9,11 @@ ID: "004-disc-design-template-redesign"
 関連: ["001-disc-current-state-and-target-doc-architecture", "002-disc-document-responsibility-redefinition", "#21", "https://github.com/chemitaro/spec-dock/issues/21"]
 ---
 
-# 004-disc initiative epic issue design template の再分析と再設計方針
+# 008-disc initiative epic issue design template の再分析と再設計方針（superseded）
+
+## ステータス
+- このシートは初期 draft です。
+- design template の現行正本は [006-disc-design-template-analysis.md](/srv/mount/spec-dock/spec-deps/current/discussions/006-disc-design-template-analysis.md) を参照してください。
 
 ## 結論
 - 3 本の design template は、方向性自体はかなり良い。

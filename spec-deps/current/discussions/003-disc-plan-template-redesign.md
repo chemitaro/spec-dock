@@ -13,6 +13,7 @@ ID: "003-disc-plan-template-redesign"
 
 ## 結論
 - 3 本の plan template は、**同じ形に揃えるべきではない**。揃えるべきなのは「計画として固定すべき軸」であり、見出しや粒度は scope ごとに変えるべきである。
+- concrete な section 名は [007-disc-nine-template-draft-pack.md](/srv/mount/spec-dock/spec-deps/current/discussions/007-disc-nine-template-draft-pack.md) を正本とし、このシートは plan 設計原則と粒度判断の根拠を扱う。
 - 共通で持つべき軸は次の 6 つだけでよい。
   - 対象
   - 分解
@@ -39,7 +40,7 @@ ID: "003-disc-plan-template-redesign"
 - `ロードマップ`
 - `Epic 分解`
 - `計測計画`
-- `Epic Definition of Ready`
+- `Epic readiness contract` 相当の欄
 があり、戦略から epic handoff までの骨格はある。
 
 不足
@@ -51,7 +52,7 @@ ID: "003-disc-plan-template-redesign"
 ### Epic plan（現行）
 良い点
 - `Issue 分割`
-- `Issue Definition of Ready`
+- `Issue readiness contract` 相当の欄
 - `Epic 品質ゲート`
 - `ロールアウト / 移行`
 があり、Issue handoff 用の骨格はある。
@@ -168,8 +169,8 @@ Epic --> Issue
 - sequencing rationale
 - investment / decision checkpoint
 - metric review timing
-- epic DoR
-- initiative plan exit criteria
+- epic readiness contract
+- final exit contract
 
 持つべき gate
 - `G1 strategy review`
@@ -181,11 +182,11 @@ Epic --> Issue
 - `G9 final initiative plan review`
   - initiative docs bundle review
 
-DoR / DoD の扱い
-- DoR:
-  - Epic に求める ready 条件として持つ
-- DoD:
-  - metric / rollout / follow-up decomposition の完了条件として持つ
+readiness / exit contract の扱い
+- readiness:
+  - `epic readiness contract` として持つ
+- exit:
+  - metric / rollout / follow-up decomposition の完了条件を `final exit contract` として持つ
 
 最適な見出し案
 - `## この計画が達成する Goal / Metric`
@@ -194,9 +195,9 @@ DoR / DoD の扱い
 - `## 順序と理由`
 - `## 意思決定チェックポイント`
 - `## 計測 / ロールアウト / governance 更新`
-- `## Epic Definition of Ready`
+- `## Epic readiness contract`
 - `## 依存 / ブロッカー`
-- `## 最終レビュー条件`
+- `## final exit contract`
 
 ### Epic plan
 
@@ -216,8 +217,8 @@ DoR / DoD の扱い
 - tranche / integration grouping
 - epic gate plan
 - rollout readiness
-- issue DoR
-- epic exit criteria
+- issue readiness contract
+- final exit contract
 
 持つべき gate
 - `G1 decomposition review`
@@ -229,11 +230,11 @@ DoR / DoD の扱い
 - `G9 final epic spec review`
   - epic requirement / design / plan bundle review
 
-DoR / DoD の扱い
-- DoR:
-  - Issue に求める ready 条件として持つ
-- DoD:
-  - E-AC と rollout / observability の達成条件として持つ
+readiness / exit contract の扱い
+- readiness:
+  - `issue readiness contract` として持つ
+- exit:
+  - E-AC と rollout / observability の達成条件を `final exit contract` として持つ
 
 最適な見出し案
 - `## この計画で閉じる E-RQ / E-AC`
@@ -242,9 +243,9 @@ DoR / DoD の扱い
 - `## 統合チェックポイント`
 - `## 品質ゲート`
 - `## ロールアウト / docs impact`
-- `## Issue Definition of Ready`
+- `## Issue readiness contract`
 - `## 依存 / ブロッカー`
-- `## 最終レビュー条件`
+- `## final exit contract`
 
 ### Issue plan
 
@@ -260,11 +261,11 @@ DoR / DoD の扱い
 - AC / EC / 制約への対応範囲
 - step list
 - step ↔ requirement mapping
-- nested execution rule
+- nested execution rule（必要時のみ `block` / `iteration` を使う）
 - milestone review gate plan
 - docs impact policy
 - final diff review
-- plan DoD
+- final exit contract
 
 持つべき gate
 - `G0 plan upfront approval`
@@ -278,16 +279,15 @@ DoR / DoD の扱い
 - `G9 final diff review`
   - branch 全体差分の承認
 
-DoR / DoD の扱い
-- DoR:
-  - 直接の節としては軽くしてよい
-  - 代わりに `G0 plan upfront approval` を強くする
-- DoD:
+readiness / exit contract の扱い
+- readiness:
+  - 直接の節としては持たず、`G0 plan upfront approval` で requirement / design / plan 整合を確認する
+- exit:
   - AC / EC
   - tests
   - docs impact
   - final diff review
-  を plan の exit として明記する
+  を `final exit contract` として明記する
 
 最適な見出し案
 - `## この計画で満たす要件ID`
@@ -299,7 +299,7 @@ DoR / DoD の扱い
 - `## S90 docs impact resolution`
 - `## S99 final diff review quality gate`
 - `## 未確定事項`
-- `## 完了条件`
+- `## final exit contract`
 
 ## Issue plan の理想的な nested 構造
 
@@ -309,8 +309,8 @@ skinparam monochrome true
 skinparam defaultTextAlignment left
 
 rectangle "Step\nobservable behavior" as Step
-rectangle "Block\ncoherent work package" as Block
-rectangle "Iteration\nsmall Red->Green->Refactor" as Iter
+rectangle "Block\noptional work package" as Block
+rectangle "Iteration\noptional Red->Green->Refactor" as Iter
 rectangle "Review Gate\nimplementation / QA / docs" as Gate
 
 Step --> Block
@@ -323,9 +323,9 @@ Step --> Gate
 - Step:
   - 1 つの観測可能な振る舞い
 - Block:
-  - 同じ関心事、同じ変更境界を持つ作業束
+  - 必要な時だけ使う、同じ関心事 / 変更境界を持つ作業束
 - Iteration:
-  - 最小の TDD cycle
+  - 必要な時だけ使う、最小の TDD cycle
 
 重要
 - reviewer を every iteration に呼ばない
