@@ -1,23 +1,23 @@
 ---
 種別: 実装報告書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "iss-00021"
+タイトル: "initiative epic issue テンプレートと playbook の責務を再構築する"
+関連GitHub: ["#21", "https://github.com/chemitaro/spec-dock/issues/21"]
+状態: "draft"
+作成者: "Codex"
+最終更新: "2026-03-10"
 依存: ["requirement.md", "design.md", "plan.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: []
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装報告（LOG）
+# iss-00021 initiative epic issue テンプレートと playbook の責務を再構築する — 実装報告（LOG）
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
 
 ## 実装記録（セッションログ） (必須)
 
-### YYYY-MM-DD HH:MM - HH:MM
+### 2026-03-10 HH:MM - HH:MM
 
 #### 対象
 - Step: S01, S02, ...
@@ -45,7 +45,7 @@ ID: "<ISS_ID>"
 
 ---
 
-### YYYY-MM-DD HH:MM - HH:MM
+### 2026-03-10 HH:MM - HH:MM
 
 #### 対象
 - Step: ...
