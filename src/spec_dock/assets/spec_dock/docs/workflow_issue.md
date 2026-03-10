@@ -43,6 +43,7 @@ Issue は実装の最小単位です。
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、plan upfront approval を得る
 - 各 step は `Red → Green → Refactor → review → fix → re-review → report → commit/no-op` の順で進める
 - `1 step = 1 つの観測可能な振る舞い` を原則にし、各 step に観測用の 1 本のコマンドを置く
+- 各 step は step result approval を得てから次へ進む
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
 
