@@ -1,7 +1,7 @@
 # guide（全体像 / 概念 / 生成物）
 
 このドキュメントは、spec-dock の **概念**と **生成物**と **ディレクトリ構造**を最短で理解するための総合ガイドです。  
-具体的な手順（品質ゲート/チェックリストを含む）は、各ワークフローへ移動しています。
+scope 固有の手順・品質ゲートは `workflow_*.md`、shared な requirement / design / plan の進め方は `phase_*.md` を正本とします。
 
 - Initiative: [workflow_initiative.md](workflow_initiative.md)
 - Epic: [workflow_epic.md](workflow_epic.md)
@@ -25,6 +25,7 @@ scope（initiative / epic / issue）をまたいで再利用する requirement /
 補足:
 - scope 固有の制約や分解方針は `workflow_*.md` を正本にします。
 - playbook 本文を workflow に複製せず、導線で結ぶ構成を維持します。
+- phase を進めるときは、全体 workflow の中での位置づけと phase 内の標準順を各 `phase_*.md` 冒頭で先に確認します。
 
 ## 1. spec-dock が管理するもの（SSOT と生成物）
 

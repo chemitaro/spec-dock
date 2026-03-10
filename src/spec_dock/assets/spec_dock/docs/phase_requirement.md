@@ -8,7 +8,41 @@
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - 議論資料の置き方: `discussions/rules.md`
 
-## 1. この phase の目的 / 出力 / 非ゴール
+## 1. requirement phase の全体 workflow
+
+requirement phase は、全体 workflow の **調査分析 → requirement → design → plan → 実装/品質ゲート** のうち、`requirement` を扱います。  
+この phase では、調査分析で集めた事実をもとに、何を解くか、なぜ今やるか、どこまでを対象にするかを固定します。  
+Initiative / Epic / Issue のどれでも、まず対象 scope の `workflow_*.md` で前後の流れと品質ゲートを確認し、そのうえでこの playbook に沿って requirement を詰めます。
+
+- この phase の位置づけ:
+  - 調査分析の結果を、WHAT / WHY / scope / success として固定する
+- 前段で揃っている前提:
+  - 対象 scope が明確になっている
+  - 関連 docs / 実装 / 周辺情報を調べ始められる状態になっている
+- この phase で固定すること:
+  - 目的
+  - 背景・現状
+  - 成功条件
+  - スコープと非スコープ
+- この phase の完了条件:
+  - reviewer が「design へ進めてよい」と判断できること
+
+標準順:
+1. 目的理解
+2. 徹底調査
+3. 調査結果の docs 化（`research` / `disc` / `note` / `adr`）
+4. discussion / ADR 準備
+5. 必要ならヒアリング
+6. 本文作成
+7. reviewer loop
+8. handoff
+
+注意:
+- 情報が揃う前に requirement 本文を書き始めません。
+- source のない断定や HOW に踏み込みすぎた内容は requirement 本文へ入れません。
+- scope 固有の操作、entry 条件、品質ゲートは `workflow_*.md` を正本とします。
+
+## 2. この phase の目的 / 出力 / 非ゴール
 
 ### 目的
 - 何を解決するのか、なぜ今やるのか、どこまでを対象にするのかを観測可能な形で固定する
@@ -25,7 +59,7 @@
 - template の節を機械的に全部埋めること自体を目的化すること
 - 未確定論点を曖昧な文章で包んで設計へ送ること
 
-## 2. 着手前に確認すること
+## 3. workflow 開始前に確認すること
 
 - 対象スコープの workflow を開き、いま扱うのが Initiative / Epic / Issue のどれかを明確にする
 - 対応する template を開き、最低限どの節があるかを把握する
@@ -37,11 +71,11 @@ template 参照先:
 - Epic: `spec-dock/templates/epic/requirement.md`
 - Issue: `spec-dock/templates/issue/requirement.md`
 
-## 3. 調査・分析の進め方
+## 4. requirement workflow の進め方
 
 要件定義では、最初に「結論」を書くのではなく、**事実と解釈を分けて集める**のが基本です。
 
-### 3.1 最初に集めるもの
+### 4.1 最初に集めるもの
 - 現状の困りごとを示す一次情報
   - 既存ドキュメント
   - コードや設定
@@ -53,13 +87,15 @@ template 参照先:
 - 成功を判断する観測点
   - UI / HTTP / DB / Log / dashboard / 運用手順 など
 
-### 3.2 調査の進め方
+### 4.2 調査の進め方
 - まず As-Is を箇条書きで固め、To-Be はその後に書く
 - 「事実」「推測」「未確定」を混ぜない
 - 分からないことは `TBD` へ逃がす前に、追加調査で潰せるかを一度確認する
 - スコープが広がりそうなら、早めに MUST / MUST NOT / OUT OF SCOPE を仮置きする
+- requirement 本文へ昇格させる前に、主要な事実・比較・未確定論点を `research` / `disc` / `note` に残す
+- requirement 本文には結論・制約・未決を残し、調査ログや長い比較表は discussion 系 docs へ分離する
 
-## 4. ユーザーヒアリングの進め方
+## 5. ユーザーヒアリングを挟む条件
 
 次のどれかに当てはまる場合、ヒアリングは事実上必須です。
 - 困りごとの一次情報がドキュメントやコードだけでは足りない
@@ -70,9 +106,9 @@ template 参照先:
 進め方:
 - 先に仮説を整理してから聞く
 - 「どう実装するか」ではなく「何が困るか / 何なら成功か」を確認する
-- 回答は requirement 本文に直接埋め込まず、必要なら discussion sheet に整理してから反映する
+- 回答は requirement 本文に直接埋め込まず、先に discussion sheet へ整理してから反映する
 
-## 5. discussion sheet を作る条件
+## 6. discussion / docs 化の使い分け
 
 次の条件のいずれかを満たしたら、`discussions/` に sheet を作ります。
 - 論点が 2 つ以上あり、会話だけでは追跡しにくい
@@ -86,7 +122,15 @@ template 参照先:
 - `NNN-disc-*`: 論点整理、選択肢比較、合意形成の叩き台
 - `NNN-note-*`: 軽量メモ、一時的な整理
 
-## 6. ADR を切る条件
+ヒアリングや意思決定依頼へ進む前に、少なくとも次を sheet 上で見えるようにします。
+- 今回決めたいこと / 聞きたいこと
+- 確定した事実
+- 未確定事項 / 仮説
+- 選択肢と比較
+- 推奨案
+- 反映先の本文節
+
+## 7. ADR を切る条件
 
 要件 phase では ADR は乱用しません。  
 ただし、次のような **意思決定を固定しないと要件が閉じない** 場合は ADR を検討します。
@@ -97,7 +141,7 @@ template 参照先:
 
 逆に、追加調査で解けるもの、単なる作業メモ、未整理の疑問は ADR ではなく discussion sheet に置きます。
 
-## 7. template のどこを埋めるか
+## 8. template で先に埋める節
 
 この playbook は骨子そのものを再掲しません。  
 代わりに、各 template で特に先に埋める節を示します。
@@ -127,7 +171,7 @@ template 参照先:
 - `例外・エッジケース`
 - `未確定事項`
 
-## 8. reviewer に渡す前の exit criteria
+## 9. reviewer に渡す前の exit criteria
 
 次を満たしてから reviewer へ渡します。
 - 目的が 1〜3 行で説明できる
@@ -136,8 +180,10 @@ template 参照先:
 - 主要な TBD が列挙され、放置理由ではなく「質問 / 選択肢 / 推奨案」がある
 - discussion / ADR が必要な論点を requirement 本文へ押し込んでいない
 - 設計の話に踏み込みすぎず、WHAT / WHY に留まっている
+- `requirement.md` 単体ではなく、必要な `research` / `disc` / `adr` を束で渡せる
+- reviewer コメント反映後に re-review し、提出可能状態まで戻せる
 
-## 9. 次 phase へ進める条件
+## 10. 次の phase へ進める条件
 
 要件定義は reviewer 承認前に次 phase へ進めません。  
 次の条件を満たしたときだけ design へ進みます。
@@ -146,8 +192,9 @@ template 参照先:
 - 重要な未確定事項が「design で扱う論点」なのか「追加調査 / ヒアリングが必要」なのか仕分けできている
 - 必要な discussion / ADR が `discussions/` に残っている
 - success metrics または受け入れ条件が、後続設計で参照できる粒度になっている
+- `requirement.md` と関連 docs を handoff 単位としてまとめられる
 
-## 10. subagent 活用ガイダンス
+## 11. subagent 活用ガイダンス
 
 shared playbook の前提は「自分で全部抱え込まない」です。
 
@@ -162,7 +209,7 @@ shared playbook の前提は「自分で全部抱え込まない」です。
 - subagent に渡す前に、対象スコープ、未確定論点、期待する出力を 3 点セットで明記する
 - subagent の出力をそのまま requirement に貼らず、採用判断を人間可読な形で整理する
 
-## 11. 迷ったときの判断順
+## 12. 迷ったときの判断順
 
 1. 追加調査で事実を増やせるか
 2. ユーザーヒアリングで判断できるか

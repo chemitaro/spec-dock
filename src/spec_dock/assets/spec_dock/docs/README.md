@@ -42,6 +42,7 @@
 補足:
 - playbook は共通作法の正本です。
 - scope 固有の制約や判断は `workflow_*.md` 側で扱います。
+- 実務では、先に対象 scope の `workflow_*.md` を確認し、その後に `phase_*.md` 冒頭の workflow に沿って requirement / design / plan を進めます。
 
 ## 作成前の原則
 
