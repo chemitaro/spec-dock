@@ -52,9 +52,13 @@ ID: "<ISS_ID>"
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
+- cadence / approval policy は `workflow_issue.md` を正本とする。
+- 互換参照: `Red → Green → Refactor → review → fix → re-review → report → commit/no-op`
 - 各 step は 1 つの観測可能な振る舞いを単位とする。
-- nested は `step` を基本とし、`block` / `iteration` は必要な時だけ使う。
-- 各 step は **Red → Green → Refactor → review → fix → re-review → report → commit/no-op** の順で閉じる。
+- `block` は optional concern group。単純な step では最小 wrapper 1 個でよい。
+- `iteration` は 1 回の TDD cycle とし、各 iteration は `Red → Green → Refactor` で閉じる。
+- failing test は iteration ごとに 1 本ずつ進める。
+- `Green` は最小実装、`Refactor` は green 維持を前提とする。
 - shared minimum gate と scope-specific readiness contract / final exit contract を満たす。
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
@@ -74,21 +78,35 @@ ID: "<ISS_ID>"
 - [ ] `update_plan` に step の作業単位を登録した
 - [ ] `./spec-dock/active/issue/report.md` の追記位置を決めた
 
-#### B1 — <work block>
+#### B1 — <optional concern group>
 - purpose:
   - ...
 - files:
   - ...
 
-##### I1 — <iteration>
-- Red:
-  - ...
-- Green:
-  - ...
-- Refactor:
+##### I1 — <tdd cycle>
+- slice goal:
   - ...
 
-#### milestone gate
+###### Red
+- failing test:
+  - ...
+- expected failure:
+  - ...
+
+###### Green
+- minimum implementation:
+  - ...
+- pass condition:
+  - ...
+
+###### Refactor
+- cleanup target:
+  - ...
+- invariants to keep green:
+  - ...
+
+#### step gate
 - review:
   - ...
 - expected tests:
@@ -101,8 +119,9 @@ ID: "<ISS_ID>"
 
 ### nested の使い方
 - `step` は常に使う
-- `block` は必要な時だけ使う
-- `iteration` は複雑な step で必要な時だけ使う
+- `block` は必要な時だけ分ける
+- `iteration` は必要な数だけ並べる
+- review / QA / docs / final diff は iteration の外に置く
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:

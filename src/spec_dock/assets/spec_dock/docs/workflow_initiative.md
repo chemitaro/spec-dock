@@ -12,6 +12,7 @@ Initiative は投資単位です。
 - Epic: [workflow_epic.md](workflow_epic.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
+- Initiative plan playbook: [phase_plan_initiative.md](phase_plan_initiative.md)
 
 ## 再利用判定
 
@@ -37,9 +38,9 @@ Initiative は投資単位です。
 
 - `requirement.md`: 投資理由、成功条件、スコープ
 - `design.md`: 方針、境界、依存、リスク
-- `plan.md`: Epic 分解、順序、ブロッカー
+- `plan.md`: Epic 分解、順序、ブロッカー。shared axiom は `phase_plan.md`、Initiative 固有の書き方は `phase_plan_initiative.md`
 - `discussions/`: `new doc {adr|disc|research|note} --initiative <initiative-id> --title "..."`
-- shared な書き方は `phase_*.md`、Initiative 固有の分解判断はこの workflow を正本とする
+- shared な書き方は `phase_*.md`、lifecycle / governance と Initiative 固有の分解判断はこの workflow を正本とする
 
 ## 品質ゲート
 
