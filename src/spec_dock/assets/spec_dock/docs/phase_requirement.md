@@ -16,7 +16,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - 固定すること: 目的、背景・現状、成功条件、スコープ / 非スコープ、主要 TBD の置き場
 - 出力: reviewer が design へ送れる `requirement.md` と必要な `research` / `disc` / `adr`
 - 非ゴール: HOW の先取り、source のない断定、未確定論点の隠蔽
-- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有の操作と品質ゲートは `workflow_*.md` が additive に定義する
+- 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有 gate は `workflow_*.md` が additive に定義する
 
 ## 標準順
 
@@ -47,11 +47,12 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 
 - As-Is は一次情報を根拠にし、事実 / 推測 / 未確定を混ぜない
 - `WHAT / WHY / scope / success` を先に固め、HOW は入れすぎない
-- `MUST / MUST NOT / OUT OF SCOPE` を早めに仮置きし、主要 TBD の位置を決める
+- `MUST / MUST NOT / OUT OF SCOPE` と `Always / Ask / Never` を早めに仮置きする
 - requirement 本文には結論と制約を残し、長い比較や調査ログは `discussions/` へ逃がす
+- generic DoR / DoD や `省略/例外メモ` は template に戻さない
 - 先に埋める節:
-  - Initiative: `目的`, `背景・現状`, `成功指標`, `スコープ`, `非交渉制約`, `未確定事項`
-  - Epic: `目的`, `ユースケース`, `要求`, `受け入れ条件`, `依存 / 影響範囲`, `未確定事項`
+  - Initiative: `目的`, `背景と Why now`, `成功指標`, `スコープ`, `境界`, `非交渉制約`, `未確定事項`
+  - Epic: `目的`, `ユースケース`, `Epic requirements`, `Epic acceptance criteria`, `スコープ`, `境界`, `依存 / 影響範囲`, `未確定事項`
   - Issue: `目的`, `背景・現状`, `スコープ`, `境界`, `受け入れ条件`, `例外・エッジケース`, `未確定事項`
 
 ## 論点の逃がし先
@@ -74,7 +75,6 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - スコープ境界や方針が後続全体へ影響する
   - 非交渉制約や運用ルールを固定しないと success が閉じない
   - 将来参照したい採択理由を残す必要がある
-- 追加調査で閉じる話や作業メモは ADR にしない
 
 ## review / handoff gate
 
@@ -82,7 +82,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 
 - 目的が 1〜3 行で説明できる
 - As-Is の根拠と主要観測点がある
-- `MUST / MUST NOT / OUT OF SCOPE` が曖昧でない
+- `MUST / MUST NOT / OUT OF SCOPE` と `Always / Ask / Never` が曖昧でない
 - 主要 TBD に `質問 / 選択肢 / 推奨案` がある
 - design 論点と追加調査 / ヒアリング論点が仕分けできている
 - `requirement.md` と必要な `research` / `disc` / `adr` を束で渡せる

@@ -2,6 +2,7 @@
 
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
 まず `guide.md` で全体像を掴み、その後は対象 scope の `workflow_*.md` を入口にしてください。
+plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の scope-specific playbook を合わせて参照します。
 
 ## エージェント起点
 
@@ -25,7 +26,11 @@
    - [phase_requirement.md](phase_requirement.md)
    - [phase_design.md](phase_design.md)
    - [phase_plan.md](phase_plan.md)
-4. 参照仕様
+4. scope 固有の plan playbook
+   - [phase_plan_initiative.md](phase_plan_initiative.md)
+   - [phase_plan_epic.md](phase_plan_epic.md)
+   - [phase_plan_issue.md](phase_plan_issue.md)
+5. reference レイヤ
    - [reference_github.md](reference_github.md)
    - [reference_naming.md](reference_naming.md)
    - [reference_deps.md](reference_deps.md)
@@ -52,7 +57,9 @@
 ## 高頻度ルール
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
+- plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
 - `new issue` はデフォルトで GitHub Issue を作る。local-only は `--no-github`
 - `new initiative` / `new epic` はデフォルトで local-only。GitHub 連携は opt-in
 - `import` は読み取り確認のみで、GitHub を更新しない
+- Issue plan は TDD ベースの execution contract を持つが、cadence policy の正本は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

@@ -13,6 +13,7 @@ Issue は実装の最小単位です。
 - ADR: [workflow_adr.md](workflow_adr.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
+- Issue plan playbook: [phase_plan_issue.md](phase_plan_issue.md)
 
 ## 作成と active set
 
@@ -36,13 +37,15 @@ Issue は実装の最小単位です。
 
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
 - `discussions/`: `new doc {adr|disc|research|note} --issue <issue-id> --title "..."`
-- shared な書き方は `phase_*.md`、Issue 固有の実行ルールはこの workflow を正本とする
+- shared な書き方は `phase_*.md`、Issue plan の構造化は `phase_plan_issue.md`、Issue 固有の実行 policy はこの workflow を正本とする
 
 ## 実行 contract
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、plan upfront approval を得る
 - 各 step は `Red → Green → Refactor → review → fix → re-review → report → commit/no-op` の順で進める
 - `1 step = 1 つの観測可能な振る舞い` を原則にし、各 step に観測用の 1 本のコマンドを置く
+- `plan.md` では TDD cycle を step / block / iteration に埋め込み、配置ルールは `phase_plan_issue.md` に従う
+- 各 step は step result approval を得てから次へ進む
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
 

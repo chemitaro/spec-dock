@@ -13,6 +13,7 @@ Epic は設計の背骨です。
 - Issue: [workflow_issue.md](workflow_issue.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
+- Epic plan playbook: [phase_plan_epic.md](phase_plan_epic.md)
 
 ## 再利用判定
 
@@ -39,9 +40,9 @@ Epic は設計の背骨です。
 
 - `requirement.md`: 期待する価値、受け入れ条件、非機能、スコープ
 - `design.md`: 契約、移行、観測性、リスク
-- `plan.md`: Issue 分割、依存順、品質ゲート
+- `plan.md`: Issue 分割、依存順、品質ゲート。shared axiom は `phase_plan.md`、Epic 固有の書き方は `phase_plan_epic.md`
 - `discussions/`: `new doc {adr|disc|research|note} --epic <epic-id> --title "..."`
-- shared な書き方は `phase_*.md`、Epic 固有の分割判断はこの workflow を正本とする
+- shared な書き方は `phase_*.md`、lifecycle / governance と Epic 固有の分割判断はこの workflow を正本とする
 
 ## 品質ゲート
 

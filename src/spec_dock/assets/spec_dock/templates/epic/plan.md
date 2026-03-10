@@ -12,71 +12,80 @@ ID: "<EPIC_ID>"
 
 # <EPIC_ID> <EPIC_TITLE> — 計画（Issues / Order）
 
-## Issue 分割（縦切り方針） (必須)
-- 価値の縦切り（UI→API→DBまで通す） / 移行の縦切り（expand→...）:
+## この計画で閉じる E-RQ / E-AC
+- E-RQ:
   - ...
-- 分割方針（原則）:
-  - ...
-- 例外（分割方針を破る条件）:
+- E-AC:
   - ...
 
-## Issue 一覧（順序付き） (必須)
+## Issue 分割方針
+- slicing principle:
+  - ...
+- exceptions:
+  - ...
+
+## Issue 一覧（順序 / tranche 付き）
 - iss-xxxx-...:
   - 目的:
     - ...
-  - 成果物（Deliverable）:
+  - deliverable:
     - ...
-  - 対応する E-RQ / E-AC:
+  - tranche:
     - ...
-  - Depends on:
+  - closes:
+    - ...
+  - depends on:
     - ...
 - iss-xxxx-...:
   - ...
 
-### UML（任意） (任意)
-```plantuml
-@startuml
-' TODO: 必要なら UML を追加する（形式は自由）
-@enduml
-```
-
-## 品質ゲート（Epic） (必須)
-- [ ] 各 Issue が AC/EC を満たす自動テストを持つ（例外は理由がある）
-- [ ] Epic の統合観点（E-AC）が確認できる（自動/半自動/手順のいずれか）
-- [ ] 観測性（ログ/メトリクス/アラート）が入る（該当する場合）
-- [ ] 移行手順/ロールバックが文書化される（該当する場合）
-
-## ロールアウト / 移行 (必須)
-- Feature flag:
+## 統合チェックポイント
+- G1 decomposition review:
   - ...
-- 段階公開（カナリア/一部テナント/内部先行など）:
+- G2 integration readiness:
   - ...
-- ロールバック:
+- G3 rollout/docs impact:
+  - ...
+- G9 final epic spec review:
   - ...
 
-## Issue Definition of Ready（Issue に求める着手可能条件） (必須)
-- [ ] Issue requirement に AC/EC がテスト可能な形で書けている
-- [ ] Issue requirement に MUST/MUST NOT/OUT OF SCOPE と Always/Ask/Never がある
-- [ ] Issue design に変更計画（パス単位）と要件→設計マッピングがある
-- [ ] Issue design にテスト戦略（AC/EC→テスト）がある（該当なしの場合は理由がある）
-- [ ] Issue plan が 1ステップ=1つの観測可能な振る舞いになっている
-- [ ] 未確定事項が「質問/選択肢/推奨案/影響範囲」で整理されている
+## 品質ゲート
+- test / observability / migration / docs:
+  - ...
 
-## 実行コマンド（必要なら） (任意)
-- Test: `<command>`
-- Lint/Format: `<command>`
-- Typecheck: `<command>`
+## ロールアウト / docs impact
+- rollout order:
+  - ...
+- contract / docs refresh:
+  - ...
 
-## 未確定事項（TBD） (必須)
+## Issue readiness contract
+- Issue に要求する最低条件:
+  - ...
+
+## final exit contract
+- E-AC closure:
+  - ...
+- integration / rollout complete:
+  - ...
+- docs impact resolved:
+  - ...
+
+## 依存 / ブロッカー
+- D-001:
+  - ...
+- D-002:
+  - ...
+
+## 未確定事項
 - Q-001:
-  - 質問: TBD ...
+  - 質問:
   - 選択肢:
-    - A: ...
-    - B: ...
-  - 推奨案（暫定）:
+    - A:
+      - ...
+    - B:
+      - ...
+  - 推奨案:
     - ...
   - 影響範囲:
-    - Issue分割 / 順序 / ロールアウト / 品質ゲート / ...
-
-## 省略/例外メモ (必須)
-- 該当なし
+    - ...
