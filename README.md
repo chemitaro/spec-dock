@@ -86,7 +86,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 <epic-dir>/issues/new-issue "Add refresh token"
 
 # ADRs are created via runtime command (no scope-local ADR wrapper)
-./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title "Token rotation strategy"
+./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "Token rotation strategy"
 
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
@@ -115,7 +115,7 @@ Notes:
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
 - Generated initiative/epic/issue nodes include `discussions/` (`rules.md` included).
 - For non-ADR notes/discussions/research docs, copy templates from `spec-dock/templates/discussions/{note,disc,research}.md`.
-- ADR docs are created by `./spec-dock/scripts/spec-dock new adr --{initiative|epic|issue} <id> --title "..."`.
+- ADR docs are created by `./spec-dock/scripts/spec-dock new doc adr --{initiative|epic|issue} <id> --title "..."`.
 - Generated nodes do not include template-derived `README.md`.
 
 See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
