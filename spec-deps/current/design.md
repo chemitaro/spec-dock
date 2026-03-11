@@ -121,6 +121,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
     __init__.py
     create_node.py
     import_node.py
+    status_context.py
     set_active.py
     sync_state.py
     check_deps.py
@@ -144,6 +145,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
     active_store.py
     git_cli.py
     github_cli.py
+    derived_state_reader.py
     json_store.py
     artifact_writer.py
     clock.py
@@ -155,6 +157,124 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
     puml.py
     cli_text.py
 ```
+
+### 実装対象ディレクトリ / ファイル構成図
+凡例:
+- `[new]`: 新規作成
+- `[modify]`: 既存を修正
+- `[move/rename]`: 既存責務の再配置
+- `[delete]`: 削除
+
+```text
+/srv/mount/spec-dock/
+  src/
+    spec_dock/
+      assets/
+        spec_dock/
+          scripts/
+            spec_dock_runtime/
+              app.py [modify]
+              ids.py [move/rename]
+              io_json.py [move/rename]
+              github.py [move/rename]
+              render_md.py [move/rename]
+              render_puml.py [move/rename]
+              active.py [move/rename]
+              nodes.py [move/rename]
+              cli/ [new]
+                __init__.py [new]
+                parser.py [new]
+                registry.py [new]
+                bootstrap.py [new]
+                dispatch.py [new]
+              commands/ [new]
+                __init__.py [new]
+                contracts.py [new]
+                new.py [new]
+                import_cmd.py [new]
+                active.py [new]
+                sync.py [new]
+                deps.py [new]
+                validate.py [new]
+              application/ [new]
+                __init__.py [new]
+                contracts.py [new]
+                ports.py [new]
+                status_context.py [new]
+                create_node.py [new]
+                import_node.py [new]
+                set_active.py [new]
+                sync_state.py [new]
+                check_deps.py [new]
+                validate_tree.py [new]
+              domain/ [new]
+                __init__.py [new]
+                models.py [new]
+                ids.py [new]
+                tree.py [new]
+                deps.py [new]
+                active.py [new]
+                status.py [new]
+                validation.py [new]
+              infra/ [new]
+                __init__.py [new]
+                contracts.py [new]
+                fs_repo.py [new]
+                template_scaffolder.py [new]
+                active_store.py [new]
+                git_cli.py [new]
+                github_cli.py [new]
+                derived_state_reader.py [new]
+                json_store.py [new]
+                artifact_writer.py [new]
+                clock.py [new]
+              presentation/ [new]
+                __init__.py [new]
+                contracts.py [new]
+                json_state.py [new]
+                markdown.py [new]
+                puml.py [new]
+                cli_text.py [new]
+  tests/
+    test_cli.py [modify]
+    test_init_update.py [new]
+    cli_runtime/ [new]
+      harness.py [new]
+      test_new.py [new]
+      test_active.py [new]
+      test_sync.py [new]
+      test_deps.py [new]
+      test_import.py [new]
+      test_validate.py [new]
+      test_wrappers.py [new]
+    domain_runtime/ [new]
+      test_ids.py [new]
+      test_tree.py [new]
+      test_deps.py [new]
+      test_active.py [new]
+    presentation_runtime/ [new]
+      test_markdown.py [new]
+      test_puml.py [new]
+      test_json_state.py [new]
+```
+
+### ファイル変更分類
+- 新規作成:
+  - `cli/`, `commands/`, `application/`, `domain/`, `infra/`, `presentation/` 配下の runtime module 一式
+  - `tests/cli_runtime/`, `tests/domain_runtime/`, `tests/presentation_runtime/`, `tests/test_init_update.py`
+- 修正:
+  - [app.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py)
+  - [test_cli.py](/srv/mount/spec-dock/tests/test_cli.py)
+- move/rename:
+  - [ids.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py) 相当を `domain/ids.py` へ再配置
+  - [io_json.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py) 相当を `infra/json_store.py` へ再配置
+  - [github.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py) 相当を `infra/github_cli.py` へ再配置
+  - [render_md.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py) 相当を `presentation/markdown.py` へ再配置
+  - [render_puml.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py) 相当を `presentation/puml.py` へ再配置
+  - [active.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/active.py) / [nodes.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/nodes.py) の責務を `domain/*`, `application/*`, `infra/active_store.py` へ分解再配置
+- 削除:
+  - 現時点では削除対象なし
+  - stage 5 で旧 helper 群の削除を許容するが、本 issue の設計時点では rollback のため保持する
 
 ### UML（推奨: module / dependency）
 ```plantuml
@@ -183,6 +303,7 @@ package "application" {
   [ports.py]
   [create_node.py]
   [import_node.py]
+  [status_context.py]
   [set_active.py]
   [sync_state.py]
   [check_deps.py]
@@ -204,6 +325,7 @@ package "infra" {
   [active_store.py]
   [git_cli.py]
   [github_cli.py]
+  [derived_state_reader.py]
   [json_store.py]
   [artifact_writer.py]
   [clock.py]
@@ -240,20 +362,26 @@ package "presentation" {
 [sync.py] --> [sync_state.py]
 [deps.py] --> [check_deps.py]
 [validate.py] --> [validate_tree.py]
+[set_active.py] --> [status_context.py]
+[sync_state.py] --> [status_context.py]
+[check_deps.py] --> [status_context.py]
 [create_node.py] --> [contracts.py]
 [import_node.py] --> [contracts.py]
+[status_context.py] --> [contracts.py]
 [set_active.py] --> [contracts.py]
 [sync_state.py] --> [contracts.py]
 [check_deps.py] --> [contracts.py]
 [validate_tree.py] --> [contracts.py]
 [create_node.py] --> [ports.py]
 [import_node.py] --> [ports.py]
+[status_context.py] --> [ports.py]
 [set_active.py] --> [ports.py]
 [sync_state.py] --> [ports.py]
 [check_deps.py] --> [ports.py]
 [validate_tree.py] --> [ports.py]
 [create_node.py] --> [domain]
 [import_node.py] --> [domain]
+[status_context.py] --> [domain]
 [set_active.py] --> [domain]
 [sync_state.py] --> [domain]
 [check_deps.py] --> [domain]
@@ -263,14 +391,12 @@ package "presentation" {
 [active_store.py] ..> [ports.py] : implements
 [git_cli.py] ..> [ports.py] : implements
 [github_cli.py] ..> [ports.py] : implements
+[derived_state_reader.py] ..> [ports.py] : implements
 [json_store.py] ..> [ports.py] : implements
 [clock.py] ..> [ports.py] : implements
 [sync_state.py] --> [presentation]
-[check_deps.py] --> [presentation]
 [set_active.py] --> [presentation]
 [sync_state.py] --> [presentation/contracts.py]
-[check_deps.py] --> [presentation/contracts.py]
-[set_active.py] --> [presentation/contracts.py]
 @enduml
 ```
 
@@ -434,9 +560,9 @@ package "presentation" {
   - `ActiveUpdateOutcome(applied: bool, reason: str | None)`
   - `SyncCommandResult(state: SyncStateResult, write_result: ArtifactWriteResult, active_update: ActiveUpdateOutcome | None)`
   - `CheckDepsRequest(target: TargetRef, use_github: bool, issue_limit: int)`
-  - `DepsCheckResult(target: TargetRef, resolved_node_id: NodeId, evaluation: DepsEvaluation, node_states: dict[str, DepsNodeState], effective_depends_on: list[str], issue_statuses: dict[str, IssueStatusSnapshot], warnings: list[str])`
+  - `DepsCheckResult(target: TargetRef, inspection: TargetDepsInspection)`
   - `ValidateTreeRequest()`
-  - `ValidationResult(report: ValidationReport, checked_node_count: int, warnings: list[str])`
+  - `ValidationResult(report: ValidationReport, checked_node_count: int)`
   - `ArtifactWriteResult(index_all_path: str, index_todo_path: str, tree_all_path: str, tree_todo_path: str, tree_all_puml_path: str, tree_todo_puml_path: str, deps_issues_json_path: str, deps_issues_puml_path: str, dashboard_md_path: str)`
 - `TargetRef` 不変条件:
   - `kind="node_id"` の場合は `node_id` 必須、`github_issue_number` は `None`
@@ -455,6 +581,7 @@ package "presentation" {
     - `TemplateScaffolder`
     - `ActiveStateStore`
     - `IssueGateway`
+    - `DerivedStateReader`
     - `GitGateway`
     - `JsonStore`
     - `Clock`
@@ -463,10 +590,12 @@ package "presentation" {
   - `NodeRepository.load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]`
   - `NodeRepository.write_meta(dest_dir: Path, record: StoredMetaRecord) -> None`
   - `TemplateScaffolder.render_text(text: str, replacements: dict[str, str]) -> str`
+  - `TemplateScaffolder.load_template_text(src_path: Path) -> str`
   - `TemplateScaffolder.copy_scaffolded_tree(src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]`
+  - `TemplateScaffolder.write_text(dest_path: Path, text: str) -> None`
   - `ActiveStateStore.load_active_manifest(specdock_dir: Path) -> ActiveManifest | None`
   - `ActiveStateStore.load_active_manifest_no_migrate(specdock_dir: Path) -> ActiveManifest | None`
-  - `ActiveStateStore.write_active_manifest(specdock_dir: Path, selection: ActiveSelection, graph: SpecGraph) -> ActiveManifest`
+  - `ActiveStateStore.write_active_manifest(specdock_dir: Path, manifest: ActiveManifest) -> ActiveManifest`
   - `ActiveStateStore.apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, rendered_context_pack: str) -> None`
   - `ActiveStateStore.patch_agent_state_active_fields(specdock_dir: Path, manifest: ActiveManifest | None) -> None`
   - `ActiveStateStore.snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot`
@@ -475,6 +604,7 @@ package "presentation" {
   - `IssueGateway.issue_create(repo_root: Path, title: str, body: str) -> int`
   - `IssueGateway.issue_view_minimal(repo_root: Path, issue_number: int) -> StoredIssueSnapshot`
   - `IssueGateway.issue_checkout(repo_root: Path, issue_number: int) -> None`
+  - `DerivedStateReader.load_cached_issue_status_by_id(specdock_dir: Path) -> dict[str, str]`
   - `GitGateway.require_clean_working_tree(repo_root: Path) -> None`
   - `GitGateway.current_branch_or_none(repo_root: Path) -> str | None`
   - `GitGateway.local_branch_exists(repo_root: Path, branch: str) -> bool`
@@ -492,6 +622,14 @@ package "presentation" {
   - concrete adapter は `infra/*` が実装する
   - `application/*` use case は `application/ports.py` の Protocol / `Ports` にのみ依存し、`infra/*` concrete module を直接 import しない
 
+### `application/status_context.py`
+- internal helper:
+  - `resolve_issue_status_context(graph: SpecGraph, *, github_enabled: bool, issue_limit: int, ports: Ports) -> dict[str, IssueStatusSnapshot]`
+- 責務:
+  - `ports.issue_gateway` と `ports.derived_state_reader` の source selection を一元化する
+  - `domain.status.resolve_issue_statuses()` を呼び、`sync` / `deps check` / `active set` で同じ readiness 入力を再利用できるようにする
+  - active issue context (`active_issue_id`) 自体は返さず、呼び出し側が active manifest / active selection から抽出して `domain.deps.*` へ渡す
+
 ### `presentation/contracts.py`
 - dataclass:
   - `CliText(stdout_lines: list[str], stderr_lines: list[str], warnings: list[str])`
@@ -507,11 +645,20 @@ package "presentation" {
   - `create_epic(req: CreateNodeRequest, ports: Ports) -> CreateNodeResult`
   - `create_issue(req: CreateNodeRequest, ports: Ports) -> CreateNodeResult`
   - `create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult`
+- internal helper:
+  - `load_graph(ports: Ports, *, validate: bool) -> SpecGraph`
+  - `resolve_parent_for_create(req: CreateNodeRequest, graph: SpecGraph, *, kind: Literal["initiative","epic","issue"]) -> NodeId | None`
+  - `guard_github_issue_uniqueness(graph: SpecGraph, github_issue_number: int | None) -> None`
+  - `plan_node_creation(req: CreateNodeRequest, graph: SpecGraph, *, kind: Literal["initiative","epic","issue"]) -> tuple[StoredMetaRecord, Path, dict[str, str]]`
+  - `execute_create_plan(meta: StoredMetaRecord, dest_dir: Path, replacements: dict[str, str], ports: Ports) -> list[Path]`
+  - `plan_discussion_doc(req: CreateDiscussionDocRequest, graph: SpecGraph) -> tuple[Path, Path, dict[str, str]]`
+  - `create_node_core(req: CreateNodeRequest, ports: Ports, *, kind: Literal["initiative","epic","issue"]) -> CreateNodeResult`
 - 主な使用ロジック:
   - `ports.node_repo.write_meta(...)`
   - `ports.template_scaffolder.render_text(...)`
   - `ports.template_scaffolder.copy_scaffolded_tree(...)`
-  - discussion sequence helper
+  - `ports.template_scaffolder.write_text(...)`
+  - discussion sequence helper は `create_discussion_doc()` 専用とし、initiative/epic/issue create core からは分離する
 - mapper 責務:
   - `StoredMetaRecord` <-> `SpecNodeSeed` 変換は `application` で行い、`domain` に infra 保存形を渡さない
   - `new doc` は `SpecNode` を増やさず scope 配下の discussion document を生成する workflow として扱う
@@ -527,6 +674,10 @@ package "presentation" {
   - `import_initiative(req: ImportNodeRequest, ports: Ports) -> ImportNodeResult`
   - `import_epic(req: ImportNodeRequest, ports: Ports) -> ImportNodeResult`
   - `import_issue(req: ImportNodeRequest, ports: Ports) -> ImportNodeResult`
+- internal helper:
+  - `import_node_core(req: ImportNodeRequest, ports: Ports, *, kind: Literal["initiative","epic","issue"]) -> ImportNodeResult`
+  - `resolve_parent_for_import(req: ImportNodeRequest, graph: SpecGraph, ports: Ports, *, kind: Literal["initiative","epic","issue"]) -> NodeId | None`
+  - `build_linked_create_request(req: ImportNodeRequest, parent_id: NodeId | None) -> CreateNodeRequest`
 - 責務:
   - import preflight
   - `ports.issue_gateway` 経由の GitHub issue lookup
@@ -541,12 +692,17 @@ package "presentation" {
   - `ImportNodeRequest.title` / `slug` は現行 CLI の `--title` / `--slug` 契約を保持し、GitHub issue title を暗黙採用しない
   - import 後の再生成結果は `post_import_sync: SyncCommandResult` へ束ね、`sync` の内部 helper 境界を再露出しない
   - `sync_after_import()` は `update_active_from_branch=False` と `active_manifest_mode="no_migrate"` を internal policy として固定する
+  - `parent_id is None` の場合は `load_active_manifest_no_migrate() -> ActiveSelection -> domain.tree.resolve_parent_from_active()` で fallback を解決する
+  - `import_node_core()` は `build_linked_create_request()` で `ImportNodeRequest -> CreateNodeRequest(github_mode="link_existing")` を明示変換したうえで、`plan_node_creation()` と `execute_create_plan()` の lower-level helper を再利用して二重 graph load を避ける
 
 ### `application/set_active.py`
 - 公開関数:
   - `set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult`
   - `show_active(req: ShowActiveRequest, ports: Ports) -> ActiveViewResult`
   - `clear_active(req: ClearActiveRequest, ports: Ports) -> ActiveClearResult`
+- internal helper:
+  - `build_active_manifest(selection: ActiveSelection, graph: SpecGraph) -> ActiveManifest`
+  - `commit_active_state(*, persisted_manifest: ActiveManifest, patch_manifest: ActiveManifest | None, ports: Ports, context_pack_text: str) -> ActiveManifest`
 - 責務:
   - `TargetRef` を `NodeId` へ解決する
   - deps guard
@@ -554,39 +710,40 @@ package "presentation" {
   - active state 書込と pointer 更新 orchestration
   - `ActiveStateStore.snapshot_current_state()` による rollback snapshot 取得と `restore_previous_state()` の起動判断
   - `show_active()` は manifest entry の `id/path` を `ActiveViewEntry` へ正規化し、current CLI の `id (path)` 表示契約を支える
+  - deps guard 用の `active_issue_id` は current active manifest から抽出して `domain.deps.evaluate_readiness()` へ渡す
 - 成功時の厳密順序:
   1. `SpecGraph` と current active manifest をロードする
   2. target を解決し、active chain を計算する
   3. `force=False` の場合は deps guard を評価し、blocked/unknown ならここで失敗する
   4. branch decision を計算し、必要な git checkout を完了する
-  5. 新しい active manifest をメモリ上で構築する
+  5. `build_active_manifest()` で新しい active manifest をメモリ上で構築する
   6. 新 manifest 向け context pack text を render する
-  7. active manifest を永続化する
-  8. `apply_active_pointers()` で symlink/pathfile と context-pack を更新する
-  9. `patch_agent_state_active_fields()` で agent state active fields を patch する
+  7. `commit_active_state()` が `snapshot_current_state() -> write_active_manifest() -> apply_active_pointers() -> patch_agent_state_active_fields()` を正本順序で実行する
 - 失敗時の扱い:
   - step 7 より前の失敗では永続変更を行わない
-  - step 7 成功後に step 8/9 が失敗した場合、`ActiveStateSnapshot` を使って旧 manifest / 旧 pointer / 旧 context-pack / 旧 agent state へ best-effort rollback し、rollback 失敗時は原失敗と rollback 失敗の両方を報告する
+  - `commit_active_state()` 内で write/apply/patch が失敗した場合、`ActiveStateSnapshot` を使って旧 manifest / 旧 pointer / 旧 context-pack / 旧 agent state へ best-effort rollback し、rollback 失敗時は原失敗と rollback 失敗の両方を報告する
   - git checkout は manifest 書込より前に終えるため、active state rollback は git state rollback を伴わない
 - `clear_active()` の副作用契約:
-  - manifest は empty selection を永続化する
+  - `build_active_manifest(empty selection)` 相当の placeholder manifest を `persisted_manifest` として `commit_active_state()` に渡して永続化する
   - pointer/context-pack は placeholder 状態へ更新する
-  - agent state active fields は `patch_agent_state_active_fields(..., manifest=None)` で明示的に消去する
+  - agent state active fields は `patch_manifest=None` を使って `patch_agent_state_active_fields(..., manifest=None)` へ明示的に伝える
 
 ### `application/sync_state.py`
 - 公開関数:
   - `sync(req: SyncRequest, ports: Ports) -> SyncCommandResult`
 - internal helper:
   - `collect_sync_state(req: SyncRequest, ports: Ports, *, active_manifest_mode: Literal["migrate","no_migrate"] = "migrate") -> SyncStateResult`
+  - `maybe_auto_update_from_branch(state: SyncStateResult, ports: Ports) -> tuple[SyncStateResult, ActiveUpdateOutcome | None]`
   - `write_sync_artifacts(result: SyncStateResult, ports: Ports) -> ArtifactWriteResult`
   - `sync_after_import(ports: Ports) -> SyncCommandResult`
 - `sync()` の責務:
   - `collect_sync_state()` と `write_sync_artifacts()` の順序制御を command から隠蔽する
   - sync command に必要な workflow 全体を単一 use case として提供する
-  - active auto-update を実施したか、未実施なら理由が何かを `ActiveUpdateOutcome` として返す
+  - `maybe_auto_update_from_branch()` を `write_sync_artifacts()` より前に適用し、最終 active 状態を含む artifact と `ActiveUpdateOutcome` を同時に確定する
 - `collect_sync_state()` の責務:
   - preflight
   - node load
+  - `domain.validation.validate_graph_and_deps()` を用いた structural/deps preflight
   - issue status resolve
   - progress / deps derivation
   - active inference
@@ -600,27 +757,29 @@ package "presentation" {
   - `StoredMetaRecord` -> `SpecNodeSeed`
   - `StoredIssueSnapshot` -> `IssueSnapshot`
   - `ActiveManifest` -> `ActiveSelection`
-  - presentation 入力の正本は `SyncStateResult` `DepsCheckResult` `ActiveViewResult` `ActiveClearResult` `ActiveSelection` とし、presentation 専用 input DTO は追加しない
+  - presentation 入力の正本は `SyncStateResult` `DepsCheckResult` `ValidationResult` `ActiveViewResult` `ActiveClearResult` `ActiveSelection` とし、presentation 専用 input DTO は追加しない
 
 ### `application/check_deps.py`
 - 公開関数:
   - `check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult`
 - 責務:
+  - node graph load と structural validation
   - `TargetRef` を `NodeId` へ解決する
-  - `ports.issue_gateway` と cached snapshot の使い分け
+  - `ports.issue_gateway` と `ports.derived_state_reader` の使い分け
+  - active manifest を読み、active issue context を readiness 判定へ渡す
   - readiness / blockers 計算
-  - json/text presentation への受け渡し
+  - `DepsCheckResult` の構築
 - mapper 責務:
   - cached index / github snapshots を `IssueSnapshot` へ正規化してから `domain` に渡す
   - `deps check --json` が現行 payload を再現できるよう、target-scoped `node_states` と `effective_depends_on` を `DepsCheckResult` へ詰める
+  - issue source 正規化は `application/status_context.py::resolve_issue_status_context()` で一元化し、command 間で readiness の解釈がずれないようにする
 
 ### `application/validate_tree.py`
 - 公開関数:
   - `validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult`
 - 責務:
   - node graph load
-  - structural validation
-  - deps cycle validation
+  - `domain.validation.validate_graph_and_deps()` による structural + deps 統合 validation
 
 ### `domain/models.py`
 - dataclass:
@@ -635,7 +794,8 @@ package "presentation" {
   - `ProgressMap(by_node_id: dict[str, str], counts: dict[str, int])`
   - `DepsNodeState(node_id: str, status: str, ready: bool, blockers_top: list[str], effective_depends_on: list[str])`
   - `DepsState(nodes: list[DepsNodeState], warnings: list[str])`
-  - `DepsEvaluation(target_id: NodeId, ready: bool, blockers: list[str], blockers_top: list[str], closure: list[str], warnings: list[str])`
+  - `DepsEvaluation(ready: bool, blockers: list[str], blockers_top: list[str], closure: list[str])`
+  - `TargetDepsInspection(target_id: NodeId, evaluation: DepsEvaluation, node_states: dict[str, DepsNodeState], effective_depends_on: list[str], warnings: list[str])`
   - `ValidationReport(errors: list[str], warnings: list[str])`
 - 境界:
   - `SpecGraph` は initiative / epic / issue のみを保持する
@@ -676,6 +836,7 @@ package "presentation" {
 ### `domain/deps.py`
 - 公開関数:
   - `evaluate_readiness(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot], active_issue_id: str | None) -> DepsEvaluation`
+  - `inspect_target_deps(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot], active_issue_id: str | None) -> TargetDepsInspection`
   - `build_deps_state(graph: SpecGraph, effective_deps_map: dict[str, list[str]], issue_statuses: dict[str, IssueStatusSnapshot], active: ActiveSelection | None, warnings: list[str]) -> DepsState`
   - `validate_deps_cycles(deps_map: dict[str, list[str]]) -> None`
 - internal helper:
@@ -690,6 +851,7 @@ package "presentation" {
 ### `domain/validation.py`
 - 公開関数:
   - `validate_graph(graph: SpecGraph, repo_root: Path | None = None) -> ValidationReport`
+  - `validate_graph_and_deps(graph: SpecGraph, repo_root: Path | None = None) -> ValidationReport`
   - `validate_github_issue_numbers_unique(graph: SpecGraph, repo_root: Path | None = None) -> None`
 
 ### `domain/active.py`
@@ -707,8 +869,10 @@ package "presentation" {
   - node record の read/write
   - `.meta.json` の shape の正本
 - `infra/template_scaffolder.py`
+  - `load_template_text(src_path: Path) -> str`
   - `render_text(text: str, replacements: dict[str, str]) -> str`
   - `copy_scaffolded_tree(src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]`
+  - `write_text(dest_path: Path, text: str) -> None`
 - 責務:
   - template 読み出し
   - placeholder 置換
@@ -729,7 +893,7 @@ package "presentation" {
   - `load_active_manifest(specdock_dir: Path) -> ActiveManifest | None`
   - `load_active_manifest_no_migrate(specdock_dir: Path) -> ActiveManifest | None`
   - `snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot`
-  - `write_active_manifest(specdock_dir: Path, selection: ActiveSelection, graph: SpecGraph) -> ActiveManifest`
+  - `write_active_manifest(specdock_dir: Path, manifest: ActiveManifest) -> ActiveManifest`
   - `write_pathfile(active_dir: Path, name: str, target: Path) -> None`
   - `apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, rendered_context_pack: str) -> None`
   - `patch_agent_state_active_fields(specdock_dir: Path, manifest: ActiveManifest | None) -> None`
@@ -755,6 +919,9 @@ package "presentation" {
   - `issue_create(repo_root: Path, title: str, body: str) -> int`
   - `issue_view_minimal(repo_root: Path, issue_number: int) -> StoredIssueSnapshot`
   - `issue_checkout(repo_root: Path, issue_number: int) -> None`
+- `infra/derived_state_reader.py`
+  - `load_cached_issue_status_by_id(specdock_dir: Path) -> dict[str, str]`
+  - `spec-dock/.agent/index*.json` から cached issue status を読む read-side adapter とする
 - `infra/json_store.py`
   - `load_json(path: Path) -> Any`
   - `write_json(path: Path, data: Any) -> None`
@@ -877,11 +1044,17 @@ class IssueStatusSnapshot {
 }
 
 class DepsEvaluation {
-  +target_id: NodeId
   +ready: bool
   +blockers: list[str]
   +blockers_top: list[str]
   +closure: list[str]
+}
+
+class TargetDepsInspection {
+  +target_id: NodeId
+  +evaluation: DepsEvaluation
+  +node_states: dict[str, DepsNodeState]
+  +effective_depends_on: list[str]
   +warnings: list[str]
 }
 
@@ -923,18 +1096,21 @@ interface NodeRepository
 interface ActiveStateStore
 interface GitGateway
 interface IssueGateway
+interface DerivedStateReader
 interface ArtifactWriter
 
 SpecGraph *-- SpecNode
 SyncStateResult --> SpecGraph
 SyncStateResult --> IssueStatusSnapshot
 SyncStateResult --> ActiveSelection
+TargetDepsInspection --> DepsEvaluation
 SyncCommandResult --> SyncStateResult
 SyncCommandResult --> ActiveUpdateOutcome
 NodeRepository <.. application
 ActiveStateStore <.. application
 GitGateway <.. application
 IssueGateway <.. application
+DerivedStateReader <.. application
 ArtifactWriter <.. application
 @enduml
 ```
@@ -944,12 +1120,13 @@ ArtifactWriter <.. application
 ### `sync`
 1. `commands/sync.py::run()` が `SyncArgs` を `SyncRequest` に変換する。
 2. `application/sync_state.py::sync()` が `collect_sync_state()` を呼び、`Ports` から node records / active manifest / issue index を読み込む。
-3. `domain/tree.py` で `SpecGraph` を構築し、`domain/validation.py` で graph を検証する。
+3. `domain/tree.py` で `SpecGraph` を構築し、`domain/validation.py::validate_graph_and_deps()` で preflight を検証する。
 4. `domain/status.py` と `domain/deps.py` で issue status / progress / deps state を導出する。
-5. `application/sync_state.py::write_sync_artifacts()` が `presentation/json_state.py` と `presentation/markdown.py` を呼び、`ArtifactBundle` を構築する。
-6. 同じ `write_sync_artifacts()` が `ports.artifact_writer.write()` へ bundle を渡し、既存 path/name 契約に従って保存する。
-7. `sync()` は branch 由来 active auto-update の適用有無を `ActiveUpdateOutcome` として返す。
-8. `commands/sync.py` が `CommandOutcome` を返す。
+5. `update_active_from_branch=True` の場合、`maybe_auto_update_from_branch()` が branch から active を推定し、必要なら `commit_active_state()` を経由して active state を先に更新する。
+6. `application/sync_state.py::write_sync_artifacts()` が final active を含む `SyncStateResult` をもとに `presentation/json_state.py` と `presentation/markdown.py` を呼び、`ArtifactBundle` を構築する。
+7. 同じ `write_sync_artifacts()` が `ports.artifact_writer.write()` へ bundle を渡し、既存 path/name 契約に従って保存する。
+8. `sync()` は branch 由来 active auto-update の適用有無を `ActiveUpdateOutcome` として返す。
+9. `commands/sync.py` が `CommandOutcome` を返す。
 
 ### `active set`
 1. `commands/active.py::run()` が `ActiveSetArgs` を `SetActiveRequest` に変換する。
@@ -957,11 +1134,10 @@ ArtifactWriter <.. application
 3. `domain/active.py` と `domain/deps.py` が target / branch / readiness を評価する。
 4. `infra/git_cli.py` が必要なら branch 操作を行う。
 5. `presentation/json_state.py::render_context_pack()` が context pack content を生成する。
-6. `infra/active_store.py::write_active_manifest()` が manifest を更新する。
-7. `infra/active_store.py::apply_active_pointers()` が symlink/pathfile と context-pack を更新する。
-8. `infra/active_store.py::patch_agent_state_active_fields()` が agent state active fields を更新する。
-9. step 7/8 失敗時は `restore_previous_state()` が manifest / pointer / context-pack / agent state を best-effort restore する。
-10. `commands/active.py` が `CommandOutcome` を返す。
+6. `build_active_manifest()` が永続化対象 manifest を構築する。
+7. `commit_active_state()` が `snapshot_current_state() -> write_active_manifest() -> apply_active_pointers() -> patch_agent_state_active_fields()` を実行する。
+8. `commit_active_state()` 内で失敗した場合は `restore_previous_state()` が manifest / pointer / context-pack / agent state を best-effort restore する。
+9. `commands/active.py` が `CommandOutcome` を返す。
 
 ### `import issue`
 1. `commands/import_cmd.py::run()` が `ImportIssueArgs` を `ImportNodeRequest` に変換する。
@@ -988,11 +1164,382 @@ Cmd -> UC : sync(req)
 UC -> App : sync(req, ports)
 App -> Infra : load node records / active / github index
 App -> Dom : build graph + validate + derive status/deps
+App -> App : maybe_auto_update_from_branch()
 App -> Pre : render json/md/puml
 App -> Infra : write artifacts
 App --> UC : SyncCommandResult
 UC --> Cmd : SyncCommandResult
 Cmd --> User : exit code + stdout/stderr
+@enduml
+```
+
+## 関数依存設計
+
+### 設計ルール
+- `commands/*` は `Args DTO -> Request DTO -> UseCases -> renderer -> CommandOutcome` に限定し、`domain` / `infra` を直接呼ばない。
+- `application/*` は public use case と internal helper を分け、cross-command で共有したい依存連鎖は internal helper として明示する。
+- `domain/*` は pure function 群として扱い、function dependency 図では stateful port を持たない。
+- DTO / dataclass は function dependency 図では note として扱い、呼び出し先そのものにはしない。
+
+### create / import 関数依存
+- `commands/new.py::run()` は request 正規化と renderer 選択だけを持ち、node create と doc create を public use case に振り分ける。
+- `application/create_node.py` は initiative/epic/issue を `create_node_core()` に寄せ、doc 作成だけは `plan_discussion_doc() -> load_template_text() -> render_text() -> write_text()` の別枝に保つ。
+- `application/import_node.py` は `import_node_core()` から `build_linked_create_request() -> plan_node_creation(..., github_mode="link_existing") -> execute_create_plan()` と `sync_after_import()` を再利用する。
+- parent fallback は `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` に固定する。
+
+```plantuml
+@startuml
+skinparam monochrome true
+left to right direction
+title create/import function dependency
+
+package "commands" {
+  rectangle "commands/new.py::args_factory" as CmdNewArgs
+  rectangle "commands/new.py::run" as CmdNewRun
+  rectangle "commands/import_cmd.py::args_factory" as CmdImportArgs
+  rectangle "commands/import_cmd.py::run" as CmdImportRun
+}
+
+package "application/create_node.py" {
+  rectangle "create_initiative" as CreateInit
+  rectangle "create_epic" as CreateEpic
+  rectangle "create_issue" as CreateIssue
+  rectangle "create_discussion_doc" as CreateDoc
+  rectangle "load_graph(validate)" as CreateLoadGraph
+  rectangle "resolve_parent_for_create(kind)" as CreateResolveParent
+  rectangle "guard_github_issue_uniqueness" as CreateGuardGh
+  rectangle "plan_node_creation(kind)" as CreatePlan
+  rectangle "execute_create_plan" as CreateExec
+  rectangle "plan_discussion_doc" as CreatePlanDoc
+  rectangle "create_node_core(kind)" as CreateCore
+}
+
+package "application/import_node.py" {
+  rectangle "import_initiative" as ImportInit
+  rectangle "import_epic" as ImportEpic
+  rectangle "import_issue" as ImportIssue
+  rectangle "resolve_parent_for_import(kind)" as ImportResolveParent
+  rectangle "build_linked_create_request" as ImportToCreateReq
+  rectangle "import_node_core(kind)" as ImportCore
+}
+
+package "application/sync_state.py" {
+  rectangle "sync_after_import" as SyncAfterImport
+}
+
+package "domain" {
+  rectangle "build_graph" as DomBuildGraph
+  rectangle "validate_graph" as DomValidateGraph
+  rectangle "resolve_parent_from_active" as DomResolveParentActive
+  rectangle "resolve_input_title_and_slug" as DomResolveTitle
+  rectangle "normalize_local_id_input" as DomNormalizeId
+  rectangle "format_id" as DomFormatId
+}
+
+package "infra ports" {
+  rectangle "NodeRepository.load_node_records" as PortLoadNodes
+  rectangle "NodeRepository.write_meta" as PortWriteMeta
+  rectangle "TemplateScaffolder.copy_scaffolded_tree" as PortCopyTree
+  rectangle "TemplateScaffolder.load_template_text" as PortLoadTemplateText
+  rectangle "TemplateScaffolder.render_text" as PortRenderText
+  rectangle "TemplateScaffolder.write_text" as PortWriteText
+  rectangle "IssueGateway.issue_create" as PortIssueCreate
+  rectangle "IssueGateway.issue_view_minimal" as PortIssueView
+  rectangle "ActiveStateStore.load_active_manifest_no_migrate" as PortLoadActiveNoMigrate
+}
+
+package "presentation" {
+  rectangle "render_new_node_text" as PreNewText
+  rectangle "render_new_doc_text" as PreDocText
+  rectangle "render_import_text" as PreImportText
+}
+
+CmdNewArgs --> CmdNewRun
+CmdImportArgs --> CmdImportRun
+
+CmdNewRun --> CreateInit
+CmdNewRun --> CreateEpic
+CmdNewRun --> CreateIssue
+CmdNewRun --> CreateDoc
+CmdNewRun --> PreNewText
+CmdNewRun --> PreDocText
+
+CmdImportRun --> ImportInit
+CmdImportRun --> ImportEpic
+CmdImportRun --> ImportIssue
+CmdImportRun --> PreImportText
+
+CreateInit --> CreateCore
+CreateEpic --> CreateCore
+CreateIssue --> CreateCore
+CreateDoc --> CreateLoadGraph
+CreateDoc --> CreatePlanDoc
+CreateDoc --> PortLoadTemplateText
+CreateDoc --> PortRenderText
+CreateDoc --> PortWriteText
+
+CreateCore --> CreateLoadGraph
+CreateCore --> CreateResolveParent
+CreateCore --> CreateGuardGh
+CreateCore --> DomResolveTitle
+CreateCore --> DomNormalizeId
+CreateCore --> DomFormatId
+CreateCore --> CreatePlan
+CreateCore --> CreateExec
+CreateCore --> PortIssueCreate : github_mode=create
+
+CreateLoadGraph --> PortLoadNodes
+CreateLoadGraph --> DomBuildGraph
+CreateLoadGraph --> DomValidateGraph
+CreateExec --> PortCopyTree
+CreateExec --> PortWriteMeta
+
+ImportInit --> ImportCore
+ImportEpic --> ImportCore
+ImportIssue --> ImportCore
+
+ImportCore --> CreateLoadGraph
+ImportCore --> PortIssueView
+ImportCore --> CreateGuardGh
+ImportCore --> ImportResolveParent
+ImportCore --> ImportToCreateReq
+ImportCore --> CreatePlan : github_mode=link_existing
+ImportCore --> CreateExec
+ImportCore --> SyncAfterImport
+
+ImportResolveParent --> PortLoadActiveNoMigrate
+ImportResolveParent --> DomResolveParentActive
+
+note bottom
+Args DTO -> Request DTO -> Result DTO は command/application 境界でのみ受け渡す
+end note
+@enduml
+```
+
+### active / sync 関数依存
+- `commands/active.py` と `commands/sync.py` は public use case を呼ぶだけに留める。
+- active state 永続副作用は `commit_active_state()` に一元化し、`set_active` / `clear_active` / branch 由来 active auto-update が同じ rollback 契約を共有する。
+- `sync()` は `maybe_auto_update_from_branch()` を `write_sync_artifacts()` より前に実行し、最終 active を含む artifact を生成する。
+
+```plantuml
+@startuml
+skinparam monochrome true
+title active/sync function dependency
+
+actor User
+
+package "commands" {
+  rectangle "commands/active.py::run_set" as CmdActiveSet
+  rectangle "commands/active.py::run_show" as CmdActiveShow
+  rectangle "commands/active.py::run_clear" as CmdActiveClear
+  rectangle "commands/sync.py::run" as CmdSync
+}
+
+package "application/set_active.py" {
+  rectangle "set_active" as AppSetActive
+  rectangle "show_active" as AppShowActive
+  rectangle "clear_active" as AppClearActive
+  rectangle "build_active_manifest" as AppBuildManifest
+  rectangle "commit_active_state" as AppCommitActive
+}
+
+package "application/sync_state.py" {
+  rectangle "sync" as AppSync
+  rectangle "collect_sync_state" as AppCollectSync
+  rectangle "maybe_auto_update_from_branch" as AppAutoActive
+  rectangle "write_sync_artifacts" as AppWriteArtifacts
+}
+
+package "application/status_context.py" {
+  rectangle "resolve_issue_status_context" as AppStatusCtx
+}
+
+package "domain" {
+  rectangle "build_graph" as DomGraph
+  rectangle "validate_graph_and_deps" as DomValidateAll
+  rectangle "select_active_chain" as DomSelectChain
+  rectangle "resolve_branch_decision" as DomBranchDecision
+  rectangle "infer_active_node_from_branch" as DomInferActive
+  rectangle "evaluate_readiness" as DomReadiness
+  rectangle "resolve_issue_statuses" as DomStatuses
+  rectangle "build_progress_map" as DomProgress
+  rectangle "build_deps_state" as DomDepsState
+}
+
+package "infra ports" {
+  rectangle "NodeRepository.load_node_records" as PortNodes
+  rectangle "DerivedStateReader.load_cached_issue_status_by_id" as PortCachedStatuses
+  rectangle "IssueGateway.issue_index" as PortIssueIndex
+  rectangle "ActiveStateStore.load_active_manifest" as PortLoadActive
+  rectangle "ActiveStateStore.snapshot_current_state" as PortSnapshot
+  rectangle "ActiveStateStore.write_active_manifest" as PortWriteManifest
+  rectangle "ActiveStateStore.apply_active_pointers" as PortApplyPointers
+  rectangle "ActiveStateStore.patch_agent_state_active_fields" as PortPatchAgent
+  rectangle "ActiveStateStore.restore_previous_state" as PortRestore
+  rectangle "GitGateway.current_branch_or_none" as PortCurrentBranch
+  rectangle "GitGateway.require_clean_working_tree" as PortRequireClean
+  rectangle "GitGateway.check_ref_format_branch" as PortCheckBranch
+  rectangle "GitGateway.local_branch_exists" as PortBranchExists
+  rectangle "GitGateway.checkout_branch" as PortCheckout
+  rectangle "ArtifactWriter.write" as PortWriteArtifacts
+}
+
+package "presentation" {
+  rectangle "render_context_pack" as PreContextPack
+  rectangle "render_sync_text" as PreSyncText
+  rectangle "render_active_set_text" as PreActiveSetText
+  rectangle "render_active_show_text" as PreActiveShowText
+  rectangle "render_active_clear_text" as PreActiveClearText
+  rectangle "render_index_artifact" as PreIndexArtifact
+  rectangle "render_tree_artifact" as PreTreeArtifact
+  rectangle "render_deps_issues_artifact" as PreDepsArtifact
+  rectangle "render_dashboard" as PreDashboard
+}
+
+User --> CmdActiveSet
+User --> CmdActiveShow
+User --> CmdActiveClear
+User --> CmdSync
+
+CmdActiveSet --> AppSetActive
+CmdActiveShow --> AppShowActive
+CmdActiveClear --> AppClearActive
+CmdSync --> AppSync
+
+AppSetActive --> PortNodes
+AppSetActive --> DomGraph
+AppSetActive --> PortLoadActive
+AppSetActive --> AppStatusCtx
+AppSetActive --> DomSelectChain
+AppSetActive --> DomReadiness
+AppSetActive --> PortCurrentBranch
+AppSetActive --> DomBranchDecision
+AppSetActive --> PortRequireClean
+AppSetActive --> PortCheckBranch
+AppSetActive --> PortBranchExists
+AppSetActive --> PortCheckout
+AppSetActive --> AppBuildManifest
+AppSetActive --> PreContextPack
+AppSetActive --> AppCommitActive
+CmdActiveSet --> PreActiveSetText
+
+AppShowActive --> PortLoadActive
+CmdActiveShow --> PreActiveShowText
+
+AppClearActive --> AppBuildManifest
+AppClearActive --> PreContextPack
+AppClearActive --> AppCommitActive
+CmdActiveClear --> PreActiveClearText
+
+AppStatusCtx --> PortIssueIndex : github
+AppStatusCtx --> PortCachedStatuses : local cache
+AppStatusCtx --> DomStatuses
+
+AppCommitActive --> PortSnapshot
+AppCommitActive --> PortWriteManifest
+AppCommitActive --> PortApplyPointers
+AppCommitActive --> PortPatchAgent
+AppCommitActive --> PortRestore : on failure
+
+AppSync --> AppCollectSync
+AppSync --> AppAutoActive
+AppSync --> AppWriteArtifacts
+CmdSync --> PreSyncText
+
+AppCollectSync --> PortNodes
+AppCollectSync --> DomGraph
+AppCollectSync --> DomValidateAll
+AppCollectSync --> PortLoadActive
+AppCollectSync --> AppStatusCtx
+AppCollectSync --> DomProgress
+AppCollectSync --> DomDepsState
+
+AppAutoActive --> PortCurrentBranch
+AppAutoActive --> DomInferActive
+AppAutoActive --> DomSelectChain
+AppAutoActive --> AppBuildManifest
+AppAutoActive --> PreContextPack
+AppAutoActive --> AppCommitActive
+
+AppWriteArtifacts --> PreIndexArtifact
+AppWriteArtifacts --> PreTreeArtifact
+AppWriteArtifacts --> PreDepsArtifact
+AppWriteArtifacts --> PreDashboard
+AppWriteArtifacts --> PortWriteArtifacts
+@enduml
+```
+
+### deps / validate 関数依存
+- `commands/deps.py` は renderer 選択と exit code 決定だけを持ち、`check_deps` の result を再計算しない。
+- `application/check_deps.py` は `presentation` へ依存せず、`inspect_target_deps()` の返り値で `DepsCheckResult` を組み立てる。
+- `application/validate_tree.py` は `domain.validation.validate_graph_and_deps()` を 1 回呼ぶだけに寄せる。
+
+```plantuml
+@startuml
+skinparam monochrome true
+top to bottom direction
+title deps/validate function dependency
+
+package "commands" {
+  rectangle "commands/deps.py::run" as CmdDeps
+  rectangle "commands/validate.py::run" as CmdValidate
+}
+
+package "application" {
+  rectangle "check_deps" as AppCheckDeps
+  rectangle "validate_tree" as AppValidate
+}
+
+package "application/status_context.py" {
+  rectangle "resolve_issue_status_context" as AppIssueStatusCtx
+}
+
+package "domain" {
+  rectangle "build_graph" as DomBuildGraph2
+  rectangle "validate_graph" as DomValidateGraph2
+  rectangle "inspect_target_deps" as DomInspectTargetDeps
+  rectangle "validate_graph_and_deps" as DomValidateAll
+  rectangle "resolve_issue_statuses" as DomResolveStatuses2
+}
+
+package "infra ports" {
+  rectangle "NodeRepository.load_node_records" as PortLoadNodes2
+  rectangle "DerivedStateReader.load_cached_issue_status_by_id" as PortCached2
+  rectangle "IssueGateway.issue_index" as PortIssueIndex2
+  rectangle "ActiveStateStore.load_active_manifest" as PortLoadActive2
+}
+
+package "presentation" {
+  rectangle "render_deps_check_text" as PreDepsText
+  rectangle "render_deps_check_json" as PreDepsJson
+  rectangle "render_validate_text" as PreValidateText
+}
+
+CmdDeps --> AppCheckDeps
+CmdDeps --> PreDepsText
+CmdDeps --> PreDepsJson
+
+AppCheckDeps --> PortLoadNodes2
+AppCheckDeps --> DomBuildGraph2
+AppCheckDeps --> DomValidateGraph2
+AppCheckDeps --> AppIssueStatusCtx
+AppCheckDeps --> PortLoadActive2
+AppCheckDeps --> DomInspectTargetDeps
+
+AppIssueStatusCtx --> PortIssueIndex2 : github
+AppIssueStatusCtx --> PortCached2 : cache
+AppIssueStatusCtx --> DomResolveStatuses2
+
+CmdValidate --> AppValidate
+CmdValidate --> PreValidateText
+AppValidate --> PortLoadNodes2
+AppValidate --> DomBuildGraph2
+AppValidate --> DomValidateAll
+
+note bottom
+DepsCheckResult / ValidationResult は application が構築し
+CliText / json string は commands が renderer で包む
+end note
 @enduml
 ```
 
@@ -1238,7 +1785,7 @@ tests/
   - `infra` は Protocol 実装を提供する adapter 層であり、use case から concrete adapter import を行わない。
 - presentation type ownership:
   - `presentation` は `application` / `domain` 所有の DTO だけを入力とし、`infra/contracts.py` の保存形 dataclass を直接受け取らない。
-  - renderer の入力正本は `SyncStateResult` `DepsCheckResult` `ActiveViewResult` `ActiveClearResult` `ActiveSelection` とし、presentation 専用 input DTO は今回追加しない。
+  - renderer の入力正本は `SyncStateResult` `DepsCheckResult` `ValidationResult` `ActiveViewResult` `ActiveClearResult` `ActiveSelection` とし、presentation 専用 input DTO は今回追加しない。
 - bootstrap ownership:
   - composition root は `cli/bootstrap.py` に一元化し、`app.py` `cli/dispatch.py` `commands/*` が別々に adapter / use case を組み立てない。
 - artifact ownership:
