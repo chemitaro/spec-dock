@@ -1696,6 +1696,114 @@ def _git_current_branch_or_none(repo_root: Path) -> str | None:
     return branch
 
 
+@dataclass(frozen=True)
+class _IssueStatusResolution:
+    """Internal issue status value with an explicit source."""
+
+    status: str
+    source: str
+    github_payload: dict[str, Any] | None = None
+
+
+def _load_cached_issue_snapshot(
+    specdock_dir: Path,
+    *,
+    github: bool,
+) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
+    """Return cached issue status/github fields from prior sync artifacts."""
+    if github:
+        return {}, {}
+
+    agent_dir = specdock_dir / _AGENT_DIRNAME
+    state_index_all_path = agent_dir / "index-all.json"
+    state_index_todo_path = agent_dir / "index.json"
+
+    cached_index: dict[str, Any] | None = None
+    for state_index_path in (state_index_all_path, state_index_todo_path):
+        if not state_index_path.is_file():
+            continue
+        try:
+            loaded = _load_json(state_index_path)
+        except RuntimeError:
+            continue
+        if isinstance(loaded, dict):
+            cached_index = loaded
+            break
+
+    if not isinstance(cached_index, dict):
+        return {}, {}
+
+    cached_issue_status_by_id: dict[str, str] = {}
+    cached_github_by_id: dict[str, dict[str, Any]] = {}
+    raw_nodes = cached_index.get("nodes")
+    if not isinstance(raw_nodes, dict):
+        return cached_issue_status_by_id, cached_github_by_id
+
+    for node_id, item in raw_nodes.items():
+        if not isinstance(node_id, str) or not isinstance(item, dict):
+            continue
+        raw_status = item.get("status")
+        if isinstance(raw_status, str):
+            status = raw_status.strip().lower()
+            if status in ("done", "open", "unknown"):
+                cached_issue_status_by_id[node_id] = status
+        raw_github = item.get("github")
+        if isinstance(raw_github, dict):
+            cached_github_by_id[node_id] = raw_github
+
+    return cached_issue_status_by_id, cached_github_by_id
+
+
+def _resolve_issue_statuses(
+    nodes: dict[str, _Node],
+    *,
+    github: bool,
+    issue_index: dict[int, dict[str, Any]],
+    cached_issue_status_by_id: dict[str, str],
+) -> dict[str, _IssueStatusResolution]:
+    """Resolve issue status values while keeping their source explicit internally."""
+    resolved: dict[str, _IssueStatusResolution] = {}
+    for node in nodes.values():
+        if node.type != "issue":
+            continue
+        if github and node.github_issue_number is not None:
+            gh = issue_index.get(node.github_issue_number)
+            if gh:
+                status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
+                resolved[node.id] = _IssueStatusResolution(status=status, source="github", github_payload=dict(gh))
+                continue
+        elif not github:
+            cached_status = cached_issue_status_by_id.get(node.id)
+            if cached_status is not None:
+                resolved[node.id] = _IssueStatusResolution(status=cached_status, source="cache")
+                continue
+        resolved[node.id] = _IssueStatusResolution(status="unknown", source="unknown")
+    return resolved
+
+
+def _build_progress_map(
+    nodes: dict[str, _Node],
+    issue_statuses: dict[str, _IssueStatusResolution],
+) -> dict[str, dict[str, int]]:
+    """Aggregate issue status counts for initiative/epic nodes."""
+    progress: dict[str, dict[str, int]] = {}
+    for node in nodes.values():
+        if node.type in ("initiative", "epic"):
+            progress[node.id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
+
+    for node in nodes.values():
+        if node.type != "issue":
+            continue
+        resolution = issue_statuses.get(node.id, _IssueStatusResolution(status="unknown", source="unknown"))
+        for parent in filter(None, (node.epic_id, node.initiative_id)):
+            if parent not in progress:
+                continue
+            progress[parent]["total"] += 1
+            progress[parent][resolution.status] += 1
+
+    return progress
+
+
 def _infer_active_node_from_branch(nodes: dict[str, _Node], *, branch: str) -> tuple[_Node | None, str | None]:
     """Infer a unique node from a branch name (best-effort)."""
     s = branch.strip().lower()
@@ -1894,64 +2002,20 @@ def _sync(
     state_index_all_path = agent_dir / "index-all.json"
     state_tree_all_path = agent_dir / "tree-all.json"
 
-    cached_issue_status_by_id: dict[str, str] = {}
-    cached_github_by_id: dict[str, dict[str, Any]] = {}
-    if not github:
-        cached_index: dict[str, Any] | None = None
-        for state_index_path in (state_index_all_path, state_index_todo_path):
-            if not state_index_path.is_file():
-                continue
-            try:
-                loaded = _load_json(state_index_path)
-            except RuntimeError:
-                continue
-            if isinstance(loaded, dict):
-                cached_index = loaded
-                break
-
-        if isinstance(cached_index, dict):
-            raw_nodes = cached_index.get("nodes")
-            if isinstance(raw_nodes, dict):
-                for node_id, item in raw_nodes.items():
-                    if not isinstance(node_id, str) or not isinstance(item, dict):
-                        continue
-                    raw_status = item.get("status")
-                    if isinstance(raw_status, str):
-                        status = raw_status.strip().lower()
-                        if status in ("done", "open", "unknown"):
-                            cached_issue_status_by_id[node_id] = status
-                    raw_github = item.get("github")
-                    if isinstance(raw_github, dict):
-                        cached_github_by_id[node_id] = raw_github
-
-    # Progress is derived data: initiative/epic aggregate counts of their descendant issues.
-    progress: dict[str, dict[str, int]] = {}
-    for node in nodes.values():
-        if node.type in ("initiative", "epic"):
-            progress[node.id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
-
-    issue_status_by_id: dict[str, str] = {}
-    for node in nodes.values():
-        if node.type != "issue":
-            continue
-
-        # When GitHub enrichment is enabled, map GH state to done/open.
-        # Otherwise, preserve the cached status from `.agent/index.json` when available
-        # (snapshot; may be stale), falling back to unknown.
-        status = "unknown"
-        if github and node.github_issue_number is not None:
-            gh = issue_index.get(node.github_issue_number)
-            if gh:
-                status = "done" if str(gh.get("state", "")).upper() == "CLOSED" else "open"
-        elif not github:
-            status = cached_issue_status_by_id.get(node.id, "unknown")
-        issue_status_by_id[node.id] = status
-
-        for parent in filter(None, (node.epic_id, node.initiative_id)):
-            if parent not in progress:
-                continue
-            progress[parent]["total"] += 1
-            progress[parent][status] += 1
+    cached_issue_status_by_id, cached_github_by_id = _load_cached_issue_snapshot(
+        specdock_dir,
+        github=github,
+    )
+    issue_statuses = _resolve_issue_statuses(
+        nodes,
+        github=github,
+        issue_index=issue_index,
+        cached_issue_status_by_id=cached_issue_status_by_id,
+    )
+    issue_status_by_id = {
+        issue_id: resolution.status for issue_id, resolution in issue_statuses.items()
+    }
+    progress = _build_progress_map(nodes, issue_statuses)
 
     issue_deps_fields_by_id: dict[str, dict[str, Any] | None]
     if deps_preflight_failed:
