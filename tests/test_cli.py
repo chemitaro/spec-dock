@@ -16,6 +16,9 @@ except ModuleNotFoundError:
     from spec_dock.cli import main
 
 
+import importlib.util
+from types import SimpleNamespace
+
 def _expected_spec_dock_version() -> str:
     try:
         return version("spec-dock")
@@ -2480,6 +2483,40 @@ class TestCli(unittest.TestCase):
             self.assertIn("note", p_doc.stdout)
             self.assertNotIn("--id", p_doc.stdout)
             self.assertNotIn("--seq", p_doc.stdout)
+
+    def test_internal_issue_status_resolution_marks_cached_source(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime import app as runtime_app
+        finally:
+            sys.path.pop(0)
+
+        nodes = {
+            "iss-00301": SimpleNamespace(
+                id="iss-00301",
+                type="issue",
+                github_issue_number=301,
+                epic_id="epic-00201",
+                initiative_id="init-00101",
+            )
+        }
+        resolved = runtime_app._resolve_issue_statuses(
+            nodes,
+            github=False,
+            issue_index={},
+            cached_issue_status_by_id={"iss-00301": "done"},
+        )
+
+        self.assertEqual(resolved["iss-00301"].status, "done")
+        self.assertEqual(resolved["iss-00301"].source, "cache")
 
     def test_new_doc_rejects_unknown_type(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
