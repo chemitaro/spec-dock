@@ -5,7 +5,7 @@ ID: "issue-25"
 関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/25"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-11"
+最終更新: "2026-03-12"
 依存: ["requirement.md", "adrs/adr-001-runtime-cli-layered-architecture.md"]
 親: ["#25"]
 ---
@@ -532,6 +532,7 @@ package "presentation" {
 - dataclass:
   - `TargetRef(kind: Literal["node_id","github_issue"], node_id: str | None, github_issue_number: int | None)`
   - `CreateNodeRequest(title: str, slug: str | None, parent_id: str | None, requested_node_id: str | None, github_mode: Literal["create","link_existing","local_only"], github_issue_number: int | None)`
+  - `CreatePlan(meta: StoredMetaRecord, dest_dir: Path, replacements: dict[str, str], planned_paths: list[Path])`
   - `CreateNodeResult(node: SpecNode, created_paths: list[Path], warnings: list[str])`
   - `CreateDiscussionDocRequest(doc_type: Literal["adr","disc","research","note"], scope_node_id: str, title: str, slug: str | None)`
   - `CreateDiscussionDocResult(doc_id: str, doc_type: str, scope_node_id: str, path: Path, warnings: list[str])`
@@ -541,13 +542,14 @@ package "presentation" {
   - `ActiveSetResult(selection: ActiveSelection, branch: BranchDecision | None, manifest_written: bool, pointer_updated: bool, warnings: list[str])`
   - `ShowActiveRequest()`
   - `ActiveViewEntry(id: str | None, path: str | None)`
-  - `ActiveViewResult(initiative: ActiveViewEntry, epic: ActiveViewEntry, issue: ActiveViewEntry, source: str, warnings: list[str])`
+  - `ActiveViewResult(initiative: ActiveViewEntry, epic: ActiveViewEntry, issue: ActiveViewEntry, source: Literal["agent.active","legacy.work.active","legacy.work.current","none"], warnings: list[str])`
   - `ClearActiveRequest()`
   - `ActiveClearResult(cleared: bool, previous: ActiveSelection | None, warnings: list[str])`
   - `SyncRequest(force: bool, github_enabled: bool, issue_limit: int, update_active_from_branch: bool)`
   - `SyncStateResult(graph: SpecGraph, active: ActiveSelection | None, issue_statuses: dict[str, IssueStatusSnapshot], progress: ProgressMap, deps_state: DepsState, deps_eval_by_id: dict[str, DepsEvaluation], generated_at: str, warnings: list[str], deps_preflight_error: str | None)`
   - `ActiveUpdateOutcome(applied: bool, reason: str | None)`
-  - `SyncCommandResult(state: SyncStateResult, write_result: ArtifactWriteResult, active_update: ActiveUpdateOutcome | None)`
+  - `ArtifactWriteFailure(status: Literal["failed_before_write","failed_partial_or_stale"], reason: str)`
+  - `SyncCommandResult(state: SyncStateResult, write_result: ArtifactWriteResult | None, active_update: ActiveUpdateOutcome | None, artifact_failure: ArtifactWriteFailure | None)`
   - `CheckDepsRequest(target: TargetRef, use_github: bool, issue_limit: int)`
   - `DepsCheckResult(target: TargetRef, inspection: TargetDepsInspection)`
   - `ValidateTreeRequest()`
@@ -582,8 +584,8 @@ package "presentation" {
   - `TemplateScaffolder.load_template_text(src_path: Path) -> str`
   - `TemplateScaffolder.copy_scaffolded_tree(src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]`
   - `TemplateScaffolder.write_text(dest_path: Path, text: str) -> None`
-  - `ActiveStateStore.load_active_manifest(specdock_dir: Path) -> ActiveManifest | None`
-  - `ActiveStateStore.load_active_manifest_no_migrate(specdock_dir: Path) -> ActiveManifest | None`
+  - `ActiveStateStore.load_active_manifest(specdock_dir: Path) -> ActiveManifestLoadResult`
+  - `ActiveStateStore.load_active_manifest_no_migrate(specdock_dir: Path) -> ActiveManifestLoadResult`
   - `ActiveStateStore.write_active_manifest(specdock_dir: Path, manifest: ActiveManifest) -> ActiveManifest`
   - `ActiveStateStore.apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, rendered_context_pack: str) -> None`
   - `ActiveStateStore.patch_agent_state_active_fields(specdock_dir: Path, manifest: ActiveManifest | None) -> None`
@@ -606,6 +608,11 @@ package "presentation" {
   - `ArtifactWriter.write(specdock_dir: Path, bundle: ArtifactBundle) -> ArtifactWriteResult`
   - 各 Protocol の失敗は `RuntimeError` 系で上位へ送出し、exit code 正規化は `cli/dispatch.py` が行う
   - `JsonStore` は raw JSON read/write helper に留め、artifact path/name の正本は `ArtifactWriter` が持つ
+  - `ActiveStateStore.load_active_manifest()` は supported legacy input を `.work/active.json` と `.work/current.json` に限定し、read-time / in-memory で current shape へ正規化してよいが、この read path 自体は write-back を行わない
+  - `ActiveStateStore.load_active_manifest_no_migrate()` は import parent fallback 専用とし、supported legacy input を `.work/active.json` と `.work/current.json` に限定したうえで legacy manifest shape をそのまま読む
+  - `ActiveManifestLoadResult.source` は `agent.active` / `legacy.work.active` / `legacy.work.current` / `none` のいずれかを返す
+  - `ActiveManifestLoadResult.warnings` は migration/normalization に伴う user-visible warning の搬送路とする
+  - 競合時優先順位は `spec-dock/.agent/active.json` > `.work/active.json` > `.work/current.json` とする
 - 所有ルール:
   - `Ports` dataclass と各 Protocol は `application/ports.py` が正本
   - concrete adapter は `infra/*` が実装する
@@ -617,7 +624,7 @@ package "presentation" {
 - 責務:
   - `ports.issue_gateway` と `ports.derived_state_reader` の source selection を一元化する
   - `domain.status.resolve_issue_statuses()` を呼び、`sync` / `deps check` / `active set` で同じ readiness 入力を再利用できるようにする
-  - active issue context (`active_issue_id`) 自体は返さず、呼び出し側が active manifest / active selection から抽出して `domain.deps.*` へ渡す
+  - active issue context (`active_issue_id`) 自体は返さず、呼び出し側が active manifest / active selection から抽出して state decoration 系 helper にのみ渡す
 
 ### `presentation/contracts.py`
 - dataclass:
@@ -638,8 +645,8 @@ package "presentation" {
   - `load_graph(ports: Ports, *, validate: bool) -> SpecGraph`
   - `resolve_parent_for_create(req: CreateNodeRequest, graph: SpecGraph, *, kind: Literal["initiative","epic","issue"]) -> NodeId | None`
   - `guard_github_issue_uniqueness(graph: SpecGraph, github_issue_number: int | None) -> None`
-  - `plan_node_creation(req: CreateNodeRequest, graph: SpecGraph, *, kind: Literal["initiative","epic","issue"]) -> tuple[StoredMetaRecord, Path, dict[str, str]]`
-  - `execute_create_plan(meta: StoredMetaRecord, dest_dir: Path, replacements: dict[str, str], ports: Ports) -> list[Path]`
+  - `plan_node_creation(req: CreateNodeRequest, graph: SpecGraph, *, kind: Literal["initiative","epic","issue"]) -> CreatePlan`
+  - `execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]`
   - `plan_discussion_doc(req: CreateDiscussionDocRequest, graph: SpecGraph) -> tuple[Path, Path, dict[str, str]]`
   - `create_node_core(req: CreateNodeRequest, ports: Ports, *, kind: Literal["initiative","epic","issue"]) -> CreateNodeResult`
 - 主な使用ロジック:
@@ -653,8 +660,11 @@ package "presentation" {
   - `new doc` は `SpecNode` を増やさず scope 配下の discussion document を生成する workflow として扱う
   - `requested_node_id` は現行 `--id` の意味を保持し、未指定時は `domain/ids.py` で採番する
   - `github_mode` は `create` / `link_existing` / `local_only` の 3 値に正規化し、create/link/local の分岐ロジックを command 側の flag 組み合わせから切り離す
+  - `CreatePlan` は `meta`, `dest_dir`, `replacements`, `planned_paths` を一体で持ち、full no-write preflight と executor seam の正本とする
+  - kind ごとの GitHub mode default は initiative/epic=`local_only`, issue=`create` を正本とする
 - preflight / no-write 契約:
   - `new/import` は `.meta.json` と scaffold 出力を含む全 target path を事前検査し、衝突がある場合は command 全体として無書き込みで失敗する
+  - `planned_paths` には `.meta.json`、nested scaffold path、placeholder path を含む全 candidate output を含める
   - 書き込み順序は `copy_scaffolded_tree -> write_meta` とし、partial write rollback を設計対象にしない
   - 回帰テストは `meta 未作成` と `scaffold 未生成` を同時観測点に含める
 
@@ -681,7 +691,7 @@ package "presentation" {
   - `ImportNodeRequest.title` / `slug` は現行 CLI の `--title` / `--slug` 契約を保持し、GitHub issue title を暗黙採用しない
   - import 後の再生成結果は `post_import_sync: SyncCommandResult` へ束ね、`sync` の内部 helper 境界を再露出しない
   - `sync_after_import()` は `update_active_from_branch=False` と `active_manifest_mode="no_migrate"` を internal policy として固定する
-  - `parent_id is None` の場合は `load_active_manifest_no_migrate() -> ActiveSelection -> domain.tree.resolve_parent_from_active()` で fallback を解決する
+  - `parent_id is None` の場合は `load_active_manifest_no_migrate().manifest -> ActiveSelection -> domain.tree.resolve_parent_from_active()` で fallback を解決する
   - `import_node_core()` は `build_linked_create_request()` で `ImportNodeRequest -> CreateNodeRequest(github_mode="link_existing")` を明示変換したうえで、`plan_node_creation()` と `execute_create_plan()` の lower-level helper を再利用して二重 graph load を避ける
 
 ### `application/set_active.py`
@@ -698,8 +708,9 @@ package "presentation" {
   - branch decision / checkout policy
   - active state 書込と pointer 更新 orchestration
   - `ActiveStateStore.snapshot_current_state()` による rollback snapshot 取得と `restore_previous_state()` の起動判断
-  - `show_active()` は manifest entry の `id/path` を `ActiveViewEntry` へ正規化し、current CLI の `id (path)` 表示契約を支える
-  - deps guard 用の `active_issue_id` は current active manifest から抽出して `domain.deps.evaluate_readiness()` へ渡す
+  - `show_active()` は `ActiveManifestLoadResult` を受けて manifest entry の `id/path` を `ActiveViewEntry` へ正規化し、source/warnings を `ActiveViewResult` へ搬送しつつ current CLI の `id (path)` 表示契約を支える
+  - legacy manifest を読む場合も `show_active()` の観測面は current CLI と同じ `id/path/source/warnings` を返し、migration は read-only/in-memory 正規化として扱う
+  - deps guard は `domain.deps.evaluate_readiness()` の pure 判定で閉じ、`active_issue_id` は `inspect_target_deps()` / state decoration 側にのみ渡す
 - 成功時の厳密順序:
   1. `SpecGraph` と current active manifest をロードする
   2. target を解決し、active chain を計算する
@@ -729,6 +740,7 @@ package "presentation" {
   - `collect_sync_state()` と `write_sync_artifacts()` の順序制御を command から隠蔽する
   - sync command に必要な workflow 全体を単一 use case として提供する
   - `maybe_auto_update_from_branch()` を `write_sync_artifacts()` より前に適用し、最終 active 状態を含む artifact と `ActiveUpdateOutcome` を同時に確定する
+  - active 更新後に artifact write が失敗した場合は `SyncCommandResult.artifact_failure` へ `reason` と `failed_partial_or_stale` を束ね、CLI 側が `exit=1` と failure reason を user-visible にできるようにする
 - `collect_sync_state()` の責務:
   - preflight
   - node load
@@ -741,7 +753,7 @@ package "presentation" {
 - `write_sync_artifacts()` の責務:
   - `presentation` から `ArtifactBundle` を組み立てる
   - `ports.artifact_writer` 経由の artifact write orchestration
-  - `ArtifactWriteResult` を返す
+  - 成功時は `ArtifactWriteResult` を返し、失敗時は `ArtifactWriteFailure` を `sync()` へ返せるよう failure reason を保持する
 - mapper 責務:
   - `StoredMetaRecord` -> `SpecNodeSeed`
   - `StoredIssueSnapshot` -> `IssueSnapshot`
@@ -755,7 +767,7 @@ package "presentation" {
   - node graph load と structural validation
   - `TargetRef` を `NodeId` へ解決する
   - `ports.issue_gateway` と `ports.derived_state_reader` の使い分け
-  - active manifest を読み、active issue context を readiness 判定へ渡す
+  - active manifest を読み、active issue context は deps state decoration にのみ使う
   - readiness / blockers 計算
   - `DepsCheckResult` の構築
 - mapper 責務:
@@ -783,7 +795,7 @@ package "presentation" {
   - `ProgressMap(by_node_id: dict[str, str], counts: dict[str, int])`
   - `DepsNodeState(node_id: str, status: str, ready: bool, blockers_top: list[str], effective_depends_on: list[str])`
   - `DepsState(nodes: list[DepsNodeState], warnings: list[str])`
-  - `DepsEvaluation(ready: bool, blockers: list[str], blockers_top: list[str], closure: list[str])`
+  - `DepsEvaluation(ready: bool, guard_reason: Literal["ready","blocked","unknown"], blockers: list[str], blockers_top: list[str], closure: list[str])`
   - `TargetDepsInspection(target_id: NodeId, evaluation: DepsEvaluation, node_states: dict[str, DepsNodeState], effective_depends_on: list[str], warnings: list[str])`
   - `ValidationReport(errors: list[str], warnings: list[str])`
 - 境界:
@@ -795,6 +807,7 @@ package "presentation" {
   - `StoredMetaRecord(kind: str, id: str, title: str, slug: str, path: str, parent_id: str | None, initiative_id: str | None, epic_id: str | None, github_issue_number: int | None, meta_path: str)`
   - `ActiveManifestEntry(id: str, path: str)`
   - `ActiveManifest(initiative: ActiveManifestEntry | None, epic: ActiveManifestEntry | None, issue: ActiveManifestEntry | None)`
+  - `ActiveManifestLoadResult(manifest: ActiveManifest | None, source: Literal["agent.active","legacy.work.active","legacy.work.current","none"], warnings: list[str])`
   - `ActiveStateSnapshot(manifest: ActiveManifest | None, pointer_targets: dict[str, str], context_pack_text: str | None, agent_state_files: dict[str, str | None])`
   - `StoredIssueSnapshot(number: int, state: str, title: str, labels: list[str], updated_at: str, url: str)`
 
@@ -824,7 +837,7 @@ package "presentation" {
 
 ### `domain/deps.py`
 - 公開関数:
-  - `evaluate_readiness(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot], active_issue_id: str | None) -> DepsEvaluation`
+  - `evaluate_readiness(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot]) -> DepsEvaluation`
   - `inspect_target_deps(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot], active_issue_id: str | None) -> TargetDepsInspection`
   - `build_deps_state(graph: SpecGraph, effective_deps_map: dict[str, list[str]], issue_statuses: dict[str, IssueStatusSnapshot], active: ActiveSelection | None, warnings: list[str]) -> DepsState`
   - `validate_deps_cycles(deps_map: dict[str, list[str]]) -> None`
@@ -879,8 +892,8 @@ package "presentation" {
   - 返却 `list[Path]` は実際に生成したファイルのみを `src_dir` からの相対パス昇順で返す
   - `new/import` の created_paths 回帰テストはこの返却順序と生成ファイル集合を観測点とする
 - `infra/active_store.py`
-  - `load_active_manifest(specdock_dir: Path) -> ActiveManifest | None`
-  - `load_active_manifest_no_migrate(specdock_dir: Path) -> ActiveManifest | None`
+  - `load_active_manifest(specdock_dir: Path) -> ActiveManifestLoadResult`
+  - `load_active_manifest_no_migrate(specdock_dir: Path) -> ActiveManifestLoadResult`
   - `snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot`
   - `write_active_manifest(specdock_dir: Path, manifest: ActiveManifest) -> ActiveManifest`
   - `write_pathfile(active_dir: Path, name: str, target: Path) -> None`
@@ -944,6 +957,7 @@ package "presentation" {
   - `render_active_show_text(result: ActiveViewResult) -> CliText`
   - `render_active_clear_text(result: ActiveClearResult) -> CliText`
   - `render_sync_text()` は `ActiveUpdateOutcome` を参照して `sync: active updated (...)` / `sync: active unchanged (...)` 互換の stderr 行を生成する
+  - `render_sync_text()` は `artifact_failure.status="failed_partial_or_stale"` の場合、stale-or-partial 許容 failure であることを stderr の user-visible line に含める
 - dataclass:
   - `CliText(stdout_lines: list[str], stderr_lines: list[str], warnings: list[str])`
 - 所有ルール:
@@ -1061,8 +1075,9 @@ class SyncStateResult {
 
 class SyncCommandResult {
   +state: SyncStateResult
-  +write_result: ArtifactWriteResult
+  +write_result: ArtifactWriteResult?
   +active_update: ActiveUpdateOutcome?
+  +artifact_failure: ArtifactWriteFailure?
 }
 
 class ActiveUpdateOutcome {
@@ -1174,7 +1189,7 @@ Cmd --> User : exit code + stdout/stderr
 - `commands/new.py::run()` は request 正規化と renderer 選択だけを持ち、node create と doc create を public use case に振り分ける。
 - `application/create_node.py` は initiative/epic/issue を `create_node_core()` に寄せ、doc 作成だけは `plan_discussion_doc() -> load_template_text() -> render_text() -> write_text()` の別枝に保つ。
 - `application/import_node.py` は `import_node_core()` から `build_linked_create_request() -> plan_node_creation(..., github_mode="link_existing") -> execute_create_plan()` と `sync_after_import()` を再利用する。
-- parent fallback は `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` に固定する。
+- parent fallback は `load_active_manifest_no_migrate().manifest -> ActiveSelection -> resolve_parent_from_active()` に固定する。
 
 ```plantuml
 @startuml
@@ -1721,12 +1736,14 @@ tests/
 - AC-004 -> regression tests for `sync --force`, `deps check`, `active set`, `import -> sync`, artifact contents
   - parser/help tree snapshot assertions
   - stdout/stderr/warnings regression assertions
+  - `active clear` zero-input / exit `0` / clear-text regression assertions
 - AC-005 -> full unittest suite green
 - EC-001 -> staged delegation path tests
 - EC-002 -> import then sync artifacts assertions
 - EC-003 -> active/deps readiness guard tests
   - `active set` step 7-9 失敗注入で manifest / pointer / context-pack / agent state restore を観測する tests
-- EC-004 -> markdown/puml/json content snapshot assertions
+  - `active clear` placeholder manifest / pointer / context-pack / active-field clear assertions
+- EC-004 -> markdown/puml/json path/name snapshot assertions + content snapshot assertions
   - `copy_scaffolded_tree` の fail-fast no-write / byte-identical copy / created_paths ordering assertions
 
 ## リスク / 移行 / ロールバック
@@ -1743,23 +1760,27 @@ tests/
   4. `application` へ use case orchestration を集約
   5. `presentation` へ render を集約
   6. 重複 helper を削除して `app.py` を薄化完了
+- interface catalog と導入順:
+  - 本設計書の dataclass / public interface 一覧は final-state の正本であり、各 symbol を同一 step で一括導入することは要求しない
+  - 実装時の導入順と最初の消費者 step は `plan.md` を正本とし、shared contract / stored-shape は additive に導入する
 - 中間状態で許容する seam:
   - stage 1:
-    - `commands/*` は旧 `app.py` helper を thin wrapper として呼んでよい
-    - ただし parser/help の正本はすでに `CommandSpec.add_arguments` へ移す
+    - `commands/*` は bootstrap 済み `UseCases` facade のみを受け取り、旧 `app.py` helper を直接呼ばない
+    - stage-1 の temporary shim のみが facade 内部で旧 helper / `Ports` へ委譲してよい
+    - parser/help の正本はすでに `CommandSpec.add_arguments` へ移す
   - stage 2:
-    - `commands/*` は `UseCases` facade のみを受け取り、temporary shim は facade 内で旧 helper / `Ports` へ委譲してよい
+    - read-side / active-side の vertical slice を layered use case へ置き換え始める
     - workflow の新規追加を `commands/*` に書き戻してはならない
   - stage 3:
     - `commands/*` から `domain/*` / `infra/*` への直接依存は導入せず、temporary shim のみが内部で既存 helper を使える
   - stage 4:
     - `commands/*` から旧 `app.py` helper への依存を禁止し、`UseCases` facade 経由に統一する
-    - この時点で layered invariant を enforce し、以後の rollback は git revert ベースへ切り替える
-- ロールバック:
+    - この時点で layered invariant を enforce するが、rollback 基準の切替はまだ行わない
+  - ロールバック:
   - stage 1 から stage 4 完了まで、旧 helper 本体は削除せず `app.py` から到達可能な互換 wrapper として残す
-  - stage 1 から stage 4 の間は `app.py` / `cli/parser.py` / `cli/bootstrap.py` / `cli/dispatch.py` の wiring を一体で切り戻すことで旧経路へ戻せることを rollback 保証とする
+  - stage 1 から stage 4 の間は `app.py` / `cli/parser.py` / `cli/registry.py` / `cli/bootstrap.py` / `cli/dispatch.py` / `commands/*` / `commands/contracts.py` / `application/contracts.py` / `application/ports.py` / `presentation/contracts.py` の wiring を一体で切り戻すことで旧経路へ戻せることを rollback 保証とする
   - `dispatch` 単体の差し戻しだけではなく、parser/help 正本を含む CLI wiring 一式が rollback 単位である
-  - stage 5 で旧 helper を削除した後の rollback は import 差し戻しではなく git revert / commit rollback に切り替わる
+  - stage 5 で旧 helper を削除した後に rollback は import 差し戻しではなく git revert / commit rollback へ切り替わる
   - `active set` は manifest 書込後の pointer 更新失敗に備えて旧 manifest / 旧 pointer を best-effort restore する
 
 ## 未確定事項
