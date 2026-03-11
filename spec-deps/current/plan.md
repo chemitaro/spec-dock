@@ -290,7 +290,7 @@ ID: "issue-25"
 - 導入順の正本:
   - `S01`: facade/wiring に必要な最小 contract shell
   - `S02`: `SpecNodeSeed` / `SpecNode` / `SpecGraph` / `ValidationReport` / `StoredMetaRecord`
-  - `S03`: `IssueSnapshot` / `IssueStatusSnapshot` / `Deps*` / `StoredIssueSnapshot`
+  - `S03`: `domain/ids.py` の canonical helper と `IssueSnapshot` / `IssueStatusSnapshot` / `Deps*` / `StoredIssueSnapshot`
   - `S04-S05`: `ActiveSelection` / `ActiveManifest*` / `ActiveStateSnapshot`
   - `S06`: `SyncRequest` / `SyncStateResult` / `ActiveUpdateOutcome` / `ArtifactWriteFailure` / `SyncCommandResult` / `ArtifactWriteResult` / `ArtifactBundle` とその下位 artifact contract
   - `S07-S08`: `CreateNodeRequest` / `CreatePlan` / `CreateNodeResult` / `CreateDiscussionDocRequest` / `CreateDiscussionDocResult`
@@ -300,7 +300,7 @@ ID: "issue-25"
 ## legacy shim matrix
 | 旧 module | 中間段階の扱い | 正式移設先 | 削除/最終整理 step | rollback unit |
 | --- | --- | --- | --- | --- |
-| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S11` | `S02-S03` |
+| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S11` | `S03/S05/S07/S09` |
 | `io_json.py` | wrapper 維持可 | `infra/json_store.py` | `S11` | `S03/S06` |
 | `github.py` | wrapper 維持可 | `infra/github_cli.py` | `S11` | `S03/S07/S09` |
 | `render_md.py` | wrapper 維持可 | `presentation/markdown.py` | `S11` | `S06` |
@@ -553,8 +553,11 @@ ID: "issue-25"
   - `application/check_deps.py`
   - `application/contracts.py`
   - `application/ports.py`
+  - `domain/models.py`
+  - `domain/ids.py`
   - `domain/status.py`
   - `domain/deps.py`
+  - `infra/contracts.py`
   - `infra/github_cli.py`
   - `infra/derived_state_reader.py`
   - `infra/active_store.py`
@@ -682,6 +685,8 @@ ID: "issue-25"
   - `application/set_active.py`
   - `application/contracts.py`
   - `application/ports.py`
+  - `domain/models.py`
+  - `infra/contracts.py`
   - `infra/active_store.py`
   - `presentation/cli_text.py`
   - `presentation/contracts.py`
@@ -794,12 +799,15 @@ ID: "issue-25"
   - `application/set_active.py`
   - `application/contracts.py`
   - `application/ports.py`
+  - `domain/models.py`
   - `infra/active_store.py`
   - `infra/fs_repo.py`
   - `infra/json_store.py`
   - `infra/git_cli.py`
   - `infra/clock.py`
+  - `infra/contracts.py`
   - `domain/active.py`
+  - `domain/ids.py`
   - `presentation/cli_text.py`
   - `presentation/json_state.py`
   - `presentation/contracts.py`
