@@ -158,104 +158,93 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
     cli_text.py
 ```
 
-### 実装対象ディレクトリ / ファイル構成図
-凡例:
-- `[new]`: 新規作成
-- `[modify]`: 既存を修正
-- `[move/rename]`: 既存責務の再配置
-- `[delete]`: 削除
-
+## ディレクトリ/ファイル構成図（変更点の見取り図） (任意)
 ```text
-/srv/mount/spec-dock/
-  src/
-    spec_dock/
-      assets/
-        spec_dock/
-          scripts/
-            spec_dock_runtime/
-              app.py [modify]
-              ids.py [move/rename]
-              io_json.py [move/rename]
-              github.py [move/rename]
-              render_md.py [move/rename]
-              render_puml.py [move/rename]
-              active.py [move/rename]
-              nodes.py [move/rename]
-              cli/ [new]
-                __init__.py [new]
-                parser.py [new]
-                registry.py [new]
-                bootstrap.py [new]
-                dispatch.py [new]
-              commands/ [new]
-                __init__.py [new]
-                contracts.py [new]
-                new.py [new]
-                import_cmd.py [new]
-                active.py [new]
-                sync.py [new]
-                deps.py [new]
-                validate.py [new]
-              application/ [new]
-                __init__.py [new]
-                contracts.py [new]
-                ports.py [new]
-                status_context.py [new]
-                create_node.py [new]
-                import_node.py [new]
-                set_active.py [new]
-                sync_state.py [new]
-                check_deps.py [new]
-                validate_tree.py [new]
-              domain/ [new]
-                __init__.py [new]
-                models.py [new]
-                ids.py [new]
-                tree.py [new]
-                deps.py [new]
-                active.py [new]
-                status.py [new]
-                validation.py [new]
-              infra/ [new]
-                __init__.py [new]
-                contracts.py [new]
-                fs_repo.py [new]
-                template_scaffolder.py [new]
-                active_store.py [new]
-                git_cli.py [new]
-                github_cli.py [new]
-                derived_state_reader.py [new]
-                json_store.py [new]
-                artifact_writer.py [new]
-                clock.py [new]
-              presentation/ [new]
-                __init__.py [new]
-                contracts.py [new]
-                json_state.py [new]
-                markdown.py [new]
-                puml.py [new]
-                cli_text.py [new]
-  tests/
-    test_cli.py [modify]
-    test_init_update.py [new]
-    cli_runtime/ [new]
-      harness.py [new]
-      test_new.py [new]
-      test_active.py [new]
-      test_sync.py [new]
-      test_deps.py [new]
-      test_import.py [new]
-      test_validate.py [new]
-      test_wrappers.py [new]
-    domain_runtime/ [new]
-      test_ids.py [new]
-      test_tree.py [new]
-      test_deps.py [new]
-      test_active.py [new]
-    presentation_runtime/ [new]
-      test_markdown.py [new]
-      test_puml.py [new]
-      test_json_state.py [new]
+├── src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
+│   ├── app.py                                         # Modify
+│   ├── ids.py                                         # Move/Rename (to domain/ids.py)
+│   ├── io_json.py                                     # Move/Rename (to infra/json_store.py)
+│   ├── github.py                                      # Move/Rename (to infra/github_cli.py)
+│   ├── render_md.py                                   # Move/Rename (to presentation/markdown.py)
+│   ├── render_puml.py                                 # Move/Rename (to presentation/puml.py)
+│   ├── active.py                                      # Move/Rename (split to domain/*, application/*, infra/active_store.py)
+│   ├── nodes.py                                       # Move/Rename (split to domain/*, application/*)
+│   ├── cli/                                           # Add
+│   │   ├── __init__.py                                # Add
+│   │   ├── parser.py                                  # Add
+│   │   ├── registry.py                                # Add
+│   │   ├── bootstrap.py                               # Add
+│   │   └── dispatch.py                                # Add
+│   ├── commands/                                      # Add
+│   │   ├── __init__.py                                # Add
+│   │   ├── contracts.py                               # Add
+│   │   ├── new.py                                     # Add
+│   │   ├── import_cmd.py                              # Add
+│   │   ├── active.py                                  # Add
+│   │   ├── sync.py                                    # Add
+│   │   ├── deps.py                                    # Add
+│   │   └── validate.py                                # Add
+│   ├── application/                                   # Add
+│   │   ├── __init__.py                                # Add
+│   │   ├── contracts.py                               # Add
+│   │   ├── ports.py                                   # Add
+│   │   ├── status_context.py                          # Add
+│   │   ├── create_node.py                             # Add
+│   │   ├── import_node.py                             # Add
+│   │   ├── set_active.py                              # Add
+│   │   ├── sync_state.py                              # Add
+│   │   ├── check_deps.py                              # Add
+│   │   └── validate_tree.py                           # Add
+│   ├── domain/                                        # Add
+│   │   ├── __init__.py                                # Add
+│   │   ├── models.py                                  # Add
+│   │   ├── ids.py                                     # Add
+│   │   ├── tree.py                                    # Add
+│   │   ├── deps.py                                    # Add
+│   │   ├── active.py                                  # Add
+│   │   ├── status.py                                  # Add
+│   │   └── validation.py                              # Add
+│   ├── infra/                                         # Add
+│   │   ├── __init__.py                                # Add
+│   │   ├── contracts.py                               # Add
+│   │   ├── fs_repo.py                                 # Add
+│   │   ├── template_scaffolder.py                     # Add
+│   │   ├── active_store.py                            # Add
+│   │   ├── git_cli.py                                 # Add
+│   │   ├── github_cli.py                              # Add
+│   │   ├── derived_state_reader.py                    # Add
+│   │   ├── json_store.py                              # Add
+│   │   ├── artifact_writer.py                         # Add
+│   │   └── clock.py                                   # Add
+│   └── presentation/                                  # Add
+│       ├── __init__.py                                # Add
+│       ├── contracts.py                               # Add
+│       ├── json_state.py                              # Add
+│       ├── markdown.py                                # Add
+│       ├── puml.py                                    # Add
+│       └── cli_text.py                                # Add
+├── tests/
+│   ├── test_cli.py                                    # Modify
+│   ├── test_init_update.py                            # Add
+│   ├── cli_runtime/                                   # Add
+│   │   ├── harness.py                                 # Add
+│   │   ├── test_new.py                                # Add
+│   │   ├── test_active.py                             # Add
+│   │   ├── test_sync.py                               # Add
+│   │   ├── test_deps.py                               # Add
+│   │   ├── test_import.py                             # Add
+│   │   ├── test_validate.py                           # Add
+│   │   └── test_wrappers.py                           # Add
+│   ├── domain_runtime/                                # Add
+│   │   ├── test_ids.py                                # Add
+│   │   ├── test_tree.py                               # Add
+│   │   ├── test_deps.py                               # Add
+│   │   └── test_active.py                             # Add
+│   └── presentation_runtime/                          # Add
+│       ├── test_markdown.py                           # Add
+│       ├── test_puml.py                               # Add
+│       └── test_json_state.py                         # Add
+└── spec-deps/current/design.md                        # Modify (this file)
 ```
 
 ### ファイル変更分類
