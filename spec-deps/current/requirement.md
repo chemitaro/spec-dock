@@ -175,6 +175,7 @@ ID: "issue-25"
     - exit codes
     - generated file paths/names
     - generated JSON/Markdown/PUML の content shape と主要内容
+    - scaffold collision 時の fail-fast no-write 挙動
     - 次の重要契約に対する明示的な回帰テストが存在し、通過すること:
       - `sync --force`
       - `deps check` の readiness/exit code
