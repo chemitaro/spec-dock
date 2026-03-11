@@ -300,7 +300,7 @@ ID: "issue-25"
 ## legacy shim matrix
 | 旧 module | 中間段階の扱い | 正式移設先 | 削除/最終整理 step | rollback unit |
 | --- | --- | --- | --- | --- |
-| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S11` | `S03/S05/S07/S09` |
+| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S11` | `S03/S05/S07` |
 | `io_json.py` | wrapper 維持可 | `infra/json_store.py` | `S11` | `S03/S06` |
 | `github.py` | wrapper 維持可 | `infra/github_cli.py` | `S11` | `S03/S07/S09` |
 | `render_md.py` | wrapper 維持可 | `presentation/markdown.py` | `S11` | `S06` |
