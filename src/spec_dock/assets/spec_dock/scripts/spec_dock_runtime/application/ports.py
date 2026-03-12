@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 from typing import Any
 from typing import Protocol
 
+from .contracts import ArtifactWriteResult, SyncCommandResult, SyncRequest
 from ..domain.models import IssueSnapshot, SpecGraph
 from ..infra.contracts import ActiveManifest
 from ..infra.contracts import ActiveManifestLoadResult
 from ..infra.contracts import ActiveStateSnapshot
 from ..infra.contracts import DepsTopologyLoadResult
 from ..infra.contracts import StoredMetaRecord
+from ..presentation.contracts import ArtifactBundle
 
 
 class ValidateNodeReader(Protocol):
@@ -79,6 +82,21 @@ class GitGateway(Protocol):
         ...
 
 
+class ArtifactWriter(Protocol):
+    def write(self, specdock_dir: Path, bundle: ArtifactBundle) -> ArtifactWriteResult:
+        ...
+
+
+class SyncLegacyRunner(Protocol):
+    def run_sync(
+        self,
+        req: SyncRequest,
+        *,
+        active_manifest_mode: Literal["migrate", "no_migrate"] = "migrate",
+    ) -> SyncCommandResult:
+        ...
+
+
 @dataclass(frozen=True)
 class Ports:
     node_reader: ValidateNodeReader
@@ -91,3 +109,5 @@ class Ports:
     git_gateway: GitGateway | None = None
     json_store: Any | None = None
     clock: Any | None = None
+    artifact_writer: ArtifactWriter | None = None
+    sync_legacy_runner: SyncLegacyRunner | None = None

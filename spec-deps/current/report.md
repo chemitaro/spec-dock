@@ -324,7 +324,7 @@ Ran 8 tests ... OK
 - `tests/test_cli.py` - active set/clear CLI regression を更新
 
 #### コミット
-- 未実施
+- `8e2c74e2495edbcb30846bef105c89454b9a9e22` `feat(active): S06のactive set/clear write sliceを導入`
 
 #### メモ
 - non-issue target でも `deps.ready` を使って `unknown` を拒否するようにしたため、dependency closure が空でも status 不明なら active mutation を止める。
@@ -333,6 +333,64 @@ Ran 8 tests ... OK
 ## 今後の推奨事項
 - `S07` では `sync` の preflight / artifact write を `S04` / `S06` の shared seam に再接続する。
 - `S07` で active auto-update は `ActiveUpdateOutcome` と artifact write failure の境界を明確にしたまま導入する。
+
+---
+
+### 2026-03-12 10:25 - 11:45
+
+#### 対象
+- Step: S07
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `application/sync_state.py` を追加し、`collect_sync_state()`、`maybe_auto_update_from_branch()`、`write_sync_artifacts()`、`sync_after_import()` を導入した。
+- `S06` の `commit_active_state()` を再利用し、branch 由来 active update を artifact write より前に適用する流れを固定した。
+- `infra/artifact_writer.py`, `infra/json_store.py`, `infra/clock.py` を追加し、artifact write と timestamp 取得の責務を分離した。
+- `presentation/json_state.py`, `presentation/markdown.py`, `presentation/puml.py`, `presentation/cli_text.py` を拡張し、JSON / markdown / PUML / text の renderer 所有境界を整理した。
+- `tests/test_runtime_sync_s07.py` を追加し、sync use case、cycle fail-fast、force placeholder、artifact failure contract、legacy delegated smoke を focused に固定した。
+- 初回 review では、artifact writer の途中失敗が `failed_before_write` と誤分類される P1 指摘を受けた。
+- `application/sync_state.py` を修正し、writer 実行中の例外は `failed_partial_or_stale` として再分類し、pre-write failure だけを `failed_before_write` に残すようにした。
+- `tests/test_cli.py` の関連 setup を `--force` 前提へ補正し、S06 で導入した unknown readiness block と衝突しないよう整理した。
+- 修正後の再レビューで重大指摘なしの pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_runtime_sync_s07 -v
+
+Ran 9 tests ... OK
+
+python -m unittest discover -v
+
+Ran 211 tests in 32.716s
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - S07 用 DTO を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - sync / artifact ports を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync pipeline を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/active.py` - sync path から再利用する helper を拡張
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_writer.py` - artifact writer を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/clock.py` - clock seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/json_store.py` - JSON store seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/contracts.py` - artifact bundle 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - sync JSON renderer を拡張
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/markdown.py` - markdown renderer を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - PUML renderer を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - sync text renderer を追加
+- `tests/test_runtime_sync_s07.py` - S07 focused tests
+- `tests/test_cli.py` - sync / active setup regression を更新
+
+#### コミット
+- 未実施
+
+#### メモ
+- artifact writer の途中失敗は部分書き込みの可能性を失わないよう `failed_partial_or_stale` に固定した。
+- pre-write failure は `failed_before_write` のまま維持している。
+
+## 今後の推奨事項
+- `S08` では create core を no-write preflight と planned write に分けて固定する。
+- `S09` では `new doc` を node create から独立枝として閉じる。
 
 ## 省略/例外メモ
 - 該当なし
