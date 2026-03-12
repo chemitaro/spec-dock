@@ -38,6 +38,42 @@ def resolve_active_node(graph: SpecGraph, entry_id: str | None, expected_kind: s
     return node
 
 
+def resolve_parent_from_active(graph: SpecGraph, child_kind: str, active: ActiveSelection) -> str:
+    if child_kind == "issue":
+        active_epic = resolve_active_node(graph, active.epic_id, expected_kind="epic")
+        if active_epic is not None:
+            return active_epic.id
+
+        active_issue = resolve_active_node(graph, active.issue_id, expected_kind="issue")
+        if active_issue is not None and active_issue.epic_id:
+            issue_epic = resolve_active_node(graph, active_issue.epic_id, expected_kind="epic")
+            if issue_epic is not None:
+                return issue_epic.id
+
+        raise RuntimeError("Cannot resolve parent epic from active selection. Pass --epic explicitly.")
+
+    if child_kind == "epic":
+        active_initiative = resolve_active_node(graph, active.initiative_id, expected_kind="initiative")
+        if active_initiative is not None:
+            return active_initiative.id
+
+        active_epic = resolve_active_node(graph, active.epic_id, expected_kind="epic")
+        if active_epic is not None and active_epic.initiative_id:
+            epic_initiative = resolve_active_node(graph, active_epic.initiative_id, expected_kind="initiative")
+            if epic_initiative is not None:
+                return epic_initiative.id
+
+        active_issue = resolve_active_node(graph, active.issue_id, expected_kind="issue")
+        if active_issue is not None and active_issue.initiative_id:
+            issue_initiative = resolve_active_node(graph, active_issue.initiative_id, expected_kind="initiative")
+            if issue_initiative is not None:
+                return issue_initiative.id
+
+        raise RuntimeError("Cannot resolve parent initiative from active selection. Pass --initiative explicitly.")
+
+    raise RuntimeError(f"Internal error: unsupported child type for active fallback: {child_kind}")
+
+
 def select_active_chain(graph: SpecGraph, target_id: NodeId) -> ActiveSelection:
     node = graph.nodes_by_id.get(target_id.value)
     if node is None:

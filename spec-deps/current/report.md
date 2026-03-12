@@ -473,11 +473,57 @@ Ran 228 tests ... OK
 - `tests/test_runtime_new_doc_s09.py` - S09 focused tests
 
 #### コミット
-- 未実施
+- `cc5069bd122960d9bbe3ba66cc10e70fd4c8e557` `feat(new): S09のnew doc coreを導入`
 
 #### メモ
 - `scope_node_id` は canonical id 前提で、CLI 経由では `app.py` 側で解決済みの値だけを use case に渡している。
 - `app.py` の旧 `_new_doc` 本体は staged rollback 用に残している。
+
+---
+
+### 2026-03-12 13:25 - 14:20
+
+#### 対象
+- Step: S10
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `application/import_node.py` を追加し、`import` 専用 use case と `sync_after_import()` を導入した。
+- `resolve_parent_for_import()` を実装し、`parent_id` 未指定時は `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` の鎖で親解決するようにした。
+- duplicate guard と no-write preflight を GitHub lookup より前へ配置し、offline/degraded な状況でも deterministic に duplicate/collision を返すよう修正した。
+- `build_linked_create_request()` で `CreateNodeRequest(github_mode=\"link_existing\")` へ変換し、`plan_node_creation()` / `execute_create_plan()` を再利用する形へ統一した。
+- `app.py` は staged delegation owner のまま維持し、`import` を `application/import_node.py` へ委譲した。
+- `presentation/cli_text.py` に `render_import_text()` を追加し、import 結果の text 契約を固定した。
+- `tests/test_runtime_import_s10.py` を追加し、parent fallback、duplicate/no-write、import->sync、artifact path/content、negative path、no_migrate chain、reuse seam、renderer、legacy delegated smoke を focused に固定した。
+- 初回 review では duplicate/collision preflight が `issue_view_minimal()` より後ろにある P1 指摘を受けた。
+- `application/import_node.py` と `tests/test_runtime_import_s10.py` を修正し、duplicate/collision ケースでは `view_calls == []` であることまで含めて再レビューを pass させた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_runtime_import_s10
+
+Ran 9 tests ... OK
+
+python -m unittest discover -v
+
+Ran 237 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - import path を use case へ委譲
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - S10 用 DTO を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - import 用 port 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py` - import core と sync_after_import を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py` - `resolve_parent_from_active()` を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - import text renderer を追加
+- `tests/test_runtime_import_s10.py` - S10 focused tests
+
+#### コミット
+- 未実施
+
+#### メモ
+- `post_import_sync` の artifact 書き込み失敗は `ImportNodeResult.post_import_sync.artifact_failure` と warning で表現し、CLI 終了コード変更は今回扱っていない。
+- `load_active_manifest_no_migrate()` の user-facing consumer は import parent fallback のみに限定している。
 
 ## 省略/例外メモ
 - 該当なし
