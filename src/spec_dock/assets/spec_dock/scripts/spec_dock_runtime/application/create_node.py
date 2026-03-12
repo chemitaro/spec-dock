@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -14,15 +15,27 @@ from ..domain.ids import (
     parse_id,
     resolve_id_input,
     resolve_input_title_and_slug,
+    slugify,
+    validate_input_slug_kebab,
 )
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import StoredMetaRecord
-from .contracts import CreateNodeRequest, CreateNodeResult, CreatePlan
+from .contracts import (
+    CreateDiscussionDocRequest,
+    CreateDiscussionDocResult,
+    CreateNodeRequest,
+    CreateNodeResult,
+    CreatePlan,
+)
 from .ports import Ports
 
 _META_FILENAME = ".meta.json"
+_DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
+_DISCUSSION_DOC_FILENAME_RE = re.compile(
+    r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+)
 
 
 def _resolve_specdock_dir(ports: Ports) -> Path:
@@ -375,6 +388,141 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
     )
     node_repo.write_meta(plan.dest_dir, plan.meta)
     return [*created_paths, Path(plan.meta.meta_path)]
+
+
+def _resolve_scope_node(req: CreateDiscussionDocRequest, graph: SpecGraph) -> SpecNode:
+    scope = graph.nodes_by_id.get(req.scope_node_id)
+    if scope is None:
+        raise RuntimeError(f"Scope node not found: {req.scope_node_id}")
+    if scope.kind not in ("initiative", "epic", "issue"):
+        raise RuntimeError(f"Unsupported scope kind for discussion docs: {scope.kind}")
+    return scope
+
+
+def _normalize_discussion_doc_inputs(req: CreateDiscussionDocRequest) -> tuple[str, str, str]:
+    doc_type = str(req.doc_type).strip().lower()
+    if doc_type not in _DISCUSSION_DOC_TYPES:
+        allowed = ", ".join(_DISCUSSION_DOC_TYPES)
+        raise RuntimeError(f"Unknown discussion doc type: {doc_type} (allowed: {allowed})")
+
+    title = str(req.title).strip()
+    if not title:
+        raise RuntimeError("--title is required")
+
+    slug = str(req.slug).strip() if req.slug is not None else slugify(title)
+    if not slug:
+        raise RuntimeError("Failed to derive slug from title. Pass --slug explicitly.")
+    slug = validate_input_slug_kebab(slug, field="--slug")
+    return doc_type, title, slug
+
+
+def _scan_discussion_sequence_sources(discussions_dir: Path) -> list[tuple[int, str, Path]]:
+    refs: list[tuple[int, str, Path]] = []
+    if not discussions_dir.exists():
+        return refs
+    for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+        matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
+        if not matched:
+            continue
+        refs.append((int(matched.group("seq")), str(matched.group("doc_type")), path))
+    return refs
+
+
+def _next_discussion_doc_seq(discussions_dir: Path) -> int:
+    refs = _scan_discussion_sequence_sources(discussions_dir)
+    if not refs:
+        return 1
+
+    max_seq = 0
+    by_seq: dict[int, list[Path]] = {}
+    for seq, _doc_type, path in refs:
+        max_seq = max(max_seq, seq)
+        by_seq.setdefault(seq, []).append(path)
+
+    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
+    if duplicate_seqs:
+        dup_seq = duplicate_seqs[0]
+        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
+        raise RuntimeError(
+            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+        )
+
+    next_seq = max_seq + 1
+    if next_seq > 999:
+        raise RuntimeError(
+            "Discussion sequence overflow: next sequence would exceed 999. "
+            "Create a follow-up issue to decide whether to archive old discussion docs or extend sequence width."
+        )
+    return next_seq
+
+
+def _resolve_specdock_root(path: Path) -> Path:
+    for current in [path, *path.parents]:
+        if current.name == "spec-dock":
+            return current
+    raise RuntimeError(f"spec-dock root not found from scope path: {path}")
+
+
+def _doc_id_from_path(path: Path) -> str:
+    matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
+    if matched is None:
+        raise RuntimeError(f"Invalid discussion document filename: {path.name}")
+    return f"{matched.group('seq')}-{matched.group('doc_type')}"
+
+
+def plan_discussion_doc(
+    req: CreateDiscussionDocRequest,
+    graph: SpecGraph,
+    *,
+    today: str | None = None,
+) -> tuple[Path, Path, dict[str, str]]:
+    scope = _resolve_scope_node(req, graph)
+    doc_type, title, slug = _normalize_discussion_doc_inputs(req)
+
+    specdock_dir = _resolve_specdock_root(scope.path)
+    template_path = specdock_dir / "templates" / "discussions" / f"{doc_type}.md"
+    discussions_dir = scope.path / "discussions"
+    seq = _next_discussion_doc_seq(discussions_dir)
+    seq_text = f"{seq:03d}"
+    doc_id = f"{seq_text}-{doc_type}"
+    dest_path = discussions_dir / f"{seq_text}-{doc_type}-{slug}.md"
+    if dest_path.exists():
+        raise RuntimeError(f"Discussion doc already exists: {dest_path}")
+
+    replacements = {
+        "<ADR_ID>": doc_id,
+        "<ADR_TITLE>": title,
+        "<DISC_ID>": doc_id,
+        "<DISC_TITLE>": title,
+        "<RESEARCH_ID>": doc_id,
+        "<RESEARCH_TITLE>": title,
+        "<NOTE_ID>": doc_id,
+        "<NOTE_TITLE>": title,
+        "<SCOPE_ID>": scope.id,
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": today if today is not None else date.today().isoformat(),
+    }
+    return template_path, dest_path, replacements
+
+
+def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult:
+    template_scaffolder = _resolve_template_scaffolder(ports)
+    graph = load_graph(ports, validate=False)
+    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+    template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
+
+    template_text = template_scaffolder.load_template_text(template_path)
+    rendered_text = template_scaffolder.render_text(template_text, replacements)
+    template_scaffolder.write_text(dest_path, rendered_text)
+    doc_id = _doc_id_from_path(dest_path)
+
+    return CreateDiscussionDocResult(
+        doc_id=doc_id,
+        doc_type=doc_id.split("-", 1)[1],
+        scope_node_id=replacements["<SCOPE_ID>"],
+        path=dest_path,
+        warnings=[],
+    )
 
 
 def _github_issue_body(
