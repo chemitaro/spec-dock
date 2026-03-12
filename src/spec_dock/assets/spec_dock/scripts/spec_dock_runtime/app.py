@@ -37,20 +37,22 @@ from .github import (
     _gh_issue_index,
     _gh_issue_view_minimal,
 )
+from .domain.models import SpecGraph, SpecNodeSeed
+from .domain.tree import build_graph as _domain_build_graph
+from .domain.validation import (
+    validate_graph_and_deps as _domain_validate_graph_and_deps,
+    validate_github_issue_numbers_unique as _domain_validate_github_issue_numbers_unique,
+)
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
     _format_id,
-    _normalize_id_input,
     _normalize_local_id_input,
     _parse_id,
     _resolve_id_input,
     _resolve_input_title_and_slug,
     _slugify,
     _validate_input_slug_kebab,
-    _validate_input_title,
-    _validate_lowercase,
-    _validate_slug,
 )
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
@@ -1294,29 +1296,30 @@ def _ensure_github_issue_not_linked(
     )
 
 
+def _build_graph_from_nodes(nodes: dict[str, _Node]) -> SpecGraph:
+    """Map app-layer nodes into pure domain graph."""
+    seeds = [
+        SpecNodeSeed(
+            kind=node.type,
+            id=node.id,
+            title=node.title,
+            slug=node.slug,
+            path=node.path,
+            meta_path=node.meta_path,
+            parent_id=node.parent_id,
+            initiative_id=node.initiative_id,
+            epic_id=node.epic_id,
+            github_issue_number=node.github_issue_number,
+        )
+        for node in nodes.values()
+    ]
+    return _domain_build_graph(seeds)
+
+
 def _validate_github_issue_numbers_unique(nodes: dict[str, _Node], *, repo_root: Path | None = None) -> None:
     """Ensure github.issue_number is unique across initiative/epic/issue nodes."""
-    by_issue_number: dict[int, list[_Node]] = {}
-    for node in nodes.values():
-        if node.type not in ("initiative", "epic", "issue"):
-            continue
-        if node.github_issue_number is None:
-            continue
-        by_issue_number.setdefault(int(node.github_issue_number), []).append(node)
-
-    for issue_number in sorted(by_issue_number.keys()):
-        linked = sorted(
-            by_issue_number[issue_number],
-            key=lambda n: (n.type, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
-        )
-        if len(linked) <= 1:
-            continue
-        found = _format_linked_github_nodes(linked, repo_root=repo_root)
-        raise RuntimeError(
-            f"Duplicate github.issue_number detected: github.issue_number={issue_number} "
-            f"is linked by multiple nodes: {found}. "
-            "Fix github.issue_number in one of the listed .meta.json files to restore uniqueness."
-        )
+    graph = _build_graph_from_nodes(nodes)
+    _domain_validate_github_issue_numbers_unique(graph, repo_root=repo_root)
 
 
 def _resolve_active_node(nodes: dict[str, _Node], *, entry: Any, expected_type: str) -> _Node | None:
@@ -3574,73 +3577,10 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
     - `validate` (full validation command)
     - `sync` preflight (to avoid generating index/tree from an invalid tree)
     """
-    numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
-    for node_id in nodes.keys():
-        prefix, is_local, num = _parse_id(str(node_id))
-        numeric_ids.setdefault((prefix, is_local, num), []).append(str(node_id))
-
-    for (prefix, is_local, num), ids in sorted(numeric_ids.items()):
-        uniq = sorted(set(ids))
-        if len(uniq) > 1:
-            marker = "-local" if is_local else ""
-            raise RuntimeError(
-                f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
-            )
-
-    _validate_github_issue_numbers_unique(nodes, repo_root=repo_root)
-
-    for node_id, node in nodes.items():
-        _validate_lowercase(node_id, field="id")
-        _parse_id(node_id)
-        if not node.title:
-            raise RuntimeError(f"Missing title in .meta.json: {node.meta_path}")
-        if not node.slug:
-            raise RuntimeError(f"Missing slug in .meta.json: {node.meta_path}")
-        _validate_slug(node.slug, field="slug")
-
-        if node.type == "initiative":
-            if node.parent_id is not None:
-                raise RuntimeError(f"initiative parent_id must be null: {node.id}")
-            if node.initiative_id is not None or node.epic_id is not None:
-                raise RuntimeError(f"initiative must not have initiative_id/epic_id: {node.id}")
-            continue
-
-        if node.type == "epic":
-            if not node.parent_id:
-                raise RuntimeError(f"epic missing parent_id: {node.meta_path}")
-            if not node.initiative_id:
-                raise RuntimeError(f"epic missing initiative_id: {node.meta_path}")
-            if node.parent_id != node.initiative_id:
-                raise RuntimeError(
-                    f"epic parent_id mismatch: {node.id} parent_id={node.parent_id} initiative_id={node.initiative_id}"
-                )
-            parent = nodes.get(node.parent_id)
-            if not parent or parent.type != "initiative":
-                raise RuntimeError(f"epic points to invalid parent initiative: {node.parent_id}")
-            continue
-
-        if node.type == "issue":
-            if not node.parent_id:
-                raise RuntimeError(f"issue missing parent_id: {node.meta_path}")
-            if not node.initiative_id or not node.epic_id:
-                raise RuntimeError(f"issue missing initiative_id/epic_id: {node.meta_path}")
-            if node.parent_id != node.epic_id:
-                raise RuntimeError(
-                    f"issue parent_id mismatch: {node.id} parent_id={node.parent_id} epic_id={node.epic_id}"
-                )
-            epic = nodes.get(node.epic_id)
-            if not epic or epic.type != "epic":
-                raise RuntimeError(f"issue points to invalid epic_id: {node.epic_id}")
-            initiative = nodes.get(node.initiative_id)
-            if not initiative or initiative.type != "initiative":
-                raise RuntimeError(f"issue points to invalid initiative_id: {node.initiative_id}")
-            if epic.initiative_id and epic.initiative_id != node.initiative_id:
-                raise RuntimeError(
-                    f"issue initiative_id mismatch: {node.id} initiative_id={node.initiative_id} but epic {epic.id} initiative_id={epic.initiative_id}"
-                )
-            continue
-
-        raise RuntimeError(f"Unknown node type: {node.type} ({node.meta_path})")
+    graph = _build_graph_from_nodes(nodes)
+    report = _domain_validate_graph_and_deps(graph, repo_root=repo_root)
+    if report.errors:
+        raise RuntimeError(report.errors[0])
 
 
 def _validate(specdock_dir: Path) -> None:
