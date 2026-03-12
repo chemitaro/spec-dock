@@ -519,11 +519,69 @@ Ran 237 tests ... OK
 - `tests/test_runtime_import_s10.py` - S10 focused tests
 
 #### コミット
-- 未実施
+- `7722d79c1ae5fa77b7d85320c0cb47d9d09be2e6` `feat(import): s10のimport coreとsync連携を導入`
 
 #### メモ
 - `post_import_sync` の artifact 書き込み失敗は `ImportNodeResult.post_import_sync.artifact_failure` と warning で表現し、CLI 終了コード変更は今回扱っていない。
 - `load_active_manifest_no_migrate()` の user-facing consumer は import parent fallback のみに限定している。
+
+---
+
+### 2026-03-12 14:25 - 15:30
+
+#### 対象
+- Step: S11
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `cli/*` と `commands/*` を追加し、parser/help/dispatch ownership を `cli` 側へ移した。
+- `application/contracts.py` に `UseCases` facade を追加し、`commands/*` は request normalization + renderer selection に限定した。
+- `app.py` を thin entrypoint 化し、`registry -> parser -> bootstrap -> dispatch` の起動に責務を縮小した。
+- `commands/sync.py` は staged coexistence のため facade 経由 legacy 委譲を維持した。
+- `tests/test_runtime_shell_s11.py` を追加し、parser/help/dispatch / wrapper / staged delegation の focused regression を固定した。
+- 初回 review では `deps --json` が stderr warning を出してしまう P2 指摘を受けた。
+- `commands/deps.py` を修正し、JSON mode では `CliText.warnings=[]` として stdout-only 契約を守るようにした。text モードの warning は維持した。
+- 修正後の focused tests と full `discover` を通し、再レビューで pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_runtime_shell_s11
+
+Ran 6 tests ... OK
+
+python -m unittest discover -v
+
+Ran 244 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - thin entrypoint 化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `UseCases` facade を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - bootstrap 用 port 契約調整
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/__init__.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/dispatch.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/__init__.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/contracts.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/targets.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/active.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/sync.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/validate.py`
+- `tests/test_runtime_shell_s11.py` - S11 focused tests
+- `tests/test_runtime_validate_s02.py` - ownership 変更に合わせて更新
+- `tests/test_cli.py` - `deps --json` stdout-only 契約を更新
+
+#### コミット
+- 未実施
+
+#### メモ
+- `commands/*` は `UseCases facade + application DTO + presentation renderer + commands/contracts` のみに依存する方針へ揃えた。
+- `sync` は意図的に staged coexistence を残し、最終 detach は後続 step に残している。
 
 ## 省略/例外メモ
 - 該当なし

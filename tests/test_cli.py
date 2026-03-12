@@ -3978,7 +3978,7 @@ class TestCli(unittest.TestCase):
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--github", "--json"], env=test_env)
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            self.assertIn("gh_index_incomplete", p.stderr)
+            self.assertEqual(p.stderr.strip(), "")
             data = json.loads(p.stdout)
             self.assertIn("gh_index_incomplete", data["warnings"])
             self.assertEqual(data["blockers"], ["iss-00301"])
@@ -4027,7 +4027,7 @@ class TestCli(unittest.TestCase):
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--github", "--json"], env=test_env)
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            self.assertIn("gh_fetch_failed", p.stderr)
+            self.assertEqual(p.stderr.strip(), "")
             data = json.loads(p.stdout)
             self.assertIn("gh_fetch_failed", data["warnings"])
             self.assertEqual(data["blockers"], ["iss-00301"])

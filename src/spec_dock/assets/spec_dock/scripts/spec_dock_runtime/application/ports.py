@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
-from typing import Any
 from typing import Protocol
 
 from .contracts import ArtifactWriteResult, SyncCommandResult, SyncRequest
@@ -115,6 +114,22 @@ class ArtifactWriter(Protocol):
         ...
 
 
+class JsonStore(Protocol):
+    def load_json(self, path: Path) -> object:
+        ...
+
+    def write_json(self, path: Path, data: object) -> None:
+        ...
+
+
+class Clock(Protocol):
+    def now_iso(self) -> str:
+        ...
+
+    def today(self) -> str:
+        ...
+
+
 class SyncLegacyRunner(Protocol):
     def run_sync(
         self,
@@ -137,7 +152,7 @@ class Ports:
     active_state_store: ActiveStateStore | None = None
     deps_topology_reader: DepsTopologyReader | None = None
     git_gateway: GitGateway | None = None
-    json_store: Any | None = None
-    clock: Any | None = None
+    json_store: JsonStore | None = None
+    clock: Clock | None = None
     artifact_writer: ArtifactWriter | None = None
     sync_legacy_runner: SyncLegacyRunner | None = None
