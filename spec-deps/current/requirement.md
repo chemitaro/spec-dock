@@ -63,7 +63,7 @@ ID: "issue-25"
 ## スコープ
 - MUST:
   - runtime CLI に、ADR で確定した layered architecture の骨格を導入する。
-  - `app.py` を薄い entrypoint/dispatch 中心へ縮小する。
+  - `app.py` を薄い entrypoint/live-shell delegation 中心へ縮小する。
   - runtime package 配下に、少なくとも `commands` `application` `domain` `infra` `presentation` の物理層を導入する。
   - `new/import/active/sync/deps/validate` の user-facing command 実装を `commands` 層へ移す。
   - command を跨いで共有される workflow を `application` 層へ移す。
@@ -73,7 +73,7 @@ ID: "issue-25"
   - `tests/test_cli.py` を、最低でも `installer` と `runtime` の観点で分離し、runtime 側を command 契約単位へ再編する。
   - 既存 CLI 契約、artifact 契約、exit code 契約、green を維持する。
   - 最低合格構成として、以下を満たす:
-    - `app.py` は CLI entrypoint/dispatch/error handling に限定される
+    - `app.py` は CLI entrypoint/dispatch/error handling と live shell 起動に限定される
     - `commands` は `new` `import` `active` `sync` `deps` `validate` の入口を持つ
     - `application` は command を跨ぐ workflow orchestration を少なくとも 1 つ以上持つ
     - `domain` は `spec graph` の rule を少なくとも 1 つ以上保持する
@@ -125,10 +125,12 @@ ID: "issue-25"
   - When:
     - Issue #25 の変更後の構成を参照する
   - Then:
-    - `app.py` は entrypoint/dispatch/error handling 中心に縮小され、`commands` `application` `domain` `infra` `presentation` の物理層が runtime package 配下に存在する
+    - `app.py` は entrypoint/dispatch/error handling/live shell 起動中心に縮小され、`commands` `application` `domain` `infra` `presentation` の物理層が runtime package 配下に存在する
   - 観測点:
     - runtime package の directory/module tree
-    - `app.py` 内に command 実装本体が残っていないこと
+    - `app.py` 内に live shell path から到達する command 実装本体が残っていないこと
+    - `cli/bootstrap.py` が `app.py` を composition root / application wiring surface として参照していないこと
+    - `app.py` に残る legacy helper は dormant compatibility code に限られ、`main()` / `cli/bootstrap.py` / `commands/*` から到達しないこと
     - layer ごとのファイル配置
     - `commands` `application` `domain` `infra` `presentation` の各層に少なくとも 1 つ以上の実責務 module が存在すること
 - AC-002:

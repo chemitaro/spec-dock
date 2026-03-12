@@ -1280,7 +1280,7 @@ ID: "issue-25"
     - `deps check`
     - markdown/puml/json artifact contracts
   - final API call-site regression
-  - `app.py` thin-entrypoint / no legacy helper direct import structural check
+  - `app.py` thin-entrypoint / no live wrapper / no bootstrap->app wiring structural check
   - legacy import prohibition / layer direction assertions:
     - `commands/* -> UseCases facade + presentation renderer`
     - `domain/*` no I/O import
@@ -1379,12 +1379,12 @@ ID: "issue-25"
   - `spec_reviewer` pass
   - branch diff review の blocking finding 0 件
   - staged delegation history / rollback basis transition evidence 完了
-  - `app.py` thinness check
+  - `app.py` live thinness check
   - command thinness check
   - layer violation check
   - DTO / contract check
   - touched file / AC-EC trace check:
-    - `AC-001`: runtime package tree / `app.py` thin entrypoint / `commands|application|domain|infra|presentation` の物理導入
+    - `AC-001`: runtime package tree / `app.py` live thin entrypoint / `commands|application|domain|infra|presentation` の物理導入
     - `AC-002`: shared rule / workflow / side effect / rendering の責務分離
     - `AC-003`: `tests/test_init_update.py`, `tests/cli_runtime/*`, `tests/domain_runtime/*`, `tests/presentation_runtime/*` の分割差分
     - `AC-004`: `sync --force`, `deps check`, `active set`, `import -> sync`, scaffold collision no-write の回帰 test 群

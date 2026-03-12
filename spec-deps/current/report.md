@@ -824,8 +824,9 @@ Ran 253 tests ... OK
 
 #### 実施内容
 - `spec_reviewer` の最終指摘に対応し、`app.py` から command 固有 wrapper (`_new_*`, `_import_*`, `_active_*`, `_deps_check`, `_sync`, `_validate`) を除去した。
+- `cli/bootstrap.py` の live wiring を `app.py` 経由 (`runtime_app._application_*`) から外し、application module 直結へ切り替えた。
 - regression は `commands / cli / application / presentation` 経路へ寄せ直し、private wrapper API ではなく final layered path を観測点に更新した。
-- `tests/cli_runtime/test_runtime_shell_s11.py` に command wrapper 不在の structural check を追加し、`app.py` thin-entrypoint 契約を最終形として固定した。
+- `tests/cli_runtime/test_runtime_shell_s11.py` に command wrapper 不在 / bootstrap からの `app.py` wiring 不在の structural check を追加し、`app.py` live thinness 契約を固定した。
 
 #### 実行コマンド / 結果
 ```bash
@@ -844,17 +845,95 @@ rg -n "^def (_new_initiative|_new_epic|_new_issue|_new_doc|_import_initiative|_i
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - command wrapper 群を除去
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - application module 直結へ変更
+- `tests/cli_runtime/test_runtime_validate_s02.py` - bootstrap seam 追従
+- `tests/cli_runtime/test_runtime_deps_s04.py` - bootstrap seam 追従
+- `tests/cli_runtime/test_runtime_active_s05.py` - bootstrap seam 追従
 - `tests/cli_runtime/test_runtime_new_s08.py` - final layered path へ回帰観測点を更新
 - `tests/cli_runtime/test_runtime_new_doc_s09.py` - final layered path へ回帰観測点を更新
 - `tests/cli_runtime/test_runtime_import_s10.py` - final layered path へ回帰観測点を更新
 - `tests/cli_runtime/test_runtime_shell_s11.py` - wrapper absence / thin-entrypoint structural check を追加
 - `tests/presentation_runtime/test_runtime_sync_s07.py` - sync path regression を final layered path へ更新
+- `spec-deps/current/requirement.md` - AC-001 の live thinness 観測点を明確化
+- `spec-deps/current/design.md` - dormant compatibility rule と bootstrap ownership を明確化
+- `spec-deps/current/plan.md` - S99 final gate の live thinness 表現を整合
+- `spec-deps/current/report.md` - final gate 証跡を追記
 
 #### コミット
 - 未実施
 
 #### メモ
-- private wrapper API を直接使う外部コードがもし存在すれば破壊的だが、repo 内参照は tests も含めて解消済み。
+- `app.py` には dormant な legacy helper が残るが、`main()` / `cli/bootstrap.py` / `commands/*` からは到達しない状態に固定した。
+
+---
+
+### 2026-03-12 19:05 - 19:45
+
+#### 対象
+- Step: S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
+
+#### 実施内容
+- final branch diff を `origin/main...HEAD` 観点で再確認し、`app.py` live thinness / `cli/bootstrap.py` composition root ownership / layer 依存方向の整合を再検証した。
+- `spec_reviewer` 指摘を受けて AC-001 を live shell path 基準へ明文化し、`dormant compatibility helper` は `main()` / `cli/bootstrap.py` / `commands/*` から到達しない場合のみ許容する契約へ requirement/design/plan/report を整合した。
+- DTO / contract gate として、`commands/* -> UseCases facade + application/contracts.py + presentation/*`、`cli/bootstrap.py -> Ports internal wiring`、`app.py` が `Ports` / application alias を live path で露出しないことを差分と structural test で再確認した。
+- fresh repo smoke を一時 repo で実施し、`validate`, `deps check --json`, `active show`, `active set -f --no-checkout`, `sync --force`, `new issue`, `import issue` の shipped runtime path を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Ran 253 tests ... OK
+
+rg --files | rg '[A-Z]'
+
+既存の uppercase path のみ検出。今回追加・改名した path に uppercase 増分なし。
+
+fresh repo smoke (temp repo + stub gh):
+- new initiative --title "Smoke Initiative" -> rc=0
+- new epic --initiative 1 --title "Smoke Epic" -> rc=0
+- new issue --epic 1 --title "Smoke Issue" -> rc=0
+- validate -> rc=0
+- deps check iss-00101 --json -> rc=3, stdout JSON only, ready=false/state=unknown
+- active show -> rc=0
+- active set iss-00101 --no-checkout -f -> rc=0
+- sync --force -> rc=0
+- import issue 202 --title "Imported Issue" --epic 1 -> rc=0
+```
+
+#### レビュー / 判定
+- `code_reviewer`: pass
+  - bootstrap 直結配線化と `app.py` live thinness fix に blocking finding なし
+- `spec_reviewer`: pass
+  - requirement/design/plan/report の live thinness 契約と final gate 証跡が整合
+
+#### AC/EC トレース
+- `AC-001`
+  - runtime package に `commands|application|domain|infra|presentation|cli` が存在
+  - `app.py` の live shell path は `registry -> parser -> bootstrap -> dispatch` のみに縮小
+  - `cli/bootstrap.py` は `app.py` を wiring surface として参照しない
+- `AC-002`
+  - shared rule は `domain/*`、workflow は `application/*`、副作用は `infra/*`、描画は `presentation/*` に分離済み
+  - DTO / contract gate:
+    - `commands/*` は `UseCases facade + application DTO + presentation renderer + commands/contracts` のみへ依存
+    - `cli/bootstrap.py` が `Ports` を内部 detail として閉じ、`app.py` は live path で `Ports` / `_application_*` alias を露出しない
+- `AC-003`
+  - `tests/test_init_update.py`, `tests/cli_runtime/*`, `tests/domain_runtime/*`, `tests/presentation_runtime/*` の分割状態を維持
+- `AC-004`
+  - `sync --force`, `deps check`, `active set`, `import -> sync`, scaffold collision no-write の focused/full tests を維持
+- `AC-005`
+  - `python -m unittest discover -v` green
+- `EC-001`
+  - staged delegation history は report 既存節に記録済み、final rollback basis は commit 単位へ移行済み
+- `EC-002`
+  - `import issue` smoke と existing tests で `sync_after_import()` のみが import 後に動く契約を維持
+- `EC-003`
+  - `deps check --json` / `active set -f` smoke と focused tests で readiness / guard / warning order を維持
+- `EC-004`
+  - `sync --force` smoke と presentation/runtime tests で JSON/Markdown/PUML artifact path/name/content 契約を維持
+
+#### メモ
+- `deps check --json` の fresh repo smoke は、GitHub snapshot 未取得のため `ready=false`, `rc=3` となるが、これは既存契約どおりの expected behavior として扱った。
 
 ## 省略/例外メモ
 - 該当なし

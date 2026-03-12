@@ -350,6 +350,7 @@ class TestRuntimeDepsS04(unittest.TestCase):
             presentation_cli_text,
             presentation_json_state,
         ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
         inspection_blocked = domain_models.TargetDepsInspection(
             target_id=domain_models.NodeId("iss-local-00002"),
@@ -372,7 +373,7 @@ class TestRuntimeDepsS04(unittest.TestCase):
 
         calls = {}
         original_find_specdock_dir = runtime_app._find_specdock_dir
-        original_application_check_deps = runtime_app._application_check_deps
+        original_application_check_deps = cli_bootstrap.application_check_deps
         original_render_deps_check_text = runtime_app._render_deps_check_text
         original_render_deps_check_json = runtime_app._render_deps_check_json
         try:
@@ -383,7 +384,7 @@ class TestRuntimeDepsS04(unittest.TestCase):
                 calls["ports"] = ports
                 return blocked_result
 
-            runtime_app._application_check_deps = _fake_check_deps
+            cli_bootstrap.application_check_deps = _fake_check_deps
             runtime_app._render_deps_check_text = presentation_cli_text.render_deps_check_text
             runtime_app._render_deps_check_json = presentation_json_state.render_deps_check_json
 
@@ -401,7 +402,7 @@ class TestRuntimeDepsS04(unittest.TestCase):
             self.assertEqual(calls["req"].target.node_id, "iss-local-1")
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
-            runtime_app._application_check_deps = original_application_check_deps
+            cli_bootstrap.application_check_deps = original_application_check_deps
             runtime_app._render_deps_check_text = original_render_deps_check_text
             runtime_app._render_deps_check_json = original_render_deps_check_json
 
@@ -424,11 +425,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
         )
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
-        original_application_check_deps = runtime_app._application_check_deps
+        original_application_check_deps = cli_bootstrap.application_check_deps
         original_render_deps_check_json = runtime_app._render_deps_check_json
         try:
             runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
-            runtime_app._application_check_deps = lambda req, ports: ready_result
+            cli_bootstrap.application_check_deps = lambda req, ports: ready_result
             runtime_app._render_deps_check_json = presentation_json_state.render_deps_check_json
 
             stdout = io.StringIO()
@@ -442,14 +443,14 @@ class TestRuntimeDepsS04(unittest.TestCase):
             self.assertTrue(payload["ready"])
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
-            runtime_app._application_check_deps = original_application_check_deps
+            cli_bootstrap.application_check_deps = original_application_check_deps
             runtime_app._render_deps_check_json = original_render_deps_check_json
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
-        original_application_check_deps = runtime_app._application_check_deps
+        original_application_check_deps = cli_bootstrap.application_check_deps
         try:
             runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
-            runtime_app._application_check_deps = lambda req, ports: (_ for _ in ()).throw(RuntimeError("boom"))
+            cli_bootstrap.application_check_deps = lambda req, ports: (_ for _ in ()).throw(RuntimeError("boom"))
 
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -459,4 +460,4 @@ class TestRuntimeDepsS04(unittest.TestCase):
             self.assertIn("error: boom", stderr.getvalue())
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
-            runtime_app._application_check_deps = original_application_check_deps
+            cli_bootstrap.application_check_deps = original_application_check_deps

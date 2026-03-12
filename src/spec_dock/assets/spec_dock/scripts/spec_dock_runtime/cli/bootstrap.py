@@ -3,8 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..application.check_deps import check_deps as application_check_deps
+from ..application.create_node import create_discussion_doc as application_create_discussion_doc
+from ..application.create_node import create_epic as application_create_epic
+from ..application.create_node import create_initiative as application_create_initiative
+from ..application.create_node import create_issue as application_create_issue
 from ..application.contracts import UseCases
+from ..application.import_node import import_epic as application_import_epic
+from ..application.import_node import import_initiative as application_import_initiative
+from ..application.import_node import import_issue as application_import_issue
 from ..application.ports import Ports
+from ..application.set_active import clear_active as application_clear_active
+from ..application.set_active import set_active as application_set_active
+from ..application.set_active import show_active as application_show_active
+from ..application.sync_state import sync as application_sync
+from ..application.validate_tree import validate_tree as application_validate_tree
 from ..infra import active_store as infra_active_store
 from ..infra import artifact_writer as infra_artifact_writer
 from ..infra import clock as infra_clock
@@ -151,8 +164,6 @@ class _ArtifactWriter:
 
 
 def build_runtime(specdock_dir: Path) -> BootstrapContext:
-    from .. import app as runtime_app
-
     ports = Ports(
         node_reader=_NodeReader(specdock_dir=specdock_dir),
         repo_root=specdock_dir.parent,
@@ -169,18 +180,18 @@ def build_runtime(specdock_dir: Path) -> BootstrapContext:
         artifact_writer=_ArtifactWriter(),
     )
     use_cases = UseCases(
-        create_initiative=lambda req: runtime_app._application_create_initiative(req, ports),
-        create_epic=lambda req: runtime_app._application_create_epic(req, ports),
-        create_issue=lambda req: runtime_app._application_create_issue(req, ports),
-        create_discussion_doc=lambda req: runtime_app._application_create_discussion_doc(req, ports),
-        import_initiative=lambda req: runtime_app._application_import_initiative(req, ports),
-        import_epic=lambda req: runtime_app._application_import_epic(req, ports),
-        import_issue=lambda req: runtime_app._application_import_issue(req, ports),
-        set_active=lambda req: runtime_app._application_set_active(req, ports),
-        show_active=lambda req: runtime_app._application_show_active(req, ports),
-        clear_active=lambda req: runtime_app._application_clear_active(req, ports),
-        sync=lambda req: runtime_app._application_sync(req, ports),
-        check_deps=lambda req: runtime_app._application_check_deps(req, ports),
-        validate_tree=lambda req: runtime_app._application_validate_tree(req, ports),
+        create_initiative=lambda req: application_create_initiative(req, ports),
+        create_epic=lambda req: application_create_epic(req, ports),
+        create_issue=lambda req: application_create_issue(req, ports),
+        create_discussion_doc=lambda req: application_create_discussion_doc(req, ports),
+        import_initiative=lambda req: application_import_initiative(req, ports),
+        import_epic=lambda req: application_import_epic(req, ports),
+        import_issue=lambda req: application_import_issue(req, ports),
+        set_active=lambda req: application_set_active(req, ports),
+        show_active=lambda req: application_show_active(req, ports),
+        clear_active=lambda req: application_clear_active(req, ports),
+        sync=lambda req: application_sync(req, ports),
+        check_deps=lambda req: application_check_deps(req, ports),
+        validate_tree=lambda req: application_validate_tree(req, ports),
     )
     return BootstrapContext(use_cases=use_cases)

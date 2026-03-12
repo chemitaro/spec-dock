@@ -295,13 +295,14 @@ class TestRuntimeActiveS05(unittest.TestCase):
             _infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
-        original_application_show_active = runtime_app._application_show_active
+        original_application_show_active = cli_bootstrap.application_show_active
         original_load_active_manifest_no_migrate = runtime_app._load_active_manifest_no_migrate
 
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
-        runtime_app._application_show_active = lambda _req, _ports: app_contracts.ActiveViewResult(
+        cli_bootstrap.application_show_active = lambda _req, _ports: app_contracts.ActiveViewResult(
             initiative=app_contracts.ActiveViewEntry(id=None, path=None),
             epic=app_contracts.ActiveViewEntry(id=None, path=None),
             issue=app_contracts.ActiveViewEntry(id=None, path=None),
@@ -320,7 +321,7 @@ class TestRuntimeActiveS05(unittest.TestCase):
                 exit_code = runtime_app.main(["active", "show"])
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
-            runtime_app._application_show_active = original_application_show_active
+            cli_bootstrap.application_show_active = original_application_show_active
             runtime_app._load_active_manifest_no_migrate = original_load_active_manifest_no_migrate
 
         self.assertEqual(exit_code, 0)
