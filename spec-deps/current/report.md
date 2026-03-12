@@ -226,15 +226,61 @@ Ran 191 tests ... OK
 - `tests/test_cli.py` - deps CLI regression を更新
 
 #### コミット
-- 未実施
+- `74f57b9901d411861bd7fcdd7a0d8bd18c19ca37` `feat(deps): S04のdeps checkスライスとtopology providerを導入`
 
 #### メモ
 - `deps check` では topology invalid/cycle を reachable/unreachable にかかわらず fail-fast とし、`active set` / `sync` 側の再利用は計画どおり後続 step へ残した。
 - `validate_tree()` の reconnect は internal seam に留めており、S04 の primary user-facing review scope は `deps check` のまま維持している。
 
+---
+
+### 2026-03-12 08:20 - 09:10
+
+#### 対象
+- Step: S05
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `application/set_active.py` に `show_active()` の read path を導入し、`active show` のみを `application` へ切り出した。
+- `infra/active_store.py` を read-only の migration-capable loader として拡張し、`.agent/active.json`、`.work/active.json`、`.work/current.json` の優先順と no write-back を `load_active_manifest()` に閉じた。
+- `presentation/cli_text.py` に `render_active_show_text()` を追加し、`active show` の text 出力を use case から分離した。
+- `app.py` は staged delegation owner のまま維持し、`active show` の経路だけを新 use case + renderer に委譲した。
+- `tests/test_runtime_active_s05.py` を追加し、agent manifest read model、legacy priority、no write-back、zero-input/exit 0、legacy delegated smoke を固定した。
+- 初回 review では `.agent/active.json` の `all-null` cleared manifest を invalid 扱いして stale legacy fallback が起きうる P1 指摘を受けた。
+- `infra/active_store.py` を修正し、`initiative/epic/issue` がすべて `null` の manifest を valid cleared state として `source=\"agent.active\"` のまま扱うように変更し、focused test を追加して再レビューを pass させた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_runtime_active_s05
+
+Ran 5 tests ... OK
+
+python -m unittest -v tests.test_runtime_active_s05 tests.test_runtime_deps_s04 tests.test_runtime_validate_s02 tests.test_runtime_domain_s03
+
+Ran 25 tests in 0.033s
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `active show` を use case + renderer へ委譲
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `ActiveViewEntry` / `ActiveViewResult` など S05 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - active read port 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - `show_active()` の read path を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - migration-capable read loader と cleared manifest fix
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - active manifest read DTO を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - `render_active_show_text()` を追加
+- `tests/test_runtime_active_s05.py` - S05 focused tests
+
+#### コミット
+- 未実施
+
+#### メモ
+- `load_active_manifest_no_migrate()` は S05 の user-facing path では使っていない。
+- `all-null` `.agent/active.json` は cleared state として扱い、legacy fallback を起こさないようにした。
+
 ## 今後の推奨事項
-- `S05` では active read model を `deps check` と独立に閉じ、read path の DTO と renderer ownership を分離する。
 - `S06` で `S04` の topology provider を `active set` の readiness guard に再利用し、fail-fast 順序を command 契約へ持ち上げる。
+- `S06` では `active clear` の cleared manifest と `S05` の read loader が矛盾しないことを継続的に確認する。
 
 ## 省略/例外メモ
 - 該当なし

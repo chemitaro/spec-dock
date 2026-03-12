@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -20,4 +21,24 @@ class StoredMetaRecord:
 @dataclass(frozen=True)
 class DepsTopologyLoadResult:
     issue_depends_on_map: dict[str, list[str]]
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
+class ActiveManifestEntry:
+    id: str
+    path: str | None
+
+
+@dataclass(frozen=True)
+class ActiveManifest:
+    initiative: ActiveManifestEntry | None
+    epic: ActiveManifestEntry | None
+    issue: ActiveManifestEntry | None
+
+
+@dataclass(frozen=True)
+class ActiveManifestLoadResult:
+    manifest: ActiveManifest | None
+    source: Literal["agent.active", "legacy.work.active", "legacy.work.current", "none"]
     warnings: list[str]

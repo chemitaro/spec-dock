@@ -33,9 +33,11 @@ from typing import Any
 
 from .application.check_deps import check_deps as _application_check_deps
 from .application.contracts import CheckDepsRequest as _CheckDepsRequest
+from .application.contracts import ShowActiveRequest as _ShowActiveRequest
 from .application.contracts import TargetRef as _TargetRef
 from .application.contracts import ValidateTreeRequest as _ValidateTreeRequest
 from .application.ports import Ports as _ApplicationPorts
+from .application.set_active import show_active as _application_show_active
 from .application.validate_tree import validate_tree as _application_validate_tree
 from .github import (
     _ensure_gh_available,
@@ -54,6 +56,7 @@ from .infra.deps_reader import load_issue_depends_on_map as _infra_load_issue_de
 from .infra.derived_state_reader import load_cached_issue_status_by_id as _infra_load_cached_issue_status_by_id
 from .infra.github_cli import issue_index as _infra_issue_index
 from .infra.active_store import load_active_issue_id as _infra_load_active_issue_id
+from .infra.active_store import load_active_manifest as _infra_load_active_manifest
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
@@ -66,8 +69,9 @@ from .ids import (
     _validate_input_slug_kebab,
 )
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
-from .presentation.cli_text import render_validate_text as _render_validate_text
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
+from .presentation.cli_text import render_active_show_text as _render_active_show_text
+from .presentation.cli_text import render_validate_text as _render_validate_text
 from .presentation.json_state import render_deps_check_json as _render_deps_check_json
 from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
 from .render_puml import (
@@ -176,6 +180,9 @@ class _AppIssueGateway:
 
 @dataclass(frozen=True)
 class _AppActiveStateStore:
+    def load_active_manifest(self, specdock_dir: Path):
+        return _infra_load_active_manifest(specdock_dir)
+
     def load_active_issue_id(self, specdock_dir: Path) -> str | None:
         return _infra_load_active_issue_id(specdock_dir)
 
@@ -1722,26 +1729,21 @@ def _active_set(
 
 
 def _active_show(specdock_dir: Path) -> None:
-    """Print the current active pointers from `spec-dock/.agent/active.json`."""
-    current = _load_active_manifest(specdock_dir)
-    if not current:
-        print("spec-dock: active: (not set)")
-        return
-
-    def fmt(entry: Any) -> str:
-        if not isinstance(entry, dict):
-            return "(none)"
-        node_id = entry.get("id") if isinstance(entry.get("id"), str) else None
-        node_path = entry.get("path") if isinstance(entry.get("path"), str) else None
-        if node_id and node_path:
-            return f"{node_id} ({node_path})"
-        if node_id:
-            return str(node_id)
-        return "(none)"
-
-    print(f"initiative: {fmt(current.get('initiative'))}")
-    print(f"epic: {fmt(current.get('epic'))}")
-    print(f"issue: {fmt(current.get('issue'))}")
+    """Show active pointers via S05 read-side use case + renderer."""
+    ports = _ApplicationPorts(
+        node_reader=_AppValidateNodeReader(specdock_dir=specdock_dir),
+        repo_root=specdock_dir.parent,
+        specdock_dir=specdock_dir,
+        active_state_store=_AppActiveStateStore(),
+    )
+    result = _application_show_active(_ShowActiveRequest(), ports)
+    text = _render_active_show_text(result)
+    for warning in text.warnings:
+        _warn(warning)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+    for line in text.stdout_lines:
+        print(line)
 
 
 def _active_clear(specdock_dir: Path) -> None:
