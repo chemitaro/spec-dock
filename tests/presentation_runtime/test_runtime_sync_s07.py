@@ -669,11 +669,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_build_runtime = runtime_app._cli_build_runtime
-        original_sync = runtime_app._sync
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
-        runtime_app._sync = lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("legacy _sync should not be called from main sync path")
-        )
+        self.assertFalse(hasattr(runtime_app, "_sync"))
         try:
             runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
                 use_cases=_build_use_cases(
@@ -703,7 +700,6 @@ class TestRuntimeSyncS07(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._cli_build_runtime = original_build_runtime
-            runtime_app._sync = original_sync
 
     def test_legacy_delegated_sync_smoke(self) -> None:
         (

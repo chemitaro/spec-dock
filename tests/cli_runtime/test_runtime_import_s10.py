@@ -1,5 +1,3 @@
-import contextlib
-import io
 import json
 import sys
 import tempfile
@@ -800,9 +798,9 @@ class TestRuntimeImportS10(unittest.TestCase):
         )
         self.assertEqual(text.warnings, ["gh_index_incomplete"])
 
-    def test_legacy_delegated_import_smoke(self) -> None:
+    def test_command_import_issue_smoke(self) -> None:
         (
-            runtime_app,
+            _runtime_app,
             app_contracts,
             _app_import_node,
             _app_ports,
@@ -811,12 +809,27 @@ class TestRuntimeImportS10(unittest.TestCase):
             _infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
-        original_import_issue = runtime_app._application_import_issue
-        original_legacy_guard = runtime_app._ensure_no_legacy_meta_json
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.commands import import_cmd
+        finally:
+            sys.path.pop(0)
+
         calls = []
 
-        def _fake_import(req, ports):
-            del ports
+        def _unexpected(_req):
+            raise AssertionError("unexpected use case call")
+
+        def _fake_import(req):
             calls.append(req)
             return app_contracts.ImportNodeResult(
                 node=app_contracts.SpecNode(
@@ -847,26 +860,36 @@ class TestRuntimeImportS10(unittest.TestCase):
                 warnings=[],
             )
 
-        runtime_app._application_import_issue = _fake_import
-        runtime_app._ensure_no_legacy_meta_json = lambda _specdock_dir: None
-        try:
-            stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                runtime_app._import_issue(
-                    Path("/repo/spec-dock"),
-                    issue_number=123,
-                    title="Imported issue",
-                    slug=None,
-                    epic_id="epic-local-00001",
-                )
-        finally:
-            runtime_app._application_import_issue = original_import_issue
-            runtime_app._ensure_no_legacy_meta_json = original_legacy_guard
+        use_cases = app_contracts.UseCases(
+            create_initiative=_unexpected,
+            create_epic=_unexpected,
+            create_issue=_unexpected,
+            create_discussion_doc=_unexpected,
+            import_initiative=_unexpected,
+            import_epic=_unexpected,
+            import_issue=_fake_import,
+            set_active=_unexpected,
+            show_active=_unexpected,
+            clear_active=_unexpected,
+            sync=_unexpected,
+            check_deps=_unexpected,
+            validate_tree=_unexpected,
+        )
+        outcome = import_cmd._run_import_issue(
+            import_cmd.ImportIssueArgs(
+                issue_number=123,
+                title="Imported issue",
+                slug=None,
+                epic_id="epic-local-00001",
+            ),
+            use_cases,
+        )
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0].issue_number, 123)
         self.assertEqual(calls[0].parent_id, "epic-local-00001")
-        self.assertIn("spec-dock: ok (import issue)", stdout.getvalue())
+        self.assertEqual(outcome.exit_code, 0)
+        self.assertIn("spec-dock: ok (import issue)", "\n".join(outcome.text.stdout_lines))
 
     def test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists(self) -> None:
         runtime_scripts_dir = (

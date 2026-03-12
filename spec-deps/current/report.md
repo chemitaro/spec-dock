@@ -814,5 +814,47 @@ Ran 253 tests ... OK
 #### メモ
 - S90 は no-op resolution step として完了した。追加の non-issue doc refresh は不要。
 
+---
+
+### 2026-03-12 18:40 - 19:05
+
+#### 対象
+- Final sign-off fix-up
+- AC/EC: AC-001, AC-005
+
+#### 実施内容
+- `spec_reviewer` の最終指摘に対応し、`app.py` から command 固有 wrapper (`_new_*`, `_import_*`, `_active_*`, `_deps_check`, `_sync`, `_validate`) を除去した。
+- regression は `commands / cli / application / presentation` 経路へ寄せ直し、private wrapper API ではなく final layered path を観測点に更新した。
+- `tests/cli_runtime/test_runtime_shell_s11.py` に command wrapper 不在の structural check を追加し、`app.py` thin-entrypoint 契約を最終形として固定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_shell_s11 tests.presentation_runtime.test_runtime_sync_s07
+
+Ran 46 tests ... OK
+
+python -m unittest discover -v
+
+Ran 253 tests ... OK
+
+rg -n "^def (_new_initiative|_new_epic|_new_issue|_new_doc|_import_initiative|_import_epic|_import_issue|_active_set|_active_show|_active_clear|_deps_check|_sync|_validate)\\(" src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py
+
+(no output)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - command wrapper 群を除去
+- `tests/cli_runtime/test_runtime_new_s08.py` - final layered path へ回帰観測点を更新
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - final layered path へ回帰観測点を更新
+- `tests/cli_runtime/test_runtime_import_s10.py` - final layered path へ回帰観測点を更新
+- `tests/cli_runtime/test_runtime_shell_s11.py` - wrapper absence / thin-entrypoint structural check を追加
+- `tests/presentation_runtime/test_runtime_sync_s07.py` - sync path regression を final layered path へ更新
+
+#### コミット
+- 未実施
+
+#### メモ
+- private wrapper API を直接使う外部コードがもし存在すれば破壊的だが、repo 内参照は tests も含めて解消済み。
+
 ## 省略/例外メモ
 - 該当なし

@@ -1,5 +1,3 @@
-import contextlib
-import io
 import tempfile
 import sys
 import unittest
@@ -21,11 +19,12 @@ def _runtime_modules():
         from spec_dock_runtime.application import contracts as app_contracts
         from spec_dock_runtime.application import create_node as app_create_node
         from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.commands import new as new_commands
         from spec_dock_runtime.infra import contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)
-    return runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, presentation_cli_text
+    return runtime_app, app_contracts, app_create_node, app_ports, new_commands, infra_contracts, presentation_cli_text
 
 
 def _record(
@@ -148,7 +147,7 @@ class TestRuntimeNewS08(unittest.TestCase):
         )
 
     def test_planning_regression_create_plan_contains_all_candidates(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -182,7 +181,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertIn(plan.dest_dir / "docs" / "checklist.md", plan.planned_paths)
 
     def test_execution_regression_and_write_order(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -216,7 +215,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertTrue((plan.dest_dir / "README.md").exists())
 
     def test_full_candidate_set_no_write_preflight_collision(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -251,7 +250,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertFalse((plan.dest_dir / ".meta.json").exists())
 
     def test_collision_on_meta_is_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -285,7 +284,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertFalse((plan.dest_dir / "README.md").exists())
 
     def test_per_kind_parity_create_local(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -363,7 +362,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(issue_result.node.initiative_id, "init-local-00001")
 
     def test_github_mode_default_no_side_effect_matrix(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -442,7 +441,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(issue_result.node.id, "iss-00777")
 
     def test_execute_create_plan_reuse_seam(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -476,7 +475,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(result.created_paths[-1].name, ".meta.json")
 
     def test_renderer_text_regression(self) -> None:
-        _runtime_app, app_contracts, _app_create_node, _app_ports, _infra_contracts, presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, _app_create_node, _app_ports, _new_commands, _infra_contracts, presentation_cli_text = _runtime_modules()
         node = app_contracts.SpecNode(
             kind="issue",
             id="iss-00123",
@@ -507,13 +506,14 @@ class TestRuntimeNewS08(unittest.TestCase):
             ],
         )
 
-    def test_legacy_delegated_new_smoke(self) -> None:
-        runtime_app, app_contracts, _app_create_node, _app_ports, _infra_contracts, _presentation_cli_text = _runtime_modules()
-        original_create = runtime_app._application_create_initiative
+    def test_command_new_initiative_smoke(self) -> None:
+        _runtime_app, app_contracts, _app_create_node, _app_ports, new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         calls = []
 
-        def _fake_create(req, ports):
-            del ports
+        def _unexpected(_req):
+            raise AssertionError("unexpected use case call")
+
+        def _fake_create(req):
             calls.append(req)
             node = app_contracts.SpecNode(
                 kind="initiative",
@@ -529,25 +529,37 @@ class TestRuntimeNewS08(unittest.TestCase):
             )
             return app_contracts.CreateNodeResult(node=node, created_paths=[], warnings=[])
 
-        runtime_app._application_create_initiative = _fake_create
-        try:
-            stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                runtime_app._new_initiative(
-                    Path("/repo/spec-dock"),
-                    title="Auth platform",
-                    slug=None,
-                    node_id=None,
-                    github_issue_number=None,
-                    create_github_issue=False,
-                    no_github=True,
-                )
-        finally:
-            runtime_app._application_create_initiative = original_create
+        use_cases = app_contracts.UseCases(
+            create_initiative=_fake_create,
+            create_epic=_unexpected,
+            create_issue=_unexpected,
+            create_discussion_doc=_unexpected,
+            import_initiative=_unexpected,
+            import_epic=_unexpected,
+            import_issue=_unexpected,
+            set_active=_unexpected,
+            show_active=_unexpected,
+            clear_active=_unexpected,
+            sync=_unexpected,
+            check_deps=_unexpected,
+            validate_tree=_unexpected,
+        )
+        outcome = new_commands._run_new_initiative(
+            new_commands.NewInitiativeArgs(
+                title="Auth platform",
+                slug=None,
+                node_id=None,
+                create_github_issue=False,
+                github_issue_number=None,
+                no_github=True,
+            ),
+            use_cases,
+        )
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0].github_mode, "local_only")
-        self.assertIn("spec-dock: ok (new initiative)", stdout.getvalue())
+        self.assertEqual(outcome.exit_code, 0)
+        self.assertIn("spec-dock: ok (new initiative)", "\n".join(outcome.text.stdout_lines))
 
 
 if __name__ == "__main__":
