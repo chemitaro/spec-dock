@@ -153,7 +153,7 @@ class TestRuntimeValidateS02(unittest.TestCase):
 
     def test_app_minimal_validate_reader_seam(self) -> None:
         (
-            runtime_app,
+            _runtime_app,
             _app_contracts,
             _app_ports,
             _app_validate_tree,
@@ -162,52 +162,38 @@ class TestRuntimeValidateS02(unittest.TestCase):
             _presentation_cli_text,
             _presentation_contracts,
         ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
         calls: dict[str, object] = {}
-        original_scan_nodes = runtime_app._scan_nodes
+        original_load_node_records = cli_bootstrap.infra_fs_repo.load_node_records
+        expected_records = [
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-local-00001",
+                title="Auth Platform",
+                slug="auth-platform",
+                path="/repo/spec-dock/initiatives/init-local-00001-auth-platform",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
+            )
+        ]
 
-        def _fake_scan_nodes(specdock_dir):
+        def _fake_load_node_records(specdock_dir):
             calls["specdock_dir"] = specdock_dir
-            return {
-                "init-local-00001": runtime_app._Node(
-                    type="initiative",
-                    id="init-local-00001",
-                    title="Auth Platform",
-                    slug="auth-platform",
-                    path=Path("/repo/spec-dock/initiatives/init-local-00001-auth-platform"),
-                    meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-auth-platform/.meta.json"),
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=None,
-                )
-            }
+            return expected_records
 
-        runtime_app._scan_nodes = _fake_scan_nodes
+        cli_bootstrap.infra_fs_repo.load_node_records = _fake_load_node_records
         try:
-            reader = runtime_app._AppValidateNodeReader(specdock_dir=Path("/repo/spec-dock"))
+            reader = cli_bootstrap._NodeReader(specdock_dir=Path("/repo/spec-dock"))
             records = reader.load_node_records()
         finally:
-            runtime_app._scan_nodes = original_scan_nodes
+            cli_bootstrap.infra_fs_repo.load_node_records = original_load_node_records
 
         self.assertEqual(calls.get("specdock_dir"), Path("/repo/spec-dock"))
-        self.assertEqual(
-            records,
-            [
-                infra_contracts.StoredMetaRecord(
-                    kind="initiative",
-                    id="init-local-00001",
-                    title="Auth Platform",
-                    slug="auth-platform",
-                    path="/repo/spec-dock/initiatives/init-local-00001-auth-platform",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=None,
-                    meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
-                )
-            ],
-        )
+        self.assertEqual(records, expected_records)
 
     def test_validate_exit_0_and_stdout_only(self) -> None:
         (
@@ -220,14 +206,15 @@ class TestRuntimeValidateS02(unittest.TestCase):
             _presentation_cli_text,
             _presentation_contracts,
         ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_ensure_no_legacy_meta_json = runtime_app._ensure_no_legacy_meta_json
-        original_application_validate_tree = runtime_app._application_validate_tree
+        original_application_validate_tree = cli_bootstrap.application_validate_tree
 
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
         runtime_app._ensure_no_legacy_meta_json = lambda _specdock_dir: None
-        runtime_app._application_validate_tree = lambda _req, _ports: app_contracts.ValidationResult(
+        cli_bootstrap.application_validate_tree = lambda _req, _ports: app_contracts.ValidationResult(
             report=domain_models.ValidationReport(errors=[], warnings=[]),
             checked_node_count=2,
         )
@@ -239,7 +226,7 @@ class TestRuntimeValidateS02(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
-            runtime_app._application_validate_tree = original_application_validate_tree
+            cli_bootstrap.application_validate_tree = original_application_validate_tree
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue(), "spec-dock: ok (validate) nodes=2\n")
@@ -256,14 +243,15 @@ class TestRuntimeValidateS02(unittest.TestCase):
             _presentation_cli_text,
             _presentation_contracts,
         ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_ensure_no_legacy_meta_json = runtime_app._ensure_no_legacy_meta_json
-        original_application_validate_tree = runtime_app._application_validate_tree
+        original_application_validate_tree = cli_bootstrap.application_validate_tree
 
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
         runtime_app._ensure_no_legacy_meta_json = lambda _specdock_dir: None
-        runtime_app._application_validate_tree = lambda _req, _ports: app_contracts.ValidationResult(
+        cli_bootstrap.application_validate_tree = lambda _req, _ports: app_contracts.ValidationResult(
             report=domain_models.ValidationReport(errors=["broken tree"], warnings=[]),
             checked_node_count=2,
         )
@@ -275,7 +263,7 @@ class TestRuntimeValidateS02(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
-            runtime_app._application_validate_tree = original_application_validate_tree
+            cli_bootstrap.application_validate_tree = original_application_validate_tree
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(stdout.getvalue(), "")
@@ -292,11 +280,12 @@ class TestRuntimeValidateS02(unittest.TestCase):
             _presentation_cli_text,
             presentation_contracts,
         ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
 
         calls: dict[str, object] = {}
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_ensure_no_legacy_meta_json = runtime_app._ensure_no_legacy_meta_json
-        original_application_validate_tree = runtime_app._application_validate_tree
+        original_application_validate_tree = cli_bootstrap.application_validate_tree
 
         def _fake_validate_tree(req, ports):
             calls["req"] = req
@@ -308,7 +297,7 @@ class TestRuntimeValidateS02(unittest.TestCase):
 
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
         runtime_app._ensure_no_legacy_meta_json = lambda _specdock_dir: None
-        runtime_app._application_validate_tree = _fake_validate_tree
+        cli_bootstrap.application_validate_tree = _fake_validate_tree
         try:
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -317,7 +306,7 @@ class TestRuntimeValidateS02(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
-            runtime_app._application_validate_tree = original_application_validate_tree
+            cli_bootstrap.application_validate_tree = original_application_validate_tree
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue(), "spec-dock: ok (validate) nodes=1\n")

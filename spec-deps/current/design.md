@@ -397,9 +397,11 @@ package "presentation" {
   - `find_specdock_dir() -> Path`
   - CLI entrypoint と parser / bootstrap / dispatch の起動
   - parser 構築前または dispatch 呼び出し前に起きた entrypoint-level failure のみ `1` へ正規化する
+  - staged migration の互換維持に必要な dormant compatibility helper を暫定保持してよい
 - 禁止:
-  - command workflow の実装本体
-  - fs/git/gh/render の直接実装
+  - `main()` / `cli/bootstrap.py` / `commands/*` から到達する command workflow 実装本体
+  - `cli/bootstrap.py` の composition root を `app.py` へ逆流させること
+  - 新規 workflow や新規 lower-layer 実装を `app.py` へ追加すること
 
 ### `cli/bootstrap.py`
 - 公開関数:
@@ -1831,6 +1833,7 @@ tests/
   - renderer の入力正本は `SyncStateResult` `DepsCheckResult` `ValidationResult` `ActiveViewResult` `ActiveClearResult` `ActiveSelection` とし、presentation 専用 input DTO は今回追加しない。
 - bootstrap ownership:
   - composition root は `cli/bootstrap.py` に一元化し、`app.py` `cli/dispatch.py` `commands/*` が別々に adapter / use case を組み立てない。
+  - `app.py` は live wiring surface ではなく、`cli/bootstrap.py` が application module を直接束ねる。
 - artifact ownership:
   - content shape は `presentation/contracts.py` が所有する。
   - file path/name と legacy cleanup は `infra/artifact_writer.py` が所有する。
@@ -1838,6 +1841,9 @@ tests/
   - business exit code `0` / `3` は `commands` が `CommandOutcome` で所有する。
   - `cli/dispatch.py` は argparse failure `2` と uncaught runtime `1` を所有する。
   - `app.py` は parser / dispatch 起動前の entrypoint-level failure のみ `1` に正規化する。
+- dormant legacy compatibility rule:
+  - `app.py` に残る legacy helper は rollback/history 互換のために許容してよいが、`main()` / `cli/bootstrap.py` / `commands/*` から到達してはならない。
+  - final gate では「wrapper 不在」「bootstrap からの `app.py` wiring 不在」「main call-site の thinness」を検証対象とする。
 - warnings ownership:
   - `CliText.warnings` は `presentation/cli_text.py` が構築し、`commands` はそれを `CommandOutcome.text` として返すだけに留める。
   - `cli/dispatch.py` が `CommandOutcome.text.warnings` を `stderr` へ出力する最終 owner とし、`stdout_lines` へ混在させない。

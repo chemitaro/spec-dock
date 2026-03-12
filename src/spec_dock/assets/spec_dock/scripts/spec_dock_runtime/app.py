@@ -35,14 +35,6 @@ from .cli.bootstrap import build_runtime as _cli_build_runtime
 from .cli.dispatch import dispatch as _cli_dispatch
 from .cli.parser import build_parser as _cli_build_parser
 from .cli.registry import build_registry as _cli_build_registry
-from .application.check_deps import check_deps as _application_check_deps
-from .application.create_node import create_discussion_doc as _application_create_discussion_doc
-from .application.create_node import create_epic as _application_create_epic
-from .application.create_node import create_initiative as _application_create_initiative
-from .application.create_node import create_issue as _application_create_issue
-from .application.import_node import import_epic as _application_import_epic
-from .application.import_node import import_initiative as _application_import_initiative
-from .application.import_node import import_issue as _application_import_issue
 from .application.contracts import CheckDepsRequest as _CheckDepsRequest
 from .application.contracts import ClearActiveRequest as _ClearActiveRequest
 from .application.contracts import CreateDiscussionDocRequest as _CreateDiscussionDocRequest
@@ -53,13 +45,6 @@ from .application.contracts import ShowActiveRequest as _ShowActiveRequest
 from .application.contracts import SyncRequest as _SyncRequest
 from .application.contracts import TargetRef as _TargetRef
 from .application.contracts import ValidateTreeRequest as _ValidateTreeRequest
-from .application.ports import Ports as _ApplicationPorts
-from .application.set_active import clear_active as _application_clear_active
-from .application.set_active import set_active as _application_set_active
-from .application.set_active import show_active as _application_show_active
-from .application.sync_state import sync as _application_sync
-from .application.sync_state import sync_after_import as _application_sync_after_import
-from .application.validate_tree import validate_tree as _application_validate_tree
 from .github import (
     _ensure_gh_available,
     _gh_issue_create,
@@ -72,33 +57,6 @@ from .domain.validation import (
     validate_graph_and_deps as _domain_validate_graph_and_deps,
     validate_github_issue_numbers_unique as _domain_validate_github_issue_numbers_unique,
 )
-from .infra.contracts import StoredMetaRecord
-from .infra.deps_reader import load_issue_depends_on_map as _infra_load_issue_depends_on_map
-from .infra.derived_state_reader import load_cached_issue_status_by_id as _infra_load_cached_issue_status_by_id
-from .infra.fs_repo import load_node_records as _infra_load_node_records
-from .infra.fs_repo import write_meta as _infra_write_meta
-from .infra.git_cli import check_ref_format_branch as _infra_check_ref_format_branch
-from .infra.git_cli import checkout_branch as _infra_checkout_branch
-from .infra.git_cli import create_and_checkout_branch as _infra_create_and_checkout_branch
-from .infra.git_cli import current_branch_or_none as _infra_current_branch_or_none
-from .infra.git_cli import local_branch_exists as _infra_local_branch_exists
-from .infra.git_cli import require_clean_working_tree as _infra_require_clean_working_tree
-from .infra.github_cli import issue_create as _infra_issue_create
-from .infra.github_cli import issue_index as _infra_issue_index
-from .infra.github_cli import issue_view_minimal as _infra_issue_view_minimal
-from .infra.template_scaffolder import copy_scaffolded_tree as _infra_copy_scaffolded_tree
-from .infra.template_scaffolder import load_template_text as _infra_load_template_text
-from .infra.template_scaffolder import render_text as _infra_render_text
-from .infra.template_scaffolder import write_text as _infra_write_text
-from .infra.active_store import load_active_issue_id as _infra_load_active_issue_id
-from .infra.active_store import load_active_manifest as _infra_load_active_manifest
-from .infra.active_store import load_active_manifest_no_migrate as _infra_load_active_manifest_no_migrate
-from .infra.active_store import write_active_manifest as _infra_write_active_manifest
-from .infra.active_store import apply_active_pointers as _infra_apply_active_pointers
-from .infra.active_store import patch_agent_state_active_fields as _infra_patch_agent_state_active_fields
-from .infra.active_store import snapshot_current_state as _infra_snapshot_current_state
-from .infra.active_store import restore_previous_state as _infra_restore_previous_state
-from .infra.artifact_writer import write as _infra_write_artifacts
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
@@ -110,7 +68,7 @@ from .ids import (
     _slugify,
     _validate_input_slug_kebab,
 )
-from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
+from .io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
 from .presentation.cli_text import render_active_clear_text as _render_active_clear_text
 from .presentation.cli_text import render_new_doc_text as _render_new_doc_text
@@ -186,134 +144,6 @@ class _BranchDecision:
     desired: str
     candidates: tuple[str, str]
     warnings: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class _AppValidateNodeReader:
-    """App-owned minimal read adapter for validate use case."""
-
-    specdock_dir: Path
-
-    def load_node_records(self) -> list[StoredMetaRecord]:
-        nodes = _scan_nodes(self.specdock_dir)
-        return [_node_to_stored_meta_record(node) for node in nodes.values()]
-
-
-@dataclass(frozen=True)
-class _AppDepsNodeReader:
-    specdock_dir: Path
-
-    def load_node_records(self) -> list[StoredMetaRecord]:
-        nodes = _scan_nodes(self.specdock_dir)
-        return [_node_to_stored_meta_record(node) for node in nodes.values()]
-
-
-@dataclass(frozen=True)
-class _AppNodeRepository:
-    def load_node_records(self, specdock_dir: Path) -> list[StoredMetaRecord]:
-        return _infra_load_node_records(specdock_dir)
-
-    def write_meta(self, dest_dir: Path, record: StoredMetaRecord) -> None:
-        _infra_write_meta(dest_dir, record)
-
-
-@dataclass(frozen=True)
-class _AppTemplateScaffolder:
-    def render_text(self, text: str, replacements: dict[str, str]) -> str:
-        return _infra_render_text(text, replacements)
-
-    def load_template_text(self, src_path: Path) -> str:
-        return _infra_load_template_text(src_path)
-
-    def copy_scaffolded_tree(self, src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]:
-        return _infra_copy_scaffolded_tree(src_dir, dest_dir, replacements)
-
-    def write_text(self, dest_path: Path, text: str) -> None:
-        _infra_write_text(dest_path, text)
-
-
-@dataclass(frozen=True)
-class _AppDepsTopologyReader:
-    def load_issue_depends_on_map(self, specdock_dir: Path, graph: SpecGraph):
-        return _infra_load_issue_depends_on_map(specdock_dir, graph)
-
-
-@dataclass(frozen=True)
-class _AppDerivedStateReader:
-    def load_cached_issue_status_by_id(self, specdock_dir: Path) -> dict[str, str]:
-        return _infra_load_cached_issue_status_by_id(specdock_dir)
-
-
-@dataclass(frozen=True)
-class _AppIssueGateway:
-    def issue_index(self, repo_root: Path, *, limit: int):
-        return _infra_issue_index(repo_root, limit=limit)
-
-    def issue_create(self, repo_root: Path, title: str, body: str) -> int:
-        return _infra_issue_create(repo_root, title=title, body=body)
-
-    def issue_view_minimal(self, repo_root: Path, issue_number: int):
-        return _infra_issue_view_minimal(repo_root, issue_number=issue_number)
-
-
-@dataclass(frozen=True)
-class _AppArtifactWriter:
-    def write(self, specdock_dir: Path, bundle):
-        return _infra_write_artifacts(specdock_dir, bundle)
-
-
-@dataclass(frozen=True)
-class _AppActiveStateStore:
-    def load_active_manifest(self, specdock_dir: Path):
-        return _infra_load_active_manifest(specdock_dir)
-
-    def load_active_manifest_no_migrate(self, specdock_dir: Path):
-        return _infra_load_active_manifest_no_migrate(specdock_dir)
-
-    def load_active_issue_id(self, specdock_dir: Path) -> str | None:
-        return _infra_load_active_issue_id(specdock_dir)
-
-    def write_active_manifest(self, specdock_dir: Path, manifest):
-        return _infra_write_active_manifest(specdock_dir, manifest)
-
-    def apply_active_pointers(self, specdock_dir: Path, manifest, rendered_context_pack: str) -> None:
-        _infra_apply_active_pointers(specdock_dir, manifest, rendered_context_pack)
-
-    def patch_agent_state_active_fields(self, specdock_dir: Path, manifest) -> None:
-        _infra_patch_agent_state_active_fields(specdock_dir, manifest)
-
-    def snapshot_current_state(self, specdock_dir: Path):
-        return _infra_snapshot_current_state(specdock_dir)
-
-    def restore_previous_state(self, specdock_dir: Path, snapshot) -> None:
-        _infra_restore_previous_state(specdock_dir, snapshot)
-
-
-@dataclass(frozen=True)
-class _AppGitGateway:
-    def require_clean_working_tree(self, repo_root: Path) -> None:
-        _infra_require_clean_working_tree(repo_root)
-
-    def current_branch_or_none(self, repo_root: Path) -> str | None:
-        return _infra_current_branch_or_none(repo_root)
-
-    def local_branch_exists(self, repo_root: Path, branch: str) -> bool:
-        return _infra_local_branch_exists(repo_root, branch)
-
-    def checkout_branch(self, repo_root: Path, branch: str) -> None:
-        _infra_checkout_branch(repo_root, branch)
-
-    def create_and_checkout_branch(self, repo_root: Path, branch: str) -> None:
-        _infra_create_and_checkout_branch(repo_root, branch)
-
-    def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
-        return _infra_check_ref_format_branch(repo_root, branch)
-
-
-@dataclass(frozen=True)
-class _AppClock:
-    def today(self) -> str:
-        return _today()
 
 
 def _find_specdock_dir() -> Path:
@@ -436,45 +266,6 @@ def _next_id(
     return _format_id(prefix, max_num + 1, local=local)
 
 
-def _render_text(text: str, replacements: dict[str, str]) -> str:
-    """Apply simple placeholder replacements to text."""
-    for k, v in replacements.items():
-        text = text.replace(k, v)
-    return text
-
-
-def _copy_template_tree(src_dir: Path, dest_dir: Path, *, replacements: dict[str, str]) -> None:
-    """Copy a template directory into `dest_dir` and apply text replacements."""
-    if not src_dir.exists() or not src_dir.is_dir():
-        raise RuntimeError(f"Missing template directory: {src_dir}")
-    if dest_dir.exists():
-        raise RuntimeError(f"Destination already exists: {dest_dir}")
-
-    for src_path in sorted(src_dir.rglob("*")):
-        rel = src_path.relative_to(src_dir)
-        dest_path = dest_dir / rel
-        if src_path.is_dir():
-            dest_path.mkdir(parents=True, exist_ok=True)
-            continue
-
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            raw = src_path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            # If the template is binary, just copy it as-is.
-            shutil.copy2(src_path, dest_path)
-            continue
-        rendered = _render_text(raw, replacements)
-        dest_path.write_text(rendered, encoding="utf-8")
-        # Keep wrapper scripts executable after text rendering.
-        if rendered.startswith("#!"):
-            try:
-                dest_path.chmod(dest_path.stat().st_mode | 0o111)
-            except OSError:
-                # Best-effort: keep generation working even when chmod is restricted.
-                pass
-
-
 def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
     """Scan node meta into an id→node map based on canonical `.meta.json` only."""
     initiatives_root = _initiatives_root(specdock_dir)
@@ -523,22 +314,6 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
             github_issue_number=github_issue_number,
         )
     return nodes
-
-
-def _node_to_stored_meta_record(node: _Node) -> StoredMetaRecord:
-    return StoredMetaRecord(
-        kind=node.type,
-        id=node.id,
-        title=node.title,
-        slug=node.slug,
-        path=node.path.as_posix(),
-        parent_id=node.parent_id,
-        initiative_id=node.initiative_id,
-        epic_id=node.epic_id,
-        github_issue_number=node.github_issue_number,
-        meta_path=node.meta_path.as_posix(),
-    )
-
 
 def _write_meta(
     dest_dir: Path,
