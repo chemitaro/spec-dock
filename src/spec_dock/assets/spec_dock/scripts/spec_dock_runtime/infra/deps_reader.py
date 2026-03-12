@@ -5,15 +5,15 @@ from typing import Any
 
 from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
 from ..domain.models import SpecGraph
-from ..io_json import _load_json
 from .contracts import DepsTopologyLoadResult
+from .json_store import load_json
 
 
 def _load_deps_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"schema_version": 1, "depends_on": []}
 
-    data = _load_json(path)
+    data = load_json(path)
     if not isinstance(data, dict):
         raise RuntimeError(f"Invalid deps.json schema: {path}: expected a JSON object")
 

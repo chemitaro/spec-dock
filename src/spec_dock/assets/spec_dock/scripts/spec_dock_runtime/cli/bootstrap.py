@@ -8,13 +8,14 @@ from ..application.contracts import UseCases
 from ..application.ports import Ports
 from ..infra import active_store as infra_active_store
 from ..infra import artifact_writer as infra_artifact_writer
+from ..infra import clock as infra_clock
 from ..infra import deps_reader as infra_deps_reader
 from ..infra import derived_state_reader as infra_derived_state_reader
 from ..infra import fs_repo as infra_fs_repo
 from ..infra import git_cli as infra_git_cli
 from ..infra import github_cli as infra_github_cli
+from ..infra import json_store as infra_json_store
 from ..infra import template_scaffolder as infra_template_scaffolder
-from ..io_json import _load_json, _now_iso, _today, _write_json
 
 
 @dataclass(frozen=True)
@@ -129,19 +130,19 @@ class _GitGateway:
 @dataclass(frozen=True)
 class _JsonStore:
     def load_json(self, path: Path):
-        return _load_json(path)
+        return infra_json_store.load_json(path)
 
     def write_json(self, path: Path, data: object) -> None:
-        _write_json(path, data)
+        infra_json_store.write_json(path, data)
 
 
 @dataclass(frozen=True)
 class _Clock:
     def now_iso(self) -> str:
-        return _now_iso()
+        return infra_clock.now_iso()
 
     def today(self) -> str:
-        return _today()
+        return infra_clock.today()
 
 
 @dataclass(frozen=True)

@@ -1,14 +1,38 @@
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
-from ..io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
+from .clock import now_iso
 from .contracts import StoredMetaRecord
+from .json_store import load_json, write_json
 
 _INITIATIVES_DIRNAME = "initiatives"
 _META_FILENAME = ".meta.json"
 _LEGACY_META_FILENAME = "meta.json"
+
+
+def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
+    try:
+        mode = path.stat().st_mode
+        path.chmod(mode & ~0o222)
+    except OSError as e:
+        return False, str(e)
+
+    if os.name == "posix":
+        try:
+            if path.stat().st_mode & 0o222:
+                return False, "write bit still set after chmod"
+        except OSError as e:
+            return False, str(e)
+
+    return True, None
+
+
+def _warn(message: str) -> None:
+    print(f"spec-dock: (warn) {message}", file=sys.stderr)
 
 
 def _initiatives_root(specdock_dir: Path) -> Path:
@@ -46,7 +70,7 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
     records: list[StoredMetaRecord] = []
     seen_ids: set[str] = set()
     for meta_path in _iter_node_meta_paths(initiatives_root):
-        meta = _load_json(meta_path)
+        meta = load_json(meta_path)
         if not isinstance(meta, dict):
             raise RuntimeError(f"Invalid .meta.json (expected object): {meta_path}")
 
@@ -94,8 +118,8 @@ def _build_meta_payload(record: StoredMetaRecord) -> dict[str, Any]:
         "id": record.id,
         "title": record.title,
         "slug": record.slug,
-        "created_at": _now_iso(),
-        "updated_at": _now_iso(),
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
         "parent_id": record.parent_id,
         "initiative_id": record.initiative_id,
         "epic_id": record.epic_id,
@@ -112,7 +136,7 @@ def _build_meta_payload(record: StoredMetaRecord) -> dict[str, Any]:
 
 def write_meta(dest_dir: Path, record: StoredMetaRecord) -> None:
     meta_path = dest_dir / _META_FILENAME
-    _write_json(meta_path, _build_meta_payload(record))
+    write_json(meta_path, _build_meta_payload(record))
     readonly_ok, readonly_err = _try_make_readonly(meta_path)
     if not readonly_ok:
         reason = readonly_err or "unknown error"

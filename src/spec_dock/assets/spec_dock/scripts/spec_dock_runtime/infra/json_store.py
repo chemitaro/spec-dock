@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
-from ..io_json import _load_json, _write_json
-
-
 def load_json(path: Path) -> Any:
-    return _load_json(path)
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Invalid JSON: {path}: {e}") from e
+    except UnicodeDecodeError as e:
+        raise RuntimeError(f"Failed to read: {path}: {e}") from e
+    except OSError as e:
+        raise RuntimeError(f"Failed to read: {path}: {e}") from e
 
 
 def write_json(path: Path, data: Any) -> None:
-    _write_json(path, data)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

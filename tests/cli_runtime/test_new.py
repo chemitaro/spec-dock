@@ -674,12 +674,12 @@ class TestCliNew(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            runtime_io_json = (
-                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "io_json.py"
+            runtime_fs_repo = (
+                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
             )
-            self.assertTrue(runtime_io_json.is_file())
-            runtime_io_json.write_text(
-                runtime_io_json.read_text(encoding="utf-8")
+            self.assertTrue(runtime_fs_repo.is_file())
+            runtime_fs_repo.write_text(
+                runtime_fs_repo.read_text(encoding="utf-8")
                 + "\n\n"
                 + "def _try_make_readonly(path):\n"
                 + '    return False, "simulated"\n',

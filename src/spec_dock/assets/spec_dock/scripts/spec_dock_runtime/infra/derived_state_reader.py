@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..io_json import _load_json
+from .json_store import load_json
 
 
 def load_cached_issue_status_by_id(specdock_dir: Path) -> dict[str, str]:
@@ -14,7 +14,7 @@ def load_cached_issue_status_by_id(specdock_dir: Path) -> dict[str, str]:
         if not state_index_path.is_file():
             continue
         try:
-            loaded = _load_json(state_index_path)
+            loaded = load_json(state_index_path)
         except RuntimeError:
             continue
         if isinstance(loaded, dict):

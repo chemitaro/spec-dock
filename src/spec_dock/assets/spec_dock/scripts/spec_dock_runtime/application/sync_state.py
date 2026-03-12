@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal, cast
@@ -11,7 +12,6 @@ from ..domain.status import build_progress_map
 from ..domain.tree import build_graph, select_active_chain
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
-from ..io_json import _now_iso
 from ..presentation.contracts import ArtifactBundle
 from ..presentation.json_state import (
     render_context_pack,
@@ -82,7 +82,7 @@ def _now_iso_from_ports(ports: Ports) -> str:
     if ports.clock is not None and hasattr(ports.clock, "now_iso"):
         value = ports.clock.now_iso()
         return str(value)
-    return _now_iso()
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _require_sync_runner(ports: Ports):
