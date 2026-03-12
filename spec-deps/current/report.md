@@ -577,11 +577,83 @@ Ran 244 tests ... OK
 - `tests/test_cli.py` - `deps --json` stdout-only 契約を更新
 
 #### コミット
-- 未実施
+- `7e600f6d92b1a6f8cd00ae45a96cda4166e9ed0d` `feat(cli): s11のshell integrationを正本化`
 
 #### メモ
 - `commands/*` は `UseCases facade + application DTO + presentation renderer + commands/contracts` のみに依存する方針へ揃えた。
 - `sync` は意図的に staged coexistence を残し、最終 detach は後続 step に残している。
+
+---
+
+### 2026-03-12 15:35 - 16:10
+
+#### 対象
+- Step: S12
+- AC/EC: AC-003, AC-005, EC-001
+
+#### 実施内容
+- `tests/test_cli.py` を S12 inventory guard として追加し、split 後 test tree の critical inventory を package discovery 前提で固定した。
+- `tests/test_init_update.py` を追加し、installer regression を runtime split 後も独立 top-level module として維持した。
+- runtime focused test 群を `tests/cli_runtime/`, `tests/domain_runtime/`, `tests/presentation_runtime/` へ再配置し、`tests/__init__.py` と各 package `__init__.py` で regular package discovery に統一した。
+- 初回 review では `tests/cli_runtime/test_runtime_validate_s02.py`、`test_runtime_deps_s04.py`、`test_runtime_active_s05.py`、`test_runtime_new_s08.py`、`test_runtime_new_doc_s09.py` が S12 inventory/grouping guard から漏れている P1 指摘を受けた。
+- `tests/test_cli.py` を修正し、上記 5 モジュールを inventory と command-group sentinel checks の両方へ追加して、分割後 critical inventory coverage を完全化した。
+- 修正後に focused suite と full discover を通し、`code_reviewer` の再レビューで pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_cli tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09
+
+Ran 37 tests ... OK
+
+python -m unittest discover -v
+
+Ran 247 tests ... OK
+```
+
+#### 変更したファイル
+- `tests/__init__.py` - regular package discovery 用 package init を追加
+- `tests/test_cli.py` - S12 inventory / grouping guard を追加
+- `tests/test_init_update.py` - installer regression を top-level module へ分離
+- `tests/cli_runtime/__init__.py`
+- `tests/cli_runtime/harness.py`
+- `tests/cli_runtime/test_active.py`
+- `tests/cli_runtime/test_deps.py`
+- `tests/cli_runtime/test_import.py`
+- `tests/cli_runtime/test_new.py`
+- `tests/cli_runtime/test_runtime_active_s05.py`
+- `tests/cli_runtime/test_runtime_active_s06.py`
+- `tests/cli_runtime/test_runtime_deps_s04.py`
+- `tests/cli_runtime/test_runtime_import_s10.py`
+- `tests/cli_runtime/test_runtime_new_doc_s09.py`
+- `tests/cli_runtime/test_runtime_new_s08.py`
+- `tests/cli_runtime/test_runtime_shell_s11.py`
+- `tests/cli_runtime/test_runtime_validate_s02.py`
+- `tests/cli_runtime/test_sync.py`
+- `tests/cli_runtime/test_validate.py`
+- `tests/cli_runtime/test_wrappers.py`
+- `tests/domain_runtime/__init__.py`
+- `tests/domain_runtime/test_runtime_domain_s01.py`
+- `tests/domain_runtime/test_runtime_domain_s03.py`
+- `tests/presentation_runtime/__init__.py`
+- `tests/presentation_runtime/test_runtime_sync_s07.py`
+- `tests/test_runtime_active_s05.py` - deleted
+- `tests/test_runtime_active_s06.py` - deleted
+- `tests/test_runtime_deps_s04.py` - deleted
+- `tests/test_runtime_domain_s01.py` - deleted
+- `tests/test_runtime_domain_s03.py` - deleted
+- `tests/test_runtime_import_s10.py` - deleted
+- `tests/test_runtime_new_doc_s09.py` - deleted
+- `tests/test_runtime_new_s08.py` - deleted
+- `tests/test_runtime_shell_s11.py` - deleted
+- `tests/test_runtime_sync_s07.py` - deleted
+- `tests/test_runtime_validate_s02.py` - deleted
+
+#### コミット
+- 未実施
+
+#### メモ
+- `tests/test_cli.py` は inventory 存在確認に加えて sentinel method の存在も確認し、単なる path existence ではなく split coverage guard として機能させている。
+- S12 では runtime code 変更は行わず、test tree の再配置と discovery 契約の固定に限定した。
 
 ## 省略/例外メモ
 - 該当なし
