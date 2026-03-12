@@ -776,5 +776,43 @@ Ran 253 tests ... OK
 #### メモ
 - この fix-up は final review で検出した互換回帰の是正であり、新しい機能追加ではない。
 
+---
+
+### 2026-03-12 18:25 - 18:35
+
+#### 対象
+- Step: S90
+
+#### docs impact 判定
+- disposition: `none`
+
+#### 実施内容
+- branch diff に含まれる issue 文書 (`spec-deps/current/*`) と shipped runtime asset (`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/*`) を棚卸しした。
+- non-issue 恒久 docs / workflow / skill / onboarding 文書への追加更新要否を確認した。
+- 今回の変更は issue #25 の requirement/design/plan/report と runtime 実装/テストに閉じており、README / docs / workflow / codex skill の追加 refresh は不要と判定した。
+
+#### touched doc / asset paths
+- issue docs:
+  - `spec-deps/current/requirement.md`
+  - `spec-deps/current/design.md`
+  - `spec-deps/current/plan.md`
+  - `spec-deps/current/report.md`
+  - `spec-deps/current/adrs/adr-001-runtime-cli-layered-architecture.md`
+  - `spec-deps/current/discussions/001-disc-runtime-cli-refactor-analysis.md`
+  - `spec-deps/current/discussions/002-disc-runtime-cli-architecture-v2.md`
+  - `spec-deps/current/discussions/003-disc-deps-topology-contract-gap-and-options.md`
+- shipped assets/runtime:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/*`
+
+#### 判定理由
+- README / workflow / skill の user-facing usage contract は今回変更していない。
+- shipped runtime asset の構造変更は issue docs と regression tests で契約化済みであり、追加の repository-level docs refresh がなくても利用者向け整合性を損なわない。
+
+#### コミット
+- 未実施
+
+#### メモ
+- S90 は no-op resolution step として完了した。追加の non-issue doc refresh は不要。
+
 ## 省略/例外メモ
 - 該当なし
