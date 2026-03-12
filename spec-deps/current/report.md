@@ -1,72 +1,82 @@
 ---
 種別: 実装報告書（Issue）
-ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
-関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "YYYY-MM-DD"
+ID: "issue-25"
+タイトル: "巨大な app.py を複数 module に分割し tests/test_cli.py を領域別に再編する"
+関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/25"]
+状態: "draft"
+作成者: "Codex CLI"
+最終更新: "2026-03-12"
 依存: ["requirement.md", "design.md", "plan.md"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
+親: ["#25"]
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装報告（LOG）
+# issue-25 巨大な app.py を複数 module に分割し tests/test_cli.py を領域別に再編する — 実装報告（LOG）
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+## 実装サマリー
+- `S01` として、runtime の pure core のうち `ids / graph / validation` を `domain` 層へ additive に抽出した。
+- `app.py` は staged delegation owner のまま残し、validation seam は `domain.validation.validate_graph_and_deps()` にそろえた。
 
-## 実装記録（セッションログ） (必須)
+## 実装記録（セッションログ）
 
-### YYYY-MM-DD HH:MM - HH:MM
+### 2026-03-12 02:35 - 03:08
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001, AC-005, EC-001
 
 #### 実施内容
-- ...
+- `domain/ids.py`, `domain/models.py`, `domain/tree.py`, `domain/validation.py` を追加し、pure helper / dataclass / graph build / structural validation を抽出した。
+- legacy `ids.py` は thin wrapper として維持し、既存 import 面を壊さず `domain/ids.py` へ委譲する形へ変更した。
+- `app.py` には `_build_graph_from_nodes()` mapper を追加し、`_validate_nodes()` と `_validate_github_issue_numbers_unique()` を domain validation へ委譲する構成へ切り替えた。
+- `tests/test_runtime_domain_s01.py` を追加し、pure core test / delegation smoke / no-I/O import assertion を導入した。
+- `code_reviewer` と `consultant` で S01 をレビューし、`validate_graph_and_deps()` を live seam に使う微修正まで反映した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest -v tests.test_runtime_domain_s01 \
+  tests.test_cli.TestCli.test_validate_detects_duplicate_github_issue_numbers_with_paths \
+  tests.test_cli.TestCli.test_validate_detects_issue_initiative_id_mismatch
 
-<result>
+Ran 10 tests in 0.274s
+OK
+
+python -m unittest -v tests.test_runtime_domain_s01
+
+Ran 9 tests in 0.011s
+OK
+
+python -m unittest discover -v
+
+Ran 171 tests in 21.114s
+OK
 ```
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - domain graph / validation への委譲 seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py` - legacy wrapper 化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__init__.py` - domain package 追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/ids.py` - pure ids helper を移設
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/models.py` - `SpecNodeSeed` / `SpecNode` / `SpecGraph` / `ValidationReport`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py` - `build_graph()`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - structural validation / github issue uniqueness validation
+- `tests/test_runtime_domain_s01.py` - S01 focused tests
 
 #### コミット
-- <hash> <message>
+- 未実施
 
 #### メモ
-- ...
+- `validate_graph_and_deps()` は S01 では structural-only とし、deps pure rule は計画どおり `S03` へ残した。
+- `tests/test_runtime_domain_s01.py` は一時的な focused test file として追加し、正式な test tree split は計画どおり後続 step で扱う。
 
 ---
 
-### YYYY-MM-DD HH:MM - HH:MM
+## 遭遇した問題と解決
+- 問題: 初回実装では `app.py` の live seam が `validate_graph()` 直結で、将来の `application/validate_tree.py -> validate_graph_and_deps()` 形と少しずれていた。
+  - 解決: `consultant` 指摘を踏まえ、`_validate_nodes()` の委譲先を `validate_graph_and_deps()` に寄せ、smoke test も更新した。
 
-#### 対象
-- Step: ...
-- AC/EC: ...
+## 今後の推奨事項
+- `S02` では `domain.validation.validate_graph_and_deps()` を最初の consumer とする `application/validate_tree.py` を導入し、legacy delegated validate path を閉じる。
+- `S03` では `validate_graph_and_deps()` の deps 側中身を pure に拡張し、S01 で固定した seam をそのまま利用する。
 
-#### 実施内容
-- ...
-
----
-
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
-
-## 学んだこと (任意)
-- ...
-- ...
-
-## 今後の推奨事項 (任意)
-- ...
-- ...
-
-## 省略/例外メモ (必須)
+## 省略/例外メモ
 - 該当なし
