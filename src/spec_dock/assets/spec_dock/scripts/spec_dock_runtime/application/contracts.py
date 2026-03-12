@@ -9,6 +9,7 @@ from ..domain.models import (
     BranchDecision,
     DepsEvaluation,
     DepsState,
+    IssueSnapshot,
     IssueStatusSnapshot,
     ProgressMap,
     SpecNode,
@@ -59,6 +60,22 @@ class CreatePlan:
 class CreateNodeResult:
     node: SpecNode
     created_paths: list[Path]
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
+class ImportNodeRequest:
+    issue_number: int
+    title: str
+    slug: str | None
+    parent_id: str | None
+
+
+@dataclass(frozen=True)
+class ImportNodeResult:
+    node: SpecNode
+    imported_issue: IssueSnapshot
+    post_import_sync: SyncCommandResult
     warnings: list[str]
 
 

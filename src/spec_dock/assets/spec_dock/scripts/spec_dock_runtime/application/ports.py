@@ -55,6 +55,9 @@ class IssueGateway(Protocol):
     def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         ...
 
+    def issue_view_minimal(self, repo_root: Path, issue_number: int) -> IssueSnapshot:
+        ...
+
 
 class ActiveStateStore(Protocol):
     def load_active_manifest(self, specdock_dir: Path) -> ActiveManifestLoadResult:

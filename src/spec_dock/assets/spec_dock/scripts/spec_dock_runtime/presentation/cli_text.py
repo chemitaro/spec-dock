@@ -7,6 +7,7 @@ from ..application.contracts import (
     CreateDiscussionDocResult,
     CreateNodeResult,
     DepsCheckResult,
+    ImportNodeResult,
     SyncCommandResult,
     ValidationResult,
 )
@@ -62,6 +63,33 @@ def render_new_doc_text(result: CreateDiscussionDocResult) -> CliText:
         f"type={result.doc_type} id={result.doc_id} scope={result.scope_node_id} path={rel}"
     )
     return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
+
+
+def render_import_text(result: ImportNodeResult) -> CliText:
+    node = result.node
+    rel = _rel_path_for_output(node.path.as_posix())
+    issue_number = int(result.imported_issue.issue_number)
+
+    if node.kind == "initiative":
+        line = f"spec-dock: ok (import initiative) id={node.id} path={rel} github=#{issue_number}"
+    elif node.kind == "epic":
+        line = (
+            "spec-dock: ok (import epic) "
+            f"id={node.id} initiative={node.initiative_id} path={rel} github=#{issue_number}"
+        )
+    else:
+        line = (
+            "spec-dock: ok (import issue) "
+            f"id={node.id} epic={node.epic_id} initiative={node.initiative_id} path={rel} github=#{issue_number}"
+        )
+
+    warnings = list(result.warnings)
+    for warning in result.post_import_sync.state.warnings:
+        if warning not in warnings:
+            warnings.append(warning)
+    if result.post_import_sync.artifact_failure is not None:
+        warnings.append("import_post_sync_failed")
+    return CliText(stdout_lines=[line], stderr_lines=[], warnings=warnings)
 
 
 def render_deps_check_text(result: DepsCheckResult) -> CliText:

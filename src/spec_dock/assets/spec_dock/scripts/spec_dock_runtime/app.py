@@ -36,10 +36,14 @@ from .application.create_node import create_discussion_doc as _application_creat
 from .application.create_node import create_epic as _application_create_epic
 from .application.create_node import create_initiative as _application_create_initiative
 from .application.create_node import create_issue as _application_create_issue
+from .application.import_node import import_epic as _application_import_epic
+from .application.import_node import import_initiative as _application_import_initiative
+from .application.import_node import import_issue as _application_import_issue
 from .application.contracts import CheckDepsRequest as _CheckDepsRequest
 from .application.contracts import ClearActiveRequest as _ClearActiveRequest
 from .application.contracts import CreateDiscussionDocRequest as _CreateDiscussionDocRequest
 from .application.contracts import CreateNodeRequest as _CreateNodeRequest
+from .application.contracts import ImportNodeRequest as _ImportNodeRequest
 from .application.contracts import SetActiveRequest as _SetActiveRequest
 from .application.contracts import ShowActiveRequest as _ShowActiveRequest
 from .application.contracts import TargetRef as _TargetRef
@@ -74,6 +78,7 @@ from .infra.git_cli import local_branch_exists as _infra_local_branch_exists
 from .infra.git_cli import require_clean_working_tree as _infra_require_clean_working_tree
 from .infra.github_cli import issue_create as _infra_issue_create
 from .infra.github_cli import issue_index as _infra_issue_index
+from .infra.github_cli import issue_view_minimal as _infra_issue_view_minimal
 from .infra.template_scaffolder import copy_scaffolded_tree as _infra_copy_scaffolded_tree
 from .infra.template_scaffolder import load_template_text as _infra_load_template_text
 from .infra.template_scaffolder import render_text as _infra_render_text
@@ -86,6 +91,7 @@ from .infra.active_store import apply_active_pointers as _infra_apply_active_poi
 from .infra.active_store import patch_agent_state_active_fields as _infra_patch_agent_state_active_fields
 from .infra.active_store import snapshot_current_state as _infra_snapshot_current_state
 from .infra.active_store import restore_previous_state as _infra_restore_previous_state
+from .infra.artifact_writer import write as _infra_write_artifacts
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
@@ -102,6 +108,7 @@ from .presentation.cli_text import render_deps_check_text as _render_deps_check_
 from .presentation.cli_text import render_active_clear_text as _render_active_clear_text
 from .presentation.cli_text import render_new_doc_text as _render_new_doc_text
 from .presentation.cli_text import render_new_node_text as _render_new_node_text
+from .presentation.cli_text import render_import_text as _render_import_text
 from .presentation.cli_text import render_active_set_text as _render_active_set_text
 from .presentation.cli_text import render_active_show_text as _render_active_show_text
 from .presentation.cli_text import render_validate_text as _render_validate_text
@@ -236,6 +243,15 @@ class _AppIssueGateway:
 
     def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         return _infra_issue_create(repo_root, title=title, body=body)
+
+    def issue_view_minimal(self, repo_root: Path, issue_number: int):
+        return _infra_issue_view_minimal(repo_root, issue_number=issue_number)
+
+
+@dataclass(frozen=True)
+class _AppArtifactWriter:
+    def write(self, specdock_dir: Path, bundle):
+        return _infra_write_artifacts(specdock_dir, bundle)
 
 
 @dataclass(frozen=True)
@@ -562,6 +578,10 @@ def _new_ports(specdock_dir: Path) -> _ApplicationPorts:
         node_repo=_AppNodeRepository(),
         template_scaffolder=_AppTemplateScaffolder(),
         issue_gateway=_AppIssueGateway(),
+        active_state_store=_AppActiveStateStore(),
+        derived_state_reader=_AppDerivedStateReader(),
+        deps_topology_reader=_AppDepsTopologyReader(),
+        artifact_writer=_AppArtifactWriter(),
         clock=_AppClock(),
         repo_root=specdock_dir.parent,
         specdock_dir=specdock_dir,
@@ -601,6 +621,31 @@ def _run_new_doc(
     ports = _new_ports(specdock_dir)
     result = _application_create_discussion_doc(req, ports)
     text = _render_new_doc_text(result)
+    for warning in text.warnings:
+        _warn(warning)
+    for line in text.stdout_lines:
+        print(line)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+
+
+def _run_import_node(
+    *,
+    specdock_dir: Path,
+    kind: str,
+    req: _ImportNodeRequest,
+) -> None:
+    ports = _new_ports(specdock_dir)
+    if kind == "initiative":
+        result = _application_import_initiative(req, ports)
+    elif kind == "epic":
+        result = _application_import_epic(req, ports)
+    elif kind == "issue":
+        result = _application_import_issue(req, ports)
+    else:
+        raise RuntimeError(f"Unknown import kind: {kind}")
+
+    text = _render_import_text(result)
     for warning in text.warnings:
         _warn(warning)
     for line in text.stdout_lines:
@@ -1719,6 +1764,19 @@ def _import_initiative(
     slug: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an initiative node."""
+    _ensure_no_legacy_meta_json(specdock_dir)
+    _run_import_node(
+        specdock_dir=specdock_dir,
+        kind="initiative",
+        req=_ImportNodeRequest(
+            issue_number=int(issue_number),
+            title=title,
+            slug=slug,
+            parent_id=None,
+        ),
+    )
+    return
+
     title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
@@ -1758,6 +1816,19 @@ def _import_epic(
     initiative_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an epic node."""
+    _ensure_no_legacy_meta_json(specdock_dir)
+    _run_import_node(
+        specdock_dir=specdock_dir,
+        kind="epic",
+        req=_ImportNodeRequest(
+            issue_number=int(issue_number),
+            title=title,
+            slug=slug,
+            parent_id=initiative_id,
+        ),
+    )
+    return
+
     title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
@@ -1816,6 +1887,19 @@ def _import_issue(
     epic_id: str | None,
 ) -> None:
     """Import an existing GitHub issue into spec-dock as an issue node."""
+    _ensure_no_legacy_meta_json(specdock_dir)
+    _run_import_node(
+        specdock_dir=specdock_dir,
+        kind="issue",
+        req=_ImportNodeRequest(
+            issue_number=int(issue_number),
+            title=title,
+            slug=slug,
+            parent_id=epic_id,
+        ),
+    )
+    return
+
     title, slug = _resolve_input_title_and_slug(title, slug)
 
     repo_root = specdock_dir.parent
