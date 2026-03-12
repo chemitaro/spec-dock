@@ -48,8 +48,9 @@ ID: "issue-25"
   6. `application/set_active.py` の write path
   7. `application/sync_state.py`
   8. `application/create_node.py`
-  9. `application/import_node.py`
-  10. `commands/*`, `cli/*` の共通 shell
+  9. `application/create_node.py` の `new doc` branch
+  10. `application/import_node.py`
+  11. `commands/*`, `cli/*` の共通 shell
 - したがって、本計画では command shell を後段へ送り、vertical slice ごとに bottom-up で積み上げる。
 
 ## マイルストーン一覧
@@ -91,6 +92,7 @@ ID: "issue-25"
 - M4 create/import slices:
   - 対象:
     - `application/create_node.py`
+    - `application/create_node.py` の `new doc` branch
     - `application/import_node.py`
     - `infra/template_scaffolder.py`
     - `infra/fs_repo.py`
@@ -119,6 +121,9 @@ ID: "issue-25"
   - requirement trace:
     - AC-001
     - AC-002
+    - EC-001
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - pure core review
 - S02:
@@ -128,6 +133,9 @@ ID: "issue-25"
     - AC-001
     - AC-002
     - AC-004
+    - EC-001
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - validate core slice review
 - S03:
@@ -137,6 +145,8 @@ ID: "issue-25"
     - AC-001
     - AC-002
     - EC-003
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - deps pure core review
 - S04:
@@ -147,6 +157,8 @@ ID: "issue-25"
     - AC-002
     - AC-004
     - EC-003
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - deps command slice review
 - S05:
@@ -156,6 +168,8 @@ ID: "issue-25"
     - AC-001
     - AC-002
     - AC-004
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - active read slice review
 - S06:
@@ -166,6 +180,8 @@ ID: "issue-25"
     - AC-002
     - AC-004
     - EC-003
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - active write slice review
 - S07:
@@ -176,6 +192,8 @@ ID: "issue-25"
     - AC-002
     - AC-004
     - EC-004
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - sync slice review
 - S08:
@@ -185,6 +203,8 @@ ID: "issue-25"
     - AC-001
     - AC-002
     - AC-004
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - new node slice review
 - S09:
@@ -194,6 +214,8 @@ ID: "issue-25"
     - AC-001
     - AC-002
     - AC-004
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - new doc slice review
 - S10:
@@ -204,6 +226,8 @@ ID: "issue-25"
     - AC-002
     - AC-004
     - EC-002
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - import slice review
 - S11:
@@ -212,7 +236,10 @@ ID: "issue-25"
   - requirement trace:
     - AC-001
     - AC-002
+    - AC-004
     - EC-001
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - shell integration review
 - S12:
@@ -221,22 +248,47 @@ ID: "issue-25"
   - requirement trace:
     - AC-003
     - AC-005
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - test tree split review
 - S13:
   - 観測可能な振る舞い:
     - 旧 helper 直依存の解消と rollback basis の commit-level への切替が完了する
   - requirement trace:
+    - AC-001
     - AC-005
     - EC-001
+  - trace status:
+    - partial contribution only; final AC/EC closure is validated in `S99`
   - review gate:
     - helper detachment / rollback transition review
+- S90:
+  - 観測可能な振る舞い:
+    - docs impact が refresh または no-op 理由付きで閉じる
+  - review gate:
+    - docs impact review
+- S99:
+  - 観測可能な振る舞い:
+    - branch diff 全体で AC/EC trace と blocking finding `0` 件が確認される
+  - requirement trace:
+    - AC-001
+    - AC-002
+    - AC-003
+    - AC-004
+    - AC-005
+    - EC-001
+    - EC-002
+    - EC-003
+    - EC-004
+  - review gate:
+    - final diff review quality gate
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S13, S99
 - AC-002 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11
 - AC-003 -> S12
-- AC-004 -> S02, S04, S05, S06, S07, S08, S09, S10, S99
+- AC-004 -> S02, S04, S05, S06, S07, S08, S09, S10, S11, S99
 - AC-005 -> S12, S13, S99
 - EC-001 -> S01, S02, S04, S05, S06, S07, S08, S09, S10, S11, S13
 - EC-002 -> S10
@@ -341,6 +393,7 @@ ID: "issue-25"
 ### S01 — ids / graph / validation の pure core を抽出する
 - target:
   - `app.py`
+  - `ids.py`
   - `domain/ids.py`
   - `domain/models.py`
   - `domain/tree.py`
@@ -355,13 +408,29 @@ ID: "issue-25"
 - purpose:
   - 最小依存の pure core を最初に固定する
 
-##### I1 — ids helpers
+##### I1a — title / local id helpers
 - Red:
-  - `ids` pure test を 1 本追加
+  - `resolve_input_title_and_slug` / `normalize_local_id_input` pure test を 1 本追加
 - Green:
-  - `resolve_input_title_and_slug`, `normalize_local_id_input`, `parse_id`, `format_id`, `deps_node_sort_key` を `domain/ids.py` へ移す
+  - `resolve_input_title_and_slug`, `normalize_local_id_input` を `domain/ids.py` へ移す
 - Refactor:
-  - `app.py` 側の重複 helper を thin delegation に縮小する
+  - `app.py` 側の title/local-id helper delegation を整理する
+
+##### I1b — parse / format helpers
+- Red:
+  - `parse_id` / `format_id` pure test を 1 本追加
+- Green:
+  - `parse_id`, `format_id` を `domain/ids.py` へ移す
+- Refactor:
+  - parse/format helper の責務境界を整理する
+
+##### I1c — deps sort helper
+- Red:
+  - `deps_node_sort_key` pure test を 1 本追加
+- Green:
+  - `deps_node_sort_key` を `domain/ids.py` へ移す
+- Refactor:
+  - deps sort helper の delegation を整理する
 
 ##### I2 — graph dataclasses
 - Red:
@@ -386,6 +455,7 @@ ID: "issue-25"
   - ids pure tests
   - graph build pure tests
   - validation pure tests
+  - legacy `ids.py` / `app.py` delegation smoke
   - `domain/*` no-I/O import assertion
 - report update:
   - `spec-deps/current/report.md`
@@ -454,6 +524,7 @@ ID: "issue-25"
 - step boundary:
   - status resolution / progress / deps evaluation の pure rule まで
   - command / renderer はまだつなげない
+  - この step は additive pure core のみで live consumer は導入しない。legacy path の切替は `S04` / `S06` で開始し、rollback unit は `S03` 単独 commit/staged diff とする
 
 #### B1 — status and deps rules
 - purpose:
@@ -467,13 +538,29 @@ ID: "issue-25"
 - Refactor:
   - cached/github snapshot normalization を mapper に閉じる
 
-##### I2 — readiness evaluation
+##### I2a — readiness evaluation
 - Red:
   - `evaluate_readiness()` pure test を 1 本追加
 - Green:
-  - `DepsEvaluation`, `evaluate_readiness()`, `inspect_target_deps()` を導入する
+  - `DepsEvaluation`, `evaluate_readiness()` を導入する
 - Refactor:
   - closure / blockers / guard_reason を pure path に整理する
+
+##### I2b — deps inspection decoration
+- Red:
+  - `inspect_target_deps()` pure test を 1 本追加
+- Green:
+  - `inspect_target_deps()` を導入する
+- Refactor:
+  - active issue decoration と view-facing state を整理する
+
+##### I2c — deps state / cycle validation
+- Red:
+  - `build_deps_state()` pure test と deps cycle validation pure test を 1 本追加
+- Green:
+  - `build_deps_state()`, `validate_deps_cycles()` を導入する
+- Refactor:
+  - `effective_depends_on` / node-state assembly を `S04` と `S07` の共有 pure path に整理する
 
 #### step gate
 - review:
@@ -481,7 +568,9 @@ ID: "issue-25"
 - expected tests:
   - status pure tests
   - deps pure tests
-  - shared readiness seam contract regression
+  - deps state / cycle validation pure tests
+  - shared readiness fixture regression
+  - `active_issue_id` が `inspect_target_deps()` の decoration にのみ影響し、`evaluate_readiness()` の結果を変えない pure regression
   - `domain/status.py`, `domain/deps.py` no-I/O assertion
 - report update:
   - `spec-deps/current/report.md`
@@ -574,16 +663,23 @@ ID: "issue-25"
 - purpose:
   - write path から独立した active read side を先に固定する
 
-##### I1 — manifest read model
+##### I1 — current manifest read model
 - Red:
-  - `ActiveViewResult` read model test を 1 本追加
+  - `agent.active -> ActiveViewResult` read model test を 1 本追加
 - Green:
-  - `load_active_manifest()` と `show_active()` の read path を導入する
+  - `load_active_manifest()` と `show_active()` の current-path を導入する
 - Refactor:
-  - legacy manifest migration を read-time/in-memory に整理する
-  - `.work/active.json` / `.work/current.json` 限定、優先順位、write-back なし契約を固定する
+  - `ActiveViewEntry` への mapping を整理する
 
-##### I2 — active show rendering
+##### I2 — legacy migration-capable loader
+- Red:
+  - `.work/active.json` / `.work/current.json` priority + no write-back regression を 1 本追加
+- Green:
+  - legacy fallback を `load_active_manifest()` に閉じる
+- Refactor:
+  - source/warnings ownership と read-time/in-memory normalization を固定する
+
+##### I3 — active show rendering
 - Red:
   - `active show` text rendering regression を 1 本追加
 - Green:
@@ -596,7 +692,9 @@ ID: "issue-25"
   - active read slice review
 - expected tests:
   - active show read/result regression
+  - `active show` text/stdout/stderr/warnings compatibility regression
   - legacy manifest fixture matrix
+  - `active show` zero-input / exit `0` regression
   - legacy source priority regression
   - read-time/in-memory normalization with no write-back
   - `load_active_manifest_no_migrate()` 非使用確認
@@ -625,21 +723,30 @@ ID: "issue-25"
 - step boundary:
   - `active set` / `active clear` の guard/order/rollback
   - sync auto-update は含めない
+  - `pre-step7 failure` は rollback 対象外、`commit_active_state()` 内の step 7-9 failure のみ snapshot/restore 対象とする
   - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> set_active/clear_active` seam を含む staged diff とする
 
 #### B1 — active write
 - purpose:
   - 最初の高リスク write path を小さい iteration に分割して固定する
 
-##### I1 — deps guard
+##### I1 — active selection + deps guard
 - Red:
-  - blocked/unknown guard regression を 1 本追加
+  - blocked/unknown/force regression を 1 本追加
 - Green:
-  - `select_active_chain()`, `resolve_branch_decision()`, `set_active()` の guard path を導入する
+  - `select_active_chain()` と readiness guard を導入する
 - Refactor:
-  - readiness seam の再利用を固定する
+  - shared readiness seam reuse を固定する
 
-##### I2 — shared commit_active_state
+##### I2 — branch decision / checkout pre-write
+- Red:
+  - branch policy failure regression を 1 本追加
+- Green:
+  - `resolve_branch_decision()` と manifest write 前 checkout を導入する
+- Refactor:
+  - pre-step7 failure ownership を明文化する
+
+##### I3 — shared commit_active_state
 - Red:
   - write-order regression を 1 本追加
 - Green:
@@ -647,7 +754,7 @@ ID: "issue-25"
 - Refactor:
   - context-pack render ownership を整理する
 
-##### I3 — set command path
+##### I4 — set command path
 - Red:
   - `active set` success regression を 1 本追加
 - Green:
@@ -655,7 +762,7 @@ ID: "issue-25"
 - Refactor:
   - stdout/stderr ownership を整理する
 
-##### I4 — clear command path
+##### I5 — clear command path
 - Red:
   - `active clear` placeholder regression を 1 本追加
 - Green:
@@ -663,7 +770,7 @@ ID: "issue-25"
 - Refactor:
   - `patch_manifest=None` 契約を固定する
 
-##### I5 — rollback injection
+##### I6 — rollback injection
 - Red:
   - rollback failure injection を 1 本追加
 - Green:
@@ -676,9 +783,12 @@ ID: "issue-25"
   - active write slice review
 - expected tests:
   - active set/clear use case regression
+  - branch policy failure regression
+  - managed agent state invalid JSON pre-step7 failure with no snapshot/rollback regression
   - no manifest write before guard success
   - shared readiness seam reuse regression
   - `commit_active_state` authoritative order regression
+  - `active clear` zero-input / exit `0` / clear-text regression
   - `active clear` placeholder manifest/pointer/context-pack/agent-state clear regression
   - git rollback 非対象 regression
   - rollback injection
@@ -767,6 +877,8 @@ ID: "issue-25"
   - `sync --force` placeholder semantics regression
   - deps.valid=false / deps.error regression
   - active update after branch / before artifact regression
+  - sync success/failure exit behavior regression
+  - sync stderr/warnings ordering regression
   - non-atomic artifact failure with `failed_partial_or_stale` regression
   - artifact failure contract regression
   - renderer text regression
@@ -845,6 +957,7 @@ ID: "issue-25"
   - `app.py`
   - `application/create_node.py`
   - `application/contracts.py`
+  - `application/ports.py`
   - `infra/template_scaffolder.py`
   - `presentation/cli_text.py`
   - 対応 test
@@ -873,12 +986,21 @@ ID: "issue-25"
 - Refactor:
   - duplicate fail-fast no-write を整理する
 
+##### I3 — CLI contract
+- Red:
+  - `new doc` result/text regression を 1 本追加
+- Green:
+  - `CreateDiscussionDocResult` と `render_new_doc_text()` を固定する
+- Refactor:
+  - duplicate / invalid-sequence failure message と warnings ownership を整理する
+
 #### step gate
 - review:
   - new doc slice review
 - expected tests:
   - sequence regression
   - generated path/name/content regression
+  - doc_type (`adr|disc|research|note`) parity / template selection regression
   - duplicate/no-write regression
   - new node non-regression for shared-file edits
   - invalid slug / duplicate sequence regression
@@ -899,6 +1021,7 @@ ID: "issue-25"
   - `application/sync_state.py`
   - `infra/github_cli.py`
   - `infra/active_store.py`
+  - `presentation/cli_text.py`
   - 対応 test
 - step boundary:
   - `import` と `sync_after_import()` のみ
@@ -917,7 +1040,15 @@ ID: "issue-25"
 - Refactor:
   - `load_active_manifest_no_migrate()` 専用利用を固定する
 
-##### I2 — linked create reuse
+##### I2 — import preflight / duplicate no-write
+- Red:
+  - import duplicate / no-write regression を 1 本追加
+- Green:
+  - duplicate guard と no-write preflight を import flow に固定する
+- Refactor:
+  - preflight ownership と failure source を整理する
+
+##### I3 — linked create reuse
 - Red:
   - linked create reuse regression を 1 本追加
 - Green:
@@ -925,7 +1056,7 @@ ID: "issue-25"
 - Refactor:
   - graph load / collision planning の二重実行を排除する
 
-##### I3 — post-import sync
+##### I4 — post-import sync
 - Red:
   - `import -> sync` regression を 1 本追加
 - Green:
@@ -940,6 +1071,7 @@ ID: "issue-25"
   - parent fallback regression
   - duplicate/no-write regression
   - import then sync regression
+  - import -> sync artifact path/name/content assertions
   - post-import sync negative-path regression
   - `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` 鎖 regression
   - `execute_create_plan()` reuse seam regression
@@ -965,6 +1097,7 @@ ID: "issue-25"
 - step boundary:
   - use case 実装は増やさない
   - すでにある core を束ねる shell に限定する
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py / cli/parser.py / cli/registry.py / cli/bootstrap.py / cli/dispatch.py / commands/* / commands/contracts.py / application/contracts.py / application/ports.py / presentation/contracts.py` を含む staged diff とする
 
 #### B1 — shell integration
 - purpose:
@@ -1015,9 +1148,13 @@ ID: "issue-25"
 - target:
   - `tests/test_cli.py`
   - `tests/test_init_update.py`
+  - `tests/__init__.py`
   - `tests/cli_runtime/*`
+  - `tests/cli_runtime/__init__.py`
   - `tests/domain_runtime/*`
+  - `tests/domain_runtime/__init__.py`
   - `tests/presentation_runtime/*`
+  - `tests/presentation_runtime/__init__.py`
 - step boundary:
   - test file の physical split のみ
   - shell / core の分離が終わったあとに safety net を整理する
@@ -1058,6 +1195,8 @@ ID: "issue-25"
 - expected tests:
   - `python -m unittest discover -v`
   - touched test modules
+  - test module existence + command grouping assertions
+  - regular package (`__init__.py`) discovery assertions
   - critical inventory still covered:
     - staged delegation path
     - active rollback failure-injection
@@ -1120,6 +1259,7 @@ ID: "issue-25"
     - `deps check`
     - markdown/puml/json artifact contracts
   - final API call-site regression
+  - `app.py` thin-entrypoint / no legacy helper direct import structural check
   - legacy import prohibition / layer direction assertions:
     - `commands/* -> UseCases facade only`
     - `domain/*` no I/O import
@@ -1150,6 +1290,7 @@ ID: "issue-25"
   - docs impact checklist regression
 - Green:
   - changed assets/workflow/docs を棚卸しし `docs / assets / workflow / skill / none` を判定する
+  - actual touched doc paths list を記録する
 - Refactor:
   - docs impact checklist を整理する
 
@@ -1176,8 +1317,16 @@ ID: "issue-25"
   - 1 commit
 
 ### S99 — final diff review quality gate
+- target:
+  - branch diff
+  - final gate evidence
+  - `spec-deps/current/report.md`
 - branch diff scope:
   - `git diff origin/main...HEAD`
+- step boundary:
+  - review-only step とする
+  - blocking finding が出た場合は元 step に差し戻す
+  - `S99` 自体では新規設計や scope 拡張を入れない
 
 #### B1 — final validation
 - purpose:
@@ -1208,7 +1357,7 @@ ID: "issue-25"
 - Green:
   - `spec_reviewer` pass
   - branch diff review の blocking finding 0 件
-  - staged delegation / rollback-ready path trace 完了
+  - staged delegation history / rollback basis transition evidence 完了
   - `app.py` thinness check
   - command thinness check
   - layer violation check
@@ -1219,12 +1368,14 @@ ID: "issue-25"
     - `AC-003`: `tests/test_init_update.py`, `tests/cli_runtime/*`, `tests/domain_runtime/*`, `tests/presentation_runtime/*` の分割差分
     - `AC-004`: `sync --force`, `deps check`, `active set`, `import -> sync`, scaffold collision no-write の回帰 test 群
     - `AC-005`: `python -m unittest discover -v` green
-    - `EC-001`: staged delegation path / rollback transition evidence
+    - `EC-001`: staged delegation history / rollback basis transition evidence
     - `EC-002`: import 後のみ `sync_after_import()` 起動
     - `EC-003`: deps readiness / active guard/order
     - `EC-004`: JSON/Markdown/PUML artifact path/name/content 契約
 - Refactor:
   - final gate report を整理する
+- report update:
+  - `spec-deps/current/report.md`
 
 ## final exit contract
 - AC/EC 達成:
