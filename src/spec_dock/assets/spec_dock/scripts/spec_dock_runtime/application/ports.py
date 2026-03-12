@@ -26,8 +26,33 @@ class DerivedStateReader(Protocol):
         ...
 
 
+class NodeRepository(Protocol):
+    def load_node_records(self, specdock_dir: Path) -> list[StoredMetaRecord]:
+        ...
+
+    def write_meta(self, dest_dir: Path, record: StoredMetaRecord) -> None:
+        ...
+
+
+class TemplateScaffolder(Protocol):
+    def render_text(self, text: str, replacements: dict[str, str]) -> str:
+        ...
+
+    def load_template_text(self, src_path: Path) -> str:
+        ...
+
+    def copy_scaffolded_tree(self, src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]:
+        ...
+
+    def write_text(self, dest_path: Path, text: str) -> None:
+        ...
+
+
 class IssueGateway(Protocol):
     def issue_index(self, repo_root: Path, *, limit: int) -> list[IssueSnapshot]:
+        ...
+
+    def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         ...
 
 
@@ -102,6 +127,8 @@ class Ports:
     node_reader: ValidateNodeReader
     repo_root: Path | None
     specdock_dir: Path | None = None
+    node_repo: NodeRepository | None = None
+    template_scaffolder: TemplateScaffolder | None = None
     derived_state_reader: DerivedStateReader | None = None
     issue_gateway: IssueGateway | None = None
     active_state_store: ActiveStateStore | None = None

@@ -4,6 +4,7 @@ from ..application.contracts import (
     ActiveClearResult,
     ActiveSetResult,
     ActiveViewResult,
+    CreateNodeResult,
     DepsCheckResult,
     SyncCommandResult,
     ValidationResult,
@@ -23,6 +24,34 @@ def render_validate_text(result: ValidationResult) -> CliText:
         stderr_lines=[],
         warnings=result.report.warnings,
     )
+
+
+def _rel_path_for_output(path_text: str) -> str:
+    parts = path_text.replace("\\", "/").split("/")
+    if "spec-dock" in parts:
+        index = parts.index("spec-dock")
+        return "/".join(parts[index:])
+    return path_text
+
+
+def render_new_node_text(result: CreateNodeResult) -> CliText:
+    node = result.node
+    rel = _rel_path_for_output(node.path.as_posix())
+    gh = f" github=#{node.github_issue_number}" if node.github_issue_number is not None else ""
+
+    if node.kind == "initiative":
+        line = f"spec-dock: ok (new initiative) id={node.id} path={rel}{gh}"
+    elif node.kind == "epic":
+        line = (
+            "spec-dock: ok (new epic) "
+            f"id={node.id} initiative={node.initiative_id} path={rel}{gh}"
+        )
+    else:
+        line = (
+            "spec-dock: ok (new issue) "
+            f"id={node.id} epic={node.epic_id} initiative={node.initiative_id} path={rel}{gh}"
+        )
+    return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
 
 
 def render_deps_check_text(result: DepsCheckResult) -> CliText:
