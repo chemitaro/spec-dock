@@ -5,7 +5,7 @@ from pathlib import Path
 
 def _runtime_modules():
     runtime_scripts_dir = (
-        Path(__file__).resolve().parents[1]
+        Path(__file__).resolve().parents[2]
         / "src"
         / "spec_dock"
         / "assets"
