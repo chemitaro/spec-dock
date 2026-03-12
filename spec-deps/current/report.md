@@ -655,5 +655,69 @@ Ran 247 tests ... OK
 - `tests/test_cli.py` は inventory 存在確認に加えて sentinel method の存在も確認し、単なる path existence ではなく split coverage guard として機能させている。
 - S12 では runtime code 変更は行わず、test tree の再配置と discovery 契約の固定に限定した。
 
+---
+
+### 2026-03-12 16:15 - 17:20
+
+#### 対象
+- Step: S13
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- layered runtime (`commands/application/infra/presentation/cli`) から legacy helper 直依存を外し、`infra/json_store.py`, `infra/clock.py`, `infra/github_cli.py`, `presentation/markdown.py`, `presentation/puml.py` を正本 owner とする方向へ整理した。
+- `io_json.py`, `github.py`, `render_md.py`, `render_puml.py` は互換 shim として残し、旧 entry/legacy path からの後方互換を維持しつつ、layered path からは直接参照しない構造へ切り替えた。
+- `tests/cli_runtime/test_runtime_shell_s11.py` に final API call-site / no legacy helper direct import / layer direction assertion の structural checks を追加した。
+- `tests/cli_runtime/test_new.py` は readonly lock seam の owner 変更に合わせて `infra/fs_repo.py` 側を観測点へ更新した。
+- `tests/domain_runtime/test_runtime_domain_s03.py` に layer detachment 後も `domain` が pure であることの回帰を維持する assertion を追加した。
+- 初回 review では layer-boundary import guard が fully-qualified import (`spec_dock_runtime.io_json`) と `from .. import io_json` を十分に検出できない P2 指摘を受けた。
+- `tests/cli_runtime/test_runtime_shell_s11.py` を修正し、`_iter_import_modules()`, `_normalize_import_module()`, `_import_root()` を導入して fully-qualified / relative import を共通正規化するよう改善した。
+- 再 review で no blocking findings / pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.presentation_runtime.test_runtime_sync_s07 tests.domain_runtime.test_runtime_domain_s01 tests.domain_runtime.test_runtime_domain_s03
+
+Ran 53 tests ... OK
+
+python -m unittest -v tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_import_scan_detects_legacy_helper_import_styles tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_import_root_normalizes_fully_qualified_layer_modules tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression
+
+Ran 3 tests ... OK
+
+python -m unittest discover -v
+
+Ran 247 tests ... OK
+
+rg -n "^from \\.\\.(io_json|github|render_md|render_puml|active|nodes|ids) import|^from \\.(io_json|github|render_md|render_puml|active|nodes|ids) import" src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli
+
+(no output)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - `infra/clock.py` 正本へ切替
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - layered bootstrap から legacy `io_json.py` 直依存を除去
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py` - compatibility shim 化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - `infra/json_store.py` / `infra/clock.py` 正本へ切替
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/clock.py` - time helper 正本化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - `infra/json_store.py` 正本へ切替
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/derived_state_reader.py` - `infra/json_store.py` 正本へ切替
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - `infra/json_store.py` / `infra/clock.py` 正本へ切替
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py` - GitHub helper 正本化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/json_store.py` - JSON read/write helper 正本化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py` - compatibility shim 化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/markdown.py` - markdown renderer 正本化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - puml renderer 正本化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py` - compatibility shim 化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py` - compatibility shim 化
+- `tests/cli_runtime/test_new.py` - readonly lock seam regression を owner 更新
+- `tests/cli_runtime/test_runtime_shell_s11.py` - helper detachment / layer boundary structural regressions を追加
+- `tests/domain_runtime/test_runtime_domain_s03.py` - pure domain regression を補強
+
+#### コミット
+- 未実施
+
+#### メモ
+- rollback basis はこの step 以降 staged seam ではなく commit 単位 (`git revert / commit rollback`) を前提に扱う。
+- `app.py` には互換用 legacy 実装が残るが、`main` の shell path は thin entrypoint のまま維持し、layered path からの legacy helper direct import は構造テストで禁止している。
+
 ## 省略/例外メモ
 - 該当なし

@@ -307,6 +307,7 @@ class TestRuntimeDomainS03(unittest.TestCase):
         module_paths = [
             domain_status.__file__,
             domain_deps.__file__,
+            domain_status.__file__.replace("status.py", "active.py"),
         ]
         forbidden_import_roots = {
             "argparse",

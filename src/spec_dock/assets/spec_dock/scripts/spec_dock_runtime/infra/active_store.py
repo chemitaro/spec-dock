@@ -5,13 +5,14 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from ..io_json import _load_json, _now_iso, _write_json
+from .clock import now_iso
 from .contracts import (
     ActiveManifest,
     ActiveManifestEntry,
     ActiveManifestLoadResult,
     ActiveStateSnapshot,
 )
+from .json_store import load_json, write_json
 
 _AGENT_DIRNAME = ".agent"
 _LEGACY_WORK_DIRNAME = ".work"
@@ -53,7 +54,7 @@ def _manifest_to_json_obj(manifest: ActiveManifest | None) -> dict[str, Any]:
 
     return {
         "schema_version": 2,
-        "updated_at": _now_iso(),
+        "updated_at": now_iso(),
         "initiative": _entry(manifest.initiative if manifest is not None else None),
         "epic": _entry(manifest.epic if manifest is not None else None),
         "issue": _entry(manifest.issue if manifest is not None else None),
@@ -151,7 +152,7 @@ def load_active_manifest(specdock_dir: Path) -> ActiveManifestLoadResult:
         if not path.exists():
             continue
         try:
-            loaded = _load_json(path)
+            loaded = load_json(path)
         except RuntimeError:
             warnings.append(f"active_manifest_invalid_json:{source}")
             continue
@@ -183,7 +184,7 @@ def write_active_manifest(specdock_dir: Path, manifest: ActiveManifest) -> Activ
     agent_dir = specdock_dir / _AGENT_DIRNAME
     legacy_work_dir = specdock_dir / _LEGACY_WORK_DIRNAME
     agent_dir.mkdir(parents=True, exist_ok=True)
-    _write_json(agent_dir / "active.json", _manifest_to_json_obj(manifest))
+    write_json(agent_dir / "active.json", _manifest_to_json_obj(manifest))
     (legacy_work_dir / "active.json").unlink(missing_ok=True)
     (legacy_work_dir / "current.json").unlink(missing_ok=True)
     return manifest
@@ -224,11 +225,11 @@ def patch_agent_state_active_fields(specdock_dir: Path, manifest: ActiveManifest
         path = agent_dir / name
         if not path.is_file():
             continue
-        loaded = _load_json(path)
+        loaded = load_json(path)
         if not isinstance(loaded, dict):
             raise RuntimeError(f"invalid JSON shape (expected object): {path}")
         loaded["active"] = active_obj
-        _write_json(path, loaded)
+        write_json(path, loaded)
 
 
 def snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot:
@@ -246,7 +247,7 @@ def snapshot_current_state(specdock_dir: Path) -> ActiveStateSnapshot:
         if not path.exists():
             managed_agent_state[name] = None
             continue
-        _loaded = _load_json(path)
+        _loaded = load_json(path)
         if not isinstance(_loaded, dict):
             raise RuntimeError(f"invalid JSON shape (expected object): {path}")
         managed_agent_state[name] = path.read_text(encoding="utf-8")

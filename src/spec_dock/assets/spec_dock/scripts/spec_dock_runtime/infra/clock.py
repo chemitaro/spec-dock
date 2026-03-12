@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from ..io_json import _now_iso, _today
+from datetime import datetime
 
 
 def now_iso() -> str:
-    return _now_iso()
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def today() -> str:
-    return _today()
+    return datetime.now().date().isoformat()

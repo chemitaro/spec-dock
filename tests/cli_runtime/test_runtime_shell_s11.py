@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+_LEGACY_HELPER_MODULES = {"io_json", "github", "render_md", "render_puml", "active", "nodes", "ids"}
+
 
 def _runtime_modules():
     runtime_scripts_dir = (
@@ -40,7 +42,53 @@ def _runtime_modules():
     )
 
 
+def _iter_import_modules(tree: ast.AST) -> list[str]:
+    imported: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.extend(alias.name for alias in node.names)
+        if isinstance(node, ast.ImportFrom):
+            if node.module is None:
+                imported.extend(alias.name for alias in node.names if alias.name != "*")
+                continue
+            imported.append(node.module)
+            if node.module == "spec_dock_runtime":
+                imported.extend(f"{node.module}.{alias.name}" for alias in node.names if alias.name != "*")
+    return imported
+
+
+def _normalize_import_module(imported: str) -> str:
+    return imported.removeprefix("spec_dock_runtime.")
+
+
+def _import_root(imported: str) -> str:
+    return _normalize_import_module(imported).split(".", 1)[0]
+
+
 class RuntimeShellS11Tests(unittest.TestCase):
+    def test_import_scan_detects_legacy_helper_import_styles(self) -> None:
+        tree = ast.parse(
+            "import spec_dock_runtime.io_json\n"
+            "from spec_dock_runtime import io_json\n"
+            "from .. import io_json\n"
+        )
+        imported = _iter_import_modules(tree)
+        self.assertIn("spec_dock_runtime.io_json", imported)
+        self.assertIn("io_json", imported)
+
+        roots = {_import_root(module) for module in imported}
+        self.assertIn("io_json", roots & _LEGACY_HELPER_MODULES)
+
+    def test_import_root_normalizes_fully_qualified_layer_modules(self) -> None:
+        tree = ast.parse(
+            "import spec_dock_runtime.domain.ids\n"
+            "from spec_dock_runtime import infra\n"
+        )
+        imported = _iter_import_modules(tree)
+        roots = {_import_root(module) for module in imported}
+        self.assertIn("domain", roots)
+        self.assertIn("infra", roots)
+
     def test_parser_help_and_argparse_failure_regression(self) -> None:
         (_runtime_app, _app_contracts, _cli_dispatch, cli_parser, cli_registry, _cmd_contracts, _domain_models) = (
             _runtime_modules()
@@ -372,18 +420,61 @@ class RuntimeShellS11Tests(unittest.TestCase):
         }
         self.assertTrue(call_names.isdisjoint(legacy_helper_calls))
 
+        runtime_root = app_source_path.parent
+        layer_dirs = ("commands", "application", "infra", "presentation", "cli")
+        for layer_dir in layer_dirs:
+            for module_path in sorted((runtime_root / layer_dir).glob("*.py")):
+                if module_path.name == "__init__.py":
+                    continue
+                tree = ast.parse(module_path.read_text(encoding="utf-8"))
+                for imported in _iter_import_modules(tree):
+                    root = _import_root(imported)
+                    self.assertNotIn(
+                        root,
+                        _LEGACY_HELPER_MODULES,
+                        f"legacy helper direct import in {module_path}: {imported}",
+                    )
+
+        # commands/* must stay as thin shell layer: no direct domain/infra/app imports.
         commands_dir = app_source_path.parent / "commands"
         for module_path in sorted(commands_dir.glob("*.py")):
             if module_path.name == "__init__.py":
                 continue
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.ImportFrom):
+            for imported in _iter_import_modules(tree):
+                root = _import_root(imported)
+                self.assertNotIn(root, {"domain", "infra", "app"}, f"forbidden import in {module_path}: {imported}")
+
+        # application/* may only refer to infra through contracts.
+        application_dir = app_source_path.parent / "application"
+        for module_path in sorted(application_dir.glob("*.py")):
+            if module_path.name == "__init__.py":
+                continue
+            tree = ast.parse(module_path.read_text(encoding="utf-8"))
+            for imported in _iter_import_modules(tree):
+                root = _import_root(imported)
+                if root != "infra":
                     continue
-                if node.module is None:
-                    continue
-                root = node.module.split(".", 1)[0]
-                self.assertNotIn(root, {"domain", "infra", "app"}, f"forbidden import in {module_path}: {node.module}")
+                self.assertEqual(
+                    _normalize_import_module(imported),
+                    "infra.contracts",
+                    f"application layer must not import infra concrete module: {module_path}: {imported}",
+                )
+
+        # infra/* must not depend on shell/entrypoint layers.
+        infra_dir = app_source_path.parent / "infra"
+        forbidden_infra_roots = {"app", "cli", "commands"}
+        for module_path in sorted(infra_dir.glob("*.py")):
+            if module_path.name == "__init__.py":
+                continue
+            tree = ast.parse(module_path.read_text(encoding="utf-8"))
+            for imported in _iter_import_modules(tree):
+                root = _import_root(imported)
+                self.assertNotIn(
+                    root,
+                    forbidden_infra_roots,
+                    f"infra layer must not depend on shell layers: {module_path}: {imported}",
+                )
 
 
 if __name__ == "__main__":
