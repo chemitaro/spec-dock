@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Protocol
 
 from ..domain.models import IssueSnapshot, SpecGraph
+from ..infra.contracts import ActiveManifestLoadResult
 from ..infra.contracts import DepsTopologyLoadResult
 from ..infra.contracts import StoredMetaRecord
 
@@ -25,6 +26,9 @@ class IssueGateway(Protocol):
 
 
 class ActiveStateStore(Protocol):
+    def load_active_manifest(self, specdock_dir: Path) -> ActiveManifestLoadResult:
+        ...
+
     def load_active_issue_id(self, specdock_dir: Path) -> str | None:
         ...
 

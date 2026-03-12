@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from ..domain.models import TargetDepsInspection, ValidationReport
 
@@ -34,4 +35,24 @@ class CheckDepsRequest:
 class DepsCheckResult:
     target: TargetRef
     inspection: TargetDepsInspection
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
+class ShowActiveRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class ActiveViewEntry:
+    id: str | None
+    path: str | None
+
+
+@dataclass(frozen=True)
+class ActiveViewResult:
+    initiative: ActiveViewEntry
+    epic: ActiveViewEntry
+    issue: ActiveViewEntry
+    source: Literal["agent.active", "legacy.work.active", "legacy.work.current", "none"]
     warnings: list[str]
