@@ -1765,20 +1765,20 @@ tests/
   - 実装時の導入順と最初の消費者 step は `plan.md` を正本とし、shared contract / stored-shape は additive に導入する
 - 中間状態で許容する seam:
   - stage 1:
-    - `commands/*` は bootstrap 済み `UseCases` facade のみを受け取り、旧 `app.py` helper を直接呼ばない
-    - stage-1 の temporary shim のみが facade 内部で旧 helper / `Ports` へ委譲してよい
-    - parser/help の正本はすでに `CommandSpec.add_arguments` へ移す
+    - `app.py` は delegation owner のまま、pure core (`domain/ids.py`, `domain/tree.py`, `domain/validation.py`, `domain/status.py`, `domain/deps.py`) の additive 導入を許容する
+    - stage-1 では `cli/*` / `commands/*` をまだ必須とせず、旧 helper から新 pure core への委譲だけを先に導入してよい
   - stage 2:
-    - read-side / active-side の vertical slice を layered use case へ置き換え始める
-    - workflow の新規追加を `commands/*` に書き戻してはならない
+    - `app.py` 配下の staged delegation を維持したまま、read-side / active-side / sync-side / create-side の vertical slice を layered use case へ置き換え始める
+    - parser/help/dispatch ownership はまだ `app.py` に残っていてよい
   - stage 3:
-    - `commands/*` から `domain/*` / `infra/*` への直接依存は導入せず、temporary shim のみが内部で既存 helper を使える
+    - `app.py -> use case` seam で staged delegated smoke を維持し、`application` / `domain` / `infra` / `presentation` の責務境界を固める
+    - workflow の新規追加を `app.py` / `commands/*` に書き戻してはならない
   - stage 4:
-    - `commands/*` から旧 `app.py` helper への依存を禁止し、`UseCases` facade 経由に統一する
+    - `cli/*` / `commands/*` を導入して parser/help/dispatch の正本を移し、`commands/*` は `UseCases` facade のみを見る
     - この時点で layered invariant を enforce するが、rollback 基準の切替はまだ行わない
   - ロールバック:
-  - stage 1 から stage 4 完了まで、旧 helper 本体は削除せず `app.py` から到達可能な互換 wrapper として残す
-  - stage 1 から stage 4 の間は `app.py` / `cli/parser.py` / `cli/registry.py` / `cli/bootstrap.py` / `cli/dispatch.py` / `commands/*` / `commands/contracts.py` / `application/contracts.py` / `application/ports.py` / `presentation/contracts.py` の wiring を一体で切り戻すことで旧経路へ戻せることを rollback 保証とする
+  - stage 1 から stage 3 の間は、各 vertical slice ごとに `app.py -> new use case / renderer` seam を staged rollback unit として切り戻せることを rollback 保証とする
+  - stage 4 では `app.py` / `cli/parser.py` / `cli/registry.py` / `cli/bootstrap.py` / `cli/dispatch.py` / `commands/*` / `commands/contracts.py` / `application/contracts.py` / `application/ports.py` / `presentation/contracts.py` の CLI wiring 一式を rollback 単位とする
   - `dispatch` 単体の差し戻しだけではなく、parser/help 正本を含む CLI wiring 一式が rollback 単位である
   - stage 5 で旧 helper を削除した後に rollback は import 差し戻しではなく git revert / commit rollback へ切り替わる
   - `active set` は manifest 書込後の pointer 更新失敗に備えて旧 manifest / 旧 pointer を best-effort restore する
