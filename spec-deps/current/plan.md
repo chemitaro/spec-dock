@@ -43,7 +43,7 @@ ID: "issue-25"
   1. `domain/ids.py`, `domain/models.py`, `domain/tree.py`, `domain/validation.py`
   2. `application/validate_tree.py` と最小 reader seam
   3. `domain/status.py`, `domain/deps.py`
-  4. `application/check_deps.py`, `application/status_context.py`
+  4. `application/check_deps.py`, `application/status_context.py`, `infra/deps_reader.py`
   5. `application/set_active.py` の read path
   6. `application/set_active.py` の write path
   7. `application/sync_state.py`
@@ -524,6 +524,8 @@ ID: "issue-25"
 - step boundary:
   - status resolution / progress / deps evaluation の pure rule まで
   - command / renderer はまだつなげない
+  - dependency topology の canonical source はこの step では導入しない
+  - `domain/deps.py` は `SpecGraph` から dependency edge を compile せず、supplied `issue_depends_on_map` / `effective_deps_map` を受ける pure rule に限定する
   - この step は additive pure core のみで live consumer は導入しない。legacy path の切替は `S04` / `S06` で開始し、rollback unit は `S03` 単独 commit/staged diff とする
 
 #### B1 — status and deps rules
@@ -542,7 +544,7 @@ ID: "issue-25"
 - Red:
   - `evaluate_readiness()` pure test を 1 本追加
 - Green:
-  - `DepsEvaluation`, `evaluate_readiness()` を導入する
+  - `DepsEvaluation`, `evaluate_readiness(graph, issue_depends_on_map, ...)` を導入する
 - Refactor:
   - closure / blockers / guard_reason を pure path に整理する
 
@@ -550,7 +552,7 @@ ID: "issue-25"
 - Red:
   - `inspect_target_deps()` pure test を 1 本追加
 - Green:
-  - `inspect_target_deps()` を導入する
+  - `inspect_target_deps(graph, issue_depends_on_map, ...)` を導入する
 - Refactor:
   - active issue decoration と view-facing state を整理する
 
@@ -558,7 +560,7 @@ ID: "issue-25"
 - Red:
   - `build_deps_state()` pure test と deps cycle validation pure test を 1 本追加
 - Green:
-  - `build_deps_state()`, `validate_deps_cycles()` を導入する
+  - `build_effective_deps_map(graph, issue_depends_on_map)`, `build_deps_state()`, `validate_deps_cycles(issue_depends_on_map)` を導入する
 - Refactor:
   - `effective_depends_on` / node-state assembly を `S04` と `S07` の共有 pure path に整理する
 
@@ -570,6 +572,7 @@ ID: "issue-25"
   - deps pure tests
   - deps state / cycle validation pure tests
   - shared readiness fixture regression
+  - explicit `issue_depends_on_map` input regression
   - `active_issue_id` が `inspect_target_deps()` の decoration にのみ影響し、`evaluate_readiness()` の結果を変えない pure regression
   - `domain/status.py`, `domain/deps.py` no-I/O assertion
 - report update:
@@ -582,9 +585,11 @@ ID: "issue-25"
   - `app.py`
   - `application/status_context.py`
   - `application/check_deps.py`
+  - `application/validate_tree.py`
   - `application/contracts.py`
   - `application/ports.py`
   - `infra/contracts.py`
+  - `infra/deps_reader.py`
   - `infra/derived_state_reader.py`
   - `infra/github_cli.py`
   - `infra/active_store.py`
@@ -592,8 +597,10 @@ ID: "issue-25"
   - `presentation/json_state.py`
   - 対応 test
 - step boundary:
-  - `deps check` のみ
+  - primary user-facing scope は `deps check`
   - `active set` 再利用 seam はこの step で固定する
+  - canonical dependency topology provider の first consumer はこの step とする
+  - `validate_tree` は同じ topology provider へ internal reconnect するが、この step の primary user-facing review scope には含めない
   - parser/help/dispatch ownership は `S11` へ defer し、この step では `deps check` の use case/result/renderer と legacy delegated path だけを閉じる
   - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> check_deps` seam を含む staged diff とする
 
@@ -608,6 +615,15 @@ ID: "issue-25"
   - `resolve_issue_status_context()` を導入し、github/cached 選択を ports に閉じる
 - Refactor:
   - active issue context の扱いを state decoration 専用に整理する
+
+##### I1b — deps topology seam
+- Red:
+  - `deps topology reader -> canonical issue_depends_on_map` test を 1 本追加
+- Green:
+  - `infra/deps_reader.py` と ports 経由の topology provider を導入する
+  - `validate_tree()` を same topology provider に再接続する
+- Refactor:
+  - `deps.json` / shorthand / ref resolve の ownership を topology provider に閉じる
 
 ##### I2 — deps text path
 - Red:
@@ -632,7 +648,10 @@ ID: "issue-25"
   - deps use case/result regression
   - deps text/json renderer regression
   - status context tests
+  - deps topology provider tests
+  - validate topology reconnect regression
   - shared readiness seam contract regression
+  - deps cycle fail-fast regression
   - deps exit code `0/3/1`
   - `--json` stdout-only regression
   - source selection regression
@@ -734,9 +753,10 @@ ID: "issue-25"
 - Red:
   - blocked/unknown/force regression を 1 本追加
 - Green:
-  - `select_active_chain()` と readiness guard を導入する
+  - `select_active_chain()` と `S04` の topology provider を再利用した readiness guard を導入する
 - Refactor:
   - shared readiness seam reuse を固定する
+  - invalid/cyclic topology は readiness 判定より前に fail-fast する順序を固定する
 
 ##### I2 — branch decision / checkout pre-write
 - Red:
@@ -871,6 +891,7 @@ ID: "issue-25"
   - sync slice review
 - expected tests:
   - sync use case/result regression
+  - sync deps cycle fail-fast regression
   - JSON artifact path/name/content snapshots
   - dashboard/tree PUML snapshots
   - deps-issues PUML / disabled placeholder regression
@@ -1261,7 +1282,7 @@ ID: "issue-25"
   - final API call-site regression
   - `app.py` thin-entrypoint / no legacy helper direct import structural check
   - legacy import prohibition / layer direction assertions:
-    - `commands/* -> UseCases facade only`
+    - `commands/* -> UseCases facade + presentation renderer`
     - `domain/*` no I/O import
     - `infra/*` only through ports
   - rollback basis transition evidence:
