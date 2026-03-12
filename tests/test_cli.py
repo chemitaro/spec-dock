@@ -4434,10 +4434,10 @@ class TestCli(unittest.TestCase):
             )
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            data = json.loads(p.stdout)
-            self.assertFalse(data["ready"])
-            self.assertEqual(data["effective_depends_on"], [])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("Dependency cycle detected", p.stderr)
+            self.assertIn("iss-local-00002", p.stderr)
+            self.assertIn("iss-local-00003", p.stderr)
 
     def test_sync_fails_on_deps_structural_error_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

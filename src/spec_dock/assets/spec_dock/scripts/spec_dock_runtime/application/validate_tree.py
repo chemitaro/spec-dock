@@ -30,5 +30,16 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
     del req
     records = ports.node_reader.load_node_records()
     graph = build_graph([_to_spec_node_seed(record) for record in records])
-    report = validate_graph_and_deps(graph, repo_root=ports.repo_root)
+    issue_depends_on_map: dict[str, list[str]] | None = None
+    if ports.deps_topology_reader is not None:
+        if ports.specdock_dir is not None:
+            specdock_dir = ports.specdock_dir
+        elif ports.repo_root is not None:
+            specdock_dir = ports.repo_root / "spec-dock"
+        else:
+            raise RuntimeError("specdock_dir is required when deps_topology_reader is configured")
+        topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
+        issue_depends_on_map = dict(topology.issue_depends_on_map)
+
+    report = validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
     return ValidationResult(report=report, checked_node_count=len(records))
