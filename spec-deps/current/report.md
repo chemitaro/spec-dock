@@ -272,15 +272,67 @@ OK
 - `tests/test_runtime_active_s05.py` - S05 focused tests
 
 #### コミット
-- 未実施
+- `1372b19f8b35930d1185893d567f19f495d92f0b` `feat(active): S05のactive show read sliceを導入`
 
 #### メモ
 - `load_active_manifest_no_migrate()` は S05 の user-facing path では使っていない。
 - `all-null` `.agent/active.json` は cleared state として扱い、legacy fallback を起こさないようにした。
 
+---
+
+### 2026-03-12 09:15 - 10:20
+
+#### 対象
+- Step: S06
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `application/set_active.py` に `active set` / `active clear` の write path を導入し、guard / order / rollback を application 層へ移した。
+- `domain/active.py` を追加し、active manifest の patch / restore に必要な pure helper を分離した。
+- `S04` で導入した topology provider を readiness guard に再利用し、invalid/cyclic topology を readiness 判定より前に fail-fast する順序を固定した。
+- `commit_active_state()` の rollback 範囲を step 7-9 failure に限定し、pre-step7 failure では snapshot/restore を走らせないようにした。
+- `infra/git_cli.py` を追加し、branch decision / checkout pre-write の切り出しを行った。
+- `tests/test_runtime_active_s06.py` を追加し、blocked/unknown/force、pre-step7 no-rollback、patch failure rollback、active clear を focused に固定した。
+- 初回 review では、`initiative` / `epic` の non-issue target が `guard_reason=\"unknown\"` かつ blockers 空のときに通ってしまう P1 指摘を受けた。
+- `application/set_active.py` を修正し、non-issue でも `deps.ready` を正本に guard するよう統一し、focused test を追加して再レビューを pass させた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_runtime_active_s06
+
+Ran 6 tests ... OK
+
+python -m unittest -v tests.test_runtime_active_s06 \
+  tests.test_cli.TestCli.test_active_set_without_github_blocks_unknown_issue_even_without_deps \
+  tests.test_cli.TestCli.test_active_set_epic_and_initiative_use_v2_deps_guard
+
+Ran 8 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `active set` / `active clear` を use case へ委譲
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - S06 用 DTO を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - active write / git port 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - active write use case / rollback 制御 / guard fix
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/active.py` - active patch / restore helper を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py` - active selection helper を拡張
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - snapshot / restore / write seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - active write rollback DTO を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py` - git checkout / branch seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - active set/clear text path を追加
+- `tests/test_runtime_active_s06.py` - S06 focused tests
+- `tests/test_cli.py` - active set/clear CLI regression を更新
+
+#### コミット
+- 未実施
+
+#### メモ
+- non-issue target でも `deps.ready` を使って `unknown` を拒否するようにしたため、dependency closure が空でも status 不明なら active mutation を止める。
+- 今回は focused tests までを再実行し、全件 `discover` は未再実行。
+
 ## 今後の推奨事項
-- `S06` で `S04` の topology provider を `active set` の readiness guard に再利用し、fail-fast 順序を command 契約へ持ち上げる。
-- `S06` では `active clear` の cleared manifest と `S05` の read loader が矛盾しないことを継続的に確認する。
+- `S07` では `sync` の preflight / artifact write を `S04` / `S06` の shared seam に再接続する。
+- `S07` で active auto-update は `ActiveUpdateOutcome` と artifact write failure の境界を明確にしたまま導入する。
 
 ## 省略/例外メモ
 - 該当なし

@@ -42,3 +42,11 @@ class ActiveManifestLoadResult:
     manifest: ActiveManifest | None
     source: Literal["agent.active", "legacy.work.active", "legacy.work.current", "none"]
     warnings: list[str]
+
+
+@dataclass(frozen=True)
+class ActiveStateSnapshot:
+    manifest: ActiveManifest | None
+    context_pack_text: str | None
+    active_json_text: str | None
+    managed_agent_state: dict[str, str | None]

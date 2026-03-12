@@ -33,10 +33,14 @@ from typing import Any
 
 from .application.check_deps import check_deps as _application_check_deps
 from .application.contracts import CheckDepsRequest as _CheckDepsRequest
+from .application.contracts import ClearActiveRequest as _ClearActiveRequest
+from .application.contracts import SetActiveRequest as _SetActiveRequest
 from .application.contracts import ShowActiveRequest as _ShowActiveRequest
 from .application.contracts import TargetRef as _TargetRef
 from .application.contracts import ValidateTreeRequest as _ValidateTreeRequest
 from .application.ports import Ports as _ApplicationPorts
+from .application.set_active import clear_active as _application_clear_active
+from .application.set_active import set_active as _application_set_active
 from .application.set_active import show_active as _application_show_active
 from .application.validate_tree import validate_tree as _application_validate_tree
 from .github import (
@@ -54,9 +58,21 @@ from .domain.validation import (
 from .infra.contracts import StoredMetaRecord
 from .infra.deps_reader import load_issue_depends_on_map as _infra_load_issue_depends_on_map
 from .infra.derived_state_reader import load_cached_issue_status_by_id as _infra_load_cached_issue_status_by_id
+from .infra.git_cli import check_ref_format_branch as _infra_check_ref_format_branch
+from .infra.git_cli import checkout_branch as _infra_checkout_branch
+from .infra.git_cli import create_and_checkout_branch as _infra_create_and_checkout_branch
+from .infra.git_cli import current_branch_or_none as _infra_current_branch_or_none
+from .infra.git_cli import local_branch_exists as _infra_local_branch_exists
+from .infra.git_cli import require_clean_working_tree as _infra_require_clean_working_tree
 from .infra.github_cli import issue_index as _infra_issue_index
 from .infra.active_store import load_active_issue_id as _infra_load_active_issue_id
 from .infra.active_store import load_active_manifest as _infra_load_active_manifest
+from .infra.active_store import load_active_manifest_no_migrate as _infra_load_active_manifest_no_migrate
+from .infra.active_store import write_active_manifest as _infra_write_active_manifest
+from .infra.active_store import apply_active_pointers as _infra_apply_active_pointers
+from .infra.active_store import patch_agent_state_active_fields as _infra_patch_agent_state_active_fields
+from .infra.active_store import snapshot_current_state as _infra_snapshot_current_state
+from .infra.active_store import restore_previous_state as _infra_restore_previous_state
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
@@ -70,6 +86,8 @@ from .ids import (
 )
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
+from .presentation.cli_text import render_active_clear_text as _render_active_clear_text
+from .presentation.cli_text import render_active_set_text as _render_active_set_text
 from .presentation.cli_text import render_active_show_text as _render_active_show_text
 from .presentation.cli_text import render_validate_text as _render_validate_text
 from .presentation.json_state import render_deps_check_json as _render_deps_check_json
@@ -183,8 +201,47 @@ class _AppActiveStateStore:
     def load_active_manifest(self, specdock_dir: Path):
         return _infra_load_active_manifest(specdock_dir)
 
+    def load_active_manifest_no_migrate(self, specdock_dir: Path):
+        return _infra_load_active_manifest_no_migrate(specdock_dir)
+
     def load_active_issue_id(self, specdock_dir: Path) -> str | None:
         return _infra_load_active_issue_id(specdock_dir)
+
+    def write_active_manifest(self, specdock_dir: Path, manifest):
+        return _infra_write_active_manifest(specdock_dir, manifest)
+
+    def apply_active_pointers(self, specdock_dir: Path, manifest, rendered_context_pack: str) -> None:
+        _infra_apply_active_pointers(specdock_dir, manifest, rendered_context_pack)
+
+    def patch_agent_state_active_fields(self, specdock_dir: Path, manifest) -> None:
+        _infra_patch_agent_state_active_fields(specdock_dir, manifest)
+
+    def snapshot_current_state(self, specdock_dir: Path):
+        return _infra_snapshot_current_state(specdock_dir)
+
+    def restore_previous_state(self, specdock_dir: Path, snapshot) -> None:
+        _infra_restore_previous_state(specdock_dir, snapshot)
+
+
+@dataclass(frozen=True)
+class _AppGitGateway:
+    def require_clean_working_tree(self, repo_root: Path) -> None:
+        _infra_require_clean_working_tree(repo_root)
+
+    def current_branch_or_none(self, repo_root: Path) -> str | None:
+        return _infra_current_branch_or_none(repo_root)
+
+    def local_branch_exists(self, repo_root: Path, branch: str) -> bool:
+        return _infra_local_branch_exists(repo_root, branch)
+
+    def checkout_branch(self, repo_root: Path, branch: str) -> None:
+        _infra_checkout_branch(repo_root, branch)
+
+    def create_and_checkout_branch(self, repo_root: Path, branch: str) -> None:
+        _infra_create_and_checkout_branch(repo_root, branch)
+
+    def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
+        return _infra_check_ref_format_branch(repo_root, branch)
 
 
 def _find_specdock_dir() -> Path:
@@ -1645,87 +1702,43 @@ def _active_set(
     gh_limit: int = 10000,
 ) -> None:
     """Set active pointers (initiative/epic/issue) from a single target."""
-    repo_root = specdock_dir.parent
-
     kind, value = _parse_active_set_target(target)
-    nodes = _scan_nodes(specdock_dir)
-    if not nodes:
-        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
-
     if kind == "github_issue":
-        issue_number = int(value)  # type: ignore[arg-type]
-        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
-        display_target = f"github#{issue_number}"
+        target_ref = _TargetRef(kind="github_issue", node_id=None, github_issue_number=int(value))  # type: ignore[arg-type]
+        display_target = f"github#{int(value)}"  # type: ignore[arg-type]
     elif kind == "node_id":
-        raw_id = str(value).lower()
-        prefix, is_local, num = _parse_id(raw_id)
-        resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local) or _format_id(
-            prefix, num, local=is_local
-        )
-        node = nodes.get(resolved)
-        if not node or node.type not in ("initiative", "epic", "issue"):
-            raise RuntimeError(f"Node not found: {resolved}")
-        display_target = node.id
+        target_ref = _TargetRef(kind="node_id", node_id=str(value), github_issue_number=None)
+        display_target = str(value)
     else:
         raise RuntimeError("Internal error: invalid active target kind")
 
-    # Deps guard: refuse blocked targets by default (active.json must not be updated).
-    deps = _deps_evaluate_v2(
-        specdock_dir,
-        nodes,
-        target_id=node.id,
-        github=github,
-        gh_limit=gh_limit,
+    ports = _ApplicationPorts(
+        node_reader=_AppValidateNodeReader(specdock_dir=specdock_dir),
+        repo_root=specdock_dir.parent,
+        specdock_dir=specdock_dir,
+        deps_topology_reader=_AppDepsTopologyReader(),
+        derived_state_reader=_AppDerivedStateReader(),
+        issue_gateway=_AppIssueGateway(),
+        active_state_store=_AppActiveStateStore(),
+        git_gateway=_AppGitGateway(),
     )
-    blockers = list(deps.get("blockers") or [])
-    ready = bool(deps.get("ready", False))
-    # For initiative/epic targets, guard by unresolved blockers in descendant issues.
-    # This keeps active-set usable before the first sync snapshot while still refusing
-    # canonical dependency violations.
-    guard_ready = ready if node.type == "issue" else len(blockers) == 0
-    is_blocked = not guard_ready
-    if is_blocked:
-        if not force:
-            lines = [f"active set blocked: target={node.id} ready=false blockers={len(blockers)}"]
-            for b in blockers:
-                lines.append(f"- {b}")
-            raise RuntimeError("\n".join(lines))
-        _warn(
-            f"deps_blocked: active set target is blocked; continuing due to --force: target={node.id} blockers={len(blockers)}"
-        )
-        for b in blockers:
-            _warn(f"blocker: {b}")
-
-    initiative, epic, issue = _select_active_from_node(nodes, node)
-    branch: str | None = None
-    if checkout:
-        decision = _resolve_active_set_branch_decision(repo_root, node=node)
-        for warning in decision.warnings:
-            _warn(warning)
-        try:
-            _require_clean_working_tree(repo_root)
-            if _git_local_branch_exists(repo_root, branch=decision.desired):
-                _warn("branch already exists; reusing existing branch; content is not verified")
-            _ensure_active_set_branch_name(repo_root, desired=decision.desired)
-        except RuntimeError as e:
-            msg = str(e)
-            if msg.startswith("Working tree is not clean"):
-                raise RuntimeError(
-                    msg
-                    + "\n\nHint: use '--no-checkout' to update active only, or commit/stash before '--checkout'."
-                ) from e
-            raise
-        branch = decision.desired
-
-    current = _write_active_manifest(specdock_dir, initiative=initiative, epic=epic, issue=issue)
-    _apply_active_pointers(specdock_dir, current)
-    _patch_agent_state_active_fields(specdock_dir, current)
-    ini = initiative.id if initiative else "(none)"
-    ep = epic.id if epic else "(none)"
-    iss = issue.id if issue else "(none)"
-    print(f"spec-dock: ok (active set) target={display_target} initiative={ini} epic={ep} issue={iss}")
-    if branch:
-        print(f"spec-dock: ok (active checkout) branch={branch}")
+    result = _application_set_active(
+        _SetActiveRequest(
+            target=target_ref,
+            force=force,
+            checkout=checkout,
+            use_github=github,
+            issue_limit=gh_limit,
+        ),
+        ports,
+    )
+    text = _render_active_set_text(result, target_display=display_target)
+    for warning in text.warnings:
+        _warn(warning)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+    for line in text.stdout_lines:
+        print(line)
 
 
 def _active_show(specdock_dir: Path) -> None:
@@ -1748,10 +1761,21 @@ def _active_show(specdock_dir: Path) -> None:
 
 def _active_clear(specdock_dir: Path) -> None:
     """Clear active pointers (set all layers to placeholder)."""
-    current = _write_active_manifest(specdock_dir, initiative=None, epic=None, issue=None)
-    _apply_active_pointers(specdock_dir, current)
-    _patch_agent_state_active_fields(specdock_dir, current)
-    print("spec-dock: ok (active clear)")
+    ports = _ApplicationPorts(
+        node_reader=_AppValidateNodeReader(specdock_dir=specdock_dir),
+        repo_root=specdock_dir.parent,
+        specdock_dir=specdock_dir,
+        active_state_store=_AppActiveStateStore(),
+        git_gateway=_AppGitGateway(),
+    )
+    result = _application_clear_active(_ClearActiveRequest(), ports)
+    text = _render_active_clear_text(result)
+    for warning in text.warnings:
+        _warn(warning)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+    for line in text.stdout_lines:
+        print(line)
 
 
 def _git_current_branch_or_none(repo_root: Path) -> str | None:

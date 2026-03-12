@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..application.contracts import ActiveViewResult, DepsCheckResult, ValidationResult
+from ..application.contracts import ActiveClearResult, ActiveSetResult, ActiveViewResult, DepsCheckResult, ValidationResult
 from .contracts import CliText
 
 
@@ -60,3 +60,20 @@ def render_active_show_text(result: ActiveViewResult) -> CliText:
         ]
 
     return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
+
+
+def render_active_set_text(result: ActiveSetResult, *, target_display: str) -> CliText:
+    ini = result.selection.initiative_id or "(none)"
+    epic = result.selection.epic_id or "(none)"
+    issue = result.selection.issue_id or "(none)"
+    stdout_lines = [
+        f"spec-dock: ok (active set) target={target_display} initiative={ini} epic={epic} issue={issue}",
+    ]
+    if result.branch is not None:
+        stdout_lines.append(f"spec-dock: ok (active checkout) branch={result.branch.desired}")
+    return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
+
+
+def render_active_clear_text(result: ActiveClearResult) -> CliText:
+    del result
+    return CliText(stdout_lines=["spec-dock: ok (active clear)"], stderr_lines=[], warnings=[])
