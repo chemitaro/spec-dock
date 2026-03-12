@@ -140,6 +140,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
   infra/
     __init__.py
     contracts.py
+    deps_reader.py
     fs_repo.py
     template_scaffolder.py
     active_store.py
@@ -207,6 +208,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
 │   ├── infra/                                         # Add
 │   │   ├── __init__.py                                # Add
 │   │   ├── contracts.py                               # Add
+│   │   ├── deps_reader.py                             # Add
 │   │   ├── fs_repo.py                                 # Add
 │   │   ├── template_scaffolder.py                     # Add
 │   │   ├── active_store.py                            # Add
@@ -562,7 +564,7 @@ package "presentation" {
   - raw CLI target string は `commands/*` の local scope に留め、`TargetRef` 自体には保持しない
 - facade dataclass:
   - `UseCases(create_initiative, create_epic, create_issue, create_discussion_doc, import_initiative, import_epic, import_issue, set_active, show_active, clear_active, sync, check_deps, validate_tree)`
-  - `UseCases` は `Ports` 束縛済みの callable facade とし、`commands/*` は `UseCases` のみを受け取る
+  - `UseCases` は `Ports` 束縛済みの callable facade とし、`commands/*` は `UseCases` facade と `presentation` renderer だけを受け取る
   - `UseCases` は `specdock_dir` / `repo_root` 束縛済みの runtime-bound facade とし、command-facing request DTO に path を持ち込まない
   - `commands/*` は runtime path を知らず、CLI 引数を domain/application 向けの request DTO へ正規化することに専念する
   - non-CLI sub-workflow policy は facade の公開 request DTO へ露出させず、application internal helper が所有する
@@ -573,6 +575,7 @@ package "presentation" {
     - `ActiveStateStore`
     - `IssueGateway`
     - `DerivedStateReader`
+    - `DepsTopologyReader`
     - `GitGateway`
     - `JsonStore`
     - `Clock`
@@ -596,6 +599,7 @@ package "presentation" {
   - `IssueGateway.issue_view_minimal(repo_root: Path, issue_number: int) -> StoredIssueSnapshot`
   - `IssueGateway.issue_checkout(repo_root: Path, issue_number: int) -> None`
   - `DerivedStateReader.load_cached_issue_status_by_id(specdock_dir: Path) -> dict[str, str]`
+  - `DepsTopologyReader.load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopologyLoadResult`
   - `GitGateway.require_clean_working_tree(repo_root: Path) -> None`
   - `GitGateway.current_branch_or_none(repo_root: Path) -> str | None`
   - `GitGateway.local_branch_exists(repo_root: Path, branch: str) -> bool`
@@ -704,6 +708,7 @@ package "presentation" {
   - `commit_active_state(*, persisted_manifest: ActiveManifest, patch_manifest: ActiveManifest | None, ports: Ports, context_pack_text: str) -> ActiveManifest`
 - 責務:
   - `TargetRef` を `NodeId` へ解決する
+  - `ports.deps_topology_reader` から canonical `issue_depends_on_map` を取得し、`domain.deps.validate_deps_cycles()` で invalid/cyclic topology を fail-fast する
   - deps guard
   - branch decision / checkout policy
   - active state 書込と pointer 更新 orchestration
@@ -744,7 +749,9 @@ package "presentation" {
 - `collect_sync_state()` の責務:
   - preflight
   - node load
-  - `domain.validation.validate_graph_and_deps()` を用いた structural/deps preflight
+  - `ports.deps_topology_reader` から canonical `issue_depends_on_map` を取得する
+  - `domain.deps.validate_deps_cycles(issue_depends_on_map)` による topology fail-fast
+  - `domain.validation.validate_graph_and_deps(graph, issue_depends_on_map=...)` を用いた structural/deps preflight
   - issue status resolve
   - progress / deps derivation
   - active inference
@@ -765,6 +772,8 @@ package "presentation" {
   - `check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult`
 - 責務:
   - node graph load と structural validation
+  - `ports.deps_topology_reader` から canonical `issue_depends_on_map` を取得する
+  - `domain.deps.validate_deps_cycles(issue_depends_on_map)` による topology fail-fast
   - `TargetRef` を `NodeId` へ解決する
   - `ports.issue_gateway` と `ports.derived_state_reader` の使い分け
   - active manifest を読み、active issue context は deps state decoration にのみ使う
@@ -772,6 +781,7 @@ package "presentation" {
   - `DepsCheckResult` の構築
 - mapper 責務:
   - cached index / github snapshots を `IssueSnapshot` へ正規化してから `domain` に渡す
+  - `deps.json` / shorthand / ref resolution から得た topology の正本は `issue_depends_on_map: dict[str, list[str]]` とし、`application / infra` が構築して `domain` へ渡す
   - `deps check --json` が現行 payload を再現できるよう、target-scoped `node_states` と `effective_depends_on` を `DepsCheckResult` へ詰める
   - issue source 正規化は `application/status_context.py::resolve_issue_status_context()` で一元化し、command 間で readiness の解釈がずれないようにする
 
@@ -780,7 +790,9 @@ package "presentation" {
   - `validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult`
 - 責務:
   - node graph load
-  - `domain.validation.validate_graph_and_deps()` による structural + deps 統合 validation
+  - `ports.deps_topology_reader` が束縛されている場合は canonical `issue_depends_on_map` を取得する
+  - `domain.validation.validate_graph_and_deps(graph, issue_depends_on_map=...)` を 1 回呼び、topology 未束縛時は structural-only、束縛時は deps-aware validation を行う
+  - validate command の user-facing seam は `app.py -> validate_tree -> render_validate_text` のまま維持する
 
 ### `domain/models.py`
 - dataclass:
@@ -805,6 +817,7 @@ package "presentation" {
 ### `infra/contracts.py`
 - dataclass:
   - `StoredMetaRecord(kind: str, id: str, title: str, slug: str, path: str, parent_id: str | None, initiative_id: str | None, epic_id: str | None, github_issue_number: int | None, meta_path: str)`
+  - `DepsTopologyLoadResult(issue_depends_on_map: dict[str, list[str]], warnings: list[str])`
   - `ActiveManifestEntry(id: str, path: str)`
   - `ActiveManifest(initiative: ActiveManifestEntry | None, epic: ActiveManifestEntry | None, issue: ActiveManifestEntry | None)`
   - `ActiveManifestLoadResult(manifest: ActiveManifest | None, source: Literal["agent.active","legacy.work.active","legacy.work.current","none"], warnings: list[str])`
@@ -837,13 +850,17 @@ package "presentation" {
 
 ### `domain/deps.py`
 - 公開関数:
-  - `evaluate_readiness(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot]) -> DepsEvaluation`
-  - `inspect_target_deps(graph: SpecGraph, target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot], active_issue_id: str | None) -> TargetDepsInspection`
+  - `evaluate_readiness(graph: SpecGraph, issue_depends_on_map: dict[str, list[str]], target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot]) -> DepsEvaluation`
+  - `inspect_target_deps(graph: SpecGraph, issue_depends_on_map: dict[str, list[str]], target_id: NodeId, issue_statuses: dict[str, IssueStatusSnapshot], active_issue_id: str | None) -> TargetDepsInspection`
   - `build_deps_state(graph: SpecGraph, effective_deps_map: dict[str, list[str]], issue_statuses: dict[str, IssueStatusSnapshot], active: ActiveSelection | None, warnings: list[str]) -> DepsState`
-  - `validate_deps_cycles(deps_map: dict[str, list[str]]) -> None`
+  - `validate_deps_cycles(issue_depends_on_map: dict[str, list[str]]) -> None`
 - internal helper:
-  - `build_effective_deps_map(graph: SpecGraph) -> dict[str, list[str]]`
-  - `compile_issue_depends_on_map(graph: SpecGraph) -> tuple[dict[str, list[str]], list[str]]`
+  - `build_effective_deps_map(graph: SpecGraph, issue_depends_on_map: dict[str, list[str]]) -> dict[str, list[str]]`
+  - `collect_reachable_issue_ids(issue_depends_on_map: dict[str, list[str]], start_issue_ids: list[str]) -> list[str]`
+- 所有ルール:
+  - `domain/deps.py` は graph から dependency topology を compile しない
+  - canonical `issue_depends_on_map` の正本は `application / infra` が持ち、`domain/deps.py` はそれを受けて readiness / inspection / state を pure に導出する
+  - `effective_deps_map` は `SpecGraph` と canonical `issue_depends_on_map` から parent merge を含めて pure に導出する
 
 ### `domain/status.py`
 - 公開関数:
@@ -853,8 +870,11 @@ package "presentation" {
 ### `domain/validation.py`
 - 公開関数:
   - `validate_graph(graph: SpecGraph, repo_root: Path | None = None) -> ValidationReport`
-  - `validate_graph_and_deps(graph: SpecGraph, repo_root: Path | None = None) -> ValidationReport`
+  - `validate_graph_and_deps(graph: SpecGraph, issue_depends_on_map: dict[str, list[str]] | None = None, repo_root: Path | None = None) -> ValidationReport`
   - `validate_github_issue_numbers_unique(graph: SpecGraph, repo_root: Path | None = None) -> None`
+- 境界:
+  - `issue_depends_on_map is None` の場合は structural validation のみを行う
+  - deps validation は explicit topology が supplied されたときのみ行う
 
 ### `domain/active.py`
 - 公開関数:
@@ -870,6 +890,13 @@ package "presentation" {
 - 責務:
   - node record の read/write
   - `.meta.json` の shape の正本
+- `infra/deps_reader.py`
+  - `load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopologyLoadResult`
+- 責務:
+  - `deps.json` の read
+  - shorthand / ref resolve
+  - canonical issue-direct dependency map と warning の構築
+  - dependency topology の external data source を `application` へ供給する
 - `infra/template_scaffolder.py`
   - `load_template_text(src_path: Path) -> str`
   - `render_text(text: str, replacements: dict[str, str]) -> str`
@@ -1124,24 +1151,28 @@ ArtifactWriter <.. application
 ### `sync`
 1. `commands/sync.py::run()` が `SyncArgs` を `SyncRequest` に変換する。
 2. `application/sync_state.py::sync()` が `collect_sync_state()` を呼び、`Ports` から node records / active manifest / issue index を読み込む。
-3. `domain/tree.py` で `SpecGraph` を構築し、`domain/validation.py::validate_graph_and_deps()` で preflight を検証する。
-4. `domain/status.py` と `domain/deps.py` で issue status / progress / deps state を導出する。
-5. `update_active_from_branch=True` の場合、`maybe_auto_update_from_branch()` が branch から active を推定し、必要なら `commit_active_state()` を経由して active state を先に更新する。
-6. `application/sync_state.py::write_sync_artifacts()` が final active を含む `SyncStateResult` をもとに `presentation/json_state.py` と `presentation/markdown.py` を呼び、`ArtifactBundle` を構築する。
-7. 同じ `write_sync_artifacts()` が `ports.artifact_writer.write()` へ bundle を渡し、既存 path/name 契約に従って保存する。
-8. `sync()` は branch 由来 active auto-update の適用有無を `ActiveUpdateOutcome` として返す。
-9. `commands/sync.py` が `CommandOutcome` を返す。
+3. `domain/tree.py` で `SpecGraph` を構築し、`ports.deps_topology_reader` から canonical `issue_depends_on_map` を取得する。
+4. `domain.deps.validate_deps_cycles(issue_depends_on_map)` で topology を fail-fast 検証する。
+5. `domain/validation.py::validate_graph_and_deps(graph, issue_depends_on_map=...)` で preflight を検証する。
+6. `domain/status.py` と `domain/deps.py` で issue status / progress / deps state を導出する。
+7. `update_active_from_branch=True` の場合、`maybe_auto_update_from_branch()` が branch から active を推定し、必要なら `commit_active_state()` を経由して active state を先に更新する。
+8. `application/sync_state.py::write_sync_artifacts()` が final active を含む `SyncStateResult` をもとに `presentation/json_state.py` と `presentation/markdown.py` を呼び、`ArtifactBundle` を構築する。
+9. 同じ `write_sync_artifacts()` が `ports.artifact_writer.write()` へ bundle を渡し、既存 path/name 契約に従って保存する。
+10. `sync()` は branch 由来 active auto-update の適用有無を `ActiveUpdateOutcome` として返す。
+11. `commands/sync.py` が `CommandOutcome` を返す。
 
 ### `active set`
 1. `commands/active.py::run()` が `ActiveSetArgs` を `SetActiveRequest` に変換する。
 2. `application/set_active.py::set_active()` が graph と active manifest を読む。
-3. `domain/active.py` と `domain/deps.py` が target / branch / readiness を評価する。
-4. `infra/git_cli.py` が必要なら branch 操作を行う。
-5. `presentation/json_state.py::render_context_pack()` が context pack content を生成する。
-6. `build_active_manifest()` が永続化対象 manifest を構築する。
-7. `commit_active_state()` が `snapshot_current_state() -> write_active_manifest() -> apply_active_pointers() -> patch_agent_state_active_fields()` を実行する。
-8. `commit_active_state()` 内で失敗した場合は `restore_previous_state()` が manifest / pointer / context-pack / agent state を best-effort restore する。
-9. `commands/active.py` が `CommandOutcome` を返す。
+3. `application/set_active.py` が `ports.deps_topology_reader` から canonical `issue_depends_on_map` を取得する。
+4. `domain.deps.validate_deps_cycles(issue_depends_on_map)` で invalid/cyclic topology を fail-fast 検証する。
+5. `domain/active.py` と `domain/deps.py` が target / branch / readiness を評価する。
+6. `infra/git_cli.py` が必要なら branch 操作を行う。
+7. `presentation/json_state.py::render_context_pack()` が context pack content を生成する。
+8. `build_active_manifest()` が永続化対象 manifest を構築する。
+9. `commit_active_state()` が `snapshot_current_state() -> write_active_manifest() -> apply_active_pointers() -> patch_agent_state_active_fields()` を実行する。
+10. `commit_active_state()` 内で失敗した場合は `restore_previous_state()` が manifest / pointer / context-pack / agent state を best-effort restore する。
+11. `commands/active.py` が `CommandOutcome` を返す。
 
 ### `import issue`
 1. `commands/import_cmd.py::run()` が `ImportIssueArgs` を `ImportNodeRequest` に変換する。
@@ -1476,7 +1507,7 @@ AppWriteArtifacts --> PortWriteArtifacts
 ### deps / validate 関数依存
 - `commands/deps.py` は renderer 選択と exit code 決定だけを持ち、`check_deps` の result を再計算しない。
 - `application/check_deps.py` は `presentation` へ依存せず、`inspect_target_deps()` の返り値で `DepsCheckResult` を組み立てる。
-- `application/validate_tree.py` は `domain.validation.validate_graph_and_deps()` を 1 回呼ぶだけに寄せる。
+- `application/validate_tree.py` は `domain.validation.validate_graph_and_deps(graph, issue_depends_on_map=...)` を 1 回呼ぶだけに寄せる。`S02` 段階では `issue_depends_on_map=None` で structural validation のみを行う。
 
 ```plantuml
 @startuml
@@ -1509,6 +1540,7 @@ package "domain" {
 package "infra ports" {
   rectangle "NodeRepository.load_node_records" as PortLoadNodes2
   rectangle "DerivedStateReader.load_cached_issue_status_by_id" as PortCached2
+  rectangle "DepsTopologyReader.load_issue_depends_on_map" as PortLoadDeps2
   rectangle "IssueGateway.issue_index" as PortIssueIndex2
   rectangle "ActiveStateStore.load_active_manifest" as PortLoadActive2
 }
@@ -1537,6 +1569,7 @@ AppIssueStatusCtx --> DomResolveStatuses2
 CmdValidate --> AppValidate
 CmdValidate --> PreValidateText
 AppValidate --> PortLoadNodes2
+AppValidate --> PortLoadDeps2 : optional after S04
 AppValidate --> DomBuildGraph2
 AppValidate --> DomValidateAll
 
@@ -1774,7 +1807,7 @@ tests/
     - `app.py -> use case` seam で staged delegated smoke を維持し、`application` / `domain` / `infra` / `presentation` の責務境界を固める
     - workflow の新規追加を `app.py` / `commands/*` に書き戻してはならない
   - stage 4:
-    - `cli/*` / `commands/*` を導入して parser/help/dispatch の正本を移し、`commands/*` は `UseCases` facade のみを見る
+    - `cli/*` / `commands/*` を導入して parser/help/dispatch の正本を移し、`commands/*` は `UseCases` facade と `presentation` renderer だけを見る
     - この時点で layered invariant を enforce するが、rollback 基準の切替はまだ行わない
   - ロールバック:
   - stage 1 から stage 3 の間は、各 vertical slice ごとに `app.py -> new use case / renderer` seam を staged rollback unit として切り戻せることを rollback 保証とする
