@@ -217,20 +217,28 @@ ID: "issue-25"
     - shell integration review
 - S12:
   - 観測可能な振る舞い:
-    - test tree 分割と旧 helper detachment が完了する
+    - test tree 分割が physical refactor として独立に完了する
   - requirement trace:
     - AC-003
     - AC-005
   - review gate:
-    - test tree / helper detachment review
+    - test tree split review
+- S13:
+  - 観測可能な振る舞い:
+    - 旧 helper 直依存の解消と rollback basis の commit-level への切替が完了する
+  - requirement trace:
+    - AC-005
+    - EC-001
+  - review gate:
+    - helper detachment / rollback transition review
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S12, S99
+- AC-001 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S13, S99
 - AC-002 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11
 - AC-003 -> S12
 - AC-004 -> S02, S04, S05, S06, S07, S08, S09, S10, S99
-- AC-005 -> S12, S99
-- EC-001 -> S11
+- AC-005 -> S12, S13, S99
+- EC-001 -> S01, S02, S04, S05, S06, S07, S08, S09, S10, S11, S13
 - EC-002 -> S10
 - EC-003 -> S03, S04, S06
 - EC-004 -> S07
@@ -256,17 +264,20 @@ ID: "issue-25"
 - S06:
   - `application/contracts.py` の `SetActiveRequest`, `ActiveSetResult`, `ClearActiveRequest`, `ActiveClearResult`
   - `domain/models.py` の `ActiveSelection`, `BranchDecision`
+  - `application/ports.py` の active write 用 port seam
   - `infra/contracts.py` の `ActiveStateSnapshot`
 - S07:
   - `application/contracts.py` の `SyncRequest`, `SyncStateResult`, `ActiveUpdateOutcome`, `ArtifactWriteFailure`, `SyncCommandResult`, `ArtifactWriteResult`
   - `application/ports.py` の sync slice に必要な write-side seam
   - `presentation/contracts.py` の `ArtifactBundle` と下位 artifact contract
+  - `S06` の `commit_active_state()` を再利用する internal seam
 - S08:
   - `application/contracts.py` の `CreateNodeRequest`, `CreatePlan`, `CreateNodeResult`
 - S09:
   - `application/contracts.py` の `CreateDiscussionDocRequest`, `CreateDiscussionDocResult`
 - S10:
   - `application/contracts.py` の `ImportNodeRequest`, `ImportNodeResult`
+  - `load_active_manifest_no_migrate()` と `execute_create_plan()` を消費する reuse seam
 - S11:
   - `commands/contracts.py`
   - `application/contracts.py` の `UseCases` facade
@@ -279,13 +290,13 @@ ID: "issue-25"
 ## legacy shim matrix
 | 旧 module | 中間段階の扱い | 正式移設先 | 削除/最終整理 step | rollback unit |
 | --- | --- | --- | --- | --- |
-| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S12` | `S01/S03/S08` |
-| `io_json.py` | wrapper 維持可 | `infra/json_store.py` | `S12` | `S04/S07` |
-| `github.py` | wrapper 維持可 | `infra/github_cli.py` | `S12` | `S04/S08/S10` |
-| `render_md.py` | wrapper 維持可 | `presentation/markdown.py` | `S12` | `S07` |
-| `render_puml.py` | wrapper 維持可 | `presentation/puml.py` | `S12` | `S07` |
-| `active.py` | thin delegation のみ許容 | `application/set_active.py`, `domain/active.py`, `infra/active_store.py` | `S12` | `S05/S06/S07` |
-| `nodes.py` | thin delegation のみ許容 | `application/create_node.py`, `application/import_node.py`, `domain/*` | `S12` | `S08/S09/S10` |
+| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S13` | `S01/S03/S08` |
+| `io_json.py` | wrapper 維持可 | `infra/json_store.py` | `S13` | `S04/S07` |
+| `github.py` | wrapper 維持可 | `infra/github_cli.py` | `S13` | `S04/S08/S10` |
+| `render_md.py` | wrapper 維持可 | `presentation/markdown.py` | `S13` | `S07` |
+| `render_puml.py` | wrapper 維持可 | `presentation/puml.py` | `S13` | `S07` |
+| `active.py` | thin delegation のみ許容 | `application/set_active.py`, `domain/active.py`, `infra/active_store.py` | `S13` | `S05/S06/S07` |
+| `nodes.py` | thin delegation のみ許容 | `application/create_node.py`, `application/import_node.py`, `domain/*` | `S13` | `S08/S09/S10` |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
@@ -296,6 +307,7 @@ ID: "issue-25"
   - policy:
     - `1 step = 1 review scope = 1 commit scope`
     - 指摘修正も同じ scope に閉じる
+    - 各 step で新しい direct cross-layer dependency を増やしていないことを diff review で確認する
 - QG1 slice QA:
   - timing:
     - 各 step の review 前
@@ -328,6 +340,7 @@ ID: "issue-25"
 
 ### S01 — ids / graph / validation の pure core を抽出する
 - target:
+  - `app.py`
   - `domain/ids.py`
   - `domain/models.py`
   - `domain/tree.py`
@@ -336,6 +349,7 @@ ID: "issue-25"
 - step boundary:
   - command / presentation / gh/git/json I/O は含めない
   - `app.py` の helper から pure な rule と dataclass を切り出すところまで
+  - staged coexistence 中の delegation owner は `app.py` とし、この step の rollback unit も `app.py` を含む staged diff とする
 
 #### B1 — ids and graph
 - purpose:
@@ -380,16 +394,21 @@ ID: "issue-25"
 
 ### S02 — validate の use case core を作る
 - target:
+  - `app.py`
   - `application/validate_tree.py`
   - `application/contracts.py`
   - `application/ports.py`
   - `infra/contracts.py`
   - 最小 reader seam
   - `presentation/cli_text.py`
+  - `presentation/contracts.py`
   - 対応 test
 - step boundary:
   - 先に pure core を消費する最小 use case だけを導入する
   - command shell の一般化はまだしない
+  - parser/help/dispatch ownership は `S11` へ defer し、この step では renderer/output compatibility と legacy delegated validate path だけを閉じる
+  - 最小 reader seam の concrete owner は staged delegation 中の `app.py` とし、`infra/fs_repo.py` 正本化までは暫定 adapter を増やさない
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> validate_tree` seam を含む staged diff とする
 
 #### B1 — validate core
 - purpose:
@@ -418,6 +437,9 @@ ID: "issue-25"
   - validate use case tests
   - validate text regression
   - minimal reader seam tests
+  - validate exit `0/1`
+  - stdout/stderr split regression
+  - legacy delegated validate smoke
 - report update:
   - `spec-deps/current/report.md`
 - commit policy:
@@ -459,6 +481,7 @@ ID: "issue-25"
 - expected tests:
   - status pure tests
   - deps pure tests
+  - shared readiness seam contract regression
   - `domain/status.py`, `domain/deps.py` no-I/O assertion
 - report update:
   - `spec-deps/current/report.md`
@@ -467,6 +490,7 @@ ID: "issue-25"
 
 ### S04 — deps check slice を組み立てる
 - target:
+  - `app.py`
   - `application/status_context.py`
   - `application/check_deps.py`
   - `application/contracts.py`
@@ -481,6 +505,8 @@ ID: "issue-25"
 - step boundary:
   - `deps check` のみ
   - `active set` 再利用 seam はこの step で固定する
+  - parser/help/dispatch ownership は `S11` へ defer し、この step では `deps check` の use case/result/renderer と legacy delegated path だけを閉じる
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> check_deps` seam を含む staged diff とする
 
 #### B1 — deps command core
 - purpose:
@@ -517,6 +543,12 @@ ID: "issue-25"
   - deps use case/result regression
   - deps text/json renderer regression
   - status context tests
+  - shared readiness seam contract regression
+  - deps exit code `0/3/1`
+  - `--json` stdout-only regression
+  - source selection regression
+  - warnings/stderr order regression
+  - target normalization boundary regression
   - legacy delegated deps smoke
 - report update:
   - `spec-deps/current/report.md`
@@ -525,6 +557,7 @@ ID: "issue-25"
 
 ### S05 — active show の read model を作る
 - target:
+  - `app.py`
   - `application/set_active.py`
   - `application/contracts.py`
   - `application/ports.py`
@@ -534,6 +567,8 @@ ID: "issue-25"
 - step boundary:
   - `show_active()` のみ
   - write/rollback は含めない
+  - `load_active_manifest_no_migrate()` はまだ使わず、read path は `load_active_manifest()` のみを consumer とする
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> show_active` seam を含む staged diff とする
 
 #### B1 — active read
 - purpose:
@@ -546,6 +581,7 @@ ID: "issue-25"
   - `load_active_manifest()` と `show_active()` の read path を導入する
 - Refactor:
   - legacy manifest migration を read-time/in-memory に整理する
+  - `.work/active.json` / `.work/current.json` 限定、優先順位、write-back なし契約を固定する
 
 ##### I2 — active show rendering
 - Red:
@@ -561,6 +597,9 @@ ID: "issue-25"
 - expected tests:
   - active show read/result regression
   - legacy manifest fixture matrix
+  - legacy source priority regression
+  - read-time/in-memory normalization with no write-back
+  - `load_active_manifest_no_migrate()` 非使用確認
   - legacy delegated active-show smoke
 - report update:
   - `spec-deps/current/report.md`
@@ -569,11 +608,13 @@ ID: "issue-25"
 
 ### S06 — active set/clear の write path を作る
 - target:
+  - `app.py`
   - `domain/active.py`
   - `domain/models.py`
   - `domain/tree.py`
   - `application/set_active.py`
   - `application/contracts.py`
+  - `application/ports.py`
   - `application/status_context.py`
   - `infra/active_store.py`
   - `infra/contracts.py`
@@ -584,6 +625,7 @@ ID: "issue-25"
 - step boundary:
   - `active set` / `active clear` の guard/order/rollback
   - sync auto-update は含めない
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> set_active/clear_active` seam を含む staged diff とする
 
 #### B1 — active write
 - purpose:
@@ -634,8 +676,14 @@ ID: "issue-25"
   - active write slice review
 - expected tests:
   - active set/clear use case regression
+  - no manifest write before guard success
+  - shared readiness seam reuse regression
+  - `commit_active_state` authoritative order regression
+  - `active clear` placeholder manifest/pointer/context-pack/agent-state clear regression
+  - git rollback 非対象 regression
   - rollback injection
   - blocked/unknown/force-path regressions
+  - renderer stdout/stderr/warnings regression
   - legacy delegated active-write smoke
 - report update:
   - `spec-deps/current/report.md`
@@ -644,6 +692,7 @@ ID: "issue-25"
 
 ### S07 — sync core を作る
 - target:
+  - `app.py`
   - `domain/active.py`
   - `application/sync_state.py`
   - `application/contracts.py`
@@ -660,6 +709,8 @@ ID: "issue-25"
 - step boundary:
   - `sync` と artifact write のみ
   - create/import 再利用はまだ含めない
+  - `S06` の `commit_active_state()` を再利用し、active 更新後 artifact 失敗は non-atomic だが観測可能な failure として扱う
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> sync` seam を含む staged diff とする
 
 #### B1 — sync pipeline
 - purpose:
@@ -710,9 +761,16 @@ ID: "issue-25"
   - sync slice review
 - expected tests:
   - sync use case/result regression
-  - artifact path/name/content snapshots
-  - `sync --force` delegated smoke
+  - JSON artifact path/name/content snapshots
+  - dashboard/tree PUML snapshots
+  - deps-issues PUML / disabled placeholder regression
+  - `sync --force` placeholder semantics regression
+  - deps.valid=false / deps.error regression
+  - active update after branch / before artifact regression
+  - non-atomic artifact failure with `failed_partial_or_stale` regression
   - artifact failure contract regression
+  - renderer text regression
+  - legacy delegated sync smoke
 - report update:
   - `spec-deps/current/report.md`
 - commit policy:
@@ -720,6 +778,7 @@ ID: "issue-25"
 
 ### S08 — new node core を作る
 - target:
+  - `app.py`
   - `application/create_node.py`
   - `application/contracts.py`
   - `application/ports.py`
@@ -731,6 +790,7 @@ ID: "issue-25"
 - step boundary:
   - `initiative|epic|issue` の create のみ
   - `new doc` と `import` はまだ含めない
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> create_node` seam を含む staged diff とする
 
 #### B1 — create core
 - purpose:
@@ -766,8 +826,14 @@ ID: "issue-25"
 - expected tests:
   - planning regression
   - execution regression
+  - full candidate-set no-write preflight regression
+  - `copy_scaffolded_tree -> write_meta` order regression
+  - `created_paths` ordering regression
   - collision/no-write regression
   - per-kind parity regression
+  - GitHub mode default / no-side-effect matrix regression
+  - `execute_create_plan()` reuse seam regression
+  - renderer text regression
   - legacy delegated new smoke
 - report update:
   - `spec-deps/current/report.md`
@@ -776,6 +842,7 @@ ID: "issue-25"
 
 ### S09 — new doc core を作る
 - target:
+  - `app.py`
   - `application/create_node.py`
   - `application/contracts.py`
   - `infra/template_scaffolder.py`
@@ -784,6 +851,7 @@ ID: "issue-25"
 - step boundary:
   - `new doc` のみ
   - node create core とは別枝に保つ
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> create_discussion_doc` seam を含む staged diff とする
 
 #### B1 — discussion doc
 - purpose:
@@ -812,6 +880,9 @@ ID: "issue-25"
   - sequence regression
   - generated path/name/content regression
   - duplicate/no-write regression
+  - new node non-regression for shared-file edits
+  - invalid slug / duplicate sequence regression
+  - renderer text regression
   - legacy delegated new-doc smoke
 - report update:
   - `spec-deps/current/report.md`
@@ -820,6 +891,7 @@ ID: "issue-25"
 
 ### S10 — import core を作る
 - target:
+  - `app.py`
   - `domain/tree.py`
   - `application/import_node.py`
   - `application/contracts.py`
@@ -831,6 +903,7 @@ ID: "issue-25"
 - step boundary:
   - `import` と `sync_after_import()` のみ
   - shell 一般化はまだしない
+  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> import_node` seam を含む staged diff とする
 
 #### B1 — import flow
 - purpose:
@@ -867,6 +940,10 @@ ID: "issue-25"
   - parent fallback regression
   - duplicate/no-write regression
   - import then sync regression
+  - post-import sync negative-path regression
+  - `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` 鎖 regression
+  - `execute_create_plan()` reuse seam regression
+  - renderer text regression
   - legacy delegated import smoke
 - report update:
   - `spec-deps/current/report.md`
@@ -934,45 +1011,123 @@ ID: "issue-25"
 - commit policy:
   - 1 commit
 
-### S12 — test tree 分割と旧 helper detachment を完了する
+### S12 — test tree 分割を独立 review scope で完了する
 - target:
   - `tests/test_cli.py`
   - `tests/test_init_update.py`
   - `tests/cli_runtime/*`
   - `tests/domain_runtime/*`
   - `tests/presentation_runtime/*`
+- step boundary:
+  - test file の physical split のみ
+  - shell / core の分離が終わったあとに safety net を整理する
+  - `unittest discover` は regular package (`__init__.py`) 方式を正本とし、`load_tests` は採用しない
+  - semantic-no-change refactor とし、pure move / helper extraction / import path 修正以外の意味変更を持ち込まない
+
+#### B1 — test tree split
+- purpose:
+  - reviewer が command ごとの失敗面を追える test tree を独立 scope で先に固定する
+
+##### I1 — installer / wrapper split
+- Red:
+  - installer/wrapper discovery regression を 1 本追加
+- Green:
+  - `tests/test_init_update.py`, `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_wrappers.py`, 各 package `__init__.py` を導入する
+- Refactor:
+  - shared runtime harness import を整理する
+
+##### I2 — command runtime split
+- Red:
+  - command runtime discovery regression を 1 本追加
+- Green:
+  - `tests/cli_runtime/test_new.py`, `test_active.py`, `test_sync.py`, `test_deps.py`, `test_import.py`, `test_validate.py` を分割する
+- Refactor:
+  - duplicated command fixtures を整理する
+
+##### I3 — domain / presentation split
+- Red:
+  - pure test discovery regression を 1 本追加
+- Green:
+  - `tests/domain_runtime/*`, `tests/presentation_runtime/*` を分割する
+- Refactor:
+  - pure subtree 内 helper 境界を整理する
+
+#### step gate
+- review:
+  - test tree split review
+- expected tests:
+  - `python -m unittest discover -v`
+  - touched test modules
+  - critical inventory still covered:
+    - staged delegation path
+    - active rollback failure-injection
+    - import->sync regeneration
+    - sync artifact path/name/content snapshots
+- report update:
+  - `spec-deps/current/report.md`
+- commit policy:
+  - 1 commit
+
+### S13 — helper detachment と rollback basis 切替を完了する
+- target:
+  - `app.py`
+  - `commands/*`
+  - `application/*`
+  - `ids.py`
+  - `io_json.py`
+  - `github.py`
+  - `render_md.py`
+  - `render_puml.py`
+  - `active.py`
+  - `nodes.py`
+  - `tests/cli_runtime/*`
+  - `tests/domain_runtime/*`
+  - `tests/presentation_runtime/*`
   - 旧 helper call site 一式
 - step boundary:
+  - 旧 helper 直依存の解消のみ
   - user-facing behavior change は含めない
-  - shell / core の分離が終わったあとに cleanup する
+  - rollback basis は staged seam から `git revert / commit rollback` へこの step で切り替える
 
-#### B1 — test split and detachment
+#### B1 — helper detachment and rollback transition
 - purpose:
-  - 最後に safety net を整理し、旧 helper 直依存を除去する
+  - 段階移行で残した delegation を最後に除去し、rollback 根拠を commit 単位へ切り替える
 
-##### I1 — test tree split
-- Red:
-  - discover/import path regression を 1 本追加
-- Green:
-  - test tree を設計どおり分割する
-- Refactor:
-  - fixture/helper duplication を整理する
-
-##### I2 — helper detachment
+##### I1 — final API call-site detachment
 - Red:
   - final API call-site regression を 1 本追加
 - Green:
   - 旧 helper 直依存を final layered API へ切り替える
 - Refactor:
-  - compatibility shim を matrix どおり縮小する
+  - compatibility shim の縮小を整理する
+
+##### I2 — legacy shim cleanup
+- Red:
+  - legacy shim import assertion regression を 1 本追加
+- Green:
+  - `ids.py`, `io_json.py`, `github.py`, `render_md.py`, `render_puml.py`, `active.py`, `nodes.py` を matrix どおり削除または thin wrapper 限定へ整理する
+- Refactor:
+  - layer direction assertions を整理する
 
 #### step gate
 - review:
-  - test tree / helper detachment review
+  - helper detachment / rollback transition review
 - expected tests:
   - `python -m unittest discover -v`
-  - critical inventory still covered
-  - legacy import prohibition / layer direction assertions
+  - focused regressions:
+    - `import -> sync`
+    - `active set` guard/order
+    - `deps check`
+    - markdown/puml/json artifact contracts
+  - final API call-site regression
+  - legacy import prohibition / layer direction assertions:
+    - `commands/* -> UseCases facade only`
+    - `domain/*` no I/O import
+    - `infra/*` only through ports
+  - rollback basis transition evidence:
+    - pre-switch rollback unit は staged seam であったこと
+    - この step 完了後は `git revert / commit rollback` が唯一の rollback 基準であること
+    - partial import rollback は対象外で rollback unit は commit 単位であること
 - report update:
   - `spec-deps/current/report.md`
 - commit policy:
@@ -1010,8 +1165,11 @@ ID: "issue-25"
 - review:
   - docs impact review
 - expected checks:
-  - docs impact 判定根拠
-  - docs refresh または no-op 理由
+  - docs impact checklist:
+    - `docs / assets / workflow / skill / none` の判定根拠
+    - docs refresh が必要な場合は対象パスと理由
+    - no-op の場合は no-op 理由
+  - plan/design/requirement との整合
 - report update:
   - `spec-deps/current/report.md`
 - commit policy:
@@ -1033,7 +1191,14 @@ ID: "issue-25"
   - requirement/design/plan との trace check
   - runtime packaging / shipped asset check
   - lowercase path 増分なし確認: `rg --files | rg '[A-Z]'`
-  - fresh repo smoke check
+  - fresh repo smoke check:
+    - `validate`
+    - `deps check --json`
+    - `active show`
+    - `active set`
+    - `sync --force`
+    - `new issue`
+    - `import issue`
 - Refactor:
   - final validation checklist を整理する
 
@@ -1044,14 +1209,30 @@ ID: "issue-25"
   - `spec_reviewer` pass
   - branch diff review の blocking finding 0 件
   - staged delegation / rollback-ready path trace 完了
+  - `app.py` thinness check
+  - command thinness check
+  - layer violation check
+  - DTO / contract check
+  - touched file / AC-EC trace check:
+    - `AC-001`: runtime package tree / `app.py` thin entrypoint / `commands|application|domain|infra|presentation` の物理導入
+    - `AC-002`: shared rule / workflow / side effect / rendering の責務分離
+    - `AC-003`: `tests/test_init_update.py`, `tests/cli_runtime/*`, `tests/domain_runtime/*`, `tests/presentation_runtime/*` の分割差分
+    - `AC-004`: `sync --force`, `deps check`, `active set`, `import -> sync`, scaffold collision no-write の回帰 test 群
+    - `AC-005`: `python -m unittest discover -v` green
+    - `EC-001`: staged delegation path / rollback transition evidence
+    - `EC-002`: import 後のみ `sync_after_import()` 起動
+    - `EC-003`: deps readiness / active guard/order
+    - `EC-004`: JSON/Markdown/PUML artifact path/name/content 契約
 - Refactor:
   - final gate report を整理する
 
 ## final exit contract
 - AC/EC 達成:
-  - S01-S12, S90, S99 完了後に requirement の AC/EC をすべて満たす
+  - S01-S13, S90, S99 完了後に requirement の AC/EC をすべて満たす
 - docs impact resolved:
   - `none` または必要更新反映済み
+- rollback basis transitioned:
+  - staged seam から `git revert / commit rollback` へ切り替わっている
 - final diff approved:
   - `spec_reviewer` pass
   - branch diff review の blocking finding 0 件
