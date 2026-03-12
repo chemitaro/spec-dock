@@ -5711,7 +5711,7 @@ class TestCli(unittest.TestCase):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00301")
 
-    def test_active_set_ignores_unreachable_cycle_and_does_not_run_sync(self) -> None:
+    def test_active_set_fails_fast_on_unreachable_cycle_and_does_not_run_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -5751,22 +5751,21 @@ class TestCli(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            # There is a global deps cycle, but it's unreachable from the target; `active set` must still succeed.
+            # S06: topology invalid/cycle is fail-fast even when unreachable from target.
             p = self._run_runtime_capture(target, ["active", "set", "iss-local-00003", "--force"])
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Dependency cycle detected", p.stderr)
+            self.assertFalse((agent_dir / "active.json").exists())
 
-            active = json.loads((agent_dir / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["issue"]["id"], "iss-local-00003")
-
-            # `active set` must not run `sync`: it should only patch the cached active field.
+            # `active set` must not run `sync`: cached active field must remain unchanged.
             state_index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
             state_tree_all = json.loads((agent_dir / "tree-all.json").read_text(encoding="utf-8"))
             state_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
             state_tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
-            self.assertEqual(state_index_all["active"]["issue"]["id"], "iss-local-00003")
-            self.assertEqual(state_tree_all["active"]["issue"]["id"], "iss-local-00003")
-            self.assertEqual(state_index["active"]["issue"]["id"], "iss-local-00003")
-            self.assertEqual(state_tree["active"]["issue"]["id"], "iss-local-00003")
+            self.assertIsNone(state_index_all["active"])
+            self.assertIsNone(state_tree_all["active"])
+            self.assertIsNone(state_index["active"])
+            self.assertIsNone(state_tree["active"])
 
     def test_active_set_without_github_uses_synced_index_for_deps_guard(self) -> None:
         if os.name == "nt":
