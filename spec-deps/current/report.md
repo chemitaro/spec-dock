@@ -432,11 +432,52 @@ Ran 220 tests ... OK
 - `tests/test_runtime_new_s08.py` - S08 focused tests
 
 #### コミット
-- 未実施
+- `a92445c4dad818c9c989351b213e6730e08cc523` `feat(new): S08のnew node coreを導入`
 
 #### メモ
 - `app.py` の旧 `_new_*` 実装本体は rollback しやすさのため残し、先頭 return で新 core に委譲する形にしている。
 - `github_mode=\"link_existing\"` は S08 で契約だけ整え、主な再利用は S10 側で行う前提。
+
+---
+
+### 2026-03-12 12:40 - 13:20
+
+#### 対象
+- Step: S09
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `CreateDiscussionDocRequest` / `CreateDiscussionDocResult` を追加し、`new doc` を node create と別枝の use case として切り出した。
+- `application/create_node.py` に `plan_discussion_doc()` と `create_discussion_doc()` を追加し、共有シーケンス判定、duplicate/overflow fail-fast、template load/render/write を実装した。
+- `presentation/cli_text.py` に `render_new_doc_text()` を追加し、`new doc` の result/text 契約を固定した。
+- `app.py` は staged delegation owner のまま維持し、`_new_doc()` のみ新 core へ委譲した。
+- `tests/test_runtime_new_doc_s09.py` を追加し、sequence/path/content/type parity/no-write/invalid slug/renderer/delegation/new-node非退行を focused に固定した。
+- `code_reviewer` による S09 scope review を行い、重大指摘なしで pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_runtime_new_doc_s09 -v
+
+Ran 8 tests ... OK
+
+python -m unittest discover
+
+Ran 228 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `new doc` を use case へ委譲
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CreateDiscussionDoc*` 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - `new doc` core を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - `render_new_doc_text()` を追加
+- `tests/test_runtime_new_doc_s09.py` - S09 focused tests
+
+#### コミット
+- 未実施
+
+#### メモ
+- `scope_node_id` は canonical id 前提で、CLI 経由では `app.py` 側で解決済みの値だけを use case に渡している。
+- `app.py` の旧 `_new_doc` 本体は staged rollback 用に残している。
 
 ## 省略/例外メモ
 - 該当なし

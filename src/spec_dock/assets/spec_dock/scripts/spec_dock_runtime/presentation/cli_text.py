@@ -4,6 +4,7 @@ from ..application.contracts import (
     ActiveClearResult,
     ActiveSetResult,
     ActiveViewResult,
+    CreateDiscussionDocResult,
     CreateNodeResult,
     DepsCheckResult,
     SyncCommandResult,
@@ -51,6 +52,15 @@ def render_new_node_text(result: CreateNodeResult) -> CliText:
             "spec-dock: ok (new issue) "
             f"id={node.id} epic={node.epic_id} initiative={node.initiative_id} path={rel}{gh}"
         )
+    return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
+
+
+def render_new_doc_text(result: CreateDiscussionDocResult) -> CliText:
+    rel = _rel_path_for_output(result.path.as_posix())
+    line = (
+        "spec-dock: ok (new doc) "
+        f"type={result.doc_type} id={result.doc_id} scope={result.scope_node_id} path={rel}"
+    )
     return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
 
 

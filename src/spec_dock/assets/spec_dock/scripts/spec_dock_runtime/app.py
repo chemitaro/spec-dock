@@ -32,11 +32,13 @@ from pathlib import Path
 from typing import Any
 
 from .application.check_deps import check_deps as _application_check_deps
+from .application.create_node import create_discussion_doc as _application_create_discussion_doc
 from .application.create_node import create_epic as _application_create_epic
 from .application.create_node import create_initiative as _application_create_initiative
 from .application.create_node import create_issue as _application_create_issue
 from .application.contracts import CheckDepsRequest as _CheckDepsRequest
 from .application.contracts import ClearActiveRequest as _ClearActiveRequest
+from .application.contracts import CreateDiscussionDocRequest as _CreateDiscussionDocRequest
 from .application.contracts import CreateNodeRequest as _CreateNodeRequest
 from .application.contracts import SetActiveRequest as _SetActiveRequest
 from .application.contracts import ShowActiveRequest as _ShowActiveRequest
@@ -98,6 +100,7 @@ from .ids import (
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
 from .presentation.cli_text import render_active_clear_text as _render_active_clear_text
+from .presentation.cli_text import render_new_doc_text as _render_new_doc_text
 from .presentation.cli_text import render_new_node_text as _render_new_node_text
 from .presentation.cli_text import render_active_set_text as _render_active_set_text
 from .presentation.cli_text import render_active_show_text as _render_active_show_text
@@ -590,6 +593,22 @@ def _run_new_node(
         print(line, file=sys.stderr)
 
 
+def _run_new_doc(
+    *,
+    specdock_dir: Path,
+    req: _CreateDiscussionDocRequest,
+) -> None:
+    ports = _new_ports(specdock_dir)
+    result = _application_create_discussion_doc(req, ports)
+    text = _render_new_doc_text(result)
+    for warning in text.warnings:
+        _warn(warning)
+    for line in text.stdout_lines:
+        print(line)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+
+
 def _new_initiative(
     specdock_dir: Path,
     *,
@@ -980,6 +999,20 @@ def _new_doc(
     scope_prefix: str,
 ) -> None:
     """Create a new discussion markdown under the given scope node."""
+    _ensure_no_legacy_meta_json(specdock_dir)
+    nodes = _scan_nodes(specdock_dir)
+    resolved_scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)
+    _run_new_doc(
+        specdock_dir=specdock_dir,
+        req=_CreateDiscussionDocRequest(
+            doc_type=doc_type,
+            scope_node_id=resolved_scope_id,
+            title=title,
+            slug=slug,
+        ),
+    )
+    return
+
     _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     scope_id = _resolve_id_input(scope_id, prefix=scope_prefix, field="scope", nodes=nodes)

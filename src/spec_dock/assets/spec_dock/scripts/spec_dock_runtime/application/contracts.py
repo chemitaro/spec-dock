@@ -63,6 +63,23 @@ class CreateNodeResult:
 
 
 @dataclass(frozen=True)
+class CreateDiscussionDocRequest:
+    doc_type: Literal["adr", "disc", "research", "note"]
+    scope_node_id: str
+    title: str
+    slug: str | None
+
+
+@dataclass(frozen=True)
+class CreateDiscussionDocResult:
+    doc_id: str
+    doc_type: str
+    scope_node_id: str
+    path: Path
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
 class CheckDepsRequest:
     target: TargetRef
     use_github: bool
