@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 from ..domain.models import (
     ActiveSelection,
@@ -212,3 +212,20 @@ class SyncCommandResult:
     write_result: ArtifactWriteResult | None
     active_update: ActiveUpdateOutcome | None
     artifact_failure: ArtifactWriteFailure | None
+
+
+@dataclass(frozen=True)
+class UseCases:
+    create_initiative: Callable[[CreateNodeRequest], CreateNodeResult]
+    create_epic: Callable[[CreateNodeRequest], CreateNodeResult]
+    create_issue: Callable[[CreateNodeRequest], CreateNodeResult]
+    create_discussion_doc: Callable[[CreateDiscussionDocRequest], CreateDiscussionDocResult]
+    import_initiative: Callable[[ImportNodeRequest], ImportNodeResult]
+    import_epic: Callable[[ImportNodeRequest], ImportNodeResult]
+    import_issue: Callable[[ImportNodeRequest], ImportNodeResult]
+    set_active: Callable[[SetActiveRequest], ActiveSetResult]
+    show_active: Callable[[ShowActiveRequest], ActiveViewResult]
+    clear_active: Callable[[ClearActiveRequest], ActiveClearResult]
+    sync: Callable[[SyncRequest], SyncCommandResult]
+    check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
+    validate_tree: Callable[[ValidateTreeRequest], ValidationResult]

@@ -31,6 +31,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .cli.bootstrap import build_runtime as _cli_build_runtime
+from .cli.dispatch import dispatch as _cli_dispatch
+from .cli.parser import build_parser as _cli_build_parser
+from .cli.registry import build_registry as _cli_build_registry
 from .application.check_deps import check_deps as _application_check_deps
 from .application.create_node import create_discussion_doc as _application_create_discussion_doc
 from .application.create_node import create_epic as _application_create_epic
@@ -3963,299 +3967,28 @@ def _validate(specdock_dir: Path) -> None:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse CLI arguments for the repo-local runtime script."""
-    class _Parser(argparse.ArgumentParser):
-        def error(self, message: str) -> None:  # noqa: A003 - argparse API
-            legacy_flags = ("--initiative", "--epic", "--issue", "--github-issue")
-            hint = ""
-            if "unrecognized arguments" in message and any(f in message for f in legacy_flags):
-                hint = (
-                    "\n\nHint:\n"
-                    "  'active set' is now: active set <target>\n"
-                    "  - target: GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-00123)\n"
-                    "\n"
-                    "Examples:\n"
-                    "  spec-dock/scripts/spec-dock active set 123\n"
-                    "  spec-dock/scripts/spec-dock active set iss-00123\n"
-                    "  spec-dock/scripts/spec-dock active set iss-local-00001\n"
-                )
-            super().error(message + hint)
-
-    parser = _Parser(prog="spec-dock/scripts/spec-dock")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/doc)")
-    new_sub = p_new.add_subparsers(dest="new_kind", required=True)
-
-    p_new_init = new_sub.add_parser("initiative", help="Create a new initiative")
-    p_new_init.add_argument("--title", required=True)
-    p_new_init.add_argument("--slug")
-    p_new_init.add_argument("--id")
-    gh_init = p_new_init.add_mutually_exclusive_group()
-    gh_init.add_argument("--create-github-issue", action="store_true", help="Create and link a new GitHub issue (id becomes init-NNNN)")
-    gh_init.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes init-NNNN)")
-    gh_init.add_argument("--no-github", action="store_true", help="Explicit local-only mode (default; id becomes init-local-NNNN)")
-
-    p_new_epic = new_sub.add_parser("epic", help="Create a new epic under an initiative")
-    p_new_epic.add_argument("--initiative", required=True, help="Parent initiative (e.g. 123 / init-00123 / init-local-00001)")
-    p_new_epic.add_argument("--title", required=True)
-    p_new_epic.add_argument("--slug")
-    p_new_epic.add_argument("--id")
-    gh_epic = p_new_epic.add_mutually_exclusive_group()
-    gh_epic.add_argument("--create-github-issue", action="store_true", help="Create and link a new GitHub issue (id becomes epic-NNNN)")
-    gh_epic.add_argument("--github-issue", type=int, help="Existing GitHub issue number to link (id becomes epic-NNNN)")
-    gh_epic.add_argument("--no-github", action="store_true", help="Explicit local-only mode (default; id becomes epic-local-NNNN)")
-
-    p_new_issue = new_sub.add_parser("issue", help="Create a new issue under an epic")
-    p_new_issue.add_argument("--epic", required=True, help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001)")
-    p_new_issue.add_argument("--title", required=True)
-    p_new_issue.add_argument("--slug")
-    p_new_issue.add_argument("--id")
-    gh_issue = p_new_issue.add_mutually_exclusive_group()
-    gh_issue.add_argument(
-        "--github-issue",
-        type=int,
-        help="Existing GitHub issue number to link (id becomes iss-NNNN)",
-    )
-    gh_issue.add_argument(
-        "--no-github",
-        action="store_true",
-        help="Do not use GitHub (default is to create a new GitHub issue; id becomes iss-local-NNNN)",
-    )
-
-    p_new_doc = new_sub.add_parser("doc", help="Create a discussion doc under a scope (initiative/epic/issue)")
-    p_new_doc.add_argument("doc_type", choices=_DISCUSSION_DOC_TYPES)
-    scope = p_new_doc.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-00123 / init-local-00001)")
-    scope.add_argument("--epic", help="Scope epic (e.g. 123 / epic-00123 / epic-local-00001)")
-    scope.add_argument("--issue", help="Scope issue (e.g. 123 / iss-00123 / iss-local-00001)")
-    p_new_doc.add_argument("--title", required=True)
-    p_new_doc.add_argument("--slug")
-
-    p_active = sub.add_parser("active", help="Manage the active pointers")
-    active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
-
-    p_active_set = active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)")
-    p_active_set.add_argument(
-        "target",
-        help="GitHub issue number (digits only: 123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
-    )
-    checkout = p_active_set.add_mutually_exclusive_group()
-    checkout.add_argument(
-        "--checkout",
-        action="store_true",
-        help="After setting active, create/switch to the desired branch (<id>-<slug>, fallback: <id>).",
-    )
-    checkout.add_argument(
-        "--no-checkout",
-        dest="checkout",
-        action="store_false",
-        help="Set active only and skip branch operations (default).",
-    )
-    p_active_set.set_defaults(checkout=False)
-    p_active_set.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI (deps guard)")
-    p_active_set.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
-    p_active_set.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="Ignore deps guard and set active anyway (prints blockers as warnings)",
-    )
-
-    active_sub.add_parser("show", help="Show current active pointers")
-    active_sub.add_parser("clear", help="Clear active pointers")
-
-    p_sync = sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)")
-    p_sync.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
-    p_sync.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
-    p_sync.add_argument(
-        "--no-update-active",
-        action="store_true",
-        help="Do not update active pointers from current git branch (index/tree generation only)",
-    )
-    p_sync.add_argument(
-        "--force",
-        action="store_true",
-        help="Continue even if preflight validation fails (writes index/tree; disables active auto update)",
-    )
-
-    p_deps = sub.add_parser("deps", help="Check and visualize issue/epic/initiative dependencies")
-    deps_sub = p_deps.add_subparsers(dest="deps_cmd", required=True)
-
-    p_deps_check = deps_sub.add_parser("check", help="Check whether a target is ready based on dependencies")
-    p_deps_check.add_argument(
-        "target",
-        help="GitHub issue number (123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
-    )
-    p_deps_check.add_argument("--github", action="store_true", help="Fetch GitHub issue states via gh CLI")
-    p_deps_check.add_argument("--gh-limit", type=int, default=10000, help="gh issue list limit (default: 10000)")
-    p_deps_check.add_argument("--json", action="store_true", help="Output JSON to stdout only")
-
-    p_import = sub.add_parser("import", help="Import an existing GitHub issue as a spec node")
-    import_sub = p_import.add_subparsers(dest="import_kind", required=True)
-
-    p_import_init = import_sub.add_parser("initiative", help="Import a GitHub issue as an initiative")
-    p_import_init.add_argument(
-        "target",
-        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
-    )
-    p_import_init.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
-    p_import_init.add_argument("--slug")
-
-    p_import_epic = import_sub.add_parser("epic", help="Import a GitHub issue as an epic")
-    p_import_epic.add_argument(
-        "target",
-        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
-    )
-    p_import_epic.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
-    p_import_epic.add_argument("--slug")
-    p_import_epic.add_argument(
-        "--initiative",
-        help="Parent initiative (e.g. 123 / init-00123 / init-local-00001). Omit to resolve from active.",
-    )
-
-    p_import_issue = import_sub.add_parser("issue", help="Import a GitHub issue as an issue")
-    p_import_issue.add_argument(
-        "target",
-        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
-    )
-    p_import_issue.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
-    p_import_issue.add_argument("--slug")
-    p_import_issue.add_argument(
-        "--epic",
-        help="Parent epic (e.g. 123 / epic-00123 / epic-local-00001). Omit to resolve from active.",
-    )
-
-    sub.add_parser("validate", help="Validate the spec tree structure")
-
+    registry = _cli_build_registry()
+    parser = _cli_build_parser(registry)
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns a process exit code (0=success)."""
-    ns = _parse_args(sys.argv[1:] if argv is None else argv)
-
-    exit_code: int | None = None
+    parsed_argv = sys.argv[1:] if argv is None else argv
     try:
         specdock_dir = _find_specdock_dir()
-
-        if ns.command == "new":
-            if ns.new_kind == "initiative":
-                _new_initiative(
-                    specdock_dir,
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                    node_id=getattr(ns, "id", None),
-                    github_issue_number=getattr(ns, "github_issue", None),
-                    create_github_issue=bool(getattr(ns, "create_github_issue", False)),
-                    no_github=bool(getattr(ns, "no_github", False)),
-                )
-            elif ns.new_kind == "epic":
-                _new_epic(
-                    specdock_dir,
-                    initiative_id=str(ns.initiative),
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                    node_id=getattr(ns, "id", None),
-                    github_issue_number=getattr(ns, "github_issue", None),
-                    create_github_issue=bool(getattr(ns, "create_github_issue", False)),
-                    no_github=bool(getattr(ns, "no_github", False)),
-                )
-            elif ns.new_kind == "issue":
-                _new_issue(
-                    specdock_dir,
-                    epic_id=str(ns.epic),
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                    node_id=getattr(ns, "id", None),
-                    github_issue_number=getattr(ns, "github_issue", None),
-                    no_github=bool(getattr(ns, "no_github", False)),
-                )
-            elif ns.new_kind == "doc":
-                doc_type = str(getattr(ns, "doc_type"))
-                # The scope flag determines the prefix, so we can accept shorthand numeric ids.
-                scope_id = getattr(ns, "initiative", None) or getattr(ns, "epic", None) or getattr(ns, "issue", None)
-                scope_prefix = "init" if getattr(ns, "initiative", None) is not None else ("epic" if getattr(ns, "epic", None) is not None else "iss")
-                _new_doc(
-                    specdock_dir,
-                    doc_type=doc_type,
-                    scope_id=str(scope_id),
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                    scope_prefix=scope_prefix,
-                )
-            else:
-                raise RuntimeError(f"Unknown new kind: {ns.new_kind}")
-        elif ns.command == "active":
-            if ns.active_cmd == "set":
-                _active_set(
-                    specdock_dir,
-                    target=str(ns.target),
-                    checkout=bool(getattr(ns, "checkout", False)),
-                    force=bool(getattr(ns, "force", False)),
-                    github=bool(getattr(ns, "github", False)),
-                    gh_limit=int(getattr(ns, "gh_limit", 10000)),
-                )
-            elif ns.active_cmd == "show":
-                _active_show(specdock_dir)
-            elif ns.active_cmd == "clear":
-                _active_clear(specdock_dir)
-            else:
-                raise RuntimeError(f"Unknown active command: {ns.active_cmd}")
-        elif ns.command == "deps":
-            if ns.deps_cmd == "check":
-                exit_code = _deps_check(
-                    specdock_dir,
-                    target=str(ns.target),
-                    github=bool(getattr(ns, "github", False)),
-                    gh_limit=int(getattr(ns, "gh_limit", 10000)),
-                    json_output=bool(getattr(ns, "json", False)),
-                )
-            else:
-                raise RuntimeError(f"Unknown deps command: {ns.deps_cmd}")
-        elif ns.command == "sync":
-            _sync(
-                specdock_dir,
-                github=bool(ns.github),
-                gh_limit=int(ns.gh_limit),
-                update_active=not bool(getattr(ns, "no_update_active", False)),
-                force=bool(getattr(ns, "force", False)),
-            )
-        elif ns.command == "import":
-            issue_number = _parse_github_issue_target(str(ns.target))
-            if ns.import_kind == "initiative":
-                _import_initiative(
-                    specdock_dir,
-                    issue_number=issue_number,
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                )
-            elif ns.import_kind == "epic":
-                _import_epic(
-                    specdock_dir,
-                    issue_number=issue_number,
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                    initiative_id=getattr(ns, "initiative", None),
-                )
-            elif ns.import_kind == "issue":
-                _import_issue(
-                    specdock_dir,
-                    issue_number=issue_number,
-                    title=str(ns.title),
-                    slug=getattr(ns, "slug", None),
-                    epic_id=getattr(ns, "epic", None),
-                )
-            else:
-                raise RuntimeError(f"Unknown import kind: {ns.import_kind}")
-        elif ns.command == "validate":
-            _validate(specdock_dir)
-        else:
-            raise RuntimeError(f"Unknown command: {ns.command}")
+        registry = _cli_build_registry()
+        parser = _cli_build_parser(registry)
+        try:
+            ns = parser.parse_args(parsed_argv)
+        except SystemExit as error:
+            code = getattr(error, "code", 1)
+            return int(code) if isinstance(code, int) else 1
+        runtime = _cli_build_runtime(specdock_dir)
+        return _cli_dispatch(ns, registry, runtime.use_cases)
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
-
-    return int(exit_code) if exit_code is not None else 0
 
 
 if __name__ == "__main__":

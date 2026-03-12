@@ -297,7 +297,6 @@ class TestRuntimeValidateS02(unittest.TestCase):
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_ensure_no_legacy_meta_json = runtime_app._ensure_no_legacy_meta_json
         original_application_validate_tree = runtime_app._application_validate_tree
-        original_render_validate_text = runtime_app._render_validate_text
 
         def _fake_validate_tree(req, ports):
             calls["req"] = req
@@ -307,18 +306,9 @@ class TestRuntimeValidateS02(unittest.TestCase):
                 checked_node_count=1,
             )
 
-        def _fake_render_validate_text(result):
-            calls["result"] = result
-            return presentation_contracts.CliText(
-                stdout_lines=["spec-dock: ok (validate) nodes=1"],
-                stderr_lines=[],
-                warnings=[],
-            )
-
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
         runtime_app._ensure_no_legacy_meta_json = lambda _specdock_dir: None
         runtime_app._application_validate_tree = _fake_validate_tree
-        runtime_app._render_validate_text = _fake_render_validate_text
         try:
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -328,16 +318,13 @@ class TestRuntimeValidateS02(unittest.TestCase):
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._ensure_no_legacy_meta_json = original_ensure_no_legacy_meta_json
             runtime_app._application_validate_tree = original_application_validate_tree
-            runtime_app._render_validate_text = original_render_validate_text
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue(), "spec-dock: ok (validate) nodes=1\n")
         self.assertEqual(stderr.getvalue(), "")
         req = calls.get("req")
         ports = calls.get("ports")
-        result = calls.get("result")
         self.assertIsInstance(req, app_contracts.ValidateTreeRequest)
         self.assertIsNotNone(ports)
-        self.assertIsInstance(result, app_contracts.ValidationResult)
         self.assertEqual(getattr(ports, "repo_root"), Path("/repo"))
-        self.assertIsInstance(getattr(ports, "node_reader"), runtime_app._AppValidateNodeReader)
+        self.assertEqual(getattr(ports, "specdock_dir"), Path("/repo/spec-dock"))
