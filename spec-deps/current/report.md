@@ -382,7 +382,7 @@ OK
 - `tests/test_cli.py` - sync / active setup regression を更新
 
 #### コミット
-- 未実施
+- `f63bd9831e4914ceac22be3baaff1a751b19a5d7` `feat(sync): S07のsyncスライスとartifact書き込み契約を導入`
 
 #### メモ
 - artifact writer の途中失敗は部分書き込みの可能性を失わないよう `failed_partial_or_stale` に固定した。
@@ -391,6 +391,52 @@ OK
 ## 今後の推奨事項
 - `S08` では create core を no-write preflight と planned write に分けて固定する。
 - `S09` では `new doc` を node create から独立枝として閉じる。
+
+---
+
+### 2026-03-12 11:50 - 12:35
+
+#### 対象
+- Step: S08
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `application/create_node.py` を追加し、`plan_node_creation()` / `CreatePlan` / `execute_create_plan()` / `CreateNodeResult` を導入した。
+- `infra/fs_repo.py` と `infra/template_scaffolder.py` を追加し、scaffold copy / meta write の責務を分離した。
+- no-write preflight を `planned_paths` 全体へ適用し、collision 時は fail-fast で書き込みなしに統一した。
+- `copy_scaffolded_tree -> write_meta` の順序を core と focused test の両方で固定した。
+- `app.py` は staged delegation owner のまま維持し、`new initiative|epic|issue` のみ新 core へ委譲した。
+- `tests/test_runtime_new_s08.py` を追加し、planning/execution/order/collision/default mode/reuse seam/renderer/delegation smoke を回帰化した。
+- `code_reviewer` による S08 scope review を行い、重大指摘なしで pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_runtime_new_s08 -v
+
+Ran 9 tests ... OK
+
+python -m unittest discover -v
+
+Ran 220 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - new node path を create core へ委譲
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CreatePlan` / `CreateNodeResult` などを追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - create 用 port 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - create core を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - fs write seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py` - scaffold copy / render seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py` - create で使う github helper を拡張
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - new node text renderer を追加
+- `tests/test_runtime_new_s08.py` - S08 focused tests
+
+#### コミット
+- 未実施
+
+#### メモ
+- `app.py` の旧 `_new_*` 実装本体は rollback しやすさのため残し、先頭 return で新 core に委譲する形にしている。
+- `github_mode=\"link_existing\"` は S08 で契約だけ整え、主な再利用は S10 側で行う前提。
 
 ## 省略/例外メモ
 - 該当なし

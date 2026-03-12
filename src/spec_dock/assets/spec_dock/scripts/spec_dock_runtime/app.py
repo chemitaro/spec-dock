@@ -32,8 +32,12 @@ from pathlib import Path
 from typing import Any
 
 from .application.check_deps import check_deps as _application_check_deps
+from .application.create_node import create_epic as _application_create_epic
+from .application.create_node import create_initiative as _application_create_initiative
+from .application.create_node import create_issue as _application_create_issue
 from .application.contracts import CheckDepsRequest as _CheckDepsRequest
 from .application.contracts import ClearActiveRequest as _ClearActiveRequest
+from .application.contracts import CreateNodeRequest as _CreateNodeRequest
 from .application.contracts import SetActiveRequest as _SetActiveRequest
 from .application.contracts import ShowActiveRequest as _ShowActiveRequest
 from .application.contracts import TargetRef as _TargetRef
@@ -58,13 +62,20 @@ from .domain.validation import (
 from .infra.contracts import StoredMetaRecord
 from .infra.deps_reader import load_issue_depends_on_map as _infra_load_issue_depends_on_map
 from .infra.derived_state_reader import load_cached_issue_status_by_id as _infra_load_cached_issue_status_by_id
+from .infra.fs_repo import load_node_records as _infra_load_node_records
+from .infra.fs_repo import write_meta as _infra_write_meta
 from .infra.git_cli import check_ref_format_branch as _infra_check_ref_format_branch
 from .infra.git_cli import checkout_branch as _infra_checkout_branch
 from .infra.git_cli import create_and_checkout_branch as _infra_create_and_checkout_branch
 from .infra.git_cli import current_branch_or_none as _infra_current_branch_or_none
 from .infra.git_cli import local_branch_exists as _infra_local_branch_exists
 from .infra.git_cli import require_clean_working_tree as _infra_require_clean_working_tree
+from .infra.github_cli import issue_create as _infra_issue_create
 from .infra.github_cli import issue_index as _infra_issue_index
+from .infra.template_scaffolder import copy_scaffolded_tree as _infra_copy_scaffolded_tree
+from .infra.template_scaffolder import load_template_text as _infra_load_template_text
+from .infra.template_scaffolder import render_text as _infra_render_text
+from .infra.template_scaffolder import write_text as _infra_write_text
 from .infra.active_store import load_active_issue_id as _infra_load_active_issue_id
 from .infra.active_store import load_active_manifest as _infra_load_active_manifest
 from .infra.active_store import load_active_manifest_no_migrate as _infra_load_active_manifest_no_migrate
@@ -87,6 +98,7 @@ from .ids import (
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
 from .presentation.cli_text import render_active_clear_text as _render_active_clear_text
+from .presentation.cli_text import render_new_node_text as _render_new_node_text
 from .presentation.cli_text import render_active_set_text as _render_active_set_text
 from .presentation.cli_text import render_active_show_text as _render_active_show_text
 from .presentation.cli_text import render_validate_text as _render_validate_text
@@ -179,6 +191,30 @@ class _AppDepsNodeReader:
 
 
 @dataclass(frozen=True)
+class _AppNodeRepository:
+    def load_node_records(self, specdock_dir: Path) -> list[StoredMetaRecord]:
+        return _infra_load_node_records(specdock_dir)
+
+    def write_meta(self, dest_dir: Path, record: StoredMetaRecord) -> None:
+        _infra_write_meta(dest_dir, record)
+
+
+@dataclass(frozen=True)
+class _AppTemplateScaffolder:
+    def render_text(self, text: str, replacements: dict[str, str]) -> str:
+        return _infra_render_text(text, replacements)
+
+    def load_template_text(self, src_path: Path) -> str:
+        return _infra_load_template_text(src_path)
+
+    def copy_scaffolded_tree(self, src_dir: Path, dest_dir: Path, replacements: dict[str, str]) -> list[Path]:
+        return _infra_copy_scaffolded_tree(src_dir, dest_dir, replacements)
+
+    def write_text(self, dest_path: Path, text: str) -> None:
+        _infra_write_text(dest_path, text)
+
+
+@dataclass(frozen=True)
 class _AppDepsTopologyReader:
     def load_issue_depends_on_map(self, specdock_dir: Path, graph: SpecGraph):
         return _infra_load_issue_depends_on_map(specdock_dir, graph)
@@ -194,6 +230,9 @@ class _AppDerivedStateReader:
 class _AppIssueGateway:
     def issue_index(self, repo_root: Path, *, limit: int):
         return _infra_issue_index(repo_root, limit=limit)
+
+    def issue_create(self, repo_root: Path, title: str, body: str) -> int:
+        return _infra_issue_create(repo_root, title=title, body=body)
 
 
 @dataclass(frozen=True)
@@ -242,6 +281,12 @@ class _AppGitGateway:
 
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
         return _infra_check_ref_format_branch(repo_root, branch)
+
+
+@dataclass(frozen=True)
+class _AppClock:
+    def today(self) -> str:
+        return _today()
 
 
 def _find_specdock_dir() -> Path:
@@ -508,6 +553,43 @@ def _write_meta(
         _warn(f"readonly_lock_failed: {meta_path} ({reason})")
 
 
+def _new_ports(specdock_dir: Path) -> _ApplicationPorts:
+    return _ApplicationPorts(
+        node_reader=_AppValidateNodeReader(specdock_dir=specdock_dir),
+        node_repo=_AppNodeRepository(),
+        template_scaffolder=_AppTemplateScaffolder(),
+        issue_gateway=_AppIssueGateway(),
+        clock=_AppClock(),
+        repo_root=specdock_dir.parent,
+        specdock_dir=specdock_dir,
+    )
+
+
+def _run_new_node(
+    *,
+    specdock_dir: Path,
+    kind: str,
+    req: _CreateNodeRequest,
+) -> None:
+    ports = _new_ports(specdock_dir)
+    if kind == "initiative":
+        result = _application_create_initiative(req, ports)
+    elif kind == "epic":
+        result = _application_create_epic(req, ports)
+    elif kind == "issue":
+        result = _application_create_issue(req, ports)
+    else:
+        raise RuntimeError(f"Unknown create kind: {kind}")
+
+    text = _render_new_node_text(result)
+    for warning in text.warnings:
+        _warn(warning)
+    for line in text.stdout_lines:
+        print(line)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+
+
 def _new_initiative(
     specdock_dir: Path,
     *,
@@ -519,6 +601,29 @@ def _new_initiative(
     no_github: bool,
 ) -> None:
     """Create a new initiative node under `spec-dock/initiatives/`."""
+    use_github = bool(create_github_issue or github_issue_number is not None)
+    if no_github and use_github:
+        raise RuntimeError("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+    if use_github and github_issue_number is None:
+        print(
+            "spec-dock: (info) creating GitHub issue via gh "
+            "(pass '--no-github' to avoid GitHub side effects)",
+            file=sys.stderr,
+        )
+    _run_new_node(
+        specdock_dir=specdock_dir,
+        kind="initiative",
+        req=_CreateNodeRequest(
+            title=title,
+            slug=slug,
+            parent_id=None,
+            requested_node_id=node_id,
+            github_mode="create" if use_github else "local_only",
+            github_issue_number=github_issue_number,
+        ),
+    )
+    return
+
     _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
 
@@ -595,6 +700,29 @@ def _new_epic(
     no_github: bool,
 ) -> None:
     """Create a new epic node under a given initiative."""
+    use_github = bool(create_github_issue or github_issue_number is not None)
+    if no_github and use_github:
+        raise RuntimeError("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+    if use_github and github_issue_number is None:
+        print(
+            "spec-dock: (info) creating GitHub issue via gh "
+            "(pass '--no-github' to avoid GitHub side effects)",
+            file=sys.stderr,
+        )
+    _run_new_node(
+        specdock_dir=specdock_dir,
+        kind="epic",
+        req=_CreateNodeRequest(
+            title=title,
+            slug=slug,
+            parent_id=initiative_id,
+            requested_node_id=node_id,
+            github_mode="create" if use_github else "local_only",
+            github_issue_number=github_issue_number,
+        ),
+    )
+    return
+
     _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     initiative_id = _resolve_id_input(initiative_id, prefix="init", field="initiative", nodes=nodes)
@@ -687,6 +815,28 @@ def _new_issue(
     no_github: bool,
 ) -> None:
     """Create a new issue node under a given epic."""
+    if no_github and github_issue_number is not None:
+        raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
+    if not no_github and github_issue_number is None:
+        print(
+            "spec-dock: (info) creating GitHub issue via gh "
+            "(pass '--no-github' to avoid GitHub side effects)",
+            file=sys.stderr,
+        )
+    _run_new_node(
+        specdock_dir=specdock_dir,
+        kind="issue",
+        req=_CreateNodeRequest(
+            title=title,
+            slug=slug,
+            parent_id=epic_id,
+            requested_node_id=node_id,
+            github_mode="local_only" if no_github else "create",
+            github_issue_number=github_issue_number,
+        ),
+    )
+    return
+
     _ensure_no_legacy_meta_json(specdock_dir)
     nodes = _scan_nodes(specdock_dir)
     epic_id = _resolve_id_input(epic_id, prefix="epic", field="epic", nodes=nodes)

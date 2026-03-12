@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from ..domain.models import (
@@ -10,10 +11,12 @@ from ..domain.models import (
     DepsState,
     IssueStatusSnapshot,
     ProgressMap,
+    SpecNode,
     SpecGraph,
     TargetDepsInspection,
     ValidationReport,
 )
+from ..infra.contracts import StoredMetaRecord
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,31 @@ class TargetRef:
     kind: str
     node_id: str | None
     github_issue_number: int | None
+
+
+@dataclass(frozen=True)
+class CreateNodeRequest:
+    title: str
+    slug: str | None
+    parent_id: str | None
+    requested_node_id: str | None
+    github_mode: Literal["create", "link_existing", "local_only"] | None
+    github_issue_number: int | None
+
+
+@dataclass(frozen=True)
+class CreatePlan:
+    meta: StoredMetaRecord
+    dest_dir: Path
+    replacements: dict[str, str]
+    planned_paths: list[Path]
+
+
+@dataclass(frozen=True)
+class CreateNodeResult:
+    node: SpecNode
+    created_paths: list[Path]
+    warnings: list[str]
 
 
 @dataclass(frozen=True)
