@@ -3,7 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from ..domain.models import ActiveSelection, BranchDecision, TargetDepsInspection, ValidationReport
+from ..domain.models import (
+    ActiveSelection,
+    BranchDecision,
+    DepsEvaluation,
+    DepsState,
+    IssueStatusSnapshot,
+    ProgressMap,
+    SpecGraph,
+    TargetDepsInspection,
+    ValidationReport,
+)
 
 
 @dataclass(frozen=True)
@@ -86,3 +96,57 @@ class ActiveClearResult:
     cleared: bool
     previous: ActiveSelection | None
     warnings: list[str]
+
+
+@dataclass(frozen=True)
+class SyncRequest:
+    force: bool
+    github_enabled: bool
+    issue_limit: int
+    update_active_from_branch: bool
+
+
+@dataclass(frozen=True)
+class SyncStateResult:
+    graph: SpecGraph
+    active: ActiveSelection | None
+    issue_statuses: dict[str, IssueStatusSnapshot]
+    progress: ProgressMap
+    deps_state: DepsState
+    deps_eval_by_id: dict[str, DepsEvaluation]
+    generated_at: str
+    warnings: list[str]
+    deps_preflight_error: str | None
+
+
+@dataclass(frozen=True)
+class ActiveUpdateOutcome:
+    applied: bool
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class ArtifactWriteResult:
+    index_all_path: str
+    index_todo_path: str
+    tree_all_path: str
+    tree_todo_path: str
+    tree_all_puml_path: str
+    tree_todo_puml_path: str
+    deps_issues_json_path: str
+    deps_issues_puml_path: str
+    dashboard_md_path: str
+
+
+@dataclass(frozen=True)
+class ArtifactWriteFailure:
+    status: Literal["failed_before_write", "failed_partial_or_stale"]
+    reason: str
+
+
+@dataclass(frozen=True)
+class SyncCommandResult:
+    state: SyncStateResult
+    write_result: ArtifactWriteResult | None
+    active_update: ActiveUpdateOutcome | None
+    artifact_failure: ArtifactWriteFailure | None

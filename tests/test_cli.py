@@ -2852,7 +2852,7 @@ class TestCli(unittest.TestCase):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             # Initiative-only active: epic/issue are placeholders.
-            self._run_runtime(target, ["active", "set", "init-local-00001"])
+            self._run_runtime(target, ["active", "set", "init-local-00001", "--force"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsNone(active.get("epic"))
@@ -2862,7 +2862,7 @@ class TestCli(unittest.TestCase):
             self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
 
             # Epic-only active: issue is a placeholder.
-            self._run_runtime(target, ["active", "set", "epic-local-00001"])
+            self._run_runtime(target, ["active", "set", "epic-local-00001", "--force"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsInstance(active.get("epic"), dict)
@@ -3312,7 +3312,7 @@ class TestCli(unittest.TestCase):
                 target,
                 ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Child issue"],
             )
-            self._run_runtime(target, ["active", "set", "epic-00201"])
+            self._run_runtime(target, ["active", "set", "epic-00201", "--force"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

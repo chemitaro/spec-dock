@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from ..application.contracts import ActiveClearResult, ActiveSetResult, ActiveViewResult, DepsCheckResult, ValidationResult
+from ..application.contracts import (
+    ActiveClearResult,
+    ActiveSetResult,
+    ActiveViewResult,
+    DepsCheckResult,
+    SyncCommandResult,
+    ValidationResult,
+)
 from .contracts import CliText
 
 
@@ -77,3 +84,43 @@ def render_active_set_text(result: ActiveSetResult, *, target_display: str) -> C
 def render_active_clear_text(result: ActiveClearResult) -> CliText:
     del result
     return CliText(stdout_lines=["spec-dock: ok (active clear)"], stderr_lines=[], warnings=[])
+
+
+def render_sync_text(result: SyncCommandResult) -> CliText:
+    if result.artifact_failure is not None:
+        stderr_lines = [
+            (
+                "spec-dock: failed (sync) "
+                f"status={result.artifact_failure.status} "
+                f"reason={result.artifact_failure.reason}"
+            )
+        ]
+        if result.artifact_failure.status == "failed_partial_or_stale":
+            stderr_lines.append("spec-dock: sync: artifacts may be stale or partially written")
+        return CliText(
+            stdout_lines=[],
+            stderr_lines=stderr_lines,
+            warnings=list(result.state.warnings),
+        )
+
+    line = (
+        "spec-dock: ok (sync) "
+        f"wrote={result.write_result.index_all_path},"
+        f"{result.write_result.tree_all_path},"
+        f"{result.write_result.index_todo_path},"
+        f"{result.write_result.tree_todo_path},"
+        f"{result.write_result.tree_all_puml_path},"
+        f"{result.write_result.tree_todo_puml_path},"
+        f"{result.write_result.deps_issues_json_path},"
+        f"{result.write_result.deps_issues_puml_path},"
+        f"{result.write_result.dashboard_md_path}"
+        if result.write_result is not None
+        else "spec-dock: ok (sync)"
+    )
+    stderr_lines: list[str] = []
+    if result.active_update is not None:
+        if result.active_update.applied:
+            stderr_lines.append(f"spec-dock: sync: active updated ({result.active_update.reason or 'updated'})")
+        else:
+            stderr_lines.append(f"spec-dock: sync: active unchanged ({result.active_update.reason or 'unchanged'})")
+    return CliText(stdout_lines=[line], stderr_lines=stderr_lines, warnings=list(result.state.warnings))
