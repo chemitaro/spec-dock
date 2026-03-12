@@ -113,7 +113,7 @@ OK
 - `tests/test_runtime_validate_s02.py` - S02 focused tests
 
 #### コミット
-- 未実施
+- `a54803591b561f8f90be8f62a7bd5564d64969ba` `feat(runtime): validateのS02 sliceをapplication層へ分離`
 
 #### メモ
 - `app.py` から `SpecGraph` や `_Node` を application へ渡さず、`StoredMetaRecord` 境界に留めた。
@@ -124,10 +124,58 @@ OK
 ## 遭遇した問題と解決
 - 問題: 初回実装では `app.py` の live seam が `validate_graph()` 直結で、将来の `application/validate_tree.py -> validate_graph_and_deps()` 形と少しずれていた。
   - 解決: `consultant` 指摘を踏まえ、`_validate_nodes()` の委譲先を `validate_graph_and_deps()` に寄せ、smoke test も更新した。
+- 問題: 初回の S03 着手時に `domain/deps.py` が graph-only で dependency topology を導出する前提になっており、`SpecGraph` の入力契約と衝突した。
+  - 解決: discussion 003 で整理した Option B を採用し、`issue_depends_on_map` の正本を `application / infra` 側へ移し、S03 は supplied topology を受ける pure rule のみを実装する形へ設計と計画を修正した。
+
+---
+
+### 2026-03-12 06:10 - 07:10
+
+#### 対象
+- Step: S03
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `domain/models.py` に `NodeId`, `IssueSnapshot`, `IssueStatusSnapshot`, `ProgressMap`, `DepsNodeState`, `DepsState`, `DepsEvaluation`, `TargetDepsInspection`, `ActiveSelection`, `BranchDecision` を追加し、S03 pure core の DTO を固定した。
+- `domain/status.py` を新規追加し、`resolve_issue_statuses()` と `build_progress_map()` を no-I/O pure function として実装した。
+- `domain/deps.py` を新規追加し、`evaluate_readiness()`, `inspect_target_deps()`, `build_effective_deps_map()`, `build_deps_state()`, `validate_deps_cycles()`, `collect_reachable_issue_ids()` を Option B 契約どおり supplied topology 前提で実装した。
+- 旧前提の S03 下書きは放棄し、graph から dependency topology を compile しない pure domain のみへ作り直した。
+- `tests/test_runtime_domain_s03.py` を追加し、status source 選択、progress 集計、explicit `issue_depends_on_map` 入力、active decoration、parent merge、cycle validation、no shell I/O import を固定した。
+- `code_reviewer` による S03 scope review を行い、重大指摘なしで pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_runtime_domain_s03
+
+Ran 8 tests in 0.011s
+OK
+
+python -m unittest -v tests.test_runtime_domain_s03 tests.test_runtime_domain_s01 tests.test_runtime_validate_s02
+
+Ran 24 tests ... OK
+
+python -m unittest discover -v
+
+Ran 186 tests in 21.525s
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/models.py` - S03 DTO を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py` - pure status / progress rule を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py` - pure deps / readiness / cycle validation rule を追加
+- `tests/test_runtime_domain_s03.py` - S03 focused tests
+
+#### コミット
+- 未実施
+
+#### メモ
+- `build_effective_deps_map()` は parent merge を pure path に閉じており、S04 の topology provider が issue-only map を返す場合は issue key 部分だけを自然に消費する。
+- live consumer 接続は計画どおり `S04` 以降へ残し、S03 では `app.py` / `application` / `presentation` を変更していない。
 
 ## 今後の推奨事項
-- `S02` では `domain.validation.validate_graph_and_deps()` を最初の consumer とする `application/validate_tree.py` を導入し、legacy delegated validate path を閉じる。
-- `S03` では `validate_graph_and_deps()` の deps 側中身を pure に拡張し、S01 で固定した seam をそのまま利用する。
+- `S04` では `infra/deps_reader.py` と `application/check_deps.py` を導入し、canonical `issue_depends_on_map` の first consumer として `deps check` を閉じる。
+- `S04` で `validate_tree()` も同じ topology provider へ internal reconnect し、structural-only / deps-aware の境界を use case で一元化する。
 
 ## 省略/例外メモ
 - 該当なし
