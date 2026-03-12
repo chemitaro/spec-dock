@@ -1,5 +1,3 @@
-import contextlib
-import io
 import sys
 import tempfile
 import unittest
@@ -21,11 +19,12 @@ def _runtime_modules():
         from spec_dock_runtime.application import contracts as app_contracts
         from spec_dock_runtime.application import create_node as app_create_node
         from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.commands import new as new_commands
         from spec_dock_runtime.infra import contracts as infra_contracts
         from spec_dock_runtime.presentation import cli_text as presentation_cli_text
     finally:
         sys.path.pop(0)
-    return runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, presentation_cli_text
+    return runtime_app, app_contracts, app_create_node, app_ports, new_commands, infra_contracts, presentation_cli_text
 
 
 def _record(
@@ -180,7 +179,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
         )
 
     def test_sequence_regression_and_planning(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -214,7 +213,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             self.assertEqual(replacements["<SCOPE_ID>"], "iss-local-00001")
 
     def test_generated_path_name_content_regression(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -247,7 +246,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             self.assertIn("date=2026-03-12", content)
 
     def test_doc_type_parity_template_selection_regression(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -278,7 +277,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 self.assertIn(f"id={expected_ids[doc_type]}", content)
 
     def test_duplicate_sequence_fail_fast_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -307,7 +306,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             self.assertEqual(list(discussions_dir.glob("002-note-*.md")), [])
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -332,7 +331,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             self.assertEqual(list(discussions_dir.glob("*.md")), [])
 
     def test_new_node_non_regression_for_shared_file_edits(self) -> None:
-        _runtime_app, app_contracts, app_create_node, app_ports, infra_contracts, _presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             specdock_dir = repo_root / "spec-dock"
@@ -383,7 +382,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             self.assertTrue((result.node.path / "README.md").exists())
 
     def test_renderer_text_regression(self) -> None:
-        _runtime_app, app_contracts, _app_create_node, _app_ports, _infra_contracts, presentation_cli_text = _runtime_modules()
+        _runtime_app, app_contracts, _app_create_node, _app_ports, _new_commands, _infra_contracts, presentation_cli_text = _runtime_modules()
         result = app_contracts.CreateDiscussionDocResult(
             doc_id="003-adr",
             doc_type="adr",
@@ -407,15 +406,14 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             ],
         )
 
-    def test_legacy_delegated_new_doc_smoke(self) -> None:
-        runtime_app, app_contracts, _app_create_node, _app_ports, _infra_contracts, _presentation_cli_text = _runtime_modules()
-        original_create = runtime_app._application_create_discussion_doc
-        original_scan_nodes = runtime_app._scan_nodes
-        original_legacy_guard = runtime_app._ensure_no_legacy_meta_json
+    def test_command_new_doc_smoke(self) -> None:
+        _runtime_app, app_contracts, _app_create_node, _app_ports, new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         calls = []
 
-        def _fake_create(req, ports):
-            del ports
+        def _unexpected(_req):
+            raise AssertionError("unexpected use case call")
+
+        def _fake_create(req):
             calls.append(req)
             return app_contracts.CreateDiscussionDocResult(
                 doc_id="001-adr",
@@ -428,29 +426,37 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 warnings=[],
             )
 
-        runtime_app._application_create_discussion_doc = _fake_create
-        runtime_app._scan_nodes = lambda specdock_dir: {}
-        runtime_app._ensure_no_legacy_meta_json = lambda specdock_dir: None
-        try:
-            stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                runtime_app._new_doc(
-                    Path("/repo/spec-dock"),
-                    doc_type="adr",
-                    scope_id="iss-local-00001",
-                    title="Decision one",
-                    slug=None,
-                    scope_prefix="iss",
-                )
-        finally:
-            runtime_app._application_create_discussion_doc = original_create
-            runtime_app._scan_nodes = original_scan_nodes
-            runtime_app._ensure_no_legacy_meta_json = original_legacy_guard
+        use_cases = app_contracts.UseCases(
+            create_initiative=_unexpected,
+            create_epic=_unexpected,
+            create_issue=_unexpected,
+            create_discussion_doc=_fake_create,
+            import_initiative=_unexpected,
+            import_epic=_unexpected,
+            import_issue=_unexpected,
+            set_active=_unexpected,
+            show_active=_unexpected,
+            clear_active=_unexpected,
+            sync=_unexpected,
+            check_deps=_unexpected,
+            validate_tree=_unexpected,
+        )
+        outcome = new_commands._run_new_doc(
+            new_commands.NewDocArgs(
+                doc_type="adr",
+                scope_node_id="iss-local-00001",
+                scope_kind="issue",
+                title="Decision one",
+                slug=None,
+            ),
+            use_cases,
+        )
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0].doc_type, "adr")
         self.assertEqual(calls[0].scope_node_id, "iss-local-00001")
-        self.assertIn("spec-dock: ok (new doc) type=adr id=001-adr", stdout.getvalue())
+        self.assertEqual(outcome.exit_code, 0)
+        self.assertIn("spec-dock: ok (new doc) type=adr id=001-adr", "\n".join(outcome.text.stdout_lines))
 
 
 if __name__ == "__main__":
