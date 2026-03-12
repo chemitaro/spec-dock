@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -85,6 +85,7 @@ class CreateDiscussionDocRequest:
     scope_node_id: str
     title: str
     slug: str | None
+    scope_kind: Literal["initiative", "epic", "issue"] | None = None
 
 
 @dataclass(frozen=True)
@@ -179,6 +180,8 @@ class SyncStateResult:
     generated_at: str
     warnings: list[str]
     deps_preflight_error: str | None
+    issue_depends_on_map: dict[str, list[str]] = field(default_factory=dict)
+    github_snapshot_by_issue_number: dict[int, IssueSnapshot] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

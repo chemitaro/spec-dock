@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 
-from ..application.contracts import ImportNodeRequest, UseCases
+from ..application.contracts import ImportNodeRequest, ImportNodeResult, UseCases
 from ..presentation.cli_text import render_import_text
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
 from .targets import parse_github_issue_target
@@ -123,7 +123,7 @@ def _run_import_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOut
             parent_id=None,
         )
     )
-    return CommandOutcome(exit_code=0, text=render_import_text(result))
+    return _import_outcome(result)
 
 
 def _run_import_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
@@ -136,7 +136,7 @@ def _run_import_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             parent_id=typed.initiative_id,
         )
     )
-    return CommandOutcome(exit_code=0, text=render_import_text(result))
+    return _import_outcome(result)
 
 
 def _run_import_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
@@ -149,7 +149,12 @@ def _run_import_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             parent_id=typed.epic_id,
         )
     )
-    return CommandOutcome(exit_code=0, text=render_import_text(result))
+    return _import_outcome(result)
+
+
+def _import_outcome(result: ImportNodeResult) -> CommandOutcome:
+    exit_code = 0 if result.post_import_sync.artifact_failure is None else 1
+    return CommandOutcome(exit_code=exit_code, text=render_import_text(result))
 
 
 def _expect_import_initiative_args(args: CommandArgs) -> ImportInitiativeArgs:
@@ -168,4 +173,3 @@ def _expect_import_issue_args(args: CommandArgs) -> ImportIssueArgs:
     if not isinstance(args, ImportIssueArgs):
         raise RuntimeError("Invalid command args for import issue")
     return args
-

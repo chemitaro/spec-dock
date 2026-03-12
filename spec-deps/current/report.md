@@ -719,5 +719,62 @@ rg -n "^from \\.\\.(io_json|github|render_md|render_puml|active|nodes|ids) impor
 - rollback basis はこの step 以降 staged seam ではなく commit 単位 (`git revert / commit rollback`) を前提に扱う。
 - `app.py` には互換用 legacy 実装が残るが、`main` の shell path は thin entrypoint のまま維持し、layered path からの legacy helper direct import は構造テストで禁止している。
 
+---
+
+### 2026-03-12 17:25 - 18:20
+
+#### 対象
+- Final review fix-up
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- branch-wide final review で出た `app.py` thin-entrypoint 契約違反を解消するため、`_new_*` / `_import_*` wrapper の dead legacy body を削除し、`_sync` を `application.sync_state.sync()` + `presentation.render_sync_text()` の thin shim へ置換した。
+- `cli/bootstrap.py` の sync wiring を `runtime_app._sync` legacy body 依存から `runtime_app._application_sync` 直結へ切り替え、shell path から legacy sync 実装が走らないようにした。
+- sync 互換維持のため、`SyncStateResult` / `render_sync_text()` / `render_index_artifact()` / issue status mapping を補強し、`deps.issue_edges.kind`, GitHub metadata, forced preflight stderr, non-git repo fail-open, invalid id safe sort の回帰を固定した。
+- final code review で出た 3 件の回帰を修正した:
+  - `new doc` の shorthand scope-id (`123`) 解決を復元
+  - `active set --github` の issue index failure を `gh_fetch_failed` warning + unknown-state 継続へ変更
+  - `import` の post-sync artifact failure で非0 exit を返すよう修正
+- それぞれ focused regression を追加し、full `discover` まで通している。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_sync tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_runtime_shell_s11 tests.presentation_runtime.test_runtime_sync_s07
+
+Ran 87 tests ... OK
+
+python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_active_s06
+
+Ran 111 tests ... OK
+
+python -m unittest discover -v
+
+Ran 253 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - thin shim 化と dead legacy body 削除
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - sync wiring を application use case 直結へ変更
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - sync/new-doc 互換維持向け contract 補強
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - `new doc` shorthand scope 解決を補強
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - `gh_fetch_failed` warning 化
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync thin shim 化に必要な result 補強
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py` - post-sync artifact failure 時の非0 exit
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - shorthand scope-id 受理
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py` - sync 互換 metadata 補強
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - sync text 契約補強
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - sync json contract 補強
+- `tests/cli_runtime/test_new.py` - shorthand scope regression
+- `tests/cli_runtime/test_runtime_active_s06.py` - `gh_fetch_failed` regression
+- `tests/cli_runtime/test_runtime_import_s10.py` - post-sync artifact failure exit regression
+- `tests/cli_runtime/test_runtime_shell_s11.py` - `app.py` thinness regression
+- `tests/presentation_runtime/test_runtime_sync_s07.py` - sync thin shim / output parity regression
+
+#### コミット
+- 未実施
+
+#### メモ
+- この fix-up は final review で検出した互換回帰の是正であり、新しい機能追加ではない。
+
 ## 省略/例外メモ
 - 該当なし

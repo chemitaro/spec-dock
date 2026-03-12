@@ -868,6 +868,86 @@ class TestRuntimeImportS10(unittest.TestCase):
         self.assertEqual(calls[0].parent_id, "epic-local-00001")
         self.assertIn("spec-dock: ok (import issue)", stdout.getvalue())
 
+    def test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import contracts as app_contracts
+            from spec_dock_runtime.commands import import_cmd
+            from spec_dock_runtime.domain import models as domain_models
+        finally:
+            sys.path.pop(0)
+
+        post_sync = app_contracts.SyncCommandResult(
+            state=app_contracts.SyncStateResult(
+                graph=domain_models.SpecGraph(nodes_by_id={}),
+                active=None,
+                issue_statuses={},
+                progress=domain_models.ProgressMap(by_node_id={}, counts={}),
+                deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+                deps_eval_by_id={},
+                generated_at="2026-03-12T00:00:00Z",
+                warnings=[],
+                deps_preflight_error=None,
+            ),
+            write_result=None,
+            active_update=None,
+            artifact_failure=app_contracts.ArtifactWriteFailure(
+                status="failed_partial_or_stale",
+                reason="artifact write failed",
+            ),
+        )
+        import_result = app_contracts.ImportNodeResult(
+            node=app_contracts.SpecNode(
+                kind="issue",
+                id="iss-00123",
+                title="Imported issue",
+                slug="imported-issue",
+                path=Path("/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00123-imported-issue"),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00123-imported-issue/.meta.json"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+            ),
+            imported_issue=domain_models.IssueSnapshot(
+                issue_number=123,
+                state="OPEN",
+                title="Imported issue",
+                labels=[],
+                updated_at="2026-03-12T00:00:00Z",
+                url="https://example.invalid/issues/123",
+            ),
+            post_import_sync=post_sync,
+            warnings=[],
+        )
+
+        class _UseCases:
+            def import_issue(self, req):
+                del req
+                return import_result
+
+        outcome = import_cmd._run_import_issue(
+            import_cmd.ImportIssueArgs(
+                issue_number=123,
+                title="Imported issue",
+                slug=None,
+                epic_id="epic-local-00001",
+            ),
+            _UseCases(),
+        )
+        self.assertEqual(outcome.exit_code, 1)
+        self.assertIn("import_post_sync_failed", outcome.text.warnings)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -284,7 +284,11 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if req.use_github:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required when --github is enabled")
-        issue_snapshots = ports.issue_gateway.issue_index(_resolve_repo_root(ports), limit=int(req.issue_limit))
+        try:
+            issue_snapshots = ports.issue_gateway.issue_index(_resolve_repo_root(ports), limit=int(req.issue_limit))
+        except RuntimeError:
+            _append_unique(warnings, "gh_fetch_failed")
+            issue_snapshots = []
 
     cached_issue_status_by_id: dict[str, str] = {}
     if ports.derived_state_reader is not None:
