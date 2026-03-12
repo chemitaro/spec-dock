@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from typing import Literal
 
 from ..application.contracts import (
     CreateDiscussionDocRequest,
@@ -50,6 +51,7 @@ class NewIssueArgs(CommandArgs):
 class NewDocArgs(CommandArgs):
     doc_type: str
     scope_node_id: str
+    scope_kind: Literal["initiative", "epic", "issue"]
     title: str
     slug: str | None
 
@@ -195,12 +197,24 @@ def _new_issue_args(ns: argparse.Namespace) -> CommandArgs:
 
 
 def _new_doc_args(ns: argparse.Namespace) -> CommandArgs:
-    scope_node_id = getattr(ns, "initiative", None) or getattr(ns, "epic", None) or getattr(ns, "issue", None)
-    if scope_node_id is None:
+    initiative = getattr(ns, "initiative", None)
+    epic = getattr(ns, "epic", None)
+    issue = getattr(ns, "issue", None)
+    if initiative is not None:
+        scope_kind: Literal["initiative", "epic", "issue"] = "initiative"
+        scope_node_id = initiative
+    elif epic is not None:
+        scope_kind = "epic"
+        scope_node_id = epic
+    elif issue is not None:
+        scope_kind = "issue"
+        scope_node_id = issue
+    else:
         raise RuntimeError("scope is required")
     return NewDocArgs(
         doc_type=str(ns.doc_type),
         scope_node_id=str(scope_node_id),
+        scope_kind=scope_kind,
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
     )
@@ -286,6 +300,7 @@ def _run_new_doc(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         CreateDiscussionDocRequest(
             doc_type=typed.doc_type,  # type: ignore[arg-type]
             scope_node_id=typed.scope_node_id,
+            scope_kind=typed.scope_kind,
             title=typed.title,
             slug=typed.slug,
         )
@@ -330,4 +345,3 @@ def _expect_new_doc_args(args: CommandArgs) -> NewDocArgs:
     if not isinstance(args, NewDocArgs):
         raise RuntimeError("Invalid command args for new doc")
     return args
-

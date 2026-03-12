@@ -391,9 +391,21 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
 
 
 def _resolve_scope_node(req: CreateDiscussionDocRequest, graph: SpecGraph) -> SpecNode:
-    scope = graph.nodes_by_id.get(req.scope_node_id)
+    scope_node_id = req.scope_node_id
+    if req.scope_kind is not None:
+        scope_prefix = _prefix_for_kind(req.scope_kind)
+        scope_node_id = resolve_id_input(
+            req.scope_node_id,
+            prefix=scope_prefix,
+            field=f"--{req.scope_kind}",
+            nodes=graph.nodes_by_id,
+        )
+
+    scope = graph.nodes_by_id.get(scope_node_id)
     if scope is None:
-        raise RuntimeError(f"Scope node not found: {req.scope_node_id}")
+        raise RuntimeError(f"Scope node not found: {scope_node_id}")
+    if req.scope_kind is not None and scope.kind != req.scope_kind:
+        raise RuntimeError(f"Scope kind mismatch: expected {req.scope_kind}, got {scope.kind}")
     if scope.kind not in ("initiative", "epic", "issue"):
         raise RuntimeError(f"Unsupported scope kind for discussion docs: {scope.kind}")
     return scope

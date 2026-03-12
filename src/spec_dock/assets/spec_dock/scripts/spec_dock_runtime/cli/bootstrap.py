@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..application.contracts import SyncRequest
 from ..application.contracts import UseCases
 from ..application.ports import Ports
 from ..infra import active_store as infra_active_store
@@ -180,19 +179,8 @@ def build_runtime(specdock_dir: Path) -> BootstrapContext:
         set_active=lambda req: runtime_app._application_set_active(req, ports),
         show_active=lambda req: runtime_app._application_show_active(req, ports),
         clear_active=lambda req: runtime_app._application_clear_active(req, ports),
-        sync=lambda req: _run_legacy_sync(runtime_app, specdock_dir=specdock_dir, req=req),
+        sync=lambda req: runtime_app._application_sync(req, ports),
         check_deps=lambda req: runtime_app._application_check_deps(req, ports),
         validate_tree=lambda req: runtime_app._application_validate_tree(req, ports),
     )
     return BootstrapContext(use_cases=use_cases)
-
-
-def _run_legacy_sync(runtime_app, *, specdock_dir: Path, req: SyncRequest) -> int:
-    runtime_app._sync(
-        specdock_dir,
-        github=bool(req.github_enabled),
-        gh_limit=int(req.issue_limit),
-        update_active=bool(req.update_active_from_branch),
-        force=bool(req.force),
-    )
-    return 0

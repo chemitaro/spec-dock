@@ -254,6 +254,41 @@ class TestCliNew(CliRuntimeHarness):
             self.assertNotEqual(sorted(discussions_dir.glob("002-adr-*.md")), [])
             self.assertEqual(list(issue_dir.glob("adrs")), [])
 
+    def test_new_doc_scope_shorthand_resolves_local_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p_init = self._run_runtime_capture(
+                target,
+                ["new", "doc", "note", "--initiative", "1", "--title", "Initiative note"],
+            )
+            p_epic = self._run_runtime_capture(
+                target,
+                ["new", "doc", "note", "--epic", "1", "--title", "Epic note"],
+            )
+            p_issue = self._run_runtime_capture(
+                target,
+                ["new", "doc", "note", "--issue", "1", "--title", "Issue note"],
+            )
+            self.assertEqual(p_init.returncode, 0, p_init.stdout + p_init.stderr)
+            self.assertEqual(p_epic.returncode, 0, p_epic.stdout + p_epic.stderr)
+            self.assertEqual(p_issue.returncode, 0, p_issue.stdout + p_issue.stderr)
+            self.assertIn("scope=init-local-00001", p_init.stdout)
+            self.assertIn("scope=epic-local-00001", p_epic.stdout)
+            self.assertIn("scope=iss-local-00001", p_issue.stdout)
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+            self.assertNotEqual(sorted((init_dir / "discussions").glob("001-note-*.md")), [])
+            self.assertNotEqual(sorted((epic_dir / "discussions").glob("001-note-*.md")), [])
+            self.assertNotEqual(sorted((issue_dir / "discussions").glob("001-note-*.md")), [])
+
     def test_new_doc_adr_uses_shared_sequence_across_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

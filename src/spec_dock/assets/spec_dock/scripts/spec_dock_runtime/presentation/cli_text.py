@@ -185,6 +185,8 @@ def render_sync_text(result: SyncCommandResult) -> CliText:
         else "spec-dock: ok (sync)"
     )
     stderr_lines: list[str] = []
+    if result.state.deps_preflight_error:
+        stderr_lines.append(result.state.deps_preflight_error)
     if result.active_update is not None:
         if result.active_update.applied:
             stderr_lines.append(f"spec-dock: sync: active updated ({result.active_update.reason or 'updated'})")

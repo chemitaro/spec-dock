@@ -476,6 +476,87 @@ class RuntimeShellS11Tests(unittest.TestCase):
                     f"infra layer must not depend on shell layers: {module_path}: {imported}",
                 )
 
+    def test_app_wrapper_and_sync_thinness_regression(self) -> None:
+        (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
+            _runtime_modules()
+        )
+
+        app_source_path = Path(runtime_app.__file__)
+        app_tree = ast.parse(app_source_path.read_text(encoding="utf-8"))
+
+        wrapper_names = {
+            "_new_initiative",
+            "_new_epic",
+            "_new_issue",
+            "_new_doc",
+            "_import_initiative",
+            "_import_epic",
+            "_import_issue",
+        }
+        legacy_workflow_calls = {
+            "_copy_template_tree",
+            "_write_meta",
+            "_gh_issue_create",
+            "_gh_issue_view_minimal",
+            "_ensure_github_issue_not_linked",
+            "_sync",
+        }
+
+        for node in app_tree.body:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if node.name not in wrapper_names:
+                continue
+
+            for index, stmt in enumerate(node.body):
+                if isinstance(stmt, ast.Return):
+                    self.assertEqual(
+                        index,
+                        len(node.body) - 1,
+                        f"dead code after top-level return in {node.name}",
+                    )
+
+            call_names: set[str] = set()
+            for inner in ast.walk(node):
+                if not isinstance(inner, ast.Call):
+                    continue
+                if isinstance(inner.func, ast.Name):
+                    call_names.add(inner.func.id)
+                elif isinstance(inner.func, ast.Attribute):
+                    call_names.add(inner.func.attr)
+            self.assertTrue(
+                call_names.isdisjoint(legacy_workflow_calls),
+                f"legacy workflow call found in wrapper {node.name}: {call_names & legacy_workflow_calls}",
+            )
+
+        sync_node = next(
+            (
+                node
+                for node in app_tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == "_sync"
+            ),
+            None,
+        )
+        self.assertIsNotNone(sync_node, "_sync() not found in app.py")
+        sync_calls: set[str] = set()
+        for inner in ast.walk(sync_node):
+            if not isinstance(inner, ast.Call):
+                continue
+            if isinstance(inner.func, ast.Name):
+                sync_calls.add(inner.func.id)
+            elif isinstance(inner.func, ast.Attribute):
+                sync_calls.add(inner.func.attr)
+        self.assertIn("_application_sync", sync_calls)
+        self.assertIn("_render_sync_text", sync_calls)
+        self.assertNotIn("_scan_nodes", sync_calls)
+        self.assertNotIn("_write_json", sync_calls)
+        self.assertNotIn("_gh_issue_index", sync_calls)
+
+        bootstrap_source_path = app_source_path.parent / "cli" / "bootstrap.py"
+        bootstrap_source = bootstrap_source_path.read_text(encoding="utf-8")
+        self.assertIn("runtime_app._application_sync", bootstrap_source)
+        self.assertNotIn("runtime_app._sync(", bootstrap_source)
+
 
 if __name__ == "__main__":
     unittest.main()

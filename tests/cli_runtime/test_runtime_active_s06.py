@@ -79,8 +79,14 @@ class _StubDerivedStateReader:
 
 
 class _StubIssueGateway:
+    def __init__(self, *, fail: bool = False):
+        self.fail = fail
+        self.calls = []
+
     def issue_index(self, repo_root, *, limit):
-        del repo_root, limit
+        self.calls.append((str(repo_root), int(limit)))
+        if self.fail:
+            raise RuntimeError("gh issue list failed")
         return []
 
 
@@ -170,7 +176,15 @@ class _StubActiveStateStore:
 
 
 class TestRuntimeActiveS06(unittest.TestCase):
-    def _ports(self, *, issue_depends_on_map, statuses, git_gateway=None, active_state_store=None):
+    def _ports(
+        self,
+        *,
+        issue_depends_on_map,
+        statuses,
+        git_gateway=None,
+        active_state_store=None,
+        issue_gateway=None,
+    ):
         app_contracts, app_ports, _app_set_active, infra_contracts = _runtime_modules()
         del app_contracts
         records = [
@@ -217,7 +231,7 @@ class TestRuntimeActiveS06(unittest.TestCase):
             specdock_dir=Path("/repo/spec-dock"),
             deps_topology_reader=_StubDepsTopologyReader(infra_contracts, issue_depends_on_map),
             derived_state_reader=_StubDerivedStateReader(statuses),
-            issue_gateway=_StubIssueGateway(),
+            issue_gateway=issue_gateway or _StubIssueGateway(),
             git_gateway=git_gateway or _StubGitGateway(),
             active_state_store=active_state_store or _StubActiveStateStore(infra_contracts),
         )
@@ -287,6 +301,28 @@ class TestRuntimeActiveS06(unittest.TestCase):
                 "patch_agent_state_active_fields",
             ],
         )
+
+    def test_set_active_absorbs_github_issue_index_failure_as_warning(self) -> None:
+        app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
+        issue_gateway = _StubIssueGateway(fail=True)
+        ports = self._ports(
+            issue_depends_on_map={"iss-local-00001": [], "iss-local-00002": []},
+            statuses={},
+            issue_gateway=issue_gateway,
+        )
+        req = app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None),
+            force=True,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        )
+        result = app_set_active.set_active(req, ports)
+        self.assertTrue(result.manifest_written)
+        self.assertEqual(result.selection.issue_id, "iss-local-00001")
+        self.assertIn("gh_fetch_failed", result.warnings)
+        self.assertTrue(any(w.startswith("deps_blocked:") for w in result.warnings))
+        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
 
     def test_set_active_checkout_pre_step7_failure_has_no_rollback(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()

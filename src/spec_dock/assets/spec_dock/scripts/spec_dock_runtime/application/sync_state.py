@@ -7,7 +7,7 @@ from typing import Literal, cast
 
 from ..domain.active import infer_active_node_from_branch
 from ..domain.deps import build_deps_state, build_effective_deps_map, evaluate_readiness, validate_deps_cycles
-from ..domain.models import ActiveSelection, DepsEvaluation, DepsState, NodeId, SpecNodeKind, SpecNodeSeed
+from ..domain.models import ActiveSelection, DepsEvaluation, DepsState, IssueSnapshot, NodeId, SpecNodeKind, SpecNodeSeed
 from ..domain.status import build_progress_map
 from ..domain.tree import build_graph, select_active_chain
 from ..domain.validation import validate_graph_and_deps
@@ -162,6 +162,7 @@ def collect_sync_state(
                 raise
 
     issue_snapshots = None
+    github_snapshot_by_issue_number: dict[int, IssueSnapshot] = {}
     if req.github_enabled:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required when --github is enabled")
@@ -173,6 +174,10 @@ def collect_sync_state(
             _append_unique(warnings, "gh_fetch_failed")
             issue_snapshots = []
         else:
+            github_snapshot_by_issue_number = {
+                int(snapshot.issue_number): snapshot
+                for snapshot in issue_snapshots
+            }
             linked_numbers = sorted(
                 {
                     int(node.github_issue_number)
@@ -237,6 +242,8 @@ def collect_sync_state(
         generated_at=_now_iso_from_ports(ports),
         warnings=warnings,
         deps_preflight_error=deps_preflight_error,
+        issue_depends_on_map=issue_depends_on_map,
+        github_snapshot_by_issue_number=github_snapshot_by_issue_number,
     )
 
 
@@ -245,13 +252,16 @@ def maybe_auto_update_from_branch(
     ports: Ports,
 ) -> tuple[SyncStateResult, ActiveUpdateOutcome | None]:
     if ports.repo_root is None or ports.git_gateway is None:
-        return (state, ActiveUpdateOutcome(applied=False, reason="branch detection unavailable"))
+        return (state, None)
     if ports.active_state_store is None:
         raise RuntimeError("active_state_store is required for sync active auto-update")
 
-    branch = ports.git_gateway.current_branch_or_none(ports.repo_root)
+    try:
+        branch = ports.git_gateway.current_branch_or_none(ports.repo_root)
+    except RuntimeError:
+        return (state, None)
     if not branch:
-        return (state, ActiveUpdateOutcome(applied=False, reason="branch unavailable"))
+        return (state, None)
 
     inferred_node, reason = infer_active_node_from_branch(state.graph, branch=branch)
     if inferred_node is None:

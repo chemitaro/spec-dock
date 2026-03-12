@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _runtime_modules():
@@ -628,27 +629,71 @@ class TestRuntimeSyncS07(unittest.TestCase):
     def test_sync_exit_behavior_regression(self) -> None:
         (
             runtime_app,
-            _app_contracts,
+            app_contracts,
             _app_ports,
             _app_sync_state,
-            _domain_models,
+            domain_models,
             _infra_artifact_writer,
             _infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
 
+        delegated_state = app_contracts.SyncStateResult(
+            graph=domain_models.SpecGraph(nodes_by_id={}),
+            active=None,
+            issue_statuses={},
+            progress=domain_models.ProgressMap(by_node_id={}, counts={}),
+            deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+            deps_eval_by_id={},
+            generated_at="2026-03-12T00:00:00Z",
+            warnings=[],
+            deps_preflight_error=None,
+        )
+
+        def _build_use_cases(sync_impl):
+            return app_contracts.UseCases(
+                create_initiative=lambda req: None,  # type: ignore[return-value]
+                create_epic=lambda req: None,  # type: ignore[return-value]
+                create_issue=lambda req: None,  # type: ignore[return-value]
+                create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+                import_initiative=lambda req: None,  # type: ignore[return-value]
+                import_epic=lambda req: None,  # type: ignore[return-value]
+                import_issue=lambda req: None,  # type: ignore[return-value]
+                set_active=lambda req: None,  # type: ignore[return-value]
+                show_active=lambda req: None,  # type: ignore[return-value]
+                clear_active=lambda req: None,  # type: ignore[return-value]
+                sync=sync_impl,
+                check_deps=lambda req: None,  # type: ignore[return-value]
+                validate_tree=lambda req: None,  # type: ignore[return-value]
+            )
+
         original_find_specdock_dir = runtime_app._find_specdock_dir
+        original_build_runtime = runtime_app._cli_build_runtime
         original_sync = runtime_app._sync
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
+        runtime_app._sync = lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("legacy _sync should not be called from main sync path")
+        )
         try:
-            runtime_app._sync = lambda *args, **kwargs: None
+            runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
+                use_cases=_build_use_cases(
+                    lambda _req: app_contracts.SyncCommandResult(
+                        state=delegated_state,
+                        write_result=None,
+                        active_update=None,
+                        artifact_failure=None,
+                    )
+                )
+            )
             out = io.StringIO()
             err = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 exit_code_ok = runtime_app.main(["sync"])
             self.assertEqual(exit_code_ok, 0)
 
-            runtime_app._sync = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("sync failed"))
+            runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
+                use_cases=_build_use_cases(lambda _req: (_ for _ in ()).throw(RuntimeError("sync failed")))
+            )
             out = io.StringIO()
             err = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -657,6 +702,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertIn("error: sync failed", err.getvalue())
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
+            runtime_app._cli_build_runtime = original_build_runtime
             runtime_app._sync = original_sync
 
     def test_legacy_delegated_sync_smoke(self) -> None:

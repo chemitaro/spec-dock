@@ -17,6 +17,13 @@ def _status_from_github_state(state: str) -> str:
     return "done" if str(state).strip().upper() == "CLOSED" else "open"
 
 
+def _safe_sorted_issue_ids(issue_ids: list[str]) -> list[str]:
+    try:
+        return sorted(issue_ids, key=deps_node_sort_key)
+    except RuntimeError:
+        return sorted(issue_ids)
+
+
 def resolve_issue_statuses(
     graph: SpecGraph,
     github_enabled: bool,
@@ -28,13 +35,12 @@ def resolve_issue_statuses(
         issue_snapshot_by_number[int(issue_snapshot.issue_number)] = issue_snapshot
 
     resolved: dict[str, IssueStatusSnapshot] = {}
-    issue_ids = sorted(
+    issue_ids = _safe_sorted_issue_ids(
         [
             node_id
             for node_id, node in graph.nodes_by_id.items()
             if node.kind == "issue"
-        ],
-        key=deps_node_sort_key,
+        ]
     )
     for issue_id in issue_ids:
         issue_node = graph.nodes_by_id[issue_id]
@@ -73,13 +79,12 @@ def build_progress_map(
             by_node_id[node_id] = {"total": 0, "done": 0, "open": 0, "unknown": 0}
 
     counts = {"total": 0, "done": 0, "open": 0, "unknown": 0}
-    issue_ids = sorted(
+    issue_ids = _safe_sorted_issue_ids(
         [
             node_id
             for node_id, node in graph.nodes_by_id.items()
             if node.kind == "issue"
-        ],
-        key=deps_node_sort_key,
+        ]
     )
     for issue_id in issue_ids:
         issue_node = graph.nodes_by_id[issue_id]

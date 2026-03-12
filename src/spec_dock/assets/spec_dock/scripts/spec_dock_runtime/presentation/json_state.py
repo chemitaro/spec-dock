@@ -76,13 +76,26 @@ def _build_children(graph_nodes: dict[str, SpecNode]) -> dict[str, list[str]]:
 
 
 def _build_issue_edges_from_deps_state(
+    result: SyncStateResult,
     deps_state_by_issue_id: dict[str, DepsNodeState],
 ) -> list[dict[str, str]]:
+    if result.issue_depends_on_map:
+        edges: list[dict[str, str]] = []
+        issue_ids = _sort_ids(list(result.issue_depends_on_map.keys()))
+        for issue_id in issue_ids:
+            dep_ids = _sort_ids(
+                [dep_id for dep_id in result.issue_depends_on_map.get(issue_id, []) if isinstance(dep_id, str)]
+            )
+            for dep_id in dep_ids:
+                edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
+        edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
+        return edges
+
     edges: list[dict[str, str]] = []
     for issue_id in _sort_ids(list(deps_state_by_issue_id.keys())):
         node_state = deps_state_by_issue_id[issue_id]
         for dep_id in node_state.effective_depends_on:
-            edges.append({"from": issue_id, "to": dep_id})
+            edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
     edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
     return edges
 
@@ -92,7 +105,7 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
     children = _build_children(graph_nodes)
     deps_state_by_issue_id = _deps_state_by_issue_id(result)
     deps_issue_edges_all = (
-        _build_issue_edges_from_deps_state(deps_state_by_issue_id)
+        _build_issue_edges_from_deps_state(result, deps_state_by_issue_id)
         if result.deps_preflight_error is None
         else []
     )
@@ -115,20 +128,39 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
             issue_status = result.issue_statuses.get(node.id)
             item["status"] = issue_status.status if issue_status is not None else "unknown"
             if result.deps_preflight_error is None:
-                deps = deps_state_by_issue_id.get(node.id)
-                if deps is not None:
+                evaluation = result.deps_eval_by_id.get(node.id)
+                if evaluation is not None:
                     item["deps"] = {
-                        "ready": bool(deps.ready),
-                        "depends_on": list(deps.effective_depends_on),
-                        "blockers_top": list(deps.blockers_top),
+                        "ready": bool(evaluation.ready),
+                        "depends_on": list(evaluation.blockers),
+                        "blockers_top": list(evaluation.blockers_top),
                     }
                 else:
-                    item["deps"] = None
+                    deps = deps_state_by_issue_id.get(node.id)
+                    if deps is None:
+                        item["deps"] = None
+                    else:
+                        item["deps"] = {
+                            "ready": bool(deps.ready),
+                            "depends_on": list(deps.effective_depends_on),
+                            "blockers_top": list(deps.blockers_top),
+                        }
             else:
                 item["deps"] = None
 
         if node.github_issue_number is not None:
-            item["github"] = {"issue_number": int(node.github_issue_number)}
+            github_item: dict[str, object] = {"issue_number": int(node.github_issue_number)}
+            snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
+            if snapshot is not None:
+                github_item.update(
+                    {
+                        "state": snapshot.state,
+                        "url": snapshot.url,
+                        "updated_at": snapshot.updated_at,
+                        "labels": list(snapshot.labels),
+                    }
+                )
+            item["github"] = github_item
 
         if node.kind in ("initiative", "epic"):
             progress_item = result.progress.by_node_id.get(node.id)
