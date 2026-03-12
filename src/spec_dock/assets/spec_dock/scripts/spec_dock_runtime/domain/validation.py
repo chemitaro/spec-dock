@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .deps import validate_deps_cycles
 from .ids import parse_id, validate_lowercase, validate_slug
 from .models import SpecGraph, SpecNode, ValidationReport
 
@@ -67,10 +68,22 @@ def validate_graph(graph: SpecGraph, repo_root: Path | None = None) -> Validatio
     return ValidationReport(errors=[], warnings=[])
 
 
-def validate_graph_and_deps(graph: SpecGraph, repo_root: Path | None = None) -> ValidationReport:
+def validate_graph_and_deps(
+    graph: SpecGraph,
+    issue_depends_on_map: dict[str, list[str]] | None = None,
+    repo_root: Path | None = None,
+) -> ValidationReport:
     """Validate the graph and dependency-related preconditions."""
-    # Deps-domain rules are introduced in S03; keep S01 behavior as structural validation.
-    return validate_graph(graph, repo_root=repo_root)
+    report = validate_graph(graph, repo_root=repo_root)
+    if report.errors:
+        return report
+    if issue_depends_on_map is None:
+        return report
+    try:
+        validate_deps_cycles(issue_depends_on_map)
+    except RuntimeError as e:
+        return ValidationReport(errors=[str(e)], warnings=[])
+    return report
 
 
 def _validate_graph_or_raise(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
@@ -141,4 +154,3 @@ def _validate_graph_or_raise(graph: SpecGraph, *, repo_root: Path | None = None)
             continue
 
         raise RuntimeError(f"Unknown node type: {node.kind} ({node.meta_path})")
-

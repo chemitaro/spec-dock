@@ -31,6 +31,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .application.check_deps import check_deps as _application_check_deps
+from .application.contracts import CheckDepsRequest as _CheckDepsRequest
+from .application.contracts import TargetRef as _TargetRef
 from .application.contracts import ValidateTreeRequest as _ValidateTreeRequest
 from .application.ports import Ports as _ApplicationPorts
 from .application.validate_tree import validate_tree as _application_validate_tree
@@ -47,6 +50,10 @@ from .domain.validation import (
     validate_github_issue_numbers_unique as _domain_validate_github_issue_numbers_unique,
 )
 from .infra.contracts import StoredMetaRecord
+from .infra.deps_reader import load_issue_depends_on_map as _infra_load_issue_depends_on_map
+from .infra.derived_state_reader import load_cached_issue_status_by_id as _infra_load_cached_issue_status_by_id
+from .infra.github_cli import issue_index as _infra_issue_index
+from .infra.active_store import load_active_issue_id as _infra_load_active_issue_id
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
@@ -60,6 +67,8 @@ from .ids import (
 )
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
 from .presentation.cli_text import render_validate_text as _render_validate_text
+from .presentation.cli_text import render_deps_check_text as _render_deps_check_text
+from .presentation.json_state import render_deps_check_json as _render_deps_check_json
 from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
 from .render_puml import (
     _deps_disabled_error_text,
@@ -136,6 +145,39 @@ class _AppValidateNodeReader:
     def load_node_records(self) -> list[StoredMetaRecord]:
         nodes = _scan_nodes(self.specdock_dir)
         return [_node_to_stored_meta_record(node) for node in nodes.values()]
+
+
+@dataclass(frozen=True)
+class _AppDepsNodeReader:
+    specdock_dir: Path
+
+    def load_node_records(self) -> list[StoredMetaRecord]:
+        nodes = _scan_nodes(self.specdock_dir)
+        return [_node_to_stored_meta_record(node) for node in nodes.values()]
+
+
+@dataclass(frozen=True)
+class _AppDepsTopologyReader:
+    def load_issue_depends_on_map(self, specdock_dir: Path, graph: SpecGraph):
+        return _infra_load_issue_depends_on_map(specdock_dir, graph)
+
+
+@dataclass(frozen=True)
+class _AppDerivedStateReader:
+    def load_cached_issue_status_by_id(self, specdock_dir: Path) -> dict[str, str]:
+        return _infra_load_cached_issue_status_by_id(specdock_dir)
+
+
+@dataclass(frozen=True)
+class _AppIssueGateway:
+    def issue_index(self, repo_root: Path, *, limit: int):
+        return _infra_issue_index(repo_root, limit=limit)
+
+
+@dataclass(frozen=True)
+class _AppActiveStateStore:
+    def load_active_issue_id(self, specdock_dir: Path) -> str | None:
+        return _infra_load_active_issue_id(specdock_dir)
 
 
 def _find_specdock_dir() -> Path:
@@ -2426,61 +2468,52 @@ def _deps_check(
     - ready = all effective dependencies are Done
     - Unknown is treated as not Done (safe default)
     """
-    nodes = _scan_nodes(specdock_dir)
-    if not nodes:
-        raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
-
     kind, value = _parse_active_set_target(target)
     if kind == "github_issue":
-        issue_number = int(value)  # type: ignore[arg-type]
-        node = _find_node_by_github_issue_number(nodes, issue_number=issue_number)
-        target_id = node.id
-    elif kind == "node_id":
-        raw_id = str(value).lower()
-        prefix, is_local, num = _parse_id(raw_id)
-        resolved = _find_existing_id_by_num(nodes, prefix=prefix, num=num, local=is_local) or _format_id(
-            prefix, num, local=is_local
+        target_ref = _TargetRef(
+            kind="github_issue",
+            node_id=None,
+            github_issue_number=int(value),  # type: ignore[arg-type]
         )
-        node = nodes.get(resolved)
-        if not node or node.type not in ("initiative", "epic", "issue"):
-            raise RuntimeError(f"Node not found: {resolved}")
-        target_id = node.id
+    elif kind == "node_id":
+        target_ref = _TargetRef(
+            kind="node_id",
+            node_id=str(value),
+            github_issue_number=None,
+        )
     else:
         raise RuntimeError("Internal error: invalid deps target kind")
 
-    result = _deps_evaluate_v2(
-        specdock_dir,
-        nodes,
-        target_id=target_id,
-        github=github,
-        gh_limit=gh_limit,
+    ports = _ApplicationPorts(
+        node_reader=_AppDepsNodeReader(specdock_dir=specdock_dir),
+        repo_root=specdock_dir.parent,
+        specdock_dir=specdock_dir,
+        derived_state_reader=_AppDerivedStateReader(),
+        issue_gateway=_AppIssueGateway(),
+        active_state_store=_AppActiveStateStore(),
+        deps_topology_reader=_AppDepsTopologyReader(),
     )
-    ready = bool(result["ready"])
+    result = _application_check_deps(
+        _CheckDepsRequest(
+            target=target_ref,
+            use_github=github,
+            issue_limit=gh_limit,
+        ),
+        ports,
+    )
+    for warning in result.warnings:
+        _warn(warning)
 
     if json_output:
-        payload = {
-            "schema_version": 1,
-            "target": target_id,
-            "ready": bool(result["ready"]),
-            "effective_depends_on": list(result["effective_depends_on"]),
-            "blockers": list(result["blockers"]),
-            "nodes": dict(result["nodes"]),
-            "warnings": list(result["warnings"]),
-        }
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(_render_deps_check_json(result))
     else:
-        blockers = list(result["blockers"])
-        if bool(result["ready"]):
-            print(f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0")
-        else:
-            print(
-                f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
-                file=sys.stderr,
-            )
-            for b in blockers:
-                print(f"- {b}", file=sys.stderr)
+        text = _render_deps_check_text(result)
+        for line in text.stdout_lines:
+            print(line)
+        for line in text.stderr_lines:
+            print(line, file=sys.stderr)
 
-    return 0 if ready else 3
+    return 0 if result.inspection.evaluation.ready else 3
 
 
 def _deps_target_issue_ids(nodes: dict[str, _Node], *, target_id: str) -> list[str]:
@@ -3620,6 +3653,8 @@ def _validate(specdock_dir: Path) -> None:
     ports = _ApplicationPorts(
         node_reader=_AppValidateNodeReader(specdock_dir=specdock_dir),
         repo_root=specdock_dir.parent,
+        specdock_dir=specdock_dir,
+        deps_topology_reader=_AppDepsTopologyReader(),
     )
     result = _application_validate_tree(_ValidateTreeRequest(), ports)
     if result.checked_node_count <= 0:

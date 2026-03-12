@@ -15,3 +15,9 @@ class StoredMetaRecord:
     epic_id: str | None
     github_issue_number: int | None
     meta_path: str
+
+
+@dataclass(frozen=True)
+class DepsTopologyLoadResult:
+    issue_depends_on_map: dict[str, list[str]]
+    warnings: list[str]

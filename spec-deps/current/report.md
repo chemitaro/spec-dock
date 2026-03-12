@@ -167,15 +167,74 @@ OK
 - `tests/test_runtime_domain_s03.py` - S03 focused tests
 
 #### コミット
-- 未実施
+- `d42b3a820bb9c21f3bb41123d982b06d48cfdbe4` `feat(runtime): S03のpure domainルールとfocused testを導入`
 
 #### メモ
 - `build_effective_deps_map()` は parent merge を pure path に閉じており、S04 の topology provider が issue-only map を返す場合は issue key 部分だけを自然に消費する。
 - live consumer 接続は計画どおり `S04` 以降へ残し、S03 では `app.py` / `application` / `presentation` を変更していない。
 
+---
+
+### 2026-03-12 07:15 - 08:15
+
+#### 対象
+- Step: S04
+- AC/EC: AC-001, AC-005, EC-001
+
+#### 実施内容
+- `application/check_deps.py` と `application/status_context.py` を追加し、`deps check` の read-side use case と status source 正規化 seam を導入した。
+- `infra/deps_reader.py` を追加し、canonical `issue_depends_on_map` の first consumer として `deps check` へ topology provider を接続した。
+- `application/validate_tree.py` と `domain/validation.py` を更新し、topology reader が束縛されている場合のみ `validate_graph_and_deps(graph, issue_depends_on_map=...)` を使う internal reconnect を導入した。
+- `presentation/json_state.py` を追加して `deps check --json` の ownership を移し、`presentation/cli_text.py` には text 側の rendering を追加した。
+- `app.py` は staged delegation owner のまま保ち、`deps check` の経路だけを `application/check_deps.py` へ委譲した。
+- `tests/test_runtime_deps_s04.py` を追加し、use case/result、status context、topology reader、validate reconnect、legacy delegated deps smoke を固定した。
+- `tests/test_cli.py` の `deps check` 関連 regression を更新し、cycle fail-fast、json/text path、source selection、stderr/stdout の観測点を S04 契約に合わせた。
+- `code_reviewer` による S04 scope review を行い、重大指摘なしで pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_runtime_deps_s04
+
+Ran 5 tests ... OK
+
+python -m unittest -v tests.test_runtime_deps_s04 tests.test_runtime_validate_s02 tests.test_runtime_domain_s03
+
+Ran 20 tests in 0.031s
+OK
+
+python -m unittest discover -v
+
+Ran 191 tests ... OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `deps check` を use case + renderer へ委譲
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CheckDepsRequest` / `DepsCheckResult` など S04 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - `DepsTopologyReader` など read-side ports を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/validate_tree.py` - topology reconnect を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py` - deps use case を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/status_context.py` - issue status source 正規化 seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - optional topology を受ける validate 境界へ更新
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - `DepsTopologyLoadResult` など infra 契約を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - topology provider を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/derived_state_reader.py` - cached status reader を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py` - github status reader を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - active manifest load seam を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - deps text renderer を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - deps json renderer を追加
+- `tests/test_runtime_deps_s04.py` - S04 focused tests
+- `tests/test_cli.py` - deps CLI regression を更新
+
+#### コミット
+- 未実施
+
+#### メモ
+- `deps check` では topology invalid/cycle を reachable/unreachable にかかわらず fail-fast とし、`active set` / `sync` 側の再利用は計画どおり後続 step へ残した。
+- `validate_tree()` の reconnect は internal seam に留めており、S04 の primary user-facing review scope は `deps check` のまま維持している。
+
 ## 今後の推奨事項
-- `S04` では `infra/deps_reader.py` と `application/check_deps.py` を導入し、canonical `issue_depends_on_map` の first consumer として `deps check` を閉じる。
-- `S04` で `validate_tree()` も同じ topology provider へ internal reconnect し、structural-only / deps-aware の境界を use case で一元化する。
+- `S05` では active read model を `deps check` と独立に閉じ、read path の DTO と renderer ownership を分離する。
+- `S06` で `S04` の topology provider を `active set` の readiness guard に再利用し、fail-fast 順序を command 契約へ持ち上げる。
 
 ## 省略/例外メモ
 - 該当なし
