@@ -31,6 +31,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .application.contracts import ValidateTreeRequest as _ValidateTreeRequest
+from .application.ports import Ports as _ApplicationPorts
+from .application.validate_tree import validate_tree as _application_validate_tree
 from .github import (
     _ensure_gh_available,
     _gh_issue_create,
@@ -43,6 +46,7 @@ from .domain.validation import (
     validate_graph_and_deps as _domain_validate_graph_and_deps,
     validate_github_issue_numbers_unique as _domain_validate_github_issue_numbers_unique,
 )
+from .infra.contracts import StoredMetaRecord
 from .ids import (
     _deps_node_sort_key,
     _find_existing_id_by_num,
@@ -55,6 +59,7 @@ from .ids import (
     _validate_input_slug_kebab,
 )
 from .io_json import _load_json, _now_iso, _today, _try_make_readonly, _warn, _write_json
+from .presentation.cli_text import render_validate_text as _render_validate_text
 from .render_md import _render_dashboard_md, _render_deps_disabled_dashboard_md
 from .render_puml import (
     _deps_disabled_error_text,
@@ -120,6 +125,17 @@ class _BranchDecision:
     desired: str
     candidates: tuple[str, str]
     warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _AppValidateNodeReader:
+    """App-owned minimal read adapter for validate use case."""
+
+    specdock_dir: Path
+
+    def load_node_records(self) -> list[StoredMetaRecord]:
+        nodes = _scan_nodes(self.specdock_dir)
+        return [_node_to_stored_meta_record(node) for node in nodes.values()]
 
 
 def _find_specdock_dir() -> Path:
@@ -329,6 +345,21 @@ def _scan_nodes(specdock_dir: Path) -> dict[str, _Node]:
             github_issue_number=github_issue_number,
         )
     return nodes
+
+
+def _node_to_stored_meta_record(node: _Node) -> StoredMetaRecord:
+    return StoredMetaRecord(
+        kind=node.type,
+        id=node.id,
+        title=node.title,
+        slug=node.slug,
+        path=node.path.as_posix(),
+        parent_id=node.parent_id,
+        initiative_id=node.initiative_id,
+        epic_id=node.epic_id,
+        github_issue_number=node.github_issue_number,
+        meta_path=node.meta_path.as_posix(),
+    )
 
 
 def _write_meta(
@@ -3586,12 +3617,20 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
 def _validate(specdock_dir: Path) -> None:
     """Validate basic structural integrity of the tree based on `.meta.json`."""
     _ensure_no_legacy_meta_json(specdock_dir)
-    nodes = _scan_nodes(specdock_dir)
-    if not nodes:
+    ports = _ApplicationPorts(
+        node_reader=_AppValidateNodeReader(specdock_dir=specdock_dir),
+        repo_root=specdock_dir.parent,
+    )
+    result = _application_validate_tree(_ValidateTreeRequest(), ports)
+    if result.checked_node_count <= 0:
         raise RuntimeError("No nodes found.")
-
-    _validate_nodes(nodes, repo_root=specdock_dir.parent)
-    print(f"spec-dock: ok (validate) nodes={len(nodes)}")
+    text = _render_validate_text(result)
+    for warning in text.warnings:
+        _warn(warning)
+    if text.stderr_lines:
+        raise RuntimeError(text.stderr_lines[0])
+    for line in text.stdout_lines:
+        print(line)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
