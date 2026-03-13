@@ -1,39 +1,28 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .infra import clock as _infra_clock
+from .infra import json_store as _infra_json_store
+
 
 def _now_iso() -> str:
-    """Return current local time in ISO-8601 (timezone-aware, seconds precision)."""
-    return datetime.now().astimezone().isoformat(timespec="seconds")
+    return _infra_clock.now_iso()
 
 
 def _today() -> str:
-    """Return today's date as `YYYY-MM-DD`."""
-    return datetime.now().date().isoformat()
+    return _infra_clock.today()
 
 
 def _load_json(path: Path) -> Any:
-    """Read and parse JSON from `path` with user-friendly errors."""
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Invalid JSON: {path}: {e}") from e
-    except UnicodeDecodeError as e:
-        raise RuntimeError(f"Failed to read: {path}: {e}") from e
-    except OSError as e:
-        raise RuntimeError(f"Failed to read: {path}: {e}") from e
+    return _infra_json_store.load_json(path)
 
 
 def _write_json(path: Path, data: Any) -> None:
-    """Write `data` as pretty-printed JSON into `path` (UTF-8)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _infra_json_store.write_json(path, data)
 
 
 def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
