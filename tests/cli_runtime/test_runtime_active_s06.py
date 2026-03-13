@@ -301,6 +301,16 @@ class TestRuntimeActiveS06(unittest.TestCase):
                 "patch_agent_state_active_fields",
             ],
         )
+        write_calls = [call for call in ports.active_state_store.calls if call[0] == "write_active_manifest"]
+        self.assertEqual(len(write_calls), 1)
+        written_manifest = write_calls[0][2]
+        for entry in (written_manifest.initiative, written_manifest.epic, written_manifest.issue):
+            self.assertIsNotNone(entry)
+            assert entry is not None
+            self.assertIsNotNone(entry.path)
+            assert entry.path is not None
+            self.assertTrue(entry.path.startswith("spec-dock/"), entry.path)
+            self.assertFalse(Path(entry.path).is_absolute(), entry.path)
 
     def test_set_active_absorbs_github_issue_index_failure_as_warning(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()

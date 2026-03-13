@@ -157,6 +157,38 @@ class TestCliSync(CliRuntimeHarness):
             self.assertTrue(index_todo_nodes.issubset(index_all_nodes))
             self.assertEqual(index_all_nodes, index_todo_nodes)
 
+            def _assert_repo_relative_node_paths(nodes: dict[str, object]) -> None:
+                for item in nodes.values():
+                    self.assertIsInstance(item, dict)
+                    node_path = item.get("path")
+                    self.assertIsInstance(node_path, str)
+                    assert isinstance(node_path, str)
+                    self.assertTrue(node_path.startswith("spec-dock/"), node_path)
+                    self.assertFalse(Path(node_path).is_absolute(), node_path)
+                    self.assertFalse(node_path.startswith(str(target)), node_path)
+
+            def _iter_tree_nodes(items: list[dict[str, object]]):
+                for initiative in items:
+                    yield initiative
+                    for epic in initiative.get("epics", []):
+                        if not isinstance(epic, dict):
+                            continue
+                        yield epic
+                        for issue in epic.get("issues", []):
+                            if isinstance(issue, dict):
+                                yield issue
+
+            _assert_repo_relative_node_paths(index_all["nodes"])
+            _assert_repo_relative_node_paths(index_todo["nodes"])
+            for tree_payload in (tree_all, tree_todo):
+                for node_item in _iter_tree_nodes(tree_payload["tree"]):
+                    node_path = node_item.get("path")
+                    self.assertIsInstance(node_path, str)
+                    assert isinstance(node_path, str)
+                    self.assertTrue(node_path.startswith("spec-dock/"), node_path)
+                    self.assertFalse(Path(node_path).is_absolute(), node_path)
+                    self.assertFalse(node_path.startswith(str(target)), node_path)
+
     def test_sync_compiles_shorthand_to_issue_edges(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1269,4 +1301,3 @@ class TestCliSync(CliRuntimeHarness):
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             nodes = index["nodes"]
             self.assertEqual(nodes["iss-00301"]["status"], "unknown")
-

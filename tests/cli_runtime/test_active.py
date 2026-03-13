@@ -32,6 +32,11 @@ class TestCliActive(CliRuntimeHarness):
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsNone(active.get("epic"))
             self.assertIsNone(active.get("issue"))
+            self.assertEqual(
+                active["initiative"]["path"],
+                "spec-dock/initiatives/init-local-00001-auth-platform",
+            )
+            self.assertFalse(active["initiative"]["path"].startswith(str(target)))
             self.assertIn("init-local-00001", self._read_active_pointer_text(target, "initiative", "requirement.md"))
             self.assertIn("Active Epic: （なし）", self._read_active_pointer_text(target, "epic", "README.md"))
             self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
@@ -42,6 +47,14 @@ class TestCliActive(CliRuntimeHarness):
             self.assertIsInstance(active.get("initiative"), dict)
             self.assertIsInstance(active.get("epic"), dict)
             self.assertIsNone(active.get("issue"))
+            self.assertEqual(
+                active["epic"]["path"],
+                (
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/"
+                    "epic-local-00001-jwt-auth"
+                ),
+            )
+            self.assertFalse(active["epic"]["path"].startswith(str(target)))
             self.assertIn("epic-local-00001", self._read_active_pointer_text(target, "epic", "requirement.md"))
             self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
 
@@ -116,6 +129,14 @@ class TestCliActive(CliRuntimeHarness):
             self.assertEqual(current, "iss-00123-add-refresh-token")
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
+            self.assertEqual(
+                active["issue"]["path"],
+                (
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/"
+                    "epic-local-00001-jwt-auth/issues/iss-00123-add-refresh-token"
+                ),
+            )
+            self.assertFalse(active["issue"]["path"].startswith(str(target)))
 
     def test_active_set_local_only_node_does_not_rename_branch(self) -> None:
         if shutil.which("git") is None:
@@ -1548,4 +1569,3 @@ class TestCliActive(CliRuntimeHarness):
 
             self._run_runtime_expect_fail(target, ["active", "set", "123", "--checkout"], env=test_env)
             self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
-

@@ -1716,10 +1716,32 @@ end note
   - `spec-dock/active/issue`
   - `spec-dock/active/context-pack.md`
   - symlink 非対応環境では `spec-dock/active/{initiative,epic,issue}.path`
+  - `spec-dock/.agent/active.json` の `initiative.path` / `epic.path` / `issue.path` は repo-relative path を canonical とし、`spec-dock/...` 形式で保存する
+  - read/write の正本は repo-relative path であり、absolute filesystem path は persistence shape として採用しない
 - method ownership:
   - `write_active_manifest()` -> `spec-dock/.agent/active.json`
   - `apply_active_pointers()` -> `spec-dock/active/{initiative,epic,issue}` と `context-pack.md`
   - `patch_agent_state_active_fields()` -> `spec-dock/.agent/index-all.json`, `tree-all.json`, `index.json`, `tree.json`
+
+## Relative Path Canonicalization Appendix
+- canonical rule:
+  - persisted JSON / generated artifact に格納する node path は repo-relative を canonical とする
+  - canonical format は `spec-dock/...` の POSIX path とする
+  - machine-local absolute path は persistence / artifact schema に含めない
+- applies to:
+  - `spec-dock/.agent/active.json`
+  - `spec-dock/.agent/index-all.json`
+  - `spec-dock/.agent/index.json`
+  - `spec-dock/.agent/tree-all.json`
+  - `spec-dock/.agent/tree.json`
+- ownership:
+  - active manifest の repo-relative 化は `application/set_active.py` が正本責務を持つ
+  - state artifact の repo-relative 化は `presentation/json_state.py` が正本責務を持つ
+  - actual filesystem access が必要な時だけ `infra/active_store.py` が repo root を基準に absolute path へ解決する
+- compatibility:
+  - `spec-dock/.agent/active.json` の read path は、過去に書かれた legacy absolute path を best-effort 互換として受理してよい
+  - ただし write path / generated artifact は canonical repo-relative へ収束させ、absolute path を再生成しない
+  - `index-all.json` / `index.json` / `tree-all.json` / `tree.json` は migration read を持たず、generate 時点で canonical repo-relative shape を出力する
 
 ## テスト戦略
 - Unit:

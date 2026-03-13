@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from ..application.contracts import DepsCheckResult, SyncStateResult
 from ..domain.ids import deps_node_sort_key
@@ -46,6 +47,22 @@ def _sort_key(node_id: str) -> tuple[int, int, str] | tuple[int, str]:
         return deps_node_sort_key(node_id)
     except RuntimeError:
         return (2, node_id)
+
+
+def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path | None) -> str:
+    if repo_root is not None:
+        try:
+            return path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+
+    parts = path.parts
+    if parts and parts[0] == "spec-dock":
+        return path.as_posix()
+    if "spec-dock" in parts:
+        index = parts.index("spec-dock")
+        return Path(*parts[index:]).as_posix()
+    raise RuntimeError(f"Node path missing 'spec-dock' segment: {path}")
 
 
 def _active_to_json(active: ActiveSelection | None) -> dict[str, object] | None:
@@ -117,7 +134,7 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
             "type": node.kind,
             "id": node.id,
             "title": node.title,
-            "path": node.path.as_posix(),
+            "path": _to_repo_relative_specdock_path(node.path, repo_root=result.repo_root),
             "parent_id": node.parent_id,
             "initiative_id": node.initiative_id,
             "epic_id": node.epic_id,

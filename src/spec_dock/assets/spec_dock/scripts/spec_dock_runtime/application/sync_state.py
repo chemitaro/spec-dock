@@ -242,6 +242,7 @@ def collect_sync_state(
         generated_at=_now_iso_from_ports(ports),
         warnings=warnings,
         deps_preflight_error=deps_preflight_error,
+        repo_root=ports.repo_root,
         issue_depends_on_map=issue_depends_on_map,
         github_snapshot_by_issue_number=github_snapshot_by_issue_number,
     )
@@ -271,7 +272,7 @@ def maybe_auto_update_from_branch(
     if state.active == selection:
         return (state, ActiveUpdateOutcome(applied=False, reason=reason or "already active"))
 
-    manifest = build_active_manifest(selection, state.graph)
+    manifest = build_active_manifest(selection, state.graph, repo_root=ports.repo_root)
     context_pack_text = render_context_pack(selection)
     commit_active_state(
         persisted_manifest=manifest,

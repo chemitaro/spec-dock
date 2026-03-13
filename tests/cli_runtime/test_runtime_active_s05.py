@@ -229,6 +229,270 @@ class TestRuntimeActiveS05(unittest.TestCase):
             self.assertIsNone(result.manifest.issue)
             self.assertEqual(legacy_active_path.read_text(encoding="utf-8"), before_legacy)
 
+    def test_legacy_absolute_agent_manifest_is_readable_and_not_rewritten(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_set_active,
+            infra_active_store,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            agent_dir = specdock_dir / ".agent"
+            active_dir = specdock_dir / "active"
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-alpha"
+            epic_dir = init_dir / "epics" / "epic-local-00001-beta"
+            issue_dir = epic_dir / "issues" / "iss-local-00001-gamma"
+            issue_dir.mkdir(parents=True, exist_ok=True)
+            agent_dir.mkdir(parents=True, exist_ok=True)
+
+            active_json_path = agent_dir / "active.json"
+            active_json_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "initiative": {"id": "init-local-00001", "path": init_dir.as_posix()},
+                        "epic": {"id": "epic-local-00001", "path": epic_dir.as_posix()},
+                        "issue": {"id": "iss-local-00001", "path": issue_dir.as_posix()},
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            before = active_json_path.read_text(encoding="utf-8")
+
+            result = infra_active_store.load_active_manifest(specdock_dir)
+            self.assertEqual(result.source, "agent.active")
+            self.assertIsNotNone(result.manifest)
+            assert result.manifest is not None
+            assert result.manifest.issue is not None
+            self.assertEqual(result.manifest.issue.path, issue_dir.as_posix())
+
+            infra_active_store.apply_active_pointers(
+                specdock_dir,
+                result.manifest,
+                "# Context Pack (generated)\n",
+            )
+
+            issue_pointer = active_dir / "issue"
+            if issue_pointer.is_symlink():
+                self.assertEqual(issue_pointer.resolve(), issue_dir.resolve())
+            else:
+                path_file = active_dir / "issue.path"
+                self.assertTrue(path_file.is_file())
+                resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
+                self.assertEqual(resolved, issue_dir.resolve())
+
+            self.assertEqual(active_json_path.read_text(encoding="utf-8"), before)
+
+    def test_legacy_absolute_agent_manifest_path_remaps_to_current_repo_when_possible(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_set_active,
+            infra_active_store,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            agent_dir = specdock_dir / ".agent"
+            active_dir = specdock_dir / "active"
+            init_rel = Path("spec-dock/initiatives/init-local-00001-alpha")
+            epic_rel = init_rel / "epics" / "epic-local-00001-beta"
+            issue_rel = epic_rel / "issues" / "iss-local-00001-gamma"
+            issue_dir = repo_root / issue_rel
+            issue_dir.mkdir(parents=True, exist_ok=True)
+            agent_dir.mkdir(parents=True, exist_ok=True)
+
+            old_root = Path("/moved/from/old-repo")
+            active_json_path = agent_dir / "active.json"
+            active_json_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "initiative": {"id": "init-local-00001", "path": (old_root / init_rel).as_posix()},
+                        "epic": {"id": "epic-local-00001", "path": (old_root / epic_rel).as_posix()},
+                        "issue": {"id": "iss-local-00001", "path": (old_root / issue_rel).as_posix()},
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            before = active_json_path.read_text(encoding="utf-8")
+
+            result = infra_active_store.load_active_manifest(specdock_dir)
+            self.assertEqual(result.source, "agent.active")
+            self.assertIsNotNone(result.manifest)
+            assert result.manifest is not None
+
+            infra_active_store.apply_active_pointers(
+                specdock_dir,
+                result.manifest,
+                "# Context Pack (generated)\n",
+            )
+
+            issue_pointer = active_dir / "issue"
+            if issue_pointer.is_symlink():
+                self.assertEqual(issue_pointer.resolve(), issue_dir.resolve())
+            else:
+                path_file = active_dir / "issue.path"
+                self.assertTrue(path_file.is_file())
+                resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
+                self.assertEqual(resolved, issue_dir.resolve())
+
+            self.assertEqual(active_json_path.read_text(encoding="utf-8"), before)
+
+    def test_legacy_absolute_agent_manifest_prefers_trailing_specdock_segment(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_set_active,
+            infra_active_store,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            agent_dir = specdock_dir / ".agent"
+            active_dir = specdock_dir / "active"
+            init_rel = Path("spec-dock/initiatives/init-local-00001-alpha")
+            epic_rel = init_rel / "epics" / "epic-local-00001-beta"
+            issue_rel = epic_rel / "issues" / "iss-local-00001-gamma"
+            issue_dir = repo_root / issue_rel
+            issue_dir.mkdir(parents=True, exist_ok=True)
+            agent_dir.mkdir(parents=True, exist_ok=True)
+
+            legacy_root_with_specdock_name = Path("/old/spec-dock")
+            active_json_path = agent_dir / "active.json"
+            active_json_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "initiative": {
+                            "id": "init-local-00001",
+                            "path": (legacy_root_with_specdock_name / init_rel).as_posix(),
+                        },
+                        "epic": {
+                            "id": "epic-local-00001",
+                            "path": (legacy_root_with_specdock_name / epic_rel).as_posix(),
+                        },
+                        "issue": {
+                            "id": "iss-local-00001",
+                            "path": (legacy_root_with_specdock_name / issue_rel).as_posix(),
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = infra_active_store.load_active_manifest(specdock_dir)
+            self.assertEqual(result.source, "agent.active")
+            self.assertIsNotNone(result.manifest)
+            assert result.manifest is not None
+
+            infra_active_store.apply_active_pointers(
+                specdock_dir,
+                result.manifest,
+                "# Context Pack (generated)\n",
+            )
+
+            issue_pointer = active_dir / "issue"
+            if issue_pointer.is_symlink():
+                self.assertEqual(issue_pointer.resolve(), issue_dir.resolve())
+            else:
+                path_file = active_dir / "issue.path"
+                self.assertTrue(path_file.is_file())
+                resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
+                self.assertEqual(resolved, issue_dir.resolve())
+
+    def test_legacy_absolute_agent_manifest_outside_repo_falls_back_to_placeholder(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_set_active,
+            infra_active_store,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            agent_dir = specdock_dir / ".agent"
+            active_dir = specdock_dir / "active"
+            placeholder_issue_dir = specdock_dir / "system" / "active-none" / "issue"
+            placeholder_epic_dir = specdock_dir / "system" / "active-none" / "epic"
+            placeholder_init_dir = specdock_dir / "system" / "active-none" / "initiative"
+            placeholder_issue_dir.mkdir(parents=True, exist_ok=True)
+            placeholder_epic_dir.mkdir(parents=True, exist_ok=True)
+            placeholder_init_dir.mkdir(parents=True, exist_ok=True)
+            agent_dir.mkdir(parents=True, exist_ok=True)
+
+            with tempfile.TemporaryDirectory() as outside_tmp:
+                outside_root = Path(outside_tmp)
+                outside_init = outside_root / "outside-init"
+                outside_epic = outside_root / "outside-epic"
+                outside_issue = outside_root / "outside-issue"
+                outside_init.mkdir(parents=True, exist_ok=True)
+                outside_epic.mkdir(parents=True, exist_ok=True)
+                outside_issue.mkdir(parents=True, exist_ok=True)
+
+                active_json_path = agent_dir / "active.json"
+                active_json_path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 2,
+                            "initiative": {"id": "init-local-00001", "path": outside_init.as_posix()},
+                            "epic": {"id": "epic-local-00001", "path": outside_epic.as_posix()},
+                            "issue": {"id": "iss-local-00001", "path": outside_issue.as_posix()},
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+                result = infra_active_store.load_active_manifest(specdock_dir)
+                self.assertEqual(result.source, "agent.active")
+                self.assertIsNotNone(result.manifest)
+                assert result.manifest is not None
+
+                infra_active_store.apply_active_pointers(
+                    specdock_dir,
+                    result.manifest,
+                    "# Context Pack (generated)\n",
+                )
+
+            issue_pointer = active_dir / "issue"
+            if issue_pointer.is_symlink():
+                self.assertEqual(issue_pointer.resolve(), placeholder_issue_dir.resolve())
+            else:
+                path_file = active_dir / "issue.path"
+                self.assertTrue(path_file.is_file())
+                resolved = (active_dir / path_file.read_text(encoding="utf-8").strip()).resolve()
+                self.assertEqual(resolved, placeholder_issue_dir.resolve())
+
     def test_render_active_show_text_regression(self) -> None:
         (
             _runtime_app,
