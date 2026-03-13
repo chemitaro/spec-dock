@@ -52,6 +52,21 @@ def _resolve_repo_root(ports: Ports) -> Path:
     return ports.repo_root
 
 
+def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path) -> str:
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        parts = path.parts
+        if not parts:
+            raise RuntimeError(f"Cannot canonicalize empty node path: {path}")
+        if parts[0] == "spec-dock":
+            return path.as_posix()
+        if "spec-dock" in parts:
+            index = parts.index("spec-dock")
+            return Path(*parts[index:]).as_posix()
+        raise RuntimeError(f"Node path is not under repo root and missing 'spec-dock' segment: {path}")
+
+
 def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: bool) -> str | None:
     for node_id in graph.nodes_by_id.keys():
         try:
@@ -184,14 +199,17 @@ def show_active(req: ShowActiveRequest, ports: Ports) -> ActiveViewResult:
     )
 
 
-def build_active_manifest(selection: ActiveSelection, graph: SpecGraph) -> ActiveManifest:
+def build_active_manifest(selection: ActiveSelection, graph: SpecGraph, *, repo_root: Path) -> ActiveManifest:
     def _entry(node_id: str | None) -> ActiveManifestEntry | None:
         if node_id is None:
             return None
         node = graph.nodes_by_id.get(node_id)
         if node is None:
             raise RuntimeError(f"Node not found while building active manifest: {node_id}")
-        return ActiveManifestEntry(id=node.id, path=node.path.as_posix())
+        return ActiveManifestEntry(
+            id=node.id,
+            path=_to_repo_relative_specdock_path(node.path, repo_root=repo_root),
+        )
 
     return ActiveManifest(
         initiative=_entry(selection.initiative_id),
@@ -338,7 +356,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if req.checkout:
         branch = _checkout_before_write(graph=graph, target_id=target_id, ports=ports, warnings=warnings)
 
-    manifest = build_active_manifest(selection, graph)
+    manifest = build_active_manifest(selection, graph, repo_root=_resolve_repo_root(ports))
     context_pack_text = _build_context_pack_text(manifest)
     commit_active_state(
         persisted_manifest=manifest,
@@ -365,7 +383,7 @@ def clear_active(req: ClearActiveRequest, ports: Ports) -> ActiveClearResult:
     load_result = ports.active_state_store.load_active_manifest(specdock_dir)
     previous = _to_active_selection(load_result.manifest)
     empty_selection = ActiveSelection(initiative_id=None, epic_id=None, issue_id=None)
-    manifest = build_active_manifest(empty_selection, graph)
+    manifest = build_active_manifest(empty_selection, graph, repo_root=_resolve_repo_root(ports))
     context_pack_text = _build_context_pack_text(manifest)
     commit_active_state(
         persisted_manifest=manifest,

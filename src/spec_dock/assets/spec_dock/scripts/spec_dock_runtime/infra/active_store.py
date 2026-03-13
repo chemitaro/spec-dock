@@ -64,9 +64,31 @@ def _manifest_to_json_obj(manifest: ActiveManifest | None) -> dict[str, Any]:
 def _active_entry_path(repo_root: Path, entry: ActiveManifestEntry | None) -> Path | None:
     if entry is None or entry.path is None:
         return None
-    path = repo_root / entry.path
-    if path.exists():
-        return path
+    raw_path = entry.path.strip()
+    if not raw_path:
+        return None
+
+    parsed = Path(raw_path)
+    candidates: list[Path] = []
+
+    if parsed.is_absolute():
+        try:
+            rel_from_repo_root = parsed.relative_to(repo_root)
+            candidates.append(repo_root / rel_from_repo_root)
+        except ValueError:
+            pass
+        parts = parsed.parts
+        for specdock_index in range(len(parts) - 1, -1, -1):
+            if parts[specdock_index] != "spec-dock":
+                continue
+            candidates.append(repo_root / Path(*parts[specdock_index:]))
+    else:
+        # Canonical persisted path is repo-relative (`spec-dock/...`).
+        candidates.append(repo_root / parsed)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
     return None
 
 

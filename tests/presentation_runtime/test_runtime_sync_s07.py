@@ -322,11 +322,57 @@ class TestRuntimeSyncS07(unittest.TestCase):
 
             index_todo = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            tree_todo = json.loads((specdock_dir / ".agent" / "tree.json").read_text(encoding="utf-8"))
+            tree_all = json.loads((specdock_dir / ".agent" / "tree-all.json").read_text(encoding="utf-8"))
             self.assertTrue(index_todo["deps"]["valid"])
             self.assertIsNone(index_todo["deps"]["error"])
             self.assertIn("iss-local-00001", index_todo["nodes"])
             self.assertNotIn("iss-local-00002", index_todo["nodes"])
             self.assertIn("iss-local-00002", index_all["nodes"])
+
+            def _index_paths(payload: dict[str, object]) -> list[str]:
+                nodes = payload.get("nodes")
+                if not isinstance(nodes, dict):
+                    return []
+                paths: list[str] = []
+                for item in nodes.values():
+                    if isinstance(item, dict) and isinstance(item.get("path"), str):
+                        paths.append(item["path"])
+                return paths
+
+            def _tree_paths(tree_payload: dict[str, object]) -> list[str]:
+                out: list[str] = []
+                roots = tree_payload.get("tree")
+                if not isinstance(roots, list):
+                    return out
+                for initiative in roots:
+                    if not isinstance(initiative, dict):
+                        continue
+                    init_path = initiative.get("path")
+                    if isinstance(init_path, str):
+                        out.append(init_path)
+                    for epic in initiative.get("epics", []):
+                        if not isinstance(epic, dict):
+                            continue
+                        epic_path = epic.get("path")
+                        if isinstance(epic_path, str):
+                            out.append(epic_path)
+                        for issue in epic.get("issues", []):
+                            if isinstance(issue, dict) and isinstance(issue.get("path"), str):
+                                out.append(issue["path"])
+                return out
+
+            node_paths = (
+                _index_paths(index_all)
+                + _index_paths(index_todo)
+                + _tree_paths(tree_all)
+                + _tree_paths(tree_todo)
+            )
+            self.assertTrue(node_paths)
+            for node_path in node_paths:
+                self.assertTrue(node_path.startswith("spec-dock/"), node_path)
+                self.assertFalse(Path(node_path).is_absolute(), node_path)
+                self.assertFalse(node_path.startswith(repo_root.as_posix()), node_path)
 
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
             self.assertTrue(deps_issues["deps"]["valid"])

@@ -935,5 +935,73 @@ fresh repo smoke (temp repo + stub gh):
 #### メモ
 - `deps check --json` の fresh repo smoke は、GitHub snapshot 未取得のため `ready=false`, `rc=3` となるが、これは既存契約どおりの expected behavior として扱った。
 
+---
+
+### 2026-03-13 00:10 - 02:10
+
+#### 対象
+- Step: S14
+- AC/EC: AC-001, AC-002, AC-004, AC-005, EC-004
+
+#### 実施内容
+- PR review で指摘された absolute path regression に対して、persisted/generated path を repo-relative canonical (`spec-dock/...`) へ戻す follow-up を実施した。
+- `application/set_active.py` の `build_active_manifest()` を修正し、`spec-dock/.agent/active.json` の `initiative.path` / `epic.path` / `issue.path` が repo-relative で保存されるようにした。
+- `presentation/json_state.py` を修正し、`index-all.json`, `index.json`, `tree-all.json`, `tree.json` の node `path` を repo-relative で出力するようにした。
+- `infra/active_store.py` の read path に legacy absolute-path `active.json` の best-effort 互換を実装し、repo 移動後も `spec-dock/...` suffix から現 repo へ remap できる場合は active pointer を復元するようにした。
+- reviewer 指摘を受けて、多重 `spec-dock` segment を含む legacy absolute path (`/old/spec-dock/spec-dock/...`) でも trailing `spec-dock` suffix を優先して remap できるように修正した。
+- active/sync の regression tests を追加し、canonical write path、legacy absolute-path read compatibility、4 artifact すべての repo-relative path emission を固定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_runtime_active_s05
+
+Ran 9 tests ... OK
+
+python -m unittest -v tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_active_s06 tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_active tests.cli_runtime.test_sync
+
+Ran 72 tests ... OK
+
+python -m unittest discover -v
+
+Ran 257 tests ... OK
+
+rg --files | rg '[A-Z]'
+
+既存の uppercase path のみ検出。今回追加・改名した path に uppercase 増分なし。
+```
+
+#### レビュー / 判定
+- `spec_reviewer`: pass
+  - `design.md`, `plan.md`, `discussion 004` と current diff の S14 契約整合に blocking finding なし
+- `code_reviewer`: conditional_pass -> pass
+  - 初回指摘:
+    - legacy absolute-path remap が最初の `spec-dock` segment を採用しており、`/old/spec-dock/spec-dock/...` 形で placeholder fallback しうる
+  - 修正後:
+    - trailing `spec-dock` suffix 優先へ変更し、focused regression test を追加
+    - 再レビューで blocking finding なし
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `SyncStateResult.repo_root` を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - active manifest path を repo-relative canonical へ変更
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync active auto-update の manifest build を新 signature へ追従
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - legacy absolute-path active manifest read compatibility と trailing `spec-dock` remap を実装
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - state artifact node path を repo-relative canonical へ変更
+- `tests/cli_runtime/test_active.py` - active.json path が repo-relative であることを回帰固定
+- `tests/cli_runtime/test_runtime_active_s05.py` - legacy absolute-path manifest read / remap / fallback regression を追加
+- `tests/cli_runtime/test_runtime_active_s06.py` - active manifest write payload の repo-relative shape を固定
+- `tests/cli_runtime/test_sync.py` - `index*.json` / `tree*.json` path portability regression を追加
+- `tests/presentation_runtime/test_runtime_sync_s07.py` - presentation layer の repo-relative path emission を固定
+- `spec-deps/current/design.md` - relative path canonicalization appendix を追加
+- `spec-deps/current/plan.md` - additive step `S14` を追加
+- `spec-deps/current/discussions/004-disc-relative-path-regression-analysis.md` - review analysis / option compare / Plan B 採用根拠を記録
+- `spec-deps/current/report.md` - 本節を追記
+
+#### コミット
+- 未実施
+
+#### メモ
+- `active.json` の read compatibility は best-effort に留め、stale absolute path で remap 不能な場合は placeholder fallback を維持した。
+- write path / generated artifact は canonical repo-relative へ収束させ、absolute path の再生成は行わない。
+
 ## 省略/例外メモ
 - 該当なし

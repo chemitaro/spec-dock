@@ -285,15 +285,15 @@ ID: "issue-25"
     - final diff review quality gate
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S13, S99
-- AC-002 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11
+- AC-001 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S13, S14, S99
+- AC-002 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S14
 - AC-003 -> S12
-- AC-004 -> S02, S04, S05, S06, S07, S08, S09, S10, S11, S99
-- AC-005 -> S12, S13, S99
+- AC-004 -> S02, S04, S05, S06, S07, S08, S09, S10, S11, S14, S99
+- AC-005 -> S12, S13, S14, S99
 - EC-001 -> S01, S02, S04, S05, S06, S07, S08, S09, S10, S11, S13
 - EC-002 -> S10
 - EC-003 -> S03, S04, S06
-- EC-004 -> S07
+- EC-004 -> S07, S14
 
 ## shared contract / stored-shape 導入順の正本
 - S01:
@@ -1337,6 +1337,57 @@ ID: "issue-25"
 - commit policy:
   - 1 commit
 
+### S14 — relative path canonical regression を修正する
+- target:
+  - `application/set_active.py`
+  - `infra/active_store.py`
+  - `presentation/json_state.py`
+  - `tests/cli_runtime/test_active.py`
+  - `tests/cli_runtime/test_sync.py`
+  - 追加の focused regression tests
+- step boundary:
+  - `active.json` と state artifact の path canonical を repo-relative へ戻す
+  - absolute path persistence/artifact regression の修正に限定する
+  - user-facing command 名や exit code の変更は含めない
+
+#### B1 — repo-relative canonicalization
+- purpose:
+  - portability / stable diff / repo move durability の回帰を閉じる
+
+##### I1 — active manifest canonical path
+- Red:
+  - `active.json` path durability regression を 1 本追加
+- Green:
+  - `build_active_manifest()` が repo-relative path を canonical として書く
+  - `active_store` の read/write path が repo-relative 正本と整合する
+  - 既存の legacy absolute-path `active.json` は best-effort 互換で読める
+- Refactor:
+  - active path normalization helper を整理する
+
+##### I2 — state artifact canonical path
+- Red:
+  - `index*.json` / `tree*.json` path portability regression を 1 本追加
+- Green:
+  - `presentation/json_state.py` が node `path` を `spec-dock/...` 形式で出力する
+  - absolute host path が artifact に漏れないことを固定する
+- Refactor:
+  - relative path helper / mapper の重複を整理する
+
+#### step gate
+- review:
+  - relative path regression review
+- expected tests:
+  - focused regressions:
+    - `active.json` path is repo-relative
+    - legacy absolute-path `active.json` remains readable
+    - `index-all.json` / `index.json` / `tree-all.json` / `tree.json` node paths are repo-relative
+    - repo move / workspace rename durability smoke または同等の portability regression
+  - `python -m unittest discover -v`
+- report update:
+  - `spec-deps/current/report.md`
+- commit policy:
+  - 1 commit
+
 ### S99 — final diff review quality gate
 - target:
   - branch diff
@@ -1400,7 +1451,7 @@ ID: "issue-25"
 
 ## final exit contract
 - AC/EC 達成:
-  - S01-S13, S90, S99 完了後に requirement の AC/EC をすべて満たす
+  - S01-S14, S90, S99 完了後に requirement の AC/EC をすべて満たす
 - docs impact resolved:
   - `none` または必要更新反映済み
 - rollback basis transitioned:

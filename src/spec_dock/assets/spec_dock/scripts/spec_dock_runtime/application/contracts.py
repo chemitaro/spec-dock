@@ -180,6 +180,7 @@ class SyncStateResult:
     generated_at: str
     warnings: list[str]
     deps_preflight_error: str | None
+    repo_root: Path | None = None
     issue_depends_on_map: dict[str, list[str]] = field(default_factory=dict)
     github_snapshot_by_issue_number: dict[int, IssueSnapshot] = field(default_factory=dict)
 
