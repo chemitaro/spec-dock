@@ -1,0 +1,165 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import date
+from pathlib import Path
+from typing import Literal
+from typing import cast
+
+from ..domain.ids import resolve_id_input, resolve_input_title_and_slug
+from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
+from ..domain.tree import resolve_parent_from_active
+from ..infra.contracts import ActiveManifest, StoredMetaRecord
+from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
+from .create_node import execute_create_plan, guard_github_issue_uniqueness, load_graph, plan_node_creation
+from .ports import Ports
+from .sync_state import sync_after_import
+
+
+def _resolve_specdock_dir(ports: Ports) -> Path:
+    if ports.specdock_dir is not None:
+        return ports.specdock_dir
+    if ports.repo_root is not None:
+        return ports.repo_root / "spec-dock"
+    raise RuntimeError("specdock_dir is required")
+
+
+def _resolve_repo_root(ports: Ports) -> Path:
+    if ports.repo_root is None:
+        raise RuntimeError("repo_root is required")
+    return ports.repo_root
+
+
+def _resolve_issue_gateway(ports: Ports):
+    if ports.issue_gateway is None:
+        raise RuntimeError("issue_gateway is required")
+    return ports.issue_gateway
+
+
+def _active_selection_from_manifest(manifest: ActiveManifest | None) -> ActiveSelection:
+    if manifest is None:
+        return ActiveSelection(initiative_id=None, epic_id=None, issue_id=None)
+    return ActiveSelection(
+        initiative_id=manifest.initiative.id if manifest.initiative is not None else None,
+        epic_id=manifest.epic.id if manifest.epic is not None else None,
+        issue_id=manifest.issue.id if manifest.issue is not None else None,
+    )
+
+
+def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
+    return SpecNode(
+        kind=cast(SpecNodeKind, record.kind),
+        id=record.id,
+        title=record.title,
+        slug=record.slug,
+        path=Path(record.path),
+        meta_path=Path(record.meta_path),
+        parent_id=record.parent_id,
+        initiative_id=record.initiative_id,
+        epic_id=record.epic_id,
+        github_issue_number=record.github_issue_number,
+    )
+
+
+def resolve_parent_for_import(
+    req: ImportNodeRequest,
+    graph: SpecGraph,
+    ports: Ports,
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+) -> str | None:
+    if kind == "initiative":
+        return None
+
+    if req.parent_id is not None:
+        if kind == "epic":
+            parent_id = resolve_id_input(req.parent_id, prefix="init", field="initiative", nodes=graph.nodes_by_id)
+            parent = graph.nodes_by_id.get(parent_id)
+            if parent is None or parent.kind != "initiative":
+                raise RuntimeError(f"Initiative not found: {parent_id}")
+            return parent.id
+
+        parent_id = resolve_id_input(req.parent_id, prefix="epic", field="epic", nodes=graph.nodes_by_id)
+        parent = graph.nodes_by_id.get(parent_id)
+        if parent is None or parent.kind != "epic":
+            raise RuntimeError(f"Epic not found: {parent_id}")
+        if not parent.initiative_id:
+            raise RuntimeError(f"Epic meta missing initiative_id: {parent.id}")
+        return parent.id
+
+    if ports.active_state_store is None:
+        raise RuntimeError("active_state_store is required for active parent fallback")
+
+    load_result = ports.active_state_store.load_active_manifest_no_migrate(_resolve_specdock_dir(ports))
+    active = _active_selection_from_manifest(load_result.manifest)
+    return resolve_parent_from_active(graph, kind, active)
+
+
+def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -> CreateNodeRequest:
+    return CreateNodeRequest(
+        title=req.title,
+        slug=req.slug,
+        parent_id=parent_id,
+        requested_node_id=None,
+        github_mode="link_existing",
+        github_issue_number=int(req.issue_number),
+    )
+
+
+def import_node_core(
+    req: ImportNodeRequest,
+    ports: Ports,
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+) -> ImportNodeResult:
+    title, slug = resolve_input_title_and_slug(req.title, req.slug)
+    req = replace(req, title=title, slug=slug)
+
+    try:
+        graph = load_graph(ports, validate=True)
+    except RuntimeError as error:
+        raise RuntimeError(f"preflight validate failed: {error}") from error
+
+    issue_number = int(req.issue_number)
+    guard_github_issue_uniqueness(graph, issue_number)
+
+    parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+    create_req = build_linked_create_request(req, parent_id)
+
+    specdock_dir = _resolve_specdock_dir(ports)
+    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+    plan = plan_node_creation(
+        create_req,
+        graph,
+        kind=kind,
+        specdock_dir=specdock_dir,
+        today=today,
+    )
+
+    collisions = [path for path in plan.planned_paths if path.exists()]
+    if collisions:
+        raise RuntimeError(f"Destination already exists: {collisions[0]}")
+
+    issue_gateway = _resolve_issue_gateway(ports)
+    imported_issue = issue_gateway.issue_view_minimal(_resolve_repo_root(ports), issue_number)
+
+    execute_create_plan(plan, ports)
+    post_import_sync = sync_after_import(ports)
+    return ImportNodeResult(
+        node=_to_spec_node(plan.meta),
+        imported_issue=imported_issue,
+        post_import_sync=post_import_sync,
+        warnings=[],
+    )
+
+
+def import_initiative(req: ImportNodeRequest, ports: Ports) -> ImportNodeResult:
+    return import_node_core(req, ports, kind="initiative")
+
+
+def import_epic(req: ImportNodeRequest, ports: Ports) -> ImportNodeResult:
+    return import_node_core(req, ports, kind="epic")
+
+
+def import_issue(req: ImportNodeRequest, ports: Ports) -> ImportNodeResult:
+    return import_node_core(req, ports, kind="issue")

@@ -1,0 +1,64 @@
+# workflow: initiative
+
+Initiative は投資単位です。
+この workflow は、Initiative 固有の再利用判定、作成、Epic 分解、品質ゲートを正本として扱います。
+この workflow の品質ゲートは scope 固有の additive gate であり、`phase_*.md` の shared minimum gate 通過を前提とします。
+
+対応 leaf skill:
+- `.agents/skills/spec-dock-initiative-planning/SKILL.md`
+
+関連:
+- 総合: [guide.md](guide.md)
+- Epic: [workflow_epic.md](workflow_epic.md)
+- GitHub 連携: [reference_github.md](reference_github.md)
+- 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
+- Initiative plan playbook: [phase_plan_initiative.md](phase_plan_initiative.md)
+
+## 再利用判定
+
+- まず既存 initiative の `requirement.md` / `design.md` / `plan.md` / `discussions/` と current active を確認する
+- 目的、成功条件、スコープ、責任主体が既存 initiative に自然に収まるなら、新規作成せず既存 initiative を更新する
+- 投資判断の単位や success metrics が崩れる場合だけ `new` / `import` を使う
+- 新規作成した理由や既存 initiative を使わない理由は、作成後の対象 initiative 配下の最初の `disc` に残す
+
+## 作成
+
+```bash
+./spec new initiative --title "..."
+./spec new initiative --github-issue <n> --title "..."
+./spec new initiative --create-github-issue --title "..."
+
+./spec import initiative <num|#num|url> --title "..."
+```
+
+- naming 制約と GitHub 振る舞いは [reference_naming.md](reference_naming.md), [reference_github.md](reference_github.md) を参照する
+- Initiative 配下では wrapper `epics/new-epic "<title>"` で local-only Epic を追加できる
+
+## 記述
+
+- `requirement.md`: 投資理由、成功条件、スコープ
+- `design.md`: 方針、境界、依存、リスク
+- `plan.md`: Epic 分解、順序、ブロッカー。shared axiom は `phase_plan.md`、Initiative 固有の書き方は `phase_plan_initiative.md`
+- `discussions/`: `new doc {adr|disc|research|note} --initiative <initiative-id> --title "..."`
+- shared な書き方は `phase_*.md`、lifecycle / governance と Initiative 固有の分解判断はこの workflow を正本とする
+
+## 品質ゲート
+
+- requirement:
+  - 背景 / 目的が 1〜3 行で言える
+  - 成功条件が観測可能
+  - スコープと非スコープが明確
+  - 新規 initiative が必要な理由を最初の `disc` で追える
+- design:
+  - 依存関係が列挙されている
+  - リスクと軽減策がある
+- plan:
+  - Epic への分解方針がある
+  - 大まかな順序とブロッカーが見える
+
+## 仕上げ
+
+```bash
+./spec validate
+./spec sync
+```
