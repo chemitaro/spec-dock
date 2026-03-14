@@ -12,11 +12,12 @@ ID: "init-local-00001"
 
 ## 目的（Outcome）
 - Primary:
-  - `spec-dock` 自身を `spec-dock` で管理しながら開発できる prototype を成立させる。
+  - `spec-dock` 自身を `spec-dock` で管理しながら開発できる prototype を完成させる。
   - provider 側の実装と consumer 側の dogfooding workspace を一貫した運用でつなぐ。
 - Secondary:
   - 実運用を通じて、agentic cli として不足している command、contract、diagnostics を早期に発見する。
   - 今後の roadmap を repo 内文書へ集約し、会話依存の管理を減らす。
+  - dogfooding で見つかった課題を継続的に backlog へ投入し、prototype 完成までの改善ループを回す。
 
 ## 背景と Why now
 - 現状の課題:
@@ -39,20 +40,20 @@ ID: "init-local-00001"
   - Baseline:
     - `spec-dock` 自身の開発運用で、local-only issue の close/reopen、link/unlink、診断導線が不足している。
   - Target:
-    - 本 initiative の roadmap と ADR を起点に、prototype の実装順が dogfooding に耐える形で固定されている。
+    - 本 initiative の roadmap と ADR を起点に、prototype 完成までの実装順と guardrail が固定されている。
   - 計測方法:
     - initiative 文書と ADR が current dogfooding workspace 上の正本として参照されること。
   - 判定時期:
-    - 本 initiative 承認時、および各 epic 着手時。
+    - 本 initiative 承認時、および prototype completion 判定時。
 - Metric-002:
   - Baseline:
     - 状態遷移、authority、GitHub mutation の設計判断が文書間に分散している。
   - Target:
-    - `status lifecycle`、`link/unlink`、`doctor/dry-run` の実装順序と guardrail が一つの initiative に集約されている。
+    - `status lifecycle`、`link/unlink`、`doctor/dry-run` の実装順序と、dogfooding で見つかった主要課題の投入先が一つの initiative に集約されている。
   - 計測方法:
-    - plan.md と ADR の整合確認。
+    - plan.md / ADR / backlog note の整合確認。
   - 判定時期:
-    - epic 分割前。
+    - prototype completion 判定前。
 
 ## スコープ
 - MUST:
@@ -63,6 +64,7 @@ ID: "init-local-00001"
   - `doctor`、`--dry-run`、`--explain` の診断系施策を roadmap に含める。
   - repo-safe な GitHub mutation を scope に含める。
   - existing artifact を壊さない additive migration を前提にする。
+  - dogfooding で見つかったバグ、UX 問題、構造改善候補をこの initiative に継続投入できるようにする。
 - MUST NOT:
   - GitHub issue を必須化して local-only issue を排除しない。
   - linked issue に local override を許す二重 authority を導入しない。
@@ -73,12 +75,16 @@ ID: "init-local-00001"
   - naming / adoption extras
   - 広範な metadata automation
   - 今回の prototype 成立に直接関係しない純粋な refactor 単独施策
+  - 日常運用可能な本番レベルへの到達
+  - 安定運用体制の完成
 
 ## 境界
 - Always:
   - provider 側の source of truth は `src/spec_dock/` に置く。
   - dogfooding workspace `spec-dock/` は利用側検証と active docs のために使う。
   - `1 issue = 1 authority` を維持する。
+  - prototype 完成までをこの initiative の成功境界とする。
+  - dogfooding で見つかった課題は backlog note / discussion / issue として継続投入する。
 - Ask:
   - GitHub を伴う外部副作用の追加
   - 既存 artifact schema の hardening を warning から error に切り替える時
@@ -116,6 +122,7 @@ ID: "init-local-00001"
 - 運用:
   - repo docs を正本とし、会話ログは正本にしない。
   - dogfooding 中でも provider と consumer の役割を混同しない。
+  - prototype 完成前に見つかった課題は、この initiative の配下で継続管理する。
 
 ## リスク / 依存
 - R-001:
