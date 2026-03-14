@@ -13,11 +13,12 @@ ID: "init-local-00001"
 
 ## この計画が達成する Goal / Metric
 - Goal:
-  - `spec-dock` 自身を `spec-dock` で管理しながら、状態管理・authority transfer・診断系まで含む prototype を成立させる。
+  - `spec-dock` 自身を `spec-dock` で管理しながら、状態管理・authority transfer・診断系まで含む prototype を完成させる。
 - 対象 metric:
   - roadmap と ADR に基づいて epic が切り出せること
   - status lifecycle と link lifecycle の実装順が固定されていること
   - dogfooding 運用で必要な最小 command 群が明確であること
+  - 主要な dogfooding blocker が backlog 管理下にあること
 
 ## マイルストーン
 - M1:
@@ -35,6 +36,11 @@ ID: "init-local-00001"
     - diagnostics / discovery / hardening の後半テーマが実装計画として着手可能
   - exit:
     - Epic 3-4 の issue 分割が完了している
+- M4:
+  - deliverable:
+    - prototype completion 判定に必要な主要 blocker と remaining backlog が整理されている
+  - exit:
+    - prototype 完成判定が可能
 
 ## Epic ポートフォリオ
 - epic-0001-status-and-authority-foundation:
@@ -65,26 +71,28 @@ ID: "init-local-00001"
     - epic-0001-status-and-authority-foundation
 - epic-0003-operability-and-diagnostics:
   - 目的:
-    - dogfooding 運用で mutate 系 command を安全かつ説明可能にする。
+    - dogfooding 運用で mutate 系 command を安全かつ説明可能にし、運用上の気づきを継続投入できる受け皿を持つ。
   - deliverable:
     - Phase 4 に対応する `doctor`
     - `--dry-run` の導入方針
     - `--explain` と reason code / next action の整理
     - stale / partial / blocked 状態の説明契約
     - 運用時の preflight / failure messaging の一貫化
+    - debug / ux / operability 上の気づきを issue 化するための受け皿整理
   - metric link:
     - M3
   - depends on:
     - epic-0002-link-and-github-lifecycle
 - epic-0004-discovery-and-hardening:
   - 目的:
-    - visibility と recoverability を後半テーマとして仕上げる。
+    - visibility と recoverability を後半テーマとして仕上げ、dogfooding で見つかった構造改善候補を継続投入できるようにする。
   - deliverable:
     - Phase 5 に対応する `list` / `find` / `show` 系 discovery
     - status filtering と stale visibility
     - Phase 6 に対応する atomic sync/update
     - contradiction validation hardening
     - migration assist と rollback/recovery 方針
+    - dogfooding feedback に基づく構造改善候補の backlog 管理
   - metric link:
     - M3
   - depends on:
@@ -94,9 +102,11 @@ ID: "init-local-00001"
 - sequencing rationale:
   - Phase は product rollout の順序を表す。
   - Epic はその順序を束ねる設計テーマを表す。
+  - Epic は一般的に適切な大まかな設計テーマとして維持し、細かな分割は issue に落とす。
   - Issue は各 epic 内で実装可能な単位へ分割する。
   - `status contract` を mutation より先に固定し、その後 local path、authority transfer、remote mutation の順で進める。
   - diagnostics は mutation が増えるタイミングでまとめて強化し、discovery/hardening は後半テーマとして扱う。
+  - dogfooding で見つかった細かなバグ、UX 問題、構造改善候補は、適切な epic の issue として継続投入する。
 - parallelizable:
   - Epic 3 の一部と Epic 4 の一部は並行可能。
   - ただし Epic 2 までの authority 決定が前提になる。
@@ -112,6 +122,8 @@ ID: "init-local-00001"
   - Epic 3 着手前に diagnostics の surface を確認
 - G9 final initiative plan review:
   - Epic 4 着手前に remaining debt と hardening 範囲を見直す
+- G10 prototype completion review:
+  - prototype が完成し、主要な dogfooding blocker が backlog 管理下にあることを確認する
 
 ## 指標レビュー計画
 - review timing:
@@ -134,11 +146,12 @@ ID: "init-local-00001"
 
 ## final exit contract
 - milestone exit:
-  - Phase 0-6 に対する epic backlog が運用可能な粒度で整理されていること
+  - prototype が完成し、Phase 0-6 に対する epic backlog が運用可能な粒度で整理されていること
 - success metrics reviewed:
   - requirement の metric を milestone ごとに確認していること
 - remaining follow-up ownership:
   - prototype 後の extras は別 initiative / epic に切り分ける
+  - 主要な dogfooding blocker は backlog 管理下にあり、残課題の行き先が明確であること
 
 ## 依存 / ブロッカー
 - D-001:
