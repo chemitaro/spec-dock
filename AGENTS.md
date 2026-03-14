@@ -1,46 +1,159 @@
 # Repository Guidelines
 
+## Operating Mode
+
+- This repository is now a `spec-dock` dogfooding repo: we develop `spec-dock` while also using `spec-dock` to manage this product's own specs and workflow.
+- Treat repo documents as the source of truth.
+
+## Dogfooding Warning
+
+- This repo contains both provider code and a local consumer workspace.
+- `src/spec_dock/` is the provider-side source of truth.
+- `spec-dock/` is the generated consumer-side workspace used for dogfooding, validation, and active docs.
+- `src/spec_dock/assets/spec_dock/...` produces what later appears under `spec-dock/...`.
+- When implementation and generated files look similar, edit the provider side first.
+- Do not treat `spec-dock/` as the implementation source of truth unless the task is explicitly about dogfooding data or generated output.
+
+## Canonical Paths
+
+Read these first before changing code or tests:
+
+- Use `spec-dock/active/` when an active initiative / epic / issue is set.
+- If `spec-dock/active/` is not set, use:
+  - `spec-dock/system/active-none/initiative/{requirement,design,plan,report}.md`
+  - `spec-dock/system/active-none/epic/{requirement,design,plan,report}.md`
+  - `spec-dock/system/active-none/issue/{requirement,design,plan,report}.md`
+- Accepted architecture and roadmap decisions are reflected in the current runtime structure and dogfooding workflow below.
+
 ## Project Structure & Module Organization
 
-- `src/spec_dock/`: Python package for the installer CLI (`spec-dock`).
-- `src/spec_dock/assets/`: Scaffolded runtime assets copied into target repos (templates, docs, runtime scripts, agent skill).
-- `tests/`: `unittest`-based regression tests (focus on `init/update` outputs and runtime script behavior).
-- `docs/`: Design/notes about aggregation and GitHub integration.
-- `manual-tests/`: Local manual test workspaces (gitignored except `manual-tests/README.md`).
+- `src/spec_dock/`: installer package for the top-level `spec-dock` CLI.
+- `src/spec_dock/cli.py`: installer entrypoint for `init` / `update`.
+- `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
+- `src/spec_dock/assets/spec_dock/`: provider-side scaffold source of truth for files that are generated into managed repos.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`: provider-side runtime CLI shipped into managed repos.
+- `spec-dock/`: local dogfooding workspace scaffolded into this repository. Use it for validation, dogfooding, and active docs, not as the primary implementation source.
+- `tests/`: regression suite for installer behavior and shipped runtime behavior.
+
+### Provider-Side Directory Map
+
+```text
+src/spec_dock/
+|-- cli.py
+|-- assets/
+|   |-- codex_skills/
+|   `-- spec_dock/
+|       |-- docs/
+|       |-- templates/
+|       |-- system/
+|       `-- scripts/
+|           |-- spec-dock
+|           `-- spec_dock_runtime/
+|               |-- cli/
+|               |-- commands/
+|               |-- application/
+|               |-- domain/
+|               |-- infra/
+|               `-- presentation/
+`-- __init__.py
+
+tests/
+|-- test_cli.py
+|-- test_init_update.py
+|-- cli_runtime/
+|-- domain_runtime/
+`-- presentation_runtime/
+```
+
+Read it like this:
+
+- Change installer behavior: start at `src/spec_dock/cli.py`.
+- Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
+- Change runtime command entrypoints: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{cli,commands}/`.
+- Change orchestration or use cases: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`.
+- Change business rules or models: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/`.
+- Change filesystem/git/github/persistence behavior: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/`.
+- Change JSON/markdown/PUML/CLI output: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/`.
+- Choose tests by surface: installer in `tests/test_cli.py` and `tests/test_init_update.py`, runtime in `tests/cli_runtime/`, domain in `tests/domain_runtime/`, presentation in `tests/presentation_runtime/`.
+
+### Runtime Architecture
+
+The current runtime architecture is a hybrid layered architecture.
+
+- `cli/`: bootstrap, parser, registry, dispatch.
+- `commands/`: user-facing command handlers and command contracts.
+- `application/`: orchestration and use-case layer.
+- `domain/`: core rules, models, status/deps/tree/validation logic.
+- `infra/`: filesystem, git/github, active store, artifact writing, persistence adapters.
+- `presentation/`: JSON, markdown, PUML, and CLI rendering.
+
+Do not collapse new work back into monolithic command files when a layer-specific home already exists.
+
+## Dogfooding Rules
+
+- Assume `spec-dock` in this repo is an active consumer of the shipped scaffold.
+- Expect duplication-by-design between `src/spec_dock/assets/spec_dock/...` and `spec-dock/...`.
+- In normal development, edit `src/spec_dock/assets/spec_dock/...` and then verify the result in `spec-dock/...`.
+- When changing shipped assets under `src/spec_dock/assets/`, consider the impact on both newly initialized repos and this local dogfooding repo.
+- Prefer commands and flows that will also work for a real consumer repo; avoid one-off local shortcuts unless they are explicitly test-only.
+- If a change affects scaffold structure, docs, templates, scripts, or runtime contracts, treat it as a shipped asset API change.
+
+## Development Workflow
+
+1. Read the relevant docs under `spec-dock/active/`, or `spec-dock/system/active-none/` if no active context is set.
+2. Identify the layer or surface you are changing:
+   - installer: `src/spec_dock/cli.py`, asset sync/update behavior
+   - runtime command surface: `.../spec_dock_runtime/cli/` and `.../commands/`
+   - orchestration or business logic: `.../application/` and `.../domain/`
+   - external adapters or persistence: `.../infra/`
+   - output/rendering: `.../presentation/`
+3. Make the smallest coherent change in the correct layer.
+4. Update tests that cover the changed contract or scaffold behavior.
+5. Verify whether the local dogfooding workspace under `spec-dock/` should be refreshed, inspected, or intentionally left as-is.
 
 ## Build, Test, and Development Commands
 
 ```bash
-# Run unit tests (preferred baseline)
+# Full baseline
 python -m unittest discover -v
 
-# Try the installer CLI locally (no publish required)
+# Run installer locally from the current checkout
 uvx --from . spec-dock init /tmp/target-repo
 uvx --from . spec-dock update /tmp/target-repo
 
-# Or run the module directly
+# Dogfooding repo: installed local tool
+spec-dock --version
+spec-dock update .
+
+# Module entrypoint
 python -m spec_dock.cli init /tmp/target-repo
 ```
 
-## Coding Style & Naming Conventions
-
-- Python 3.10+; use type hints and keep imports sorted and minimal.
-- Indentation: 4 spaces; prefer clear, small helper functions over clever abstractions.
-- Assets under `src/spec_dock/assets/` are part of the shipped scaffold—treat changes as API changes and update tests/docs accordingly.
-
 ## Testing Guidelines
 
-- Framework: `unittest` (see `tests/test_cli.py`).
-- When changing scaffolding behavior, add/adjust assertions that validate generated file structure and content.
-- Keep tests hermetic: prefer temp dirs and command stubs (e.g., `gh` stubs) over network calls.
+- Framework: `unittest`.
+- Installer/scaffold coverage: `tests/test_cli.py`, `tests/test_init_update.py`.
+- Runtime coverage: `tests/cli_runtime/`, `tests/domain_runtime/`, `tests/presentation_runtime/`.
+- Keep tests hermetic: use temp directories and `gh` stubs instead of live network calls.
+- When changing shipped scaffold behavior, update or add assertions for generated file structure, content, and runtime behavior.
+
+## Coding Style & Change Boundaries
+
+- Python 3.10+; use type hints and keep imports minimal and ordered.
+- Prefer small helpers and explicit contracts over clever abstractions.
+- Keep edits aligned with the accepted layered architecture.
+- The implementation source of truth is under `src/spec_dock/`, especially `src/spec_dock/assets/spec_dock/...` for shipped scaffold behavior.
+- `spec-dock/` is for dogfooding confirmation and consumer-side inspection.
+- However, do inspect `spec-dock/` after scaffold-affecting changes because it is now part of dogfooding validation.
 
 ## Commit & Pull Request Guidelines
 
-- Commits follow Conventional Commits in practice, e.g.:
-  - `feat(deps): ...`, `fix(active): ...`, `docs(...): ...`, `chore(...): ...`
-- Use a multi-line message: summary line, blank line, then bullet list of changes/reasoning/tests.
-- PRs should include: problem statement, linked issue, test output (`python -m unittest discover -v`), and notes on any scaffold/template changes.
+- Commits follow Conventional Commits in Japanese.
+- Use a multi-line message: `type(scope): summary`, blank line, bullet body.
+- PRs should include the problem statement, linked issue, test output, and notes on scaffold/template/runtime impact.
 
 ## Security & Configuration Tips
 
-- Do not commit secrets (tokens, `.env`, local trial repos). Keep experiments under `manual-tests/`.
+- Do not commit secrets, tokens, `.env`, or local experimental artifacts.
+- Keep ad hoc experiments under `manual-tests/`.
+- Avoid assuming the local dogfooding workspace is disposable; confirm before deleting or rewriting data under `spec-dock/`.
