@@ -110,7 +110,7 @@ stop
   - `effective_status`
   - `source`
   - `stale`
-  - `last_sync_at` または同等の freshness 情報
+  - `last_sync_at`
 - local-only issue は `authority=local`、初期 `effective_status=open`、初期 `source=local`、`stale=false`
 - GitHub-linked issue は `authority=github` を基本としつつ、`--github` なしの読み取りでは cached projection を返してよい
 - ただし cached projection には `source=cache` を必ず伴わせる
@@ -151,7 +151,7 @@ ActiveSet --> IssueStatusResolution : uses
 - application:
   - deps / active use case が共通 resolution を参照
 - presentation:
-  - stale/source を text と json の両方へ反映
+  - stale/source/last_sync_at を text と json の両方へ反映
 
 ### トレードオフ
 
@@ -346,4 +346,4 @@ CLI --> User : safe success or explicit failure
 
 ## open questions
 
-- freshness 表示に `last_sync_at` を本 issue で含めるか、それとも `source/stale` を first fix とするか
+- なし。freshness contract は本 issue で `source / stale / last_sync_at` を必須 field として扱う
