@@ -103,6 +103,34 @@ def _shared_graph(domain_models, domain_tree):
     return domain_tree.build_graph(seeds)
 
 
+def _issue_status_snapshot(
+    domain_models,
+    *,
+    issue_id: str,
+    effective_status: str,
+    source: str,
+    github_number: int | None,
+    authority: str | None = None,
+    stale: bool | None = None,
+    last_sync_at: str | None = None,
+):
+    resolved_authority = authority
+    if resolved_authority is None:
+        resolved_authority = "local" if github_number is None else "github"
+    resolved_stale = stale
+    if resolved_stale is None:
+        resolved_stale = source == "cache"
+    return domain_models.IssueStatusSnapshot(
+        issue_id=issue_id,
+        authority=resolved_authority,
+        effective_status=effective_status,
+        source=source,
+        stale=resolved_stale,
+        last_sync_at=last_sync_at,
+        github_number=github_number,
+    )
+
+
 class TestRuntimeDomainS03(unittest.TestCase):
     def test_resolve_issue_statuses_selects_source(self) -> None:
         _domain_deps, domain_models, domain_status, domain_tree = _runtime_modules()
@@ -130,10 +158,14 @@ class TestRuntimeDomainS03(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id=cached,
         )
-        self.assertEqual(github_statuses["iss-local-00001"].status, "done")
+        self.assertEqual(github_statuses["iss-local-00001"].authority, "github")
+        self.assertEqual(github_statuses["iss-local-00001"].effective_status, "done")
         self.assertEqual(github_statuses["iss-local-00001"].source, "github")
-        self.assertEqual(github_statuses["iss-local-00002"].status, "unknown")
+        self.assertFalse(github_statuses["iss-local-00001"].stale)
+        self.assertEqual(github_statuses["iss-local-00001"].last_sync_at, "2026-01-01T00:00:00Z")
+        self.assertEqual(github_statuses["iss-local-00002"].effective_status, "unknown")
         self.assertEqual(github_statuses["iss-local-00002"].source, "unknown")
+        self.assertTrue(github_statuses["iss-local-00002"].stale)
 
         cache_statuses = domain_status.resolve_issue_statuses(
             graph,
@@ -141,25 +173,111 @@ class TestRuntimeDomainS03(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id=cached,
         )
-        self.assertEqual(cache_statuses["iss-local-00001"].status, "open")
+        self.assertEqual(cache_statuses["iss-local-00001"].authority, "github")
+        self.assertEqual(cache_statuses["iss-local-00001"].effective_status, "open")
         self.assertEqual(cache_statuses["iss-local-00001"].source, "cache")
-        self.assertEqual(cache_statuses["iss-local-00002"].status, "done")
+        self.assertTrue(cache_statuses["iss-local-00001"].stale)
+        self.assertEqual(cache_statuses["iss-local-00002"].effective_status, "done")
         self.assertEqual(cache_statuses["iss-local-00002"].source, "cache")
+        self.assertTrue(cache_statuses["iss-local-00002"].stale)
 
     def test_build_progress_map_aggregates_counts(self) -> None:
         _domain_deps, domain_models, domain_status, domain_tree = _runtime_modules()
 
         graph = _shared_graph(domain_models, domain_tree)
         issue_statuses = {
-            "iss-local-00001": domain_models.IssueStatusSnapshot("iss-local-00001", "done", "github", 301),
-            "iss-local-00002": domain_models.IssueStatusSnapshot("iss-local-00002", "open", "github", 302),
-            "iss-local-00003": domain_models.IssueStatusSnapshot("iss-local-00003", "unknown", "unknown", 303),
+            "iss-local-00001": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00001",
+                effective_status="done",
+                source="github",
+                stale=False,
+                github_number=301,
+            ),
+            "iss-local-00002": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00002",
+                effective_status="open",
+                source="github",
+                stale=False,
+                github_number=302,
+            ),
+            "iss-local-00003": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00003",
+                effective_status="unknown",
+                source="unknown",
+                stale=True,
+                github_number=303,
+            ),
         }
 
         progress = domain_status.build_progress_map(graph, issue_statuses)
         self.assertEqual(progress.by_node_id["epic-local-00001"], {"total": 3, "done": 1, "open": 1, "unknown": 1})
         self.assertEqual(progress.by_node_id["init-local-00001"], {"total": 3, "done": 1, "open": 1, "unknown": 1})
         self.assertEqual(progress.counts, {"total": 3, "done": 1, "open": 1, "unknown": 1})
+
+    def test_resolve_issue_statuses_local_only_is_deterministic_open(self) -> None:
+        _domain_deps, domain_models, domain_status, domain_tree = _runtime_modules()
+        graph = domain_tree.build_graph(
+            [
+                domain_models.SpecNodeSeed(
+                    kind="initiative",
+                    id="init-local-00001",
+                    title="init",
+                    slug="init",
+                    path=Path("/repo/spec-dock/initiatives/init-local-00001-init"),
+                    meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-init/.meta.json"),
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="epic",
+                    id="epic-local-00001",
+                    title="epic",
+                    slug="epic",
+                    path=Path("/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic"),
+                    meta_path=Path(
+                        "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/.meta.json"
+                    ),
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                domain_models.SpecNodeSeed(
+                    kind="issue",
+                    id="iss-local-00001",
+                    title="issue",
+                    slug="issue",
+                    path=Path(
+                        "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/issues/iss-local-00001-issue"
+                    ),
+                    meta_path=Path(
+                        "/repo/spec-dock/initiatives/init-local-00001-init/epics/epic-local-00001-epic/issues/iss-local-00001-issue/.meta.json"
+                    ),
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=None,
+                ),
+            ]
+        )
+
+        statuses = domain_status.resolve_issue_statuses(
+            graph,
+            github_enabled=False,
+            issue_snapshots=[],
+            cached_issue_status_by_id={},
+        )
+        issue = statuses["iss-local-00001"]
+        self.assertEqual(issue.authority, "local")
+        self.assertEqual(issue.effective_status, "open")
+        self.assertEqual(issue.source, "local")
+        self.assertFalse(issue.stale)
+        self.assertIsNone(issue.last_sync_at)
 
     def test_build_effective_deps_map_merges_parent_dependencies(self) -> None:
         domain_deps, domain_models, _domain_status, domain_tree = _runtime_modules()
@@ -179,9 +297,27 @@ class TestRuntimeDomainS03(unittest.TestCase):
 
         graph = _shared_graph(domain_models, domain_tree)
         issue_statuses = {
-            "iss-local-00001": domain_models.IssueStatusSnapshot("iss-local-00001", "open", "cache", 301),
-            "iss-local-00002": domain_models.IssueStatusSnapshot("iss-local-00002", "open", "cache", 302),
-            "iss-local-00003": domain_models.IssueStatusSnapshot("iss-local-00003", "open", "cache", 303),
+            "iss-local-00001": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00001",
+                effective_status="open",
+                source="cache",
+                github_number=301,
+            ),
+            "iss-local-00002": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00002",
+                effective_status="open",
+                source="cache",
+                github_number=302,
+            ),
+            "iss-local-00003": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00003",
+                effective_status="open",
+                source="cache",
+                github_number=303,
+            ),
         }
         issue_depends_on_map = {
             "iss-local-00001": ["iss-local-00002"],
@@ -206,9 +342,27 @@ class TestRuntimeDomainS03(unittest.TestCase):
 
         graph = _shared_graph(domain_models, domain_tree)
         issue_statuses = {
-            "iss-local-00001": domain_models.IssueStatusSnapshot("iss-local-00001", "open", "cache", 301),
-            "iss-local-00002": domain_models.IssueStatusSnapshot("iss-local-00002", "unknown", "cache", 302),
-            "iss-local-00003": domain_models.IssueStatusSnapshot("iss-local-00003", "open", "cache", 303),
+            "iss-local-00001": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00001",
+                effective_status="open",
+                source="cache",
+                github_number=301,
+            ),
+            "iss-local-00002": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00002",
+                effective_status="unknown",
+                source="cache",
+                github_number=302,
+            ),
+            "iss-local-00003": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00003",
+                effective_status="open",
+                source="cache",
+                github_number=303,
+            ),
         }
         issue_depends_on_map = {
             "iss-local-00001": ["iss-local-00002"],
@@ -230,9 +384,27 @@ class TestRuntimeDomainS03(unittest.TestCase):
 
         graph = _shared_graph(domain_models, domain_tree)
         issue_statuses = {
-            "iss-local-00001": domain_models.IssueStatusSnapshot("iss-local-00001", "open", "cache", 301),
-            "iss-local-00002": domain_models.IssueStatusSnapshot("iss-local-00002", "done", "cache", 302),
-            "iss-local-00003": domain_models.IssueStatusSnapshot("iss-local-00003", "open", "cache", 303),
+            "iss-local-00001": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00001",
+                effective_status="open",
+                source="cache",
+                github_number=301,
+            ),
+            "iss-local-00002": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00002",
+                effective_status="done",
+                source="cache",
+                github_number=302,
+            ),
+            "iss-local-00003": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00003",
+                effective_status="open",
+                source="cache",
+                github_number=303,
+            ),
         }
         issue_depends_on_map = {
             "iss-local-00001": ["iss-local-00002"],
@@ -276,9 +448,27 @@ class TestRuntimeDomainS03(unittest.TestCase):
             )
 
         issue_statuses = {
-            "iss-local-00001": domain_models.IssueStatusSnapshot("iss-local-00001", "open", "cache", 301),
-            "iss-local-00002": domain_models.IssueStatusSnapshot("iss-local-00002", "done", "cache", 302),
-            "iss-local-00003": domain_models.IssueStatusSnapshot("iss-local-00003", "open", "cache", 303),
+            "iss-local-00001": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00001",
+                effective_status="open",
+                source="cache",
+                github_number=301,
+            ),
+            "iss-local-00002": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00002",
+                effective_status="done",
+                source="cache",
+                github_number=302,
+            ),
+            "iss-local-00003": _issue_status_snapshot(
+                domain_models,
+                issue_id="iss-local-00003",
+                effective_status="open",
+                source="cache",
+                github_number=303,
+            ),
         }
         state = domain_deps.build_deps_state(
             graph,

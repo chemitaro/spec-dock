@@ -17,6 +17,13 @@ def _status_from_github_state(state: str) -> str:
     return "done" if str(state).strip().upper() == "CLOSED" else "open"
 
 
+def _normalize_last_sync_at(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 def _safe_sorted_issue_ids(issue_ids: list[str]) -> list[str]:
     try:
         return sorted(issue_ids, key=deps_node_sort_key)
@@ -29,11 +36,13 @@ def resolve_issue_statuses(
     github_enabled: bool,
     issue_snapshots: list[IssueSnapshot] | None,
     cached_issue_status_by_id: dict[str, str],
+    cached_issue_last_sync_at_by_id: dict[str, str | None] | None = None,
 ) -> dict[str, IssueStatusSnapshot]:
     issue_snapshot_by_number: dict[int, IssueSnapshot] = {}
     for issue_snapshot in issue_snapshots or []:
         issue_snapshot_by_number[int(issue_snapshot.issue_number)] = issue_snapshot
 
+    cache_last_sync_at_by_id = dict(cached_issue_last_sync_at_by_id or {})
     resolved: dict[str, IssueStatusSnapshot] = {}
     issue_ids = _safe_sorted_issue_ids(
         [
@@ -45,24 +54,37 @@ def resolve_issue_statuses(
     for issue_id in issue_ids:
         issue_node = graph.nodes_by_id[issue_id]
 
-        status = "unknown"
+        authority = "local" if issue_node.github_issue_number is None else "github"
+        effective_status = "unknown"
         source = "unknown"
+        stale = authority == "github"
+        last_sync_at: str | None = None
 
-        if github_enabled and issue_node.github_issue_number is not None:
+        if authority == "local":
+            effective_status = "open"
+            source = "local"
+            stale = False
+        elif github_enabled:
             issue_snapshot = issue_snapshot_by_number.get(int(issue_node.github_issue_number))
             if issue_snapshot is not None:
-                status = _status_from_github_state(issue_snapshot.state)
+                effective_status = _status_from_github_state(issue_snapshot.state)
                 source = "github"
-        elif not github_enabled:
+                stale = False
+                last_sync_at = _normalize_last_sync_at(issue_snapshot.updated_at)
+        else:
+            source = "cache"
             cached_status = cached_issue_status_by_id.get(issue_node.id)
             if cached_status is not None:
-                status = _normalize_issue_status(cached_status)
-                source = "cache"
+                effective_status = _normalize_issue_status(cached_status)
+                last_sync_at = _normalize_last_sync_at(cache_last_sync_at_by_id.get(issue_node.id))
 
         resolved[issue_id] = IssueStatusSnapshot(
             issue_id=issue_id,
-            status=status,
+            authority=authority,
+            effective_status=effective_status,
             source=source,
+            stale=stale,
+            last_sync_at=last_sync_at,
             github_number=issue_node.github_issue_number,
         )
 
@@ -90,9 +112,17 @@ def build_progress_map(
         issue_node = graph.nodes_by_id[issue_id]
         resolution = issue_statuses.get(
             issue_id,
-            IssueStatusSnapshot(issue_id=issue_id, status="unknown", source="unknown", github_number=None),
+            IssueStatusSnapshot(
+                issue_id=issue_id,
+                authority="unknown",
+                effective_status="unknown",
+                source="unknown",
+                stale=True,
+                last_sync_at=None,
+                github_number=None,
+            ),
         )
-        issue_status = _normalize_issue_status(resolution.status)
+        issue_status = _normalize_issue_status(resolution.effective_status)
 
         counts["total"] += 1
         counts[issue_status] += 1

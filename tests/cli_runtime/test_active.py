@@ -1301,7 +1301,7 @@ class TestCliActive(CliRuntimeHarness):
             after = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
-    def test_active_set_without_github_blocks_unknown_issue_even_without_deps(self) -> None:
+    def test_active_set_without_github_local_issue_without_deps_is_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1317,11 +1317,12 @@ class TestCliActive(CliRuntimeHarness):
 
             before = (agent_dir / "active.json").read_text(encoding="utf-8")
             p = self._run_runtime_capture(target, ["active", "set", "iss-local-00001"])
-            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("active set blocked", p.stderr)
-            self.assertIn("ready=false", p.stderr)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (active set)", p.stdout)
             after = (agent_dir / "active.json").read_text(encoding="utf-8")
-            self.assertEqual(after, before)
+            self.assertNotEqual(after, before)
+            active = json.loads(after)
+            self.assertEqual(active["issue"]["id"], "iss-local-00001")
 
     def test_active_set_epic_and_initiative_use_v2_deps_guard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

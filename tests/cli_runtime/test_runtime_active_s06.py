@@ -255,7 +255,7 @@ class TestRuntimeActiveS06(unittest.TestCase):
         self.assertNotIn("snapshot_current_state", calls)
         self.assertNotIn("write_active_manifest", calls)
 
-    def test_set_active_non_issue_unknown_without_blockers_is_blocked(self) -> None:
+    def test_set_active_non_issue_local_only_without_blockers_is_ready(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
         ports = self._ports(
             issue_depends_on_map={"iss-local-00001": [], "iss-local-00002": []},
@@ -268,11 +268,11 @@ class TestRuntimeActiveS06(unittest.TestCase):
             use_github=False,
             issue_limit=10000,
         )
-        with self.assertRaisesRegex(RuntimeError, r"active set blocked.*guard_reason=unknown"):
-            app_set_active.set_active(req, ports)
-        calls = [name for name, *_rest in ports.active_state_store.calls]
-        self.assertNotIn("snapshot_current_state", calls)
-        self.assertNotIn("write_active_manifest", calls)
+        result = app_set_active.set_active(req, ports)
+        self.assertTrue(result.manifest_written)
+        self.assertEqual(result.selection.initiative_id, "init-local-00001")
+        self.assertIsNone(result.selection.epic_id)
+        self.assertIsNone(result.selection.issue_id)
 
     def test_set_active_force_commits_and_order_is_authoritative(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
@@ -331,7 +331,7 @@ class TestRuntimeActiveS06(unittest.TestCase):
         self.assertTrue(result.manifest_written)
         self.assertEqual(result.selection.issue_id, "iss-local-00001")
         self.assertIn("gh_fetch_failed", result.warnings)
-        self.assertTrue(any(w.startswith("deps_blocked:") for w in result.warnings))
+        self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
         self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
 
     def test_set_active_checkout_pre_step7_failure_has_no_rollback(self) -> None:

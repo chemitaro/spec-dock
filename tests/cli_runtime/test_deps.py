@@ -288,9 +288,9 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            self.assertIn("spec-dock: blocked (deps check)", p.stderr)
-            self.assertIn("ready=false", p.stderr)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (deps check)", p.stdout)
+            self.assertIn("ready=true", p.stdout)
 
     def test_deps_check_returns_ready_and_blockers_and_closure_json(self) -> None:
         if os.name == "nt":
@@ -381,7 +381,16 @@ class TestCliDeps(CliRuntimeHarness):
             data = json.loads(p.stdout)
             self.assertEqual(
                 list(data.keys()),
-                ["schema_version", "target", "ready", "effective_depends_on", "blockers", "nodes", "warnings"],
+                [
+                    "schema_version",
+                    "target",
+                    "target_status",
+                    "ready",
+                    "effective_depends_on",
+                    "blockers",
+                    "nodes",
+                    "warnings",
+                ],
             )
             self.assertEqual(data["target"], "iss-00301")
             self.assertFalse(data["ready"])
@@ -462,6 +471,10 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertTrue(data["ready"])
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
+            self.assertEqual(data["target_status"]["source"], "cache")
+            self.assertTrue(data["target_status"]["stale"])
+            self.assertEqual(data["target_status"]["last_sync_at"], "t")
+            self.assertEqual(data["nodes"]["iss-00302"]["source"], "cache")
 
     def test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -506,6 +519,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertFalse(data["ready"])
             self.assertEqual(data["blockers"], ["iss-00301"])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "unknown")
+            self.assertEqual(data["target_status"]["source"], "cache")
+            self.assertTrue(data["target_status"]["stale"])
+            self.assertIsNone(data["target_status"]["last_sync_at"])
+            self.assertEqual(data["target_status"]["source"], "cache")
+            self.assertTrue(data["target_status"]["stale"])
+            self.assertIsNone(data["target_status"]["last_sync_at"])
 
     def test_deps_check_missing_target_is_argparse_exit_2_not_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -881,8 +900,10 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            json.loads(p.stdout)  # must be valid JSON
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            data = json.loads(p.stdout)  # must be valid JSON
+            self.assertTrue(data["ready"])
+            self.assertEqual(data["target_status"]["source"], "local")
             self.assertEqual(p.stderr.strip(), "")
 
     def test_deps_check_missing_deps_json_is_empty(self) -> None:
@@ -895,8 +916,9 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             data = json.loads(p.stdout)
+            self.assertTrue(data["ready"])
             self.assertEqual(data["effective_depends_on"], [])
 
     def test_deps_json_parse_error_fails_with_path(self) -> None:
@@ -1469,7 +1491,6 @@ class TestCliDeps(CliRuntimeHarness):
             )
             before = issue_meta.read_text(encoding="utf-8")
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             after = issue_meta.read_text(encoding="utf-8")
             self.assertEqual(after, before)
-

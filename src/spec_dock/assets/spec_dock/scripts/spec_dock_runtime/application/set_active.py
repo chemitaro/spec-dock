@@ -133,6 +133,28 @@ def _append_unique(warnings: list[str], warning: str) -> None:
         warnings.append(warning)
 
 
+def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
+    if ports.derived_state_reader is None:
+        return {}
+    loader = getattr(ports.derived_state_reader, "load_cached_issue_last_sync_at_by_id", None)
+    if not callable(loader):
+        return {}
+    loaded = loader(specdock_dir)
+    if not isinstance(loaded, dict):
+        return {}
+    out: dict[str, str | None] = {}
+    for issue_id, value in loaded.items():
+        if not isinstance(issue_id, str):
+            continue
+        if value is None:
+            out[issue_id] = None
+            continue
+        if isinstance(value, str):
+            normalized = value.strip()
+            out[issue_id] = normalized or None
+    return out
+
+
 def _build_context_pack_text(manifest: ActiveManifest) -> str:
     has_init = manifest.initiative is not None
     has_epic = manifest.epic is not None
@@ -309,14 +331,17 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
             issue_snapshots = []
 
     cached_issue_status_by_id: dict[str, str] = {}
+    cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
+        cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
 
     status_context = resolve_issue_status_context(
         graph,
         github_enabled=req.use_github,
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
+        cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)

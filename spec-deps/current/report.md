@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-17"
+最終更新: "2026-03-18"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: []
 ---
@@ -15,8 +15,9 @@ ID: "issue-28-runtime-regression-bugs"
 ## 実施サマリー
 - `S01 create transaction で duplicate id を予防する` を完了
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
+- `S03 status/readiness contract を統一し stale projection を明示する` を完了
 - implementation review と QA review を通過
-- 次は `S03 status/readiness contract を統一し stale projection を明示する` に着手
+- 次は `S04 sync artifact / doctor / validator 契約を揃える` に着手
 
 ## 記録
 - `S01` 実装:
@@ -52,14 +53,41 @@ ID: "issue-28-runtime-regression-bugs"
   - `pass`
   - 実行:
     - `python -m unittest -v tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
+- `S03` 実装:
+  - local-only issue を deterministic に `open` / `ready` と解釈するよう status/readiness 契約を統一
+  - `IssueStatusSnapshot` と sync/deps JSON・text 出力に `authority` / `effective_status` / `source` / `stale` / `last_sync_at` を追加
+  - `deps check` / `active set` / `sync` が同じ status context を使うよう統一
+  - cache の `last_sync_at` は top-level `generated_at` ではなく issue node ごとの保存値を読むよう修正
+- `S03` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - cache の `last_sync_at` が local-only sync 後の `generated_at` で前進して見え、authoritative freshness を過大表示する
+  - 対応:
+    - cached `last_sync_at` を issue node の persisted field から読むよう修正
+    - GitHub authoritative / cache re-sync の freshness 回帰テストを追加
+  - 再レビュー:
+    - `pass`
+- `S03` QA review:
+  - 初回 `fail`
+  - 指摘:
+    - linked issue sync の freshness 契約が cache/live 両経路で未固定
+    - `deps check` text 出力の freshness 表示が未固定
+  - 対応:
+    - `tests/cli_runtime/test_sync.py` に authoritative / cache 両経路の `source` / `stale` / `last_sync_at` 検証を追加
+    - `tests/cli_runtime/test_runtime_deps_s04.py` に blocked / ready 両経路の text freshness 表示検証を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.domain_runtime.test_runtime_domain_s03 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_deps tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.presentation_runtime.test_runtime_sync_s07`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
 - `issue` の GitHub create が遅延するケースでは lock 保持時間が伸び、競合失敗が増える運用リスクがある
 - 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
 - duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
+- cache `last_sync_at` は issue node の persisted freshness field がない旧 index では `None` になる
 
 ## 次アクション
-- `S02` の変更をコミットする
-- `S03` の dev implementation を開始する
-- `S03` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
+- `S03` の変更をコミットする
+- `S04` の dev implementation を開始する
+- `S04` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
