@@ -72,6 +72,9 @@ class _DerivedStateReader:
     def load_cached_issue_status_by_id(self, specdock_dir: Path) -> dict[str, str]:
         return infra_derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
 
+    def load_cached_issue_last_sync_at_by_id(self, specdock_dir: Path) -> dict[str, str | None]:
+        return infra_derived_state_reader.load_cached_issue_last_sync_at_by_id(specdock_dir)
+
 
 @dataclass(frozen=True)
 class _IssueGateway:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -72,9 +72,17 @@ class ActiveSelection:
 @dataclass(frozen=True)
 class IssueStatusSnapshot:
     issue_id: str
-    status: str
+    authority: str
+    effective_status: str
     source: str
+    stale: bool
+    last_sync_at: str | None
     github_number: int | None
+
+    @property
+    def status(self) -> str:
+        # Backward-compatible alias for existing callers/tests.
+        return self.effective_status
 
 
 @dataclass(frozen=True)
@@ -114,6 +122,7 @@ class TargetDepsInspection:
     node_states: dict[str, DepsNodeState]
     effective_depends_on: list[str]
     warnings: list[str]
+    issue_statuses: dict[str, IssueStatusSnapshot] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -17,9 +17,21 @@ from .puml import (
 
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
+    target_id = inspection.target_id.value
+
+    target_status = inspection.issue_statuses.get(target_id)
+    target_status_payload = {
+        "authority": target_status.authority if target_status is not None else "unknown",
+        "effective_status": target_status.effective_status if target_status is not None else "unknown",
+        "source": target_status.source if target_status is not None else "unknown",
+        "stale": bool(target_status.stale) if target_status is not None else True,
+        "last_sync_at": target_status.last_sync_at if target_status is not None else None,
+    }
+
     payload = {
         "schema_version": 1,
-        "target": inspection.target_id.value,
+        "target": target_id,
+        "target_status": target_status_payload,
         "ready": bool(inspection.evaluation.ready),
         "effective_depends_on": list(inspection.effective_depends_on),
         "blockers": list(inspection.evaluation.blockers),
@@ -27,6 +39,31 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
             node_id: {
                 "state": node_state.status,
                 "ready": bool(node_state.ready),
+                "authority": (
+                    inspection.issue_statuses[node_id].authority
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "effective_status": (
+                    inspection.issue_statuses[node_id].effective_status
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "source": (
+                    inspection.issue_statuses[node_id].source
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "stale": (
+                    bool(inspection.issue_statuses[node_id].stale)
+                    if node_id in inspection.issue_statuses
+                    else True
+                ),
+                "last_sync_at": (
+                    inspection.issue_statuses[node_id].last_sync_at
+                    if node_id in inspection.issue_statuses
+                    else None
+                ),
             }
             for node_id, node_state in inspection.node_states.items()
         },
@@ -143,7 +180,12 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
 
         if node.kind == "issue":
             issue_status = result.issue_statuses.get(node.id)
-            item["status"] = issue_status.status if issue_status is not None else "unknown"
+            item["status"] = issue_status.effective_status if issue_status is not None else "unknown"
+            item["authority"] = issue_status.authority if issue_status is not None else "unknown"
+            item["effective_status"] = issue_status.effective_status if issue_status is not None else "unknown"
+            item["source"] = issue_status.source if issue_status is not None else "unknown"
+            item["stale"] = bool(issue_status.stale) if issue_status is not None else True
+            item["last_sync_at"] = issue_status.last_sync_at if issue_status is not None else None
             if result.deps_preflight_error is None:
                 evaluation = result.deps_eval_by_id.get(node.id)
                 if evaluation is not None:

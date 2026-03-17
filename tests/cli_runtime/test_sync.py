@@ -478,7 +478,7 @@ class TestCliSync(CliRuntimeHarness):
             tree_issue = [i for i in tree["tree"][0]["epics"][0]["issues"] if i["id"] == "iss-00303"][0]
             self.assertEqual(tree_issue["deps"], nodes["iss-00303"]["deps"])
 
-    def test_unknown_is_not_ready(self) -> None:
+    def test_local_only_issue_is_open_and_ready_without_deps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -492,8 +492,13 @@ class TestCliSync(CliRuntimeHarness):
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             issue = index["nodes"]["iss-local-00001"]
-            self.assertEqual(issue["status"], "unknown")
-            self.assertEqual(issue["deps"], {"ready": False, "depends_on": [], "blockers_top": []})
+            self.assertEqual(issue["status"], "open")
+            self.assertEqual(issue["authority"], "local")
+            self.assertEqual(issue["effective_status"], "open")
+            self.assertEqual(issue["source"], "local")
+            self.assertFalse(issue["stale"])
+            self.assertIsNone(issue["last_sync_at"])
+            self.assertEqual(issue["deps"], {"ready": True, "depends_on": [], "blockers_top": []})
 
     def test_sync_outputs_are_deterministically_sorted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1076,10 +1081,27 @@ class TestCliSync(CliRuntimeHarness):
             nodes = index_all["nodes"]
             self.assertEqual(nodes["iss-00301"]["status"], "done")
             self.assertEqual(nodes["iss-00301"]["github"]["state"], "CLOSED")
+            self.assertEqual(nodes["iss-00301"]["source"], "github")
+            self.assertFalse(nodes["iss-00301"]["stale"])
+            self.assertEqual(nodes["iss-00301"]["last_sync_at"], "t")
             self.assertEqual(nodes["iss-00302"]["status"], "open")
             self.assertEqual(nodes["iss-00302"]["github"]["state"], "OPEN")
+            self.assertEqual(nodes["iss-00302"]["source"], "github")
+            self.assertFalse(nodes["iss-00302"]["stale"])
+            self.assertEqual(nodes["iss-00302"]["last_sync_at"], "t")
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             self.assertNotIn("iss-00301", index_todo["nodes"])
+
+            p_cache = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
+            self.assertEqual(p_cache.returncode, 0, p_cache.stdout + p_cache.stderr)
+            index_all_cache = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            cache_nodes = index_all_cache["nodes"]
+            self.assertEqual(cache_nodes["iss-00301"]["source"], "cache")
+            self.assertTrue(cache_nodes["iss-00301"]["stale"])
+            self.assertEqual(cache_nodes["iss-00301"]["last_sync_at"], "t")
+            self.assertEqual(cache_nodes["iss-00302"]["source"], "cache")
+            self.assertTrue(cache_nodes["iss-00302"]["stale"])
+            self.assertEqual(cache_nodes["iss-00302"]["last_sync_at"], "t")
 
     def test_sync_generates_index_deps_and_deps_issues_artifacts(self) -> None:
         if os.name == "nt":

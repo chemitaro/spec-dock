@@ -94,17 +94,38 @@ def render_import_text(result: ImportNodeResult) -> CliText:
 
 def render_deps_check_text(result: DepsCheckResult) -> CliText:
     target_id = result.inspection.target_id.value
+    target_status = result.inspection.issue_statuses.get(target_id)
+    authority = target_status.authority if target_status is not None else "unknown"
+    effective_status = target_status.effective_status if target_status is not None else "unknown"
+    source = target_status.source if target_status is not None else "unknown"
+    stale = "true" if (target_status.stale if target_status is not None else True) else "false"
+    last_sync_at = target_status.last_sync_at if target_status is not None else None
+    last_sync_display = last_sync_at if isinstance(last_sync_at, str) and last_sync_at.strip() else "-"
     blockers = list(result.inspection.evaluation.blockers)
     if result.inspection.evaluation.ready:
         return CliText(
-            stdout_lines=[f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0"],
+            stdout_lines=[
+                (
+                    "spec-dock: ok (deps check) "
+                    f"target={target_id} "
+                    f"authority={authority} effective_status={effective_status} "
+                    f"source={source} stale={stale} last_sync_at={last_sync_display} "
+                    "ready=true blockers=0"
+                )
+            ],
             stderr_lines=[],
             warnings=list(result.warnings),
         )
     return CliText(
         stdout_lines=[],
         stderr_lines=[
-            f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
+            (
+                "spec-dock: blocked (deps check) "
+                f"target={target_id} "
+                f"authority={authority} effective_status={effective_status} "
+                f"source={source} stale={stale} last_sync_at={last_sync_display} "
+                f"ready=false blockers={len(blockers)}"
+            ),
             *[f"- {blocker}" for blocker in blockers],
         ],
         warnings=list(result.warnings),

@@ -97,6 +97,34 @@ def _sample_records(infra_contracts):
     ]
 
 
+def _issue_status_snapshot(
+    domain_models,
+    *,
+    issue_id: str,
+    effective_status: str,
+    source: str,
+    github_number: int | None,
+    authority: str | None = None,
+    stale: bool | None = None,
+    last_sync_at: str | None = None,
+):
+    resolved_authority = authority
+    if resolved_authority is None:
+        resolved_authority = "local" if github_number is None else "github"
+    resolved_stale = stale
+    if resolved_stale is None:
+        resolved_stale = source == "cache"
+    return domain_models.IssueStatusSnapshot(
+        issue_id=issue_id,
+        authority=resolved_authority,
+        effective_status=effective_status,
+        source=source,
+        stale=resolved_stale,
+        last_sync_at=last_sync_at,
+        github_number=github_number,
+    )
+
+
 class _StubNodeReader:
     def __init__(self, records):
         self.records = list(records)
@@ -184,8 +212,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id={"iss-local-00001": "open"},
         )
-        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].status, "done")
+        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].authority, "github")
+        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].effective_status, "done")
         self.assertEqual(context_gh.issue_statuses["iss-local-00001"].source, "github")
+        self.assertFalse(context_gh.issue_statuses["iss-local-00001"].stale)
+        self.assertEqual(context_gh.issue_statuses["iss-local-00001"].last_sync_at, "t")
 
         context_cache = app_status_context.resolve_issue_status_context(
             graph,
@@ -193,8 +224,9 @@ class TestRuntimeDepsS04(unittest.TestCase):
             issue_snapshots=snapshots,
             cached_issue_status_by_id={"iss-local-00001": "open"},
         )
-        self.assertEqual(context_cache.issue_statuses["iss-local-00001"].status, "open")
+        self.assertEqual(context_cache.issue_statuses["iss-local-00001"].effective_status, "open")
         self.assertEqual(context_cache.issue_statuses["iss-local-00001"].source, "cache")
+        self.assertTrue(context_cache.issue_statuses["iss-local-00001"].stale)
 
     def test_check_deps_use_case_and_cycle_fail_fast(self) -> None:
         (
@@ -321,6 +353,24 @@ class TestRuntimeDepsS04(unittest.TestCase):
             },
             effective_depends_on=["iss-local-00001"],
             warnings=[],
+            issue_statuses={
+                "iss-local-00001": _issue_status_snapshot(
+                    domain_models,
+                    issue_id="iss-local-00001",
+                    effective_status="open",
+                    source="cache",
+                    github_number=301,
+                    last_sync_at="2026-03-17T12:34:56Z",
+                ),
+                "iss-local-00002": _issue_status_snapshot(
+                    domain_models,
+                    issue_id="iss-local-00002",
+                    effective_status="open",
+                    source="cache",
+                    github_number=302,
+                    last_sync_at="2026-03-17T12:34:56Z",
+                ),
+            },
         )
         result = app_contracts.DepsCheckResult(
             target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00002", github_issue_number=None),
@@ -330,11 +380,20 @@ class TestRuntimeDepsS04(unittest.TestCase):
 
         text = presentation_cli_text.render_deps_check_text(result)
         self.assertIn("spec-dock: blocked (deps check)", text.stderr_lines[0])
+        self.assertIn("authority=github", text.stderr_lines[0])
+        self.assertIn("effective_status=open", text.stderr_lines[0])
+        self.assertIn("source=cache", text.stderr_lines[0])
+        self.assertIn("stale=true", text.stderr_lines[0])
+        self.assertIn("last_sync_at=2026-03-17T12:34:56Z", text.stderr_lines[0])
         self.assertEqual(text.warnings, ["gh_fetch_failed"])
 
         payload = json.loads(presentation_json_state.render_deps_check_json(result))
         self.assertEqual(payload["target"], "iss-local-00002")
         self.assertEqual(payload["blockers"], ["iss-local-00001"])
+        self.assertEqual(payload["target_status"]["source"], "cache")
+        self.assertTrue(payload["target_status"]["stale"])
+        self.assertEqual(payload["target_status"]["last_sync_at"], "2026-03-17T12:34:56Z")
+        self.assertEqual(payload["nodes"]["iss-local-00001"]["source"], "cache")
         self.assertEqual(payload["warnings"], ["gh_fetch_failed"])
 
     def test_legacy_deps_path_delegates_and_exit_codes(self) -> None:
@@ -364,6 +423,16 @@ class TestRuntimeDepsS04(unittest.TestCase):
             node_states={},
             effective_depends_on=["iss-local-00001"],
             warnings=[],
+            issue_statuses={
+                "iss-local-00002": _issue_status_snapshot(
+                    domain_models,
+                    issue_id="iss-local-00002",
+                    effective_status="open",
+                    source="cache",
+                    github_number=302,
+                    last_sync_at="2026-03-17T12:34:56Z",
+                )
+            },
         )
         blocked_result = app_contracts.DepsCheckResult(
             target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00002", github_issue_number=None),
@@ -398,6 +467,11 @@ class TestRuntimeDepsS04(unittest.TestCase):
             stderr_lines = [line for line in stderr.getvalue().splitlines() if line.strip()]
             self.assertTrue(stderr_lines[0].startswith("spec-dock: (warn) gh_fetch_failed"))
             self.assertIn("spec-dock: blocked (deps check)", stderr_lines[1])
+            self.assertIn("authority=github", stderr_lines[1])
+            self.assertIn("effective_status=open", stderr_lines[1])
+            self.assertIn("source=cache", stderr_lines[1])
+            self.assertIn("stale=true", stderr_lines[1])
+            self.assertIn("last_sync_at=2026-03-17T12:34:56Z", stderr_lines[1])
             self.assertEqual(calls["req"].target.kind, "node_id")
             self.assertEqual(calls["req"].target.node_id, "iss-local-1")
         finally:
@@ -420,17 +494,45 @@ class TestRuntimeDepsS04(unittest.TestCase):
                 node_states={},
                 effective_depends_on=[],
                 warnings=[],
+                issue_statuses={
+                    "iss-00123": _issue_status_snapshot(
+                        domain_models,
+                        issue_id="iss-00123",
+                        authority="github",
+                        effective_status="open",
+                        source="github",
+                        stale=False,
+                        last_sync_at="2026-03-17T12:34:56Z",
+                        github_number=123,
+                    )
+                },
             ),
             warnings=[],
         )
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
         original_application_check_deps = cli_bootstrap.application_check_deps
+        original_render_deps_check_text = runtime_app._render_deps_check_text
         original_render_deps_check_json = runtime_app._render_deps_check_json
         try:
             runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
             cli_bootstrap.application_check_deps = lambda req, ports: ready_result
+            runtime_app._render_deps_check_text = presentation_cli_text.render_deps_check_text
             runtime_app._render_deps_check_json = presentation_json_state.render_deps_check_json
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = runtime_app.main(["deps", "check", "#123"])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue().strip(), "")
+            ready_line = stdout.getvalue().strip()
+            self.assertIn("spec-dock: ok (deps check)", ready_line)
+            self.assertIn("authority=github", ready_line)
+            self.assertIn("effective_status=open", ready_line)
+            self.assertIn("source=github", ready_line)
+            self.assertIn("stale=false", ready_line)
+            self.assertIn("last_sync_at=2026-03-17T12:34:56Z", ready_line)
 
             stdout = io.StringIO()
             stderr = io.StringIO()
@@ -444,6 +546,7 @@ class TestRuntimeDepsS04(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_check_deps = original_application_check_deps
+            runtime_app._render_deps_check_text = original_render_deps_check_text
             runtime_app._render_deps_check_json = original_render_deps_check_json
 
         original_find_specdock_dir = runtime_app._find_specdock_dir
