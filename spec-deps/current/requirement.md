@@ -56,7 +56,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `deps check` と `active set` が同じ readiness / status 契約で動作すること
 - required artifact 欠損を `validate` が検知できるようにする
 - recoverability を改善する
-  - `.meta.json` の保護方針を維持する場合でも、supported な診断・修復導線を用意すること
+  - `.meta.json` の保護方針を維持したまま、`doctor` コマンドで supported な診断・修復導線を用意すること
 - active 未設定時の導線を改善する
   - `active` が未設定でも human/agent が次に何を見るべきか分かること
 - GitHub target 解釈を安全化する
@@ -101,8 +101,10 @@ ID: "issue-28-runtime-regression-bugs"
 
 ### B03 local-only deps/active inconsistency
 
+- local-only issue の初期 `authority=local`、初期 `effective_status=open` であること
 - local-only issue の初期 effective status が deterministic であること
 - `deps check` の readiness と `active set` の guard が一致すること
+  - 共通 readiness rule は少なくとも `blockers=[]` かつ `effective_status=open` を ready と扱うこと
 
 ### B04 validate gap
 
@@ -111,7 +113,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ### B05 repair gap
 
-- `.meta.json` を直接 chmod/edit しなくても、supported path で診断・修復方針が得られること
+- `.meta.json` を直接 chmod/edit しなくても、`doctor` で診断・修復方針が得られること
 
 ### B06 active-not-set pathway gap
 
@@ -129,12 +131,14 @@ ID: "issue-28-runtime-regression-bugs"
 ### B09 stale projection
 
 - linked issue の status source / freshness が利用者に明示されること
+- linked issue を `--github` なしで読む場合、少なくとも `source=cache` が露出すること
 - `--github` なしの読み取りで stale の可能性が分かること
 
 ### B10 numeric target ambiguity
 
 - `active set` などで target intent を明示指定できること
 - pure number の誤解釈が減ること
+  - bare number の fail 化は本 issue の対象外とし、まずは explicit flags の追加を優先すること
 
 ## 境界
 
@@ -181,6 +185,7 @@ ID: "issue-28-runtime-regression-bugs"
 - When:
   - `deps check` と `active set` を実行する
 - Then:
+  - `authority=local`、`effective_status=open` と整合した readiness 判定になる
   - `blockers=[]` なのに `ready=false/state=unknown` となる矛盾が解消されている
 
 ### AC-003 required artifact validation
@@ -209,6 +214,7 @@ ID: "issue-28-runtime-regression-bugs"
 - When:
   - `deps check` などの status 読み取りを `--github` なしで実行する
 - Then:
+  - 少なくとも `source=cache` が露出する
   - source / stale / freshness が明示され、latest と誤認しにくい
 
 ### AC-006 active pathway
@@ -218,6 +224,7 @@ ID: "issue-28-runtime-regression-bugs"
 - When:
   - `active show` または `spec-dock/active` を参照する
 - Then:
+  - `spec-dock/active` は未設定でも解決可能な入口として存在する
   - 未設定であることと、次に取るべき action/fallback path が分かる
 
 ### AC-007 CLI symmetry and disambiguation
@@ -229,3 +236,21 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - `new issue` でも explicit GitHub create を表現できる
   - `active set` などで node id と GitHub issue number を明示指定できる
+
+### AC-008 doctor guidance
+
+- Given:
+  - duplicate id/seq、missing artifact、broken meta、stale active pointer のいずれかが存在する
+- When:
+  - `doctor` を実行する
+- Then:
+  - 問題の種別と修復方針が supported path として提示される
+
+### AC-009 duplicate sequence validation
+
+- Given:
+  - discussion sequence が重複した壊れた状態が存在する
+- When:
+  - `validate` を実行する
+- Then:
+  - duplicate seq が failure として検知される
