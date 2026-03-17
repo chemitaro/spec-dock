@@ -1,98 +1,231 @@
 ---
 種別: 要件定義書（Issue）
-ID: "manual-regression-sweep"
-タイトル: "manual-tests 環境を再整備し手動回帰テストで潜在バグを洗い出す"
-関連GitHub: []
+ID: "issue-28-runtime-regression-bugs"
+タイトル: "manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する"
+関連GitHub: ["28"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-15"
+最終更新: "2026-03-17"
 親: []
 ---
 
-# manual-regression-sweep manual-tests 環境を再整備し手動回帰テストで潜在バグを洗い出す — 要件定義（WHAT / WHY）
+# issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 要件定義（WHAT / WHY）
 
 ## 目的
-- `manual-tests/` を整理し、実使用を想定した手動テスト環境を再整備する。
-- `spec-dock` の通常操作と紛らわしい操作を網羅的に手動実行し、既知バグ以外の潜在バグを洗い出す。
-- テスト計画、実施記録、最終報告を repo 内に正本として残す。
+
+- manual regression で再現した runtime の重大不具合を修正し、通常操作での整合性破綻を防ぐ。
+- `local-only` と `GitHub-linked` が混在する現在設計でも、少なくとも prototype 段階で安全に操作できる状態へ引き上げる。
+- 今後の `design.md` / `plan.md` / 実装委任の正本となる bugfix scope と acceptance criteria を固定する。
 
 ## 背景・現状
-- `manual-tests/` には過去の workspace や report が多数残っており、今回の sweep 用としては散らかっている。
-- これまでの手動確認は「1件作れて OK」といった単発確認を通過していた可能性がある。
-- 今回、`new epic` の duplicate id が実使用に近い並列操作で顕在化し、単発確認では不十分だと判明した。
-- 今後の bugfix を正しく優先づけるには、通常操作と複雑操作を含む manual regression sweep が必要である。
+
+- 2026-03-15 の local/stub manual regression と GitHub live manual regression により、create race、status/readiness 不整合、GitHub target 誤解釈、validate gap など複数の不具合が確認された。
+- これらの不具合は、単なる UX ノイズではなく、tree 破損、誤リンク、誤認、復旧困難といった実害に直結する。
+- dogfooding を本格化する前に、まず runtime の基本信頼性を上げる必要がある。
+
+主な根拠:
+
+- `manual-tests/reports/2026-03-15-manual-regression-sweep/summary.md`
+- `manual-tests/reports/2026-03-15-manual-regression-sweep-github-live/summary.md`
+- `spec-deps/current/discussions/005-disc-duplicate-epic-id-race-analysis.md`
+- `spec-deps/current/discussions/006-disc-github-linkage-simplification-analysis.md`
+- `spec-deps/current/discussions/007` から `016`
 
 ## 対象ユーザー / 利用シナリオ
+
 - 主な利用者:
   - `spec-dock` の maintainer
-  - `spec-dock` を操作する coding agent / 開発者
+  - runtime CLI を利用する開発者
+  - `spec-dock` を操作する coding agent
 - 代表シナリオ:
-  - 新しい workspace を作り、initiative / epic / issue / doc を複数作成する。
-  - active / sync / deps / validate / import などを組み合わせて運用する。
-  - 紛らわしい指定、複数回実行、複数リソース作成、整合性確認を行う。
+  - `new initiative|epic|issue|doc` を連続または並列で作成する
+  - local-only issue を active にし、deps / validate / sync を使う
+  - GitHub issue URL や issue number を使って import / active / status 確認を行う
+  - GitHub-linked issue の状態変化を運用上安全に読む
+  - 壊れた状態や欠損を validate / doctor 系で発見し、復旧方針を得る
 
 ## スコープ
-- MUST:
-  - `manual-tests/` を今回の sweep 用に整理する。
-  - 手動テスト計画を先に作成する。
-  - 手動テストの実施記録を残す。
-  - 最終報告を作成する。
-  - 単発操作ではなく、複数リソース作成と整合性確認を含める。
-  - 通常操作、境界操作、紛らわしい操作、複雑操作を含める。
-  - duplicate id 以外の潜在バグも広く洗い出す。
-- MUST NOT:
-  - 事前計画なしに場当たりで試すだけにしない。
-  - 実行ログを残さずに結果だけまとめない。
-  - 1件成功しただけで健全性を判断しない。
-- OUT OF SCOPE:
-  - バグ修正そのもの
-  - 自動テストコードの追加
-  - GitHub live 環境を前提とした外部依存テストの常時化
+
+### MUST
+
+- create allocator race を修正する
+  - `new initiative|epic|issue|doc` の create 系で id / sequence が並列実行でも重複しないこと
+- discussion sequence race を修正する
+  - `new doc` で duplicate sequence を予防し、validator でも検知できること
+- local-only issue の readiness contract を整備する
+  - `deps check` と `active set` が同じ readiness / status 契約で動作すること
+- required artifact 欠損を `validate` が検知できるようにする
+- recoverability を改善する
+  - `.meta.json` の保護方針を維持する場合でも、supported な診断・修復導線を用意すること
+- active 未設定時の導線を改善する
+  - `active` が未設定でも human/agent が次に何を見るべきか分かること
+- GitHub target 解釈を安全化する
+  - URL import で `owner/repo` を無視した誤リンクを防ぐこと
+  - numeric target の曖昧性を下げること
+- create CLI contract を整える
+  - `new issue` にも explicit GitHub create surface を用意すること
+- GitHub-linked issue の freshness 契約を改善する
+  - stale projection を authoritative と誤読しにくくすること
+
+### SHOULD
+
+- local-only / GitHub-linked issue の status について、今後の `close/reopen` や `link/unlink` に耐える表現に寄せる
+- warning / error / machine-readable output の改善により、agent が次アクションを判断しやすい形にする
+- validator / doctor / create contract が同じ artifact/status contract を再利用できるようにする
+
+### MUST NOT
+
+- `initiative` / `epic` / `issue` / `doc` の既存 file-based runtime を大幅に別方式へ置き換えない
+- prototype bugfix の範囲を超えて、大規模な再設計や DB 導入に踏み込まない
+- GitHub 依存を増やすだけで local-first の逃げ道を失わせない
+- backward compatibility を無視して既存 CLI surface を破壊しない
+
+### OUT OF SCOPE
+
+- 全ての future roadmap 機能の実装
+- `issue close/reopen` や `link/unlink` の完全実装
+- runtime 全面リライト
+- 本 issue とは独立したドキュメント体系の刷新
+
+## バグ別の要求整理
+
+### B01 create allocator race
+
+- 並列 create でも duplicate id が発生しないこと
+- duplicate id を partial write 後に事後検知するだけでは不可
+
+### B02 discussion sequence race
+
+- 並列 `new doc` でも duplicate seq が発生しないこと
+- validator に duplicate seq 検知があること
+
+### B03 local-only deps/active inconsistency
+
+- local-only issue の初期 effective status が deterministic であること
+- `deps check` の readiness と `active set` の guard が一致すること
+
+### B04 validate gap
+
+- node kind ごとに required artifact contract があること
+- required artifact 欠損を `validate` が失敗として扱うこと
+
+### B05 repair gap
+
+- `.meta.json` を直接 chmod/edit しなくても、supported path で診断・修復方針が得られること
+
+### B06 active-not-set pathway gap
+
+- active 未設定時でも、CLI と path の両面で fallback 導線があること
+
+### B07 import wrong-repo risk
+
+- GitHub URL を使う import は current repo と一致検証されること
+- foreign repo を許すなら明示 opt-in であること
+
+### B08 create UX asymmetry
+
+- `new issue` でも initiative/epic と同様に explicit GitHub create intent を表現できること
+
+### B09 stale projection
+
+- linked issue の status source / freshness が利用者に明示されること
+- `--github` なしの読み取りで stale の可能性が分かること
+
+### B10 numeric target ambiguity
+
+- `active set` などで target intent を明示指定できること
+- pure number の誤解釈が減ること
 
 ## 境界
-- Always:
-  - テスト計画、実施記録、最終報告を分離して残す。
-  - 1操作ごとにコマンド、結果、副作用、確認項目を記録する。
-  - 2件、3件、4件と複数リソースを連続で作り、整合性を確認する。
-- Ask:
-  - 外部サービスへの破壊的操作が必要な場合
-  - テスト中に重大なデータ破損が起きた場合
-- Never:
-  - 本番的な外部 repo や実 GitHub Issue に対して無断で破壊的変更しない。
+
+### Always
+
+- manual regression で再現した実害に優先して対処する
+- local/stub と GitHub live の両方で acceptance を考える
+- safety net と根本対策を分けて設計する
+
+### Ask
+
+- backward compatibility を壊す CLI surface 変更が必要な場合
+- GitHub mandatory 化のように product policy 自体を変える場合
+- 本 issue のスコープを超える architecture change が必要な場合
+
+### Never
+
+- `warning` だけで誤リンクや duplicate create を許容しない
+- 既知の unsafe default を「仕様だから」で温存しない
 
 ## 非交渉制約
-- `manual-tests/README.md` は保持する。
-- manual test は isolated workspace で行う。
-- 失敗結果も成功結果と同じ粒度で記録する。
-- 報告では、再現条件、観測結果、推定原因、影響度を切り分ける。
+
+- コード変更は既存 runtime layering を尊重する
+- 既存 asset/scaffold 変更は shipped API 変更として扱う
+- local-only の逃げ道は prototype 段階では維持する
+- GitHub live manual regression で再確認できる acceptance を意識する
 
 ## 受け入れ条件
-- AC-001:
-  - Given:
-    - 散らかった `manual-tests/` がある
-  - When:
-    - 今回の sweep 用に整備する
-  - Then:
-    - 今回のテスト対象 workspace / reports が識別しやすく整理されている
-- AC-002:
-  - Given:
-    - 手動テストを始める前
-  - When:
-    - テスト実施に入る
-  - Then:
-    - テスト計画書が存在し、網羅観点と実施順が定義されている
-- AC-003:
-  - Given:
-    - manual regression sweep を実施する
-  - When:
-    - 通常操作と複雑操作を進める
-  - Then:
-    - 複数リソース作成、整合性確認、紛らわしい操作、複合操作が実行され、記録される
-- AC-004:
-  - Given:
-    - テスト実施後
-  - When:
-    - 報告をまとめる
-  - Then:
-    - 発見した問題、再現条件、影響、推定原因、次アクションがレポート化されている
 
+### AC-001 create atomicity
+
+- Given:
+  - 同一 repo / 同一親配下で `new epic` または `new issue` または `new doc` を並列実行する
+- When:
+  - manual regression と同等の並列 create を再実行する
+- Then:
+  - duplicate id / duplicate seq が発生しない
+  - create 結果が validate/sync を壊さない
+
+### AC-002 local-only readiness
+
+- Given:
+  - local-only issue が通常 create されている
+- When:
+  - `deps check` と `active set` を実行する
+- Then:
+  - `blockers=[]` なのに `ready=false/state=unknown` となる矛盾が解消されている
+
+### AC-003 required artifact validation
+
+- Given:
+  - issue / epic / initiative / discussion の required artifact のいずれかを削除する
+- When:
+  - `validate` を実行する
+- Then:
+  - 欠損が failure として検知される
+
+### AC-004 GitHub URL safety
+
+- Given:
+  - foreign repo の GitHub issue URL を import target に渡す
+- When:
+  - `import` を実行する
+- Then:
+  - current repo と一致しない場合は誤リンクせず、安全側に失敗する
+  - 例外が許される場合でも明示 opt-in が必要である
+
+### AC-005 freshness clarity
+
+- Given:
+  - GitHub-linked issue の remote state が local cache と食い違っている
+- When:
+  - `deps check` などの status 読み取りを `--github` なしで実行する
+- Then:
+  - source / stale / freshness が明示され、latest と誤認しにくい
+
+### AC-006 active pathway
+
+- Given:
+  - active が未設定である
+- When:
+  - `active show` または `spec-dock/active` を参照する
+- Then:
+  - 未設定であることと、次に取るべき action/fallback path が分かる
+
+### AC-007 CLI symmetry and disambiguation
+
+- Given:
+  - create / active target を script または agent から操作する
+- When:
+  - explicit GitHub create intent や target intent を指定する
+- Then:
+  - `new issue` でも explicit GitHub create を表現できる
+  - `active set` などで node id と GitHub issue number を明示指定できる
