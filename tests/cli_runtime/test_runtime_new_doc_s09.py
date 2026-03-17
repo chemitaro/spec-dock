@@ -1,7 +1,10 @@
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _runtime_modules():
@@ -162,6 +165,31 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             specdock_dir=specdock_dir,
         )
 
+    def _run_parallel_doc_create(self, create_fn, request_a, request_b):
+        results = []
+        errors = []
+        lock = threading.Lock()
+
+        def _worker(req):
+            try:
+                result = create_fn(req)
+                with lock:
+                    results.append(result)
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        thread_a = threading.Thread(target=_worker, args=(request_a,))
+        thread_b = threading.Thread(target=_worker, args=(request_b,))
+        thread_a.start()
+        thread_b.start()
+        thread_a.join(timeout=5.0)
+        thread_b.join(timeout=5.0)
+        self.assertFalse(thread_a.is_alive(), "parallel new doc thread A did not finish")
+        self.assertFalse(thread_b.is_alive(), "parallel new doc thread B did not finish")
+        self.assertEqual(errors, [])
+        return results
+
     def _issue_scope_record(self, infra_contracts, *, specdock_dir: Path):
         init_dir = specdock_dir / "initiatives" / "init-local-00001-auth"
         epic_dir = init_dir / "epics" / "epic-local-00001-login"
@@ -304,6 +332,50 @@ class TestRuntimeNewDocS09(unittest.TestCase):
 
             self.assertEqual(events, [])
             self.assertEqual(list(discussions_dir.glob("002-note-*.md")), [])
+
+    def test_parallel_new_doc_allocates_unique_sequences(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            original_next = app_create_node._next_discussion_doc_seq
+            first_call_pending = {"value": True}
+            first_call_lock = threading.Lock()
+
+            def _slow_next(discussions_dir):
+                seq = original_next(discussions_dir)
+                with first_call_lock:
+                    if first_call_pending["value"]:
+                        first_call_pending["value"] = False
+                        time.sleep(0.1)
+                return seq
+
+            with patch.object(app_create_node, "_next_discussion_doc_seq", side_effect=_slow_next):
+                results = self._run_parallel_doc_create(
+                    lambda req: app_create_node.create_discussion_doc(req, ports),
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type="adr",
+                        scope_node_id="iss-local-00001",
+                        title="Decision one",
+                        slug=None,
+                    ),
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type="disc",
+                        scope_node_id="iss-local-00001",
+                        title="Discussion one",
+                        slug=None,
+                    ),
+                )
+
+            self.assertEqual(len(results), 2)
+            seqs = sorted(int(result.doc_id.split("-", 1)[0]) for result in results)
+            self.assertEqual(seqs, [1, 2])
+            doc_types = sorted(result.doc_type for result in results)
+            self.assertEqual(doc_types, ["adr", "disc"])
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()

@@ -145,6 +145,37 @@ class TestCliValidate(CliRuntimeHarness):
             )
             self.assertIn("Fix github.issue_number", p.stderr)
 
+    def test_validate_detects_duplicate_discussion_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Duplicate discussion sequence detected", p.stderr)
+            self.assertIn("seq=001", p.stderr)
+            self.assertIn("001-adr-first.md", p.stderr)
+            self.assertIn("001-disc-second.md", p.stderr)
+
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -443,4 +474,3 @@ class TestCliValidate(CliRuntimeHarness):
 
             self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
             self.assertTrue(legacy_meta_path.is_file())
-

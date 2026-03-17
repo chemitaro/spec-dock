@@ -246,6 +246,26 @@ def _post_write_duplicate_guard(ports: Ports, *, node_id: str) -> None:
         raise RuntimeError(f"post-write duplicate guard failed: created id not found: {node_id}")
 
 
+def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
+    refs = _scan_discussion_sequence_sources(discussions_dir)
+    by_seq: dict[int, list[Path]] = {}
+    doc_ids: set[str] = set()
+    for seq, doc_type, path in refs:
+        by_seq.setdefault(seq, []).append(path)
+        doc_ids.add(f"{seq:03d}-{doc_type}")
+
+    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
+    if duplicate_seqs:
+        dup_seq = duplicate_seqs[0]
+        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
+        raise RuntimeError(
+            "post-write duplicate guard failed: "
+            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+        )
+    if doc_id not in doc_ids:
+        raise RuntimeError(f"post-write duplicate guard failed: created discussion id not found: {doc_id}")
+
+
 def _resolve_specdock_dir(ports: Ports) -> Path:
     if ports.specdock_dir is not None:
         return ports.specdock_dir
@@ -727,22 +747,46 @@ def plan_discussion_doc(
 
 def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult:
     template_scaffolder = _resolve_template_scaffolder(ports)
-    graph = load_graph(ports, validate=False)
-    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-    template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
+    specdock_dir = _resolve_specdock_dir(ports)
+    lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    result: CreateDiscussionDocResult | None = None
+    body_error: Exception | None = None
+    try:
+        graph = load_graph(ports, validate=False)
+        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
 
-    template_text = template_scaffolder.load_template_text(template_path)
-    rendered_text = template_scaffolder.render_text(template_text, replacements)
-    template_scaffolder.write_text(dest_path, rendered_text)
-    doc_id = _doc_id_from_path(dest_path)
+        template_text = template_scaffolder.load_template_text(template_path)
+        rendered_text = template_scaffolder.render_text(template_text, replacements)
+        template_scaffolder.write_text(dest_path, rendered_text)
+        doc_id = _doc_id_from_path(dest_path)
+        _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
+        result = CreateDiscussionDocResult(
+            doc_id=doc_id,
+            doc_type=doc_id.split("-", 1)[1],
+            scope_node_id=replacements["<SCOPE_ID>"],
+            path=dest_path,
+            warnings=[],
+        )
+    except Exception as exc:
+        body_error = exc
+    finally:
+        release_error: Exception | None = None
+        try:
+            _release_create_lock(lock_path, lock_token)
+        except Exception as exc:
+            release_error = exc
 
-    return CreateDiscussionDocResult(
-        doc_id=doc_id,
-        doc_type=doc_id.split("-", 1)[1],
-        scope_node_id=replacements["<SCOPE_ID>"],
-        path=dest_path,
-        warnings=[],
-    )
+        if body_error is not None:
+            if release_error is not None:
+                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
+            raise body_error
+        if release_error is not None:
+            raise release_error
+
+    if result is None:
+        raise RuntimeError("discussion doc create failed without result")
+    return result
 
 
 def _github_issue_body(
