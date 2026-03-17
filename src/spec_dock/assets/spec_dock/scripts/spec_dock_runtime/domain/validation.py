@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .deps import validate_deps_cycles
 from .ids import parse_id, validate_lowercase, validate_slug
 from .models import SpecGraph, SpecNode, ValidationReport
+
+_DISCUSSION_DOC_FILENAME_RE = re.compile(
+    r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+)
 
 
 def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None) -> str:
@@ -32,6 +37,43 @@ def _format_linked_github_nodes(linked: list[SpecNode], *, repo_root: Path | Non
         f"{n.kind}:{n.id} ({_meta_json_path_for_output(n, repo_root=repo_root)})"
         for n in linked
     )
+
+
+def _path_for_output(path: Path, *, repo_root: Path | None = None) -> str:
+    if repo_root is not None:
+        try:
+            return path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+    return path.as_posix()
+
+
+def _validate_discussion_sequences(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
+    scopes = sorted(
+        (node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")),
+        key=lambda node: (node.kind, node.id, node.path.as_posix()),
+    )
+    for scope in scopes:
+        discussions_dir = scope.path / "discussions"
+        if not discussions_dir.exists():
+            continue
+        by_seq: dict[int, list[Path]] = {}
+        for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+            matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
+            if matched is None:
+                continue
+            seq = int(matched.group("seq"))
+            by_seq.setdefault(seq, []).append(path)
+        duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
+        if not duplicate_seqs:
+            continue
+        dup_seq = duplicate_seqs[0]
+        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
+        raise RuntimeError(
+            "Duplicate discussion sequence detected under "
+            f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
+            f"seq={dup_seq:03d} files=[{files}]"
+        )
 
 
 def validate_github_issue_numbers_unique(graph: SpecGraph, repo_root: Path | None = None) -> None:
@@ -101,6 +143,7 @@ def _validate_graph_or_raise(graph: SpecGraph, *, repo_root: Path | None = None)
             )
 
     validate_github_issue_numbers_unique(graph, repo_root=repo_root)
+    _validate_discussion_sequences(graph, repo_root=repo_root)
 
     for node_id, node in graph.nodes_by_id.items():
         validate_lowercase(node_id, field="id")

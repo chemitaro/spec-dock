@@ -14,8 +14,9 @@ ID: "issue-28-runtime-regression-bugs"
 
 ## 実施サマリー
 - `S01 create transaction で duplicate id を予防する` を完了
+- `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - implementation review と QA review を通過
-- 次は `S02 discussion seq を同じ transaction に統合し validator でも守る` に着手
+- 次は `S03 status/readiness contract を統一し stale projection を明示する` に着手
 
 ## 記録
 - `S01` 実装:
@@ -39,13 +40,26 @@ ID: "issue-28-runtime-regression-bugs"
     - `python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10`
     - `python -m unittest discover -v tests/cli_runtime`
     - 競合/lock 系 7 テストの 20 回反復実行
+- `S02` 実装:
+  - `new doc` の create を S01 と同じ create lock 契約に統合
+  - post-write duplicate guard を追加し、discussion seq の重複を作成直後に検知
+  - validator に duplicate discussion sequence 検知を追加
+- `S02` implementation review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
+- `S02` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
 - `issue` の GitHub create が遅延するケースでは lock 保持時間が伸び、競合失敗が増える運用リスクがある
 - 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
+- duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
 
 ## 次アクション
-- `S01` の変更をコミットする
-- `S02` の dev implementation を開始する
-- `S02` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
+- `S02` の変更をコミットする
+- `S03` の dev implementation を開始する
+- `S03` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
