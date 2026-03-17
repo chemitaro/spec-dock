@@ -1,7 +1,11 @@
+import os
+import threading
+import time
 import tempfile
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _runtime_modules():
@@ -74,6 +78,26 @@ class _StubNodeRepo:
         self._records.append(record)
 
 
+class _RacyNodeRepo(_StubNodeRepo):
+    def __init__(self, records, events=None, *, first_load_delay_seconds=0.1):
+        super().__init__(records, events=events)
+        self._first_load_delay_seconds = first_load_delay_seconds
+        self._first_load_pending = True
+        self._first_load_lock = threading.Lock()
+
+    def load_node_records(self, specdock_dir):
+        del specdock_dir
+        snapshot = list(self._records)
+        should_delay = False
+        with self._first_load_lock:
+            if self._first_load_pending:
+                self._first_load_pending = False
+                should_delay = True
+        if should_delay:
+            time.sleep(self._first_load_delay_seconds)
+        return snapshot
+
+
 class _StubTemplateScaffolder:
     def __init__(self, events=None):
         self.events = events if events is not None else []
@@ -135,16 +159,55 @@ class TestRuntimeNewS08(unittest.TestCase):
             (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\n", encoding="utf-8")
             (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\n", encoding="utf-8")
 
-    def _ports(self, app_ports, *, specdock_dir: Path, records, events=None, issue_gateway=None):
+    def _ports(
+        self,
+        app_ports,
+        *,
+        specdock_dir: Path,
+        records,
+        events=None,
+        issue_gateway=None,
+        node_repo=None,
+        template_scaffolder=None,
+    ):
+        resolved_node_repo = node_repo if node_repo is not None else _StubNodeRepo(records, events=events)
+        resolved_template_scaffolder = (
+            template_scaffolder if template_scaffolder is not None else _StubTemplateScaffolder(events=events)
+        )
         return app_ports.Ports(
             node_reader=_DummyNodeReader(),
-            node_repo=_StubNodeRepo(records, events=events),
-            template_scaffolder=_StubTemplateScaffolder(events=events),
+            node_repo=resolved_node_repo,
+            template_scaffolder=resolved_template_scaffolder,
             issue_gateway=issue_gateway or _StubIssueGateway([501]),
             clock=_StubClock(),
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
         )
+
+    def _run_parallel_create(self, create_fn, request_a, request_b):
+        node_ids = []
+        errors = []
+        lock = threading.Lock()
+
+        def _worker(req):
+            try:
+                result = create_fn(req)
+                with lock:
+                    node_ids.append(result.node.id)
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        thread_a = threading.Thread(target=_worker, args=(request_a,))
+        thread_b = threading.Thread(target=_worker, args=(request_b,))
+        thread_a.start()
+        thread_b.start()
+        thread_a.join(timeout=5.0)
+        thread_b.join(timeout=5.0)
+        self.assertFalse(thread_a.is_alive(), "parallel create thread A did not finish")
+        self.assertFalse(thread_b.is_alive(), "parallel create thread B did not finish")
+        self.assertEqual(errors, [])
+        return sorted(node_ids)
 
     def test_planning_regression_create_plan_contains_all_candidates(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -361,6 +424,283 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(issue_result.node.parent_id, "epic-local-00001")
             self.assertEqual(issue_result.node.initiative_id, "init-local-00001")
 
+    def test_parallel_create_initiative_allocates_unique_local_ids(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            node_repo = _RacyNodeRepo([], first_load_delay_seconds=0.1)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], node_repo=node_repo)
+            ids = self._run_parallel_create(
+                lambda req: app_create_node.create_initiative(req, ports),
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform A",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform B",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+            )
+
+            self.assertEqual(ids, ["init-local-00001", "init-local-00002"])
+
+    def test_parallel_create_epic_allocates_unique_local_ids(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                )
+            ]
+            node_repo = _RacyNodeRepo(records, first_load_delay_seconds=0.1)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records, node_repo=node_repo)
+            ids = self._run_parallel_create(
+                lambda req: app_create_node.create_epic(req, ports),
+                app_contracts.CreateNodeRequest(
+                    title="Epic A",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+                app_contracts.CreateNodeRequest(
+                    title="Epic B",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+            )
+
+            self.assertEqual(ids, ["epic-local-00001", "epic-local-00002"])
+
+    def test_parallel_create_issue_allocates_unique_local_ids(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            node_repo = _RacyNodeRepo(records, first_load_delay_seconds=0.1)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records, node_repo=node_repo)
+            ids = self._run_parallel_create(
+                lambda req: app_create_node.create_issue(req, ports),
+                app_contracts.CreateNodeRequest(
+                    title="Issue A",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+                app_contracts.CreateNodeRequest(
+                    title="Issue B",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+            )
+
+            self.assertEqual(ids, ["iss-local-00001", "iss-local-00002"])
+
+    def test_create_lock_contention_timeout_is_no_write_and_reports_metadata(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "token=holder\npid=222\nuser=lock-holder\ncreated_unix=9999999999\ncreated_iso=2099-01-01\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.005",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "create lock acquisition failed") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            self.assertIn("wait_s=", message)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("user=lock-holder", message)
+            self.assertIn("spec doctor", message)
+            self.assertEqual(events, [])
+            self.assertFalse((specdock_dir / "initiatives").exists())
+            self.assertTrue(lock_path.exists())
+
+    def test_create_lock_stale_is_no_write_and_reports_metadata(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "token=stale-holder\npid=333\nuser=stale-holder\ncreated_unix=0\ncreated_iso=1970-01-01\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.2",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.01",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "0",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "create lock acquisition failed") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            self.assertIn("stale=true", message)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("created_iso=1970-01-01", message)
+            self.assertIn("spec doctor", message)
+            self.assertEqual(events, [])
+            self.assertFalse((specdock_dir / "initiatives").exists())
+            self.assertTrue(lock_path.exists())
+
+    def test_create_lock_metadata_write_failure_cleans_orphan_lock(self) -> None:
+        _runtime_app, _app_contracts, app_create_node, _app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+
+            def _raise_write_failure(fd, _payload):
+                os.close(fd)
+                raise OSError("disk full")
+
+            with patch.object(app_create_node, "_write_create_lock_payload", side_effect=_raise_write_failure):
+                with self.assertRaisesRegex(RuntimeError, "create lock metadata write failed") as raised:
+                    app_create_node._acquire_create_lock(specdock_dir)
+
+            message = str(raised.exception)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("cleanup_unlink=ok", message)
+            self.assertIn("spec doctor", message)
+            self.assertFalse(lock_path.exists())
+
+    def test_create_fails_when_release_unlink_fails(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            original_unlink = app_create_node.Path.unlink
+
+            def _unlink_with_failure(path_self, missing_ok=False):
+                if path_self == lock_path:
+                    raise OSError("permission denied")
+                return original_unlink(path_self, missing_ok=missing_ok)
+
+            with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                with self.assertRaisesRegex(RuntimeError, "create lock release failed") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("spec doctor", message)
+            self.assertTrue((specdock_dir / "initiatives").exists())
+            self.assertTrue(lock_path.exists())
+
     def test_github_mode_default_no_side_effect_matrix(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -450,12 +790,14 @@ class TestRuntimeNewS08(unittest.TestCase):
 
             calls = []
             original_execute = app_create_node.execute_create_plan
+            original_guard = app_create_node._post_write_duplicate_guard
 
             def _fake_execute(plan, ports_arg):
                 calls.append((plan.meta.id, ports_arg))
                 return [plan.dest_dir / "README.md", plan.dest_dir / ".meta.json"]
 
             app_create_node.execute_create_plan = _fake_execute
+            app_create_node._post_write_duplicate_guard = lambda _ports_arg, *, node_id: None
             try:
                 result = app_create_node.create_initiative(
                     app_contracts.CreateNodeRequest(
@@ -470,6 +812,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 )
             finally:
                 app_create_node.execute_create_plan = original_execute
+                app_create_node._post_write_duplicate_guard = original_guard
 
             self.assertEqual(len(calls), 1)
             self.assertEqual(result.created_paths[-1].name, ".meta.json")
