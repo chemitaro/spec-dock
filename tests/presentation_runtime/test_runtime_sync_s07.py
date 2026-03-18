@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+_REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
+
 
 def _runtime_modules():
     runtime_scripts_dir = (
@@ -212,12 +214,23 @@ class _LegacySyncRunner:
 
 
 class TestRuntimeSyncS07(unittest.TestCase):
+    def _materialize_required_artifacts(self, records) -> None:
+        for record in records:
+            node_dir = Path(record.path)
+            node_dir.mkdir(parents=True, exist_ok=True)
+            Path(record.meta_path).write_text(
+                json.dumps({"id": record.id, "kind": record.kind}, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            for doc_name in _REQUIRED_NODE_DOCS:
+                (node_dir / doc_name).write_text(f"# {doc_name}\n", encoding="utf-8")
+
     def _records(self, infra_contracts, repo_root: Path):
         base = repo_root / "spec-dock" / "initiatives" / "init-local-00001-auth"
         epic = base / "epics" / "epic-local-00001-core"
         iss1 = epic / "issues" / "iss-local-00001-api"
         iss2 = epic / "issues" / "iss-local-00002-db"
-        return [
+        records = [
             _record(
                 infra_contracts,
                 kind="initiative",
@@ -263,6 +276,8 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 github_issue_number=302,
             ),
         ]
+        self._materialize_required_artifacts(records)
+        return records
 
     def _request(self, app_contracts, *, force=False, update_active=False):
         return app_contracts.SyncRequest(
