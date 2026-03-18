@@ -54,7 +54,13 @@ class IssueGateway(Protocol):
     def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         ...
 
-    def issue_view_minimal(self, repo_root: Path, issue_number: int) -> IssueSnapshot:
+    def issue_view_minimal(
+        self,
+        repo_root: Path,
+        issue_number: int,
+        *,
+        repo_slug: str | None = None,
+    ) -> IssueSnapshot:
         ...
 
 
