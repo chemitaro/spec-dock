@@ -176,6 +176,109 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("001-adr-first.md", p.stderr)
             self.assertIn("001-disc-second.md", p.stderr)
 
+    def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
+        artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
+        node_roots = {
+            "initiative": (
+                Path("spec-dock/initiatives/init-local-00001-auth-platform"),
+                "kind=initiative id=init-local-00001",
+            ),
+            "epic": (
+                Path("spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth"),
+                "kind=epic id=epic-local-00001",
+            ),
+            "issue": (
+                Path(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token"
+                ),
+                "kind=issue id=iss-local-00001",
+            ),
+        }
+        cases = [
+            (kind, artifact_name, node_root / artifact_name, expected)
+            for kind, (node_root, expected) in node_roots.items()
+            for artifact_name in artifact_names
+        ]
+        for _name, artifact_name, artifact_rel_path, expected in cases:
+            with self.subTest(kind=_name, artifact=artifact_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+                    self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+                    artifact_path = target / artifact_rel_path
+                    artifact_path.unlink(missing_ok=False)
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Missing required artifact", p.stderr)
+                    self.assertIn(expected, p.stderr)
+                    self.assertIn(artifact_rel_path.as_posix(), p.stderr)
+
+    def test_validate_detects_missing_required_meta_for_each_node_kind(self) -> None:
+        cases = [
+            (
+                "initiative",
+                Path("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json"),
+                "kind=initiative id=init-local-00001",
+            ),
+            (
+                "epic",
+                Path(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"
+                ),
+                "kind=epic id=epic-local-00001",
+            ),
+            (
+                "issue",
+                Path(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json"
+                ),
+                "kind=issue id=iss-local-00001",
+            ),
+        ]
+        for kind, meta_rel_path, expected in cases:
+            with self.subTest(kind=kind):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+                    self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+                    meta_path = target / meta_rel_path
+                    meta_path.unlink(missing_ok=False)
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Missing required artifact", p.stderr)
+                    self.assertIn(expected, p.stderr)
+                    self.assertIn(meta_rel_path.as_posix(), p.stderr)
+
+    def test_doctor_detects_missing_required_meta_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            meta_rel_path = Path(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json"
+            )
+            (target / meta_rel_path).unlink(missing_ok=False)
+
+            p = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: doctor: findings=1", p.stderr)
+            self.assertIn("[missing_artifact]", p.stderr)
+            self.assertIn(meta_rel_path.as_posix(), p.stderr)
+
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

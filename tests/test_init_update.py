@@ -99,6 +99,22 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((placeholder_root / "initiative" / "README.md").is_file())
             self.assertTrue((placeholder_root / "epic" / "README.md").is_file())
             self.assertTrue((placeholder_root / "issue" / "README.md").is_file())
+            self.assertEqual(
+                self._read_active_pointer_text(target, "initiative", "README.md"),
+                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "epic", "README.md"),
+                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "issue", "README.md"),
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
+            )
+            context_pack_text = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- initiative: (none)", context_pack_text)
+            self.assertIn("- epic: (none)", context_pack_text)
+            self.assertIn("- issue: (none)", context_pack_text)
 
             # Legacy (v1) templates should not be installed.
             templates_dir = target / "spec-dock" / "templates"
@@ -473,3 +489,150 @@ class TestInitUpdate(CliRuntimeHarness):
             if created_symlink:
                 self.assertFalse(legacy_symlink.is_symlink())
 
+    def test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            active_dir = target / "spec-dock" / "active"
+            for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
+                p = active_dir / name
+                if p.is_symlink() or p.is_file():
+                    p.unlink(missing_ok=True)
+                elif p.is_dir():
+                    shutil.rmtree(p)
+
+            self.assertEqual(list(active_dir.iterdir()), [])
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            placeholder_root = target / "spec-dock" / "system" / "active-none"
+            self.assertEqual(
+                self._read_active_pointer_text(target, "initiative", "README.md"),
+                (placeholder_root / "initiative" / "README.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "epic", "README.md"),
+                (placeholder_root / "epic" / "README.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "issue", "README.md"),
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
+            )
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- initiative: (none)", context_pack_text)
+            self.assertIn("- epic: (none)", context_pack_text)
+            self.assertIn("- issue: (none)", context_pack_text)
+
+    def test_update_regenerates_context_pack_from_persisted_active_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            initiative_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = initiative_dir / "epics" / "epic-local-00001-jwt-auth"
+            issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+            issue_dir.mkdir(parents=True, exist_ok=True)
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {
+                        "id": "init-local-00001",
+                        "path": initiative_dir.relative_to(target).as_posix(),
+                    },
+                    "epic": {
+                        "id": "epic-local-00001",
+                        "path": epic_dir.relative_to(target).as_posix(),
+                    },
+                    "issue": {
+                        "id": "iss-local-00001",
+                        "path": issue_dir.relative_to(target).as_posix(),
+                    },
+                },
+            )
+
+            context_pack_path = target / "spec-dock" / "active" / "context-pack.md"
+            context_pack_path.unlink(missing_ok=True)
+            self.assertFalse(context_pack_path.exists())
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            context_pack_text = context_pack_path.read_text(encoding="utf-8")
+            self.assertIn("- initiative: init-local-00001", context_pack_text)
+            self.assertIn("- epic: epic-local-00001", context_pack_text)
+            self.assertIn("- issue: iss-local-00001", context_pack_text)
+            self.assertIn("- `spec-dock/active/initiative/requirement.md`", context_pack_text)
+            self.assertIn("- `spec-dock/active/epic/requirement.md`", context_pack_text)
+            self.assertIn("- `spec-dock/active/issue/report.md`", context_pack_text)
+            self.assertNotIn("- issue: (none)", context_pack_text)
+            self.assertNotIn("- `spec-dock/active/issue/README.md`", context_pack_text)
+
+    def test_update_bootstraps_active_path_files_when_active_symlink_creation_fails(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            active_dir = target / "spec-dock" / "active"
+            for name in ("initiative", "epic", "issue", "context-pack.md", "initiative.path", "epic.path", "issue.path"):
+                p = active_dir / name
+                if p.is_symlink() or p.is_file():
+                    p.unlink(missing_ok=True)
+                elif p.is_dir():
+                    shutil.rmtree(p)
+
+            self.assertEqual(list(active_dir.iterdir()), [])
+
+            original_symlink = cli.os.symlink
+
+            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
+                dst_path = Path(dst)
+                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                    raise OSError("simulated active symlink failure")
+                original_symlink(src, dst, *args, **kwargs)
+
+            cli.os.symlink = _fail_active_symlink
+            try:
+                self.assertEqual(main(["update", str(target)]), 0)
+            finally:
+                cli.os.symlink = original_symlink
+
+            placeholder_root = target / "spec-dock" / "system" / "active-none"
+            for layer in ("initiative", "epic", "issue"):
+                with self.subTest(layer=layer):
+                    link = active_dir / layer
+                    pathfile = active_dir / f"{layer}.path"
+                    self.assertFalse(link.exists())
+                    self.assertFalse(link.is_symlink())
+                    self.assertTrue(pathfile.is_file())
+                    resolved = (active_dir / pathfile.read_text(encoding="utf-8").strip()).resolve()
+                    self.assertEqual(resolved, (placeholder_root / layer).resolve())
+                    self.assertEqual(
+                        self._read_active_pointer_text(target, layer, "README.md"),
+                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8"),
+                    )
+
+    def test_update_repairs_dangling_active_symlink_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            active_dir = target / "spec-dock" / "active"
+            pointer = active_dir / "initiative"
+            pointer.unlink(missing_ok=True)
+            os.symlink("../system/active-none/missing-initiative", pointer)
+            self.assertTrue(pointer.is_symlink())
+            self.assertFalse(pointer.exists())
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            placeholder = target / "spec-dock" / "system" / "active-none" / "initiative" / "README.md"
+            self.assertEqual(
+                self._read_active_pointer_text(target, "initiative", "README.md"),
+                placeholder.read_text(encoding="utf-8"),
+            )

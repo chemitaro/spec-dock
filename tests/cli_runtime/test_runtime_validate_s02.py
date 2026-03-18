@@ -1,6 +1,7 @@
 import contextlib
 import io
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -62,29 +63,37 @@ class TestRuntimeValidateS02(unittest.TestCase):
             _presentation_contracts,
         ) = _runtime_modules()
 
-        reader = _StubReader(
-            [
-                infra_contracts.StoredMetaRecord(
-                    kind="initiative",
-                    id="init-local-00001",
-                    title="Auth Platform",
-                    slug="auth-platform",
-                    path="/repo/spec-dock/initiatives/init-local-00001-auth-platform",
-                    parent_id=None,
-                    initiative_id=None,
-                    epic_id=None,
-                    github_issue_number=None,
-                    meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
-                )
-            ]
-        )
-        ports = app_ports.Ports(node_reader=reader, repo_root=Path("/repo"))
-        result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp) / "repo"
+            initiative_dir = repo_root / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            initiative_dir.mkdir(parents=True, exist_ok=True)
+            (initiative_dir / ".meta.json").write_text("{}\n", encoding="utf-8")
+            for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+                (initiative_dir / name).write_text(f"{name}\n", encoding="utf-8")
 
-        self.assertEqual(reader.calls, 1)
-        self.assertEqual(result.checked_node_count, 1)
-        self.assertEqual(result.report.errors, [])
-        self.assertEqual(result.report.warnings, [])
+            reader = _StubReader(
+                [
+                    infra_contracts.StoredMetaRecord(
+                        kind="initiative",
+                        id="init-local-00001",
+                        title="Auth Platform",
+                        slug="auth-platform",
+                        path=initiative_dir.as_posix(),
+                        parent_id=None,
+                        initiative_id=None,
+                        epic_id=None,
+                        github_issue_number=None,
+                        meta_path=(initiative_dir / ".meta.json").as_posix(),
+                    )
+                ]
+            )
+            ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
+            result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
+
+            self.assertEqual(reader.calls, 1)
+            self.assertEqual(result.checked_node_count, 1)
+            self.assertEqual(result.report.errors, [])
+            self.assertEqual(result.report.warnings, [])
 
     def test_validate_tree_use_case_returns_domain_error(self) -> None:
         (
@@ -98,24 +107,41 @@ class TestRuntimeValidateS02(unittest.TestCase):
             _presentation_contracts,
         ) = _runtime_modules()
 
-        reader = _StubReader(
-            [
-                infra_contracts.StoredMetaRecord(
-                    kind="issue",
-                    id="iss-local-00001",
-                    title="Add Refresh Token",
-                    slug="add-refresh-token",
-                    path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token",
-                    parent_id=None,
-                    initiative_id="init-local-00001",
-                    epic_id="epic-local-00001",
-                    github_issue_number=None,
-                    meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json",
-                )
-            ]
-        )
-        ports = app_ports.Ports(node_reader=reader, repo_root=Path("/repo"))
-        result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp) / "repo"
+            issue_dir = (
+                repo_root
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            issue_dir.mkdir(parents=True, exist_ok=True)
+            (issue_dir / ".meta.json").write_text("{}\n", encoding="utf-8")
+            for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+                (issue_dir / name).write_text(f"{name}\n", encoding="utf-8")
+
+            reader = _StubReader(
+                [
+                    infra_contracts.StoredMetaRecord(
+                        kind="issue",
+                        id="iss-local-00001",
+                        title="Add Refresh Token",
+                        slug="add-refresh-token",
+                        path=issue_dir.as_posix(),
+                        parent_id=None,
+                        initiative_id="init-local-00001",
+                        epic_id="epic-local-00001",
+                        github_issue_number=None,
+                        meta_path=(issue_dir / ".meta.json").as_posix(),
+                    )
+                ]
+            )
+            ports = app_ports.Ports(node_reader=reader, repo_root=repo_root)
+            result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
 
         self.assertEqual(result.checked_node_count, 1)
         self.assertTrue(result.report.errors)

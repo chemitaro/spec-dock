@@ -16,8 +16,9 @@ ID: "issue-28-runtime-regression-bugs"
 - `S01 create transaction で duplicate id を予防する` を完了
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
+- `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - implementation review と QA review を通過
-- 次は `S04 sync artifact / doctor / validator 契約を揃える` に着手
+- 次は `S05 GitHub targeting と CLI intent surface を安全化する` に着手
 
 ## 記録
 - `S01` 実装:
@@ -79,6 +80,34 @@ ID: "issue-28-runtime-regression-bugs"
     - `pass`
   - 実行:
     - `python -m unittest -v tests.domain_runtime.test_runtime_domain_s03 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_deps tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.presentation_runtime.test_runtime_sync_s07`
+- `S04` 実装:
+  - `initiative` / `epic` / `issue` の required artifact presence を validate 契約へ追加し、`.meta.json` / `requirement.md` / `design.md` / `plan.md` / `report.md` 欠損を failure 化
+  - `doctor` command/use case/presentation を追加し、`duplicate_id` / `duplicate_seq` / `missing_artifact` / `broken_meta` / `stale_active_pointer` の supported guidance を返すようにした
+  - `active show` の not-set 出力に fallback path と next action を追加
+  - installer `init/update` で `spec-dock/active/{initiative,epic,issue}` と `context-pack.md` の fallback entrypoint を自動生成し、empty active dir / symlink failure / dangling symlink / missing context-pack を復旧できるようにした
+- `S04` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - `doctor` が `Invalid JSON: .../.meta.json` や required field 欠損を `broken_meta` に分類できない
+    - invalid active manifest や stale pointer の一部で `doctor` guidance が漏れる
+  - 対応:
+    - `.meta.json` 系エラーの分類条件を拡張
+    - invalid active manifest、absolute path outside repo、file path target、graph unavailable、dangling symlink / missing context-pack の各 edge case を修正
+    - stale pointer false positive を避けるため `graph is None` 時の id-side stale check を抑止
+  - 再レビュー:
+    - `pass`
+- `S04` QA review:
+  - 初回 `fail`
+  - 指摘:
+    - required artifact matrix の一部と `doctor` guidance / installer fallback edge case の回帰保護が薄い
+  - 対応:
+    - `initiative|epic|issue × requirement.md|design.md|plan.md|report.md` の欠損を全組合せで検証
+    - `doctor` の exact duplicate id / duplicate seq / broken meta / stale active pointer guidance をテスト固定
+    - installer の symlink failure / dangling symlink / persisted active からの context-pack 再生成をテスト固定
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_active tests.cli_runtime.test_runtime_doctor_s04 tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_dangling_active_symlink_entrypoint tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_persisted_active_manifest`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -86,8 +115,9 @@ ID: "issue-28-runtime-regression-bugs"
 - 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
 - duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
 - cache `last_sync_at` は issue node の persisted freshness field がない旧 index では `None` になる
+- discussion は first-class node / manifest を持たないため、S04 の required artifact presence validation は `initiative` / `epic` / `issue` に限定した。discussion は既存どおり recognized markdown の integrity contract（少なくとも seq uniqueness）を validate 対象とする
 
 ## 次アクション
-- `S03` の変更をコミットする
-- `S04` の dev implementation を開始する
-- `S04` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
+- `S04` の変更をコミットする
+- `S05` の dev implementation を開始する
+- `S05` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
