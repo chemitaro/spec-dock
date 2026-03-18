@@ -206,6 +206,7 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - current repo と一致しない場合は誤リンクせず、安全側に失敗する
   - 例外が許される場合でも明示 opt-in が必要である
+  - 明示 opt-in で foreign repo import を許可した場合でも、後続の `sync --github` / `deps check --github` は同じ foreign repo identity を維持し、current repo の同番号 issue に誤 hydrate しない
 
 ### AC-005 freshness clarity
 
@@ -240,7 +241,7 @@ ID: "issue-28-runtime-regression-bugs"
 ### AC-008 doctor guidance
 
 - Given:
-  - duplicate id/seq、missing artifact、broken meta、stale active pointer のいずれかが存在する
+  - duplicate id/seq、missing artifact、broken meta、stale active pointer、stale create lock のいずれかが存在する
 - When:
   - `doctor` を実行する
 - Then:

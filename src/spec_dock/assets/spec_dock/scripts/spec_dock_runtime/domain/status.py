@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .ids import deps_node_sort_key
-from .models import IssueSnapshot, IssueStatusSnapshot, ProgressMap, SpecGraph
+from .models import IssueSnapshot, IssueStatusSnapshot, ProgressMap, SpecGraph, SpecNode
 
 _KNOWN_ISSUE_STATUSES = {"done", "open", "unknown"}
 
@@ -31,6 +31,47 @@ def _safe_sorted_issue_ids(issue_ids: list[str]) -> list[str]:
         return sorted(issue_ids)
 
 
+def _normalize_repo_identity(
+    repo_owner: str | None,
+    repo_name: str | None,
+) -> tuple[str, str] | None:
+    owner = str(repo_owner or "").strip().lower()
+    name = str(repo_name or "").strip().lower()
+    if not owner or not name:
+        return None
+    return (owner, name)
+
+
+def _build_issue_snapshot_indexes(
+    issue_snapshots: list[IssueSnapshot] | None,
+) -> tuple[dict[int, IssueSnapshot], dict[tuple[str, str, int], IssueSnapshot]]:
+    by_number: dict[int, IssueSnapshot] = {}
+    by_repo_and_number: dict[tuple[str, str, int], IssueSnapshot] = {}
+    for issue_snapshot in issue_snapshots or []:
+        issue_number = int(issue_snapshot.issue_number)
+        by_number[issue_number] = issue_snapshot
+        identity = _normalize_repo_identity(issue_snapshot.repo_owner, issue_snapshot.repo_name)
+        if identity is not None:
+            by_repo_and_number[(identity[0], identity[1], issue_number)] = issue_snapshot
+    return by_number, by_repo_and_number
+
+
+def _resolve_issue_snapshot_for_node(
+    issue_node: SpecNode,
+    *,
+    issue_snapshot_by_number: dict[int, IssueSnapshot],
+    issue_snapshot_by_repo_and_number: dict[tuple[str, str, int], IssueSnapshot],
+) -> IssueSnapshot | None:
+    if issue_node.github_issue_number is None:
+        return None
+
+    issue_number = int(issue_node.github_issue_number)
+    identity = _normalize_repo_identity(issue_node.github_repo_owner, issue_node.github_repo_name)
+    if identity is not None:
+        return issue_snapshot_by_repo_and_number.get((identity[0], identity[1], issue_number))
+    return issue_snapshot_by_number.get(issue_number)
+
+
 def resolve_issue_statuses(
     graph: SpecGraph,
     github_enabled: bool,
@@ -38,9 +79,7 @@ def resolve_issue_statuses(
     cached_issue_status_by_id: dict[str, str],
     cached_issue_last_sync_at_by_id: dict[str, str | None] | None = None,
 ) -> dict[str, IssueStatusSnapshot]:
-    issue_snapshot_by_number: dict[int, IssueSnapshot] = {}
-    for issue_snapshot in issue_snapshots or []:
-        issue_snapshot_by_number[int(issue_snapshot.issue_number)] = issue_snapshot
+    issue_snapshot_by_number, issue_snapshot_by_repo_and_number = _build_issue_snapshot_indexes(issue_snapshots)
 
     cache_last_sync_at_by_id = dict(cached_issue_last_sync_at_by_id or {})
     resolved: dict[str, IssueStatusSnapshot] = {}
@@ -65,7 +104,11 @@ def resolve_issue_statuses(
             source = "local"
             stale = False
         elif github_enabled:
-            issue_snapshot = issue_snapshot_by_number.get(int(issue_node.github_issue_number))
+            issue_snapshot = _resolve_issue_snapshot_for_node(
+                issue_node,
+                issue_snapshot_by_number=issue_snapshot_by_number,
+                issue_snapshot_by_repo_and_number=issue_snapshot_by_repo_and_number,
+            )
             if issue_snapshot is not None:
                 effective_status = _status_from_github_state(issue_snapshot.state)
                 source = "github"
@@ -88,6 +131,31 @@ def resolve_issue_statuses(
             github_number=issue_node.github_issue_number,
         )
 
+    return resolved
+
+
+def resolve_issue_snapshot_by_issue_id(
+    graph: SpecGraph,
+    issue_snapshots: list[IssueSnapshot] | None,
+) -> dict[str, IssueSnapshot]:
+    issue_snapshot_by_number, issue_snapshot_by_repo_and_number = _build_issue_snapshot_indexes(issue_snapshots)
+    resolved: dict[str, IssueSnapshot] = {}
+    issue_ids = _safe_sorted_issue_ids(
+        [
+            node_id
+            for node_id, node in graph.nodes_by_id.items()
+            if node.kind in ("initiative", "epic", "issue") and node.github_issue_number is not None
+        ]
+    )
+    for issue_id in issue_ids:
+        issue_node = graph.nodes_by_id[issue_id]
+        issue_snapshot = _resolve_issue_snapshot_for_node(
+            issue_node,
+            issue_snapshot_by_number=issue_snapshot_by_number,
+            issue_snapshot_by_repo_and_number=issue_snapshot_by_repo_and_number,
+        )
+        if issue_snapshot is not None:
+            resolved[issue_id] = issue_snapshot
     return resolved
 
 

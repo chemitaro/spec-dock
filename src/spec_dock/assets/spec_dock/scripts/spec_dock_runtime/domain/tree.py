@@ -22,6 +22,8 @@ def build_graph(seeds: list[SpecNodeSeed]) -> SpecGraph:
             initiative_id=seed.initiative_id,
             epic_id=seed.epic_id,
             github_issue_number=seed.github_issue_number,
+            github_repo_owner=seed.github_repo_owner,
+            github_repo_name=seed.github_repo_name,
         )
 
     return SpecGraph(nodes_by_id=nodes_by_id)

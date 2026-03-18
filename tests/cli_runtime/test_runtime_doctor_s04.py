@@ -2,6 +2,7 @@ import contextlib
 import io
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -511,6 +512,106 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             self.assertTrue(any("active clear" in line for line in stale_finding.guidance))
             self.assertTrue(any("active set <target>" in line for line in stale_finding.guidance))
             self.assertIn("active_manifest_invalid_shape:agent.active", result.warnings)
+
+    def test_doctor_detects_stale_create_lock(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=abc",
+                        "pid=1234",
+                        "user=tester",
+                        "created_unix=0",
+                        "created_iso=2026-03-01",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+            )
+
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+            self.assertFalse(result.ok)
+            finding = next((item for item in result.findings if item.code == "stale_create_lock"), None)
+            self.assertIsNotNone(finding)
+            if finding is None:
+                self.fail("stale_create_lock finding was not returned")
+            self.assertIn("stale=true", finding.message)
+            self.assertIn(str(lock_path), finding.message)
+            self.assertTrue(any("create 実行中プロセス" in line for line in finding.guidance))
+            self.assertTrue(any(str(lock_path) in line for line in finding.guidance))
+
+    def test_doctor_detects_invalid_create_lock_metadata(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text("pid=1234\n", encoding="utf-8")
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+            )
+
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+            self.assertFalse(result.ok)
+            finding = next((item for item in result.findings if item.code == "stale_create_lock"), None)
+            self.assertIsNotNone(finding)
+            if finding is None:
+                self.fail("stale_create_lock finding was not returned")
+            self.assertIn("metadata=missing_fields", finding.message)
+            self.assertIn(str(lock_path), finding.message)
+
+    def test_doctor_detects_non_stale_create_lock_contention(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=running",
+                        "pid=5678",
+                        "user=tester",
+                        f"created_unix={time.time():.6f}",
+                        "created_iso=2026-03-18",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+            )
+
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+            self.assertFalse(result.ok)
+            finding = next((item for item in result.findings if item.code == "stale_create_lock"), None)
+            self.assertIsNotNone(finding)
+            if finding is None:
+                self.fail("stale_create_lock finding was not returned")
+            self.assertIn("stale=false", finding.message)
+            self.assertIn("contention=true", finding.message)
+            self.assertTrue(any("create 実行中" in line for line in finding.guidance))
+            self.assertTrue(any("削除" in line for line in finding.guidance))
 
     def test_main_doctor_delegates_to_use_case(self) -> None:
         runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()

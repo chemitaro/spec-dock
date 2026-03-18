@@ -63,6 +63,15 @@ class IssueGateway(Protocol):
     ) -> IssueSnapshot:
         ...
 
+    def issue_view_snapshot(
+        self,
+        repo_root: Path,
+        issue_number: int,
+        *,
+        repo_slug: str | None = None,
+    ) -> IssueSnapshot:
+        ...
+
 
 class ActiveStateStore(Protocol):
     def load_active_manifest(self, specdock_dir: Path) -> ActiveManifestLoadResult:

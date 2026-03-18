@@ -7,6 +7,7 @@ from ..domain.models import SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifestEntry, StoredMetaRecord
+from . import create_node as app_create_node
 from .contracts import DoctorFinding, DoctorRequest, DoctorResult
 from .ports import Ports
 
@@ -23,6 +24,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -199,6 +202,77 @@ def _stale_active_pointer_finding(
     )
 
 
+def _validate_create_lock_metadata(meta: dict[str, str]) -> str | None:
+    if not meta:
+        return "empty_or_unreadable"
+    required = ("token", "pid", "user", "created_unix")
+    missing = [key for key in required if not str(meta.get(key, "")).strip()]
+    if missing:
+        return f"missing_fields={','.join(missing)}"
+    try:
+        float(str(meta.get("created_unix", "")).strip())
+    except ValueError:
+        return "invalid_created_unix"
+    return None
+
+
+def _stale_create_lock_finding(specdock_dir: Path) -> DoctorFinding | None:
+    lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+    if not lock_path.exists():
+        return None
+    if not lock_path.is_file():
+        return DoctorFinding(
+            code="stale_create_lock",
+            message=f"create lock is not a regular file: path={lock_path}",
+            guidance=[
+                "create 実行中プロセスがないことを確認してください。",
+                f"`{lock_path}` を削除してから再実行してください。",
+                "`spec-dock/scripts/spec-dock doctor` で再診断してください。",
+            ],
+        )
+
+    meta, summary = app_create_node._read_create_lock_metadata(lock_path)
+    metadata_issue = _validate_create_lock_metadata(meta)
+    stale_after_seconds: float | None = None
+    try:
+        stale_after_seconds = app_create_node._resolve_duration_seconds(
+            app_create_node._ENV_CREATE_LOCK_STALE_SECONDS,
+            app_create_node._DEFAULT_CREATE_LOCK_STALE_SECONDS,
+            minimum=0.0,
+        )
+    except RuntimeError as error:
+        metadata_issue = f"invalid_stale_threshold={error}"
+
+    stale = False
+    if stale_after_seconds is not None:
+        stale = app_create_node._is_stale_lock(meta, stale_after_seconds=stale_after_seconds)
+    reasons: list[str] = []
+    if stale:
+        reasons.append("stale=true")
+    else:
+        reasons.append("stale=false")
+    if metadata_issue is not None:
+        reasons.append(f"metadata={metadata_issue}")
+    elif not stale:
+        reasons.append("contention=true")
+
+    reason_text = " ".join(reasons).strip()
+    message = f"create lock detected: path={lock_path} {reason_text} lock_meta=[{summary}]".strip()
+    guidance: list[str] = []
+    if stale or metadata_issue is not None:
+        guidance.append("create 実行中プロセスがないことを確認してください。")
+        guidance.append(f"`{lock_path}` を削除してから再実行してください。")
+    else:
+        guidance.append("他の create 実行中であれば完了を待ってから再実行してください。")
+        guidance.append(f"実行中プロセスが無い場合は `{lock_path}` を削除してから再実行してください。")
+    guidance.append("`spec-dock/scripts/spec-dock doctor` で再診断してください。")
+    return DoctorFinding(
+        code="stale_create_lock",
+        message=message,
+        guidance=guidance,
+    )
+
+
 def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     del req
     warnings: list[str] = []
@@ -230,5 +304,9 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     )
     if stale_pointer is not None:
         findings.append(stale_pointer)
+
+    stale_create_lock = _stale_create_lock_finding(specdock_dir)
+    if stale_create_lock is not None:
+        findings.append(stale_create_lock)
 
     return DoctorResult(ok=(len(findings) == 0), findings=findings, warnings=warnings)

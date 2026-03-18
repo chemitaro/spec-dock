@@ -49,6 +49,8 @@ def _record(
     initiative_id: str | None,
     epic_id: str | None,
     github_issue_number: int | None,
+    github_repo_owner: str | None = None,
+    github_repo_name: str | None = None,
 ):
     return infra_contracts.StoredMetaRecord(
         kind=kind,
@@ -61,6 +63,8 @@ def _record(
         epic_id=epic_id,
         github_issue_number=github_issue_number,
         meta_path=(path / ".meta.json").as_posix(),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
     )
 
 
@@ -111,7 +115,11 @@ class _StubNodeRepo:
             "epic_id": record.epic_id,
         }
         if record.github_issue_number is not None:
-            data["github"] = {"issue_number": int(record.github_issue_number)}
+            github_data = {"issue_number": int(record.github_issue_number)}
+            if record.github_repo_owner is not None and record.github_repo_name is not None:
+                github_data["repo_owner"] = record.github_repo_owner
+                github_data["repo_name"] = record.github_repo_name
+            data["github"] = github_data
         (dest_dir / ".meta.json").write_text(json.dumps(data), encoding="utf-8")
         self.store.append(record)
 
@@ -173,6 +181,9 @@ class _StubIssueGateway:
             updated_at="2026-03-12T00:00:00Z",
             url=f"https://example.invalid/issues/{issue_number}",
         )
+
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        return self.issue_view_minimal(repo_root, issue_number, repo_slug=repo_slug)
 
 
 class _StubActiveStateStore:
@@ -334,7 +345,11 @@ class TestRuntimeImportS10(unittest.TestCase):
                 "epic_id": record.epic_id,
             }
             if record.github_issue_number is not None:
-                meta["github"] = {"issue_number": int(record.github_issue_number)}
+                github = {"issue_number": int(record.github_issue_number)}
+                if record.github_repo_owner is not None and record.github_repo_name is not None:
+                    github["repo_owner"] = record.github_repo_owner
+                    github["repo_name"] = record.github_repo_name
+                meta["github"] = github
             (node_dir / ".meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def _active_manifest(self, infra_contracts, *, initiative_id=None, epic_id=None, issue_id=None):
@@ -665,6 +680,11 @@ class TestRuntimeImportS10(unittest.TestCase):
 
             self.assertEqual(result.node.id, "iss-00123")
             self.assertEqual(issue_gateway.view_calls, [(str(specdock_dir.parent), 123, "other/repo")])
+            self.assertEqual(result.node.github_repo_owner, "other")
+            self.assertEqual(result.node.github_repo_name, "repo")
+            created_record = store.load()[-1]
+            self.assertEqual(created_record.github_repo_owner, "other")
+            self.assertEqual(created_record.github_repo_name, "repo")
 
     def test_import_issue_rejects_foreign_repo_without_opt_in(self) -> None:
         (

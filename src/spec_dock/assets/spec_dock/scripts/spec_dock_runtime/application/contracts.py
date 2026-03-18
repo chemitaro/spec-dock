@@ -44,6 +44,7 @@ class DoctorFinding:
         "missing_artifact",
         "broken_meta",
         "stale_active_pointer",
+        "stale_create_lock",
         "validation_error",
     ]
     message: str
@@ -72,6 +73,8 @@ class CreateNodeRequest:
     requested_node_id: str | None
     github_mode: Literal["create", "link_existing", "local_only"] | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -212,6 +215,7 @@ class SyncStateResult:
     repo_root: Path | None = None
     issue_depends_on_map: dict[str, list[str]] = field(default_factory=dict)
     github_snapshot_by_issue_number: dict[int, IssueSnapshot] = field(default_factory=dict)
+    github_snapshot_by_issue_id: dict[str, IssueSnapshot] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

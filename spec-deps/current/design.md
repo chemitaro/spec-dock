@@ -63,6 +63,7 @@ ID: "issue-28-runtime-regression-bugs"
 - lock file は spec-dock の system-internal runtime state 配下に置く
 - lock acquire は bounded wait とし、取得失敗時は create を failure にする
 - stale lock / crash 後 lock は `doctor` で検知・案内できるようにする
+- doctor は create lock path / metadata を読める範囲で露出し、stale create lock を他の repairable finding と同じ supported path で扱う
 - post-write duplicate guard failure 時は自動 rollback しない
   - file delete を伴う rollback は second failure を招きやすいため
   - transaction failure として終了し、repair guidance を返す
@@ -250,6 +251,7 @@ ActiveFallback --> ArtifactContract
 
 - GitHub URL を受け取るコマンドは `owner/repo` を parse し、current repo と一致検証する
 - foreign repo を許す場合のみ explicit opt-in を設ける
+- foreign repo を import した node には `owner/repo` identity を persisted metadata として保持し、後続の sync/deps/status refresh でも current repo と混線しないようにする
 - `new issue` に `--create-github-issue` を additive alias として追加する
 - target 解釈が曖昧なコマンドに explicit flags を追加する
   - `--id <node-id>`
@@ -286,6 +288,7 @@ CLI --> User : safe success or explicit failure
   - argparse surface の拡張
 - application:
   - repo identity validation
+  - persisted foreign repo identity の read/write と repo-aware refresh
 - presentation:
   - ambiguity / mismatch error message
 

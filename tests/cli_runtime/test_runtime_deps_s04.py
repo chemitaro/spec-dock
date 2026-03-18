@@ -225,15 +225,27 @@ class _StubDerivedStateReader:
 
 
 class _StubIssueGateway:
-    def __init__(self, snapshots=None, fail=False):
+    def __init__(self, snapshots=None, fail=False, foreign_snapshots=None):
         self.snapshots = list(snapshots or [])
         self.fail = fail
+        self.foreign_snapshots = dict(foreign_snapshots or {})
+        self.view_calls: list[tuple[str, int, str | None]] = []
 
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         if self.fail:
             raise RuntimeError("gh failed")
         return list(self.snapshots)
+
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        if self.fail:
+            raise RuntimeError("gh failed")
+        key = (str(repo_slug or ""), int(issue_number))
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
+        snapshot = self.foreign_snapshots.get(key)
+        if snapshot is None:
+            raise RuntimeError(f"gh failed: {repo_slug}#{issue_number}")
+        return snapshot
 
 
 class _StubActiveStateStore:
@@ -357,6 +369,117 @@ class TestRuntimeDepsS04(unittest.TestCase):
                 ),
                 cycle_ports,
             )
+
+    def test_check_deps_prefers_foreign_repo_snapshot_for_foreign_linked_issue(self) -> None:
+        (
+            _runtime_app,
+            app_check_deps,
+            app_contracts,
+            app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            domain_models,
+            infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        records = [
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-local-00001",
+                title="Auth Platform",
+                slug="auth-platform",
+                path="spec-dock/initiatives/init-local-00001-auth-platform",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=101,
+                meta_path="spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-local-00001",
+                title="JWT Auth",
+                slug="jwt-auth",
+                path="spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=201,
+                meta_path="spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-local-00001",
+                title="Foreign issue",
+                slug="foreign-issue",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00001-foreign-issue"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+                meta_path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00001-foreign-issue/.meta.json"
+                ),
+                github_repo_owner="other",
+                github_repo_name="repo",
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            snapshots=[
+                domain_models.IssueSnapshot(
+                    issue_number=123,
+                    state="OPEN",
+                    title="Current repo #123",
+                    labels=[],
+                    updated_at="2026-03-18T00:00:00Z",
+                    url="https://github.com/current/repo/issues/123",
+                    repo_owner="current",
+                    repo_name="repo",
+                )
+            ],
+            foreign_snapshots={
+                ("other/repo", 123): domain_models.IssueSnapshot(
+                    issue_number=123,
+                    state="CLOSED",
+                    title="Foreign #123",
+                    labels=[],
+                    updated_at="2026-03-18T01:23:45Z",
+                    url="https://github.com/other/repo/issues/123",
+                    repo_owner="other",
+                    repo_name="repo",
+                )
+            },
+        )
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(records),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open"}),
+            issue_gateway=issue_gateway,
+            active_state_store=_StubActiveStateStore(None),
+            deps_topology_reader=_StubDepsTopologyReader({"iss-local-00001": []}),
+        )
+
+        result = app_check_deps.check_deps(
+            app_contracts.CheckDepsRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None),
+                use_github=True,
+                issue_limit=10000,
+            ),
+            ports,
+        )
+
+        status = result.inspection.issue_statuses["iss-local-00001"]
+        self.assertEqual(status.source, "github")
+        self.assertEqual(status.effective_status, "done")
+        self.assertFalse(status.stale)
+        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
+        self.assertNotIn("gh_index_incomplete", result.warnings)
 
     def test_validate_tree_reconnects_topology_provider(self) -> None:
         (
