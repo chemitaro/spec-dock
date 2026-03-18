@@ -324,6 +324,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -339,6 +341,8 @@ def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -570,6 +574,16 @@ def plan_node_creation(
         github_issue_number=req.github_issue_number,
         today=today,
     )
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
+    if req.github_issue_number is not None:
+        owner = (req.github_repo_owner or "").strip().lower()
+        repo = (req.github_repo_name or "").strip().lower()
+        if owner or repo:
+            if not owner or not repo:
+                raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+            github_repo_owner = owner
+            github_repo_name = repo
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
     planned_paths.append(dest_dir / _META_FILENAME)
@@ -586,6 +600,8 @@ def plan_node_creation(
             epic_id=epic_id,
             github_issue_number=req.github_issue_number,
             meta_path=meta_path.as_posix(),
+            github_repo_owner=github_repo_owner,
+            github_repo_name=github_repo_name,
         ),
         dest_dir=dest_dir,
         replacements=replacements,

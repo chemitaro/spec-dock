@@ -92,6 +92,13 @@ class _IssueGateway:
             repo_slug=repo_slug,
         )
 
+    def issue_view_snapshot(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
+        return infra_github_cli.issue_view_snapshot(
+            repo_root,
+            issue_number=issue_number,
+            repo_slug=repo_slug,
+        )
+
 
 @dataclass(frozen=True)
 class _ActiveStateStore:

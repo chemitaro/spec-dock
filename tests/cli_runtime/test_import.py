@@ -365,6 +365,21 @@ class TestCliImport(CliRuntimeHarness):
             log = log_path.read_text(encoding="utf-8")
             self.assertIn("issue view 123 --json number,url --repo other/repo", log)
 
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-imported-issue"
+            )
+            meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(meta["github"]["issue_number"], 123)
+            self.assertEqual(meta["github"]["repo_owner"], "other")
+            self.assertEqual(meta["github"]["repo_name"], "repo")
+
     def test_import_rejects_non_canonical_url_like_target(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")

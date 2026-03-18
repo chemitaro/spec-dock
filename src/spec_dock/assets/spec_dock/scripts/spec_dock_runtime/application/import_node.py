@@ -64,6 +64,8 @@ def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -102,6 +104,10 @@ def resolve_parent_for_import(
 
 
 def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -> CreateNodeRequest:
+    owner = (req.target_repo_owner or "").strip().lower()
+    repo = (req.target_repo_name or "").strip().lower()
+    github_repo_owner = owner if owner and repo else None
+    github_repo_name = repo if owner and repo else None
     return CreateNodeRequest(
         title=req.title,
         slug=req.slug,
@@ -109,6 +115,8 @@ def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -
         requested_node_id=None,
         github_mode="link_existing",
         github_issue_number=int(req.issue_number),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
     )
 
 

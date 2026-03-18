@@ -19,6 +19,8 @@ class SpecNodeSeed:
     initiative_id: str | None
     epic_id: str | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,8 @@ class SpecNode:
     initiative_id: str | None
     epic_id: str | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,8 @@ class IssueSnapshot:
     labels: list[str]
     updated_at: str
     url: str
+    repo_owner: str | None = None
+    repo_name: str | None = None
 
 
 @dataclass(frozen=True)

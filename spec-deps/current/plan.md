@@ -476,7 +476,7 @@ ID: "issue-28-runtime-regression-bugs"
 - minimum implementation:
   - doctor command/use case/presentation を追加する
 - pass condition:
-  - `duplicate id/seq`、`missing artifact`、`broken meta`、`stale active pointer` をそれぞれ診断する doctor guidance test が通る
+  - `duplicate id/seq`、`missing artifact`、`broken meta`、`stale active pointer`、`stale create lock` をそれぞれ診断する doctor guidance test が通る
 
 ###### Refactor
 - cleanup target:
@@ -511,7 +511,7 @@ ID: "issue-28-runtime-regression-bugs"
   - validate と doctor の契約境界、active fallback の UX 意図が説明できる
 - expected tests:
   - `initiative` / `epic` / `issue` / `discussion` の required artifact validation
-  - `duplicate id/seq` / `missing artifact` / `broken meta` / `stale active pointer` の doctor guidance
+  - `duplicate id/seq` / `missing artifact` / `broken meta` / `stale active pointer` / `stale create lock` の doctor guidance
   - `spec-dock/active` path 入口と `active show` CLI 入口の active fallback
 - report update:
   - `spec-deps/current/report.md`
@@ -557,8 +557,10 @@ ID: "issue-28-runtime-regression-bugs"
 ###### Green
 - minimum implementation:
   - repo identity validation と foreign URL 用の explicit opt-in flag（例: `--allow-foreign-url`）を追加する
+  - foreign repo import を許可した node には repo identity を persisted metadata として保持し、後続の sync/deps/status refresh が同じ foreign repo を参照するようにする
 - pass condition:
   - foreign URL mismatch が default fail する regression test と、explicit opt-in でのみ成功する regression test が通る
+  - foreign repo import 後の `sync --github` / `deps check --github` が current repo の同番号 issue に誤 hydrate しない regression test が通る
 
 ###### Refactor
 - cleanup target:
@@ -595,6 +597,7 @@ ID: "issue-28-runtime-regression-bugs"
 - expected tests:
   - foreign URL mismatch default fail
   - foreign URL explicit opt-in success
+  - foreign repo identity persistence across sync/deps refresh
   - explicit create flag
   - `active set --id`
   - `active set --github-issue`

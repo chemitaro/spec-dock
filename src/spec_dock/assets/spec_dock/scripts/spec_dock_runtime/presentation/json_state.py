@@ -209,7 +209,12 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
 
         if node.github_issue_number is not None:
             github_item: dict[str, object] = {"issue_number": int(node.github_issue_number)}
-            snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
+            if node.github_repo_owner and node.github_repo_name:
+                github_item["repo_owner"] = node.github_repo_owner
+                github_item["repo_name"] = node.github_repo_name
+            snapshot = result.github_snapshot_by_issue_id.get(node.id)
+            if snapshot is None:
+                snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
             if snapshot is not None:
                 github_item.update(
                     {

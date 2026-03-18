@@ -35,6 +35,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -131,6 +133,26 @@ def _to_active_selection(manifest: ActiveManifest | None) -> ActiveSelection | N
 def _append_unique(warnings: list[str], warning: str) -> None:
     if warning not in warnings:
         warnings.append(warning)
+
+
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
+def _collect_foreign_issue_targets(graph: SpecGraph) -> list[tuple[str, int]]:
+    targets: set[tuple[str, int]] = set()
+    for node in graph.nodes_by_id.values():
+        if node.kind not in ("initiative", "epic", "issue") or node.github_issue_number is None:
+            continue
+        repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+        if repo_slug is None:
+            continue
+        targets.add((repo_slug, int(node.github_issue_number)))
+    return sorted(targets, key=lambda item: (item[0], item[1]))
 
 
 def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
@@ -324,11 +346,28 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if req.use_github:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required when --github is enabled")
+        issue_snapshots = []
+        issue_index_snapshots = []
         try:
-            issue_snapshots = ports.issue_gateway.issue_index(_resolve_repo_root(ports), limit=int(req.issue_limit))
+            issue_index_snapshots = ports.issue_gateway.issue_index(
+                _resolve_repo_root(ports),
+                limit=int(req.issue_limit),
+            )
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
-            issue_snapshots = []
+        else:
+            issue_snapshots.extend(issue_index_snapshots)
+        for repo_slug, issue_number in _collect_foreign_issue_targets(graph):
+            try:
+                snapshot = ports.issue_gateway.issue_view_snapshot(
+                    _resolve_repo_root(ports),
+                    issue_number,
+                    repo_slug=repo_slug,
+                )
+            except RuntimeError:
+                _append_unique(warnings, "gh_fetch_failed")
+                continue
+            issue_snapshots.append(snapshot)
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}

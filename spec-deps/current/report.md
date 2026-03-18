@@ -30,6 +30,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `sev-3: generated runtime command surface mismatch` は継続観測として残るが、issue-28 の blocking condition ではない
 - comprehensive manual rerun `RT-01` から `RT-10` を fresh GitHub repository で実施し、overall verdict は `pass`
 - rerun では `foreign URL + --allow-foreign-url` は live で再現せず、same-repo / foreign / local-only / organic long-run の各経路で blocker は確認されなかった
+- PR #29 の Codex review 2 件は妥当と判断し、follow-up corrective patch を追加で実施した
+- corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
 
 ## 記録
 - `S01` 実装:
@@ -255,6 +257,20 @@ ID: "issue-28-runtime-regression-bugs"
   - evidence:
     - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/execution-log.md`
     - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/summary.md`
+- PR review follow-up corrective patch:
+  - analysis:
+    - `spec-deps/current/discussions/019-disc-pr29-reviewfollowup-analysis.md`
+  - finding resolution:
+    - `R1 foreign repo identity persistence`
+      - import 時だけでなく persisted meta/model に `github.repo_owner` / `github.repo_name` を保持
+      - `sync --github` / `deps check --github` / `active set --github` が repo-aware refresh を使い、foreign linked node を current repo 同番号 issue に誤 hydrate しないよう修正
+    - `R2 stale create lock doctor guidance`
+      - `doctor` に create lock 診断を追加し、stale / non-stale contention / metadata 異常を supported finding として返すよう修正
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_active_s06 tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_import tests.cli_runtime.test_sync tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_validate_s02 tests.domain_runtime.test_runtime_domain_s03`
+    - 結果: `Ran 156 tests in 21.267s` / `OK`
+  - review status:
+    - sub-agent review は usage limit のため完走しなかったが、指摘反映後にメインで差分確認と追加 test 実行を行い、少なくとも PR review の 2 finding を直接覆う regression は通過した
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -269,8 +285,10 @@ ID: "issue-28-runtime-regression-bugs"
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 - manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
 - comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
+- PR review で指摘された `foreign repo identity persistence` と `stale create lock doctor guidance` は corrective patch で解消済み
 
 ## 次アクション
 - issue-28 自体は完了として扱い、継続観測事項は別 follow-up として管理する
 - `sev-3` は follow-up investigation として切り分け、`init/update` 生成物 help に `doctor` と explicit target surface が現れることを確認する
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
+- PR #29 を再pushし、Codex review / PR checks を再監視する

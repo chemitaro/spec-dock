@@ -151,14 +151,41 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
         seen_ids.add(node_id)
 
         github_issue_number: int | None = None
+        github_repo_owner: str | None = None
+        github_repo_name: str | None = None
         github = meta.get("github")
-        if isinstance(github, dict) and github.get("issue_number") is not None:
-            try:
-                github_issue_number = int(github.get("issue_number"))
-            except (TypeError, ValueError) as exc:
-                raise RuntimeError(
-                    f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}"
-                ) from exc
+        if isinstance(github, dict):
+            if github.get("issue_number") is not None:
+                try:
+                    github_issue_number = int(github.get("issue_number"))
+                except (TypeError, ValueError) as exc:
+                    raise RuntimeError(
+                        f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}"
+                    ) from exc
+
+            owner_raw = github.get("repo_owner")
+            name_raw = github.get("repo_name")
+            if owner_raw is not None or name_raw is not None:
+                if owner_raw is None or name_raw is None:
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required"
+                    )
+                if not isinstance(owner_raw, str) or not isinstance(name_raw, str):
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: both fields must be strings"
+                    )
+                owner = owner_raw.strip().lower()
+                name = name_raw.strip().lower()
+                if not owner or not name:
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: empty value is not allowed"
+                    )
+                if github_issue_number is None:
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: github.issue_number is required"
+                    )
+                github_repo_owner = owner
+                github_repo_name = name
 
         records.append(
             StoredMetaRecord(
@@ -172,6 +199,8 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
                 epic_id=meta.get("epic_id") or None,
                 github_issue_number=github_issue_number,
                 meta_path=meta_path.as_posix(),
+                github_repo_owner=github_repo_owner,
+                github_repo_name=github_repo_name,
             )
         )
     return records
@@ -196,7 +225,15 @@ def _build_meta_payload(record: StoredMetaRecord) -> dict[str, Any]:
         },
     }
     if record.github_issue_number is not None:
-        payload["github"] = {"issue_number": int(record.github_issue_number)}
+        github_payload: dict[str, Any] = {"issue_number": int(record.github_issue_number)}
+        owner = (record.github_repo_owner or "").strip().lower()
+        name = (record.github_repo_name or "").strip().lower()
+        if owner or name:
+            if not owner or not name:
+                raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+            github_payload["repo_owner"] = owner
+            github_payload["repo_name"] = name
+        payload["github"] = github_payload
     return payload
 
 

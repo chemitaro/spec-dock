@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _runtime_modules():
@@ -32,6 +33,8 @@ def _record(
     initiative_id: str | None,
     epic_id: str | None,
     github_issue_number: int | None,
+    github_repo_owner: str | None = None,
+    github_repo_name: str | None = None,
 ) -> object:
     return infra_contracts.StoredMetaRecord(
         kind=kind,
@@ -44,6 +47,8 @@ def _record(
         epic_id=epic_id,
         github_issue_number=github_issue_number,
         meta_path=f"/repo/spec-dock/{kind}s/{node_id}/.meta.json",
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
     )
 
 
@@ -79,15 +84,28 @@ class _StubDerivedStateReader:
 
 
 class _StubIssueGateway:
-    def __init__(self, *, fail: bool = False):
+    def __init__(self, *, fail: bool = False, snapshots=None, foreign_snapshots=None):
         self.fail = fail
+        self.snapshots = list(snapshots or [])
+        self.foreign_snapshots = dict(foreign_snapshots or {})
         self.calls = []
+        self.view_calls = []
 
     def issue_index(self, repo_root, *, limit):
         self.calls.append((str(repo_root), int(limit)))
         if self.fail:
             raise RuntimeError("gh issue list failed")
-        return []
+        return list(self.snapshots)
+
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
+        if self.fail:
+            raise RuntimeError("gh issue view failed")
+        key = (str(repo_slug or ""), int(issue_number))
+        snapshot = self.foreign_snapshots.get(key)
+        if snapshot is None:
+            raise RuntimeError(f"gh issue view failed: {repo_slug}#{issue_number}")
+        return snapshot
 
 
 class _StubGitGateway:
@@ -184,47 +202,49 @@ class TestRuntimeActiveS06(unittest.TestCase):
         git_gateway=None,
         active_state_store=None,
         issue_gateway=None,
+        records=None,
     ):
         app_contracts, app_ports, _app_set_active, infra_contracts = _runtime_modules()
         del app_contracts
-        records = [
-            _record(
-                infra_contracts,
-                kind="initiative",
-                node_id="init-local-00001",
-                parent_id=None,
-                initiative_id=None,
-                epic_id=None,
-                github_issue_number=None,
-            ),
-            _record(
-                infra_contracts,
-                kind="epic",
-                node_id="epic-local-00001",
-                parent_id="init-local-00001",
-                initiative_id="init-local-00001",
-                epic_id=None,
-                github_issue_number=None,
-            ),
-            _record(
-                infra_contracts,
-                kind="issue",
-                node_id="iss-local-00001",
-                parent_id="epic-local-00001",
-                initiative_id="init-local-00001",
-                epic_id="epic-local-00001",
-                github_issue_number=None,
-            ),
-            _record(
-                infra_contracts,
-                kind="issue",
-                node_id="iss-local-00002",
-                parent_id="epic-local-00001",
-                initiative_id="init-local-00001",
-                epic_id="epic-local-00001",
-                github_issue_number=None,
-            ),
-        ]
+        if records is None:
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="issue",
+                    node_id="iss-local-00001",
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="issue",
+                    node_id="iss-local-00002",
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=None,
+                ),
+            ]
         return app_ports.Ports(
             node_reader=_StubNodeReader(records),
             repo_root=Path("/repo"),
@@ -333,6 +353,124 @@ class TestRuntimeActiveS06(unittest.TestCase):
         self.assertIn("gh_fetch_failed", result.warnings)
         self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
         self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
+
+    def test_set_active_github_prefers_foreign_snapshot_under_same_number_collision(self) -> None:
+        app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
+        records = [
+            _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=101,
+                github_repo_owner="upstream",
+                github_repo_name="product",
+            ),
+            _record(
+                infra_contracts,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00002",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            snapshots=[
+                SimpleNamespace(
+                    issue_number=101,
+                    state="OPEN",
+                    title="current repo #101",
+                    labels=[],
+                    updated_at="2026-03-18T00:00:00Z",
+                    url="https://github.com/current/repo/issues/101",
+                    repo_owner="current",
+                    repo_name="repo",
+                ),
+                SimpleNamespace(
+                    issue_number=123,
+                    state="OPEN",
+                    title="current repo #123",
+                    labels=[],
+                    updated_at="2026-03-18T00:00:00Z",
+                    url="https://github.com/current/repo/issues/123",
+                    repo_owner="current",
+                    repo_name="repo",
+                )
+            ],
+            foreign_snapshots={
+                ("upstream/product", 101): SimpleNamespace(
+                    issue_number=101,
+                    state="OPEN",
+                    title="foreign init #101",
+                    labels=[],
+                    updated_at="2026-03-18T00:10:00Z",
+                    url="https://github.com/upstream/product/issues/101",
+                    repo_owner="upstream",
+                    repo_name="product",
+                ),
+                ("other/repo", 123): SimpleNamespace(
+                    issue_number=123,
+                    state="CLOSED",
+                    title="foreign #123",
+                    labels=[],
+                    updated_at="2026-03-18T01:00:00Z",
+                    url="https://github.com/other/repo/issues/123",
+                    repo_owner="other",
+                    repo_name="repo",
+                )
+            },
+        )
+        ports = self._ports(
+            issue_depends_on_map={"iss-local-00001": [], "iss-local-00002": ["iss-local-00001"]},
+            statuses={},
+            issue_gateway=issue_gateway,
+            records=records,
+        )
+        req = app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00002", github_issue_number=None),
+            force=False,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        )
+        result = app_set_active.set_active(req, ports)
+
+        self.assertTrue(result.manifest_written)
+        self.assertEqual(result.selection.issue_id, "iss-local-00002")
+        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
+        self.assertEqual(
+            issue_gateway.view_calls,
+            [
+                ("/repo", 123, "other/repo"),
+                ("/repo", 101, "upstream/product"),
+            ],
+        )
+        self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
+        self.assertNotIn("gh_fetch_failed", result.warnings)
 
     def test_set_active_checkout_pre_step7_failure_has_no_rollback(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
