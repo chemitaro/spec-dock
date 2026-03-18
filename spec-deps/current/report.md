@@ -3,7 +3,7 @@
 ID: "issue-28-runtime-regression-bugs"
 タイトル: "manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する"
 関連GitHub: ["28"]
-状態: "in_progress"
+状態: "completed"
 作成者: "Codex CLI"
 最終更新: "2026-03-18"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -28,6 +28,8 @@ ID: "issue-28-runtime-regression-bugs"
 - post-fix manual test `MT-01` から `MT-10` を実施
 - manual test で見つかった `sev-2: foreign URL + --allow-foreign-url success path failure` を追加修正で解消し、affected case rerun 後の overall verdict は `pass`
 - `sev-3: generated runtime command surface mismatch` は継続観測として残るが、issue-28 の blocking condition ではない
+- comprehensive manual rerun `RT-01` から `RT-10` を fresh GitHub repository で実施し、overall verdict は `pass`
+- rerun では `foreign URL + --allow-foreign-url` は live で再現せず、same-repo / foreign / local-only / organic long-run の各経路で blocker は確認されなかった
 
 ## 記録
 - `S01` 実装:
@@ -221,6 +223,38 @@ ID: "issue-28-runtime-regression-bugs"
   - evidence:
     - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/execution-log.md`
     - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/summary.md`
+- comprehensive manual rerun:
+  - report root:
+    - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/`
+  - scope:
+    - `RT-01` baseline fresh init and scaffold parity
+    - `RT-02` broad local create matrix
+    - `RT-03` discussion and artifact churn
+    - `RT-04` deps topology growth
+    - `RT-05` recovery and odd local states
+    - `RT-06` github live same-repo flows
+    - `RT-07` github live foreign-url safety
+    - `RT-08` explicit target and ambiguity stress
+    - `RT-09` organic long-run operator session
+    - `RT-10` summary and residue check
+  - verdict:
+    - `RT-01` `pass`（generated/provider help 差分は継続観測）
+    - `RT-02` `pass`
+    - `RT-03` `pass`
+    - `RT-04` `pass`
+    - `RT-05` `pass`
+    - `RT-06` `pass`
+    - `RT-07` `pass`
+    - `RT-08` `pass`
+    - `RT-09` `pass`
+    - `RT-10` `pass`
+  - findings:
+    - `resolved`: `foreign URL + --allow-foreign-url` live success path は再現せず、期待どおり成功
+    - `new`: `sev-4` `gh_index_incomplete` warning を観測したが、機能失敗には未接続
+    - `residual`: generated runtime と provider runtime の help surface 差分は継続観測
+  - evidence:
+    - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/execution-log.md`
+    - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/summary.md`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -234,7 +268,9 @@ ID: "issue-28-runtime-regression-bugs"
 - current repo 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するが、origin 以外の remote を自動探索する契約にはしていない
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 - manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
+- comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
 
 ## 次アクション
-- issue-28 の実装・回帰修正・manual rerun まで含めたコミットを作成する
+- issue-28 自体は完了として扱い、継続観測事項は別 follow-up として管理する
 - `sev-3` は follow-up investigation として切り分け、`init/update` 生成物 help に `doctor` と explicit target surface が現れることを確認する
+- `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
