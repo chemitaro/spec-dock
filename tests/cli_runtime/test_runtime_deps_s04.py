@@ -2,8 +2,11 @@ import contextlib
 import io
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+
+_REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
 
 
 def _runtime_modules():
@@ -44,57 +47,120 @@ def _runtime_modules():
     )
 
 
-def _sample_records(infra_contracts):
+def _sample_records(infra_contracts, *, repo_root: Path = Path("/repo")):
+    specdock_dir = repo_root / "spec-dock"
     return [
         infra_contracts.StoredMetaRecord(
             kind="initiative",
             id="init-local-00001",
             title="Auth Platform",
             slug="auth-platform",
-            path="/repo/spec-dock/initiatives/init-local-00001-auth-platform",
+            path=(specdock_dir / "initiatives" / "init-local-00001-auth-platform").as_posix(),
             parent_id=None,
             initiative_id=None,
             epic_id=None,
             github_issue_number=101,
-            meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
+            meta_path=(
+                specdock_dir / "initiatives" / "init-local-00001-auth-platform" / ".meta.json"
+            ).as_posix(),
         ),
         infra_contracts.StoredMetaRecord(
             kind="epic",
             id="epic-local-00001",
             title="JWT Auth",
             slug="jwt-auth",
-            path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth",
+            path=(
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+            ).as_posix(),
             parent_id="init-local-00001",
             initiative_id="init-local-00001",
             epic_id=None,
             github_issue_number=201,
-            meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json",
+            meta_path=(
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / ".meta.json"
+            ).as_posix(),
         ),
         infra_contracts.StoredMetaRecord(
             kind="issue",
             id="iss-local-00001",
             title="Dependency",
             slug="dependency",
-            path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-dependency",
+            path=(
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-dependency"
+            ).as_posix(),
             parent_id="epic-local-00001",
             initiative_id="init-local-00001",
             epic_id="epic-local-00001",
             github_issue_number=301,
-            meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-dependency/.meta.json",
+            meta_path=(
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-dependency"
+                / ".meta.json"
+            ).as_posix(),
         ),
         infra_contracts.StoredMetaRecord(
             kind="issue",
             id="iss-local-00002",
             title="Target",
             slug="target",
-            path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00002-target",
+            path=(
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00002-target"
+            ).as_posix(),
             parent_id="epic-local-00001",
             initiative_id="init-local-00001",
             epic_id="epic-local-00001",
             github_issue_number=302,
-            meta_path="/repo/spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00002-target/.meta.json",
+            meta_path=(
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00002-target"
+                / ".meta.json"
+            ).as_posix(),
         ),
     ]
+
+
+def _materialize_required_artifacts(records) -> None:
+    for record in records:
+        node_dir = Path(record.path)
+        node_dir.mkdir(parents=True, exist_ok=True)
+        meta_path = Path(record.meta_path)
+        meta_path.write_text(
+            json.dumps({"id": record.id, "kind": record.kind}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        for doc_name in _REQUIRED_NODE_DOCS:
+            (node_dir / doc_name).write_text(f"# {doc_name}\n", encoding="utf-8")
 
 
 def _issue_status_snapshot(
@@ -305,20 +371,23 @@ class TestRuntimeDepsS04(unittest.TestCase):
             _presentation_cli_text,
             _presentation_json_state,
         ) = _runtime_modules()
-        records = _sample_records(infra_contracts)
-        deps_reader = _StubDepsTopologyReader(
-            {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": ["iss-local-00001"]}
-        )
-        ports = app_ports.Ports(
-            node_reader=_StubNodeReader(records),
-            repo_root=Path("/repo"),
-            specdock_dir=Path("/repo/spec-dock"),
-            deps_topology_reader=deps_reader,
-        )
-        result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
-        self.assertEqual(deps_reader.calls, 1)
-        self.assertTrue(result.report.errors)
-        self.assertIn("Dependency cycle detected", result.report.errors[0])
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            records = _sample_records(infra_contracts, repo_root=repo_root)
+            _materialize_required_artifacts(records)
+            deps_reader = _StubDepsTopologyReader(
+                {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": ["iss-local-00001"]}
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                deps_topology_reader=deps_reader,
+            )
+            result = app_validate_tree.validate_tree(app_contracts.ValidateTreeRequest(), ports)
+            self.assertEqual(deps_reader.calls, 1)
+            self.assertTrue(result.report.errors)
+            self.assertIn("Dependency cycle detected", result.report.errors[0])
 
     def test_deps_renderers(self) -> None:
         (

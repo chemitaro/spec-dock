@@ -19,9 +19,11 @@ ID: "issue-28-runtime-regression-bugs"
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
 - `S90 docs impact resolution` を完了
+- `S99 final diff review quality gate` の corrective fix を反映
 - `S01` から `S05` まで implementation review と QA review を通過
 - docs/spec review を通過
-- 次は `S99 final diff review` を行う
+- broad final suite 262 tests を通過
+- 次は branch diff 全体の final review を完了させる
 
 ## 記録
 - `S01` 実装:
@@ -149,6 +151,18 @@ ID: "issue-28-runtime-regression-bugs"
     - import URL safety, `--allow-foreign-url`, `--id`, `--github-issue`, `new issue --create-github-issue` の説明が requirement/design/plan/report と整合
     - provider-side docs と dogfooding mirror の対応ファイルが同期されている
     - mirror-only の旧 docs に残る active set 誤読も抑止されている
+- `S99` corrective fix:
+  - broad final suite で、`tests/cli_runtime/test_runtime_deps_s04.py` と `tests/presentation_runtime/test_runtime_sync_s07.py` の fixture が S04 required artifact 契約に追随しておらず、cycle / sync artifact failure contract を見る前に preflight validate で落ちることを確認した
+  - tests-only で `.meta.json` / `requirement.md` / `design.md` / `plan.md` / `report.md` を fixture 生成する helper を追加し、元の assertion 意図を回復した
+- `S99` corrective fix review:
+  - implementation review: `pass`
+  - QA review: `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_deps_s04 tests.presentation_runtime.test_runtime_sync_s07`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_doctor_s04 tests.domain_runtime.test_runtime_domain_s03 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_deps tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_dangling_active_symlink_entrypoint tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_persisted_active_manifest tests.cli_runtime.test_import tests.cli_runtime.test_new tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_command_import_issue_smoke tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists`
+  - 結果:
+    - `Ran 262 tests in 41.667s`
+    - `OK`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -163,6 +177,6 @@ ID: "issue-28-runtime-regression-bugs"
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 
 ## 次アクション
-- `S90` の docs 変更をコミットする
-- `S99` で branch diff 全体の final review を実施する
+- tests-only corrective fix をコミットする
+- branch diff 全体の final review を実施する
 - final review が通れば branch task 完了として報告する
