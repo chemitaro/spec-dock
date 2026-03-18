@@ -11,6 +11,7 @@ are handled by the repo-local runtime script installed at:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -18,7 +19,7 @@ import sys
 from contextlib import contextmanager
 from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from spec_dock import __version__
 
@@ -131,6 +132,148 @@ def _make_readonly_tree(path: Path) -> None:
         except OSError:
             # Best-effort only.
             continue
+
+
+def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
+    """Return placeholder directory for a layer or raise if missing."""
+    path = specdock_dir / "system" / "active-none" / layer
+    if not path.is_dir():
+        raise RuntimeError(f"Missing placeholder directory: {path}")
+    return path
+
+
+def _write_active_pathfile(active_dir: Path, name: str, target: Path) -> None:
+    """Write `active/<name>.path` as symlink fallback."""
+    rel_target = os.path.relpath(target, start=active_dir)
+    (active_dir / f"{name}.path").write_text(rel_target + "\n", encoding="utf-8")
+
+
+def _normalize_active_manifest_entry_id(entry: object) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    raw_id = entry.get("id")
+    if not isinstance(raw_id, str):
+        return None
+    normalized = raw_id.strip()
+    return normalized or None
+
+
+def _normalize_active_manifest_ids(current: object) -> tuple[str | None, str | None, str | None] | None:
+    if not isinstance(current, dict):
+        return None
+
+    if all(key in current and current[key] is None for key in ("initiative", "epic", "issue")):
+        return (None, None, None)
+
+    initiative_id = _normalize_active_manifest_entry_id(current.get("initiative"))
+    epic_id = _normalize_active_manifest_entry_id(current.get("epic"))
+    issue_id = _normalize_active_manifest_entry_id(current.get("issue"))
+    if initiative_id is None and epic_id is None and issue_id is None:
+        return None
+    return (initiative_id, epic_id, issue_id)
+
+
+def _load_persisted_active_ids(specdock_dir: Path) -> tuple[str | None, str | None, str | None]:
+    candidates = (
+        specdock_dir / ".agent" / "active.json",
+        specdock_dir / ".work" / "active.json",
+        specdock_dir / ".work" / "current.json",
+    )
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            loaded: Any = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        normalized = _normalize_active_manifest_ids(loaded)
+        if normalized is not None:
+            return normalized
+    return (None, None, None)
+
+
+def _render_context_pack(*, initiative_id: str | None, epic_id: str | None, issue_id: str | None) -> str:
+    """Render context-pack content used before runtime active commands run."""
+    has_init = initiative_id is not None
+    has_epic = epic_id is not None
+    has_issue = issue_id is not None
+    init_value = initiative_id if has_init else "(none)"
+    epic_value = epic_id if has_epic else "(none)"
+    issue_value = issue_id if has_issue else "(none)"
+    lines: list[str] = []
+    lines.append("# Context Pack (generated)")
+    lines.append("")
+    lines.append("## Active")
+    lines.append(f"- initiative: {init_value}")
+    lines.append(f"- epic: {epic_value}")
+    lines.append(f"- issue: {issue_value}")
+    lines.append("")
+    lines.append("## Generated state")
+    lines.append("- index: `spec-dock/.agent/index.json`")
+    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("")
+    lines.append("## Read order")
+    if has_init:
+        lines.append("- `spec-dock/active/initiative/requirement.md`")
+        lines.append("- `spec-dock/active/initiative/design.md`")
+        lines.append("- `spec-dock/active/initiative/plan.md`")
+    else:
+        lines.append("- `spec-dock/active/initiative/README.md`")
+    if has_epic:
+        lines.append("- `spec-dock/active/epic/requirement.md`")
+        lines.append("- `spec-dock/active/epic/design.md`")
+        lines.append("- `spec-dock/active/epic/plan.md`")
+    else:
+        lines.append("- `spec-dock/active/epic/README.md`")
+    if has_issue:
+        lines.append("- `spec-dock/active/issue/requirement.md`")
+        lines.append("- `spec-dock/active/issue/design.md`")
+        lines.append("- `spec-dock/active/issue/plan.md`")
+        lines.append("- `spec-dock/active/issue/report.md`")
+    else:
+        lines.append("- `spec-dock/active/issue/README.md`")
+    lines.append("")
+    lines.append("## Commands")
+    lines.append("- state (local): `./spec-dock/scripts/spec-dock sync`")
+    lines.append("- state (github): `./spec-dock/scripts/spec-dock sync --github`")
+    lines.append("- validate: `./spec-dock/scripts/spec-dock validate`")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _render_default_context_pack() -> str:
+    return _render_context_pack(initiative_id=None, epic_id=None, issue_id=None)
+
+
+def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
+    """Ensure `spec-dock/active/*` fallback entrypoints exist after init/update."""
+    active_dir = specdock_dir / "active"
+    active_dir.mkdir(parents=True, exist_ok=True)
+
+    for layer in ("initiative", "epic", "issue"):
+        link = active_dir / layer
+        pathfile = active_dir / f"{layer}.path"
+        # Repair stale symlinks so update can restore fallback pointers.
+        if link.is_symlink() and not link.exists():
+            link.unlink(missing_ok=True)
+
+        if link.exists() or link.is_symlink() or pathfile.exists():
+            continue
+
+        target = _active_placeholder_dir(specdock_dir, layer)
+        rel_target = os.path.relpath(target, start=active_dir)
+        try:
+            os.symlink(rel_target, link)
+        except OSError:
+            _write_active_pathfile(active_dir, layer, target)
+
+    context_pack_path = active_dir / "context-pack.md"
+    if not context_pack_path.exists():
+        initiative_id, epic_id, issue_id = _load_persisted_active_ids(specdock_dir)
+        context_pack_path.write_text(
+            _render_context_pack(initiative_id=initiative_id, epic_id=epic_id, issue_id=issue_id),
+            encoding="utf-8",
+        )
 
 
 def _install_repo_root_shortcut(target_root: Path) -> None:
@@ -257,6 +400,9 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
 
         # Best-effort: placeholders are not user-authored specs; discourage edits.
         _make_readonly_tree(specdock_dir / "system" / "active-none")
+
+        # Ensure active fallback entrypoints exist before runtime `active clear/set`.
+        _ensure_active_fallback_entrypoints(specdock_dir)
 
         (specdock_dir / "spec-dock.version").write_text(f"{_tool_version()}\n", encoding="utf-8")
 

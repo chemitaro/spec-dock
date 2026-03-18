@@ -77,6 +77,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     )
 
     _bind_leaf(sub.add_parser("validate", help="Validate the spec tree structure"), registry, "validate")
+    _bind_leaf(sub.add_parser("doctor", help="Diagnose broken state and show repair guidance"), registry, "doctor")
     return parser
 
 

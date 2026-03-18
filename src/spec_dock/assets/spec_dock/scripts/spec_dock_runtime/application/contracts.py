@@ -32,6 +32,32 @@ class ValidationResult:
 
 
 @dataclass(frozen=True)
+class DoctorRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class DoctorFinding:
+    code: Literal[
+        "duplicate_id",
+        "duplicate_seq",
+        "missing_artifact",
+        "broken_meta",
+        "stale_active_pointer",
+        "validation_error",
+    ]
+    message: str
+    guidance: list[str]
+
+
+@dataclass(frozen=True)
+class DoctorResult:
+    ok: bool
+    findings: list[DoctorFinding]
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
 class TargetRef:
     kind: str
     node_id: str | None
@@ -233,3 +259,6 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    doctor: Callable[[DoctorRequest], DoctorResult] = (
+        lambda _req: DoctorResult(ok=True, findings=[], warnings=[])
+    )

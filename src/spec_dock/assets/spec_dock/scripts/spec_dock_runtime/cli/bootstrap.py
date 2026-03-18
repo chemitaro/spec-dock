@@ -8,6 +8,7 @@ from ..application.create_node import create_discussion_doc as application_creat
 from ..application.create_node import create_epic as application_create_epic
 from ..application.create_node import create_initiative as application_create_initiative
 from ..application.create_node import create_issue as application_create_issue
+from ..application.doctor import doctor as application_doctor
 from ..application.contracts import UseCases
 from ..application.import_node import import_epic as application_import_epic
 from ..application.import_node import import_initiative as application_import_initiative
@@ -196,5 +197,6 @@ def build_runtime(specdock_dir: Path) -> BootstrapContext:
         sync=lambda req: application_sync(req, ports),
         check_deps=lambda req: application_check_deps(req, ports),
         validate_tree=lambda req: application_validate_tree(req, ports),
+        doctor=lambda req: application_doctor(req, ports),
     )
     return BootstrapContext(use_cases=use_cases)

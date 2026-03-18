@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,11 @@ from .json_store import load_json, write_json
 _INITIATIVES_DIRNAME = "initiatives"
 _META_FILENAME = ".meta.json"
 _LEGACY_META_FILENAME = "meta.json"
+_NODE_DIRNAME_PATTERNS: dict[str, re.Pattern[str]] = {
+    "initiative": re.compile(r"^(?P<id>init(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    "epic": re.compile(r"^(?P<id>epic(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    "issue": re.compile(r"^(?P<id>iss(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*$"),
+}
 
 
 def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
@@ -47,6 +53,65 @@ def _find_legacy_meta_paths(initiatives_root: Path) -> list[Path]:
     return sorted(initiatives_root.rglob(_LEGACY_META_FILENAME), key=lambda p: p.as_posix())
 
 
+def _sorted_child_dirs(path: Path) -> list[Path]:
+    if not path.exists():
+        return []
+    return sorted((p for p in path.iterdir() if p.is_dir()), key=lambda p: p.as_posix())
+
+
+def _parse_node_id_from_dirname(kind: str, dirname: str) -> str | None:
+    pattern = _NODE_DIRNAME_PATTERNS[kind]
+    matched = pattern.fullmatch(dirname)
+    if matched is None:
+        return None
+    return str(matched.group("id"))
+
+
+def _iter_expected_node_dirs(initiatives_root: Path) -> list[tuple[str, str, Path]]:
+    rows: list[tuple[str, str, Path]] = []
+    for initiative_dir in _sorted_child_dirs(initiatives_root):
+        initiative_id = _parse_node_id_from_dirname("initiative", initiative_dir.name)
+        if initiative_id is None:
+            continue
+        rows.append(("initiative", initiative_id, initiative_dir))
+
+        epics_root = initiative_dir / "epics"
+        for epic_dir in _sorted_child_dirs(epics_root):
+            epic_id = _parse_node_id_from_dirname("epic", epic_dir.name)
+            if epic_id is None:
+                continue
+            rows.append(("epic", epic_id, epic_dir))
+
+            issues_root = epic_dir / "issues"
+            for issue_dir in _sorted_child_dirs(issues_root):
+                issue_id = _parse_node_id_from_dirname("issue", issue_dir.name)
+                if issue_id is None:
+                    continue
+                rows.append(("issue", issue_id, issue_dir))
+    return rows
+
+
+def _meta_path_for_output(meta_path: Path, *, repo_root: Path) -> str:
+    try:
+        return meta_path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return meta_path.as_posix()
+
+
+def _ensure_expected_node_meta_present(*, specdock_dir: Path, initiatives_root: Path) -> None:
+    repo_root = specdock_dir.parent
+    for kind, node_id, node_dir in _iter_expected_node_dirs(initiatives_root):
+        meta_path = node_dir / _META_FILENAME
+        if meta_path.is_file():
+            continue
+        raise RuntimeError(
+            "Missing required artifact: "
+            f"kind={kind} id={node_id} "
+            f"artifact={_meta_path_for_output(meta_path, repo_root=repo_root)} "
+            "(restore .meta.json for this node directory)"
+        )
+
+
 def ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
     initiatives_root = _initiatives_root(specdock_dir)
     if not initiatives_root.exists():
@@ -66,6 +131,7 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
     initiatives_root = _initiatives_root(specdock_dir)
     if not initiatives_root.exists():
         return []
+    _ensure_expected_node_meta_present(specdock_dir=specdock_dir, initiatives_root=initiatives_root)
 
     records: list[StoredMetaRecord] = []
     seen_ids: set[str] = set()
