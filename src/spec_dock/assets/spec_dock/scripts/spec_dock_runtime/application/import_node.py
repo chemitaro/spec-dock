@@ -36,6 +36,12 @@ def _resolve_issue_gateway(ports: Ports):
     return ports.issue_gateway
 
 
+def _resolve_git_gateway(ports: Ports):
+    if ports.git_gateway is None:
+        raise RuntimeError("git_gateway is required")
+    return ports.git_gateway
+
+
 def _active_selection_from_manifest(manifest: ActiveManifest | None) -> ActiveSelection:
     if manifest is None:
         return ActiveSelection(initiative_id=None, epic_id=None, issue_id=None)
@@ -106,6 +112,30 @@ def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -
     )
 
 
+def _validate_url_repo_identity(req: ImportNodeRequest, ports: Ports) -> None:
+    owner = (req.target_repo_owner or "").strip().lower()
+    repo = (req.target_repo_name or "").strip().lower()
+    if not owner or not repo:
+        return
+    if req.allow_foreign_url:
+        return
+
+    current_repo = _resolve_git_gateway(ports).origin_github_repo_slug(_resolve_repo_root(ports))
+    if current_repo is None:
+        raise RuntimeError(
+            "Cannot verify GitHub URL repository against current repo. "
+            "Configure git remote.origin.url or pass '--allow-foreign-url'."
+        )
+    expected = f"{owner}/{repo}"
+    actual = current_repo.lower()
+    if actual != expected:
+        raise RuntimeError(
+            "GitHub URL repository mismatch for import target: "
+            f"target={expected}, current={actual}. "
+            "Use '--allow-foreign-url' only when cross-repo import is intentional."
+        )
+
+
 def import_node_core(
     req: ImportNodeRequest,
     ports: Ports,
@@ -121,6 +151,7 @@ def import_node_core(
         raise RuntimeError(f"preflight validate failed: {error}") from error
 
     issue_number = int(req.issue_number)
+    _validate_url_repo_identity(req, ports)
     guard_github_issue_uniqueness(graph, issue_number)
 
     parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)

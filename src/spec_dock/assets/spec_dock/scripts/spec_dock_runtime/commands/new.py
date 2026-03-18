@@ -43,6 +43,7 @@ class NewIssueArgs(CommandArgs):
     title: str
     slug: str | None
     node_id: str | None
+    create_github_issue: bool
     github_issue_number: int | None
     no_github: bool
 
@@ -141,6 +142,11 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--id")
     github_group = parser.add_mutually_exclusive_group()
     github_group.add_argument(
+        "--create-github-issue",
+        action="store_true",
+        help="Create and link a new GitHub issue (default behavior for issue)",
+    )
+    github_group.add_argument(
         "--github-issue",
         type=int,
         help="Existing GitHub issue number to link (id becomes iss-NNNN)",
@@ -191,6 +197,7 @@ def _new_issue_args(ns: argparse.Namespace) -> CommandArgs:
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
         node_id=getattr(ns, "id", None),
+        create_github_issue=bool(getattr(ns, "create_github_issue", False)),
         github_issue_number=getattr(ns, "github_issue", None),
         no_github=bool(getattr(ns, "no_github", False)),
     )
@@ -272,8 +279,8 @@ def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 
 def _run_new_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_issue_args(args)
-    if typed.no_github and typed.github_issue_number is not None:
-        return _command_error("Cannot combine '--no-github' with '--github-issue'.")
+    if typed.no_github and (typed.create_github_issue or typed.github_issue_number is not None):
+        return _command_error("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
 
     result = use_cases.create_issue(
         CreateNodeRequest(

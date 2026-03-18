@@ -7,18 +7,22 @@ from ..commands.contracts import CommandRegistry, CommandSpec
 
 class _RuntimeArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:  # noqa: A003 - argparse API
-        legacy_flags = ("--initiative", "--epic", "--issue", "--github-issue")
+        legacy_flags = ("--initiative", "--epic", "--issue")
         hint = ""
         if "unrecognized arguments" in message and any(flag in message for flag in legacy_flags):
             hint = (
                 "\n\nHint:\n"
-                "  'active set' is now: active set <target>\n"
-                "  - target: GitHub issue number (e.g. 123 / #123 / URL) or node id (e.g. iss-00123)\n"
+                "  'active set' supports explicit targets:\n"
+                "  - active set <target>\n"
+                "  - active set --id <node-id>\n"
+                "  - active set --github-issue <number>\n"
                 "\n"
                 "Examples:\n"
                 "  spec-dock/scripts/spec-dock active set 123\n"
+                "  spec-dock/scripts/spec-dock active set --github-issue 123\n"
+                "  spec-dock/scripts/spec-dock active set --id iss-00123\n"
                 "  spec-dock/scripts/spec-dock active set iss-00123\n"
-                "  spec-dock/scripts/spec-dock active set iss-local-00001\n"
+                "  spec-dock/scripts/spec-dock deps check --id iss-local-00001\n"
             )
         super().error(message + hint)
 

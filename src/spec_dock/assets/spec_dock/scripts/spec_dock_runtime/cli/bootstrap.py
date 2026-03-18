@@ -142,6 +142,9 @@ class _GitGateway:
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.check_ref_format_branch(repo_root, branch)
 
+    def origin_github_repo_slug(self, repo_root: Path) -> str | None:
+        return infra_git_cli.origin_github_repo_slug(repo_root)
+
 
 @dataclass(frozen=True)
 class _JsonStore:

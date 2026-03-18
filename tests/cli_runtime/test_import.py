@@ -240,6 +240,11 @@ class TestCliImport(CliRuntimeHarness):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
                     self.assertEqual(main(["init", str(target)]), 0)
+                    if issue_target.startswith("https://"):
+                        if shutil.which("git") is None:
+                            self.skipTest("git not available")
+                        self._run_git(target, ["init"])
+                        self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
                     self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
                     self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
 
@@ -268,6 +273,264 @@ class TestCliImport(CliRuntimeHarness):
                     self.assertTrue(issue_dir.is_dir())
                     log = log_path.read_text(encoding="utf-8")
                     self.assertIn("issue view 123", log)
+
+    def test_import_rejects_foreign_repo_url_without_opt_in(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "https://github.com/other/repo/issues/123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("repository mismatch", p.stderr)
+            self.assertIn("--allow-foreign-url", p.stderr)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-imported-issue"
+            )
+            self.assertFalse(issue_dir.exists())
+
+    def test_import_allows_foreign_repo_url_with_opt_in(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "https://github.com/other/repo/issues/123",
+                    "--allow-foreign-url",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (import issue)", p.stdout)
+            self.assertIn("github=#123", p.stdout)
+
+    def test_import_rejects_non_canonical_url_like_target(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "git@github.com:other/repo/issues/123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Invalid target", p.stderr)
+
+    def test_import_url_rejects_when_origin_is_not_configured(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "https://github.com/example/repo/issues/123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
+
+    def test_import_url_rejects_when_origin_is_not_github(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://example.com/owner/repo.git"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "https://github.com/example/repo/issues/123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
+
+    def test_import_accepts_canonical_url_when_origin_is_ssh_remote(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "git@github.com:example/repo.git"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "https://github.com/example/repo/issues/123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (import issue)", p.stdout)
+
+    def test_import_accepts_canonical_url_when_origin_is_credentialed_https_remote(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(
+                target,
+                ["remote", "add", "origin", "https://token@github.com/example/repo.git"],
+            )
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "https://github.com/example/repo/issues/123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-local-00001",
+                ],
+                env=test_env,
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (import issue)", p.stdout)
 
     def test_import_issue_uses_active_epic_when_parent_not_specified(self) -> None:
         if os.name == "nt":
@@ -667,4 +930,3 @@ class TestCliImport(CliRuntimeHarness):
             self.assertTrue(issue_dir.is_dir())
             self.assertFalse((target / "spec-dock" / ".agent" / "active.json").exists())
             self.assertTrue(legacy_active_path.is_file())
-
