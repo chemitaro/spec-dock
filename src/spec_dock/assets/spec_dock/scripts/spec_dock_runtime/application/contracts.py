@@ -95,6 +95,9 @@ class ImportNodeRequest:
     title: str
     slug: str | None
     parent_id: str | None
+    target_repo_owner: str | None = None
+    target_repo_name: str | None = None
+    allow_foreign_url: bool = False
 
 
 @dataclass(frozen=True)

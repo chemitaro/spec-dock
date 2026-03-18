@@ -108,6 +108,9 @@ class GitGateway(Protocol):
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
         ...
 
+    def origin_github_repo_slug(self, repo_root: Path) -> str | None:
+        ...
+
 
 class ArtifactWriter(Protocol):
     def write(self, specdock_dir: Path, bundle: ArtifactBundle) -> ArtifactWriteResult:

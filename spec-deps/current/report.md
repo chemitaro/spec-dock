@@ -17,8 +17,9 @@ ID: "issue-28-runtime-regression-bugs"
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
-- implementation review と QA review を通過
-- 次は `S05 GitHub targeting と CLI intent surface を安全化する` に着手
+- `S05 GitHub targeting と CLI intent surface を安全化する` を完了
+- `S01` から `S05` まで implementation review と QA review を通過
+- 次は `S90 docs impact resolution` を行う
 
 ## 記録
 - `S01` 実装:
@@ -108,6 +109,34 @@ ID: "issue-28-runtime-regression-bugs"
     - `pass`
   - 実行:
     - `python -m unittest -v tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_active tests.cli_runtime.test_runtime_doctor_s04 tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_dangling_active_symlink_entrypoint tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_persisted_active_manifest`
+- `S05` 実装:
+  - import target の canonical GitHub issue URL から `owner/repo` を抽出し、current repo と一致しない URL import を default fail に変更した
+  - `--allow-foreign-url` を追加し、cross-repo import を explicit opt-in のときだけ許可するようにした
+  - `active set` / `deps check` に `--id` / `--github-issue` を追加し、positional target との conflict / invalid input を明示的に reject するようにした
+  - `new issue --create-github-issue` を additive alias として追加し、`--no-github` / `--github-issue` との排他も固定した
+  - canonical でない URL-like import target を reject し、repo identity 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するようにした
+- `S05` implementation review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - non-canonical URL-like target が repo identity guard を回避しうる
+    - credentialed HTTPS remote を current repo 判定で解釈できない
+  - 対応:
+    - canonical GitHub issue URL 以外の URL-like target を reject するよう parser を修正
+    - `https://<userinfo>@github.com/<owner>/<repo>.git` 形式を current repo 判定で許容した
+  - 再レビュー:
+    - `pass`
+- `S05` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - explicit target flag の conflict / invalid input 回帰が不足
+    - no-origin / non-GitHub-origin / SSH-origin の repo identity 分岐が未保護
+  - 対応:
+    - `active set` / `deps check` の conflict / non-positive `--github-issue` をテスト固定
+    - import の no-origin / non-GitHub-origin fail、SSH-origin success、credentialed HTTPS-origin success、non-canonical URL-like target reject をテスト固定
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_new tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_command_import_issue_smoke tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -116,8 +145,11 @@ ID: "issue-28-runtime-regression-bugs"
 - duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
 - cache `last_sync_at` は issue node の persisted freshness field がない旧 index では `None` になる
 - discussion は first-class node / manifest を持たないため、S04 の required artifact presence validation は `initiative` / `epic` / `issue` に限定した。discussion は既存どおり recognized markdown の integrity contract（少なくとも seq uniqueness）を validate 対象とする
+- current repo 判定は `git remote.origin.url` に依存し、origin 未設定または GitHub 以外の host では canonical URL import も default fail する。cross-repo / non-verifiable import は `--allow-foreign-url` による explicit intent を要求する
+- `active set` / `deps check` は explicit target flag 追加により、target 未指定時は argparse exit `2` ではなく runtime error exit `1` を返す
+- current repo 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するが、origin 以外の remote を自動探索する契約にはしていない
 
 ## 次アクション
-- `S04` の変更をコミットする
-- `S05` の dev implementation を開始する
-- `S05` 完了後に implementation review / QA review / report 更新 / commit を同じ単位で進める
+- `S05` の変更をコミットする
+- `S90` で docs/help/dogfooding の impact を閉じる
+- `S90` 完了後に spec review と commit を行い、最後に `S99` final diff review を実施する

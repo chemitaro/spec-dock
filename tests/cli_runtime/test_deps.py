@@ -292,6 +292,48 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn("spec-dock: ok (deps check)", p.stdout)
             self.assertIn("ready=true", p.stdout)
 
+    def test_deps_check_accepts_explicit_id_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001", "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn('"target": "iss-local-00001"', p.stdout)
+
+    def test_deps_check_accepts_explicit_github_issue_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "123", "--json"])
+            self.assertIn(p.returncode, (0, 3), p.stdout + p.stderr)
+            self.assertIn('"target": "iss-00123"', p.stdout)
+
+    def test_deps_check_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(target, ["deps", "check", "123", "--id", "iss-local-00001"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("choose exactly one", p.stderr)
+
+    def test_deps_check_rejects_non_positive_github_issue_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "0"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("positive integer", p.stderr)
+
     def test_deps_check_returns_ready_and_blockers_and_closure_json(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -526,12 +568,13 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertTrue(data["target_status"]["stale"])
             self.assertIsNone(data["target_status"]["last_sync_at"])
 
-    def test_deps_check_missing_target_is_argparse_exit_2_not_blocked(self) -> None:
+    def test_deps_check_missing_target_reports_runtime_target_requirement(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             p = self._run_runtime_capture(target, ["deps", "check"])
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("target is required", p.stderr)
 
     def test_deps_check_accepts_github_number_forms_and_urls(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

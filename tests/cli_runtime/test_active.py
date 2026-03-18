@@ -76,6 +76,66 @@ class TestCliActive(CliRuntimeHarness):
             # Legacy flags were removed in favor of a single `target` argument.
             self._run_runtime_expect_fail(target, ["active", "set", "--issue", "1"])
 
+    def test_active_set_accepts_explicit_id_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (active set)", p.stdout)
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-local-00001")
+
+    def test_active_set_accepts_explicit_github_issue_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "123", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (active set)", p.stdout)
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-00123")
+
+    def test_active_set_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(
+                target,
+                ["active", "set", "123", "--id", "iss-local-00001"],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("choose exactly one", p.stderr)
+
+    def test_active_set_rejects_conflict_between_id_and_github_issue_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(
+                target,
+                ["active", "set", "--id", "iss-local-00001", "--github-issue", "123"],
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("choose exactly one", p.stderr)
+
+    def test_active_set_rejects_non_positive_github_issue_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(target, ["active", "set", "--github-issue", "0"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("positive integer", p.stderr)
+
     def test_active_set_github_issue_checkout_sets_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
