@@ -23,7 +23,11 @@ ID: "issue-28-runtime-regression-bugs"
 - `S01` から `S05` まで implementation review と QA review を通過
 - docs/spec review を通過
 - broad final suite 262 tests を通過
-- 次は branch diff 全体の final review を完了させる
+- branch diff 全体の final review を通過
+- 修正後の manual test 計画を `discussions/017` に記録
+- post-fix manual test `MT-01` から `MT-10` を実施
+- manual test で見つかった `sev-2: foreign URL + --allow-foreign-url success path failure` を追加修正で解消し、affected case rerun 後の overall verdict は `pass`
+- `sev-3: generated runtime command surface mismatch` は継続観測として残るが、issue-28 の blocking condition ではない
 
 ## 記録
 - `S01` 実装:
@@ -163,6 +167,60 @@ ID: "issue-28-runtime-regression-bugs"
   - 結果:
     - `Ran 262 tests in 41.667s`
     - `OK`
+- post-manual blocking fix:
+  - 実装:
+    - `import issue <foreign-url> --allow-foreign-url` で `gh issue view` に target repo context を渡すため、`repo_slug` を `import_node -> IssueGateway -> infra.github_cli` まで伝播させた
+    - `gh issue view ... --repo <owner>/<repo>` の command boundary を CLI integration test で固定した
+  - implementation review:
+    - `pass`
+  - QA review:
+    - 初回 `fail`
+    - 指摘:
+      - stubbed gateway までしか検証しておらず、live failure が起きた `gh issue view --repo ...` 境界が未保護
+    - 対応:
+      - `tests/cli_runtime/test_import.py` に foreign URL default fail / allow success / same-repo no-regression の command boundary 検証を追加
+    - 再レビュー:
+      - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10`
+    - `python -m unittest -v tests.cli_runtime.test_import`
+  - 結果:
+    - `tests.cli_runtime.test_runtime_import_s10` `OK`
+    - `tests.cli_runtime.test_import` `OK`
+- manual test:
+  - report root:
+    - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/`
+  - scope:
+    - `MT-01` baseline local init
+    - `MT-02` multi-resource local create
+    - `MT-03` discussion sequence stress
+    - `MT-04` local-only status and deps
+    - `MT-05` validate and doctor recovery
+    - `MT-06` odd but plausible local flows
+    - `MT-07` GitHub live import and sync
+    - `MT-08` GitHub target safety and explicit intent
+    - `MT-10` organic long-run operator session
+    - `MT-09` summary and residue check
+  - verdict:
+    - `MT-01` `pass` ただし generated runtime と provider runtime の command surface 差異を検知
+    - `MT-02` `pass`
+    - `MT-03` `pass`
+    - `MT-04` `pass`
+    - `MT-05` `pass`
+    - `MT-06` `pass`
+    - `MT-07` `pass`
+    - `MT-08` 初回 `fail` -> rerun `pass`
+    - `MT-10` `pass`（affected subset rerun も `pass`）
+    - `MT-09` `pass`
+  - key findings:
+    - `sev-3`: `uvx init` 生成 runtime の command surface が provider runtime とずれて見え、`doctor` と issue-28 の explicit flags が生成物 help から見えない
+  - rerun result:
+    - `MT-07` rerun で same-repo import/sync/deps/active の回帰なしを確認
+    - `MT-08` rerun で foreign URL default fail + `--allow-foreign-url` success を確認
+    - `MT-10` rerun subset で GitHub issue close/reopen 後の sync/deps/active 整合を確認
+  - evidence:
+    - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/execution-log.md`
+    - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/summary.md`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -175,8 +233,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `active set` / `deps check` は explicit target flag 追加により、target 未指定時は argparse exit `2` ではなく runtime error exit `1` を返す
 - current repo 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するが、origin 以外の remote を自動探索する契約にはしていない
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
+- manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
 
 ## 次アクション
-- tests-only corrective fix をコミットする
-- branch diff 全体の final review を実施する
-- final review が通れば branch task 完了として報告する
+- issue-28 の実装・回帰修正・manual rerun まで含めたコミットを作成する
+- `sev-3` は follow-up investigation として切り分け、`init/update` 生成物 help に `doctor` と explicit target surface が現れることを確認する

@@ -85,8 +85,12 @@ class _IssueGateway:
     def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         return infra_github_cli.issue_create(repo_root, title=title, body=body)
 
-    def issue_view_minimal(self, repo_root: Path, issue_number: int):
-        return infra_github_cli.issue_view_minimal(repo_root, issue_number=issue_number)
+    def issue_view_minimal(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
+        return infra_github_cli.issue_view_minimal(
+            repo_root,
+            issue_number=issue_number,
+            repo_slug=repo_slug,
+        )
 
 
 @dataclass(frozen=True)

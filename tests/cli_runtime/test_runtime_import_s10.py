@@ -163,8 +163,8 @@ class _StubIssueGateway:
         del repo_root, title, body
         raise AssertionError("issue_create must not be used in import flow")
 
-    def issue_view_minimal(self, repo_root, issue_number):
-        self.view_calls.append((str(repo_root), int(issue_number)))
+    def issue_view_minimal(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
         return self._domain_models.IssueSnapshot(
             issue_number=int(issue_number),
             state="OPEN",
@@ -238,6 +238,16 @@ class _StubDerivedStateReader:
         return {}
 
 
+class _StubGitGateway:
+    def __init__(self, origin_slug):
+        self.origin_slug = origin_slug
+        self.origin_calls = []
+
+    def origin_github_repo_slug(self, repo_root):
+        self.origin_calls.append(str(repo_root))
+        return self.origin_slug
+
+
 class _FailingArtifactWriter:
     def write(self, specdock_dir, bundle):
         del specdock_dir, bundle
@@ -266,6 +276,15 @@ class TestRuntimeImportS10(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        for template_dir, token in (
+            (initiative_dir, "<INIT_ID>"),
+            (epic_dir, "<EPIC_ID>"),
+            (issue_dir, "<ISS_ID>"),
+        ):
+            (template_dir / "requirement.md").write_text(f"# requirement {token}\n", encoding="utf-8")
+            (template_dir / "design.md").write_text(f"# design {token}\n", encoding="utf-8")
+            (template_dir / "plan.md").write_text(f"# plan {token}\n", encoding="utf-8")
+            (template_dir / "report.md").write_text(f"# report {token}\n", encoding="utf-8")
 
     def _base_records(self, infra_contracts, specdock_dir: Path):
         init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
@@ -294,6 +313,29 @@ class TestRuntimeImportS10(unittest.TestCase):
                 github_issue_number=None,
             ),
         ]
+
+    def _materialize_required_artifacts(self, records) -> None:
+        for record in records:
+            node_dir = Path(record.path)
+            node_dir.mkdir(parents=True, exist_ok=True)
+            (node_dir / "requirement.md").write_text(f"# requirement: {record.id}\n", encoding="utf-8")
+            (node_dir / "design.md").write_text(f"# design: {record.id}\n", encoding="utf-8")
+            (node_dir / "plan.md").write_text(f"# plan: {record.id}\n", encoding="utf-8")
+            (node_dir / "report.md").write_text(f"# report: {record.id}\n", encoding="utf-8")
+
+            meta = {
+                "schema_version": 1,
+                "type": record.kind,
+                "id": record.id,
+                "title": record.title,
+                "slug": record.slug,
+                "parent_id": record.parent_id,
+                "initiative_id": record.initiative_id,
+                "epic_id": record.epic_id,
+            }
+            if record.github_issue_number is not None:
+                meta["github"] = {"issue_number": int(record.github_issue_number)}
+            (node_dir / ".meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def _active_manifest(self, infra_contracts, *, initiative_id=None, epic_id=None, issue_id=None):
         def _entry(node_id):
@@ -336,17 +378,21 @@ class TestRuntimeImportS10(unittest.TestCase):
         active_manifest,
         artifact_writer,
         events=None,
+        issue_gateway=None,
+        git_gateway=None,
     ):
+        self._materialize_required_artifacts(store.load())
         return app_ports.Ports(
             node_reader=_StubNodeReader(store),
             node_repo=_StubNodeRepo(store, events=events),
             template_scaffolder=_StubTemplateScaffolder(events=events),
-            issue_gateway=_StubIssueGateway(domain_models),
+            issue_gateway=issue_gateway or _StubIssueGateway(domain_models),
             active_state_store=_StubActiveStateStore(infra_contracts, active_manifest),
             deps_topology_reader=_StubDepsTopologyReader(infra_contracts),
             derived_state_reader=_StubDerivedStateReader(),
             artifact_writer=artifact_writer,
             clock=_DummyClock(),
+            git_gateway=git_gateway,
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
         )
@@ -394,6 +440,7 @@ class TestRuntimeImportS10(unittest.TestCase):
             self.assertEqual(result.node.id, "iss-00123")
             self.assertEqual(result.node.parent_id, "epic-local-00001")
             self.assertEqual(result.node.github_issue_number, 123)
+            self.assertEqual(ports.issue_gateway.view_calls, [(str(specdock_dir.parent), 123, None)])
             calls = [name for name, _path in ports.active_state_store.calls]
             self.assertIn("load_active_manifest_no_migrate", calls)
             self.assertNotIn("load_active_manifest", calls)
@@ -575,6 +622,95 @@ class TestRuntimeImportS10(unittest.TestCase):
             self.assertEqual(events, [])
             self.assertEqual(ports.issue_gateway.view_calls, [])
             self.assertFalse((collision.parent / ".meta.json").exists())
+
+    def test_import_issue_uses_target_repo_slug_for_issue_view_when_present(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            issue_gateway = _StubIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                issue_gateway=issue_gateway,
+            )
+
+            result = app_import_node.import_issue(
+                app_contracts.ImportNodeRequest(
+                    issue_number=123,
+                    title="Imported issue",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    target_repo_owner="other",
+                    target_repo_name="repo",
+                    allow_foreign_url=True,
+                ),
+                ports,
+            )
+
+            self.assertEqual(result.node.id, "iss-00123")
+            self.assertEqual(issue_gateway.view_calls, [(str(specdock_dir.parent), 123, "other/repo")])
+
+    def test_import_issue_rejects_foreign_repo_without_opt_in(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            issue_gateway = _StubIssueGateway(domain_models)
+            git_gateway = _StubGitGateway("example/repo")
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                issue_gateway=issue_gateway,
+                git_gateway=git_gateway,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "repository mismatch"):
+                app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=123,
+                        title="Imported issue",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        target_repo_owner="other",
+                        target_repo_name="repo",
+                        allow_foreign_url=False,
+                    ),
+                    ports,
+                )
+
+            self.assertEqual(issue_gateway.view_calls, [])
+            self.assertEqual(git_gateway.origin_calls, [str(specdock_dir.parent)])
 
     def test_import_then_sync_artifact_path_name_content_regression(self) -> None:
         (

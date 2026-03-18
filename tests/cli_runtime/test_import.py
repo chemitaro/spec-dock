@@ -273,6 +273,7 @@ class TestCliImport(CliRuntimeHarness):
                     self.assertTrue(issue_dir.is_dir())
                     log = log_path.read_text(encoding="utf-8")
                     self.assertIn("issue view 123", log)
+                    self.assertNotIn("--repo other/repo", log)
 
     def test_import_rejects_foreign_repo_url_without_opt_in(self) -> None:
         if os.name == "nt":
@@ -290,7 +291,8 @@ class TestCliImport(CliRuntimeHarness):
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            self._make_gh_issue_view_stub(bin_dir)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(
@@ -321,6 +323,7 @@ class TestCliImport(CliRuntimeHarness):
                 / "iss-00123-imported-issue"
             )
             self.assertFalse(issue_dir.exists())
+            self.assertFalse(log_path.exists())
 
     def test_import_allows_foreign_repo_url_with_opt_in(self) -> None:
         if os.name == "nt":
@@ -338,7 +341,8 @@ class TestCliImport(CliRuntimeHarness):
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            self._make_gh_issue_view_stub(bin_dir)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
             p = self._run_runtime_capture(
@@ -358,6 +362,8 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("spec-dock: ok (import issue)", p.stdout)
             self.assertIn("github=#123", p.stdout)
+            log = log_path.read_text(encoding="utf-8")
+            self.assertIn("issue view 123 --json number,url --repo other/repo", log)
 
     def test_import_rejects_non_canonical_url_like_target(self) -> None:
         if os.name == "nt":

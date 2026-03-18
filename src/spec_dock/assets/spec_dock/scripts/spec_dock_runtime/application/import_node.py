@@ -136,6 +136,14 @@ def _validate_url_repo_identity(req: ImportNodeRequest, ports: Ports) -> None:
         )
 
 
+def _target_repo_slug(req: ImportNodeRequest) -> str | None:
+    owner = (req.target_repo_owner or "").strip()
+    repo = (req.target_repo_name or "").strip()
+    if not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
 def import_node_core(
     req: ImportNodeRequest,
     ports: Ports,
@@ -172,7 +180,11 @@ def import_node_core(
         raise RuntimeError(f"Destination already exists: {collisions[0]}")
 
     issue_gateway = _resolve_issue_gateway(ports)
-    imported_issue = issue_gateway.issue_view_minimal(_resolve_repo_root(ports), issue_number)
+    imported_issue = issue_gateway.issue_view_minimal(
+        _resolve_repo_root(ports),
+        issue_number,
+        repo_slug=_target_repo_slug(req),
+    )
 
     execute_create_plan(plan, ports)
     post_import_sync = sync_after_import(ports)

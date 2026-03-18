@@ -69,9 +69,12 @@ def issue_create_raw(repo_root: Path, *, title: str, body: str) -> int:
     return int(m.group("num"))
 
 
-def issue_view_minimal_raw(repo_root: Path, *, issue_number: int) -> dict[str, Any]:
+def issue_view_minimal_raw(repo_root: Path, *, issue_number: int, repo_slug: str | None = None) -> dict[str, Any]:
     ensure_gh_available()
     cmd = ["gh", "issue", "view", str(issue_number), "--json", "number,url"]
+    normalized_repo_slug = (repo_slug or "").strip()
+    if normalized_repo_slug:
+        cmd.extend(["--repo", normalized_repo_slug])
     try:
         p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
@@ -118,8 +121,8 @@ def issue_create(repo_root: Path, title: str, body: str) -> int:
     return issue_create_raw(repo_root, title=title, body=body)
 
 
-def issue_view_minimal(repo_root: Path, issue_number: int) -> IssueSnapshot:
-    raw = issue_view_minimal_raw(repo_root, issue_number=issue_number)
+def issue_view_minimal(repo_root: Path, issue_number: int, *, repo_slug: str | None = None) -> IssueSnapshot:
+    raw = issue_view_minimal_raw(repo_root, issue_number=issue_number, repo_slug=repo_slug)
     return IssueSnapshot(
         issue_number=int(raw.get("number")),
         state=str(raw.get("state", "")),
