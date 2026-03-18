@@ -16,13 +16,17 @@ Codex CLI（コーディングエージェント）は、原則としてこの�
 
 ```bash
 ./spec-dock/scripts/spec-dock active show
-./spec-dock/scripts/spec-dock active set 123         # GitHub issue number（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-00123    # node id（checkout + active + sync）
+./spec-dock/scripts/spec-dock active set 123
+./spec-dock/scripts/spec-dock active set --github-issue 123
+./spec-dock/scripts/spec-dock active set iss-00123
+./spec-dock/scripts/spec-dock active set --id iss-00123
 ./spec-dock/scripts/spec-dock active set iss-local-00001  # local node id（checkout しない）
 ```
 
 補足:
-- GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set` した場合、`active set` は checkout も行います（initiative/epic/issue 共通）。
+- `active set` のデフォルトは no-checkout です。checkout が必要な場合だけ `--checkout` を付けます。
+- GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set --checkout` した場合は checkout も行います（initiative/epic/issue 共通）。
+- `<target>` の後方互換は維持されますが、`--id` / `--github-issue` の explicit form も使えます。
 - ローカルのみ（`*-local-*`）のノードは checkout しません。
 
 `spec-dock/active/context-pack.md` が生成され、エージェントはそこから作業を開始できます。

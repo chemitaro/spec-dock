@@ -18,8 +18,10 @@ ID: "issue-28-runtime-regression-bugs"
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
+- `S90 docs impact resolution` を完了
 - `S01` から `S05` まで implementation review と QA review を通過
-- 次は `S90 docs impact resolution` を行う
+- docs/spec review を通過
+- 次は `S99 final diff review` を行う
 
 ## 記録
 - `S01` 実装:
@@ -137,6 +139,16 @@ ID: "issue-28-runtime-regression-bugs"
     - `pass`
   - 実行:
     - `python -m unittest -v tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_new tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_command_import_issue_smoke tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists`
+- `S90` docs impact:
+  - provider-side docs の `reference_github.md` / `reference_deps.md` / `README.md` / `workflow_issue.md` と `system/active-none/*/README.md` を更新した
+  - dogfooding mirror 側の対応 docs を同期し、mirror-only の旧 docs `workflow-issue.md` / `workflow-tree.md` にも `active set` no-checkout default と explicit target form を反映した
+  - 旧文言の `owner/repo は無視` / `番号抽出だけ` / `active set` が常に checkout する読まれ方を解消した
+- `S90` docs/spec review:
+  - `pass`
+  - 確認:
+    - import URL safety, `--allow-foreign-url`, `--id`, `--github-issue`, `new issue --create-github-issue` の説明が requirement/design/plan/report と整合
+    - provider-side docs と dogfooding mirror の対応ファイルが同期されている
+    - mirror-only の旧 docs に残る active set 誤読も抑止されている
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -148,8 +160,9 @@ ID: "issue-28-runtime-regression-bugs"
 - current repo 判定は `git remote.origin.url` に依存し、origin 未設定または GitHub 以外の host では canonical URL import も default fail する。cross-repo / non-verifiable import は `--allow-foreign-url` による explicit intent を要求する
 - `active set` / `deps check` は explicit target flag 追加により、target 未指定時は argparse exit `2` ではなく runtime error exit `1` を返す
 - current repo 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するが、origin 以外の remote を自動探索する契約にはしていない
+- `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 
 ## 次アクション
-- `S05` の変更をコミットする
-- `S90` で docs/help/dogfooding の impact を閉じる
-- `S90` 完了後に spec review と commit を行い、最後に `S99` final diff review を実施する
+- `S90` の docs 変更をコミットする
+- `S99` で branch diff 全体の final review を実施する
+- final review が通れば branch task 完了として報告する
