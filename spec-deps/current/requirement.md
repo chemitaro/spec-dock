@@ -250,6 +250,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `doctor` を実行する
 - Then:
   - 問題の種別と修復方針が supported path として提示される
+  - current repo `#123` と foreign repo `other/repo#123` が併存する正常系では、current repo slug を解決できる限り ambiguity false positive を返さない
 
 ### AC-009 duplicate sequence validation
 

@@ -471,6 +471,7 @@ ID: "issue-28-runtime-regression-bugs"
 ##### I1 — doctor guidance
 - slice goal:
   - duplicate id/seq、missing artifact、broken meta、stale active pointer を doctor が診断し guidance を返す
+  - repo-aware uniqueness 導入後も、doctor の validation context が `validate` / `sync` と一致し、current/foreign 同番号の正常系を false positive にしない
 
 ###### Red
 - failing test:
@@ -521,6 +522,7 @@ ID: "issue-28-runtime-regression-bugs"
 - expected tests:
   - `initiative` / `epic` / `issue` / `discussion` の required artifact validation
   - `duplicate id/seq` / `missing artifact` / `broken meta` / `stale active pointer` / `stale create lock` の doctor guidance
+  - current repo `#123` と foreign repo `#123` を併存した正常 graph に対して doctor が ambiguity false positive を出さない
   - `spec-dock/active` path 入口と `active show` CLI 入口の active fallback
   - persisted active manifest からの active entrypoint rebuild
 - report update:
