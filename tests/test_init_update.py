@@ -275,6 +275,38 @@ class TestInitUpdate(CliRuntimeHarness):
         text_map = self._read_text_map(repo_root, guidance_paths)
         self._assert_discussion_guidance_contract(text_map)
 
+    def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+        self.assertTrue(runtime_script.is_file(), f"dogfooding runtime script missing: {runtime_script}")
+
+        doctor_help = subprocess.run(
+            [sys.executable, str(runtime_script), "doctor", "--help"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(
+            doctor_help.returncode,
+            0,
+            msg=(
+                "checked-in dogfooding runtime must expose 'doctor'\n"
+                f"stdout:\n{doctor_help.stdout}\n"
+                f"stderr:\n{doctor_help.stderr}\n"
+            ),
+        )
+        self.assertIn("usage: spec-dock/scripts/spec-dock doctor", doctor_help.stdout)
+
+        legacy_active = subprocess.run(
+            [sys.executable, str(runtime_script), "active", "set", "--initiative", "1"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(legacy_active.returncode, 2)
+        self.assertIn("'active set' supports explicit targets:", legacy_active.stderr)
+        self.assertIn("active set --id <node-id>", legacy_active.stderr)
+
     def test_tool_version_fallback_reads_pyproject(self) -> None:
         import spec_dock.cli as cli
 

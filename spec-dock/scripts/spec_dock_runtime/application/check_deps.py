@@ -5,7 +5,7 @@ from typing import cast
 
 from ..domain.deps import inspect_target_deps, validate_deps_cycles
 from ..domain.ids import format_id, parse_id
-from ..domain.models import NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
+from ..domain.models import IssueSnapshot, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..infra.contracts import StoredMetaRecord
 from .contracts import CheckDepsRequest, DepsCheckResult, TargetRef
@@ -25,6 +25,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -87,6 +89,48 @@ def _append_unique(warnings: list[str], code: str) -> None:
         warnings.append(code)
 
 
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
+def _collect_foreign_issue_targets(graph: SpecGraph) -> list[tuple[str, int]]:
+    targets: set[tuple[str, int]] = set()
+    for node in graph.nodes_by_id.values():
+        if node.kind not in ("initiative", "epic", "issue") or node.github_issue_number is None:
+            continue
+        repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+        if repo_slug is None:
+            continue
+        targets.add((repo_slug, int(node.github_issue_number)))
+    return sorted(targets, key=lambda item: (item[0], item[1]))
+
+
+def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
+    if ports.derived_state_reader is None:
+        return {}
+    loader = getattr(ports.derived_state_reader, "load_cached_issue_last_sync_at_by_id", None)
+    if not callable(loader):
+        return {}
+    loaded = loader(specdock_dir)
+    if not isinstance(loaded, dict):
+        return {}
+    out: dict[str, str | None] = {}
+    for issue_id, value in loaded.items():
+        if not isinstance(issue_id, str):
+            continue
+        if value is None:
+            out[issue_id] = None
+            continue
+        if isinstance(value, str):
+            normalized = value.strip()
+            out[issue_id] = normalized or None
+    return out
+
+
 def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     if ports.deps_topology_reader is None:
         raise RuntimeError("deps_topology_reader is required")
@@ -102,39 +146,57 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     issue_depends_on_map = dict(topology.issue_depends_on_map)
     validate_deps_cycles(issue_depends_on_map)
 
-    issue_snapshots = None
+    issue_snapshots: list[IssueSnapshot] | None = None
     if req.use_github:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required when --github is enabled")
         if ports.repo_root is None:
             raise RuntimeError("repo_root is required when --github is enabled")
+        issue_snapshots = []
+        issue_index_snapshots = []
         try:
-            issue_snapshots = ports.issue_gateway.issue_index(ports.repo_root, limit=int(req.issue_limit))
+            issue_index_snapshots = ports.issue_gateway.issue_index(ports.repo_root, limit=int(req.issue_limit))
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
-            issue_snapshots = []
         else:
+            issue_snapshots.extend(issue_index_snapshots)
             linked_numbers = sorted(
                 {
                     int(node.github_issue_number)
                     for node in graph.nodes_by_id.values()
-                    if node.kind == "issue" and node.github_issue_number is not None
+                    if node.kind == "issue"
+                    and node.github_issue_number is not None
+                    and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
                 }
             )
-            indexed = {int(snapshot.issue_number) for snapshot in issue_snapshots}
+            indexed = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [n for n in linked_numbers if n not in indexed]
             if missing:
                 _append_unique(warnings, "gh_index_incomplete")
+        for repo_slug, issue_number in _collect_foreign_issue_targets(graph):
+            try:
+                snapshot = ports.issue_gateway.issue_view_snapshot(
+                    ports.repo_root,
+                    issue_number,
+                    repo_slug=repo_slug,
+                )
+            except RuntimeError:
+                _append_unique(warnings, "gh_fetch_failed")
+                continue
+            issue_snapshots.append(snapshot)
 
     cached_issue_status_by_id: dict[str, str] = {}
+    cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
+        cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
 
     status_context = resolve_issue_status_context(
         graph,
         github_enabled=req.use_github,
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
+        cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)

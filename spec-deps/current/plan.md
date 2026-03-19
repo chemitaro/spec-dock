@@ -93,6 +93,7 @@ ID: "issue-28-runtime-regression-bugs"
     - docs impact resolution
   - review gate:
     - provider-side docs と consumer-side dogfooding 確認が両方完了している
+    - checked-in dogfooding runtime で `doctor` と issue-28 追加 surface の executable smoke が通る
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -110,6 +111,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-007` -> `S05`
 - `AC-008` -> `S04`
 - `AC-009` -> `S02`
+- `AC-010` -> `S90`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:

@@ -259,18 +259,24 @@ ID: "issue-28-runtime-regression-bugs"
     - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/summary.md`
 - PR review follow-up corrective patch:
   - analysis:
-    - `spec-deps/current/discussions/019-disc-pr29-reviewfollowup-analysis.md`
+    - `spec-deps/current/discussions/019-disc-pr29-review-followup-analysis.md`
   - finding resolution:
     - `R1 foreign repo identity persistence`
       - import 時だけでなく persisted meta/model に `github.repo_owner` / `github.repo_name` を保持
       - `sync --github` / `deps check --github` / `active set --github` が repo-aware refresh を使い、foreign linked node を current repo 同番号 issue に誤 hydrate しないよう修正
     - `R2 stale create lock doctor guidance`
       - `doctor` に create lock 診断を追加し、stale / non-stale contention / metadata 異常を supported finding として返すよう修正
+    - `R3 dogfooding runtime parity`
+      - checked-in consumer workspace `spec-dock/scripts/` を provider-side runtime へ refresh し、dogfooding repo 上でも `doctor` と explicit target hint が使えるよう修正
+      - `tests/test_init_update.py` に checked-in dogfooding runtime surface の executable smoke を追加し、`doctor --help` と `active set --id` hint を固定
   - validation:
     - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_active_s06 tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_import tests.cli_runtime.test_sync tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_validate_s02 tests.domain_runtime.test_runtime_domain_s03`
     - 結果: `Ran 156 tests in 21.267s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint`
+    - `python -m unittest -v tests.test_init_update`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_shell_s11`
   - review status:
-    - sub-agent review は usage limit のため完走しなかったが、指摘反映後にメインで差分確認と追加 test 実行を行い、少なくとも PR review の 2 finding を直接覆う regression は通過した
+    - sub-agent review は一部 usage limit の影響を受けたが、R3 については追加の code review / QA review を再実施する
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -285,10 +291,10 @@ ID: "issue-28-runtime-regression-bugs"
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 - manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
 - comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
-- PR review で指摘された `foreign repo identity persistence` と `stale create lock doctor guidance` は corrective patch で解消済み
+- PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`dogfooding runtime parity` は corrective patch で解消済み
 
 ## 次アクション
 - issue-28 自体は完了として扱い、継続観測事項は別 follow-up として管理する
-- `sev-3` は follow-up investigation として切り分け、`init/update` 生成物 help に `doctor` と explicit target surface が現れることを確認する
+- `sev-3` は checked-in dogfooding workspace では解消した。installer/`uvx` 経由の generated runtime surface 差分が再度観測される場合だけ follow-up として切り分ける
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
 - PR #29 を再pushし、Codex review / PR checks を再監視する

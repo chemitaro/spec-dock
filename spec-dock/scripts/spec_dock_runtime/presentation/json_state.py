@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from ..application.contracts import DepsCheckResult, SyncStateResult
 from ..domain.ids import deps_node_sort_key
@@ -16,9 +17,21 @@ from .puml import (
 
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
+    target_id = inspection.target_id.value
+
+    target_status = inspection.issue_statuses.get(target_id)
+    target_status_payload = {
+        "authority": target_status.authority if target_status is not None else "unknown",
+        "effective_status": target_status.effective_status if target_status is not None else "unknown",
+        "source": target_status.source if target_status is not None else "unknown",
+        "stale": bool(target_status.stale) if target_status is not None else True,
+        "last_sync_at": target_status.last_sync_at if target_status is not None else None,
+    }
+
     payload = {
         "schema_version": 1,
-        "target": inspection.target_id.value,
+        "target": target_id,
+        "target_status": target_status_payload,
         "ready": bool(inspection.evaluation.ready),
         "effective_depends_on": list(inspection.effective_depends_on),
         "blockers": list(inspection.evaluation.blockers),
@@ -26,6 +39,31 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
             node_id: {
                 "state": node_state.status,
                 "ready": bool(node_state.ready),
+                "authority": (
+                    inspection.issue_statuses[node_id].authority
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "effective_status": (
+                    inspection.issue_statuses[node_id].effective_status
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "source": (
+                    inspection.issue_statuses[node_id].source
+                    if node_id in inspection.issue_statuses
+                    else "unknown"
+                ),
+                "stale": (
+                    bool(inspection.issue_statuses[node_id].stale)
+                    if node_id in inspection.issue_statuses
+                    else True
+                ),
+                "last_sync_at": (
+                    inspection.issue_statuses[node_id].last_sync_at
+                    if node_id in inspection.issue_statuses
+                    else None
+                ),
             }
             for node_id, node_state in inspection.node_states.items()
         },
@@ -46,6 +84,22 @@ def _sort_key(node_id: str) -> tuple[int, int, str] | tuple[int, str]:
         return deps_node_sort_key(node_id)
     except RuntimeError:
         return (2, node_id)
+
+
+def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path | None) -> str:
+    if repo_root is not None:
+        try:
+            return path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+
+    parts = path.parts
+    if parts and parts[0] == "spec-dock":
+        return path.as_posix()
+    if "spec-dock" in parts:
+        index = parts.index("spec-dock")
+        return Path(*parts[index:]).as_posix()
+    raise RuntimeError(f"Node path missing 'spec-dock' segment: {path}")
 
 
 def _active_to_json(active: ActiveSelection | None) -> dict[str, object] | None:
@@ -117,7 +171,7 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
             "type": node.kind,
             "id": node.id,
             "title": node.title,
-            "path": node.path.as_posix(),
+            "path": _to_repo_relative_specdock_path(node.path, repo_root=result.repo_root),
             "parent_id": node.parent_id,
             "initiative_id": node.initiative_id,
             "epic_id": node.epic_id,
@@ -126,7 +180,12 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
 
         if node.kind == "issue":
             issue_status = result.issue_statuses.get(node.id)
-            item["status"] = issue_status.status if issue_status is not None else "unknown"
+            item["status"] = issue_status.effective_status if issue_status is not None else "unknown"
+            item["authority"] = issue_status.authority if issue_status is not None else "unknown"
+            item["effective_status"] = issue_status.effective_status if issue_status is not None else "unknown"
+            item["source"] = issue_status.source if issue_status is not None else "unknown"
+            item["stale"] = bool(issue_status.stale) if issue_status is not None else True
+            item["last_sync_at"] = issue_status.last_sync_at if issue_status is not None else None
             if result.deps_preflight_error is None:
                 evaluation = result.deps_eval_by_id.get(node.id)
                 if evaluation is not None:
@@ -150,7 +209,12 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
 
         if node.github_issue_number is not None:
             github_item: dict[str, object] = {"issue_number": int(node.github_issue_number)}
-            snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
+            if node.github_repo_owner and node.github_repo_name:
+                github_item["repo_owner"] = node.github_repo_owner
+                github_item["repo_name"] = node.github_repo_name
+            snapshot = result.github_snapshot_by_issue_id.get(node.id)
+            if snapshot is None:
+                snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
             if snapshot is not None:
                 github_item.update(
                     {
