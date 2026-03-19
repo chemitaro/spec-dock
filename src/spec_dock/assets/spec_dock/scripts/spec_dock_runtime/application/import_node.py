@@ -10,6 +10,7 @@ from ..domain.ids import resolve_id_input, resolve_input_title_and_slug
 from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
 from ..domain.tree import resolve_parent_from_active
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
 from .create_node import (
     execute_create_plan,
@@ -191,6 +192,10 @@ def import_node_core(
 
     try:
         graph = load_graph(ports, validate=True)
+    except RuntimeError as error:
+        raise RuntimeError(f"preflight validate failed: {error}") from error
+    try:
+        validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
     except RuntimeError as error:
         raise RuntimeError(f"preflight validate failed: {error}") from error
 

@@ -10,11 +10,6 @@ from .models import SpecGraph, SpecNode, ValidationReport
 _DISCUSSION_DOC_FILENAME_RE = re.compile(
     r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
-_REQUIRED_ARTIFACTS_BY_KIND: dict[str, tuple[str, ...]] = {
-    "initiative": (".meta.json", "requirement.md", "design.md", "plan.md", "report.md"),
-    "epic": (".meta.json", "requirement.md", "design.md", "plan.md", "report.md"),
-    "issue": (".meta.json", "requirement.md", "design.md", "plan.md", "report.md"),
-}
 
 
 def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None) -> str:
@@ -248,7 +243,6 @@ def _validate_graph_or_raise(
                 raise RuntimeError(f"initiative parent_id must be null: {node.id}")
             if node.initiative_id is not None or node.epic_id is not None:
                 raise RuntimeError(f"initiative must not have initiative_id/epic_id: {node.id}")
-            _validate_required_artifacts(node, repo_root=repo_root)
             continue
 
         if node.kind == "epic":
@@ -263,7 +257,6 @@ def _validate_graph_or_raise(
             parent = graph.nodes_by_id.get(node.parent_id)
             if not parent or parent.kind != "initiative":
                 raise RuntimeError(f"epic points to invalid parent initiative: {node.parent_id}")
-            _validate_required_artifacts(node, repo_root=repo_root)
             continue
 
         if node.kind == "issue":
@@ -285,20 +278,6 @@ def _validate_graph_or_raise(
                 raise RuntimeError(
                     f"issue initiative_id mismatch: {node.id} initiative_id={node.initiative_id} but epic {epic.id} initiative_id={epic.initiative_id}"
                 )
-            _validate_required_artifacts(node, repo_root=repo_root)
             continue
 
         raise RuntimeError(f"Unknown node type: {node.kind} ({node.meta_path})")
-
-
-def _validate_required_artifacts(node: SpecNode, *, repo_root: Path | None = None) -> None:
-    required = _REQUIRED_ARTIFACTS_BY_KIND.get(node.kind, ())
-    for filename in required:
-        artifact_path = node.path / filename
-        if artifact_path.is_file():
-            continue
-        raise RuntimeError(
-            "Missing required artifact: "
-            f"kind={node.kind} id={node.id} "
-            f"artifact={_path_for_output(artifact_path, repo_root=repo_root)}"
-        )

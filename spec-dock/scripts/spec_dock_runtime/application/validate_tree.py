@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from ..domain.models import SpecNodeKind, SpecNodeSeed
+from ..domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import StoredMetaRecord
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import ValidateTreeRequest, ValidationResult
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
@@ -50,4 +51,9 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         repo_root=ports.repo_root,
         current_repo_slug=resolve_current_repo_slug(ports),
     )
+    if not report.errors:
+        try:
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+        except RuntimeError as error:
+            report = ValidationReport(errors=[str(error)], warnings=list(report.warnings))
     return ValidationResult(report=report, checked_node_count=len(records))

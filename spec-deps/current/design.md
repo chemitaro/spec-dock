@@ -429,7 +429,16 @@ CLI --> User : safe success or explicit failure
 - `cli/parser.py` / `cli/registry.py` の command surface
 - `application/create_node.py` の GitHub linkage uniqueness
 - `application/sync_state.py` の repo-aware snapshot aggregation / resolution
+- `application/import_node.py` の preflight validate 契約
 - 上記を provider-side source of truth と同じ contract へ refresh し、checked-in runtime 実行テストで固定する
+
+### checked-in runtime parity の実行証跡
+
+- checked-in consumer runtime の parity は importable helper の unit test だけで閉じたとみなさない
+- `spec-dock/scripts/spec-dock` を subprocess 実行し、少なくとも次を固定する
+  - `import issue <url>` が required artifact 欠損時に create 前の preflight で止まり、新規 node を残さない
+  - `sync --force` が required artifact 欠損時に warning degradation しつつ `.agent/index.json` / `.agent/tree.json` の `deps.valid=false` と `deps.error` を保持する
+  - structure error と artifact 欠損が同時にある時、`validate` / `doctor` / `sync` は structure error を優先する
 
 ### トレードオフ
 
