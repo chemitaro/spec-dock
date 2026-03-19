@@ -51,6 +51,16 @@ ID: "issue-28-runtime-regression-bugs"
     - `tests.cli_runtime.test_active`
     - `tests.cli_runtime.test_deps`
     - `tests.cli_runtime.test_import`
+- 2026-03-19 minimal corrective patch 完了:
+  - 実装:
+    - sync の unscoped snapshot 集約を current-repo index 優先に固定し、repo-aware 解決へ `current_repo_slug` を渡すよう補強した
+    - status 解決は same issue number の複数 snapshot を保持し、repo 文脈がない unscoped node では cross-repo fallback しないようにした
+    - `active/context-pack.md` は persisted manifest ではなく、既存 `spec-dock/active/{initiative,epic,issue}` の解決結果を正本にして再生成するようにした
+  - 実行:
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
+  - 結果:
+    - `Ran 157 tests in 33.600s`
+    - `OK`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入
   - bounded wait / stale lock safe failure / no-write failure / `spec doctor` 誘導メッセージを追加
@@ -320,10 +330,14 @@ ID: "issue-28-runtime-regression-bugs"
     - 結果: `Ran 24 tests` / `OK`
     - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
     - 結果: `Ran 117 tests in 30.733s` / `OK`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update`
+    - 結果: `Ran 41 tests in 2.381s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
+    - 結果: `Ran 117 tests in 31.464s` / `OK`
   - review status:
     - spec review: `pass`
     - QA review: `pass`
-    - implementation review は reviewer 応答が不安定だったが、出た指摘（mixed-scope fail-closed / stale context-pack）はすべて反映し、再検証済み
+    - implementation review は reviewer 応答が不安定だったが、出た指摘（mixed-scope fail-closed / stale context-pack / repo-aware snapshot lookup / context-pack reality drift）はすべて反映し、再検証済み
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証

@@ -286,6 +286,35 @@ def _resolve_manifest_target_dir(
     return None
 
 
+def _resolve_persisted_path_dir(
+    specdock_dir: Path,
+    *,
+    layer: str,
+    persisted_path: str | None,
+) -> Path | None:
+    if persisted_path is None:
+        return None
+    candidate = Path(persisted_path)
+    repo_root = specdock_dir.parent.resolve()
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(repo_root)
+    except ValueError:
+        return None
+    if not resolved.is_dir():
+        return None
+    expected_prefix = {
+        "initiative": "init-",
+        "epic": "epic-",
+        "issue": "iss-",
+    }.get(layer)
+    if expected_prefix is not None and not resolved.name.startswith(expected_prefix):
+        return None
+    return resolved
+
+
 def _resolve_existing_active_entrypoint(
     specdock_dir: Path,
     *,
@@ -398,11 +427,6 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
     active_dir = specdock_dir / "active"
     active_dir.mkdir(parents=True, exist_ok=True)
     persisted = _load_persisted_active_entries(specdock_dir)
-    resolved_ids = {
-        "initiative": persisted["initiative"][0],
-        "epic": persisted["epic"][0],
-        "issue": persisted["issue"][0],
-    }
 
     for layer in ("initiative", "epic", "issue"):
         link = active_dir / layer
@@ -417,13 +441,9 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             layer=layer,
         )
         if existing_entrypoint is not None:
-            resolved_ids[layer] = existing_entrypoint[1]
             continue
 
         if link.exists() or link.is_symlink() or pathfile.exists():
-            # Pointer exists but cannot be resolved as a managed node.
-            # Keep context-pack conservative instead of trusting stale manifest ids.
-            resolved_ids[layer] = None
             continue
 
         target = _active_placeholder_dir(specdock_dir, layer)
@@ -434,15 +454,30 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
             expected_id=persisted_id,
             persisted_path=persisted_path,
         )
+        if resolved_target is None:
+            resolved_target = _resolve_persisted_path_dir(
+                specdock_dir,
+                layer=layer,
+                persisted_path=persisted_path,
+            )
         if resolved_target is not None:
             target = resolved_target
-        else:
-            resolved_ids[layer] = None
         rel_target = os.path.relpath(target, start=active_dir)
         try:
             os.symlink(rel_target, link)
         except OSError:
             _write_active_pathfile(active_dir, layer, target)
+
+    # Context pack must come from currently-resolved active entrypoints only.
+    resolved_ids: dict[str, str | None] = {"initiative": None, "epic": None, "issue": None}
+    for layer in ("initiative", "epic", "issue"):
+        existing_entrypoint = _resolve_existing_active_entrypoint(
+            specdock_dir,
+            active_dir=active_dir,
+            layer=layer,
+        )
+        if existing_entrypoint is not None:
+            resolved_ids[layer] = existing_entrypoint[1]
 
     context_pack_path = active_dir / "context-pack.md"
     desired_context_pack = _render_context_pack(

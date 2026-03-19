@@ -728,6 +728,108 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(foreign_payload["url"], "https://github.com/other/repo/issues/301")
             self.assertEqual(foreign_payload["state"], "CLOSED")
 
+    def test_sync_does_not_apply_foreign_snapshot_to_current_unscoped_issue_when_current_snapshot_missing(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[3] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00002",
+                title="DB",
+                path=Path(records[3].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            )
+            issue_gateway = _StubIssueGateway(
+                snapshots=[
+                    domain_models.IssueSnapshot(
+                        issue_number=302,
+                        state="OPEN",
+                        title="Current repo #302",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/302",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                ],
+                foreign_snapshots={
+                    ("other/repo", 301): domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="CLOSED",
+                        title="Foreign #301",
+                        labels=["bugfix"],
+                        updated_at="2026-03-18T02:00:00Z",
+                        url="https://github.com/other/repo/issues/301",
+                        repo_owner="other",
+                        repo_name="repo",
+                    )
+                },
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIsNone(result.artifact_failure)
+            self.assertIn("gh_index_incomplete", result.state.warnings)
+            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+
+            current_status = result.state.issue_statuses["iss-local-00001"]
+            foreign_status = result.state.issue_statuses["iss-local-00002"]
+            self.assertEqual(current_status.source, "unknown")
+            self.assertEqual(current_status.effective_status, "unknown")
+            self.assertEqual(foreign_status.source, "github")
+            self.assertEqual(foreign_status.effective_status, "done")
+
+            index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            current_payload = index_all["nodes"]["iss-local-00001"]["github"]
+            foreign_payload = index_all["nodes"]["iss-local-00002"]["github"]
+            self.assertEqual(current_payload["issue_number"], 301)
+            self.assertNotIn("url", current_payload)
+            self.assertNotIn("state", current_payload)
+            self.assertEqual(foreign_payload["url"], "https://github.com/other/repo/issues/301")
+            self.assertEqual(foreign_payload["state"], "CLOSED")
+
     def test_sync_prefers_foreign_repo_snapshot_for_foreign_linked_initiative_and_epic(self) -> None:
         (
             _runtime_app,

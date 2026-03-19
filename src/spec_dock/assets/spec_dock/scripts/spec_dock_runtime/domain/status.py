@@ -42,15 +42,24 @@ def _normalize_repo_identity(
     return (owner, name)
 
 
+def _normalize_repo_slug_value(repo_slug: str | None) -> tuple[str, str] | None:
+    normalized = str(repo_slug or "").strip().lower()
+    if not normalized:
+        return None
+    owner, sep, name = normalized.partition("/")
+    if not sep or not owner or not name:
+        return None
+    return (owner, name)
+
+
 def _build_issue_snapshot_indexes(
     issue_snapshots: list[IssueSnapshot] | None,
-) -> tuple[dict[int, IssueSnapshot], dict[tuple[str, str, int], IssueSnapshot]]:
-    by_number: dict[int, IssueSnapshot] = {}
+) -> tuple[dict[int, list[IssueSnapshot]], dict[tuple[str, str, int], IssueSnapshot]]:
+    by_number: dict[int, list[IssueSnapshot]] = {}
     by_repo_and_number: dict[tuple[str, str, int], IssueSnapshot] = {}
     for issue_snapshot in issue_snapshots or []:
         issue_number = int(issue_snapshot.issue_number)
-        if issue_number not in by_number:
-            by_number[issue_number] = issue_snapshot
+        by_number.setdefault(issue_number, []).append(issue_snapshot)
         identity = _normalize_repo_identity(issue_snapshot.repo_owner, issue_snapshot.repo_name)
         if identity is not None:
             by_repo_and_number[(identity[0], identity[1], issue_number)] = issue_snapshot
@@ -60,8 +69,9 @@ def _build_issue_snapshot_indexes(
 def _resolve_issue_snapshot_for_node(
     issue_node: SpecNode,
     *,
-    issue_snapshot_by_number: dict[int, IssueSnapshot],
+    issue_snapshot_by_number: dict[int, list[IssueSnapshot]],
     issue_snapshot_by_repo_and_number: dict[tuple[str, str, int], IssueSnapshot],
+    current_repo_identity: tuple[str, str] | None,
 ) -> IssueSnapshot | None:
     if issue_node.github_issue_number is None:
         return None
@@ -70,7 +80,20 @@ def _resolve_issue_snapshot_for_node(
     identity = _normalize_repo_identity(issue_node.github_repo_owner, issue_node.github_repo_name)
     if identity is not None:
         return issue_snapshot_by_repo_and_number.get((identity[0], identity[1], issue_number))
-    return issue_snapshot_by_number.get(issue_number)
+    if current_repo_identity is not None:
+        return issue_snapshot_by_repo_and_number.get((current_repo_identity[0], current_repo_identity[1], issue_number))
+
+    snapshots = issue_snapshot_by_number.get(issue_number, [])
+    if len(snapshots) != 1:
+        return None
+
+    # Without repo identity for the node and current-repo context, fall back only to
+    # snapshots that also lack repo identity to avoid cross-repo misbinding.
+    snapshot = snapshots[0]
+    snapshot_identity = _normalize_repo_identity(snapshot.repo_owner, snapshot.repo_name)
+    if snapshot_identity is not None:
+        return None
+    return snapshot
 
 
 def resolve_issue_statuses(
@@ -79,8 +102,10 @@ def resolve_issue_statuses(
     issue_snapshots: list[IssueSnapshot] | None,
     cached_issue_status_by_id: dict[str, str],
     cached_issue_last_sync_at_by_id: dict[str, str | None] | None = None,
+    current_repo_slug: str | None = None,
 ) -> dict[str, IssueStatusSnapshot]:
     issue_snapshot_by_number, issue_snapshot_by_repo_and_number = _build_issue_snapshot_indexes(issue_snapshots)
+    current_repo_identity = _normalize_repo_slug_value(current_repo_slug)
 
     cache_last_sync_at_by_id = dict(cached_issue_last_sync_at_by_id or {})
     resolved: dict[str, IssueStatusSnapshot] = {}
@@ -109,6 +134,7 @@ def resolve_issue_statuses(
                 issue_node,
                 issue_snapshot_by_number=issue_snapshot_by_number,
                 issue_snapshot_by_repo_and_number=issue_snapshot_by_repo_and_number,
+                current_repo_identity=current_repo_identity,
             )
             if issue_snapshot is not None:
                 effective_status = _status_from_github_state(issue_snapshot.state)
@@ -138,8 +164,10 @@ def resolve_issue_statuses(
 def resolve_issue_snapshot_by_issue_id(
     graph: SpecGraph,
     issue_snapshots: list[IssueSnapshot] | None,
+    current_repo_slug: str | None = None,
 ) -> dict[str, IssueSnapshot]:
     issue_snapshot_by_number, issue_snapshot_by_repo_and_number = _build_issue_snapshot_indexes(issue_snapshots)
+    current_repo_identity = _normalize_repo_slug_value(current_repo_slug)
     resolved: dict[str, IssueSnapshot] = {}
     issue_ids = _safe_sorted_issue_ids(
         [
@@ -154,6 +182,7 @@ def resolve_issue_snapshot_by_issue_id(
             issue_node,
             issue_snapshot_by_number=issue_snapshot_by_number,
             issue_snapshot_by_repo_and_number=issue_snapshot_by_repo_and_number,
+            current_repo_identity=current_repo_identity,
         )
         if issue_snapshot is not None:
             resolved[issue_id] = issue_snapshot
