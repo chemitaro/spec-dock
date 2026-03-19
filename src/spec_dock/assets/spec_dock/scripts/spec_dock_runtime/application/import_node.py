@@ -9,10 +9,14 @@ from typing import cast
 from ..domain.ids import resolve_id_input, resolve_input_title_and_slug
 from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
 from ..domain.tree import resolve_parent_from_active
+from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
 from .create_node import (
+    _acquire_create_lock,
+    _post_write_duplicate_guard,
+    _release_create_lock,
     execute_create_plan,
     guard_github_issue_uniqueness,
     load_graph,
@@ -40,12 +44,6 @@ def _resolve_issue_gateway(ports: Ports):
     if ports.issue_gateway is None:
         raise RuntimeError("issue_gateway is required")
     return ports.issue_gateway
-
-
-def _resolve_git_gateway(ports: Ports):
-    if ports.git_gateway is None:
-        raise RuntimeError("git_gateway is required")
-    return ports.git_gateway
 
 
 def _normalize_repo_slug_value(slug: str | None) -> str | None:
@@ -149,7 +147,11 @@ def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -
     )
 
 
-def _validate_url_repo_identity(req: ImportNodeRequest, ports: Ports) -> None:
+def _validate_url_repo_identity(
+    req: ImportNodeRequest,
+    *,
+    current_repo_slug: str | None,
+) -> None:
     owner = (req.target_repo_owner or "").strip().lower()
     repo = (req.target_repo_name or "").strip().lower()
     if not owner or not repo:
@@ -157,14 +159,13 @@ def _validate_url_repo_identity(req: ImportNodeRequest, ports: Ports) -> None:
     if req.allow_foreign_url:
         return
 
-    current_repo = _resolve_git_gateway(ports).origin_github_repo_slug(_resolve_repo_root(ports))
-    if current_repo is None:
+    if current_repo_slug is None:
         raise RuntimeError(
             "Cannot verify GitHub URL repository against current repo. "
             "Configure git remote.origin.url or pass '--allow-foreign-url'."
         )
     expected = f"{owner}/{repo}"
-    actual = current_repo.lower()
+    actual = current_repo_slug
     if actual != expected:
         raise RuntimeError(
             "GitHub URL repository mismatch for import target: "
@@ -190,8 +191,16 @@ def import_node_core(
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     req = replace(req, title=title, slug=slug)
 
+    current_repo_slug = _resolve_current_repo_slug(ports)
     try:
-        graph = load_graph(ports, validate=True)
+        graph = load_graph(ports, validate=False)
+        report = validate_graph_and_deps(
+            graph,
+            repo_root=_resolve_repo_root(ports),
+            current_repo_slug=current_repo_slug,
+        )
+        if report.errors:
+            raise RuntimeError(report.errors[0])
     except RuntimeError as error:
         raise RuntimeError(f"preflight validate failed: {error}") from error
     try:
@@ -200,8 +209,9 @@ def import_node_core(
         raise RuntimeError(f"preflight validate failed: {error}") from error
 
     issue_number = int(req.issue_number)
-    current_repo_slug = _resolve_current_repo_slug(ports)
-    _validate_url_repo_identity(req, ports)
+    _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+    specdock_dir = _resolve_specdock_dir(ports)
+    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
     guard_github_issue_uniqueness(
         graph,
         issue_number,
@@ -209,24 +219,19 @@ def import_node_core(
         github_repo_name=req.target_repo_name,
         current_repo_slug=current_repo_slug,
     )
-
-    parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
-    create_req = build_linked_create_request(req, parent_id)
-
-    specdock_dir = _resolve_specdock_dir(ports)
-    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-    plan = plan_node_creation(
-        create_req,
+    precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+    precheck_req = build_linked_create_request(req, precheck_parent_id)
+    precheck_plan = plan_node_creation(
+        precheck_req,
         graph,
         kind=kind,
         specdock_dir=specdock_dir,
         today=today,
         current_repo_slug=current_repo_slug,
     )
-
-    collisions = [path for path in plan.planned_paths if path.exists()]
-    if collisions:
-        raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+    if precheck_collisions:
+        raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
 
     issue_gateway = _resolve_issue_gateway(ports)
     imported_issue = issue_gateway.issue_view_minimal(
@@ -234,11 +239,52 @@ def import_node_core(
         issue_number,
         repo_slug=_target_repo_slug(req),
     )
+    lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    result_node: SpecNode | None = None
+    body_error: Exception | None = None
+    try:
+        graph = load_graph(ports, validate=False)
+        guard_github_issue_uniqueness(
+            graph,
+            issue_number,
+            github_repo_owner=req.target_repo_owner,
+            github_repo_name=req.target_repo_name,
+            current_repo_slug=current_repo_slug,
+        )
+        create_req = build_linked_create_request(req, precheck_parent_id)
+        plan = plan_node_creation(
+            create_req,
+            graph,
+            kind=kind,
+            specdock_dir=specdock_dir,
+            today=today,
+            current_repo_slug=current_repo_slug,
+        )
+        execute_create_plan(plan, ports)
+        _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+        result_node = _to_spec_node(plan.meta)
+    except Exception as exc:
+        body_error = exc
+    finally:
+        release_error: Exception | None = None
+        try:
+            _release_create_lock(lock_path, lock_token)
+        except Exception as exc:
+            release_error = exc
 
-    execute_create_plan(plan, ports)
+        if body_error is not None:
+            if release_error is not None:
+                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
+            raise body_error
+        if release_error is not None:
+            raise release_error
+
+    if result_node is None:
+        raise RuntimeError("import failed without result")
+
     post_import_sync = sync_after_import(ports)
     return ImportNodeResult(
-        node=_to_spec_node(plan.meta),
+        node=result_node,
         imported_issue=imported_issue,
         post_import_sync=post_import_sync,
         warnings=[],

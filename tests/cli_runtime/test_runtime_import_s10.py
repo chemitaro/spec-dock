@@ -589,6 +589,159 @@ class TestRuntimeImportS10(unittest.TestCase):
             self.assertEqual(events, [])
             self.assertEqual(ports.issue_gateway.view_calls, [])
 
+    def test_import_import_race_revalidation_no_write_regression(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            events: list[str] = []
+            issue_gateway = _StubIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            raced_record = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-00555",
+                title="Race winner import",
+                path=Path(store.load()[1].path) / "issues" / "iss-00555-race-winner-import",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=555,
+            )
+            injected = {"done": False}
+            original_issue_view = issue_gateway.issue_view_minimal
+
+            def _issue_view_with_race(repo_root, issue_number, *, repo_slug=None):
+                if not injected["done"]:
+                    self._materialize_required_artifacts([raced_record])
+                    store.append(raced_record)
+                    injected["done"] = True
+                return original_issue_view(repo_root, issue_number, repo_slug=repo_slug)
+
+            issue_gateway.issue_view_minimal = _issue_view_with_race
+
+            with self.assertRaisesRegex(RuntimeError, "already linked"):
+                app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=555,
+                        title="Imported issue",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                    ),
+                    ports,
+                )
+
+            self.assertTrue(injected["done"])
+            self.assertEqual(events, [])
+            self.assertEqual(issue_gateway.view_calls, [(str(specdock_dir.parent), 555, None)])
+            self.assertEqual(
+                sum(1 for record in store.load() if record.id == "iss-00555"),
+                1,
+            )
+
+    def test_import_new_race_revalidation_preserves_foreign_repo_id_fallback_regression(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            events: list[str] = []
+            issue_gateway = _StubIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                events=events,
+                issue_gateway=issue_gateway,
+                git_gateway=_StubGitGateway("current/repo"),
+            )
+
+            raced_record = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-00123",
+                title="Race winner new issue",
+                path=Path(store.load()[1].path) / "issues" / "iss-00123-race-winner-new-issue",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+            )
+            injected = {"done": False}
+            original_issue_view = issue_gateway.issue_view_minimal
+
+            def _issue_view_with_race(repo_root, issue_number, *, repo_slug=None):
+                if not injected["done"]:
+                    self._materialize_required_artifacts([raced_record])
+                    store.append(raced_record)
+                    injected["done"] = True
+                return original_issue_view(repo_root, issue_number, repo_slug=repo_slug)
+
+            issue_gateway.issue_view_minimal = _issue_view_with_race
+
+            result = app_import_node.import_issue(
+                app_contracts.ImportNodeRequest(
+                    issue_number=123,
+                    title="Imported foreign issue",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    target_repo_owner="other",
+                    target_repo_name="repo",
+                    allow_foreign_url=True,
+                ),
+                ports,
+            )
+
+            self.assertTrue(injected["done"])
+            self.assertEqual(result.node.id, "iss-local-00001")
+            self.assertEqual(result.node.github_issue_number, 123)
+            self.assertEqual(result.node.github_repo_owner, "other")
+            self.assertEqual(result.node.github_repo_name, "repo")
+            self.assertEqual(issue_gateway.view_calls, [(str(specdock_dir.parent), 123, "other/repo")])
+            self.assertEqual(events, ["copy_scaffolded_tree", "write_meta"])
+            self.assertEqual(
+                sum(1 for record in store.load() if record.id == "iss-00123"),
+                1,
+            )
+            self.assertEqual(
+                sum(1 for record in store.load() if record.id == "iss-local-00001"),
+                1,
+            )
+
     def test_no_write_preflight_collision_regression(self) -> None:
         (
             _runtime_app,
@@ -636,6 +789,64 @@ class TestRuntimeImportS10(unittest.TestCase):
 
             self.assertEqual(events, [])
             self.assertEqual(ports.issue_gateway.view_calls, [])
+            self.assertFalse((collision.parent / ".meta.json").exists())
+
+    def test_no_write_preflight_collision_with_active_parent_fallback_regression(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            records = self._base_records(infra_contracts, specdock_dir)
+            store = _NodeStore(records)
+            events: list[str] = []
+            manifest = self._active_manifest(
+                infra_contracts,
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+            )
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=manifest,
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                events=events,
+            )
+
+            collision = (
+                Path(records[1].path) / "issues" / "iss-00124-add-refresh-token" / "README.md"
+            )
+            collision.parent.mkdir(parents=True, exist_ok=True)
+            collision.write_text("existing", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "Destination already exists"):
+                app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=124,
+                        title="Add refresh token",
+                        slug=None,
+                        parent_id=None,
+                    ),
+                    ports,
+                )
+
+            self.assertEqual(events, [])
+            self.assertEqual(ports.issue_gateway.view_calls, [])
+            self.assertEqual(
+                [name for name, _path in ports.active_state_store.calls],
+                ["load_active_manifest_no_migrate"],
+            )
             self.assertFalse((collision.parent / ".meta.json").exists())
 
     def test_import_issue_uses_target_repo_slug_for_issue_view_when_present(self) -> None:
@@ -862,7 +1073,7 @@ class TestRuntimeImportS10(unittest.TestCase):
 
             def _fake_execute(plan, ports_arg):
                 calls.append((plan.meta.id, ports_arg))
-                return [Path(plan.meta.path) / "README.md", Path(plan.meta.meta_path)]
+                return original_execute(plan, ports_arg)
 
             app_import_node.execute_create_plan = _fake_execute
             app_import_node.sync_after_import = lambda _ports: self._dummy_sync_result(app_contracts, domain_models)

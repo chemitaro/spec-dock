@@ -13,6 +13,7 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
+- 2026-03-20 fresh whole-diff review で見つかった import create transaction 漏れに対し、corrective scope `S01H` を追加した
 - 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
@@ -46,9 +47,57 @@ ID: "issue-28-runtime-regression-bugs"
 - 先行時点での `final review pass` / `merge-ready` 判断は `S05H` 追加前の状態を指すものであり、現在は `S05H` 完了と再レビューまで superseded として扱う
 - `S05H` では same-repo URL-linked issue の indexed fetch dedup を provider/checked-in runtime の github-aware read path に揃え、targeted regression / implementation review / QA review を通過した
 - `S04H` では provider/checked-in runtime の import preflight fail-fast と checked-in executable-path artifact/precedence evidence を補完し、spec review / implementation review / QA review を通過した
+- `S01H` では provider/checked-in runtime の import path を create transaction 契約へ統合し、import/import・import/new・active-parent fallback の precheck parity を補完して、spec review / implementation review / QA review を通過した
 - 先行時点での `S99 final diff review pass` / `merge-ready` 判断は `S04H` 追加前の状態を含むため、最新 head に対して fresh whole-diff review を再実施する前提で superseded として扱う
 
 ## 記録
+- 2026-03-20 `S01H` corrective docs refresh:
+  - background:
+    - fresh whole-diff review で、`import issue` だけが create lock / post-write duplicate guard 契約の外にあり、import/import と import/new の並行実行で duplicate id / duplicate GitHub linkage を再導入しうることを確認した
+  - docs:
+    - `requirement.md` の `AC-001 create atomicity` を create-like import まで明示拡張し、sequence allocator は引き続き `S02` の責務であることを明文化した
+    - `design.md` の `create transaction` に import の lock boundary を追加し、lock 外の URL/repo 解析・artifact preflight・GitHub fetch と、lock 内の graph 読み取り・uniqueness 再検証・write・post-write duplicate guard を分離した
+    - `plan.md` に `S01H import を create transaction 契約へ統合する` を追加した
+    - `discussions/032` に判断根拠と corrective plan を記録した
+  - spec review:
+    - 初回 `fail`
+    - 指摘:
+      - import lock boundary が不明確
+      - `AC-001` と seq scope の関係が曖昧
+      - checked-in parity で import/import と import/new の両 race class の ownership が明示不足
+    - 対応:
+      - requirement/design/plan/discussion を更新し、lock boundary / seq scope / checked-in race parity を明文化した
+    - 再レビュー:
+      - `pass`
+- 2026-03-20 `S01H` 実装:
+  - 実装:
+    - provider-side `application/import_node.py` を `new issue` と同じ create transaction 契約へ寄せ、cheap precheck 後に lock を取得し、lock 内で graph 再読込・uniqueness 再検証・plan/write・post-write duplicate guard を行うよう補修した
+    - checked-in `spec-dock/scripts/.../application/import_node.py` に同じ契約を反映した
+    - provider-side import/import race、import/new race、active-parent fallback collision precheck の回帰を `tests/cli_runtime/test_runtime_import_s10.py` に追加した
+    - checked-in runtime parity と active-parent fallback no-lookup parity を `tests/test_init_update.py` に追加した
+  - implementation review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - active-parent fallback 経路の cheap precheck が issue fetch より後ろへ残っている
+    - 対応:
+      - active-parent fallback でも local collision を external fetch 前に検出するよう補修した
+    - 再レビュー:
+      - `pass`
+  - QA review:
+    - 初回 `fail`
+    - 指摘:
+      - non-race import 契約が壊れ、existing import regression が green でなくなっている
+      - checked-in parity で active-parent fallback collision precheck が未保護
+    - 対応:
+      - duplicate/collision/mismatch の cheap precheck を `issue_view_minimal()` 前に戻し、seam test を新しい post-write guard 契約へ追随させた
+      - checked-in runtime に active-parent fallback no-lookup parity test を追加した
+    - 最終再レビュー:
+      - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_import.TestCliImport.test_import_url_rejects_when_origin_is_not_configured tests.cli_runtime.test_import.TestCliImport.test_import_url_rejects_when_origin_is_not_github tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_url_without_opt_in tests.test_init_update`
+  - 結果:
+    - `Ran 62 tests in 6.654s`
+    - `OK`
 - 2026-03-20 `S04H` corrective docs refresh:
   - background:
     - fresh whole-diff follow-up QA で、required artifact 欠損時の `import` fail-fast 回帰が provider/checked-in ともに未保護であること、checked-in `sync --force` が generated artifact 契約まで固定されていないことを確認した
