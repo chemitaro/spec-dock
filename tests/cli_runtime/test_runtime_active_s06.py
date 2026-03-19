@@ -109,12 +109,13 @@ class _StubIssueGateway:
 
 
 class _StubGitGateway:
-    def __init__(self):
+    def __init__(self, *, origin_repo_slug: str | None = None):
         self.calls = []
         self.raise_on_require_clean = None
         self.current_branch = "main"
         self.existing = set()
         self.invalid_refs = set()
+        self.origin_repo_slug = origin_repo_slug
 
     def require_clean_working_tree(self, repo_root):
         self.calls.append(("require_clean_working_tree", str(repo_root)))
@@ -138,6 +139,10 @@ class _StubGitGateway:
     def check_ref_format_branch(self, repo_root, branch):
         self.calls.append(("check_ref_format_branch", str(repo_root), branch))
         return branch not in self.invalid_refs
+
+    def origin_github_repo_slug(self, repo_root):
+        self.calls.append(("origin_github_repo_slug", str(repo_root)))
+        return self.origin_repo_slug
 
 
 class _StubActiveStateStore:
@@ -353,6 +358,109 @@ class TestRuntimeActiveS06(unittest.TestCase):
         self.assertIn("gh_fetch_failed", result.warnings)
         self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
         self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
+
+    def test_set_active_github_resolves_current_unscoped_issue_with_current_repo_slug(self) -> None:
+        app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()
+        records = [
+            _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00002",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00003",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            snapshots=[
+                SimpleNamespace(
+                    issue_number=123,
+                    state="OPEN",
+                    title="current #123",
+                    labels=[],
+                    updated_at="2026-03-19T00:00:00Z",
+                    url="https://github.com/current/repo/issues/123",
+                    repo_owner="current",
+                    repo_name="repo",
+                )
+            ],
+            foreign_snapshots={
+                ("other/repo", 123): SimpleNamespace(
+                    issue_number=123,
+                    state="CLOSED",
+                    title="foreign #123",
+                    labels=[],
+                    updated_at="2026-03-19T00:00:01Z",
+                    url="https://github.com/other/repo/issues/123",
+                    repo_owner="other",
+                    repo_name="repo",
+                )
+            },
+        )
+        ports = self._ports(
+            issue_depends_on_map={
+                "iss-local-00001": [],
+                "iss-local-00002": ["iss-local-00001"],
+                "iss-local-00003": [],
+            },
+            statuses={},
+            issue_gateway=issue_gateway,
+            git_gateway=_StubGitGateway(origin_repo_slug="current/repo"),
+            records=records,
+        )
+        req = app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00002", github_issue_number=None),
+            force=False,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        )
+        with self.assertRaises(RuntimeError) as cm:
+            app_set_active.set_active(req, ports)
+        message = str(cm.exception)
+        self.assertIn("guard_reason=blocked", message)
+        self.assertNotIn("guard_reason=unknown", message)
+        self.assertEqual(issue_gateway.calls, [("/repo", 10000)])
+        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
 
     def test_set_active_github_prefers_foreign_snapshot_under_same_number_collision(self) -> None:
         app_contracts, _app_ports, app_set_active, infra_contracts = _runtime_modules()

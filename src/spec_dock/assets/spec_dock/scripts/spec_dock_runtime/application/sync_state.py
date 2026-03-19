@@ -29,6 +29,7 @@ from .contracts import (
     SyncStateResult,
 )
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .set_active import build_active_manifest, commit_active_state
 from .status_context import resolve_issue_status_context
 
@@ -58,29 +59,6 @@ def _snapshot_repo_issue_key(snapshot: IssueSnapshot) -> tuple[str, int] | None:
     if repo_slug is None:
         return None
     return (repo_slug, int(snapshot.issue_number))
-
-
-def _normalize_repo_slug_value(slug: str | None) -> str | None:
-    text = str(slug or "").strip().lower()
-    if not text:
-        return None
-    owner, sep, repo = text.partition("/")
-    if not sep or not owner or not repo:
-        return None
-    return f"{owner}/{repo}"
-
-
-def _resolve_current_repo_slug(ports: Ports) -> str | None:
-    if ports.git_gateway is None or ports.repo_root is None:
-        return None
-    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
-    if not callable(resolver):
-        return None
-    try:
-        raw = resolver(ports.repo_root)
-    except RuntimeError:
-        return None
-    return _normalize_repo_slug_value(raw)
 
 
 def _is_safe_unscoped_snapshot(
@@ -223,7 +201,7 @@ def collect_sync_state(
     warnings: list[str] = []
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
-    current_repo_slug = _resolve_current_repo_slug(ports)
+    current_repo_slug = resolve_current_repo_slug(ports)
 
     validation = validate_graph_and_deps(
         graph,

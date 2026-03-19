@@ -20,6 +20,7 @@ from .contracts import (
     TargetRef,
 )
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .status_context import resolve_issue_status_context
 
 
@@ -381,6 +382,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=resolve_current_repo_slug(ports),
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
