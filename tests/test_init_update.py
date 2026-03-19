@@ -1247,6 +1247,254 @@ with tempfile.TemporaryDirectory() as td:
         )
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
+    def test_checked_in_dogfooding_runtime_parent_fallback_reresolve_inside_lock_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import import_node as app_import_node
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.domain import models as domain_models
+    from spec_dock_runtime.infra import contracts as infra_contracts
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+    )
+
+def _materialize_required_artifacts(records):
+    for record in records:
+        node_dir = Path(record.path)
+        node_dir.mkdir(parents=True, exist_ok=True)
+        meta_payload = {{
+            "schema_version": 1,
+            "type": record.kind,
+            "id": record.id,
+            "title": record.title,
+            "slug": record.slug,
+            "parent_id": record.parent_id,
+            "initiative_id": record.initiative_id,
+            "epic_id": record.epic_id,
+        }}
+        if record.github_issue_number is not None:
+            meta_payload["github"] = {{"issue_number": int(record.github_issue_number)}}
+        (node_dir / ".meta.json").write_text(json.dumps(meta_payload, ensure_ascii=False), encoding="utf-8")
+        for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+            (node_dir / filename).write_text(f"{{record.id}}:{{filename}}\\n", encoding="utf-8")
+
+class _StubNodeReader:
+    def load_node_records(self):
+        return []
+
+class _StubNodeRepo:
+    def __init__(self, records):
+        self.records = list(records)
+    def load_node_records(self, specdock_dir):
+        del specdock_dir
+        return list(self.records)
+    def write_meta(self, dest_dir, record):
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        payload = {{
+            "schema_version": 1,
+            "type": record.kind,
+            "id": record.id,
+            "title": record.title,
+            "slug": record.slug,
+            "parent_id": record.parent_id,
+            "initiative_id": record.initiative_id,
+            "epic_id": record.epic_id,
+        }}
+        if record.github_issue_number is not None:
+            payload["github"] = {{"issue_number": int(record.github_issue_number)}}
+        (Path(dest_dir) / ".meta.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        self.records.append(record)
+
+class _StubTemplateScaffolder:
+    def render_text(self, text, replacements):
+        rendered = text
+        for key, value in replacements.items():
+            rendered = rendered.replace(str(key), str(value))
+        return rendered
+    def load_template_text(self, src_path):
+        return Path(src_path).read_text(encoding="utf-8")
+    def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
+        created = []
+        for src_path in sorted(Path(src_dir).rglob("*"), key=lambda p: p.as_posix()):
+            if src_path.is_dir():
+                continue
+            rel = src_path.relative_to(src_dir)
+            dst = Path(dest_dir) / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            rendered = self.render_text(src_path.read_text(encoding="utf-8"), replacements)
+            dst.write_text(rendered, encoding="utf-8")
+            created.append(dst)
+        return created
+    def write_text(self, dest_path, text):
+        path = Path(dest_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+class _StubIssueGateway:
+    def __init__(self):
+        self.calls = []
+    def issue_view_minimal(self, repo_root, issue_number, *, repo_slug=None):
+        self.calls.append((str(repo_root), int(issue_number), repo_slug))
+        return domain_models.IssueSnapshot(
+            issue_number=int(issue_number),
+            state="OPEN",
+            title="Issue",
+            labels=[],
+            updated_at="2026-03-20T00:00:00Z",
+            url=f"https://example.invalid/issues/{{issue_number}}",
+        )
+
+class _StubActiveStateStore:
+    def __init__(self, manifest):
+        self._manifest = manifest
+        self.calls = []
+    def load_active_manifest(self, specdock_dir):
+        self.calls.append(("load_active_manifest", str(specdock_dir)))
+        return infra_contracts.ActiveManifestLoadResult(
+            manifest=self._manifest,
+            source="agent.active",
+            warnings=[],
+        )
+    def load_active_manifest_no_migrate(self, specdock_dir):
+        self.calls.append(("load_active_manifest_no_migrate", str(specdock_dir)))
+        return infra_contracts.ActiveManifestLoadResult(
+            manifest=self._manifest,
+            source="agent.active",
+            warnings=[],
+        )
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    issue_template_dir = specdock_dir / "templates" / "issue"
+    issue_template_dir.mkdir(parents=True, exist_ok=True)
+    (issue_template_dir / "README.md").write_text("issue=<ISS_ID>\\n", encoding="utf-8")
+    for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
+
+    records = [
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Auth platform",
+            path=specdock_dir / "initiatives" / "init-local-00001-auth-platform",
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        _record(
+            kind="epic",
+            node_id="epic-local-00001",
+            title="JWT auth",
+            path=specdock_dir / "initiatives" / "init-local-00001-auth-platform" / "epics" / "epic-local-00001-jwt-auth",
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        _record(
+            kind="epic",
+            node_id="epic-local-00002",
+            title="Session rotation",
+            path=specdock_dir / "initiatives" / "init-local-00001-auth-platform" / "epics" / "epic-local-00002-session-rotation",
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=None,
+        ),
+    ]
+    _materialize_required_artifacts(records)
+
+    issue_gateway = _StubIssueGateway()
+    active_state_store = _StubActiveStateStore(
+        infra_contracts.ActiveManifest(
+            initiative=infra_contracts.ActiveManifestEntry(
+                id="init-local-00001",
+                path="spec-dock/path/init-local-00001",
+            ),
+            epic=infra_contracts.ActiveManifestEntry(
+                id="epic-local-00001",
+                path="spec-dock/path/epic-local-00001",
+            ),
+            issue=None,
+        )
+    )
+    ports = app_ports.Ports(
+        node_reader=_StubNodeReader(),
+        node_repo=_StubNodeRepo(records),
+        template_scaffolder=_StubTemplateScaffolder(),
+        issue_gateway=issue_gateway,
+        active_state_store=active_state_store,
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+    )
+
+    captured = {{"resolve_calls": 0}}
+    original_resolve_parent_from_active = app_import_node.resolve_parent_from_active
+    original_sync_after_import = app_import_node.sync_after_import
+    def _drifting_resolve_parent_from_active(graph, child_kind, active):
+        del graph, active
+        assert child_kind == "issue", child_kind
+        captured["resolve_calls"] += 1
+        if captured["resolve_calls"] == 1:
+            return "epic-local-00001"
+        return "epic-local-00002"
+    app_import_node.resolve_parent_from_active = _drifting_resolve_parent_from_active
+    app_import_node.sync_after_import = lambda _ports: object()
+    try:
+        result = app_import_node.import_issue(
+            app_contracts.ImportNodeRequest(
+                issue_number=777,
+                title="Parent drift import",
+                slug=None,
+                parent_id=None,
+            ),
+            ports,
+        )
+    finally:
+        app_import_node.resolve_parent_from_active = original_resolve_parent_from_active
+        app_import_node.sync_after_import = original_sync_after_import
+
+    assert captured["resolve_calls"] == 2, captured
+    assert result.node.parent_id == "epic-local-00002", result.node.parent_id
+    assert "/epic-local-00002-session-rotation/" in result.node.path.as_posix(), result.node.path
+    assert issue_gateway.calls == [(str(repo_root), 777, None)], issue_gateway.calls
+    assert [name for name, _path in active_state_store.calls] == [
+        "load_active_manifest_no_migrate",
+        "load_active_manifest_no_migrate",
+    ], active_state_store.calls
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"

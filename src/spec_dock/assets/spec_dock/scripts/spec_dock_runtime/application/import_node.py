@@ -251,7 +251,8 @@ def import_node_core(
             github_repo_name=req.target_repo_name,
             current_repo_slug=current_repo_slug,
         )
-        create_req = build_linked_create_request(req, precheck_parent_id)
+        locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+        create_req = build_linked_create_request(req, locked_parent_id)
         plan = plan_node_creation(
             create_req,
             graph,
