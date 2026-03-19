@@ -180,6 +180,28 @@ ActiveSet --> IssueStatusResolution : uses
 - domain:
   - current repo slug を受け取った時の repo-aware snapshot binding 契約は維持
 
+## 2.2 repo-aware numeric deps resolution
+
+### 変更方針
+
+- `deps.json` の bare numeric ref は後方互換のため継続して許容する
+- current repo slug が解決できる場合、bare numeric ref `123` は current repo issue `current/repo#123` を優先解決する
+- current repo slug を解決できず、scoped/unscoped が混在する場合だけ fail-closed にする
+
+### 意図
+
+- foreign overlap 許容で既存 numeric deps ref を壊さない
+- `123` を current repo issue shorthand として使ってきた運用を維持する
+
+### 実装境界
+
+- infra:
+  - `deps_reader` の bare numeric ref 解決を repo-aware 化する
+- legacy app:
+  - 同じ bare issue number 解決ロジックがある場合は parity を取る
+- tests:
+  - overlap 導入後も既存 numeric deps ref が current repo issue を指し続ける回帰を固定する
+
 ## 3. artifact/repair contract
 
 対象:
@@ -201,6 +223,26 @@ ActiveSet --> IssueStatusResolution : uses
 - active 未設定時は filesystem と CLI の両方で fallback 導線を統一する
   - `spec-dock/active` は常に解決可能な symlink とする
   - `active show` は fallback path と次アクションを返す
+
+## 3.1 stale active pathfile healing
+
+### 変更方針
+
+- symlink 制限環境で通常 fallback として使う `spec-dock/active/*.path` も self-healing 対象に含める
+- `_resolve_existing_active_entrypoint()` が `None` を返した stale `.path` は残置せず、一度除去したうえで既存 recovery ロジックへ流す
+- persisted manifest / recovered target が有効ならそこへ、そうでなければ placeholder へ戻す
+
+### 意図
+
+- `update` を symlink 環境だけでなく pathfile fallback 環境でも self-healing path にする
+- stale pathfile があるだけで recovery が止まる自己矛盾をなくす
+
+### 実装境界
+
+- installer:
+  - `_ensure_active_fallback_entrypoints()` の stale pathfile 分岐を追加
+- tests:
+  - symlink 制限環境の stale pathfile recovery を固定する
 
 ### 意図
 

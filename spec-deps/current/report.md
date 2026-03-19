@@ -38,6 +38,7 @@ ID: "issue-28-runtime-regression-bugs"
 - PR #29 の追加 Codex review 3 件は妥当と判断し、current repo slug parity と domain/application validation boundary の corrective patch を追加で実施した
 - PR #29 の最新 Codex review 2 件は妥当と判断し、checked-in dogfooding runtime の repo-aware parity drift を corrective scope として追加した
 - `S90F` では checked-in consumer runtime の import/sync/validate/doctor/active/deps parity drift を補修し、targeted regression / implementation review / QA review を通過した
+- PR #29 の新しい Codex review 2 件は妥当と判断し、provider-side corrective scope として `S04G stale active pathfile healing` / `S05G repo-aware numeric deps resolution` を追加した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:

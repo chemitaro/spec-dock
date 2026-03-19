@@ -292,3 +292,25 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - domain validation は graph/deps/linkage の structural invariant に集中し、on-disk artifact existence に依存しない
   - required artifact matrix の欠損検査は application/use-case 側の preflight として維持される
+
+### AC-013 repo-aware numeric deps resolution
+
+- Given:
+  - current repo の issue `#123` を指す既存 numeric deps ref `depends_on: [123]` が存在する
+  - foreign repo issue `other/repo#123` が同じ tree に追加される
+- When:
+  - `validate` / `sync` / deps topology compile を実行する
+- Then:
+  - current repo slug が解決できる限り、bare numeric ref `123` は current repo issue を継続して指す
+  - current repo slug が解決できず scoped/unscoped が混在する場合だけ fail-closed に倒れる
+
+### AC-014 stale active pathfile healing
+
+- Given:
+  - symlink 制限環境で `spec-dock/active/*.path` fallback が使われている
+  - `.path` が stale になり、`_resolve_existing_active_entrypoint()` が `None` を返す
+- When:
+  - `spec-dock update` を実行する
+- Then:
+  - stale `.path` は残置されず、persisted/recovered target があればそこへ再生成される
+  - target も壊れていれば placeholder へ戻る
