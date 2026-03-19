@@ -214,7 +214,15 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
                 github_item["repo_name"] = node.github_repo_name
             snapshot = result.github_snapshot_by_issue_id.get(node.id)
             if snapshot is None:
-                snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
+                repo_scope = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+                fallback_allowed = True
+                if repo_scope is None and node.kind == "issue":
+                    issue_status = result.issue_statuses.get(node.id)
+                    fallback_allowed = issue_status is not None and issue_status.source == "github"
+                if fallback_allowed:
+                    snapshot = result.github_snapshot_by_repo_scope_and_issue_number.get(
+                        (repo_scope, int(node.github_issue_number))
+                    )
             if snapshot is not None:
                 github_item.update(
                     {

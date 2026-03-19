@@ -9,6 +9,7 @@ from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import StoredMetaRecord
 from .contracts import ValidateTreeRequest, ValidationResult
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -43,5 +44,10 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
         issue_depends_on_map = dict(topology.issue_depends_on_map)
 
-    report = validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
+    report = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=issue_depends_on_map,
+        repo_root=ports.repo_root,
+        current_repo_slug=resolve_current_repo_slug(ports),
+    )
     return ValidationResult(report=report, checked_node_count=len(records))

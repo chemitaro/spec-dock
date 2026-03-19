@@ -21,8 +21,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
 - `S90 docs impact resolution` を完了
-- `S90F checked-in dogfooding runtime parity` は open corrective scope として追加した
-- `S99 final diff review quality gate` は `S90F` 完了後に再実施する
+- `S90F checked-in dogfooding runtime parity` を完了
+- `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
 - `S01` から `S05` まで implementation review と QA review を通過
 - docs/spec review は corrective scope 反映後に `pass`
 - broad final suite 262 tests を通過
@@ -37,6 +37,7 @@ ID: "issue-28-runtime-regression-bugs"
 - corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
 - PR #29 の追加 Codex review 3 件は妥当と判断し、current repo slug parity と domain/application validation boundary の corrective patch を追加で実施した
 - PR #29 の最新 Codex review 2 件は妥当と判断し、checked-in dogfooding runtime の repo-aware parity drift を corrective scope として追加した
+- `S90F` では checked-in consumer runtime の import/sync/validate/doctor/active/deps parity drift を補修し、targeted regression / implementation review / QA review を通過した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -101,6 +102,33 @@ ID: "issue-28-runtime-regression-bugs"
     - `python -m unittest -v tests.domain_runtime.test_runtime_domain_s01.TestRuntimeDomainS01.test_validate_graph_and_deps_detects_structural_error tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04.test_doctor_detects_missing_artifact tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_missing_required_artifact_docs_for_each_node_kind tests.cli_runtime.test_validate.TestCliValidate.test_validate_sync_and_doctor_detect_missing_required_plan_artifact tests.cli_runtime.test_validate.TestCliValidate.test_sync_force_continues_when_required_plan_artifact_is_missing tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02.test_validate_tree_use_case_returns_result_with_checked_node_count tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02.test_validate_tree_use_case_returns_domain_error tests.cli_runtime.test_validate.TestCliValidate.test_sync_force_continues_when_tree_is_invalid`
   - 結果:
     - `Ran 8 tests in 3.502s`
+    - `OK`
+- `S90F` 実装:
+  - checked-in consumer runtime `spec-dock/scripts/...` の `create_node` / `import_node` / `sync_state` / `set_active` / `check_deps` / `doctor` / `validate_tree` / `app.py` と repo context / status / json rendering 関連部を provider-side runtime と同じ repo-aware 契約へ揃えた
+  - current repo issue `#123` と foreign repo issue `other/repo#123` の same-number coexistence について、checked-in runtime でも import uniqueness、sync snapshot、validation/doctor、active/deps github status が provider-side と同じ振る舞いになるよう補修した
+- `S90F` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - validation entrypoint と status caller の一部に `current_repo_slug` 伝播漏れがあり、checked-in runtime で false positive / `unknown/stale` 退行が起きうる
+  - 対応:
+    - checked-in `import_node.py` の実経路へ repo context を渡す wiring を追加
+    - checked-in `doctor.py` / `validate_tree.py` / `create_node.py` / `app.py` と `set_active.py` / `check_deps.py` に `current_repo_slug` 伝播を追加
+    - checked-in runtime 実行系の parity regression を `tests/test_init_update.py` に追加
+  - 再レビュー:
+    - `pass`
+- `S90F` QA review:
+  - 初回 `fail`
+  - 指摘:
+    - helper 単体テストでは実 import path の parity regressions を保護できない
+  - 対応:
+    - checked-in `import_issue(...)` 実行経路を通す回帰テストへ置換し、`issue_view_minimal(..., repo_slug=\"other/repo\")` まで固定
+    - active/deps github status parity と validation/doctor false-positive 防止の回帰を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_validation_doctor_parity`
+  - 結果:
+    - `Ran 5 tests in 0.239s`
     - `OK`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入
@@ -431,10 +459,10 @@ ID: "issue-28-runtime-regression-bugs"
 - manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
 - comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
 - PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`foreign linkage uniqueness`、`active entrypoint rebuild` は corrective patch で解消済み
-- checked-in dogfooding runtime の repo-aware parity drift は `S90F` open corrective scope として継続中
+- checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- issue-28 は `S90F` の corrective scope 完了まで継続中として扱う
-- `sev-3` のうち checked-in runtime command surface は解消済みだが、repo-aware import/sync parity は `S90F` で閉じる
+- issue-28 の追加 corrective scope は `S90F` まで完了した
+- `sev-3` のうち checked-in runtime 側の parity drift は command surface / repo-aware behavior ともに解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
 - PR #29 を再pushし、Codex review / PR checks を再監視する

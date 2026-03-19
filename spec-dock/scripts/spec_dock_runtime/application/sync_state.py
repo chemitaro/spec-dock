@@ -29,6 +29,7 @@ from .contracts import (
     SyncStateResult,
 )
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .set_active import build_active_manifest, commit_active_state
 from .status_context import resolve_issue_status_context
 
@@ -51,6 +52,26 @@ def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
     if not normalized_owner or not normalized_repo:
         return None
     return f"{normalized_owner}/{normalized_repo}"
+
+
+def _snapshot_repo_issue_key(snapshot: IssueSnapshot) -> tuple[str, int] | None:
+    repo_slug = _normalize_repo_slug(snapshot.repo_owner, snapshot.repo_name)
+    if repo_slug is None:
+        return None
+    return (repo_slug, int(snapshot.issue_number))
+
+
+def _is_safe_unscoped_snapshot(
+    snapshot: IssueSnapshot,
+    *,
+    current_repo_slug: str | None,
+) -> bool:
+    scoped_key = _snapshot_repo_issue_key(snapshot)
+    if scoped_key is None:
+        return True
+    if current_repo_slug is None:
+        return False
+    return scoped_key[0] == current_repo_slug
 
 
 def _collect_foreign_issue_targets(graph) -> list[tuple[str, int]]:
@@ -180,8 +201,14 @@ def collect_sync_state(
     warnings: list[str] = []
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
+    current_repo_slug = resolve_current_repo_slug(ports)
 
-    validation = validate_graph_and_deps(graph, issue_depends_on_map=None, repo_root=ports.repo_root)
+    validation = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=None,
+        repo_root=ports.repo_root,
+        current_repo_slug=current_repo_slug,
+    )
     if validation.errors:
         if req.force:
             deps_preflight_error = f"preflight validate failed: {validation.errors[0]}"
@@ -195,7 +222,12 @@ def collect_sync_state(
             _append_unique(warnings, warning)
         try:
             validate_deps_cycles(issue_depends_on_map)
-            validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
+            validate_graph_and_deps(
+                graph,
+                issue_depends_on_map=issue_depends_on_map,
+                repo_root=ports.repo_root,
+                current_repo_slug=current_repo_slug,
+            )
             effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
             validate_deps_cycles(effective_deps_map)
         except RuntimeError as error:
@@ -206,7 +238,8 @@ def collect_sync_state(
                 raise
 
     issue_snapshots: list[IssueSnapshot] | None = None
-    github_snapshot_by_issue_number: dict[int, IssueSnapshot] = {}
+    github_snapshot_by_repo_and_issue_number: dict[tuple[str, int], IssueSnapshot] = {}
+    github_snapshot_by_repo_scope_and_issue_number: dict[tuple[str | None, int], IssueSnapshot] = {}
     github_snapshot_by_issue_id: dict[str, IssueSnapshot] = {}
     if req.github_enabled:
         if ports.issue_gateway is None:
@@ -215,12 +248,12 @@ def collect_sync_state(
             raise RuntimeError("repo_root is required when --github is enabled")
         issue_snapshots = []
         issue_index_snapshots: list[IssueSnapshot] = []
+        foreign_issue_snapshots: list[IssueSnapshot] = []
         try:
             issue_index_snapshots = ports.issue_gateway.issue_index(ports.repo_root, limit=int(req.issue_limit))
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
         else:
-            issue_snapshots.extend(issue_index_snapshots)
             linked_numbers = sorted(
                 {
                     int(node.github_issue_number)
@@ -245,11 +278,23 @@ def collect_sync_state(
             except RuntimeError:
                 _append_unique(warnings, "gh_fetch_failed")
                 continue
-            issue_snapshots.append(snapshot)
-        github_snapshot_by_issue_number = {
-            int(snapshot.issue_number): snapshot
-            for snapshot in issue_snapshots
-        }
+            foreign_issue_snapshots.append(snapshot)
+        issue_snapshots = [*issue_index_snapshots, *foreign_issue_snapshots]
+        for snapshot in issue_index_snapshots:
+            if not _is_safe_unscoped_snapshot(snapshot, current_repo_slug=current_repo_slug):
+                continue
+            issue_number = int(snapshot.issue_number)
+            unscoped_key = (None, issue_number)
+            if unscoped_key not in github_snapshot_by_repo_scope_and_issue_number:
+                github_snapshot_by_repo_scope_and_issue_number[unscoped_key] = snapshot
+
+        for snapshot in issue_snapshots:
+            scoped_key = _snapshot_repo_issue_key(snapshot)
+            if scoped_key is not None:
+                if scoped_key not in github_snapshot_by_repo_and_issue_number:
+                    github_snapshot_by_repo_and_issue_number[scoped_key] = snapshot
+                if scoped_key not in github_snapshot_by_repo_scope_and_issue_number:
+                    github_snapshot_by_repo_scope_and_issue_number[scoped_key] = snapshot
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
@@ -262,9 +307,14 @@ def collect_sync_state(
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=current_repo_slug,
     )
     if req.github_enabled:
-        github_snapshot_by_issue_id = resolve_issue_snapshot_by_issue_id(graph, issue_snapshots)
+        github_snapshot_by_issue_id = resolve_issue_snapshot_by_issue_id(
+            graph,
+            issue_snapshots,
+            current_repo_slug=current_repo_slug,
+        )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
 
@@ -310,7 +360,8 @@ def collect_sync_state(
         deps_preflight_error=deps_preflight_error,
         repo_root=ports.repo_root,
         issue_depends_on_map=issue_depends_on_map,
-        github_snapshot_by_issue_number=github_snapshot_by_issue_number,
+        github_snapshot_by_repo_and_issue_number=github_snapshot_by_repo_and_issue_number,
+        github_snapshot_by_repo_scope_and_issue_number=github_snapshot_by_repo_scope_and_issue_number,
         github_snapshot_by_issue_id=github_snapshot_by_issue_id,
     )
 

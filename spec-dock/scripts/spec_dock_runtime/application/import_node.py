@@ -13,6 +13,7 @@ from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
 from .create_node import execute_create_plan, guard_github_issue_uniqueness, load_graph, plan_node_creation
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .sync_state import sync_after_import
 
 
@@ -168,7 +169,14 @@ def import_node_core(
 
     issue_number = int(req.issue_number)
     _validate_url_repo_identity(req, ports)
-    guard_github_issue_uniqueness(graph, issue_number)
+    current_repo_slug = resolve_current_repo_slug(ports)
+    guard_github_issue_uniqueness(
+        graph,
+        issue_number,
+        github_repo_owner=req.target_repo_owner,
+        github_repo_name=req.target_repo_name,
+        current_repo_slug=current_repo_slug,
+    )
 
     parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
     create_req = build_linked_create_request(req, parent_id)
@@ -181,6 +189,7 @@ def import_node_core(
         kind=kind,
         specdock_dir=specdock_dir,
         today=today,
+        current_repo_slug=current_repo_slug,
     )
 
     collisions = [path for path in plan.planned_paths if path.exists()]
