@@ -711,6 +711,14 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(current_status.effective_status, "open")
             self.assertEqual(foreign_status.source, "github")
             self.assertEqual(foreign_status.effective_status, "done")
+            self.assertEqual(
+                result.state.github_snapshot_by_repo_and_issue_number[("current/repo", 301)].url,
+                "https://github.com/current/repo/issues/301",
+            )
+            self.assertEqual(
+                result.state.github_snapshot_by_repo_and_issue_number[("other/repo", 301)].url,
+                "https://github.com/other/repo/issues/301",
+            )
 
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             current_payload = index_all["nodes"]["iss-local-00001"]["github"]

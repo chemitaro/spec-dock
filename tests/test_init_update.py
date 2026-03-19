@@ -1055,6 +1055,71 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("- issue: iss-local-00001", context_pack_text)
             self.assertNotIn("- issue: (none)", context_pack_text)
 
+    def test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            active_dir = target / "spec-dock" / "active"
+
+            # Keep healthy entrypoints via pathfiles, then inject stale persisted ids.
+            entry_targets = {
+                "initiative": initiative_dir,
+                "epic": epic_dir,
+                "issue": issue_dir,
+            }
+            for layer, target_dir in entry_targets.items():
+                with self.subTest(layer=layer):
+                    link = active_dir / layer
+                    if link.is_symlink() or link.is_file():
+                        link.unlink(missing_ok=True)
+                    elif link.is_dir():
+                        shutil.rmtree(link)
+                    rel_target = os.path.relpath(target_dir, start=active_dir)
+                    (active_dir / f"{layer}.path").write_text(rel_target + "\n", encoding="utf-8")
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {"id": "init-local-99999", "path": "spec-dock/initiatives/init-local-99999-missing"},
+                    "epic": {
+                        "id": "epic-local-99999",
+                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
+                    },
+                    "issue": {
+                        "id": "iss-local-99999",
+                        "path": (
+                            "spec-dock/initiatives/init-local-99999-missing/epics/"
+                            "epic-local-99999-missing/issues/iss-local-99999-missing"
+                        ),
+                    },
+                },
+            )
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            self.assertEqual(
+                self._read_active_pointer_text(target, "initiative", "requirement.md"),
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "epic", "requirement.md"),
+                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "issue", "report.md"),
+                (issue_dir / "report.md").read_text(encoding="utf-8"),
+            )
+
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- initiative: init-local-00001", context_pack_text)
+            self.assertIn("- epic: epic-local-00001", context_pack_text)
+            self.assertIn("- issue: iss-local-00001", context_pack_text)
+            self.assertNotIn("init-local-99999", context_pack_text)
+            self.assertNotIn("epic-local-99999", context_pack_text)
+            self.assertNotIn("iss-local-99999", context_pack_text)
+
     def test_update_repairs_dangling_active_symlink_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
