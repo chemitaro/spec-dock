@@ -367,6 +367,67 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("[missing_artifact]", p.stderr)
             self.assertIn(meta_rel_path.as_posix(), p.stderr)
 
+    def test_validate_sync_and_doctor_detect_missing_required_plan_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            missing_rel_path = Path(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/plan.md"
+            )
+            (target / missing_rel_path).unlink(missing_ok=False)
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Missing required artifact", p_validate.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("preflight validate failed", p_sync.stderr)
+            self.assertIn("Missing required artifact", p_sync.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_sync.stderr)
+
+            p_doctor = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
+            self.assertIn("[missing_artifact]", p_doctor.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_doctor.stderr)
+
+    def test_sync_force_continues_when_required_plan_artifact_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["sync", "--no-update-active"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            missing_rel_path = Path(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/plan.md"
+            )
+            (target / missing_rel_path).unlink(missing_ok=False)
+
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("deps_preflight_failed", p.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p.stderr)
+
+            index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertFalse(index["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
+            self.assertIn("deps_preflight_failed", index["warnings"])
+
+            tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertFalse(tree["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
+
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

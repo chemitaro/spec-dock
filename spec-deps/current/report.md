@@ -13,7 +13,7 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
-- 2026-03-19 R7/R8/R9 corrective patch は open corrective scope として進行中であり、本 issue は `S05F` / `S04F` 完了まで未完了扱いとする
+- 2026-03-19 R7/R8/R9 corrective patch を完了し、追加 review 指摘に対する corrective scope は `S05F` / `S04F` ともに完了した
 - `S01 create transaction で duplicate id を予防する` を完了
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
@@ -22,7 +22,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `S90 docs impact resolution` を完了
 - `S99 final diff review quality gate` は R7/R8/R9 corrective scope 完了後に再実施する
 - `S01` から `S05` まで implementation review と QA review を通過
-- docs/spec review は R7/R8/R9 corrective scope 完了後に再通過させる
+- docs/spec review は corrective scope 反映後に `pass`
 - broad final suite 262 tests を通過
 - branch diff 全体の final review を通過
 - 修正後の manual test 計画を `discussions/017` に記録
@@ -33,6 +33,7 @@ ID: "issue-28-runtime-regression-bugs"
 - rerun では `foreign URL + --allow-foreign-url` は live で再現せず、same-repo / foreign / local-only / organic long-run の各経路で blocker は確認されなかった
 - PR #29 の Codex review 2 件は妥当と判断し、follow-up corrective patch を追加で実施した
 - corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
+- PR #29 の追加 Codex review 3 件は妥当と判断し、current repo slug parity と domain/application validation boundary の corrective patch を追加で実施した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -60,6 +61,43 @@ ID: "issue-28-runtime-regression-bugs"
     - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
   - 結果:
     - `Ran 157 tests in 33.600s`
+    - `OK`
+- 2026-03-19 corrective docs refresh:
+  - requirement/design/plan に `R7` `R8` `R9` corrective scope を反映し、`AC-011 current repo slug parity across github-aware commands` と `AC-012 domain/application validation boundary` を追加
+  - spec review:
+    - `pass`
+- `S05F` 実装:
+  - `active set --github` / `deps check --github` / `sync` / `doctor` / `validate` が current repo slug 解決を共有 helper で扱うよう統一した
+  - current repo の unscoped issue と foreign scoped issue が同じ issue number を持っていても status/readiness が repo-aware に解決されるよう補強した
+- `S05F` implementation review:
+  - `pass`
+- `S05F` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_validate_s02`
+  - 結果:
+    - `Ran 16 tests`
+    - `OK`
+    - `Ran 40 tests`
+    - `OK`
+- `S04F` 実装:
+  - domain validation から required artifact existence check を外し、graph/in-memory 構造検証を filesystem 非依存に戻した
+  - required artifact matrix は application preflight helper `artifact_preflight.py` に移し、`validate` / `sync` / `doctor` の entrypoint で継続して enforce するよう戻した
+- `S04F` implementation review:
+  - `pass`
+- `S04F` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - `sync --force` の missing-artifact preflight 分岐に対する回帰保護が不足
+  - 対応:
+    - `tests/cli_runtime/test_validate.py` に required `plan.md` 欠損時の `sync --no-update-active --force` 契約を固定するテストを追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.domain_runtime.test_runtime_domain_s01.TestRuntimeDomainS01.test_validate_graph_and_deps_detects_structural_error tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04.test_doctor_detects_missing_artifact tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_missing_required_artifact_docs_for_each_node_kind tests.cli_runtime.test_validate.TestCliValidate.test_validate_sync_and_doctor_detect_missing_required_plan_artifact tests.cli_runtime.test_validate.TestCliValidate.test_sync_force_continues_when_required_plan_artifact_is_missing tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02.test_validate_tree_use_case_returns_result_with_checked_node_count tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02.test_validate_tree_use_case_returns_domain_error tests.cli_runtime.test_validate.TestCliValidate.test_sync_force_continues_when_tree_is_invalid`
+  - 結果:
+    - `Ran 8 tests in 3.502s`
     - `OK`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入
