@@ -252,10 +252,13 @@ ActiveFallback --> ArtifactContract
 - GitHub URL を受け取るコマンドは `owner/repo` を parse し、current repo と一致検証する
 - foreign repo を許す場合のみ explicit opt-in を設ける
 - foreign repo を import した node には `owner/repo` identity を persisted metadata として保持し、後続の sync/deps/status refresh でも current repo と混線しないようにする
+- linked GitHub uniqueness は `issue_number` 単独ではなく `normalized repo identity + issue_number` で扱い、foreign repo 同番号を same-repo duplicate と誤認しないようにする
+- sync/export が保持する GitHub snapshot lookup も同じ repo-aware identity に従い、同一 `issue_number` の current/foreign snapshot が後勝ちで上書きされないようにする
 - `new issue` に `--create-github-issue` を additive alias として追加する
 - target 解釈が曖昧なコマンドに explicit flags を追加する
   - `--id <node-id>`
   - `--github-issue <n>`
+- `--github-issue <n>` は convenience selector として残すが、repo-aware uniqueness 導入後に複数 match がありうる場合は ambiguous fail とし、確定 selector は `--id` とする
 - 裸の数値は本 issue では互換維持する
   - fail 化は out of scope
   - warning または help で explicit 形へ寄せる
@@ -289,8 +292,26 @@ CLI --> User : safe success or explicit failure
 - application:
   - repo identity validation
   - persisted foreign repo identity の read/write と repo-aware refresh
+  - repo-aware uniqueness preflight
+- domain:
+  - repo-aware GitHub linkage uniqueness validation
 - presentation:
   - ambiguity / mismatch error message
+  - ambiguous `--github-issue` guidance
+
+## active entrypoint recovery
+
+### 変更方針
+
+- installer/update の active recovery は placeholder 再生成だけで終わらせず、persisted active manifest が健全なら `spec-dock/active/{initiative,epic,issue}` の entrypoint 自体を実 node に戻す
+- `context-pack.md` は raw persisted manifest ではなく、最終的に解決できた active entrypoint 実体を source of truth として再生成する
+- 既存 symlink/pathfile が健全に残っている場合も、その実体から active id を再計算し、persisted manifest 欠損・破損・stale に引きずられて `context-pack.md` だけ退行しないようにする
+- persisted manifest が壊れている、または path が解決できない場合だけ placeholder fallback に落とす
+
+### 意図
+
+- `context-pack.md` では active に見えるのに、主導線の `spec-dock/active/*` は placeholder を向く、という recovery の自己矛盾を防ぐ
+- `spec-dock update` を self-healing path として成立させる
 
 ## dogfooding runtime parity
 

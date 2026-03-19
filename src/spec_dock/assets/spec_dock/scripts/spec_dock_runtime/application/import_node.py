@@ -11,7 +11,12 @@ from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
 from ..domain.tree import resolve_parent_from_active
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
-from .create_node import execute_create_plan, guard_github_issue_uniqueness, load_graph, plan_node_creation
+from .create_node import (
+    execute_create_plan,
+    guard_github_issue_uniqueness,
+    load_graph,
+    plan_node_creation,
+)
 from .ports import Ports
 from .sync_state import sync_after_import
 
@@ -40,6 +45,29 @@ def _resolve_git_gateway(ports: Ports):
     if ports.git_gateway is None:
         raise RuntimeError("git_gateway is required")
     return ports.git_gateway
+
+
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(_resolve_repo_root(ports))
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
 
 
 def _active_selection_from_manifest(manifest: ActiveManifest | None) -> ActiveSelection:
@@ -167,8 +195,15 @@ def import_node_core(
         raise RuntimeError(f"preflight validate failed: {error}") from error
 
     issue_number = int(req.issue_number)
+    current_repo_slug = _resolve_current_repo_slug(ports)
     _validate_url_repo_identity(req, ports)
-    guard_github_issue_uniqueness(graph, issue_number)
+    guard_github_issue_uniqueness(
+        graph,
+        issue_number,
+        github_repo_owner=req.target_repo_owner,
+        github_repo_name=req.target_repo_name,
+        current_repo_slug=current_repo_slug,
+    )
 
     parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
     create_req = build_linked_create_request(req, parent_id)
@@ -181,6 +216,7 @@ def import_node_core(
         kind=kind,
         specdock_dir=specdock_dir,
         today=today,
+        current_repo_slug=current_repo_slug,
     )
 
     collisions = [path for path in plan.planned_paths if path.exists()]

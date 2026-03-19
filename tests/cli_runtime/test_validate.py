@@ -134,8 +134,9 @@ class TestCliValidate(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate github.issue_number detected", p.stderr)
+            self.assertIn("Duplicate github.linkage detected", p.stderr)
             self.assertIn("github.issue_number=1", p.stderr)
+            self.assertIn("repo=(current-or-unknown)", p.stderr)
             self.assertIn("initiative:init-local-00001", p.stderr)
             self.assertIn("issue:iss-local-00001", p.stderr)
             self.assertIn("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json", p.stderr)
@@ -143,7 +144,94 @@ class TestCliValidate(CliRuntimeHarness):
                 "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json",
                 p.stderr,
             )
-            self.assertIn("Fix github.issue_number", p.stderr)
+            self.assertIn("Fix github linkage", p.stderr)
+
+    def test_validate_rejects_same_issue_number_when_repo_linkage_is_mixed_and_current_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / ".meta.json"
+            )
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / ".meta.json"
+            )
+
+            init_data = json.loads(init_meta.read_text(encoding="utf-8"))
+            init_data["github"] = {"issue_number": 1}
+            self._write_json_force(init_meta, init_data)
+
+            issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            issue_data["github"] = {"issue_number": 1, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(issue_meta, issue_data)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Ambiguous github.linkage scope detected", p.stderr)
+            self.assertIn("fail-closed", p.stderr)
+            self.assertIn("github.issue_number=1", p.stderr)
+
+    def test_validate_allows_same_issue_number_when_current_repo_is_resolved(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / ".meta.json"
+            )
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / ".meta.json"
+            )
+
+            init_data = json.loads(init_meta.read_text(encoding="utf-8"))
+            init_data["github"] = {"issue_number": 1}
+            self._write_json_force(init_meta, init_data)
+
+            issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            issue_data["github"] = {"issue_number": 1, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(issue_meta, issue_data)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
 
     def test_validate_detects_duplicate_discussion_sequence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

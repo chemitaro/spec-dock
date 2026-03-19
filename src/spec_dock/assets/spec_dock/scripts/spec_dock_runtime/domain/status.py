@@ -49,7 +49,8 @@ def _build_issue_snapshot_indexes(
     by_repo_and_number: dict[tuple[str, str, int], IssueSnapshot] = {}
     for issue_snapshot in issue_snapshots or []:
         issue_number = int(issue_snapshot.issue_number)
-        by_number[issue_number] = issue_snapshot
+        if issue_number not in by_number:
+            by_number[issue_number] = issue_snapshot
         identity = _normalize_repo_identity(issue_snapshot.repo_owner, issue_snapshot.repo_name)
         if identity is not None:
             by_repo_and_number[(identity[0], identity[1], issue_number)] = issue_snapshot

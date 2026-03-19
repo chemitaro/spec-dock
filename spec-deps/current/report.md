@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "completed"
 作成者: "Codex CLI"
-最終更新: "2026-03-18"
+最終更新: "2026-03-19"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: []
 ---
@@ -13,6 +13,7 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
+- 2026-03-19 minimal corrective patch として P1/P2 を追加で実施中
 - `S01 create transaction で duplicate id を予防する` を完了
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
@@ -34,6 +35,22 @@ ID: "issue-28-runtime-regression-bugs"
 - corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
 
 ## 記録
+- 2026-03-19 minimal corrective patch 着手:
+  - scope:
+    - `P1` same issue number の current(unscoped) と foreign(scoped) が共存しても sync/json snapshot lookup が混線しないこと
+    - `P2` `src/spec_dock/cli.py` の `_ensure_active_fallback_entrypoints` が persisted manifest より先に既存 active entrypoint の実体から `resolved_ids` を導出し、`context-pack.md` を実際の active entrypoint と整合させること
+  - provider-side target:
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`
+    - `src/spec_dock/cli.py`
+  - targeted tests:
+    - `tests/presentation_runtime/test_runtime_sync_s07.py`
+    - `tests/test_init_update.py`
+    - `tests.cli_runtime.test_active`
+    - `tests.cli_runtime.test_deps`
+    - `tests.cli_runtime.test_import`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入
   - bounded wait / stale lock safe failure / no-write failure / `spec doctor` 誘導メッセージを追加
@@ -260,6 +277,8 @@ ID: "issue-28-runtime-regression-bugs"
 - PR review follow-up corrective patch:
   - analysis:
     - `spec-deps/current/discussions/019-disc-pr29-review-followup-analysis.md`
+    - `spec-deps/current/discussions/020-disc-pr29-r4-foreign-linkage-uniqueness-analysis.md`
+    - `spec-deps/current/discussions/021-disc-pr29-r5-active-entrypoint-rebuild-analysis.md`
   - finding resolution:
     - `R1 foreign repo identity persistence`
       - import 時だけでなく persisted meta/model に `github.repo_owner` / `github.repo_name` を保持
@@ -269,14 +288,42 @@ ID: "issue-28-runtime-regression-bugs"
     - `R3 dogfooding runtime parity`
       - checked-in consumer workspace `spec-dock/scripts/` を provider-side runtime へ refresh し、dogfooding repo 上でも `doctor` と explicit target hint が使えるよう修正
       - `tests/test_init_update.py` に checked-in dogfooding runtime surface の executable smoke を追加し、`doctor --help` と `active set --id` hint を固定
+    - `R4 foreign github linkage uniqueness`
+      - linked uniqueness を `github.issue_number` 単独ではなく `repo + issue_number` で評価するよう修正
+      - current repo `#123` と foreign repo `#123` は併存可能にし、same-repo duplicate だけを reject する contract に更新
+      - `--github-issue <n>` は overlap 時に ambiguity fail とし、`--id` を確定 selector に固定
+      - current repo slug が未解決で scoped/unscoped linkage が衝突する場合は fail-closed で reject するよう補強
+    - `R5 active entrypoint rebuild`
+      - `spec-dock update` が persisted active manifest を使って `spec-dock/active/{initiative,epic,issue}` entrypoint 自体を rebuild するよう修正
+      - persisted path が壊れていても id から復元を試み、kind/path/id が壊れている場合だけ placeholder fallback に落とす
+      - partial recovery で active entrypoint を直した場合は `context-pack.md` も同じ state に rewrite するよう修正
+    - `R4/P1 additional review: sync snapshot repo-aware key alignment`
+      - `SyncStateResult` に `github_snapshot_by_repo_and_issue_number` を追加し、`repo + issue_number` で snapshot を保持する contract に更新
+      - `json_state` の fallback は `issue_number` 単独 lookup をやめ、repo-aware key だけを使うよう修正
+      - `domain.status` の `issue_number` index は first-wins に変更し、foreign fetch append が unscoped current issue の snapshot を上書きしないよう修正
+      - `tests.presentation_runtime.test_runtime_sync_s07` に `same issue_number current/foreign coexist` の no-mixup 回帰を追加
+    - `R5/P2 additional review: context-pack aligns with existing active entrypoints`
+      - `_ensure_active_fallback_entrypoints` で `active/{initiative,epic,issue}` の既存 symlink/pathfile 実体から id を解決し、`resolved_ids` を補正するよう修正
+      - persisted manifest が stale でも既存 active entrypoint が健全なら `context-pack.md` は実体に整合した active id を維持するよう修正
+      - `tests.test_init_update` に `stale persisted manifest + healthy active entrypoints` 回帰を追加
   - validation:
     - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_active_s06 tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_import tests.cli_runtime.test_sync tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_validate_s02 tests.domain_runtime.test_runtime_domain_s03`
     - 結果: `Ran 156 tests in 21.267s` / `OK`
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint`
     - `python -m unittest -v tests.test_init_update`
     - `python -m unittest -v tests.cli_runtime.test_runtime_shell_s11`
+    - `python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_validate tests.test_init_update`
+    - 結果: `Ran 170 tests in 38.652s` / `OK`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07`
+    - 結果: `Ran 14 tests` / `OK`
+    - `python -m unittest -v tests.test_init_update`
+    - 結果: `Ran 24 tests` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
+    - 結果: `Ran 117 tests in 30.733s` / `OK`
   - review status:
-    - sub-agent review は一部 usage limit の影響を受けたが、R3 については追加の code review / QA review を再実施する
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review は reviewer 応答が不安定だったが、出た指摘（mixed-scope fail-closed / stale context-pack）はすべて反映し、再検証済み
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -291,7 +338,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 - manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
 - comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
-- PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`dogfooding runtime parity` は corrective patch で解消済み
+- PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`dogfooding runtime parity`、`foreign linkage uniqueness`、`active entrypoint rebuild` は corrective patch で解消済み
 
 ## 次アクション
 - issue-28 自体は完了として扱い、継続観測事項は別 follow-up として管理する

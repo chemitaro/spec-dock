@@ -79,6 +79,8 @@ ID: "issue-28-runtime-regression-bugs"
     - B06 active-not-set pathway gap
   - review gate:
     - artifact matrix と doctor guidance が同じ contract を再利用している
+    - persisted active manifest recovery で `context-pack.md` と active entrypoint が不整合にならない
+    - persisted manifest が stale/欠損でも、既存 active entrypoint 実体が健全なら `context-pack.md` がその実体へ追従する
 - S05:
   - 観測可能な振る舞い: import/create/active の GitHub target 解釈が safe default かつ explicit intent で操作できる
   - closes:
@@ -87,6 +89,8 @@ ID: "issue-28-runtime-regression-bugs"
     - B10 numeric target ambiguity
   - review gate:
     - URL/number/id の曖昧性が command surface と error/help message の両方で説明可能になっている
+    - foreign repo linked uniqueness が `repo + issue_number` 契約で説明可能になっている
+    - sync/export の GitHub snapshot lookup も repo-aware key で整合し、current/foreign 同番号が混線しない
 - S90:
   - 観測可能な振る舞い: shipped docs/help/dogfooding workspace が新 contract を誤読させない
   - closes:
@@ -489,6 +493,7 @@ ID: "issue-28-runtime-regression-bugs"
 ##### I2 — active-not-set fallback
 - slice goal:
   - active 未設定でも `spec-dock/active` と `active show` から次アクションが分かることを固定する
+  - persisted active manifest が残っている recovery では、placeholder ではなく active entrypoint 自体を復元する
 
 ###### Red
 - failing test:
@@ -499,8 +504,10 @@ ID: "issue-28-runtime-regression-bugs"
 ###### Green
 - minimum implementation:
   - `spec-dock/active -> system/active-none` の一貫した入口と fallback guidance を追加する
+  - persisted active manifest が健全な場合は `spec-dock/active/{initiative,epic,issue}` を対応 node へ再構築し、壊れている場合だけ placeholder fallback に落とす
 - pass condition:
   - `spec-dock/active` の path 入口と `active show` の CLI 入口の両方で fallback guidance が機能する test が通る
+  - active dir 欠損 recovery 後に `context-pack.md` と active entrypoint が同じ persisted active state を指す test が通る
 
 ###### Refactor
 - cleanup target:
@@ -515,6 +522,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `initiative` / `epic` / `issue` / `discussion` の required artifact validation
   - `duplicate id/seq` / `missing artifact` / `broken meta` / `stale active pointer` / `stale create lock` の doctor guidance
   - `spec-dock/active` path 入口と `active show` CLI 入口の active fallback
+  - persisted active manifest からの active entrypoint rebuild
 - report update:
   - `spec-deps/current/report.md`
 - git commit:
@@ -560,9 +568,11 @@ ID: "issue-28-runtime-regression-bugs"
 - minimum implementation:
   - repo identity validation と foreign URL 用の explicit opt-in flag（例: `--allow-foreign-url`）を追加する
   - foreign repo import を許可した node には repo identity を persisted metadata として保持し、後続の sync/deps/status refresh が同じ foreign repo を参照するようにする
+  - linked uniqueness を `repo + issue_number` で評価し、same-repo duplicate は防ぎつつ foreign 同番号は許可する
 - pass condition:
   - foreign URL mismatch が default fail する regression test と、explicit opt-in でのみ成功する regression test が通る
   - foreign repo import 後の `sync --github` / `deps check --github` が current repo の同番号 issue に誤 hydrate しない regression test が通る
+  - current repo `#123` と foreign repo `#123` を併存でき、same-repo duplicate だけが fail する regression test が通る
 
 ###### Refactor
 - cleanup target:
@@ -586,6 +596,7 @@ ID: "issue-28-runtime-regression-bugs"
   - additive flags と help/error guidance を追加する
 - pass condition:
   - create/active explicit intent regression test が通る
+  - overlapping foreign/current issue number が存在する時、`--github-issue <n>` は ambiguity error となり、`--id <node-id>` でのみ確定できる regression test が通る
 
 ###### Refactor
 - cleanup target:
@@ -600,9 +611,11 @@ ID: "issue-28-runtime-regression-bugs"
   - foreign URL mismatch default fail
   - foreign URL explicit opt-in success
   - foreign repo identity persistence across sync/deps refresh
+  - foreign overlap issue number allow / same-repo duplicate fail
   - explicit create flag
   - `active set --id`
   - `active set --github-issue`
+  - ambiguous `--github-issue` fail with overlapping foreign/current issue numbers
   - numeric target を受ける同系 command の explicit target flags
 - report update:
   - `spec-deps/current/report.md`

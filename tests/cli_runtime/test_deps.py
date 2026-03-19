@@ -318,6 +318,39 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn(p.returncode, (0, 3), p.stdout + p.stderr)
             self.assertIn('"target": "iss-00123"', p.stdout)
 
+    def test_deps_check_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            ambiguous = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "123"])
+            self.assertNotEqual(ambiguous.returncode, 0, ambiguous.stdout + ambiguous.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous.stderr)
+
+            by_id = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00123", "--json"])
+            self.assertIn(by_id.returncode, (0, 3), by_id.stdout + by_id.stderr)
+            self.assertIn('"target": "iss-00123"', by_id.stdout)
+
     def test_deps_check_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
