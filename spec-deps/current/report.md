@@ -39,6 +39,7 @@ ID: "issue-28-runtime-regression-bugs"
 - PR #29 の最新 Codex review 2 件は妥当と判断し、checked-in dogfooding runtime の repo-aware parity drift を corrective scope として追加した
 - `S90F` では checked-in consumer runtime の import/sync/validate/doctor/active/deps parity drift を補修し、targeted regression / implementation review / QA review を通過した
 - PR #29 の新しい Codex review 2 件は妥当と判断し、provider-side corrective scope として `S04G stale active pathfile healing` / `S05G repo-aware numeric deps resolution` を追加した
+- `S04G` では stale active `.path` fallback の self-healing を補修し、targeted regression / implementation review / QA review を通過した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -130,6 +131,17 @@ ID: "issue-28-runtime-regression-bugs"
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_validation_doctor_parity`
   - 結果:
     - `Ran 5 tests in 0.239s`
+    - `OK`
+- `S04G` 実装:
+  - `src/spec_dock/cli.py` の `_ensure_active_fallback_entrypoints()` で、`_resolve_existing_active_entrypoint()` が `None` を返した stale `.path` を残置せず、persisted/recovered target または placeholder へ再生成するよう補修した
+- `S04G` implementation review:
+  - `pass`
+- `S04G` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails`
+  - 結果:
+    - `Ran 4 tests in 0.580s`
     - `OK`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入
