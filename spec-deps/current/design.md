@@ -343,13 +343,23 @@ CLI --> User : safe success or explicit failure
 ### 変更方針
 
 - provider-side assets で command surface を広げた時は、この repo に checked-in されている consumer workspace `spec-dock/scripts/` も同じ surface へ refresh する
+- provider-side assets で repo-scoped GitHub linkage / snapshot resolution のロジックを直した時も、checked-in consumer workspace `spec-dock/scripts/` の対応 runtime file を同じ contract へ refresh する
 - parity は単なる file copy の一致ではなく、`python spec-dock/scripts/spec-dock doctor --help` のような executable smoke で確認する
 - `spec doctor` のように recovery guidance から直接案内される command は、dogfooding repo 上でも即座に実行できる状態を維持する
+- parity regression は CLI surface だけでなく、cross-repo overlap のような runtime behavior でも checked-in consumer 実行系で固定する
 
 ### 意図
 
 - provider 側だけ直っていて consumer mirror が古い、という dogfooding 特有の誤判定を防ぐ
 - operator guidance と実際の checked-in runtime surface を一致させる
+- provider-side runtime では直っているのに checked-in consumer runtime では cross-repo overlap が再発する、という parity drift を防ぐ
+
+### checked-in runtime parity の対象
+
+- `cli/parser.py` / `cli/registry.py` の command surface
+- `application/create_node.py` の GitHub linkage uniqueness
+- `application/sync_state.py` の repo-aware snapshot aggregation / resolution
+- 上記を provider-side source of truth と同じ contract へ refresh し、checked-in runtime 実行テストで固定する
 
 ### トレードオフ
 
