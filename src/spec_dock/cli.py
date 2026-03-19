@@ -443,6 +443,14 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
         if existing_entrypoint is not None:
             continue
 
+        # If `.path` exists but does not resolve to a valid active entrypoint,
+        # treat it as stale so recovery can rebuild from persisted state/placeholder.
+        if pathfile.exists():
+            try:
+                pathfile.unlink()
+            except OSError:
+                pass
+
         if link.exists() or link.is_symlink() or pathfile.exists():
             continue
 

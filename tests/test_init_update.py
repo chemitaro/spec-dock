@@ -1885,6 +1885,141 @@ with tempfile.TemporaryDirectory() as td:
             self.assertIn("- issue: iss-local-00001", context_pack_text)
             self.assertNotIn("- issue: (none)", context_pack_text)
 
+    def test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            active_dir = self._clear_active_entrypoints(target)
+
+            stale_rel = "../system/active-none/missing-node"
+            for layer in ("initiative", "epic", "issue"):
+                (active_dir / f"{layer}.path").write_text(stale_rel + "\n", encoding="utf-8")
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {
+                        "id": "init-local-00001",
+                        "path": initiative_dir.relative_to(target).as_posix(),
+                    },
+                    "epic": {
+                        "id": "epic-local-00001",
+                        "path": epic_dir.relative_to(target).as_posix(),
+                    },
+                    "issue": {
+                        "id": "iss-local-00001",
+                        "path": issue_dir.relative_to(target).as_posix(),
+                    },
+                },
+            )
+
+            original_symlink = cli.os.symlink
+
+            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
+                dst_path = Path(dst)
+                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                    raise OSError("simulated active symlink failure")
+                original_symlink(src, dst, *args, **kwargs)
+
+            cli.os.symlink = _fail_active_symlink
+            try:
+                self.assertEqual(main(["update", str(target)]), 0)
+            finally:
+                cli.os.symlink = original_symlink
+
+            expected_paths = {
+                "initiative": initiative_dir,
+                "epic": epic_dir,
+                "issue": issue_dir,
+            }
+            for layer, expected in expected_paths.items():
+                with self.subTest(layer=layer):
+                    pathfile = active_dir / f"{layer}.path"
+                    self.assertTrue(pathfile.is_file())
+                    rel_target = pathfile.read_text(encoding="utf-8").strip()
+                    self.assertNotEqual(rel_target, stale_rel)
+                    resolved = (active_dir / rel_target).resolve()
+                    self.assertEqual(resolved, expected.resolve())
+
+            self.assertEqual(
+                self._read_active_pointer_text(target, "initiative", "requirement.md"),
+                (initiative_dir / "requirement.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "epic", "requirement.md"),
+                (epic_dir / "requirement.md").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                self._read_active_pointer_text(target, "issue", "report.md"),
+                (issue_dir / "report.md").read_text(encoding="utf-8"),
+            )
+
+    def test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails(
+        self,
+    ) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            active_dir = self._clear_active_entrypoints(target)
+
+            stale_rel = "../system/active-none/missing-node"
+            for layer in ("initiative", "epic", "issue"):
+                (active_dir / f"{layer}.path").write_text(stale_rel + "\n", encoding="utf-8")
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {
+                        "id": "init-local-99999",
+                        "path": issue_dir.relative_to(target).as_posix(),
+                    },
+                    "epic": {
+                        "id": "epic-local-99999",
+                        "path": initiative_dir.relative_to(target).as_posix(),
+                    },
+                    "issue": {
+                        "id": "iss-local-99999",
+                        "path": epic_dir.relative_to(target).as_posix(),
+                    },
+                },
+            )
+
+            original_symlink = cli.os.symlink
+
+            def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
+                dst_path = Path(dst)
+                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                    raise OSError("simulated active symlink failure")
+                original_symlink(src, dst, *args, **kwargs)
+
+            cli.os.symlink = _fail_active_symlink
+            try:
+                self.assertEqual(main(["update", str(target)]), 0)
+            finally:
+                cli.os.symlink = original_symlink
+
+            placeholder_root = target / "spec-dock" / "system" / "active-none"
+            for layer in ("initiative", "epic", "issue"):
+                with self.subTest(layer=layer):
+                    pathfile = active_dir / f"{layer}.path"
+                    self.assertTrue(pathfile.is_file())
+                    rel_target = pathfile.read_text(encoding="utf-8").strip()
+                    self.assertNotEqual(rel_target, stale_rel)
+                    resolved = (active_dir / rel_target).resolve()
+                    self.assertEqual(resolved, (placeholder_root / layer).resolve())
+                    self.assertEqual(
+                        self._read_active_pointer_text(target, layer, "README.md"),
+                        (placeholder_root / layer / "README.md").read_text(encoding="utf-8"),
+                    )
+
     def test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
