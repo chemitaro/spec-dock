@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import re
+import time
+import uuid
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -36,6 +38,232 @@ _DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
 _DISCUSSION_DOC_FILENAME_RE = re.compile(
     r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
+_CREATE_LOCK_DIRNAME = ".runtime"
+_CREATE_LOCK_FILENAME = "create.lock"
+_ENV_CREATE_LOCK_WAIT_SECONDS = "SPEC_DOCK_CREATE_LOCK_WAIT_SECONDS"
+_ENV_CREATE_LOCK_POLL_SECONDS = "SPEC_DOCK_CREATE_LOCK_POLL_SECONDS"
+_ENV_CREATE_LOCK_STALE_SECONDS = "SPEC_DOCK_CREATE_LOCK_STALE_SECONDS"
+_DEFAULT_CREATE_LOCK_WAIT_SECONDS = 3.0
+_DEFAULT_CREATE_LOCK_POLL_SECONDS = 0.05
+_DEFAULT_CREATE_LOCK_STALE_SECONDS = 600.0
+
+
+def _resolve_duration_seconds(env_name: str, default: float, *, minimum: float) -> float:
+    raw = os.environ.get(env_name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid {env_name}: {raw!r}") from exc
+    if value < minimum:
+        raise RuntimeError(f"Invalid {env_name}: {value} (must be >= {minimum})")
+    return value
+
+
+def _resolve_create_lock_path(specdock_dir: Path) -> Path:
+    return specdock_dir / "system" / _CREATE_LOCK_DIRNAME / _CREATE_LOCK_FILENAME
+
+
+def _build_create_lock_metadata(token: str) -> str:
+    now_unix = time.time()
+    lines = [
+        f"token={token}",
+        f"pid={os.getpid()}",
+        f"user={os.environ.get('USER', 'unknown')}",
+        f"created_unix={now_unix:.6f}",
+        f"created_iso={date.today().isoformat()}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _write_create_lock_payload(fd: int, payload: str) -> None:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(payload)
+
+
+def _read_create_lock_metadata(lock_path: Path) -> tuple[dict[str, str], str]:
+    try:
+        text = lock_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return {}, f"unreadable={exc}"
+
+    meta: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        if not key:
+            continue
+        meta[key] = value.strip()
+    if not meta:
+        stripped = text.strip()
+        if stripped:
+            return {}, f"raw={stripped}"
+        return {}, "empty"
+    fields = []
+    for key in ("pid", "user", "created_unix", "created_iso"):
+        if key in meta:
+            fields.append(f"{key}={meta[key]}")
+    if not fields:
+        fields = [f"{k}={v}" for k, v in sorted(meta.items())]
+    return meta, ", ".join(fields)
+
+
+def _is_stale_lock(meta: dict[str, str], *, stale_after_seconds: float) -> bool:
+    created_raw = meta.get("created_unix")
+    if created_raw is None:
+        return False
+    try:
+        created_unix = float(created_raw)
+    except ValueError:
+        return False
+    return (time.time() - created_unix) >= stale_after_seconds
+
+
+def _lock_failure_message(
+    *,
+    lock_path: Path,
+    wait_seconds: float,
+    elapsed_seconds: float,
+    stale: bool,
+    lock_meta_summary: str,
+) -> str:
+    stale_flag = "true" if stale else "false"
+    return (
+        "create lock acquisition failed: "
+        f"wait_s={elapsed_seconds:.3f} wait_limit_s={wait_seconds:.3f} stale={stale_flag} "
+        f"path={lock_path} lock_meta=[{lock_meta_summary}]. "
+        "No files were written. Run `spec doctor` for guidance."
+    )
+
+
+def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
+    lock_path = _resolve_create_lock_path(specdock_dir)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    wait_seconds = _resolve_duration_seconds(
+        _ENV_CREATE_LOCK_WAIT_SECONDS,
+        _DEFAULT_CREATE_LOCK_WAIT_SECONDS,
+        minimum=0.0,
+    )
+    poll_seconds = _resolve_duration_seconds(
+        _ENV_CREATE_LOCK_POLL_SECONDS,
+        _DEFAULT_CREATE_LOCK_POLL_SECONDS,
+        minimum=0.001,
+    )
+    stale_after_seconds = _resolve_duration_seconds(
+        _ENV_CREATE_LOCK_STALE_SECONDS,
+        _DEFAULT_CREATE_LOCK_STALE_SECONDS,
+        minimum=0.0,
+    )
+
+    token = uuid.uuid4().hex
+    payload = _build_create_lock_metadata(token)
+    started_at = time.monotonic()
+    deadline = started_at + wait_seconds
+
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            meta, summary = _read_create_lock_metadata(lock_path)
+            elapsed = time.monotonic() - started_at
+            if _is_stale_lock(meta, stale_after_seconds=stale_after_seconds):
+                raise RuntimeError(
+                    _lock_failure_message(
+                        lock_path=lock_path,
+                        wait_seconds=wait_seconds,
+                        elapsed_seconds=elapsed,
+                        stale=True,
+                        lock_meta_summary=summary,
+                    )
+                )
+            if elapsed >= wait_seconds:
+                raise RuntimeError(
+                    _lock_failure_message(
+                        lock_path=lock_path,
+                        wait_seconds=wait_seconds,
+                        elapsed_seconds=elapsed,
+                        stale=False,
+                        lock_meta_summary=summary,
+                    )
+                )
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining <= 0:
+                continue
+            time.sleep(min(poll_seconds, remaining))
+            continue
+        except OSError as exc:
+            raise RuntimeError(
+                "create lock acquisition failed: "
+                f"path={lock_path} error={exc}. Run `spec doctor` for guidance."
+            ) from exc
+        else:
+            try:
+                _write_create_lock_payload(fd, payload)
+            except Exception as exc:
+                cleanup_result = "cleanup_unlink=ok"
+                try:
+                    lock_path.unlink()
+                except OSError as cleanup_exc:
+                    cleanup_result = f"cleanup_unlink_failed={cleanup_exc}"
+                raise RuntimeError(
+                    "create lock metadata write failed: "
+                    f"path={lock_path} error={exc} {cleanup_result}. "
+                    "No files were written. Run `spec doctor` for guidance."
+                ) from exc
+            return lock_path, token
+
+
+def _release_create_lock(lock_path: Path, token: str) -> None:
+    meta, _summary = _read_create_lock_metadata(lock_path)
+    if meta.get("token") != token:
+        if lock_path.exists():
+            raise RuntimeError(
+                "create lock release failed: "
+                f"path={lock_path} reason=ownership_mismatch. "
+                "Create may have already written files. Run `spec doctor` for guidance."
+            )
+        return
+    try:
+        lock_path.unlink()
+    except OSError as exc:
+        raise RuntimeError(
+            "create lock release failed: "
+            f"path={lock_path} error={exc}. "
+            "Create may have already written files. Run `spec doctor` for guidance."
+        ) from exc
+
+
+def _post_write_duplicate_guard(ports: Ports, *, node_id: str) -> None:
+    try:
+        graph = load_graph(ports, validate=False)
+    except RuntimeError as exc:
+        raise RuntimeError(f"post-write duplicate guard failed: {exc}") from exc
+    if node_id not in graph.nodes_by_id:
+        raise RuntimeError(f"post-write duplicate guard failed: created id not found: {node_id}")
+
+
+def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
+    refs = _scan_discussion_sequence_sources(discussions_dir)
+    by_seq: dict[int, list[Path]] = {}
+    doc_ids: set[str] = set()
+    for seq, doc_type, path in refs:
+        by_seq.setdefault(seq, []).append(path)
+        doc_ids.add(f"{seq:03d}-{doc_type}")
+
+    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
+    if duplicate_seqs:
+        dup_seq = duplicate_seqs[0]
+        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
+        raise RuntimeError(
+            "post-write duplicate guard failed: "
+            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+        )
+    if doc_id not in doc_ids:
+        raise RuntimeError(f"post-write duplicate guard failed: created discussion id not found: {doc_id}")
 
 
 def _resolve_specdock_dir(ports: Ports) -> Path:
@@ -96,6 +324,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -111,6 +341,8 @@ def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -342,6 +574,16 @@ def plan_node_creation(
         github_issue_number=req.github_issue_number,
         today=today,
     )
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
+    if req.github_issue_number is not None:
+        owner = (req.github_repo_owner or "").strip().lower()
+        repo = (req.github_repo_name or "").strip().lower()
+        if owner or repo:
+            if not owner or not repo:
+                raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+            github_repo_owner = owner
+            github_repo_name = repo
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
     planned_paths.append(dest_dir / _META_FILENAME)
@@ -358,6 +600,8 @@ def plan_node_creation(
             epic_id=epic_id,
             github_issue_number=req.github_issue_number,
             meta_path=meta_path.as_posix(),
+            github_repo_owner=github_repo_owner,
+            github_repo_name=github_repo_name,
         ),
         dest_dir=dest_dir,
         replacements=replacements,
@@ -519,22 +763,46 @@ def plan_discussion_doc(
 
 def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult:
     template_scaffolder = _resolve_template_scaffolder(ports)
-    graph = load_graph(ports, validate=False)
-    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-    template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
+    specdock_dir = _resolve_specdock_dir(ports)
+    lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    result: CreateDiscussionDocResult | None = None
+    body_error: Exception | None = None
+    try:
+        graph = load_graph(ports, validate=False)
+        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
 
-    template_text = template_scaffolder.load_template_text(template_path)
-    rendered_text = template_scaffolder.render_text(template_text, replacements)
-    template_scaffolder.write_text(dest_path, rendered_text)
-    doc_id = _doc_id_from_path(dest_path)
+        template_text = template_scaffolder.load_template_text(template_path)
+        rendered_text = template_scaffolder.render_text(template_text, replacements)
+        template_scaffolder.write_text(dest_path, rendered_text)
+        doc_id = _doc_id_from_path(dest_path)
+        _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
+        result = CreateDiscussionDocResult(
+            doc_id=doc_id,
+            doc_type=doc_id.split("-", 1)[1],
+            scope_node_id=replacements["<SCOPE_ID>"],
+            path=dest_path,
+            warnings=[],
+        )
+    except Exception as exc:
+        body_error = exc
+    finally:
+        release_error: Exception | None = None
+        try:
+            _release_create_lock(lock_path, lock_token)
+        except Exception as exc:
+            release_error = exc
 
-    return CreateDiscussionDocResult(
-        doc_id=doc_id,
-        doc_type=doc_id.split("-", 1)[1],
-        scope_node_id=replacements["<SCOPE_ID>"],
-        path=dest_path,
-        warnings=[],
-    )
+        if body_error is not None:
+            if release_error is not None:
+                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
+            raise body_error
+        if release_error is not None:
+            raise release_error
+
+    if result is None:
+        raise RuntimeError("discussion doc create failed without result")
+    return result
 
 
 def _github_issue_body(
@@ -579,43 +847,67 @@ def create_node_core(
     *,
     kind: Literal["initiative", "epic", "issue"],
 ) -> CreateNodeResult:
-    graph = load_graph(ports, validate=False)
     mode = _resolve_github_mode(req, kind)
     title, _slug = resolve_input_title_and_slug(req.title, req.slug)
-    github_issue_number = req.github_issue_number
-
-    if mode == "create" and github_issue_number is None:
-        if ports.issue_gateway is None:
-            raise RuntimeError("issue_gateway is required for github issue creation")
-        repo_root = _resolve_repo_root(ports)
-        github_issue_number = ports.issue_gateway.issue_create(
-            repo_root,
-            title=title,
-            body=_github_issue_body(kind=kind, graph=graph, req=req),
-        )
-
-    if mode == "link_existing" and github_issue_number is None:
-        raise RuntimeError("github_issue_number is required for link_existing mode")
-
     specdock_dir = _resolve_specdock_dir(ports)
-    today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-    plan = plan_node_creation(
-        replace(
-            req,
-            github_mode=mode,
-            github_issue_number=github_issue_number,
-        ),
-        graph,
-        kind=kind,
-        specdock_dir=specdock_dir,
-        today=today,
-    )
-    created_paths = execute_create_plan(plan, ports)
-    return CreateNodeResult(
-        node=_to_spec_node(plan.meta),
-        created_paths=created_paths,
-        warnings=[],
-    )
+    lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    result: CreateNodeResult | None = None
+    body_error: Exception | None = None
+    try:
+        graph = load_graph(ports, validate=False)
+        github_issue_number = req.github_issue_number
+
+        if mode == "create" and github_issue_number is None:
+            if ports.issue_gateway is None:
+                raise RuntimeError("issue_gateway is required for github issue creation")
+            repo_root = _resolve_repo_root(ports)
+            github_issue_number = ports.issue_gateway.issue_create(
+                repo_root,
+                title=title,
+                body=_github_issue_body(kind=kind, graph=graph, req=req),
+            )
+
+        if mode == "link_existing" and github_issue_number is None:
+            raise RuntimeError("github_issue_number is required for link_existing mode")
+
+        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
+        plan = plan_node_creation(
+            replace(
+                req,
+                github_mode=mode,
+                github_issue_number=github_issue_number,
+            ),
+            graph,
+            kind=kind,
+            specdock_dir=specdock_dir,
+            today=today,
+        )
+        created_paths = execute_create_plan(plan, ports)
+        _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+        result = CreateNodeResult(
+            node=_to_spec_node(plan.meta),
+            created_paths=created_paths,
+            warnings=[],
+        )
+    except Exception as exc:
+        body_error = exc
+    finally:
+        release_error: Exception | None = None
+        try:
+            _release_create_lock(lock_path, lock_token)
+        except Exception as exc:
+            release_error = exc
+
+        if body_error is not None:
+            if release_error is not None:
+                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
+            raise body_error
+        if release_error is not None:
+            raise release_error
+
+    if result is None:
+        raise RuntimeError("create failed without result")
+    return result
 
 
 def create_initiative(req: CreateNodeRequest, ports: Ports) -> CreateNodeResult:

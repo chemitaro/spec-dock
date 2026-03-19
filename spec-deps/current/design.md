@@ -292,6 +292,19 @@ CLI --> User : safe success or explicit failure
 - presentation:
   - ambiguity / mismatch error message
 
+## dogfooding runtime parity
+
+### 変更方針
+
+- provider-side assets で command surface を広げた時は、この repo に checked-in されている consumer workspace `spec-dock/scripts/` も同じ surface へ refresh する
+- parity は単なる file copy の一致ではなく、`python spec-dock/scripts/spec-dock doctor --help` のような executable smoke で確認する
+- `spec doctor` のように recovery guidance から直接案内される command は、dogfooding repo 上でも即座に実行できる状態を維持する
+
+### 意図
+
+- provider 側だけ直っていて consumer mirror が古い、という dogfooding 特有の誤判定を防ぐ
+- operator guidance と実際の checked-in runtime surface を一致させる
+
 ### トレードオフ
 
 - flags は増える

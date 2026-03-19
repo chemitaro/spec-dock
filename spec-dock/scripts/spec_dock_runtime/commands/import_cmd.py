@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from ..application.contracts import ImportNodeRequest, ImportNodeResult, UseCases
 from ..presentation.cli_text import render_import_text
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
-from .targets import parse_github_issue_target
+from .targets import parse_github_issue_target_ref
 
 
 @dataclass(frozen=True)
@@ -14,6 +14,9 @@ class ImportInitiativeArgs(CommandArgs):
     issue_number: int
     title: str
     slug: str | None
+    target_repo_owner: str | None
+    target_repo_name: str | None
+    allow_foreign_url: bool
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,9 @@ class ImportEpicArgs(CommandArgs):
     issue_number: int
     title: str
     slug: str | None
+    target_repo_owner: str | None
+    target_repo_name: str | None
+    allow_foreign_url: bool
     initiative_id: str | None
 
 
@@ -29,6 +35,9 @@ class ImportIssueArgs(CommandArgs):
     issue_number: int
     title: str
     slug: str | None
+    target_repo_owner: str | None
+    target_repo_name: str | None
+    allow_foreign_url: bool
     epic_id: str | None
 
 
@@ -55,7 +64,12 @@ def command_specs() -> dict[str, CommandSpec]:
 def _add_import_initiative_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "target",
-        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+        help="GitHub issue number (123 / #123) or GitHub issue URL (https://github.com/<owner>/<repo>/issues/123)",
+    )
+    parser.add_argument(
+        "--allow-foreign-url",
+        action="store_true",
+        help="Allow GitHub URL import even when URL owner/repo differs from current repo.",
     )
     parser.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     parser.add_argument("--slug")
@@ -64,7 +78,12 @@ def _add_import_initiative_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_import_epic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "target",
-        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+        help="GitHub issue number (123 / #123) or GitHub issue URL (https://github.com/<owner>/<repo>/issues/123)",
+    )
+    parser.add_argument(
+        "--allow-foreign-url",
+        action="store_true",
+        help="Allow GitHub URL import even when URL owner/repo differs from current repo.",
     )
     parser.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     parser.add_argument("--slug")
@@ -77,7 +96,12 @@ def _add_import_epic_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_import_issue_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "target",
-        help="GitHub issue number (123 / #123 / URL; URL is parsed for number only; owner/repo is ignored)",
+        help="GitHub issue number (123 / #123) or GitHub issue URL (https://github.com/<owner>/<repo>/issues/123)",
+    )
+    parser.add_argument(
+        "--allow-foreign-url",
+        action="store_true",
+        help="Allow GitHub URL import even when URL owner/repo differs from current repo.",
     )
     parser.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     parser.add_argument("--slug")
@@ -88,27 +112,39 @@ def _add_import_issue_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _import_initiative_args(ns: argparse.Namespace) -> CommandArgs:
+    target = parse_github_issue_target_ref(str(ns.target))
     return ImportInitiativeArgs(
-        issue_number=parse_github_issue_target(str(ns.target)),
+        issue_number=target.issue_number,
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
+        target_repo_owner=target.repo_owner,
+        target_repo_name=target.repo_name,
+        allow_foreign_url=bool(getattr(ns, "allow_foreign_url", False)),
     )
 
 
 def _import_epic_args(ns: argparse.Namespace) -> CommandArgs:
+    target = parse_github_issue_target_ref(str(ns.target))
     return ImportEpicArgs(
-        issue_number=parse_github_issue_target(str(ns.target)),
+        issue_number=target.issue_number,
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
+        target_repo_owner=target.repo_owner,
+        target_repo_name=target.repo_name,
+        allow_foreign_url=bool(getattr(ns, "allow_foreign_url", False)),
         initiative_id=getattr(ns, "initiative", None),
     )
 
 
 def _import_issue_args(ns: argparse.Namespace) -> CommandArgs:
+    target = parse_github_issue_target_ref(str(ns.target))
     return ImportIssueArgs(
-        issue_number=parse_github_issue_target(str(ns.target)),
+        issue_number=target.issue_number,
         title=str(ns.title),
         slug=getattr(ns, "slug", None),
+        target_repo_owner=target.repo_owner,
+        target_repo_name=target.repo_name,
+        allow_foreign_url=bool(getattr(ns, "allow_foreign_url", False)),
         epic_id=getattr(ns, "epic", None),
     )
 
@@ -121,6 +157,9 @@ def _run_import_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOut
             title=typed.title,
             slug=typed.slug,
             parent_id=None,
+            target_repo_owner=typed.target_repo_owner,
+            target_repo_name=typed.target_repo_name,
+            allow_foreign_url=typed.allow_foreign_url,
         )
     )
     return _import_outcome(result)
@@ -134,6 +173,9 @@ def _run_import_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             title=typed.title,
             slug=typed.slug,
             parent_id=typed.initiative_id,
+            target_repo_owner=typed.target_repo_owner,
+            target_repo_name=typed.target_repo_name,
+            allow_foreign_url=typed.allow_foreign_url,
         )
     )
     return _import_outcome(result)
@@ -147,6 +189,9 @@ def _run_import_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             title=typed.title,
             slug=typed.slug,
             parent_id=typed.epic_id,
+            target_repo_owner=typed.target_repo_owner,
+            target_repo_name=typed.target_repo_name,
+            allow_foreign_url=typed.allow_foreign_url,
         )
     )
     return _import_outcome(result)

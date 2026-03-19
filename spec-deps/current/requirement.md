@@ -255,3 +255,13 @@ ID: "issue-28-runtime-regression-bugs"
   - `validate` を実行する
 - Then:
   - duplicate seq が failure として検知される
+
+### AC-010 dogfooding runtime parity
+
+- Given:
+  - provider-side shipped runtime に `doctor` や explicit target flags などの新 command surface が追加されている
+- When:
+  - この repo の checked-in dogfooding workspace `spec-dock/scripts/spec-dock` を実行する
+- Then:
+  - checked-in consumer runtime でも同じ command surface が利用できる
+  - create failure message から案内される `spec doctor` がこの repo 上で実際に起動できる
