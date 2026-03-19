@@ -3,7 +3,7 @@
 ID: "issue-28-runtime-regression-bugs"
 タイトル: "manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する"
 関連GitHub: ["28"]
-状態: "completed"
+状態: "in_progress"
 作成者: "Codex CLI"
 最終更新: "2026-03-19"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -13,16 +13,16 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
-- 2026-03-19 minimal corrective patch として P1/P2 を追加で実施中
+- 2026-03-19 R7/R8/R9 corrective patch は open corrective scope として進行中であり、本 issue は `S05F` / `S04F` 完了まで未完了扱いとする
 - `S01 create transaction で duplicate id を予防する` を完了
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
 - `S90 docs impact resolution` を完了
-- `S99 final diff review quality gate` の corrective fix を反映
+- `S99 final diff review quality gate` は R7/R8/R9 corrective scope 完了後に再実施する
 - `S01` から `S05` まで implementation review と QA review を通過
-- docs/spec review を通過
+- docs/spec review は R7/R8/R9 corrective scope 完了後に再通過させる
 - broad final suite 262 tests を通過
 - branch diff 全体の final review を通過
 - 修正後の manual test 計画を `discussions/017` に記録
@@ -350,6 +350,18 @@ ID: "issue-28-runtime-regression-bugs"
   - review status:
     - spec review: pending final response
     - QA review: pending final response
+- PR review follow-up open corrective scope:
+  - `spec-deps/current/discussions/023-disc-pr29-r7-active-set-current-repo-slug-analysis.md`
+  - `spec-deps/current/discussions/024-disc-pr29-r8-deps-check-current-repo-slug-analysis.md`
+  - `spec-deps/current/discussions/025-disc-pr29-r9-domain-validation-artifact-coupling-analysis.md`
+  - verdict:
+    - `R7 active-set current repo slug`: `valid`, `fix required`
+    - `R8 deps-check current repo slug`: `valid`, `fix required`
+    - `R9 domain validation artifact coupling`: `valid`, `fix required`
+  - gate:
+    - `AC-011` は `S05F` 完了まで未達
+    - `AC-012` は `S04F` 完了まで未達
+    - この corrective scope が完了するまで issue-28 は close しない
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -367,7 +379,7 @@ ID: "issue-28-runtime-regression-bugs"
 - PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`dogfooding runtime parity`、`foreign linkage uniqueness`、`active entrypoint rebuild` は corrective patch で解消済み
 
 ## 次アクション
-- issue-28 自体は完了として扱い、継続観測事項は別 follow-up として管理する
+- issue-28 は `S05F` / `S04F` の corrective scope 完了まで継続中として扱う
 - `sev-3` は checked-in dogfooding workspace では解消した。installer/`uvx` 経由の generated runtime surface 差分が再度観測される場合だけ follow-up として切り分ける
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
 - PR #29 を再pushし、Codex review / PR checks を再監視する

@@ -159,6 +159,27 @@ ActiveSet --> IssueStatusResolution : uses
 - status surface はやや複雑になる
 - ただし「複雑さを隠して誤認させる」より「複雑さを contract として表に出す」方が安全
 
+## 2.1 current repo slug parity for github-aware commands
+
+### 変更方針
+
+- `sync --github` だけでなく `active set --github` と `deps check --github` も同じ current repo slug-aware status resolution を使う
+- current repo issue が unscoped、snapshot 側が repo-scoped の場合でも、application が current repo slug を渡せる限り current repo snapshot を正しく再結合する
+- current repo slug が解決できない場合は既存の fail-closed / unknown 側へ倒す
+
+### 意図
+
+- command ごとの status resolution drift をなくす
+- foreign repo support の追加で、通常の current repo linked issue が壊れる回帰を防ぐ
+
+### 実装境界
+
+- application:
+  - current repo slug 解決 helper の共通化または parity 整備
+  - `set_active` / `check_deps` / `sync` / `doctor` の status/validation context を揃える
+- domain:
+  - current repo slug を受け取った時の repo-aware snapshot binding 契約は維持
+
 ## 3. artifact/repair contract
 
 対象:
@@ -208,8 +229,8 @@ ActiveSet --> IssueStatusResolution : uses
   - `plan.md`
   - `report.md`
 - discussion:
-  - discussion markdown file 本体
-  - seq uniqueness
+  - required artifact presence の対象外
+  - discussion markdown/integrity contract（markdown file 本体の存在と seq uniqueness）を validate 対象とする
 
 ### 構造
 
@@ -229,8 +250,9 @@ ActiveFallback --> ArtifactContract
 ### 実装境界
 
 - domain:
-  - required artifact matrix
+  - graph/deps/linkage の structural invariant
 - application:
+  - required artifact matrix preflight
   - validate / doctor / active fallback orchestration
 - presentation:
   - failure message / repair guidance / fallback guidance
@@ -239,6 +261,8 @@ ActiveFallback --> ArtifactContract
 
 - `doctor` を入れるとコマンド面は増える
 - ただし read-only `.meta.json` を維持する以上、supported repair path は不可欠
+- artifact matrix を application 側へ寄せるぶん preflight 呼び出し箇所は増える
+- ただし domain validation API の純度と synthetic graph の検証可能性を保つ方が価値が高い
 
 ## 4. GitHub targeting and CLI intent surface
 
