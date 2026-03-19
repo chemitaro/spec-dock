@@ -25,6 +25,8 @@ ID: "issue-28-runtime-regression-bugs"
   - `AC-009 duplicate sequence validation`
   - `AC-011 current repo slug parity across github-aware commands`
   - `AC-012 domain/application validation boundary`
+  - `AC-013 repo-aware numeric deps resolution`
+  - `AC-014 stale active pathfile healing`
 - EC:
   - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
 - 制約:
@@ -127,6 +129,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-010` -> `S90`, `S90F`
 - `AC-011` -> `S05F`
 - `AC-012` -> `S04F`
+- `AC-013` -> `S05G`
+- `AC-014` -> `S04G`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -747,6 +751,114 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S04F` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04G — stale active pathfile healing を self-healing contract に含める
+- target:
+  - symlink 制限環境の `spec-dock/active/*.path` stale fallback も `update` で repair できるようにする
+- design refs:
+  - `design.md` の `3.1 stale active pathfile healing`
+  - `discussions/029`
+- step boundary:
+  - recovery surface は `cli.py` と installer/update regression に限定する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04G` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — stale pathfile repair
+- purpose:
+  - `.path` が stale でも persisted/recovered target または placeholder へ自動復旧する
+- files:
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+
+##### I1 — stale pathfile を除去して再生成する
+- slice goal:
+  - `existing_entrypoint is None` なのに `.path` があるだけで recovery が止まる分岐を閉じる
+
+###### Red
+- failing test:
+  - symlink 制限下で stale `.path` が persisted active target に repair されない regression
+  - symlink 制限下で persisted target も stale の時 placeholder に戻らない regression
+- expected failure:
+  - stale `.path` 存在だけで `update` が `continue` してしまう
+
+###### Green
+- minimum implementation:
+  - stale `.path` を削除してから既存 resolved target 判定へ流す
+- pass condition:
+  - stale pathfile recovery regression が通る
+
+###### Refactor
+- cleanup target:
+  - stale symlink と stale pathfile の recovery 分岐整理
+- invariants to keep green:
+  - 健全な entrypoint は触らない
+
+#### step gate
+- review:
+  - symlink/pathfile 両 fallback の self-healing 契約が説明できる
+- expected tests:
+  - stale `.path` -> persisted target recovery
+  - stale `.path` -> placeholder fallback
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04G` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05G — repo-aware numeric deps resolution で foreign overlap 後も既存 shorthand を守る
+- target:
+  - foreign overlap 導入後も bare numeric deps ref が current repo issue shorthand として解決されるようにする
+- design refs:
+  - `design.md` の `2.2 repo-aware numeric deps resolution`
+  - `discussions/028`
+- step boundary:
+  - numeric deps ref 自体は後方互換のため維持し、repo-aware 解決だけを追加する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05G` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — numeric dep ref resolution parity
+- purpose:
+  - `depends_on: [123]` が overlap 後に `Ambiguous github.issue_number` へ退行しないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py`
+  - 必要なら `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+  - `tests/cli_runtime/...`
+
+##### I1 — current repo context で bare number を解決する
+- slice goal:
+  - bare numeric ref を current repo 文脈で解決し、current repo slug 不明時だけ fail-closed にする
+
+###### Red
+- failing test:
+  - existing `depends_on: [123]` が foreign overlap 導入後に `Ambiguous github.issue_number=123` へ退行する regression
+- expected failure:
+  - bare numeric deps ref が bare issue number key のまま曖昧化する
+
+###### Green
+- minimum implementation:
+  - `deps_reader` の numeric ref 解決を repo-aware にし、必要なら legacy app path も parity させる
+- pass condition:
+  - overlap 導入後も existing numeric deps ref が current repo issue を解決する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - bare ref / scoped ref / fail-closed 条件の整理
+- invariants to keep green:
+  - current repo slug 不明時の fail-closed 契約は維持する
+
+#### step gate
+- review:
+  - numeric deps shorthand と foreign overlap の後方互換契約が説明できる
+- expected tests:
+  - current repo numeric deps shorthand survives foreign overlap
+  - current repo slug unknown mixed-scope fail-closed
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05G` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
