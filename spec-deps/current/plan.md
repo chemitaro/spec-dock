@@ -3,9 +3,9 @@
 ID: "issue-28-runtime-regression-bugs"
 タイトル: "manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する"
 関連GitHub: ["28", "https://github.com/chemitaro/spec-dock/issues/28"]
-状態: "draft"
+状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-17"
+最終更新: "2026-03-19"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -23,6 +23,8 @@ ID: "issue-28-runtime-regression-bugs"
   - `AC-007 CLI symmetry and disambiguation`
   - `AC-008 doctor guidance`
   - `AC-009 duplicate sequence validation`
+  - `AC-011 current repo slug parity across github-aware commands`
+  - `AC-012 domain/application validation boundary`
 - EC:
   - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
 - 制約:
@@ -116,6 +118,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-008` -> `S04`
 - `AC-009` -> `S02`
 - `AC-010` -> `S90`
+- `AC-011` -> `S05F`
+- `AC-012` -> `S04F`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -430,7 +434,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 #### B1 — validate と artifact matrix
 - purpose:
-  - node kind ごとの required artifact contract を domain 化し、validate/sync の safety net を強化する
+  - node kind ごとの required artifact contract を runtime preflight として扱い、validate/sync の safety net を強化する
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
@@ -439,7 +443,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ##### I1 — required artifact validation
 - slice goal:
-  - issue/epic/initiative/discussion の required artifact 欠損が validate failure になることを固定する
+  - initiative/epic/issue の required artifact 欠損と discussion markdown/integrity contract の破損が validate failure になることを固定する
 
 ###### Red
 - failing test:
@@ -449,9 +453,10 @@ ID: "issue-28-runtime-regression-bugs"
 
 ###### Green
 - minimum implementation:
-  - required artifact matrix と validator integration を追加する
+  - required artifact matrix と preflight integration を追加する
 - pass condition:
-  - `initiative` / `epic` / `issue` / `discussion` の required artifact 欠損をそれぞれ検知する validation test が通る
+  - `initiative` / `epic` / `issue` の required artifact 欠損を検知する validation test が通る
+  - discussion は markdown file 本体の不整合または seq uniqueness 破損を検知する validation test が通る
 
 ###### Refactor
 - cleanup target:
@@ -520,7 +525,8 @@ ID: "issue-28-runtime-regression-bugs"
 - review:
   - validate と doctor の契約境界、active fallback の UX 意図が説明できる
 - expected tests:
-  - `initiative` / `epic` / `issue` / `discussion` の required artifact validation
+  - `initiative` / `epic` / `issue` の required artifact validation
+  - discussion markdown/integrity validation
   - `duplicate id/seq` / `missing artifact` / `broken meta` / `stale active pointer` / `stale create lock` の doctor guidance
   - current repo `#123` と foreign repo `#123` を併存した正常 graph に対して doctor が ambiguity false positive を出さない
   - `spec-dock/active` path 入口と `active show` CLI 入口の active fallback
@@ -623,6 +629,117 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S05` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05F — current repo slug parity を github-aware command 全体へ揃える
+- target:
+  - `active set --github` と `deps check --github` が `sync --github` と同じ current repo slug-aware status resolution を使う
+- design refs:
+  - `design.md` の `2.1 current repo slug parity for github-aware commands`
+  - `discussions/023`, `024`
+- step boundary:
+  - foreign repo uniqueness や explicit flags の仕様自体は `S05` で固定済みとし、ここでは command 間の context parity だけを補修する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05F` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — active/deps status context parity
+- purpose:
+  - current repo linked issue が `active set --github` / `deps check --github` で `unknown/stale` に退行しないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — current repo slug propagation
+- slice goal:
+  - `set_active` と `check_deps` が current repo slug を status resolution へ渡す
+
+###### Red
+- failing test:
+  - current repo linked issue の `active set --github` / `deps check --github` が `unknown` になって誤 block / 誤 JSON となる regression test
+- expected failure:
+  - current repo snapshot を current issue に再結合できない
+
+###### Green
+- minimum implementation:
+  - current repo slug 解決 helper を parity させ、status resolution 呼び出しへ渡す
+- pass condition:
+  - current repo linked issue の `active set --github` が readiness を正しく評価する regression test が通る
+  - current repo linked issue の `deps check --github` が GitHub status を readiness / JSON に反映する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - current repo slug helper の重複整理
+- invariants to keep green:
+  - current repo slug 未解決時の fail-closed/unknown 契約は維持する
+
+#### step gate
+- review:
+  - current repo slug-aware status resolution が `sync` / `active` / `deps` で揃っている
+- expected tests:
+  - `active set --github` current repo linked issue regression
+  - `deps check --github` current repo linked issue regression
+  - foreign same-number coexist の non-regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05F` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04F — domain/application validation boundary を再分離する
+- target:
+  - domain validation API を graph/deps/linkage の structural invariant に戻し、artifact matrix 検査は application preflight へ寄せる
+- design refs:
+  - `design.md` の `3. artifact/repair contract`
+  - `discussions/025`
+- step boundary:
+  - artifact matrix 契約自体は維持し、責務の置き場だけを修正する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04F` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — domain purity recovery
+- purpose:
+  - in-memory/synthetic graph の structural validation が on-disk artifact 欠損に先回りされないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/domain_runtime/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — move artifact existence checks to application preflight
+- slice goal:
+  - domain validation から filesystem 依存を外し、validate/sync/doctor の artifact 契約は application 側で維持する
+
+###### Red
+- failing test:
+  - synthetic graph の structural error が `Missing required artifact` に先回りされる regression test
+- expected failure:
+  - domain validation API が graph ではなく filesystem 欠損に引きずられる
+
+###### Green
+- minimum implementation:
+  - required artifact existence check を application preflight へ移し、domain validation から外す
+- pass condition:
+  - domain test が structural error を artifact 欠損なしで検証できる
+  - `validate` / `sync` / `doctor` は引き続き missing artifact を検出する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - graph validation と artifact preflight の API 境界整理
+- invariants to keep green:
+  - human-facing missing artifact 診断と guidance は維持する
+
+#### step gate
+- review:
+  - domain validation API が filesystem 非依存であること、artifact 契約が application 側で維持されていることを説明できる
+- expected tests:
+  - domain structural validation regression
+  - validate/sync/doctor の missing artifact regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04F` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:

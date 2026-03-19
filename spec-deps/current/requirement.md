@@ -191,7 +191,7 @@ ID: "issue-28-runtime-regression-bugs"
 ### AC-003 required artifact validation
 
 - Given:
-  - issue / epic / initiative / discussion の required artifact のいずれかを削除する
+  - initiative / epic / issue の required artifact、または discussion markdown/integrity contract のいずれかを壊す
 - When:
   - `validate` を実行する
 - Then:
@@ -270,3 +270,24 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - checked-in consumer runtime でも同じ command surface が利用できる
   - create failure message から案内される `spec doctor` がこの repo 上で実際に起動できる
+
+### AC-011 current repo slug parity across github-aware commands
+
+- Given:
+  - current repo origin が解決できる
+  - current repo の unscoped linked issue と GitHub snapshot が存在する
+- When:
+  - `active set --github` または `deps check --github` を実行する
+- Then:
+  - `sync --github` と同じ current repo slug-aware status resolution が使われる
+  - current repo linked issue が `unknown/stale` に退行せず、GitHub の実 status を readiness / JSON / activation 判定へ反映できる
+
+### AC-012 domain/application validation boundary
+
+- Given:
+  - in-memory graph または partially-written tree を検証する
+- When:
+  - domain の graph validation API を実行する
+- Then:
+  - domain validation は graph/deps/linkage の structural invariant に集中し、on-disk artifact existence に依存しない
+  - required artifact matrix の欠損検査は application/use-case 側の preflight として維持される
