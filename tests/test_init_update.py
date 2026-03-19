@@ -2282,6 +2282,83 @@ with tempfile.TemporaryDirectory() as td:
         self.assertTrue((issue_dir / ".meta.json").is_file())
         return initiative_dir, epic_dir, issue_dir
 
+    def test_checked_in_dogfooding_runtime_subprocess_import_post_sync_no_crash_parity(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            self._create_minimal_local_tree(target)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            import_result = self._run_runtime_capture(
+                target,
+                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertEqual(
+                import_result.returncode,
+                0,
+                msg=f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (import issue)", import_result.stdout)
+            self.assertNotIn("import_post_sync_failed", import_result.stderr)
+            self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
+            self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+
+    def test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Depends issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
+            depends_issue_dir = epic_dir / "issues" / "iss-local-00003-depends-issue"
+
+            current_meta_path = current_issue_dir / ".meta.json"
+            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_meta_path, current_meta)
+
+            foreign_meta_path = foreign_issue_dir / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {
+                "issue_number": 123,
+                "repo_owner": "other",
+                "repo_name": "repo",
+            }
+            self._write_json_force(foreign_meta_path, foreign_meta)
+            self._write_json_force(
+                depends_issue_dir / "deps.json",
+                {"schema_version": 1, "depends_on": [123]},
+            )
+
+            deps_result = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-local-00003", "--json"],
+            )
+            self.assertEqual(
+                deps_result.returncode,
+                3,
+                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
+            )
+            payload = json.loads(deps_result.stdout)
+            self.assertEqual(payload.get("effective_depends_on"), ["iss-local-00001"])
+            self.assertEqual(payload.get("blockers"), ["iss-local-00001"])
+            self.assertNotIn("Ambiguous github.issue_number=123", deps_result.stderr)
+
     def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

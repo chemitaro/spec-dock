@@ -1263,13 +1263,84 @@ ID: "issue-28-runtime-regression-bugs"
 - git commit:
   - `S99` は最終 review/no-op 判定であり、この step 自体を理由に新規コミットは作らない
 
+### S90G — checked-in parity の stale json/deps paths を閉じる
+- target:
+  - checked-in consumer runtime の `presentation/json_state.py` と `infra/deps_reader.py` を provider-side parity へ refresh する
+  - checked-in import post-sync と repo-aware numeric deps resolution が provider-side と同じ contract で動くようにする
+- design refs:
+  - `requirement.md` の `AC-010 dogfooding runtime parity`
+  - `requirement.md` の `AC-013 repo-aware numeric deps resolution`
+  - `design.md` の `dogfooding runtime parity`
+  - `discussions/033`, `034`
+- step boundary:
+  - provider-side source of truth の仕様変更は行わず、checked-in runtime の stale parity drift のみを補修する
+  - `json_state` と `deps_reader` の two-file parity と、それを通す checked-in runtime regression に scope を限定する
+
+#### B1 — checked-in rendering parity
+- purpose:
+  - checked-in import post-sync が linked node の snapshot fallback 経路で crash しないようにし、実行経路でも provider-side と同じ artifact rendering 契約を示す
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/presentation/json_state.py`
+  - `tests/test_init_update.py`
+
+##### I1 — import post-sync no-crash parity
+- slice goal:
+  - checked-in runtime の import/sync artifact rendering が provider-side と同じ repo-aware fallback helper を使う
+
+###### Red
+- failing test:
+  - checked-in linked import の post-sync で `NameError: _normalize_repo_slug` が出る regression test
+- expected failure:
+  - checked-in `json_state.py` に provider-side helper parity がない
+
+###### Green
+- minimum implementation:
+  - checked-in `presentation/json_state.py` を provider-side helper 契約へ refresh する
+- pass condition:
+  - checked-in `spec-dock/scripts/spec-dock` 実行経路の import post-sync no-crash regression test が通る
+
+#### B2 — checked-in repo-aware numeric deps parity
+- purpose:
+  - checked-in runtime の numeric `depends_on: [123]` が current/foreign same-number coexistence でも provider-side と同じ repo-aware 解決を行い、実行経路でも ambiguity を再発させない
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/infra/deps_reader.py`
+  - `tests/test_init_update.py`
+
+##### I1 — deps overlap parity
+- slice goal:
+  - checked-in `deps check` / `sync` / `validate` が current repo `#123` と foreign `other/repo#123` の coexistence でも bare numeric ref を current repo scope へ解決する
+
+###### Red
+- failing test:
+  - checked-in runtime で same-number overlap 下の numeric deps が `Ambiguous github.issue_number=123` になる regression test
+- expected failure:
+  - checked-in `deps_reader.py` が bare numeric ref を repo-aware に解決できない
+
+###### Green
+- minimum implementation:
+  - checked-in `infra/deps_reader.py` を provider-side の current-repo-aware numeric deps 契約へ refresh する
+- pass condition:
+  - checked-in `spec-dock/scripts/spec-dock` 実行経路の numeric deps overlap regression test が通る
+
+#### step gate
+- review:
+  - checked-in runtime の json rendering と numeric deps resolution が provider-side contract と同じ意味で閉じている
+- expected tests:
+  - checked-in executable-path import post-sync no-crash regression
+  - checked-in executable-path numeric deps overlap parity regression
+  - 既存 checked-in runtime parity non-regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S90G` の review と expected tests が通り、`report.md` 更新後にコミットする
+
 ## 未確定事項
 - なし
   - freshness contract は本計画で `source / stale / last_sync_at` をまとめて first fix に含める前提で固定する
 
 ## final exit contract
 - AC/EC 達成:
-  - `AC-001` から `AC-009`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015` が対応 step の review/QA 付きで満たされている
+  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015` が対応 step の review/QA 付きで満たされている
   - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
 - docs impact resolved:
   - provider-side docs と dogfooding 確認が完了し、`report.md` に判断と結果が残っている
