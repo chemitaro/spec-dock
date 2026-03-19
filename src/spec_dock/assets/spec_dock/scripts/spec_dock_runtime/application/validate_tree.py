@@ -28,6 +28,29 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     )
 
 
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(ports.repo_root)
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
+
+
 def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
     del req
     records = ports.node_reader.load_node_records()
@@ -43,5 +66,10 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
         issue_depends_on_map = dict(topology.issue_depends_on_map)
 
-    report = validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
+    report = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=issue_depends_on_map,
+        repo_root=ports.repo_root,
+        current_repo_slug=_resolve_current_repo_slug(ports),
+    )
     return ValidationResult(report=report, checked_node_count=len(records))

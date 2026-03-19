@@ -28,13 +28,12 @@ def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None)
     return meta_path.as_posix()
 
 
-def _linked_github_nodes(
-    graph: SpecGraph, *, issue_number: int, repo_root: Path | None = None
-) -> list[SpecNode]:
-    linked = [
-        n for n in graph.nodes_by_id.values() if n.github_issue_number == issue_number and n.kind in ("initiative", "epic", "issue")
-    ]
-    return sorted(linked, key=lambda n: (n.kind, n.id, _meta_json_path_for_output(n, repo_root=repo_root)))
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
 
 
 def _format_linked_github_nodes(linked: list[SpecNode], *, repo_root: Path | None = None) -> str:
@@ -51,6 +50,29 @@ def _path_for_output(path: Path, *, repo_root: Path | None = None) -> str:
         except ValueError:
             pass
     return path.as_posix()
+
+
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _github_linkage_key(
+    node: SpecNode,
+    *,
+    current_repo_slug: str | None,
+) -> tuple[str | None, int] | None:
+    if node.kind not in ("initiative", "epic", "issue"):
+        return None
+    if node.github_issue_number is None:
+        return None
+    repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) or current_repo_slug
+    return (repo_slug, int(node.github_issue_number))
 
 
 def _validate_discussion_sequences(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
@@ -81,35 +103,75 @@ def _validate_discussion_sequences(graph: SpecGraph, *, repo_root: Path | None =
         )
 
 
-def validate_github_issue_numbers_unique(graph: SpecGraph, repo_root: Path | None = None) -> None:
-    """Ensure github.issue_number is unique across initiative/epic/issue nodes."""
-    by_issue_number: dict[int, list[SpecNode]] = {}
+def validate_github_issue_numbers_unique(
+    graph: SpecGraph,
+    repo_root: Path | None = None,
+    *,
+    current_repo_slug: str | None = None,
+) -> None:
+    """Ensure github linkage (`repo + issue_number`) is unique across initiative/epic/issue nodes."""
+    normalized_current_repo_slug = _normalize_repo_slug_value(current_repo_slug)
+    by_linkage: dict[tuple[str | None, int], list[SpecNode]] = {}
+    by_issue_number: dict[int, list[tuple[SpecNode, str | None, str | None]]] = {}
     for node in graph.nodes_by_id.values():
-        if node.kind not in ("initiative", "epic", "issue"):
+        explicit_repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+        key = _github_linkage_key(node, current_repo_slug=normalized_current_repo_slug)
+        if key is None:
             continue
-        if node.github_issue_number is None:
-            continue
-        by_issue_number.setdefault(int(node.github_issue_number), []).append(node)
+        by_linkage.setdefault(key, []).append(node)
+        _repo_slug, issue_number = key
+        by_issue_number.setdefault(issue_number, []).append((node, explicit_repo_slug, _repo_slug))
 
-    for issue_number in sorted(by_issue_number.keys()):
+    # Fail closed: when current repo is unknown, mixing scoped and unscoped linkage for
+    # the same issue number can represent duplicate logical linkage.
+    if normalized_current_repo_slug is None:
+        for issue_number in sorted(by_issue_number.keys()):
+            linked_rows = by_issue_number[issue_number]
+            has_explicit = any(explicit_repo_slug is not None for _, explicit_repo_slug, _ in linked_rows)
+            has_unscoped = any(effective_repo_slug is None for _, _, effective_repo_slug in linked_rows)
+            if not (has_explicit and has_unscoped):
+                continue
+            linked = sorted(
+                [node for node, _explicit_repo_slug, _effective_repo_slug in linked_rows],
+                key=lambda n: (n.kind, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
+            )
+            found = _format_linked_github_nodes(linked, repo_root=repo_root)
+            raise RuntimeError(
+                "Ambiguous github.linkage scope detected (fail-closed): "
+                f"repo=(current-or-unknown) github.issue_number={issue_number} has both "
+                f"scoped and unscoped linkage: {found}. "
+                "Configure current repo remote (origin) or normalize linkage scope to restore uniqueness."
+            )
+
+    for repo_slug, issue_number in sorted(by_linkage.keys(), key=lambda item: (item[0] or "", item[1])):
         linked = sorted(
-            by_issue_number[issue_number],
+            by_linkage[(repo_slug, issue_number)],
             key=lambda n: (n.kind, n.id, _meta_json_path_for_output(n, repo_root=repo_root)),
         )
         if len(linked) <= 1:
             continue
         found = _format_linked_github_nodes(linked, repo_root=repo_root)
+        repo_label = repo_slug if repo_slug is not None else "(current-or-unknown)"
         raise RuntimeError(
-            f"Duplicate github.issue_number detected: github.issue_number={issue_number} "
+            f"Duplicate github.linkage detected: repo={repo_label} github.issue_number={issue_number} "
             f"is linked by multiple nodes: {found}. "
-            "Fix github.issue_number in one of the listed .meta.json files to restore uniqueness."
+            "Fix github linkage in one of the listed .meta.json files to restore uniqueness."
         )
 
 
-def validate_graph(graph: SpecGraph, repo_root: Path | None = None) -> ValidationReport:
+def validate_graph(
+    graph: SpecGraph,
+    repo_root: Path | None = None,
+    *,
+    current_repo_slug: str | None = None,
+) -> ValidationReport:
     """Validate structural integrity and return accumulated errors/warnings."""
     try:
-        _validate_graph_or_raise(graph, repo_root=repo_root)
+        _validate_graph_or_raise(
+            graph,
+            repo_root=repo_root,
+            current_repo_slug=current_repo_slug,
+        )
     except RuntimeError as e:
         return ValidationReport(errors=[str(e)], warnings=[])
     return ValidationReport(errors=[], warnings=[])
@@ -119,9 +181,15 @@ def validate_graph_and_deps(
     graph: SpecGraph,
     issue_depends_on_map: dict[str, list[str]] | None = None,
     repo_root: Path | None = None,
+    *,
+    current_repo_slug: str | None = None,
 ) -> ValidationReport:
     """Validate the graph and dependency-related preconditions."""
-    report = validate_graph(graph, repo_root=repo_root)
+    report = validate_graph(
+        graph,
+        repo_root=repo_root,
+        current_repo_slug=current_repo_slug,
+    )
     if report.errors:
         return report
     if issue_depends_on_map is None:
@@ -133,7 +201,12 @@ def validate_graph_and_deps(
     return report
 
 
-def _validate_graph_or_raise(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
+def _validate_graph_or_raise(
+    graph: SpecGraph,
+    *,
+    repo_root: Path | None = None,
+    current_repo_slug: str | None = None,
+) -> None:
     numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
     for node_id in graph.nodes_by_id.keys():
         prefix, is_local, num = parse_id(str(node_id))
@@ -147,7 +220,11 @@ def _validate_graph_or_raise(graph: SpecGraph, *, repo_root: Path | None = None)
                 f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
             )
 
-    validate_github_issue_numbers_unique(graph, repo_root=repo_root)
+    validate_github_issue_numbers_unique(
+        graph,
+        repo_root=repo_root,
+        current_repo_slug=current_repo_slug,
+    )
     _validate_discussion_sequences(graph, repo_root=repo_root)
 
     for node_id, node in graph.nodes_by_id.items():

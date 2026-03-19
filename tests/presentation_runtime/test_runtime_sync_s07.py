@@ -134,12 +134,19 @@ class _StubClock:
 
 
 class _StubGitGateway:
-    def __init__(self, branch):
+    def __init__(self, branch, repo_slug: str | None = "current/repo"):
         self._branch = branch
+        self._repo_slug = repo_slug
 
     def current_branch_or_none(self, repo_root):
         del repo_root
         return self._branch
+
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        if self._repo_slug is None:
+            raise RuntimeError("origin not configured")
+        return self._repo_slug
 
 
 class _StubActiveStateStore:
@@ -613,6 +620,106 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(issue_payload["repo_owner"], "other")
             self.assertEqual(issue_payload["repo_name"], "repo")
 
+    def test_sync_does_not_mix_snapshots_when_current_and_foreign_share_same_issue_number(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[3] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00002",
+                title="DB",
+                path=Path(records[3].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            )
+            issue_gateway = _StubIssueGateway(
+                snapshots=[
+                    domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="OPEN",
+                        title="Current repo #301",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/301",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                ],
+                foreign_snapshots={
+                    ("other/repo", 301): domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="CLOSED",
+                        title="Foreign #301",
+                        labels=["bugfix"],
+                        updated_at="2026-03-18T02:00:00Z",
+                        url="https://github.com/other/repo/issues/301",
+                        repo_owner="other",
+                        repo_name="repo",
+                    )
+                },
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIsNone(result.artifact_failure)
+            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+
+            current_status = result.state.issue_statuses["iss-local-00001"]
+            foreign_status = result.state.issue_statuses["iss-local-00002"]
+            self.assertEqual(current_status.source, "github")
+            self.assertEqual(current_status.effective_status, "open")
+            self.assertEqual(foreign_status.source, "github")
+            self.assertEqual(foreign_status.effective_status, "done")
+
+            index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            current_payload = index_all["nodes"]["iss-local-00001"]["github"]
+            foreign_payload = index_all["nodes"]["iss-local-00002"]["github"]
+            self.assertEqual(current_payload["url"], "https://github.com/current/repo/issues/301")
+            self.assertEqual(current_payload["state"], "OPEN")
+            self.assertEqual(foreign_payload["url"], "https://github.com/other/repo/issues/301")
+            self.assertEqual(foreign_payload["state"], "CLOSED")
+
     def test_sync_prefers_foreign_repo_snapshot_for_foreign_linked_initiative_and_epic(self) -> None:
         (
             _runtime_app,
@@ -764,6 +871,220 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(init_payload["state"], "CLOSED")
             self.assertEqual(epic_payload["url"], "https://github.com/upstream/product/issues/201")
             self.assertEqual(epic_payload["state"], "CLOSED")
+
+    def test_sync_keeps_local_issue_snapshot_when_foreign_repo_uses_same_issue_number(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[0] = _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                title="Auth",
+                path=Path(records[0].path),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=301,
+                github_repo_owner="upstream",
+                github_repo_name="product",
+            )
+            issue_gateway = _StubIssueGateway(
+                snapshots=[
+                    domain_models.IssueSnapshot(
+                        issue_number=201,
+                        state="OPEN",
+                        title="Current repo #201",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/201",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                    domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="OPEN",
+                        title="Current repo #301",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/301",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                    domain_models.IssueSnapshot(
+                        issue_number=302,
+                        state="OPEN",
+                        title="Current repo #302",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/302",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                ],
+                foreign_snapshots={
+                    ("upstream/product", 301): domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="CLOSED",
+                        title="Foreign #301",
+                        labels=["roadmap"],
+                        updated_at="2026-03-18T01:00:00Z",
+                        url="https://github.com/upstream/product/issues/301",
+                        repo_owner="upstream",
+                        repo_name="product",
+                    ),
+                },
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIsNone(result.artifact_failure)
+            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "upstream/product")])
+            issue_status = result.state.issue_statuses["iss-local-00001"]
+            self.assertEqual(issue_status.source, "github")
+            self.assertEqual(issue_status.effective_status, "open")
+
+            index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            issue_payload = index_all["nodes"]["iss-local-00001"]["github"]
+            initiative_payload = index_all["nodes"]["init-local-00001"]["github"]
+            self.assertEqual(issue_payload["url"], "https://github.com/current/repo/issues/301")
+            self.assertEqual(issue_payload["state"], "OPEN")
+            self.assertEqual(initiative_payload["url"], "https://github.com/upstream/product/issues/301")
+            self.assertEqual(initiative_payload["state"], "CLOSED")
+
+    def test_sync_does_not_fallback_to_same_number_other_repo_snapshot_in_json(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[2] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="API",
+                path=Path(records[2].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            )
+            issue_gateway = _StubIssueGateway(
+                snapshots=[
+                    domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="OPEN",
+                        title="Current repo #301",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/301",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                    domain_models.IssueSnapshot(
+                        issue_number=302,
+                        state="OPEN",
+                        title="Current repo #302",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/302",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                ],
+                foreign_snapshots={},
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIsNone(result.artifact_failure)
+            self.assertIn("gh_fetch_failed", result.state.warnings)
+            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+            issue_status = result.state.issue_statuses["iss-local-00001"]
+            self.assertEqual(issue_status.source, "unknown")
+            self.assertEqual(issue_status.effective_status, "unknown")
+
+            index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            issue_payload = index_all["nodes"]["iss-local-00001"]["github"]
+            self.assertEqual(issue_payload["issue_number"], 301)
+            self.assertEqual(issue_payload["repo_owner"], "other")
+            self.assertEqual(issue_payload["repo_name"], "repo")
+            self.assertNotIn("url", issue_payload)
+            self.assertNotIn("state", issue_payload)
+            self.assertNotIn("updated_at", issue_payload)
+            self.assertNotIn("labels", issue_payload)
 
     def test_sync_active_update_then_artifact_failure_is_non_atomic(self) -> None:
         (

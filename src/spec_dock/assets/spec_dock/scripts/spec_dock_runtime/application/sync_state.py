@@ -53,6 +53,36 @@ def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
     return f"{normalized_owner}/{normalized_repo}"
 
 
+def _snapshot_repo_issue_key(snapshot: IssueSnapshot) -> tuple[str, int] | None:
+    repo_slug = _normalize_repo_slug(snapshot.repo_owner, snapshot.repo_name)
+    if repo_slug is None:
+        return None
+    return (repo_slug, int(snapshot.issue_number))
+
+
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(ports.repo_root)
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
+
+
 def _collect_foreign_issue_targets(graph) -> list[tuple[str, int]]:
     targets: set[tuple[str, int]] = set()
     for node in graph.nodes_by_id.values():
@@ -180,8 +210,14 @@ def collect_sync_state(
     warnings: list[str] = []
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
+    current_repo_slug = _resolve_current_repo_slug(ports)
 
-    validation = validate_graph_and_deps(graph, issue_depends_on_map=None, repo_root=ports.repo_root)
+    validation = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=None,
+        repo_root=ports.repo_root,
+        current_repo_slug=current_repo_slug,
+    )
     if validation.errors:
         if req.force:
             deps_preflight_error = f"preflight validate failed: {validation.errors[0]}"
@@ -195,7 +231,12 @@ def collect_sync_state(
             _append_unique(warnings, warning)
         try:
             validate_deps_cycles(issue_depends_on_map)
-            validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
+            validate_graph_and_deps(
+                graph,
+                issue_depends_on_map=issue_depends_on_map,
+                repo_root=ports.repo_root,
+                current_repo_slug=current_repo_slug,
+            )
             effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
             validate_deps_cycles(effective_deps_map)
         except RuntimeError as error:
@@ -206,7 +247,8 @@ def collect_sync_state(
                 raise
 
     issue_snapshots: list[IssueSnapshot] | None = None
-    github_snapshot_by_issue_number: dict[int, IssueSnapshot] = {}
+    github_snapshot_by_repo_and_issue_number: dict[tuple[str, int], IssueSnapshot] = {}
+    github_snapshot_by_repo_scope_and_issue_number: dict[tuple[str | None, int], IssueSnapshot] = {}
     github_snapshot_by_issue_id: dict[str, IssueSnapshot] = {}
     if req.github_enabled:
         if ports.issue_gateway is None:
@@ -215,12 +257,12 @@ def collect_sync_state(
             raise RuntimeError("repo_root is required when --github is enabled")
         issue_snapshots = []
         issue_index_snapshots: list[IssueSnapshot] = []
+        foreign_issue_snapshots: list[IssueSnapshot] = []
         try:
             issue_index_snapshots = ports.issue_gateway.issue_index(ports.repo_root, limit=int(req.issue_limit))
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
         else:
-            issue_snapshots.extend(issue_index_snapshots)
             linked_numbers = sorted(
                 {
                     int(node.github_issue_number)
@@ -245,11 +287,25 @@ def collect_sync_state(
             except RuntimeError:
                 _append_unique(warnings, "gh_fetch_failed")
                 continue
-            issue_snapshots.append(snapshot)
-        github_snapshot_by_issue_number = {
-            int(snapshot.issue_number): snapshot
-            for snapshot in issue_snapshots
-        }
+            foreign_issue_snapshots.append(snapshot)
+        # Keep current-repo index snapshots last so unscoped lookups never get
+        # overwritten by foreign snapshots that share the same issue number.
+        issue_snapshots = [*foreign_issue_snapshots, *issue_index_snapshots]
+        for snapshot in issue_snapshots:
+            issue_number = int(snapshot.issue_number)
+
+            # Keep the first seen unscoped snapshot so current-repo index state
+            # is not overwritten by later foreign snapshots with the same number.
+            unscoped_key = (None, issue_number)
+            if unscoped_key not in github_snapshot_by_repo_scope_and_issue_number:
+                github_snapshot_by_repo_scope_and_issue_number[unscoped_key] = snapshot
+
+            scoped_key = _snapshot_repo_issue_key(snapshot)
+            if scoped_key is not None:
+                if scoped_key not in github_snapshot_by_repo_and_issue_number:
+                    github_snapshot_by_repo_and_issue_number[scoped_key] = snapshot
+                if scoped_key not in github_snapshot_by_repo_scope_and_issue_number:
+                    github_snapshot_by_repo_scope_and_issue_number[scoped_key] = snapshot
 
     cached_issue_status_by_id: dict[str, str] = {}
     cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
@@ -310,7 +366,8 @@ def collect_sync_state(
         deps_preflight_error=deps_preflight_error,
         repo_root=ports.repo_root,
         issue_depends_on_map=issue_depends_on_map,
-        github_snapshot_by_issue_number=github_snapshot_by_issue_number,
+        github_snapshot_by_repo_and_issue_number=github_snapshot_by_repo_and_issue_number,
+        github_snapshot_by_repo_scope_and_issue_number=github_snapshot_by_repo_scope_and_issue_number,
         github_snapshot_by_issue_id=github_snapshot_by_issue_id,
     )
 

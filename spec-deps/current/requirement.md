@@ -207,6 +207,8 @@ ID: "issue-28-runtime-regression-bugs"
   - current repo と一致しない場合は誤リンクせず、安全側に失敗する
   - 例外が許される場合でも明示 opt-in が必要である
   - 明示 opt-in で foreign repo import を許可した場合でも、後続の `sync --github` / `deps check --github` は同じ foreign repo identity を維持し、current repo の同番号 issue に誤 hydrate しない
+  - foreign repo import の linked uniqueness は `repo + issue_number` で評価され、`other/repo#123` と `current/repo#123` を不必要に同一視しない
+  - その結果 `github issue number` が repo 全体では一意でなくなった場合、`--github-issue <n>` の selector は ambiguous fail し、誤って任意の node を選ばない
 
 ### AC-005 freshness clarity
 
@@ -221,12 +223,13 @@ ID: "issue-28-runtime-regression-bugs"
 ### AC-006 active pathway
 
 - Given:
-  - active が未設定である
+  - active が未設定である、または persisted active manifest は残っているが `spec-dock/active/*` entrypoint が欠損している
 - When:
-  - `active show` または `spec-dock/active` を参照する
+  - `active show` または `spec-dock/active` を参照する、または `spec-dock update` で recovery を実行する
 - Then:
   - `spec-dock/active` は未設定でも解決可能な入口として存在する
   - 未設定であることと、次に取るべき action/fallback path が分かる
+  - persisted active manifest が健全な場合は、`spec-dock update` が `context-pack.md` だけでなく `spec-dock/active/{initiative,epic,issue}` の entrypoint も同じ active state に復元する
 
 ### AC-007 CLI symmetry and disambiguation
 
@@ -237,6 +240,7 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - `new issue` でも explicit GitHub create を表現できる
   - `active set` などで node id と GitHub issue number を明示指定できる
+  - ただし `--github-issue <n>` が複数 node に一致する場合は、曖昧成功ではなく ambiguity error になり、operator は `--id <node-id>` で対象を確定できる
 
 ### AC-008 doctor guidance
 

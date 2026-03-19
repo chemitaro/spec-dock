@@ -86,6 +86,14 @@ def _sort_key(node_id: str) -> tuple[int, int, str] | tuple[int, str]:
         return (2, node_id)
 
 
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
 def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path | None) -> str:
     if repo_root is not None:
         try:
@@ -214,7 +222,10 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
                 github_item["repo_name"] = node.github_repo_name
             snapshot = result.github_snapshot_by_issue_id.get(node.id)
             if snapshot is None:
-                snapshot = result.github_snapshot_by_issue_number.get(int(node.github_issue_number))
+                repo_scope = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+                snapshot = result.github_snapshot_by_repo_scope_and_issue_number.get(
+                    (repo_scope, int(node.github_issue_number))
+                )
             if snapshot is not None:
                 github_item.update(
                     {
