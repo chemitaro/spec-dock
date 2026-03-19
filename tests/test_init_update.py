@@ -711,6 +711,50 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("epic-local-00001", self._read_active_pointer_text(target, "epic", "requirement.md"))
             self.assertIn("iss-local-00001", self._read_active_pointer_text(target, "issue", "report.md"))
 
+    def test_update_regenerates_context_pack_from_existing_active_entrypoints_when_manifest_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001"])
+
+            active_dir = target / "spec-dock" / "active"
+            context_pack_path = active_dir / "context-pack.md"
+            context_pack_path.unlink(missing_ok=True)
+            self.assertFalse(context_pack_path.exists())
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {
+                        "id": "init-local-99999",
+                        "path": "spec-dock/initiatives/init-local-99999-missing",
+                    },
+                    "epic": {
+                        "id": "epic-local-99999",
+                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
+                    },
+                    "issue": {
+                        "id": "iss-local-99999",
+                        "path": (
+                            "spec-dock/initiatives/init-local-99999-missing/epics/"
+                            "epic-local-99999-missing/issues/iss-local-99999-missing"
+                        ),
+                    },
+                },
+            )
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            context_pack_text = context_pack_path.read_text(encoding="utf-8")
+            self.assertIn("- initiative: init-local-00001", context_pack_text)
+            self.assertIn("- epic: epic-local-00001", context_pack_text)
+            self.assertIn("- issue: iss-local-00001", context_pack_text)
+            self.assertNotIn("init-local-99999", context_pack_text)
+            self.assertNotIn("epic-local-99999", context_pack_text)
+            self.assertNotIn("iss-local-99999", context_pack_text)
+
     def test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -892,11 +936,8 @@ class TestInitUpdate(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-
-            initiative_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            epic_dir = initiative_dir / "epics" / "epic-local-00001-jwt-auth"
-            issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
-            issue_dir.mkdir(parents=True, exist_ok=True)
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            active_dir = self._clear_active_entrypoints(target)
 
             self._write_json_force(
                 target / "spec-dock" / ".agent" / "active.json",
@@ -917,7 +958,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 },
             )
 
-            context_pack_path = target / "spec-dock" / "active" / "context-pack.md"
+            context_pack_path = active_dir / "context-pack.md"
             context_pack_path.unlink(missing_ok=True)
             self.assertFalse(context_pack_path.exists())
 

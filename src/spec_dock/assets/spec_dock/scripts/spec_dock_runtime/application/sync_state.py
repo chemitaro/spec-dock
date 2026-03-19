@@ -288,18 +288,16 @@ def collect_sync_state(
                 _append_unique(warnings, "gh_fetch_failed")
                 continue
             foreign_issue_snapshots.append(snapshot)
-        # Keep current-repo index snapshots last so unscoped lookups never get
-        # overwritten by foreign snapshots that share the same issue number.
-        issue_snapshots = [*foreign_issue_snapshots, *issue_index_snapshots]
-        for snapshot in issue_snapshots:
+        # Keep current-repo index snapshots first so unscoped lookups use the
+        # current repo value when foreign repos share the same issue number.
+        issue_snapshots = [*issue_index_snapshots, *foreign_issue_snapshots]
+        for snapshot in issue_index_snapshots:
             issue_number = int(snapshot.issue_number)
-
-            # Keep the first seen unscoped snapshot so current-repo index state
-            # is not overwritten by later foreign snapshots with the same number.
             unscoped_key = (None, issue_number)
             if unscoped_key not in github_snapshot_by_repo_scope_and_issue_number:
                 github_snapshot_by_repo_scope_and_issue_number[unscoped_key] = snapshot
 
+        for snapshot in issue_snapshots:
             scoped_key = _snapshot_repo_issue_key(snapshot)
             if scoped_key is not None:
                 if scoped_key not in github_snapshot_by_repo_and_issue_number:
@@ -318,9 +316,14 @@ def collect_sync_state(
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=current_repo_slug,
     )
     if req.github_enabled:
-        github_snapshot_by_issue_id = resolve_issue_snapshot_by_issue_id(graph, issue_snapshots)
+        github_snapshot_by_issue_id = resolve_issue_snapshot_by_issue_id(
+            graph,
+            issue_snapshots,
+            current_repo_slug=current_repo_slug,
+        )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
 
