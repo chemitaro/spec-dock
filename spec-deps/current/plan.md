@@ -259,7 +259,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 #### step gate
 - review:
-  - lock scope、timeout 契約、stale lock acquire-side policy、post-write duplicate guard の位置を説明できる
+  - lock scope、timeout 契約、stale lock acquire-side policy、post-write duplicate guard の位置と責務境界を説明できる
 - expected tests:
   - duplicate id prevention regression（initiative/epic/issue を含む）
   - lock contention failure regression
@@ -442,7 +442,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 #### step gate
 - review:
-  - import path が `new issue` と同じ lock scope / failure surface / post-write duplicate guard 契約を使っている
+  - import path が `new issue` と同じ lock scope / failure surface を使い、post-write duplicate guard は created-id materialization boundary として整合している
 - expected tests:
   - provider-side import/import race regression
   - provider-side import/new race regression
