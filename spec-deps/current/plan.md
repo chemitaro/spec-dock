@@ -100,6 +100,13 @@ ID: "issue-28-runtime-regression-bugs"
   - review gate:
     - provider-side docs と consumer-side dogfooding 確認が両方完了している
     - checked-in dogfooding runtime で `doctor` と issue-28 追加 surface の executable smoke が通る
+- S90F:
+  - 観測可能な振る舞い: checked-in dogfooding runtime でも repo-scoped GitHub uniqueness / snapshot resolution が provider-side runtime と同じ contract で動く
+  - closes:
+    - AC-010 dogfooding runtime parity の runtime behavior 部分
+  - review gate:
+    - checked-in `spec-dock/scripts/...` の対象 runtime file が provider-side source of truth と同じ契約へ refresh されている
+    - same-number coexistence の checked-in runtime regression test が通る
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -117,7 +124,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-007` -> `S05`
 - `AC-008` -> `S04`
 - `AC-009` -> `S02`
-- `AC-010` -> `S90`
+- `AC-010` -> `S90`, `S90F`
 - `AC-011` -> `S05F`
 - `AC-012` -> `S04F`
 
@@ -750,6 +757,84 @@ ID: "issue-28-runtime-regression-bugs"
   - `doctor`, `active show`, explicit flags, stale/source 表示, wrong-repo safety の利用方法を docs に反映する
 - git commit:
   - docs/spec review が通り、`report.md` 更新後にコミットする
+
+### S90F — checked-in dogfooding runtime parity を repo-scoped GitHub behavior まで揃える
+- target:
+  - checked-in consumer workspace `spec-dock/scripts/` の `create_node` / `sync_state` を provider-side runtime と同じ repo-aware contract へ refresh する
+- design refs:
+  - `requirement.md` の `AC-010 dogfooding runtime parity`
+  - `design.md` の `dogfooding runtime parity`
+  - `discussions/026`, `027`
+- step boundary:
+  - provider-side source of truth の仕様変更は行わず、checked-in dogfooding runtime の parity drift を補修する
+  - full workspace rewrite は避け、review で指摘された runtime file と回帰テストに scope を限定する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S90F` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — checked-in runtime refresh and parity tests
+- purpose:
+  - checked-in dogfooding runtime 上でも foreign/current same-number coexistence が provider-side runtime と同じ contract で動くようにする
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/application/...`
+  - `tests/...`
+
+##### I1 — checked-in import uniqueness parity
+- slice goal:
+  - checked-in `create_node.py` が repo-aware uniqueness 契約を使う
+
+###### Red
+- failing test:
+  - checked-in runtime で current repo `#123` と foreign repo `other/repo#123` が overlap した時、`import issue <foreign-url> --allow-foreign-url` が bare issue number duplicate として誤 reject される regression test
+- expected failure:
+  - checked-in runtime だけが bare `github_issue_number` uniqueness に留まる
+
+###### Green
+- minimum implementation:
+  - checked-in `create_node.py` を provider-side runtime と同じ repo-aware uniqueness 契約へ refresh する
+- pass condition:
+  - checked-in runtime の cross-repo overlap import regression test が通る
+
+###### Refactor
+- cleanup target:
+  - checked-in/provider 差分のうち本 step に不要な churn を持ち込まない
+- invariants to keep green:
+  - provider-side source of truth は変更しない
+
+##### I2 — checked-in sync snapshot parity
+- slice goal:
+  - checked-in `sync_state.py` が current/foreign same-number coexistence で snapshot を混線させない
+
+###### Red
+- failing test:
+  - checked-in runtime で current repo issue `#123` と foreign issue `other/repo#123` が共存すると、`sync --github` で foreign snapshot が current repo node に混入する regression test
+- expected failure:
+  - checked-in runtime だけが bare `issue_number` key の snapshot 集約に留まる
+
+###### Green
+- minimum implementation:
+  - checked-in `sync_state.py` を provider-side runtime と同じ repo-aware snapshot 集約 / current-repo-first 契約へ refresh する
+- pass condition:
+  - checked-in runtime の same-number coexistence sync regression test が通る
+
+###### Refactor
+- cleanup target:
+  - checked-in runtime parity 対象を review 指摘の 2 file と必要最小 tests に閉じる
+- invariants to keep green:
+  - checked-in runtime の command surface 既存回帰を壊さない
+
+#### step gate
+- review:
+  - checked-in runtime parity drift が provider-side contract と同じ意味で閉じている
+- expected tests:
+  - checked-in runtime import uniqueness regression
+  - checked-in runtime sync snapshot coexistence regression
+  - 既存 checked-in runtime smoke の non-regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S90F` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S99 — final diff review quality gate
 - branch diff scope:

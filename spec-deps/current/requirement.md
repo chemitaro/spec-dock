@@ -264,12 +264,13 @@ ID: "issue-28-runtime-regression-bugs"
 ### AC-010 dogfooding runtime parity
 
 - Given:
-  - provider-side shipped runtime に `doctor` や explicit target flags などの新 command surface が追加されている
+  - provider-side shipped runtime に `doctor` や explicit target flags などの新 command surface、または repo-scoped GitHub linkage/snapshot handling の修正が追加されている
 - When:
   - この repo の checked-in dogfooding workspace `spec-dock/scripts/spec-dock` を実行する
 - Then:
   - checked-in consumer runtime でも同じ command surface が利用できる
   - create failure message から案内される `spec doctor` がこの repo 上で実際に起動できる
+  - current repo issue `#123` と foreign repo issue `other/repo#123` のような same-number coexistence でも、checked-in consumer runtime が provider-side runtime と同じ repo-aware uniqueness / snapshot resolution を示す
 
 ### AC-011 current repo slug parity across github-aware commands
 

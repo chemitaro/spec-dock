@@ -13,14 +13,16 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
-- 2026-03-19 R7/R8/R9 corrective patch を完了し、追加 review 指摘に対する corrective scope は `S05F` / `S04F` ともに完了した
+- 2026-03-19 R7/R8/R9 corrective patch を完了した
+- 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
 - `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
 - `S90 docs impact resolution` を完了
-- `S99 final diff review quality gate` は R7/R8/R9 corrective scope 完了後に再実施する
+- `S90F checked-in dogfooding runtime parity` は open corrective scope として追加した
+- `S99 final diff review quality gate` は `S90F` 完了後に再実施する
 - `S01` から `S05` まで implementation review と QA review を通過
 - docs/spec review は corrective scope 反映後に `pass`
 - broad final suite 262 tests を通過
@@ -34,6 +36,7 @@ ID: "issue-28-runtime-regression-bugs"
 - PR #29 の Codex review 2 件は妥当と判断し、follow-up corrective patch を追加で実施した
 - corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
 - PR #29 の追加 Codex review 3 件は妥当と判断し、current repo slug parity と domain/application validation boundary の corrective patch を追加で実施した
+- PR #29 の最新 Codex review 2 件は妥当と判断し、checked-in dogfooding runtime の repo-aware parity drift を corrective scope として追加した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -427,10 +430,11 @@ ID: "issue-28-runtime-regression-bugs"
 - `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
 - manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
 - comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
-- PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`dogfooding runtime parity`、`foreign linkage uniqueness`、`active entrypoint rebuild` は corrective patch で解消済み
+- PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`foreign linkage uniqueness`、`active entrypoint rebuild` は corrective patch で解消済み
+- checked-in dogfooding runtime の repo-aware parity drift は `S90F` open corrective scope として継続中
 
 ## 次アクション
-- issue-28 は `S05F` / `S04F` の corrective scope 完了まで継続中として扱う
-- `sev-3` は checked-in dogfooding workspace では解消した。installer/`uvx` 経由の generated runtime surface 差分が再度観測される場合だけ follow-up として切り分ける
+- issue-28 は `S90F` の corrective scope 完了まで継続中として扱う
+- `sev-3` のうち checked-in runtime command surface は解消済みだが、repo-aware import/sync parity は `S90F` で閉じる
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
 - PR #29 を再pushし、Codex review / PR checks を再監視する
