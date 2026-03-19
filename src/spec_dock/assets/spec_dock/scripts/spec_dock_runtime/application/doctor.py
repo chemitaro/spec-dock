@@ -10,6 +10,7 @@ from ..infra.contracts import ActiveManifestEntry, StoredMetaRecord
 from . import create_node as app_create_node
 from .contracts import DoctorFinding, DoctorRequest, DoctorResult
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -40,29 +41,6 @@ def _resolve_specdock_dir(ports: Ports) -> Path:
 def _append_unique(values: list[str], value: str) -> None:
     if value not in values:
         values.append(value)
-
-
-def _normalize_repo_slug_value(slug: str | None) -> str | None:
-    text = str(slug or "").strip().lower()
-    if not text:
-        return None
-    owner, sep, repo = text.partition("/")
-    if not sep or not owner or not repo:
-        return None
-    return f"{owner}/{repo}"
-
-
-def _resolve_current_repo_slug(ports: Ports) -> str | None:
-    if ports.git_gateway is None or ports.repo_root is None:
-        return None
-    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
-    if not callable(resolver):
-        return None
-    try:
-        raw = resolver(ports.repo_root)
-    except RuntimeError:
-        return None
-    return _normalize_repo_slug_value(raw)
 
 
 def _finding_from_error(error_message: str) -> DoctorFinding:
@@ -314,7 +292,7 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
                 graph,
                 issue_depends_on_map=None,
                 repo_root=ports.repo_root,
-                current_repo_slug=_resolve_current_repo_slug(ports),
+                current_repo_slug=resolve_current_repo_slug(ports),
             )
         except RuntimeError as error:
             findings.append(_finding_from_error(str(error)))

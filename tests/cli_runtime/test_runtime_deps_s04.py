@@ -257,6 +257,15 @@ class _StubActiveStateStore:
         return self.issue_id
 
 
+class _StubGitGateway:
+    def __init__(self, repo_slug: str | None):
+        self.repo_slug = repo_slug
+
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return self.repo_slug
+
+
 class TestRuntimeDepsS04(unittest.TestCase):
     def test_status_context_source_selection(self) -> None:
         (
@@ -480,6 +489,167 @@ class TestRuntimeDepsS04(unittest.TestCase):
         self.assertFalse(status.stale)
         self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
         self.assertNotIn("gh_index_incomplete", result.warnings)
+
+    def test_check_deps_github_uses_current_repo_slug_for_unscoped_current_issue_and_keeps_foreign_same_number(self) -> None:
+        (
+            _runtime_app,
+            app_check_deps,
+            app_contracts,
+            app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            domain_models,
+            infra_contracts,
+            _presentation_cli_text,
+            presentation_json_state,
+        ) = _runtime_modules()
+        records = [
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-local-00001",
+                title="Auth Platform",
+                slug="auth-platform",
+                path="spec-dock/initiatives/init-local-00001-auth-platform",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-local-00001",
+                title="JWT Auth",
+                slug="jwt-auth",
+                path="spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-local-00001",
+                title="Current unscoped #123",
+                slug="current-unscoped-123",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00001-current-unscoped-123"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+                meta_path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00001-current-unscoped-123/.meta.json"
+                ),
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-local-00002",
+                title="Foreign #123",
+                slug="foreign-123",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00002-foreign-123"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+                meta_path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00002-foreign-123/.meta.json"
+                ),
+                github_repo_owner="other",
+                github_repo_name="repo",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-local-00003",
+                title="Target",
+                slug="target",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00003-target"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+                meta_path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00003-target/.meta.json"
+                ),
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            snapshots=[
+                domain_models.IssueSnapshot(
+                    issue_number=123,
+                    state="OPEN",
+                    title="Current #123",
+                    labels=[],
+                    updated_at="2026-03-19T00:00:00Z",
+                    url="https://github.com/current/repo/issues/123",
+                    repo_owner="current",
+                    repo_name="repo",
+                )
+            ],
+            foreign_snapshots={
+                ("other/repo", 123): domain_models.IssueSnapshot(
+                    issue_number=123,
+                    state="CLOSED",
+                    title="Foreign #123",
+                    labels=[],
+                    updated_at="2026-03-19T00:01:00Z",
+                    url="https://github.com/other/repo/issues/123",
+                    repo_owner="other",
+                    repo_name="repo",
+                )
+            },
+        )
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(records),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            derived_state_reader=_StubDerivedStateReader({}),
+            issue_gateway=issue_gateway,
+            active_state_store=_StubActiveStateStore(None),
+            deps_topology_reader=_StubDepsTopologyReader(
+                {
+                    "iss-local-00001": [],
+                    "iss-local-00002": [],
+                    "iss-local-00003": ["iss-local-00001", "iss-local-00002"],
+                }
+            ),
+            git_gateway=_StubGitGateway("current/repo"),
+        )
+        result = app_check_deps.check_deps(
+            app_contracts.CheckDepsRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00003", github_issue_number=None),
+                use_github=True,
+                issue_limit=10000,
+            ),
+            ports,
+        )
+        self.assertFalse(result.inspection.evaluation.ready)
+        self.assertEqual(result.inspection.evaluation.guard_reason, "blocked")
+        self.assertEqual(result.inspection.evaluation.blockers, ["iss-local-00001"])
+        self.assertEqual(issue_gateway.view_calls, [("/repo", 123, "other/repo")])
+        self.assertEqual(result.warnings, [])
+
+        payload = json.loads(presentation_json_state.render_deps_check_json(result))
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["blockers"], ["iss-local-00001"])
+        self.assertEqual(payload["nodes"]["iss-local-00001"]["state"], "ready")
+        self.assertEqual(payload["nodes"]["iss-local-00001"]["source"], "github")
+        self.assertEqual(payload["nodes"]["iss-local-00001"]["effective_status"], "open")
+        self.assertEqual(payload["nodes"]["iss-local-00002"]["state"], "done")
+        self.assertEqual(payload["nodes"]["iss-local-00002"]["source"], "github")
+        self.assertEqual(payload["nodes"]["iss-local-00002"]["effective_status"], "done")
 
     def test_validate_tree_reconnects_topology_provider(self) -> None:
         (

@@ -362,6 +362,19 @@ ID: "issue-28-runtime-regression-bugs"
     - `AC-011` は `S05F` 完了まで未達
     - `AC-012` は `S04F` 完了まで未達
     - この corrective scope が完了するまで issue-28 は close しない
+- S05F current repo slug parity:
+  - 実装:
+    - `set_active --github` と `deps check --github` に current repo slug 解決を追加し、status resolution へ伝播するよう修正した
+    - `sync` / `doctor` / `validate_tree` も同じ application helper を使う形へ寄せ、current repo slug 文脈の drift を抑えた
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04`
+    - 結果: `Ran 16 tests` / `OK`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_validate_s02`
+    - 結果: `Ran 40 tests` / `OK`
+  - review status:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review: reviewer 応答が不安定のため再試行中
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
