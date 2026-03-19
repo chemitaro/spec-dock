@@ -13,6 +13,7 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
+- 2026-03-20 latest GitHub/Codex review と fresh whole-diff review で見つかった checked-in runtime parity drift に対し、corrective scope `S90G` を追加した
 - 2026-03-20 fresh whole-diff review で見つかった import create transaction 漏れに対し、corrective scope `S01H` を追加した
 - 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
@@ -48,9 +49,42 @@ ID: "issue-28-runtime-regression-bugs"
 - `S05H` では same-repo URL-linked issue の indexed fetch dedup を provider/checked-in runtime の github-aware read path に揃え、targeted regression / implementation review / QA review を通過した
 - `S04H` では provider/checked-in runtime の import preflight fail-fast と checked-in executable-path artifact/precedence evidence を補完し、spec review / implementation review / QA review を通過した
 - `S01H` では provider/checked-in runtime の import path を create transaction 契約へ統合し、import/import・import/new・active-parent fallback の precheck parity を補完して、spec review / implementation review / QA review を通過した
+- `S90G` では checked-in runtime の `json_state` / `deps_reader` parity drift を補修し、checked-in executable-path regression と合わせて spec review / implementation review / QA review を通過した
 - 先行時点での `S99 final diff review pass` / `merge-ready` 判断は `S04H` 追加前の状態を含むため、最新 head に対して fresh whole-diff review を再実施する前提で superseded として扱う
 
 ## 記録
+- 2026-03-20 `S90G` corrective docs refresh:
+  - background:
+    - latest GitHub/Codex review と fresh whole-diff review で、checked-in `presentation/json_state.py` の helper parity 欠落による import post-sync crash と、checked-in `infra/deps_reader.py` の stale numeric deps resolver による repo-aware overlap drift を確認した
+  - docs:
+    - `design.md` の checked-in runtime parity 対象へ `presentation/json_state.py` と `infra/deps_reader.py` を追加した
+    - `plan.md` に `S90G checked-in parity の stale json/deps paths を閉じる` を追加した
+    - `discussions/033` と `034` に個別分析を記録した
+  - spec review:
+    - 初回 `fail`
+    - 指摘:
+      - `AC-010` が final exit contract から落ちている
+      - `S90G` が checked-in executable-path evidence を要求していない
+    - 対応:
+      - `plan.md` に `AC-010` を final exit contract へ戻し、`spec-dock/scripts/spec-dock` 実行経路の no-crash / numeric deps overlap regression を required validation として明記した
+    - 再レビュー:
+      - `pass`
+- 2026-03-20 `S90G` 実装:
+  - 実装:
+    - checked-in `presentation/json_state.py` に provider-side `_normalize_repo_slug(...)` parity を復元した
+    - checked-in `infra/deps_reader.py` を provider-side の current-repo-aware numeric deps 解決へ refresh した
+    - `tests/test_init_update.py` に checked-in executable-path の import post-sync no-crash regression と numeric deps overlap parity regression を追加した
+  - implementation review:
+    - `pass`
+  - QA review:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_post_sync_no_crash_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity`
+    - `python -m py_compile spec-dock/scripts/spec_dock_runtime/presentation/json_state.py spec-dock/scripts/spec_dock_runtime/infra/deps_reader.py tests/test_init_update.py`
+  - 結果:
+    - `Ran 3 tests in 0.996s`
+    - `OK`
+    - `py_compile: OK`
 - 2026-03-20 `S01H` corrective docs refresh:
   - background:
     - fresh whole-diff review で、`import issue` だけが create lock / post-write duplicate guard 契約の外にあり、import/import と import/new の並行実行で duplicate id / duplicate GitHub linkage を再導入しうることを確認した

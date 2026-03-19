@@ -438,6 +438,8 @@ CLI --> User : safe success or explicit failure
 - `application/create_node.py` の GitHub linkage uniqueness
 - `application/sync_state.py` の repo-aware snapshot aggregation / resolution
 - `application/import_node.py` の preflight validate 契約
+- `presentation/json_state.py` の repo-aware GitHub snapshot fallback rendering
+- `infra/deps_reader.py` の repo-aware numeric dependency resolution
 - 上記を provider-side source of truth と同じ contract へ refresh し、checked-in runtime 実行テストで固定する
 
 ### checked-in runtime parity の実行証跡
