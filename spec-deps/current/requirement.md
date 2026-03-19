@@ -220,6 +220,18 @@ ID: "issue-28-runtime-regression-bugs"
   - 少なくとも `source=cache` が露出する
   - source / stale / freshness が明示され、latest と誤認しにくい
 
+### AC-015 same-repo URL-linked sync fetch efficiency
+
+- Given:
+  - current repo の issue を canonical GitHub URL で link/import している
+  - `github_repo_owner/name` は保存されている
+- When:
+  - `sync --github` または同等の GitHub-aware 読み取りを実行する
+- Then:
+  - current repo issue が `issue_index()` ですでに取得済みなら、同じ `(repo, issue_number)` へ追加の `issue_view_snapshot()` を重ねない
+  - current repo issue が index limit などで未取得の場合だけ fallback fetch を許す
+  - foreign repo target の追加 fetch は維持され、same-repo / foreign-repo を取り違えない
+
 ### AC-006 active pathway
 
 - Given:

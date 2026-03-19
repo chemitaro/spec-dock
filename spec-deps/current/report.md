@@ -41,6 +41,8 @@ ID: "issue-28-runtime-regression-bugs"
 - PR #29 の新しい Codex review 2 件は妥当と判断し、provider-side corrective scope として `S04G stale active pathfile healing` / `S05G repo-aware numeric deps resolution` を追加した
 - `S04G` では stale active `.path` fallback の self-healing を補修し、targeted regression / implementation review / QA review を通過した
 - `S05G` では repo-aware numeric deps resolution を補修し、targeted regression / implementation review / QA review を通過した
+- PR #29 の最新 Codex review 1 件は妥当と判断し、provider-side corrective scope として `S05H same-repo URL-linked fetch dedup` を追加した
+- 先行時点での `final review pass` / `merge-ready` 判断は `S05H` 追加前の状態を指すものであり、現在は `S05H` 完了と再レビューまで superseded として扱う
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -498,7 +500,8 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- issue-28 の追加 corrective scope は `S90F` まで完了した
+- issue-28 の追加 corrective scope は `S05H same-repo URL-linked fetch dedup` が pending で、これが完了するまで PR #29 は merge-ready としない
+- `S05H` では same-repo indexed target の redundant `issue_view_snapshot()` を削減しつつ、index-incomplete fallback と foreign fetch 維持、必要なら checked-in runtime parity まで閉じる
 - `sev-3` のうち checked-in runtime 側の parity drift は command surface / repo-aware behavior ともに解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
-- PR #29 を再pushし、Codex review / PR checks を再監視する
+- `S05H` 実装後に PR #29 を再pushし、Codex review / PR checks と main 差分全体の fresh spec review を再実施する

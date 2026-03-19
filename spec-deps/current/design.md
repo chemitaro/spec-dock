@@ -202,6 +202,34 @@ ActiveSet --> IssueStatusResolution : uses
 - tests:
   - overlap 導入後も既存 numeric deps ref が current repo issue を指し続ける回帰を固定する
 
+## 2.3 indexed target dedup for same-repo URL-linked GitHub reads
+
+### 変更方針
+
+- `sync --github` は current repo 全体を `issue_index()` で先に取得し、その snapshot key `(repo_slug, issue_number)` を indexed key として保持する
+- same-repo URL-linked node でも、index に未掲載であれば fallback の `issue_view_snapshot()` を許可する
+- 逆に same-repo / same issue number が index にすでに載っている場合は、per-issue `issue_view_snapshot()` を skip する
+- この skip 判定は helper 化し、`sync_state` / `check_deps` / `set_active` の GitHub-aware read path で同じ基準を使う
+
+### 意図
+
+- same-repo URL import を foreign fetch と同列に扱ってしまうことで発生する N+1 fetch を止める
+- 単純な `repo_slug == current_repo_slug` 除外ではなく、index incomplete 時の fallback fetch を残す
+- current repo と foreign repo の混在 read でも、取得効率と repo-aware correctness を両立する
+
+### 実装境界
+
+- application:
+  - indexed snapshot key 集合を作る shared helper を追加する
+  - `sync_state` / `check_deps` / `set_active` で same-repo indexed target を skip し、missing target だけ `issue_view_snapshot()` する
+- checked-in dogfooding runtime:
+  - `spec-dock/scripts/...` に同じ helper/read path が存在する場合は parity を取る
+- tests:
+  - same-repo URL-linked issue が index 済みなら view fetch しない回帰
+  - same-repo URL-linked issue が index 未掲載なら fallback fetch する回帰
+  - mixed same-repo + foreign target でも foreign fetch が維持される回帰
+  - helper を共通利用する command parity の回帰
+
 ## 3. artifact/repair contract
 
 対象:
