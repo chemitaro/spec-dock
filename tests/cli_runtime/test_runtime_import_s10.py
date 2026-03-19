@@ -532,7 +532,95 @@ class TestRuntimeImportS10(unittest.TestCase):
             self.assertEqual(captured["active"].initiative_id, None)
             self.assertEqual(captured["active"].epic_id, None)
             self.assertEqual(captured["active"].issue_id, "iss-local-00009")
-            self.assertEqual([name for name, _path in ports.active_state_store.calls], ["load_active_manifest_no_migrate"])
+            active_manifest_calls = [name for name, _path in ports.active_state_store.calls]
+            # S01H contract: 1st read is a cheap precheck, 2nd read is lock-side final parent re-resolution.
+            self.assertEqual(
+                active_manifest_calls,
+                ["load_active_manifest_no_migrate", "load_active_manifest_no_migrate"],
+            )
+
+    def test_parent_fallback_re_resolves_inside_lock_when_parent_drifts_regression(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            records = self._base_records(infra_contracts, specdock_dir)
+            second_epic_dir = Path(records[0].path) / "epics" / "epic-local-00002-session-rotation"
+            records.append(
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00002",
+                    title="Session rotation",
+                    path=second_epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                )
+            )
+            store = _NodeStore(records)
+            manifest = self._active_manifest(
+                infra_contracts,
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+            )
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=manifest,
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+            )
+
+            captured = {"resolve_calls": 0}
+            original_resolve = app_import_node.resolve_parent_from_active
+            original_sync = app_import_node.sync_after_import
+
+            def _drifting_resolve(graph, child_kind, active):
+                del graph, active
+                self.assertEqual(child_kind, "issue")
+                captured["resolve_calls"] += 1
+                if captured["resolve_calls"] == 1:
+                    return "epic-local-00001"
+                return "epic-local-00002"
+
+            app_import_node.resolve_parent_from_active = _drifting_resolve
+            app_import_node.sync_after_import = lambda _ports: self._dummy_sync_result(app_contracts, domain_models)
+            try:
+                result = app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=777,
+                        title="Parent drift import",
+                        slug=None,
+                        parent_id=None,
+                    ),
+                    ports,
+                )
+            finally:
+                app_import_node.resolve_parent_from_active = original_resolve
+                app_import_node.sync_after_import = original_sync
+
+            self.assertEqual(captured["resolve_calls"], 2)
+            self.assertEqual(result.node.parent_id, "epic-local-00002")
+            self.assertEqual(result.node.initiative_id, "init-local-00001")
+            self.assertIn("/epic-local-00002-session-rotation/", result.node.path.as_posix())
+            self.assertEqual(
+                [name for name, _path in ports.active_state_store.calls],
+                ["load_active_manifest_no_migrate", "load_active_manifest_no_migrate"],
+            )
+            self.assertEqual(ports.issue_gateway.view_calls, [(str(specdock_dir.parent), 777, None)])
 
     def test_duplicate_guard_no_write_regression(self) -> None:
         (
