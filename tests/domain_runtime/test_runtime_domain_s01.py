@@ -127,6 +127,7 @@ class TestRuntimeDomainS01(unittest.TestCase):
             "issue parent_id mismatch: iss-local-00001 parent_id=epic-local-99999 epic_id=epic-local-00001",
             report.errors,
         )
+        self.assertFalse(any("Missing required artifact" in error for error in report.errors))
 
     def test_legacy_ids_module_delegates_to_domain(self) -> None:
         _, legacy_ids, domain_ids, _, _, _ = _runtime_modules()

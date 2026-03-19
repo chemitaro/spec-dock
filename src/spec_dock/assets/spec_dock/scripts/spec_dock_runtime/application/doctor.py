@@ -8,6 +8,7 @@ from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifestEntry, StoredMetaRecord
 from . import create_node as app_create_node
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import DoctorFinding, DoctorRequest, DoctorResult
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
@@ -299,6 +300,11 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
         else:
             if report.errors:
                 findings.append(_finding_from_error(str(report.errors[0])))
+            else:
+                try:
+                    validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+                except RuntimeError as error:
+                    findings.append(_finding_from_error(str(error)))
             for warning in report.warnings:
                 _append_unique(warnings, warning)
 

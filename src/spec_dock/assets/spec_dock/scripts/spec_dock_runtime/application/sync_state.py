@@ -20,6 +20,7 @@ from ..presentation.json_state import (
     render_tree_artifact,
 )
 from ..presentation.markdown import render_dashboard
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import (
     ActiveUpdateOutcome,
     ArtifactWriteFailure,
@@ -216,26 +217,35 @@ def collect_sync_state(
         else:
             raise RuntimeError(f"preflight validate failed: {validation.errors[0]}")
     else:
-        topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
-        issue_depends_on_map = dict(topology.issue_depends_on_map)
-        for warning in topology.warnings:
-            _append_unique(warnings, warning)
         try:
-            validate_deps_cycles(issue_depends_on_map)
-            validate_graph_and_deps(
-                graph,
-                issue_depends_on_map=issue_depends_on_map,
-                repo_root=ports.repo_root,
-                current_repo_slug=current_repo_slug,
-            )
-            effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
-            validate_deps_cycles(effective_deps_map)
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
         except RuntimeError as error:
             if req.force:
-                deps_preflight_error = str(error)
+                deps_preflight_error = f"preflight validate failed: {error}"
                 _append_unique(warnings, "deps_preflight_failed")
             else:
-                raise
+                raise RuntimeError(f"preflight validate failed: {error}")
+        else:
+            topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
+            issue_depends_on_map = dict(topology.issue_depends_on_map)
+            for warning in topology.warnings:
+                _append_unique(warnings, warning)
+            try:
+                validate_deps_cycles(issue_depends_on_map)
+                validate_graph_and_deps(
+                    graph,
+                    issue_depends_on_map=issue_depends_on_map,
+                    repo_root=ports.repo_root,
+                    current_repo_slug=current_repo_slug,
+                )
+                effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
+                validate_deps_cycles(effective_deps_map)
+            except RuntimeError as error:
+                if req.force:
+                    deps_preflight_error = str(error)
+                    _append_unique(warnings, "deps_preflight_failed")
+                else:
+                    raise
 
     issue_snapshots: list[IssueSnapshot] | None = None
     github_snapshot_by_repo_and_issue_number: dict[tuple[str, int], IssueSnapshot] = {}
