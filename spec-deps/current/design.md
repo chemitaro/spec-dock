@@ -75,6 +75,9 @@ ID: "issue-28-runtime-regression-bugs"
 - post-write duplicate guard failure 時は自動 rollback しない
   - file delete を伴う rollback は second failure を招きやすいため
   - transaction failure として終了し、repair guidance を返す
+- post-write duplicate guard は full graph invariant を再検証するものではない
+  - 役割は「書いた node id が reread で materialize していること」と exact duplicate id の異常を最終境界で検知すること
+  - repo-aware GitHub linkage uniqueness などの graph 依存判定は lock 内の pre-write uniqueness 再検証で担保する
 
 ### 構造
 
