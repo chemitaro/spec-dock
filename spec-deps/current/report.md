@@ -13,6 +13,7 @@ ID: "issue-28-runtime-regression-bugs"
 # issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
 
 ## 実施サマリー
+- 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -44,8 +45,43 @@ ID: "issue-28-runtime-regression-bugs"
 - PR #29 の最新 Codex review 1 件は妥当と判断し、provider-side corrective scope として `S05H same-repo URL-linked fetch dedup` を追加した
 - 先行時点での `final review pass` / `merge-ready` 判断は `S05H` 追加前の状態を指すものであり、現在は `S05H` 完了と再レビューまで superseded として扱う
 - `S05H` では same-repo URL-linked issue の indexed fetch dedup を provider/checked-in runtime の github-aware read path に揃え、targeted regression / implementation review / QA review を通過した
+- `S04H` では provider/checked-in runtime の import preflight fail-fast と checked-in executable-path artifact/precedence evidence を補完し、spec review / implementation review / QA review を通過した
+- 先行時点での `S99 final diff review pass` / `merge-ready` 判断は `S04H` 追加前の状態を含むため、最新 head に対して fresh whole-diff review を再実施する前提で superseded として扱う
 
 ## 記録
+- 2026-03-20 `S04H` corrective docs refresh:
+  - background:
+    - fresh whole-diff follow-up QA で、required artifact 欠損時の `import` fail-fast 回帰が provider/checked-in ともに未保護であること、checked-in `sync --force` が generated artifact 契約まで固定されていないことを確認した
+  - docs:
+    - `design.md` に checked-in executable-path parity の必須証跡として `import` fail-fast、`sync --force` degraded artifact 出力、combined-fault structure precedence を明記した
+    - `plan.md` に corrective step `S04H import preflight と checked-in executable-path evidence を補完する` を追加した
+    - `discussions/031` に判断根拠と corrective plan を記録した
+  - spec review:
+    - 初回 `fail`
+    - 指摘:
+      - `S04H` plan が checked-in combined-fault structure precedence parity を明示 ownership していない
+    - 対応:
+      - `plan.md` に `I3 checked-in structure-error precedence parity` と step gate expected test を追加
+    - 再レビュー:
+      - `conditional_pass`
+    - 追加対応:
+      - `discussions/031` を updated plan/design に合わせて precedence parity を含む decision record へ更新
+    - 最終再レビュー:
+      - `pass`
+- 2026-03-20 `S04H` 実装:
+  - 実装:
+    - provider-side `application/import_node.py` に artifact preflight を追加し、required artifact 欠損時に create 前の `preflight validate failed` で停止するよう補修した
+    - checked-in `spec-dock/scripts/.../application/import_node.py` に同じ preflight を揃えた
+    - checked-in subprocess parity test に import fail-fast / partial-write防止、`sync --force` の `.agent/index.json` / `.agent/tree.json` の `deps.valid=false` / `deps.error`、combined-fault 時の structure-error precedence を追加した
+  - implementation review:
+    - `pass`
+  - QA review:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_import.TestCliImport.test_import_fails_preflight_when_required_artifact_is_missing_without_creating_node tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_fails_fast_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_force_degrades_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing`
+  - 結果:
+    - `Ran 5 tests in 1.255s`
+    - `OK`
 - 2026-03-19 minimal corrective patch 着手:
   - scope:
     - `P1` same issue number の current(unscoped) と foreign(scoped) が共存しても sync/json snapshot lookup が混線しないこと

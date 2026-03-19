@@ -1034,6 +1034,116 @@ ID: "issue-28-runtime-regression-bugs"
 - git commit:
   - `S90F` の review と expected tests が通り、`report.md` 更新後にコミットする
 
+### S04H — import preflight と checked-in executable-path evidence を補完する
+- target:
+  - `AC-012` の application preflight 契約を `import` にも適用し、required artifact 欠損時に create 前で fail-fast させる
+  - checked-in runtime の executable-path parity で `import` fail-fast と `sync --force` degraded artifact contract を固定する
+- design refs:
+  - `requirement.md` の `AC-012 domain/application validation boundary`
+  - `design.md` の `domain/application validation boundary`
+  - `design.md` の `dogfooding runtime parity`
+- step boundary:
+  - domain validation は引き続き filesystem 非依存の構造検証に留める
+  - required artifact existence check は application preflight helper に寄せ、provider/checked-in 両 runtime の import entrypoint へ同じ契約で適用する
+
+#### B1 — provider-side import preflight closure
+- purpose:
+  - required artifact 欠損時に `import` が partial write を残さないよう provider-side runtime の fail-fast 契約を閉じる
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/...`
+
+##### I1 — import fail-fast before create
+- slice goal:
+  - `import issue <url>` が artifact 欠損時に create 前の preflight で止まり、新規 node を作らない
+
+###### Red
+- failing test:
+  - required artifact 欠損下で `import issue` を実行すると、preflight ではなく post-import sync で落ちて partial write が残る regression test
+- expected failure:
+  - domain validation だけでは artifact 欠損を捕まえられず create が先に進む
+
+###### Green
+- minimum implementation:
+  - provider-side `import_node.py` で application artifact preflight を create 前に実行する
+- pass condition:
+  - import preflight failure 時に `preflight validate failed` で止まり、新規 node が作成されない regression test が通る
+
+###### Refactor
+- cleanup target:
+  - preflight helper 呼び出しを既存 validate/sync/doctor 契約と揃える
+- invariants to keep green:
+  - structure error 優先順序を壊さない
+
+#### B2 — checked-in runtime executable-path evidence closure
+- purpose:
+  - checked-in consumer runtime の executable-path parity を import fail-fast、sync degraded artifact contract、structure-error precedence まで閉じる
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/test_init_update.py`
+
+##### I1 — checked-in import preflight parity
+- slice goal:
+  - checked-in `spec-dock/scripts/spec-dock import issue ...` でも artifact 欠損時に create 前で fail-fast する
+
+###### Red
+- failing test:
+  - checked-in runtime で required artifact を欠損させた状態の `import issue <url>` が新規 issue node を残してから失敗する subprocess regression test
+- expected failure:
+  - checked-in runtime の import path に artifact preflight がなく partial write を残しうる
+
+###### Green
+- minimum implementation:
+  - checked-in `import_node.py` に provider-side と同じ application preflight を適用する
+- pass condition:
+  - checked-in runtime subprocess test が `preflight validate failed` と `新規 node 未作成` を確認して通る
+
+##### I2 — checked-in sync --force artifact output parity
+- slice goal:
+  - checked-in `sync --force` が warning degradation 時も generated artifact 契約を保持する
+
+###### Red
+- failing test:
+  - checked-in runtime subprocess の `sync --force` が stderr だけ warning し、`.agent/index.json` / `.agent/tree.json` の `deps.valid=false` / `deps.error` を壊しても検知されない regression test
+- expected failure:
+  - executable-path parity がログ文言だけに依存し、generated artifact 契約の崩れを見逃す
+
+###### Green
+- minimum implementation:
+  - subprocess parity test で degraded sync 後の generated artifact を読み、`deps.valid=false` と `deps.error` を固定する
+- pass condition:
+  - checked-in runtime subprocess `sync --force` parity regression test が通る
+
+##### I3 — checked-in structure-error precedence parity
+- slice goal:
+  - checked-in `validate` / `doctor` / `sync` が structure error と artifact 欠損の同時発生時に structure error を優先する
+
+###### Red
+- failing test:
+  - checked-in runtime subprocess で structure error と artifact 欠損を同時に作ると、artifact error が先に出て structure corruption を隠す regression test
+- expected failure:
+  - executable-path parity が combined-fault precedence を固定しておらず、artifact preflight の適用位置変更で priority が逆転しても検知できない
+
+###### Green
+- minimum implementation:
+  - checked-in subprocess parity test で `validate` / `doctor` / `sync` の structure-error precedence を明示固定する
+- pass condition:
+  - combined-fault subprocess regression が通り、`Missing required artifact` より構造エラーを優先して返す
+
+#### step gate
+- review:
+  - provider/checked-in 両 runtime で import preflight と degraded sync artifact contract が `AC-012` に整合している
+- expected tests:
+  - provider-side import missing-artifact fail-fast regression
+  - checked-in runtime import missing-artifact subprocess regression
+  - checked-in runtime `sync --force` degraded artifact output regression
+  - checked-in runtime combined-fault structure precedence regression
+  - 既存 validation boundary non-regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04H` の review と expected tests が通り、`report.md` 更新後にコミットする
+
 ### S99 — final diff review quality gate
 - branch diff scope:
   - `fix/issue-28-runtime-regression-bugs` の差分全体

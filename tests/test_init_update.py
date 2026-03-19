@@ -1534,6 +1534,19 @@ with tempfile.TemporaryDirectory() as td:
         self.assertEqual(list(active_dir.iterdir()), [])
         return active_dir
 
+    def _overlay_checked_in_dogfooding_runtime(self, target: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        checked_in_scripts_dir = repo_root / "spec-dock" / "scripts"
+        target_scripts_dir = target / "spec-dock" / "scripts"
+        self.assertTrue(checked_in_scripts_dir.is_dir(), f"checked-in scripts dir missing: {checked_in_scripts_dir}")
+        self.assertTrue(target_scripts_dir.is_dir(), f"target scripts dir missing: {target_scripts_dir}")
+
+        target_runtime_dir = target_scripts_dir / "spec_dock_runtime"
+        if target_runtime_dir.exists():
+            shutil.rmtree(target_runtime_dir)
+        shutil.copytree(checked_in_scripts_dir / "spec_dock_runtime", target_runtime_dir)
+        shutil.copy2(checked_in_scripts_dir / "spec-dock", target_scripts_dir / "spec-dock")
+
     def _create_minimal_local_tree(self, target: Path) -> tuple[Path, Path, Path]:
         self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
         self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
@@ -1546,6 +1559,249 @@ with tempfile.TemporaryDirectory() as td:
         self.assertTrue((epic_dir / ".meta.json").is_file())
         self.assertTrue((issue_dir / ".meta.json").is_file())
         return initiative_dir, epic_dir, issue_dir
+
+    def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            self._create_minimal_local_tree(target)
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(
+                sync_result.returncode,
+                0,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+
+            deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001"])
+            self.assertEqual(
+                deps_result.returncode,
+                0,
+                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (deps check)", deps_result.stdout)
+
+            active_result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001"])
+            self.assertEqual(
+                active_result.returncode,
+                0,
+                msg=f"active stdout:\n{active_result.stdout}\nactive stderr:\n{active_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (active set)", active_result.stdout)
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+
+            doctor_result = self._run_runtime_capture(target, ["doctor"])
+            self.assertEqual(
+                doctor_result.returncode,
+                0,
+                msg=f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (doctor) findings=0", doctor_result.stdout)
+
+    def test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+
+            broken_epic_meta_path = epic_dir / ".meta.json"
+            broken_epic_meta = json.loads(broken_epic_meta_path.read_text(encoding="utf-8"))
+            broken_epic_meta.pop("parent_id", None)
+            self._write_json_force(broken_epic_meta_path, broken_epic_meta)
+            (initiative_dir / "report.md").chmod((initiative_dir / "report.md").stat().st_mode | 0o200)
+            (initiative_dir / "report.md").unlink()
+            (issue_dir / "design.md").chmod((issue_dir / "design.md").stat().st_mode | 0o200)
+            (issue_dir / "design.md").unlink()
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                1,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("epic missing parent_id", validate_result.stderr)
+            self.assertNotIn("Missing required artifact", validate_result.stderr)
+
+            doctor_result = self._run_runtime_capture(target, ["doctor"])
+            self.assertEqual(
+                doctor_result.returncode,
+                1,
+                msg=f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}",
+            )
+            self.assertIn("epic missing parent_id", doctor_result.stderr)
+            self.assertNotIn("Missing required artifact", doctor_result.stderr)
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(
+                sync_result.returncode,
+                1,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("epic missing parent_id", sync_result.stderr)
+            self.assertNotIn("Missing required artifact", sync_result.stderr)
+
+    def test_checked_in_dogfooding_runtime_subprocess_sync_fails_when_required_artifact_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _, _, issue_dir = self._create_minimal_local_tree(target)
+
+            (issue_dir / "report.md").chmod((issue_dir / "report.md").stat().st_mode | 0o200)
+            (issue_dir / "report.md").unlink()
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(
+                sync_result.returncode,
+                1,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("preflight validate failed: Missing required artifact", sync_result.stderr)
+            self.assertIn("report.md", sync_result.stderr)
+            self.assertNotIn("spec-dock: ok (sync)", sync_result.stdout)
+
+    def test_checked_in_dogfooding_runtime_subprocess_import_fails_fast_when_required_artifact_missing(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _, _, issue_dir = self._create_minimal_local_tree(target)
+
+            (issue_dir / "report.md").chmod((issue_dir / "report.md").stat().st_mode | 0o200)
+            (issue_dir / "report.md").unlink()
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            import_result = self._run_runtime_capture(
+                target,
+                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertEqual(
+                import_result.returncode,
+                1,
+                msg=f"import stdout:\n{import_result.stdout}\nimport stderr:\n{import_result.stderr}",
+            )
+            self.assertIn("preflight validate failed", import_result.stderr)
+            self.assertIn("Missing required artifact", import_result.stderr)
+            self.assertIn("report.md", import_result.stderr)
+            self.assertFalse(
+                (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-local-00001-auth-platform"
+                    / "epics"
+                    / "epic-local-00001-jwt-auth"
+                    / "issues"
+                    / "iss-00123-imported-issue"
+                ).exists()
+            )
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+
+    def test_checked_in_dogfooding_runtime_subprocess_sync_force_degrades_when_required_artifact_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _, _, issue_dir = self._create_minimal_local_tree(target)
+            agent_dir = target / "spec-dock" / ".agent"
+
+            (issue_dir / "report.md").chmod((issue_dir / "report.md").stat().st_mode | 0o200)
+            (issue_dir / "report.md").unlink()
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(
+                sync_result.returncode,
+                0,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("preflight validate failed", sync_result.stderr)
+            self.assertIn("report.md", sync_result.stderr)
+            self.assertTrue(
+                "deps_preflight_failed" in sync_result.stderr or "DEPS_DISABLED" in sync_result.stderr,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+
+            index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertFalse(index["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
+
+            tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertFalse(tree["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
+
+    def test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            initiative_dir, epic_dir, issue_dir = self._create_minimal_local_tree(target)
+
+            broken_epic_meta_path = epic_dir / ".meta.json"
+            broken_epic_meta = json.loads(broken_epic_meta_path.read_text(encoding="utf-8"))
+            broken_epic_meta.pop("parent_id", None)
+            self._write_json_force(broken_epic_meta_path, broken_epic_meta)
+            (initiative_dir / "report.md").chmod((initiative_dir / "report.md").stat().st_mode | 0o200)
+            (initiative_dir / "report.md").unlink()
+            (issue_dir / "design.md").chmod((issue_dir / "design.md").stat().st_mode | 0o200)
+            (issue_dir / "design.md").unlink()
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(
+                sync_result.returncode,
+                1,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("epic missing parent_id", sync_result.stderr)
+            self.assertNotIn("Missing required artifact", sync_result.stderr)
+
+    def test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _, _, issue_dir = self._create_minimal_local_tree(target)
+
+            (issue_dir / "design.md").chmod((issue_dir / "design.md").stat().st_mode | 0o200)
+            (issue_dir / "design.md").unlink()
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                1,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("Missing required artifact", validate_result.stderr)
+            self.assertIn("design.md", validate_result.stderr)
+
+            doctor_result = self._run_runtime_capture(target, ["doctor"])
+            self.assertEqual(
+                doctor_result.returncode,
+                1,
+                msg=f"doctor stdout:\n{doctor_result.stdout}\ndoctor stderr:\n{doctor_result.stderr}",
+            )
+            self.assertIn("[missing_artifact] Missing required artifact", doctor_result.stderr)
+            self.assertIn("design.md", doctor_result.stderr)
 
     def test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
