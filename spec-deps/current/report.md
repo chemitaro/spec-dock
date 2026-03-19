@@ -40,6 +40,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `S90F` では checked-in consumer runtime の import/sync/validate/doctor/active/deps parity drift を補修し、targeted regression / implementation review / QA review を通過した
 - PR #29 の新しい Codex review 2 件は妥当と判断し、provider-side corrective scope として `S04G stale active pathfile healing` / `S05G repo-aware numeric deps resolution` を追加した
 - `S04G` では stale active `.path` fallback の self-healing を補修し、targeted regression / implementation review / QA review を通過した
+- `S05G` では repo-aware numeric deps resolution を補修し、targeted regression / implementation review / QA review を通過した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -142,6 +143,28 @@ ID: "issue-28-runtime-regression-bugs"
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails`
   - 結果:
     - `Ran 4 tests in 0.580s`
+    - `OK`
+- `S05G` 実装:
+  - `infra/deps_reader.py` の bare numeric dependency ref 解決を current repo slug aware に変更し、current repo の shorthand `123` が foreign same-number linkage 共存後も current repo issue を指し続けるよう補修した
+  - current repo slug を解決できない状態で same-number の scoped/unscoped linkage が混在する場合は、cross-repo 誤束縛を避ける fail-closed error にした
+  - legacy shipped runtime `app.py` にも同等ロジックを反映し、provider 内の dependency resolution drift を防いだ
+- `S05G` implementation review:
+  - `pass`
+- `S05G` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - current repo slug が既知でも foreign scope にしか numeric target が存在しない場合の hard-failure branch を固定する回帰が不足
+  - 対応:
+    - `tests/cli_runtime/test_deps.py` に current repo known + foreign-only numeric match を reject する回帰を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds tests.cli_runtime.test_deps.TestCliDeps.test_deps_numeric_ref_prefers_current_repo_scope_when_foreign_same_number_exists tests.cli_runtime.test_deps.TestCliDeps.test_deps_numeric_ref_fail_closed_when_scope_mixed_and_current_repo_unknown tests.cli_runtime.test_deps.TestCliDeps.test_deps_numeric_ref_rejects_foreign_only_match_when_current_repo_known tests.cli_runtime.test_deps.TestCliDeps.test_deps_github_number_requires_imported_node`
+    - `python -m unittest -v tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_same_issue_number_when_repo_linkage_is_mixed_and_current_unknown tests.cli_runtime.test_validate.TestCliValidate.test_validate_allows_same_issue_number_when_current_repo_is_resolved`
+  - 結果:
+    - `Ran 5 tests in 1.475s`
+    - `OK`
+    - `Ran 2 tests in 0.488s`
     - `OK`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入

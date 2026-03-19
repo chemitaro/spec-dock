@@ -6,6 +6,7 @@ from typing import Any
 from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
 from ..domain.models import SpecGraph
 from .contracts import DepsTopologyLoadResult
+from .git_cli import origin_github_repo_slug
 from .json_store import load_json
 
 
@@ -34,7 +35,39 @@ def _load_deps_json(path: Path) -> dict[str, Any]:
     return {"schema_version": 1, "depends_on": depends_on}
 
 
-def _find_node_by_github_issue_number(graph: SpecGraph, *, issue_number: int) -> str:
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    normalized = str(slug or "").strip().lower()
+    if not normalized:
+        return None
+    owner, sep, repo = normalized.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(specdock_dir: Path) -> str | None:
+    repo_root = specdock_dir.parent
+    try:
+        raw = origin_github_repo_slug(repo_root)
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
+
+
+def _find_node_by_github_issue_number(
+    graph: SpecGraph,
+    *,
+    issue_number: int,
+    current_repo_slug: str | None = None,
+) -> str:
     matches = [
         node
         for node in graph.nodes_by_id.values()
@@ -42,19 +75,62 @@ def _find_node_by_github_issue_number(graph: SpecGraph, *, issue_number: int) ->
     ]
     if not matches:
         raise RuntimeError(f"No node found for github.issue_number={issue_number}. Create/link the node first.")
+
+    if current_repo_slug is not None:
+        current_scoped = [
+            node
+            for node in matches
+            if (_normalize_repo_slug(node.github_repo_owner, node.github_repo_name) or current_repo_slug)
+            == current_repo_slug
+        ]
+        if not current_scoped:
+            raise RuntimeError(
+                f"No node found for github.issue_number={issue_number} in current repo scope ({current_repo_slug}). "
+                "Create/link the node first."
+            )
+        if len(current_scoped) > 1:
+            ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in current_scoped))
+            raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
+        return current_scoped[0].id
+
+    has_scoped = any(_normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is not None for node in matches)
+    has_unscoped = any(_normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None for node in matches)
+    if has_scoped and has_unscoped:
+        ids = ", ".join(
+            sorted(
+                f"{node.kind}:{node.id}"
+                f"[repo={_normalize_repo_slug(node.github_repo_owner, node.github_repo_name) or '(current-or-unknown)'}]"
+                for node in matches
+            )
+        )
+        raise RuntimeError(
+            f"Ambiguous github.issue_number={issue_number}: mixed scoped/unscoped linkage (fail-closed): {ids}. "
+            "Configure current repo remote (origin) or normalize linkage scope before retrying."
+        )
+
     if len(matches) > 1:
         ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in matches))
         raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
     return matches[0].id
 
 
-def _resolve_dep_ref(graph: SpecGraph, ref: Any, *, src_path: Path) -> str:
+def _resolve_dep_ref(
+    graph: SpecGraph,
+    ref: Any,
+    *,
+    src_path: Path,
+    current_repo_slug: str | None = None,
+) -> str:
     if isinstance(ref, bool):
         raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
 
     if isinstance(ref, int):
         try:
-            return _find_node_by_github_issue_number(graph, issue_number=int(ref))
+            return _find_node_by_github_issue_number(
+                graph,
+                issue_number=int(ref),
+                current_repo_slug=current_repo_slug,
+            )
         except RuntimeError as e:
             raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
 
@@ -64,7 +140,11 @@ def _resolve_dep_ref(graph: SpecGraph, ref: Any, *, src_path: Path) -> str:
             raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
         if raw.isdigit():
             try:
-                return _find_node_by_github_issue_number(graph, issue_number=int(raw))
+                return _find_node_by_github_issue_number(
+                    graph,
+                    issue_number=int(raw),
+                    current_repo_slug=current_repo_slug,
+                )
             except RuntimeError as e:
                 raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
 
@@ -104,13 +184,26 @@ def _is_descendant(graph: SpecGraph, *, src_id: str, candidate_dep_id: str) -> b
         current_id = parent_id
 
 
-def _resolved_direct_depends_on(graph: SpecGraph, src_id: str) -> list[str]:
+def _resolved_direct_depends_on(
+    graph: SpecGraph,
+    src_id: str,
+    *,
+    current_repo_slug: str | None = None,
+) -> list[str]:
     src = graph.nodes_by_id.get(src_id)
     if src is None:
         raise RuntimeError(f"Internal error: missing node: {src_id}")
     deps_path = src.path / "deps.json"
     deps = _load_deps_json(deps_path)
-    resolved = [_resolve_dep_ref(graph, ref, src_path=deps_path) for ref in (deps.get("depends_on") or [])]
+    resolved = [
+        _resolve_dep_ref(
+            graph,
+            ref,
+            src_path=deps_path,
+            current_repo_slug=current_repo_slug,
+        )
+        for ref in (deps.get("depends_on") or [])
+    ]
     deduped = sorted(set(resolved), key=deps_node_sort_key)
     for dep_id in deduped:
         if _is_descendant(graph, src_id=src_id, candidate_dep_id=dep_id):
@@ -138,7 +231,7 @@ def _issue_ids_for_dep_node(graph: SpecGraph, node_id: str) -> list[str]:
 
 
 def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopologyLoadResult:
-    del specdock_dir
+    current_repo_slug = _resolve_current_repo_slug(specdock_dir)
     dep_node_ids = sorted(
         [node_id for node_id, node in graph.nodes_by_id.items() if node.kind in ("initiative", "epic", "issue")],
         key=deps_node_sort_key,
@@ -158,7 +251,11 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
             continue
         src_node = graph.nodes_by_id[src_id]
         deps_path = src_node.path / "deps.json"
-        direct_dep_node_ids = _resolved_direct_depends_on(graph, src_id)
+        direct_dep_node_ids = _resolved_direct_depends_on(
+            graph,
+            src_id,
+            current_repo_slug=current_repo_slug,
+        )
 
         for dep_node_id in direct_dep_node_ids:
             dep_issue_ids = _issue_ids_for_dep_node(graph, dep_node_id)
