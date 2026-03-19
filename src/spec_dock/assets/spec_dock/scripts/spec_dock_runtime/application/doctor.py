@@ -42,6 +42,29 @@ def _append_unique(values: list[str], value: str) -> None:
         values.append(value)
 
 
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(ports.repo_root)
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
+
+
 def _finding_from_error(error_message: str) -> DoctorFinding:
     if "Duplicate id detected" in error_message or "Duplicate numeric id detected" in error_message:
         return DoctorFinding(
@@ -287,7 +310,12 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     else:
         try:
             graph = build_graph([_to_spec_node_seed(record) for record in records])
-            report = validate_graph_and_deps(graph, issue_depends_on_map=None, repo_root=ports.repo_root)
+            report = validate_graph_and_deps(
+                graph,
+                issue_depends_on_map=None,
+                repo_root=ports.repo_root,
+                current_repo_slug=_resolve_current_repo_slug(ports),
+            )
         except RuntimeError as error:
             findings.append(_finding_from_error(str(error)))
         else:

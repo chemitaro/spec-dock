@@ -176,6 +176,7 @@ ActiveSet --> IssueStatusResolution : uses
   - broken meta
   - missing required artifact
   - stale active pointer
+- `doctor` が graph validation を再利用する箇所では、`validate` / `sync` と同じ current repo identity context を渡し、repo-aware uniqueness 契約と診断結果が矛盾しないようにする
 - active 未設定時は filesystem と CLI の両方で fallback 導線を統一する
   - `spec-dock/active` は常に解決可能な symlink とする
   - `active show` は fallback path と次アクションを返す

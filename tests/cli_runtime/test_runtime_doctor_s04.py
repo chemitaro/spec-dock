@@ -38,6 +38,9 @@ def _record(
     parent_id: str | None,
     initiative_id: str | None,
     epic_id: str | None,
+    github_issue_number: int | None = None,
+    github_repo_owner: str | None = None,
+    github_repo_name: str | None = None,
 ):
     return infra_contracts.StoredMetaRecord(
         kind=kind,
@@ -48,7 +51,9 @@ def _record(
         parent_id=parent_id,
         initiative_id=initiative_id,
         epic_id=epic_id,
-        github_issue_number=None,
+        github_issue_number=github_issue_number,
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
         meta_path=(path / ".meta.json").as_posix(),
     )
 
@@ -127,6 +132,15 @@ class _StubActiveStateStore:
     def load_active_manifest(self, specdock_dir):
         del specdock_dir
         return self._load_result
+
+
+class _StubGitGateway:
+    def __init__(self, origin_slug: str | None):
+        self._origin_slug = origin_slug
+
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return self._origin_slug
 
 
 class TestRuntimeDoctorS04(unittest.TestCase):
@@ -243,6 +257,48 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             self.assertIn("Duplicate id detected", result.findings[0].message)
             self.assertNotIn("Duplicate numeric id detected", result.findings[0].message)
             self.assertTrue(result.findings[0].guidance)
+
+    def test_doctor_allows_mixed_scoped_and_unscoped_github_linkage_when_current_repo_is_resolved(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            records[0] = _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                title="Auth Platform",
+                path=Path(records[0].path),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=123,
+            )
+            records[2] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="Add Refresh Token",
+                path=Path(records[2].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=123,
+                github_repo_owner="other",
+                github_repo_name="repo",
+            )
+
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                git_gateway=_StubGitGateway("example/repo"),
+            )
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.findings, [])
 
     def test_doctor_detects_broken_meta_when_reader_fails(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()

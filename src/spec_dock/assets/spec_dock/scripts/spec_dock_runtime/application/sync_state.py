@@ -83,6 +83,19 @@ def _resolve_current_repo_slug(ports: Ports) -> str | None:
     return _normalize_repo_slug_value(raw)
 
 
+def _is_safe_unscoped_snapshot(
+    snapshot: IssueSnapshot,
+    *,
+    current_repo_slug: str | None,
+) -> bool:
+    scoped_key = _snapshot_repo_issue_key(snapshot)
+    if scoped_key is None:
+        return True
+    if current_repo_slug is None:
+        return False
+    return scoped_key[0] == current_repo_slug
+
+
 def _collect_foreign_issue_targets(graph) -> list[tuple[str, int]]:
     targets: set[tuple[str, int]] = set()
     for node in graph.nodes_by_id.values():
@@ -292,6 +305,8 @@ def collect_sync_state(
         # current repo value when foreign repos share the same issue number.
         issue_snapshots = [*issue_index_snapshots, *foreign_issue_snapshots]
         for snapshot in issue_index_snapshots:
+            if not _is_safe_unscoped_snapshot(snapshot, current_repo_slug=current_repo_slug):
+                continue
             issue_number = int(snapshot.issue_number)
             unscoped_key = (None, issue_number)
             if unscoped_key not in github_snapshot_by_repo_scope_and_issue_number:

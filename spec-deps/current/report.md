@@ -338,6 +338,18 @@ ID: "issue-28-runtime-regression-bugs"
     - spec review: `pass`
     - QA review: `pass`
     - implementation review は reviewer 応答が不安定だったが、出た指摘（mixed-scope fail-closed / stale context-pack / repo-aware snapshot lookup / context-pack reality drift）はすべて反映し、再検証済み
+- PR review follow-up corrective patch (R6 doctor current repo slug):
+  - analysis:
+    - `spec-deps/current/discussions/022-disc-pr29-r6-doctor-current-repo-slug-analysis.md`
+  - finding resolution:
+    - `doctor` でも `validate` / `sync` と同じ current repo slug 解決を使い、`validate_graph_and_deps(..., current_repo_slug=...)` を渡すよう修正した
+    - current repo `#123` と foreign repo `other/repo#123` が共存する正常 graph を `doctor` が ambiguity false positive にしない回帰を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 18 tests in 0.053s` / `OK`
+  - review status:
+    - spec review: pending final response
+    - QA review: pending final response
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
