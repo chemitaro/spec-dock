@@ -27,6 +27,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `AC-012 domain/application validation boundary`
   - `AC-013 repo-aware numeric deps resolution`
   - `AC-014 stale active pathfile healing`
+  - `AC-015 same-repo URL-linked sync fetch efficiency`
 - EC:
   - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
 - 制約:
@@ -131,6 +132,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-012` -> `S04F`
 - `AC-013` -> `S05G`
 - `AC-014` -> `S04G`
+- `AC-015` -> `S05H`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -860,6 +862,90 @@ ID: "issue-28-runtime-regression-bugs"
 - git commit:
   - `S05G` の review と expected tests が通り、`report.md` 更新後にコミットする
 
+### S05H — same-repo URL-linked issue の indexed fetch dedup を github-aware read path に揃える
+- target:
+  - current repo issue を canonical URL で link/import した場合でも、index 済み target へ重複 `issue_view_snapshot()` を送らない
+  - index incomplete 時の same-repo fallback fetch は維持し、foreign target fetch は引き続き許可する
+- design refs:
+  - `design.md` の `2.3 indexed target dedup for same-repo URL-linked GitHub reads`
+  - `discussions/030-disc-pr29-r14-same-repo-url-linked-fetch-dedup-analysis.md`
+- step boundary:
+  - current repo/fallback dedup helper と、その helper を利用する github-aware read path に限定する
+  - snapshot binding / status contract 自体は `S05F` / `S05G` の契約を再利用し、今回 step では fetch selection の無駄取りに集中する
+  - checked-in dogfooding runtime に同じ helper/read path がある場合は、この step 内で parity を取る
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05H` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — indexed snapshot key による same-repo dedup helper
+- purpose:
+  - same-repo indexed target は view fetch を省略し、index missing target だけ fallback fetch する
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/presentation_runtime/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — sync same-repo indexed dedup regression
+- slice goal:
+  - same-repo URL-linked issue が index 済みのとき `sync --github` が追加 view fetch を行わないことを固定する
+
+###### Red
+- failing test:
+  - current repo issue を URL-linked で保存し、index に same `(repo_slug, issue_number)` snapshot がある状態で `collect_sync_state()` を呼ぶと `issue_view_snapshot()` が呼ばれてしまう regression test
+- expected failure:
+  - current repo target に対する redundant view fetch が発生する
+
+###### Green
+- minimum implementation:
+  - indexed snapshot key 集合を作り、same-repo indexed target は view fetch 対象から外す helper を導入する
+- pass condition:
+  - sync same-repo indexed dedup regression test が通る
+
+###### Refactor
+- cleanup target:
+  - target filtering helper を `sync_state` 以外でも再利用できる形に整理する
+- invariants to keep green:
+  - foreign target fetch は維持される
+  - same-repo target が index missing の場合は fallback fetch を維持する
+
+##### I2 — command parity regression
+- slice goal:
+  - `check_deps` / `set_active` でも同じ helper を使い、same-repo indexed target へ redundant view fetch を送らないことを固定する
+
+###### Red
+- failing test:
+  - current repo URL-linked issue + indexed snapshot がある状態で `deps check --github` / `active set --github` が extra view fetch を送る regression test
+- expected failure:
+  - github-aware read path ごとに fetch selection drift が発生する
+
+###### Green
+- minimum implementation:
+  - same helper を `check_deps` / `set_active` に適用し、indexed target skip を揃える
+- pass condition:
+  - command parity regression test が通る
+
+###### Refactor
+- cleanup target:
+  - helper の責務と naming を整理し、repo-aware status resolution helper 群と整合させる
+- invariants to keep green:
+  - current repo binding correctness を変えない
+  - index incomplete fallback は維持する
+
+#### step gate
+- review:
+  - same-repo indexed target skip と index-incomplete fallback の両立を説明できる
+- expected tests:
+  - sync same-repo indexed dedup regression
+  - sync same-repo index-missing fallback regression
+  - mixed same-repo + foreign target で foreign fetch 維持 regression
+  - `deps check --github` / `active set --github` parity regression
+  - checked-in dogfooding runtime parity regression または executable smoke
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05H` の review と expected tests が通り、`report.md` 更新後にコミットする
+
 ### S90 — docs impact resolution / docs refresh
 - 対象:
   - docs / assets / workflow / help text / dogfooding confirmation
@@ -969,7 +1055,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ## final exit contract
 - AC/EC 達成:
-  - `AC-001` から `AC-009` が対応 step の review/QA 付きで満たされている
+  - `AC-001` から `AC-009`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015` が対応 step の review/QA 付きで満たされている
   - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
 - docs impact resolved:
   - provider-side docs と dogfooding 確認が完了し、`report.md` に判断と結果が残っている
