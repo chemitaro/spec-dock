@@ -29,6 +29,11 @@ from .contracts import (
     SyncRequest,
     SyncStateResult,
 )
+from .github_issue_targets import (
+    collect_repo_scoped_issue_view_targets,
+    normalize_repo_slug,
+    snapshot_repo_issue_key,
+)
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .set_active import build_active_manifest, commit_active_state
@@ -47,44 +52,17 @@ def _append_unique(values: list[str], value: str) -> None:
         values.append(value)
 
 
-def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
-    normalized_owner = str(owner or "").strip().lower()
-    normalized_repo = str(repo or "").strip().lower()
-    if not normalized_owner or not normalized_repo:
-        return None
-    return f"{normalized_owner}/{normalized_repo}"
-
-
-def _snapshot_repo_issue_key(snapshot: IssueSnapshot) -> tuple[str, int] | None:
-    repo_slug = _normalize_repo_slug(snapshot.repo_owner, snapshot.repo_name)
-    if repo_slug is None:
-        return None
-    return (repo_slug, int(snapshot.issue_number))
-
-
 def _is_safe_unscoped_snapshot(
     snapshot: IssueSnapshot,
     *,
     current_repo_slug: str | None,
 ) -> bool:
-    scoped_key = _snapshot_repo_issue_key(snapshot)
+    scoped_key = snapshot_repo_issue_key(snapshot)
     if scoped_key is None:
         return True
     if current_repo_slug is None:
         return False
     return scoped_key[0] == current_repo_slug
-
-
-def _collect_foreign_issue_targets(graph) -> list[tuple[str, int]]:
-    targets: set[tuple[str, int]] = set()
-    for node in graph.nodes_by_id.values():
-        if node.kind not in ("initiative", "epic", "issue") or node.github_issue_number is None:
-            continue
-        repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
-        if repo_slug is None:
-            continue
-        targets.add((repo_slug, int(node.github_issue_number)))
-    return sorted(targets, key=lambda item: (item[0], item[1]))
 
 
 def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
@@ -270,15 +248,18 @@ def collect_sync_state(
                     for node in graph.nodes_by_id.values()
                     if node.kind == "issue"
                     and node.github_issue_number is not None
-                    and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+                    and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
                 }
             )
             indexed_numbers = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [num for num in linked_numbers if num not in indexed_numbers]
             if missing:
                 _append_unique(warnings, "gh_index_incomplete")
-        foreign_targets = _collect_foreign_issue_targets(graph)
-        for repo_slug, issue_number in foreign_targets:
+        repo_scoped_targets = collect_repo_scoped_issue_view_targets(
+            graph,
+            issue_index_snapshots=issue_index_snapshots,
+        )
+        for repo_slug, issue_number in repo_scoped_targets:
             try:
                 snapshot = ports.issue_gateway.issue_view_snapshot(
                     ports.repo_root,
@@ -301,7 +282,7 @@ def collect_sync_state(
                 github_snapshot_by_repo_scope_and_issue_number[unscoped_key] = snapshot
 
         for snapshot in issue_snapshots:
-            scoped_key = _snapshot_repo_issue_key(snapshot)
+            scoped_key = snapshot_repo_issue_key(snapshot)
             if scoped_key is not None:
                 if scoped_key not in github_snapshot_by_repo_and_issue_number:
                     github_snapshot_by_repo_and_issue_number[scoped_key] = snapshot

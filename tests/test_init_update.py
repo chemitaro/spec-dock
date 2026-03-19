@@ -587,10 +587,12 @@ class _StubIssueGateway:
     def __init__(self, snapshots, foreign_snapshots):
         self._snapshots = list(snapshots)
         self._foreign_snapshots = dict(foreign_snapshots)
+        self.view_calls = []
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         return list(self._snapshots)
     def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
         key = (str(repo_slug or ""), int(issue_number))
         return self._foreign_snapshots[key]
 
@@ -652,6 +654,8 @@ with tempfile.TemporaryDirectory() as td:
             initiative_id="init-local-00001",
             epic_id="epic-local-00001",
             github_issue_number=301,
+            github_repo_owner="current",
+            github_repo_name="repo",
         ),
         _record(
             kind="issue",
@@ -793,10 +797,12 @@ class _StubIssueGateway:
     def __init__(self, snapshots, foreign_snapshots):
         self._snapshots = list(snapshots)
         self._foreign_snapshots = dict(foreign_snapshots)
+        self.view_calls = []
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         return list(self._snapshots)
     def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
         key = (str(repo_slug or ""), int(issue_number))
         return self._foreign_snapshots[key]
 
@@ -858,6 +864,8 @@ with tempfile.TemporaryDirectory() as td:
             initiative_id="init-local-00001",
             epic_id="epic-local-00001",
             github_issue_number=301,
+            github_repo_owner="current",
+            github_repo_name="repo",
         ),
         _record(
             kind="issue",
@@ -933,6 +941,211 @@ with tempfile.TemporaryDirectory() as td:
     assert current_status.effective_status == "open"
     assert deps_result.inspection.evaluation.ready is True
     assert deps_result.inspection.evaluation.guard_reason == "ready"
+    assert len(issue_gateway.view_calls) == 2
+    assert all(call[2] == "other/repo" for call in issue_gateway.view_calls)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
+    def test_checked_in_dogfooding_runtime_keeps_same_repo_index_missing_view_fallback_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import check_deps as app_check_deps
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.application import set_active as app_set_active
+    from spec_dock_runtime.domain import models as domain_models
+    from spec_dock_runtime.infra import contracts as infra_contracts
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number, github_repo_owner=None, github_repo_name=None):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
+    )
+
+class _StubNodeReader:
+    def __init__(self, records):
+        self._records = list(records)
+    def load_node_records(self):
+        return list(self._records)
+
+class _StubDepsTopologyReader:
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return infra_contracts.DepsTopologyLoadResult(
+            issue_depends_on_map={{"iss-local-00001": [], "iss-local-00002": ["iss-local-00001"]}},
+            warnings=[],
+        )
+
+class _StubDerivedStateReader:
+    def load_cached_issue_status_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{"iss-local-00001": "open", "iss-local-00002": "open"}}
+    def load_cached_issue_last_sync_at_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+
+class _StubIssueGateway:
+    def __init__(self, snapshots, foreign_snapshots):
+        self._snapshots = list(snapshots)
+        self._foreign_snapshots = dict(foreign_snapshots)
+        self.view_calls = []
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return list(self._snapshots)
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
+        key = (str(repo_slug or ""), int(issue_number))
+        return self._foreign_snapshots[key]
+
+class _StubActiveStateStore:
+    def load_active_manifest(self, specdock_dir):
+        del specdock_dir
+        return infra_contracts.ActiveManifestLoadResult(manifest=None, source="none", warnings=[])
+    def load_active_issue_id(self, specdock_dir):
+        del specdock_dir
+        return None
+    def snapshot_current_state(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+    def write_active_manifest(self, specdock_dir, manifest):
+        del specdock_dir
+        return manifest
+    def apply_active_pointers(self, specdock_dir, manifest, context_pack_text):
+        del specdock_dir, manifest, context_pack_text
+    def patch_agent_state_active_fields(self, specdock_dir, manifest):
+        del specdock_dir, manifest
+    def rollback_to_snapshot(self, specdock_dir, snapshot):
+        del specdock_dir, snapshot
+
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    records = [
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Platform",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform",
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        _record(
+            kind="epic",
+            node_id="epic-local-00001",
+            title="Delivery",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery",
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        _record(
+            kind="issue",
+            node_id="iss-local-00001",
+            title="Current Repo Scoped",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery" / "issues" / "iss-local-00001-current-repo-scoped",
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=301,
+            github_repo_owner="current",
+            github_repo_name="repo",
+        ),
+        _record(
+            kind="issue",
+            node_id="iss-local-00002",
+            title="Target",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery" / "issues" / "iss-local-00002-target",
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=None,
+        ),
+    ]
+    issue_gateway = _StubIssueGateway(
+        snapshots=[],
+        foreign_snapshots={{
+            ("current/repo", 301): domain_models.IssueSnapshot(
+                issue_number=301,
+                state="CLOSED",
+                title="Current repo #301",
+                labels=["done"],
+                updated_at="2026-03-19T00:00:00Z",
+                url="https://github.com/current/repo/issues/301",
+                repo_owner="current",
+                repo_name="repo",
+            )
+        }},
+    )
+    ports = app_ports.Ports(
+        node_reader=_StubNodeReader(records),
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+        deps_topology_reader=_StubDepsTopologyReader(),
+        derived_state_reader=_StubDerivedStateReader(),
+        issue_gateway=issue_gateway,
+        active_state_store=_StubActiveStateStore(),
+        git_gateway=_StubGitGateway(),
+    )
+
+    set_result = app_set_active.set_active(
+        app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None),
+            force=False,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        ),
+        ports,
+    )
+    assert set_result.selection.issue_id == "iss-local-00001"
+
+    deps_result = app_check_deps.check_deps(
+        app_contracts.CheckDepsRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00002", github_issue_number=None),
+            use_github=True,
+            issue_limit=10000,
+        ),
+        ports,
+    )
+    assert deps_result.inspection.evaluation.ready is True
+    dep_status = deps_result.inspection.issue_statuses["iss-local-00001"]
+    assert dep_status.source == "github"
+    assert dep_status.effective_status == "done"
+    assert len(issue_gateway.view_calls) == 2
+    assert all(call[2] == "current/repo" for call in issue_gateway.view_calls)
 """
         result = subprocess.run(
             [sys.executable, "-c", check_code],

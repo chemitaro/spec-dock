@@ -19,6 +19,7 @@ from .contracts import (
     ShowActiveRequest,
     TargetRef,
 )
+from .github_issue_targets import collect_repo_scoped_issue_view_targets
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .status_context import resolve_issue_status_context
@@ -134,26 +135,6 @@ def _to_active_selection(manifest: ActiveManifest | None) -> ActiveSelection | N
 def _append_unique(warnings: list[str], warning: str) -> None:
     if warning not in warnings:
         warnings.append(warning)
-
-
-def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
-    normalized_owner = str(owner or "").strip().lower()
-    normalized_repo = str(repo or "").strip().lower()
-    if not normalized_owner or not normalized_repo:
-        return None
-    return f"{normalized_owner}/{normalized_repo}"
-
-
-def _collect_foreign_issue_targets(graph: SpecGraph) -> list[tuple[str, int]]:
-    targets: set[tuple[str, int]] = set()
-    for node in graph.nodes_by_id.values():
-        if node.kind not in ("initiative", "epic", "issue") or node.github_issue_number is None:
-            continue
-        repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
-        if repo_slug is None:
-            continue
-        targets.add((repo_slug, int(node.github_issue_number)))
-    return sorted(targets, key=lambda item: (item[0], item[1]))
 
 
 def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
@@ -359,7 +340,11 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
             _append_unique(warnings, "gh_fetch_failed")
         else:
             issue_snapshots.extend(issue_index_snapshots)
-        for repo_slug, issue_number in _collect_foreign_issue_targets(graph):
+        repo_scoped_targets = collect_repo_scoped_issue_view_targets(
+            graph,
+            issue_index_snapshots=issue_index_snapshots,
+        )
+        for repo_slug, issue_number in repo_scoped_targets:
             try:
                 snapshot = ports.issue_gateway.issue_view_snapshot(
                     _resolve_repo_root(ports),

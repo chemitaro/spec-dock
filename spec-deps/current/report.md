@@ -43,6 +43,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `S05G` では repo-aware numeric deps resolution を補修し、targeted regression / implementation review / QA review を通過した
 - PR #29 の最新 Codex review 1 件は妥当と判断し、provider-side corrective scope として `S05H same-repo URL-linked fetch dedup` を追加した
 - 先行時点での `final review pass` / `merge-ready` 判断は `S05H` 追加前の状態を指すものであり、現在は `S05H` 完了と再レビューまで superseded として扱う
+- `S05H` では same-repo URL-linked issue の indexed fetch dedup を provider/checked-in runtime の github-aware read path に揃え、targeted regression / implementation review / QA review を通過した
 
 ## 記録
 - 2026-03-19 minimal corrective patch 着手:
@@ -167,6 +168,27 @@ ID: "issue-28-runtime-regression-bugs"
     - `Ran 5 tests in 1.475s`
     - `OK`
     - `Ran 2 tests in 0.488s`
+    - `OK`
+- `S05H` 実装:
+  - provider-side runtime に `github_issue_targets.py` を追加し、`issue_index()` 済みの `(repo_slug, issue_number)` を基準に same-repo indexed target の redundant `issue_view_snapshot()` を skip する helper を導入した
+  - `sync_state` / `check_deps` / `set_active` の github-aware read path をこの helper に統一し、same-repo index-missing fallback と foreign fetch 維持を両立するよう補修した
+  - checked-in dogfooding runtime `spec-dock/scripts/...` にも同じ helper/read path parity を反映した
+- `S05H` implementation review:
+  - `pass`
+- `S05H` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - `check_deps` / `set_active` と checked-in parity で same-repo index-missing fallback 回帰が不足
+  - 対応:
+    - `tests/cli_runtime/test_runtime_deps_s04.py` と `tests/cli_runtime/test_runtime_active_s06.py` に same-repo index-missing fallback regression を追加
+    - `tests/test_init_update.py` に checked-in dogfooding runtime の same-repo index-missing fallback parity regression を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_same_repo_index_missing_view_fallback_parity`
+    - `python -m py_compile tests/test_init_update.py`
+  - 結果:
+    - `Ran 41 tests in 0.178s`
     - `OK`
 - `S01` 実装:
   - `new initiative|epic|issue` の create に repo-level lock を導入
