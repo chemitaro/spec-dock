@@ -20,6 +20,7 @@ from .contracts import (
     TargetRef,
 )
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .status_context import resolve_issue_status_context
 
 
@@ -325,6 +326,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if not records:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
     graph = build_graph([_to_spec_node_seed(record) for record in records])
+    current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
     warnings: list[str] = []
 
@@ -381,6 +383,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=current_repo_slug,
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)

@@ -19,6 +19,7 @@ def resolve_issue_status_context(
     issue_snapshots: list[IssueSnapshot] | None,
     cached_issue_status_by_id: dict[str, str],
     cached_issue_last_sync_at_by_id: dict[str, str | None] | None = None,
+    current_repo_slug: str | None = None,
 ) -> IssueStatusContext:
     warnings: list[str] = []
     issue_statuses = resolve_issue_statuses(
@@ -27,5 +28,6 @@ def resolve_issue_status_context(
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=current_repo_slug,
     )
     return IssueStatusContext(issue_statuses=issue_statuses, warnings=warnings)

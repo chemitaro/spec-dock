@@ -214,7 +214,10 @@ class SyncStateResult:
     deps_preflight_error: str | None
     repo_root: Path | None = None
     issue_depends_on_map: dict[str, list[str]] = field(default_factory=dict)
-    github_snapshot_by_issue_number: dict[int, IssueSnapshot] = field(default_factory=dict)
+    github_snapshot_by_repo_and_issue_number: dict[tuple[str, int], IssueSnapshot] = field(default_factory=dict)
+    github_snapshot_by_repo_scope_and_issue_number: dict[tuple[str | None, int], IssueSnapshot] = field(
+        default_factory=dict
+    )
     github_snapshot_by_issue_id: dict[str, IssueSnapshot] = field(default_factory=dict)
 
 

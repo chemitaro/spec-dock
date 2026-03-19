@@ -280,6 +280,37 @@ def _resolve_repo_root(ports: Ports) -> Path:
     return ports.repo_root
 
 
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(_resolve_repo_root(ports))
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
+
+
 def _resolve_node_repo(ports: Ports):
     if ports.node_repo is not None:
         return ports.node_repo
@@ -353,7 +384,11 @@ def load_graph(ports: Ports, *, validate: bool) -> SpecGraph:
     graph = build_graph([_to_spec_node_seed(record) for record in records])
     if validate:
         repo_root = _resolve_repo_root(ports)
-        report = validate_graph_and_deps(graph, repo_root=repo_root)
+        report = validate_graph_and_deps(
+            graph,
+            repo_root=repo_root,
+            current_repo_slug=_resolve_current_repo_slug(ports),
+        )
         if report.errors:
             raise RuntimeError(report.errors[0])
     return graph
@@ -421,22 +456,78 @@ def resolve_parent_for_create(
     return parent.id
 
 
-def guard_github_issue_uniqueness(graph: SpecGraph, github_issue_number: int | None) -> None:
+def _node_github_linkage_key(
+    node: SpecNode,
+    *,
+    current_repo_slug: str | None,
+) -> tuple[str | None, int] | None:
+    if node.kind not in ("initiative", "epic", "issue") or node.github_issue_number is None:
+        return None
+    repo_slug = _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) or current_repo_slug
+    return (repo_slug, int(node.github_issue_number))
+
+
+def _node_github_repo_slug(node: SpecNode) -> str | None:
+    return _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+
+
+def guard_github_issue_uniqueness(
+    graph: SpecGraph,
+    github_issue_number: int | None,
+    *,
+    github_repo_owner: str | None = None,
+    github_repo_name: str | None = None,
+    current_repo_slug: str | None = None,
+) -> None:
     if github_issue_number is None:
         return
+    requested_repo_slug = _normalize_repo_slug(github_repo_owner, github_repo_name) or current_repo_slug
+    linked_same_number = sorted(
+        [
+            node
+            for node in graph.nodes_by_id.values()
+            if node.kind in ("initiative", "epic", "issue") and node.github_issue_number == int(github_issue_number)
+        ],
+        key=lambda node: (node.kind, node.id, node.meta_path.as_posix()),
+    )
+    if linked_same_number:
+        mixed_scope_conflict = []
+        for node in linked_same_number:
+            explicit_repo_slug = _node_github_repo_slug(node)
+            effective_repo_slug = explicit_repo_slug or current_repo_slug
+            if requested_repo_slug is None and explicit_repo_slug is not None:
+                mixed_scope_conflict.append(node)
+                continue
+            if requested_repo_slug is not None and effective_repo_slug is None:
+                mixed_scope_conflict.append(node)
+                continue
+        if mixed_scope_conflict:
+            found = ", ".join(
+                f"{node.kind}:{node.id} ({node.meta_path.as_posix()})"
+                for node in mixed_scope_conflict
+            )
+            requested_repo_label = requested_repo_slug if requested_repo_slug is not None else "(current-or-unknown)"
+            raise RuntimeError(
+                "github linkage scope is ambiguous and rejected (fail-closed): "
+                f"repo={requested_repo_label} github.issue_number={int(github_issue_number)} conflicts with "
+                "existing linkage(s) whose repository scope cannot be resolved: "
+                f"{found}. Configure current repo remote (origin) or normalize linkage scope before retrying."
+            )
+
+    linkage_key = (requested_repo_slug, int(github_issue_number))
     linked = [
         node
         for node in graph.nodes_by_id.values()
-        if node.kind in ("initiative", "epic", "issue")
-        and node.github_issue_number == int(github_issue_number)
+        if _node_github_linkage_key(node, current_repo_slug=current_repo_slug) == linkage_key
     ]
     if not linked:
         return
     linked = sorted(linked, key=lambda node: (node.kind, node.id, node.meta_path.as_posix()))
     found = ", ".join(f"{node.kind}:{node.id} ({node.meta_path.as_posix()})" for node in linked)
+    repo_label = requested_repo_slug if requested_repo_slug is not None else "(current-or-unknown)"
     raise RuntimeError(
-        f"github.issue_number={int(github_issue_number)} is already linked: {found}. "
-        "Fix github.issue_number in one of the listed .meta.json files, "
+        f"github linkage is already linked: repo={repo_label} github.issue_number={int(github_issue_number)}: {found}. "
+        "Fix github linkage in one of the listed .meta.json files, "
         "or choose a different GitHub issue number (target)."
     )
 
@@ -528,6 +619,7 @@ def plan_node_creation(
     kind: Literal["initiative", "epic", "issue"],
     specdock_dir: Path,
     today: str,
+    current_repo_slug: str | None = None,
 ) -> CreatePlan:
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     mode = _resolve_github_mode(req, kind)
@@ -541,7 +633,13 @@ def plan_node_creation(
         if req.github_issue_number is None:
             raise RuntimeError("github_issue_number is required for github mode")
         node_id = format_id(prefix, int(req.github_issue_number), local=False)
-        guard_github_issue_uniqueness(graph, int(req.github_issue_number))
+        guard_github_issue_uniqueness(
+            graph,
+            int(req.github_issue_number),
+            github_repo_owner=req.github_repo_owner,
+            github_repo_name=req.github_repo_name,
+            current_repo_slug=current_repo_slug,
+        )
     else:
         if req.github_issue_number is not None:
             raise RuntimeError("Cannot combine '--no-github' with '--github-issue'.")
@@ -552,6 +650,14 @@ def plan_node_creation(
 
     parsed_prefix, is_local, num = parse_id(node_id)
     existing_id = find_existing_id_by_num(graph.nodes_by_id, prefix=parsed_prefix, num=num, local=is_local)
+    if existing_id and mode in ("create", "link_existing") and req.github_issue_number is not None:
+        existing = graph.nodes_by_id[existing_id]
+        existing_repo_slug = _normalize_repo_slug(existing.github_repo_owner, existing.github_repo_name) or current_repo_slug
+        requested_repo_slug = _normalize_repo_slug(req.github_repo_owner, req.github_repo_name) or current_repo_slug
+        if existing_repo_slug != requested_repo_slug:
+            node_id = _next_id(graph, prefix, local=True)
+            parsed_prefix, is_local, num = parse_id(node_id)
+            existing_id = find_existing_id_by_num(graph.nodes_by_id, prefix=parsed_prefix, num=num, local=is_local)
     if existing_id:
         existing = graph.nodes_by_id[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
@@ -881,6 +987,7 @@ def create_node_core(
             kind=kind,
             specdock_dir=specdock_dir,
             today=today,
+            current_repo_slug=_resolve_current_repo_slug(ports),
         )
         created_paths = execute_create_plan(plan, ports)
         _post_write_duplicate_guard(ports, node_id=plan.meta.id)

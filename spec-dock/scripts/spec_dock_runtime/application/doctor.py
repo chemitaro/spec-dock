@@ -10,6 +10,7 @@ from ..infra.contracts import ActiveManifestEntry, StoredMetaRecord
 from . import create_node as app_create_node
 from .contracts import DoctorFinding, DoctorRequest, DoctorResult
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -287,7 +288,12 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     else:
         try:
             graph = build_graph([_to_spec_node_seed(record) for record in records])
-            report = validate_graph_and_deps(graph, issue_depends_on_map=None, repo_root=ports.repo_root)
+            report = validate_graph_and_deps(
+                graph,
+                issue_depends_on_map=None,
+                repo_root=ports.repo_root,
+                current_repo_slug=resolve_current_repo_slug(ports),
+            )
         except RuntimeError as error:
             findings.append(_finding_from_error(str(error)))
         else:
