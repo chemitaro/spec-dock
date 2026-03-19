@@ -38,7 +38,7 @@ ID: "issue-28-runtime-regression-bugs"
   - runtime CLI を利用する開発者
   - `spec-dock` を操作する coding agent
 - 代表シナリオ:
-  - `new initiative|epic|issue|doc` を連続または並列で作成する
+  - `new initiative|epic|issue|doc` や `import issue` を連続または並列で作成する
   - local-only issue を active にし、deps / validate / sync を使う
   - GitHub issue URL や issue number を使って import / active / status 確認を行う
   - GitHub-linked issue の状態変化を運用上安全に読む
@@ -49,7 +49,7 @@ ID: "issue-28-runtime-regression-bugs"
 ### MUST
 
 - create allocator race を修正する
-  - `new initiative|epic|issue|doc` の create 系で id / sequence が並列実行でも重複しないこと
+  - `new initiative|epic|issue|doc` と create-like な `import issue` で id / sequence / GitHub linkage が並列実行でも重複しないこと
 - discussion sequence race を修正する
   - `new doc` で duplicate sequence を予防し、validator でも検知できること
 - local-only issue の readiness contract を整備する
@@ -171,11 +171,12 @@ ID: "issue-28-runtime-regression-bugs"
 ### AC-001 create atomicity
 
 - Given:
-  - 同一 repo / 同一親配下で `new epic` または `new issue` または `new doc` を並列実行する
+  - 同一 repo / 同一親配下で `new epic` または `new issue` または `new doc` または `import issue` を並列実行する
 - When:
   - manual regression と同等の並列 create を再実行する
 - Then:
-  - duplicate id / duplicate seq が発生しない
+  - duplicate id / duplicate GitHub linkage が発生しない
+  - `new doc` の sequence allocator は `S02` で引き続き保護され、`import issue` は新たな sequence allocator 義務を持ち込まない
   - create 結果が validate/sync を壊さない
 
 ### AC-002 local-only readiness

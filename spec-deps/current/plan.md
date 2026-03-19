@@ -350,6 +350,110 @@ ID: "issue-28-runtime-regression-bugs"
 - git commit:
   - `S02` の review と expected tests が通り、`report.md` 更新後にコミットする
 
+### S01H — import を create transaction 契約へ統合する
+- target:
+  - `import issue` を `new issue` と同じ repo-level create transaction 契約へ揃える
+  - import/import、import/new が競合しても duplicate id / duplicate GitHub linkage を残さない
+- design refs:
+  - `requirement.md` の `AC-001 create atomicity`
+  - `design.md` の `1. create transaction`
+- step boundary:
+  - URL safety や foreign/current repo identity の仕様自体は `S05` 系で固定済みとし、ここでは create-like write path の atomicity だけを閉じる
+  - discussion seq は引き続き `S02` の責務であり、`import issue` は新しい seq allocator 義務を持ち込まない
+  - lock の外に残すのは URL/repo identity 解析、artifact preflight、GitHub metadata fetch とし、graph 読み取り以降の uniqueness 再検証 / plan / write / post-write duplicate guard は lock 内で行う
+
+#### B1 — provider-side import transaction closure
+- purpose:
+  - provider-side `import issue` を create lock + post-write duplicate guard 配下へ入れ、stale graph 競合を防ぐ
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/...`
+
+##### I1 — import/import race
+- slice goal:
+  - 並列 `import issue` が duplicate id / duplicate GitHub linkage を作らない
+
+###### Red
+- failing test:
+  - 同一 issue を別 slug で並列 import すると、両方が stale graph を通って duplicate id/linkage を残す regression test
+- expected failure:
+  - import path が repo-level create transaction 外で動き、pre-write uniqueness check が競合を防げない
+
+###### Green
+- minimum implementation:
+  - provider-side `import_node.py` で create lock acquire/release と post-write duplicate guard を `new issue` と同じ契約で適用する
+- pass condition:
+  - import/import race regression test が通る
+
+##### I2 — import/new race
+- slice goal:
+  - `import issue` と `new issue --github-issue` が同じ GitHub target で競合しても duplicate を残さない
+
+###### Red
+- failing test:
+  - import/new の並列 create-like 競合で duplicate id/linkage が残る regression test
+- expected failure:
+  - create transaction が `new` 系だけに閉じていて import が atomicity 契約から漏れる
+
+###### Green
+- minimum implementation:
+  - provider-side import path を `new` 系と同じ critical section に入れる
+- pass condition:
+  - import/new race regression test が通る
+
+#### B2 — checked-in runtime parity
+- purpose:
+  - checked-in dogfooding runtime でも import path の create transaction 契約を provider-side と一致させる
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/test_init_update.py`
+
+##### I1 — checked-in import/import race parity
+- slice goal:
+  - checked-in runtime の import/import race でも create lock / duplicate guard が効く
+
+###### Red
+- failing test:
+  - checked-in runtime で import/import race が duplicate node/linkage を残す subprocess regression test
+- expected failure:
+  - checked-in runtime だけが import transaction 契約から漏れる
+
+###### Green
+- minimum implementation:
+  - checked-in `import_node.py` を provider-side と同じ create transaction 契約へ refresh する
+- pass condition:
+  - checked-in runtime の import/import race subprocess parity regression test が通る
+
+##### I2 — checked-in import/new race parity
+- slice goal:
+  - checked-in runtime の import/new race でも provider-side と同じ atomicity 契約が効く
+
+###### Red
+- failing test:
+  - checked-in runtime で `import issue` と `new issue --github-issue` の race が duplicate node/linkage を残す subprocess regression test
+- expected failure:
+  - checked-in runtime parity が generic import path だけを見ており、cross-command create-like contention を未固定
+
+###### Green
+- minimum implementation:
+  - checked-in subprocess parity test で import/new contention も固定する
+- pass condition:
+  - checked-in runtime の import/new race subprocess parity regression test が通る
+
+#### step gate
+- review:
+  - import path が `new issue` と同じ lock scope / failure surface / post-write duplicate guard 契約を使っている
+- expected tests:
+  - provider-side import/import race regression
+  - provider-side import/new race regression
+  - checked-in runtime import/import race parity regression
+  - checked-in runtime import/new race parity regression
+  - 既存 import success/non-race 回帰
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01H` の review と expected tests が通り、`report.md` 更新後にコミットする
+
 ### S03 — status/readiness contract を統一し stale projection を明示する
 - target:
   - local-only issue の初期 status を deterministic にし、`deps check` と `active set` を同一 readiness contract に揃える

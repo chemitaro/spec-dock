@@ -39,21 +39,29 @@ ID: "issue-28-runtime-regression-bugs"
 
 - B01 create allocator race
 - B02 discussion sequence race
+- create-like import write path の atomicity gap
 
 ### 変更方針
 
-- `new initiative|epic|issue|doc` を共通の create transaction として扱う
+- `new initiative|epic|issue|doc` と create-like な `import issue` を共通の create transaction として扱う
 - transaction の先頭で repo-global create lock を取得する
 - lock 区間内で次を実施する
   - graph 読み取り
   - next id / next sequence 採番
+  - create-like import の uniqueness 再検証
   - scaffold 書き込み
   - post-write duplicate guard
   - result 確定
+- `import issue` では次を lock の外に残す
+  - URL / repo identity 解析
+  - required artifact preflight
+  - GitHub issue metadata fetch
+- ただし、graph 依存の uniqueness 判定と node planning は lock 内で再実行する
 
 ### 意図
 
 - `load -> max+1 -> write` の gap をなくす
+- import/create 間で stale graph を共有したまま uniqueness check をすり抜ける gap をなくす
 - id allocator と discussion sequence allocator を別物にせず、同一の safety model に揃える
 
 ### lock/failure contract
