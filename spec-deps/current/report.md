@@ -621,7 +621,7 @@ ID: "issue-28-runtime-regression-bugs"
   - review status:
     - spec review: `pass`
     - QA review: `pass`
-    - implementation review: reviewer 応答が不安定のため再試行中
+    - implementation review: `pass`
 - S01I create lock scope narrowing for GitHub create:
   - analysis:
     - `spec-deps/current/discussions/035-disc-pr29-r18-create-lock-gh-create-narrowing-analysis.md`
@@ -654,6 +654,24 @@ ID: "issue-28-runtime-regression-bugs"
     - spec review: `pass`
     - QA review: `pass`
     - implementation review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/036-disc-pr29-r20-pre-github-parent-precheck-analysis.md`
+  - `spec-deps/current/discussions/037-disc-pr29-r21-all-kinds-post-create-guidance-analysis.md`
+  - finding resolution:
+    - pre-GitHub phase に read-only graph precheck を追加し、stable parent absence (`new epic` の initiative 不在 / `new issue` の epic 不在) を remote side effect 前に fail-fast するよう補強した
+    - lock 取得後は引き続き graph reload と authoritative parent revalidation を実施し、R18/S01I の lock narrowing 契約は維持した
+    - post-create local failure guidance を `initiative` / `epic` / `issue` の supported create surface 全体へ広げ、`new <kind> --github-issue <n>` ベースの kind-aware recovery message に統一した
+    - provider-side source of truth と checked-in dogfooding runtime の `create_node.py` を parity 更新した
+    - provider runtime と checked-in runtime の両方に、parent-not-found no-GH-call regression と non-issue post-create guidance parity regression を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 57 tests in 5.515s` / `OK`
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - 結果: `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証

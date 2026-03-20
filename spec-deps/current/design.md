@@ -59,13 +59,18 @@ ID: "issue-28-runtime-regression-bugs"
   - GitHub issue metadata fetch
 - `new issue` の create mode でも次を lock の外に残す
   - pure input validation
+  - read-only graph precheck で判定できる stable parent existence validation
   - graph-independent minimal body による GitHub issue create
 - pure input validation には少なくとも次を含める
   - `--id` と GitHub mode の併用禁止
   - required parent selector (`--initiative` / `--epic`) の欠落
   - `github_repo_owner` / `github_repo_name` の片側欠落
+- pre-GitHub graph precheck には少なくとも次を含める
+  - `new epic` の parent initiative existence
+  - `new issue` の parent epic existence
+- ただし pre-GitHub graph precheck は advisory ではなく no-side-effect fail-fast に使う一方、authoritative な parent resolution は lock 内で再実行する
 - ただし、graph 依存の uniqueness 判定と node planning は lock 内で再実行する
-- `new issue` の create mode で `gh issue create` 完了後に local create が失敗した場合は、phase を問わず created GitHub issue number を含む failure surface と retry/link guidance を返す
+- `new initiative|epic|issue` の create mode で `gh issue create` 完了後に local create が失敗した場合は、phase を問わず created GitHub issue number を含む failure surface と kind-aware retry/link guidance を返す
 
 ### 意図
 
@@ -121,8 +126,9 @@ stop
 - ただし prototype 段階では correctness を優先する
 - `gh issue create` 後に local write が失敗すると orphan issue は残りうる
   - ただし現行でも local write failure 後の remote rollback は未実装であり、今回の corrective fix は lock scope 是正を優先する
-- `new issue` の create mode で `gh issue create` 完了後の lock acquire timeout / stale failure、parent/uniqueness revalidation failure、write failure でも remote-only side effect は起こりうる
-  - そのため error には created issue number を含め、`new issue --github-issue <n>` で retry/link できる guidance を返す
+- pre-GitHub graph precheck は stable parent absence を減らすが、lock 取得後の graph 変化までは防げない
+- `new initiative|epic|issue` の create mode で `gh issue create` 完了後の lock acquire timeout / stale failure、parent/uniqueness revalidation failure、write failure でも remote-only side effect は起こりうる
+  - そのため error には created issue number を含め、`new <kind> --github-issue <n>` で retry/link できる guidance を返す
 - pre-lock GitHub body は graph-independent minimal body とする
   - 少なくとも kind は表現する
   - `Epic:` / `Initiative:` など graph 依存の親文脈は pre-lock body に入れない
