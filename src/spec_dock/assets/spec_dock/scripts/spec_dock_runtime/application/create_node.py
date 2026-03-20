@@ -919,8 +919,6 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
 def _github_issue_body(
     *,
     kind: Literal["initiative", "epic", "issue"],
-    graph: SpecGraph,
-    req: CreateNodeRequest,
 ) -> str:
     if kind == "initiative":
         return (
@@ -929,26 +927,66 @@ def _github_issue_body(
             "Local specs are stored under `spec-dock/initiatives/`.\n"
         )
 
-    parent_id = resolve_parent_for_create(req, graph, kind=kind)
-    if parent_id is None:
-        raise RuntimeError("parent is required")
     if kind == "epic":
         return (
             "Created by spec-dock.\n\n"
             "Type: epic\n"
-            f"Initiative: {parent_id}\n\n"
             "Local specs are stored under `spec-dock/initiatives/`.\n"
         )
 
-    epic = graph.nodes_by_id.get(parent_id)
-    if epic is None or not epic.initiative_id:
-        raise RuntimeError(f"Epic not found: {parent_id}")
     return (
         "Created by spec-dock.\n\n"
         "Type: issue\n"
-        f"Epic: {epic.id}\n"
-        f"Initiative: {epic.initiative_id}\n\n"
         "Local specs are stored under `spec-dock/initiatives/`.\n"
+    )
+
+
+def _validate_pre_github_create_inputs(
+    req: CreateNodeRequest,
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    mode: Literal["create", "link_existing", "local_only"],
+) -> None:
+    if mode not in ("create", "link_existing"):
+        return
+
+    if req.requested_node_id is not None:
+        raise RuntimeError(
+            "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
+        )
+
+    if kind == "issue" and req.parent_id is None:
+        raise RuntimeError("--epic is required")
+
+    owner = (req.github_repo_owner or "").strip()
+    repo = (req.github_repo_name or "").strip()
+    if owner or repo:
+        if not owner or not repo:
+            raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+
+
+def _post_github_create_local_failure_message(*, local_error: Exception, github_issue_number: int) -> str:
+    return (
+        f"{local_error} "
+        f"GitHub issue was created: #{github_issue_number}. "
+        f"Recovery: rerun `new issue --github-issue {github_issue_number}` to link the existing GitHub issue, "
+        "or close/cleanup that GitHub issue before retrying."
+    )
+
+
+def _wrap_post_github_create_local_failure(
+    *,
+    error: Exception,
+    created_github_issue_number: int | None,
+    kind: Literal["initiative", "epic", "issue"],
+) -> RuntimeError | None:
+    if created_github_issue_number is None or kind != "issue":
+        return None
+    return RuntimeError(
+        _post_github_create_local_failure_message(
+            local_error=error,
+            github_issue_number=created_github_issue_number,
+        )
     )
 
 
@@ -960,27 +998,42 @@ def create_node_core(
 ) -> CreateNodeResult:
     mode = _resolve_github_mode(req, kind)
     title, _slug = resolve_input_title_and_slug(req.title, req.slug)
+    _validate_pre_github_create_inputs(req, kind=kind, mode=mode)
     specdock_dir = _resolve_specdock_dir(ports)
-    lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    github_issue_number = req.github_issue_number
+    created_github_issue_number: int | None = None
+
+    if mode == "link_existing" and github_issue_number is None:
+        raise RuntimeError("github_issue_number is required for link_existing mode")
+
+    if mode == "create" and github_issue_number is None:
+        if ports.issue_gateway is None:
+            raise RuntimeError("issue_gateway is required for github issue creation")
+        repo_root = _resolve_repo_root(ports)
+        github_issue_number = ports.issue_gateway.issue_create(
+            repo_root,
+            title=title,
+            body=_github_issue_body(kind=kind),
+        )
+        created_github_issue_number = int(github_issue_number)
+
+    try:
+        lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    except Exception as exc:
+        wrapped_error = _wrap_post_github_create_local_failure(
+            error=exc,
+            created_github_issue_number=created_github_issue_number,
+            kind=kind,
+        )
+        if wrapped_error is not None:
+            raise wrapped_error from exc
+        raise
+
     result: CreateNodeResult | None = None
     body_error: Exception | None = None
     try:
         graph = load_graph(ports, validate=False)
-        github_issue_number = req.github_issue_number
         current_repo_slug = _resolve_current_repo_slug(ports)
-
-        if mode == "create" and github_issue_number is None:
-            if ports.issue_gateway is None:
-                raise RuntimeError("issue_gateway is required for github issue creation")
-            repo_root = _resolve_repo_root(ports)
-            github_issue_number = ports.issue_gateway.issue_create(
-                repo_root,
-                title=title,
-                body=_github_issue_body(kind=kind, graph=graph, req=req),
-            )
-
-        if mode == "link_existing" and github_issue_number is None:
-            raise RuntimeError("github_issue_number is required for link_existing mode")
 
         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
         plan = plan_node_creation(
@@ -1012,8 +1065,16 @@ def create_node_core(
             release_error = exc
 
         if body_error is not None:
+            wrapped_body_error = _wrap_post_github_create_local_failure(
+                error=body_error,
+                created_github_issue_number=created_github_issue_number,
+                kind=kind,
+            )
+            effective_body_error: Exception = wrapped_body_error if wrapped_body_error is not None else body_error
             if release_error is not None:
-                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
+                raise RuntimeError(f"{effective_body_error}; additionally {release_error}") from body_error
+            if wrapped_body_error is not None:
+                raise wrapped_body_error from body_error
             raise body_error
         if release_error is not None:
             raise release_error

@@ -110,6 +110,12 @@ ID: "issue-28-runtime-regression-bugs"
   - review gate:
     - checked-in `spec-dock/scripts/...` の対象 runtime file が provider-side source of truth と同じ契約へ refresh されている
     - same-number coexistence の checked-in runtime regression test が通る
+- S01I:
+  - 観測可能な振る舞い: `new issue --create-github-issue` の GitHub create latency が repo-wide local create contention を起こさない
+  - closes:
+    - PR #29 R18 create lock scope narrowing
+  - review gate:
+    - `gh issue create` は lock 外、graph reload / parent re-resolve / uniqueness revalidation / local write は lock 内、という境界が review で説明できる
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -133,6 +139,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-013` -> `S05G`
 - `AC-014` -> `S04G`
 - `AC-015` -> `S05H`
+- `PR29-R18` -> `S01I`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -269,6 +276,62 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S01` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01I — external GitHub create を create lock の外へ出す
+- target:
+  - `new issue` の create mode で実行される `gh issue create` を repo-global create lock の外へ出す
+  - external GitHub latency が `new doc` / local-only `new` / `import issue` を false contention で block しないようにする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/035`
+- step boundary:
+  - lock scope を狭める corrective fix に限定し、remote rollback や GitHub issue close 補償処理までは扱わない
+  - graph-derived parent resolution / uniqueness revalidation / write / post-write duplicate guard は lock 内のまま維持する
+  - provider-side source of truth の修正後、checked-in dogfooding runtime にも parity を反映する
+
+#### Red
+- failing test:
+  - slow `issue_create()` 中でも別 thread の local-only create が timeout せず成功する runtime regression
+  - delayed `issue_create()` の pre-lock window 中に parent もしくは competing graph state が変化しても、lock 内 reload / revalidation で no-write fail または deterministic success になる regression
+  - `issue_create()` 成功後に lock acquire / parent revalidation / uniqueness revalidation / write failure になった場合、created GitHub issue number と retry/link guidance を返す regression
+  - invalid title / invalid slug が引き続き `gh issue create` 前に失敗する regression を維持
+- expected failure:
+  - 現行実装では slow `issue_create()` が lock を保持し、後続 local create が `create lock acquisition failed` で落ちる
+
+#### Green
+- minimum implementation:
+  - `create_node_core()` で pure input validation と optional `gh issue create` を lock 外へ移す
+  - pre-lock GitHub body は graph-independent minimal body とし、`Epic:` / `Initiative:` など graph 依存文脈を含めない
+  - pure input validation は、少なくとも `--id + github mode`、required parent selector 欠落、partial repo identity を pre-GH で reject する
+  - lock 取得後は graph reload、current parent/context の再解決、repo-aware uniqueness 再検証、write、post-write duplicate guard を維持する
+- pass condition:
+  - GitHub create latency regression と既存 create regression がともに通る
+
+#### Refactor
+- cleanup target:
+  - pre-lock / in-lock responsibilities を helper 境界で整理する
+- invariants to keep green:
+  - duplicate id / duplicate GitHub linkage の preventive control を弱めない
+  - checked-in dogfooding runtime parity を含む corrective scope であることを report に残す
+
+#### step gate
+- review:
+  - lock scope の縮小で local atomicity が損なわれていないことを説明できる
+- expected tests:
+  - slow GitHub create non-blocking regression
+  - delayed GitHub create + parent/context revalidation regression
+  - post-GitHub-create local failure guidance regression
+  - post-GitHub-create uniqueness revalidation failure guidance regression
+  - minimal GH body invariant regression
+  - pure input invalid request が `gh issue create` 前に no-side-effect failure する regression
+  - invalid title / invalid slug no-gh-call regression
+  - checked-in dogfooding runtime の executable parity regression
+  - checked-in runtime でも post-GitHub-create local failure 時に created issue number と `--github-issue <n>` guidance を返す parity regression
+  - 既存 create command 回帰
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01I` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S02 — discussion seq を同じ transaction に統合し validator でも守る
 - target:
