@@ -596,20 +596,19 @@ ID: "issue-28-runtime-regression-bugs"
     - `python -m unittest -v tests.cli_runtime.test_runtime_doctor_s04`
     - 結果: `Ran 18 tests in 0.053s` / `OK`
   - review status:
-    - spec review: pending final response
-    - QA review: pending final response
-- PR review follow-up open corrective scope:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review: `pass`
+- PR review follow-up corrective scope closure:
   - `spec-deps/current/discussions/023-disc-pr29-r7-active-set-current-repo-slug-analysis.md`
   - `spec-deps/current/discussions/024-disc-pr29-r8-deps-check-current-repo-slug-analysis.md`
   - `spec-deps/current/discussions/025-disc-pr29-r9-domain-validation-artifact-coupling-analysis.md`
-  - verdict:
-    - `R7 active-set current repo slug`: `valid`, `fix required`
-    - `R8 deps-check current repo slug`: `valid`, `fix required`
-    - `R9 domain validation artifact coupling`: `valid`, `fix required`
-  - gate:
-    - `AC-011` は `S05F` 完了まで未達
-    - `AC-012` は `S04F` 完了まで未達
-    - この corrective scope が完了するまで issue-28 は close しない
+  - closure:
+    - `R7 active-set current repo slug`: `fixed`
+    - `R8 deps-check current repo slug`: `fixed`
+    - `R9 domain validation artifact coupling`: `fixed`
+    - `AC-011`: `S05F` で達成
+    - `AC-012`: `S04F` で達成
 - S05F current repo slug parity:
   - 実装:
     - `set_active --github` と `deps check --github` に current repo slug 解決を追加し、status resolution へ伝播するよう修正した
