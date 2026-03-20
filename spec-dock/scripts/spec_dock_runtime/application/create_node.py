@@ -950,6 +950,9 @@ def _validate_pre_github_create_inputs(
             "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
         )
 
+    if kind == "epic" and req.parent_id is None:
+        raise RuntimeError("--initiative is required")
+
     if kind == "issue" and req.parent_id is None:
         raise RuntimeError("--epic is required")
 
@@ -960,11 +963,28 @@ def _validate_pre_github_create_inputs(
             raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
 
 
-def _post_github_create_local_failure_message(*, local_error: Exception, github_issue_number: int) -> str:
+def _precheck_pre_github_create_parent(
+    req: CreateNodeRequest,
+    ports: Ports,
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+) -> None:
+    if kind == "initiative":
+        return
+    graph = load_graph(ports, validate=False)
+    resolve_parent_for_create(req, graph, kind=kind)
+
+
+def _post_github_create_local_failure_message(
+    *,
+    local_error: Exception,
+    github_issue_number: int,
+    kind: Literal["initiative", "epic", "issue"],
+) -> str:
     return (
         f"{local_error} "
         f"GitHub issue was created: #{github_issue_number}. "
-        f"Recovery: rerun `new issue --github-issue {github_issue_number}` to link the existing GitHub issue, "
+        f"Recovery: rerun `new {kind} --github-issue {github_issue_number}` to link the existing GitHub issue, "
         "or close/cleanup that GitHub issue before retrying."
     )
 
@@ -975,12 +995,13 @@ def _wrap_post_github_create_local_failure(
     created_github_issue_number: int | None,
     kind: Literal["initiative", "epic", "issue"],
 ) -> RuntimeError | None:
-    if created_github_issue_number is None or kind != "issue":
+    if created_github_issue_number is None:
         return None
     return RuntimeError(
         _post_github_create_local_failure_message(
             local_error=error,
             github_issue_number=created_github_issue_number,
+            kind=kind,
         )
     )
 
@@ -1004,6 +1025,7 @@ def create_node_core(
     if mode == "create" and github_issue_number is None:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required for github issue creation")
+        _precheck_pre_github_create_parent(req, ports, kind=kind)
         repo_root = _resolve_repo_root(ports)
         github_issue_number = ports.issue_gateway.issue_create(
             repo_root,

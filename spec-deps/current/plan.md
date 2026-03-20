@@ -116,6 +116,18 @@ ID: "issue-28-runtime-regression-bugs"
     - PR #29 R18 create lock scope narrowing
   - review gate:
     - `gh issue create` は lock 外、graph reload / parent re-resolve / uniqueness revalidation / local write は lock 内、という境界が review で説明できる
+- S01J:
+  - 観測可能な振る舞い: stable parent-not-found は GitHub issue 作成前に no-side-effect fail する
+  - closes:
+    - PR #29 R20 pre-GitHub parent validation
+  - review gate:
+    - pre-lock graph precheck は GH side effect を減らすが、authoritative parent revalidation は lock 内で維持する
+- S01K:
+  - 観測可能な振る舞い: initiative / epic / issue の post-create local failure がいずれも created issue number と kind-aware recovery guidance を返す
+  - closes:
+    - PR #29 R21 all-kinds post-create guidance
+  - review gate:
+    - supported `new <kind>` surface と recovery guidance surface が一致している
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -140,6 +152,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-014` -> `S04G`
 - `AC-015` -> `S05H`
 - `PR29-R18` -> `S01I`
+- `PR29-R20` -> `S01J`
+- `PR29-R21` -> `S01K`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -332,6 +346,79 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S01I` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01J — stable parent-not-found を pre-GitHub で fail-fast する
+- target:
+  - `new epic` / `new issue` の create mode で、stable parent absence を GitHub issue 作成前に no-side-effect fail にする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/036`
+- step boundary:
+  - pre-lock では read-only graph precheck のみ追加し、authoritative parent resolution は lock 内の `plan_node_creation()` に残す
+  - lock narrowing (`gh issue create` is outside lock) 自体は維持する
+
+#### Red
+- failing test:
+  - nonexistent initiative を指定した `new epic --create-github-issue` が `issue_create()` 未呼び出しで失敗する regression
+  - nonexistent epic を指定した `new issue --create-github-issue` が `issue_create()` 未呼び出しで失敗する regression
+  - checked-in dogfooding runtime でも同じ no-side-effect regression
+
+#### Green
+- minimum implementation:
+  - pre-GH phase に read-only graph load を追加する
+  - create-mode で stable parent existence precheck を行い、missing parent は remote side effect 前に fail-fast する
+  - lock 取得後は従来どおり graph reload と authoritative parent revalidation を維持する
+
+#### Refactor
+- cleanup target:
+  - pre-GH stable validation と in-lock authoritative validation の責務境界を helper に分離する
+
+#### step gate
+- review:
+  - orphan GitHub issue を減らしつつ、R18 の lock narrowing を壊していないことを説明できる
+- expected tests:
+  - provider runtime の no-gh-call parent-not-found regression
+  - checked-in runtime parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01K — all-kinds post-create local failure guidance を揃える
+- target:
+  - initiative / epic / issue の GitHub create path で、post-create local failure 時の recovery guidance を kind-aware に揃える
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/037`
+- step boundary:
+  - command surface を狭めず、recovery message surface を supported kind 全体へ合わせる
+
+#### Red
+- failing test:
+  - initiative create の lock failure が created issue number と `new initiative --github-issue <n>` を返す regression
+  - epic create の write/template failure が created issue number と `new epic --github-issue <n>` を返す regression
+  - checked-in dogfooding runtime でも同 guidance parity regression
+
+#### Green
+- minimum implementation:
+  - post-create local failure wrapper の kind restriction を外す
+  - recovery guidance を `new <kind> --github-issue <n>` ベースの kind-aware message builder にする
+
+#### Refactor
+- cleanup target:
+  - kind-aware guidance text と wrapper call site の重複をなくす
+
+#### step gate
+- review:
+  - supported create surface と orphan recovery surface が kind 間で整合している
+- expected tests:
+  - initiative guidance regression
+  - epic guidance regression
+  - checked-in parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S02 — discussion seq を同じ transaction に統合し validator でも守る
 - target:

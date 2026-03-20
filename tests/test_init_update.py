@@ -2553,32 +2553,58 @@ with tempfile.TemporaryDirectory() as td:
     cases = [
         (
             "requested-id-with-github-mode",
+            "create_issue",
             {
-                "requested_node_id": "iss-local-00100",
+                "title": "Refresh token",
                 "parent_id": "epic-local-00001",
+                "requested_node_id": "iss-local-00100",
             },
             "Cannot combine '--id' with GitHub mode",
         ),
         (
             "missing-epic",
+            "create_issue",
             {
-                "requested_node_id": None,
+                "title": "Refresh token",
                 "parent_id": None,
+                "requested_node_id": None,
             },
             "--epic is required",
         ),
         (
             "partial-repo-identity",
+            "create_issue",
             {
-                "requested_node_id": None,
+                "title": "Refresh token",
                 "parent_id": "epic-local-00001",
+                "requested_node_id": None,
                 "github_repo_owner": "chemitaro",
                 "github_repo_name": None,
             },
             "github_repo_owner and github_repo_name must be provided together",
         ),
+        (
+            "missing-initiative-node",
+            "create_epic",
+            {
+                "title": "JWT auth",
+                "parent_id": "init-local-99999",
+                "requested_node_id": None,
+            },
+            "Initiative not found: init-local-99999",
+        ),
+        (
+            "missing-epic-node",
+            "create_issue",
+            {
+                "title": "Refresh token",
+                "parent_id": "epic-local-99999",
+                "requested_node_id": None,
+            },
+            "Epic not found: epic-local-99999",
+        ),
     ]
-    for case_name, overrides, expected_error in cases:
+    for case_name, create_attr, overrides, expected_error in cases:
         issue_gateway = _StubIssueGateway([950])
         ports = app_ports.Ports(
             node_reader=_DummyNodeReader(),
@@ -2601,12 +2627,200 @@ with tempfile.TemporaryDirectory() as td:
         }
         request_kwargs.update(overrides)
         try:
-            app_create_node.create_issue(app_contracts.CreateNodeRequest(**request_kwargs), ports)
+            getattr(app_create_node, create_attr)(app_contracts.CreateNodeRequest(**request_kwargs), ports)
             raise AssertionError(f"expected failure for {case_name}")
         except RuntimeError as exc:
             message = str(exc)
         assert expected_error in message, (case_name, message)
         assert issue_gateway.calls == [], (case_name, issue_gateway.calls)
+""" % str(runtime_scripts_dir)
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
+    def test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = """
+import os
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+sys.path.insert(0, %r)
+try:
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import create_node as app_create_node
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.infra import contracts as infra_contracts
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+    )
+
+def _prepare_templates(specdock_dir):
+    for kind in ("initiative", "epic", "issue"):
+        template_root = specdock_dir / "templates" / kind
+        (template_root / "docs").mkdir(parents=True, exist_ok=True)
+        (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
+        (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+
+class _DummyNodeReader:
+    def load_node_records(self):
+        return []
+
+class _StubNodeRepo:
+    def __init__(self, records):
+        self._records = list(records)
+    def load_node_records(self, specdock_dir):
+        del specdock_dir
+        return list(self._records)
+    def write_meta(self, dest_dir, record):
+        path = Path(dest_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        (path / ".meta.json").write_text(f"id={record.id}\\n", encoding="utf-8")
+        self._records.append(record)
+
+class _StubTemplateScaffolder:
+    def render_text(self, text, replacements):
+        rendered = text
+        for key, value in replacements.items():
+            rendered = rendered.replace(key, value)
+        return rendered
+    def load_template_text(self, src_path):
+        return Path(src_path).read_text(encoding="utf-8")
+    def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
+        created = []
+        for src_path in sorted(Path(src_dir).rglob("*"), key=lambda p: p.as_posix()):
+            if not src_path.is_file():
+                continue
+            rel = src_path.relative_to(src_dir)
+            dst = Path(dest_dir) / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(self.render_text(src_path.read_text(encoding="utf-8"), replacements), encoding="utf-8")
+            created.append(dst)
+        return created
+    def write_text(self, dest_path, text):
+        path = Path(dest_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+class _StubIssueGateway:
+    def __init__(self, numbers):
+        self._numbers = list(numbers)
+        self.calls = []
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return []
+    def issue_create(self, repo_root, title, body):
+        self.calls.append((str(repo_root), title, body))
+        if not self._numbers:
+            raise RuntimeError("no issue numbers configured")
+        return self._numbers.pop(0)
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    _prepare_templates(specdock_dir)
+    issue_gateway = _StubIssueGateway([960])
+    ports = app_ports.Ports(
+        node_reader=_DummyNodeReader(),
+        node_repo=_StubNodeRepo([]),
+        template_scaffolder=_StubTemplateScaffolder(),
+        issue_gateway=issue_gateway,
+        clock=None,
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+    )
+    lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(
+        "token=holder\\npid=222\\nuser=lock-holder\\ncreated_unix=9999999999\\ncreated_iso=2099-01-01\\n",
+        encoding="utf-8",
+    )
+    os.environ[app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS] = "0.02"
+    os.environ[app_create_node._ENV_CREATE_LOCK_POLL_SECONDS] = "0.005"
+    os.environ[app_create_node._ENV_CREATE_LOCK_STALE_SECONDS] = "3600"
+    try:
+        app_create_node.create_initiative(
+            app_contracts.CreateNodeRequest(
+                title="Auth platform",
+                slug=None,
+                parent_id=None,
+                requested_node_id=None,
+                github_mode="create",
+                github_issue_number=None,
+            ),
+            ports,
+        )
+        raise AssertionError("expected initiative failure")
+    except RuntimeError as exc:
+        message = str(exc)
+    assert "GitHub issue was created: #960" in message, message
+    assert "new initiative --github-issue 960" in message, message
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    _prepare_templates(specdock_dir)
+    init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+    records = [
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Auth platform",
+            path=init_dir,
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+    ]
+    issue_gateway = _StubIssueGateway([961])
+    ports = app_ports.Ports(
+        node_reader=_DummyNodeReader(),
+        node_repo=_StubNodeRepo(records),
+        template_scaffolder=_StubTemplateScaffolder(),
+        issue_gateway=issue_gateway,
+        clock=None,
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+    )
+    with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
+        try:
+            app_create_node.create_epic(
+                app_contracts.CreateNodeRequest(
+                    title="JWT auth",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="create",
+                    github_issue_number=None,
+                ),
+                ports,
+            )
+            raise AssertionError("expected epic failure")
+        except RuntimeError as exc:
+            message = str(exc)
+    assert "GitHub issue was created: #961" in message, message
+    assert "new epic --github-issue 961" in message, message
 """ % str(runtime_scripts_dir)
         result = subprocess.run(
             [sys.executable, "-c", check_code],
