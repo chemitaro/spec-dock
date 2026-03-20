@@ -689,7 +689,7 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- latest head では `S01H` / `S04H` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
+- latest head では `S01I` / `S01J` / `S01K` / `S04H` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
 - `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
-- latest push 後の Codex review / PR checks と main 差分全体の fresh review が `pass` になれば merge-ready 判定を更新する
+- latest push 後の Codex review / PR checks は `pass`。main 差分全体の fresh review が `pass` になれば merge-ready 判定を更新する
