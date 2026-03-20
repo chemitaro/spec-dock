@@ -44,7 +44,8 @@ ID: "issue-28-runtime-regression-bugs"
 ### 変更方針
 
 - `new initiative|epic|issue|doc` と create-like な `import issue` を共通の create transaction として扱う
-- transaction の先頭で repo-global create lock を取得する
+- repo-global create lock は local graph-derived mutation boundary にだけ適用する
+- `new issue` の create mode で実行される `gh issue create` は lock 外で実行し、lock 内には入れない
 - lock 区間内で次を実施する
   - graph 読み取り
   - next id / next sequence 採番
@@ -56,13 +57,22 @@ ID: "issue-28-runtime-regression-bugs"
   - URL / repo identity 解析
   - required artifact preflight
   - GitHub issue metadata fetch
+- `new issue` の create mode でも次を lock の外に残す
+  - pure input validation
+  - graph-independent minimal body による GitHub issue create
+- pure input validation には少なくとも次を含める
+  - `--id` と GitHub mode の併用禁止
+  - required parent selector (`--initiative` / `--epic`) の欠落
+  - `github_repo_owner` / `github_repo_name` の片側欠落
 - ただし、graph 依存の uniqueness 判定と node planning は lock 内で再実行する
+- `new issue` の create mode で `gh issue create` 完了後に local create が失敗した場合は、phase を問わず created GitHub issue number を含む failure surface と retry/link guidance を返す
 
 ### 意図
 
 - `load -> max+1 -> write` の gap をなくす
 - import/create 間で stale graph を共有したまま uniqueness check をすり抜ける gap をなくす
 - id allocator と discussion sequence allocator を別物にせず、同一の safety model に揃える
+- external GitHub latency を repo-wide local create contention に拡大しない
 
 ### lock/failure contract
 
@@ -84,6 +94,8 @@ ID: "issue-28-runtime-regression-bugs"
 ```plantuml
 @startuml
 start
+:validate pure inputs;
+:optional gh issue create outside lock;
 :acquire repo lock;
 :load graph and parent state;
 :allocate id/sequence;
@@ -107,6 +119,13 @@ stop
 
 - create の完全並列性は失われる
 - ただし prototype 段階では correctness を優先する
+- `gh issue create` 後に local write が失敗すると orphan issue は残りうる
+  - ただし現行でも local write failure 後の remote rollback は未実装であり、今回の corrective fix は lock scope 是正を優先する
+- `new issue` の create mode で `gh issue create` 完了後の lock acquire timeout / stale failure、parent/uniqueness revalidation failure、write failure でも remote-only side effect は起こりうる
+  - そのため error には created issue number を含め、`new issue --github-issue <n>` で retry/link できる guidance を返す
+- pre-lock GitHub body は graph-independent minimal body とする
+  - 少なくとも kind は表現する
+  - `Epic:` / `Initiative:` など graph 依存の親文脈は pre-lock body に入れない
 
 ## 2. status/readiness contract
 

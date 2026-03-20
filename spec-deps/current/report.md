@@ -623,10 +623,41 @@ ID: "issue-28-runtime-regression-bugs"
     - spec review: `pass`
     - QA review: `pass`
     - implementation review: reviewer 応答が不安定のため再試行中
+- S01I create lock scope narrowing for GitHub create:
+  - analysis:
+    - `spec-deps/current/discussions/035-disc-pr29-r18-create-lock-gh-create-narrowing-analysis.md`
+  - review follow-up:
+    - fresh implementation review で、`issue_create()` 後に `_acquire_create_lock()` が失敗すると remote issue だけ残る新しい side-effect 経路が recovery guidance / regression coverage 不足のまま増えている、と指摘された
+    - さらに fresh reviewer から、discussion/report の wording が alias-only に読める一方で、実装契約は `new issue` create-mode 全体に掛かっていると指摘された
+    - corrective patch として、S01I の acceptance / regression 契約は `new issue` create-mode 全体を対象とし、`--create-github-issue` は explicit entrypoint として扱う方針へ統一した
+    - 追加の fresh review で、pure input validation がまだ `gh issue create` 後に残っているため、`--id + github mode`、`--epic` 欠落、partial repo identity でも remote issue を先に作りうる、と指摘された
+  - finding resolution:
+    - `new issue --create-github-issue` の `gh issue create` を repo-global create lock の外へ移し、external GitHub latency が `new doc` / local-only `new` / `import issue` を false contention で block しないよう修正した
+    - lock 内は `graph reload -> parent re-resolve / uniqueness revalidation -> local write -> post-write duplicate guard` に限定した
+    - pre-lock で stale parent 文脈を GitHub issue body へ混入させないよう、`_github_issue_body` は graph 非依存の最小本文へ縮小した
+    - provider-side source of truth と checked-in dogfooding runtime の `create_node.py` を parity 更新した
+    - runtime regression と checked-in parity regression を追加し、slow `issue_create()` の non-blocking、pre-lock parent revalidation、post-create local failure guidance、post-create uniqueness revalidation failure guidance、graph-independent minimal body 契約を固定した
+    - checked-in parity でも lock failure / parent failure / uniqueness failure / write-seam failure の guidance 分岐を executable path で確認済み
+    - pure input validation を `_validate_pre_github_create_inputs()` として `gh issue create` 前へ前倒しし、`--id + github mode`、`--epic` 欠落、partial repo identity を no-side-effect fail-fast にした
+    - provider-side runtime と checked-in dogfooding runtime の両方で、同 3 ケースが `issue_create()` 未呼び出しのまま失敗する parity regression を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update`
+    - 結果: `Ran 96 tests in 11.102s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity`
+    - 結果: `Ran 22 tests in 0.581s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity`
+    - 結果: `Ran 51 tests in 5.457s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity`
+    - 結果: `Ran 54 tests in 5.349s` / `OK`
+    - `rg --files | rg '[A-Z]'`
+    - 結果: 既存 uppercase path のみ検出、新規追加なし
+  - review status:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review: `pass`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
-- `issue` の GitHub create が遅延するケースでは lock 保持時間が伸び、競合失敗が増える運用リスクがある
 - 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
 - duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
 - cache `last_sync_at` は issue node の persisted freshness field がない旧 index では `None` になる
