@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-17"
+最終更新: "2026-03-21"
 親: []
 ---
 
@@ -178,6 +178,8 @@ ID: "issue-28-runtime-regression-bugs"
   - duplicate id / duplicate GitHub linkage が発生しない
   - `new doc` の sequence allocator は `S02` で引き続き保護され、`import issue` は新たな sequence allocator 義務を持ち込まない
   - create 結果が validate/sync を壊さない
+  - `new initiative|epic|issue` の create-mode は `gh issue create` 前に read-only graph preflight を実施し、stable tree failure や stable parent absence が分かる場合は remote side effect を起こさず no-side-effect fail する
+  - ただし lock 取得後は authoritative な graph reload / parent revalidation / uniqueness revalidation を継続し、preflight が advisory ではなく fail-fast であっても最終判定境界を置き換えない
 
 ### AC-002 local-only readiness
 
@@ -295,6 +297,8 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - `sync --github` と同じ current repo slug-aware status resolution が使われる
   - current repo linked issue が `unknown/stale` に退行せず、GitHub の実 status を readiness / JSON / activation 判定へ反映できる
+  - `deps check` は initiative / epic / issue の target 自身の resolved status を inspection / JSON の `target_status` として含み、target が issue 以外でも `unknown/stale` に退行しない
+  - 上記の `target_status` 契約は local target と `--github` target の両方で維持される
 
 ### AC-012 domain/application validation boundary
 

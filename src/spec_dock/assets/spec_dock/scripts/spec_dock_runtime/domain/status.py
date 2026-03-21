@@ -109,14 +109,14 @@ def resolve_issue_statuses(
 
     cache_last_sync_at_by_id = dict(cached_issue_last_sync_at_by_id or {})
     resolved: dict[str, IssueStatusSnapshot] = {}
-    issue_ids = _safe_sorted_issue_ids(
+    status_target_ids = _safe_sorted_issue_ids(
         [
             node_id
             for node_id, node in graph.nodes_by_id.items()
-            if node.kind == "issue"
+            if node.kind in ("initiative", "epic", "issue")
         ]
     )
-    for issue_id in issue_ids:
+    for issue_id in status_target_ids:
         issue_node = graph.nodes_by_id[issue_id]
 
         authority = "local" if issue_node.github_issue_number is None else "github"

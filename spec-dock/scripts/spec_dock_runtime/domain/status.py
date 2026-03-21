@@ -110,7 +110,7 @@ def resolve_issue_statuses(
         [
             node_id
             for node_id, node in graph.nodes_by_id.items()
-            if node.kind == "issue"
+            if node.kind in ("initiative", "epic", "issue")
         ]
     )
     for issue_id in issue_ids:

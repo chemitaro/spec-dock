@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28", "https://github.com/chemitaro/spec-dock/issues/28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-19"
+最終更新: "2026-03-21"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -128,6 +128,12 @@ ID: "issue-28-runtime-regression-bugs"
     - PR #29 R21 all-kinds post-create guidance
   - review gate:
     - supported `new <kind>` surface と recovery guidance surface が一致している
+- S01L:
+  - 観測可能な振る舞い: create-mode 全 kind が pre-GitHub graph preflight を通し、stable tree failure では remote side effect を起こさない
+  - closes:
+    - PR #29 R23 pre-GitHub graph preflight
+  - review gate:
+    - create lock narrowing を壊さず、pre-GH で防げる orphan issue だけを減らしている
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -136,7 +142,7 @@ ID: "issue-28-runtime-regression-bugs"
     - reviewer が「この diff を merge してよい」と判断できる
 
 ## 要件 ↔ ステップ対応
-- `AC-001` -> `S01`, `S02`
+- `AC-001` -> `S01`, `S01L`, `S02`
 - `AC-002` -> `S03`
 - `AC-003` -> `S04`
 - `AC-004` -> `S05`
@@ -146,7 +152,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-008` -> `S04`
 - `AC-009` -> `S02`
 - `AC-010` -> `S90`, `S90F`
-- `AC-011` -> `S05F`
+- `AC-011` -> `S05F`, `S05I`
 - `AC-012` -> `S04F`
 - `AC-013` -> `S05G`
 - `AC-014` -> `S04G`
@@ -154,6 +160,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
+- `PR29-R22` -> `S05I`
+- `PR29-R23` -> `S01L`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -216,7 +224,7 @@ ID: "issue-28-runtime-regression-bugs"
   - discussion seq と validator 追加は `S02` へ分離し、ここでは node id race に集中する
   - stale lock の診断導線は `S04` で扱うが、S01 の時点で acquire-side policy 自体は固定する
   - S01 では stale lock を自動破壊しない。lock acquire は metadata を読める範囲で露出し、timeout または stale 判定時は no-write で失敗し `doctor` へ誘導する
-  - `AC-001` の完了は `S02` を含めて判定する。S01 単体では B01 と node create 側の atomicity を閉じる
+  - `AC-001` の完了は `S01L` / `S02` を含めて判定する。S01 単体では B01 と node create 側の atomicity を閉じる
 
 #### update_plan（着手時に登録）
 - [ ] `update_plan` に `S01` の作業単位を登録した
@@ -420,6 +428,44 @@ ID: "issue-28-runtime-regression-bugs"
 - git commit:
   - `S01K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
+### S01L — create-mode 全 kind に pre-GitHub graph preflight を揃える
+- target:
+  - `new initiative|epic|issue` の create mode で、stable tree validation failure を GitHub issue 作成前に no-side-effect fail にする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/039`
+- step boundary:
+  - pre-lock では read-only graph preflight のみ追加し、authoritative な parent/uniqueness revalidation は lock 内に残す
+  - repo 全体 validate を create の必須前提へ広げるのではなく、まず `load_graph(...)` ベースで防げる orphan issue を減らす
+
+#### Red
+- failing test:
+  - broken existing tree で `new initiative --create-github-issue` が `issue_create()` 未呼び出しのまま fail する regression
+  - broken existing tree で `new epic` / `new issue` も pre-GH graph preflight で no-side-effect fail する regression
+  - checked-in dogfooding runtime でも同じ no-side-effect regression
+
+#### Green
+- minimum implementation:
+  - create-mode 全 kind で `gh issue create` 前に read-only graph preflight を実行する
+  - `epic` / `issue` は preflight graph を使って stable parent existence も確認する
+  - lock 取得後は既存どおり graph reload と authoritative parent/uniqueness revalidation を維持する
+
+#### Refactor
+- cleanup target:
+  - pure input validation / graph preflight / in-lock authoritative validation の helper 境界を整理する
+
+#### step gate
+- review:
+  - tree preflight 追加で orphan issue を減らしつつ、S01I/S01J の create-lock 契約を壊していないことを説明できる
+- expected tests:
+  - provider runtime の broken-tree no-GH-call regression
+  - provider runtime の parent-not-found regression が引き続き通ること
+  - checked-in runtime parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01L` の review と expected tests が通り、`report.md` 更新後にコミットする
+
 ### S02 — discussion seq を同じ transaction に統合し validator でも守る
 - target:
   - `new doc` の seq 採番を S01 と同じ safety model に乗せる
@@ -430,7 +476,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `discussions/008`
 - step boundary:
   - doctor guidance までは広げず、discussion create と validate safety net に限定する
-  - `S01` と合わせて `AC-001 create atomicity` を完了させる step として扱う
+  - `S01` / `S01L` と合わせて `AC-001 create atomicity` を完了させる step として扱う
 
 #### update_plan（着手時に登録）
 - [ ] `update_plan` に `S02` の作業単位を登録した
@@ -1199,6 +1245,43 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S05H` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05I — deps target 自身の status 解決を inspection 契約へ含める
+- target:
+  - `deps check` が initiative / epic target 自身の resolved status を `target_status` に正しく露出する
+- design refs:
+  - `design.md` の `2. status/readiness contract`
+  - `discussions/038`
+- step boundary:
+  - `inspection.issue_statuses` の target payload を補う局所 corrective fix に限定し、node_states の issue-only contract は変えない
+
+#### Red
+- failing test:
+  - `deps check init-local-... --json` が ready target でも `target_status.authority=unknown` / `stale=true` に落ちる regression
+  - `deps check epic-local-... --json` でも同じ regression
+  - text render でも target status が `unknown/stale` に退行しないこと
+
+#### Green
+- minimum implementation:
+  - `inspect_target_deps()` が target 自身の resolved status を `inspection.issue_statuses` に含める
+  - presentation 側の target_status 参照経路はそのまま活かす
+
+#### Refactor
+- cleanup target:
+  - issue-only node state と target status payload の責務境界をコメント/命名で明確にする
+
+#### step gate
+- review:
+  - inspection 契約に target status を含める理由と presentation 側へ責務を漏らさないことを説明できる
+- expected tests:
+  - initiative target JSON regression
+  - epic target JSON regression
+  - target text render regression
+  - checked-in parity または executable smoke
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05I` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:

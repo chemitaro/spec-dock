@@ -1922,6 +1922,164 @@ with tempfile.TemporaryDirectory() as td:
         )
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
+    def test_checked_in_dogfooding_runtime_non_issue_deps_target_status_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import check_deps as app_check_deps
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.domain import models as domain_models
+    from spec_dock_runtime.infra import contracts as infra_contracts
+    from spec_dock_runtime.presentation import json_state as presentation_json_state
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+    )
+
+class _StubNodeReader:
+    def __init__(self, records):
+        self._records = list(records)
+    def load_node_records(self):
+        return list(self._records)
+
+class _StubDepsTopologyReader:
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return infra_contracts.DepsTopologyLoadResult(issue_depends_on_map={{}}, warnings=[])
+
+class _StubDerivedStateReader:
+    def load_cached_issue_status_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+    def load_cached_issue_last_sync_at_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+
+class _StubIssueGateway:
+    def __init__(self, snapshots):
+        self._snapshots = list(snapshots)
+        self.view_calls = []
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return list(self._snapshots)
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
+        raise RuntimeError("unexpected repo-scoped issue view")
+
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    records = [
+        _record(
+            kind="initiative",
+            node_id="init-00101",
+            title="Platform",
+            path=specdock_dir / "initiatives" / "init-00101-platform",
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=101,
+        ),
+        _record(
+            kind="epic",
+            node_id="epic-00201",
+            title="Delivery",
+            path=specdock_dir / "initiatives" / "init-00101-platform" / "epics" / "epic-00201-delivery",
+            parent_id="init-00101",
+            initiative_id="init-00101",
+            epic_id=None,
+            github_issue_number=201,
+        ),
+    ]
+    issue_gateway = _StubIssueGateway(
+        snapshots=[
+            domain_models.IssueSnapshot(
+                issue_number=101,
+                state="OPEN",
+                title="Initiative #101",
+                labels=[],
+                updated_at="2026-03-20T10:00:00Z",
+                url="https://github.com/current/repo/issues/101",
+                repo_owner="current",
+                repo_name="repo",
+            ),
+            domain_models.IssueSnapshot(
+                issue_number=201,
+                state="OPEN",
+                title="Epic #201",
+                labels=[],
+                updated_at="2026-03-20T11:00:00Z",
+                url="https://github.com/current/repo/issues/201",
+                repo_owner="current",
+                repo_name="repo",
+            ),
+        ],
+    )
+    ports = app_ports.Ports(
+        node_reader=_StubNodeReader(records),
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+        deps_topology_reader=_StubDepsTopologyReader(),
+        derived_state_reader=_StubDerivedStateReader(),
+        issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
+    )
+
+    for target_id, expected_last_sync_at in (
+        ("init-00101", "2026-03-20T10:00:00Z"),
+        ("epic-00201", "2026-03-20T11:00:00Z"),
+    ):
+        deps_result = app_check_deps.check_deps(
+            app_contracts.CheckDepsRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id=target_id, github_issue_number=None),
+                use_github=True,
+                issue_limit=10000,
+            ),
+            ports,
+        )
+        payload = json.loads(presentation_json_state.render_deps_check_json(deps_result))
+        target_status = payload["target_status"]
+        assert target_status["authority"] == "github"
+        assert target_status["effective_status"] == "open"
+        assert target_status["source"] == "github"
+        assert target_status["stale"] is False
+        assert target_status["last_sync_at"] == expected_last_sync_at
+
+    assert issue_gateway.view_calls == []
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
     def test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
@@ -2821,6 +2979,150 @@ with tempfile.TemporaryDirectory() as td:
             message = str(exc)
     assert "GitHub issue was created: #961" in message, message
     assert "new epic --github-issue 961" in message, message
+""" % str(runtime_scripts_dir)
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
+    def test_checked_in_dogfooding_runtime_create_mode_graph_preflight_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = """
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, %r)
+try:
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import create_node as app_create_node
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.infra import contracts as infra_contracts
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+    )
+
+def _prepare_templates(specdock_dir):
+    for kind in ("initiative", "epic", "issue"):
+        template_root = specdock_dir / "templates" / kind
+        (template_root / "docs").mkdir(parents=True, exist_ok=True)
+        (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
+        (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+
+class _DummyNodeReader:
+    def load_node_records(self):
+        return []
+
+class _StubNodeRepo:
+    def __init__(self, records):
+        self._records = list(records)
+    def load_node_records(self, specdock_dir):
+        del specdock_dir
+        return list(self._records)
+    def write_meta(self, dest_dir, record):
+        del dest_dir, record
+        raise AssertionError("write_meta should not be called when graph preflight fails")
+
+class _StubTemplateScaffolder:
+    def render_text(self, text, replacements):
+        del replacements
+        return text
+    def load_template_text(self, src_path):
+        return Path(src_path).read_text(encoding="utf-8")
+    def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
+        del src_dir, dest_dir, replacements
+        raise AssertionError("copy_scaffolded_tree should not be called when graph preflight fails")
+    def write_text(self, dest_path, text):
+        del dest_path, text
+        raise AssertionError("write_text should not be called when graph preflight fails")
+
+class _StubIssueGateway:
+    def __init__(self, numbers):
+        self._numbers = list(numbers)
+        self.calls = []
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return []
+    def issue_create(self, repo_root, title, body):
+        self.calls.append((str(repo_root), title, body))
+        if not self._numbers:
+            raise RuntimeError("no issue numbers configured")
+        return self._numbers.pop(0)
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    _prepare_templates(specdock_dir)
+
+    init_a = specdock_dir / "initiatives" / "init-local-00001-auth-platform-a"
+    init_b = specdock_dir / "initiatives" / "init-local-00001-auth-platform-b"
+    duplicate_records = [
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Auth platform A",
+            path=init_a,
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Auth platform B",
+            path=init_b,
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+    ]
+
+    issue_gateway = _StubIssueGateway([960])
+    ports = app_ports.Ports(
+        node_reader=_DummyNodeReader(),
+        node_repo=_StubNodeRepo(duplicate_records),
+        template_scaffolder=_StubTemplateScaffolder(),
+        issue_gateway=issue_gateway,
+        clock=None,
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+    )
+    try:
+        app_create_node.create_initiative(
+            app_contracts.CreateNodeRequest(
+                title="Payments",
+                slug=None,
+                parent_id=None,
+                requested_node_id=None,
+                github_mode="create",
+                github_issue_number=None,
+            ),
+            ports,
+        )
+        raise AssertionError("expected graph preflight failure before github create")
+    except RuntimeError as exc:
+        message = str(exc)
+    assert "duplicate id" in message.lower(), message
+    assert issue_gateway.calls == [], issue_gateway.calls
 """ % str(runtime_scripts_dir)
         result = subprocess.run(
             [sys.executable, "-c", check_code],

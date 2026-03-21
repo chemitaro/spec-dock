@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-19"
+最終更新: "2026-03-21"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: []
 ---
@@ -16,6 +16,7 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-20 latest GitHub/Codex review と fresh whole-diff review で見つかった checked-in runtime parity drift に対し、corrective scope `S90G` を追加した
 - 2026-03-20 fresh whole-diff review で見つかった import create transaction 漏れに対し、corrective scope `S01H` を追加した
 - 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
+- 2026-03-21 latest GitHub/Codex review 2 件により、corrective scope `S05I deps target status payload` と `S01L pre-GitHub graph preflight` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -672,6 +673,47 @@ ID: "issue-28-runtime-regression-bugs"
     - spec review: `pass`
     - implementation review: `pass`
     - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/038-disc-pr29-r22-deps-target-status-payload-analysis.md`
+  - `spec-deps/current/discussions/039-disc-pr29-r23-pre-github-graph-preflight-analysis.md`
+  - docs:
+    - `requirement.md` に `AC-001` の pre-GitHub graph preflight / no-side-effect fail-fast 契約と、`AC-011` の deps target 自身の `target_status` 契約を追記した
+    - `design.md` と `plan.md` は `S05I` / `S01L` の corrective scope と step gate を正本として維持し、`report.md` 側の latest head summary も同スコープに更新した
+  - spec self-review:
+    - 初回 `fail`
+    - 指摘:
+      - `requirement.md` に R23 の pre-GitHub graph preflight / no-side-effect fail-fast 契約が落ちていた
+      - `requirement.md` に R22 の initiative/epic target を含む `target_status` 契約が落ちていた
+      - `report.md` に docs update trace が不足していた
+    - 対応:
+      - `AC-001` と `AC-011` を latest corrective scope に合わせて拡張した
+      - R22/R23 closure に docs update trace を追加した
+    - 再レビュー:
+      - `pass`
+  - whole-diff fresh review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `plan.md` の要件トレースが stale で、`AC-001 -> S01,S02` と `AC-011 -> S05F` のまま残っていた
+    - 対応:
+      - `plan.md` の `AC-001` を `S01 / S01L / S02` に、`AC-011` を `S05F / S05I` に更新した
+      - `S01` / `S02` の step boundary でも `S01L` を含む完了条件へ揃えた
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - `resolve_issue_statuses()` の対象を `initiative` / `epic` / `issue` へ広げ、`deps check` の target 自身が initiative / epic でも real status を返せるよう補強した
+    - `inspect_target_deps()` が target 自身の resolved status payload を inspection 契約に含めるよう補強した
+    - create-mode 全 kind で `gh issue create` 前に read-only graph preflight を通し、stable tree failure では no-side-effect fail にする補強を入れた
+    - checked-in dogfooding runtime の `domain/status.py` / `domain/deps.py` も provider-side contract へ揃え、deps target_status parity drift を閉じた
+    - provider runtime と checked-in runtime の両方に、initiative/epic target_status と create-mode graph preflight の回帰を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_create_mode_graph_preflight_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_deps_target_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity`
+    - 結果: `Ran 74 tests in 12.887s` / `OK`
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/domain/status.py spec-dock/scripts/spec_dock_runtime/domain/deps.py tests/cli_runtime/test_deps.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - 結果: `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
@@ -689,7 +731,7 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- latest head では `S01I` / `S01J` / `S01K` / `S04H` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
+- latest head では `S01I` / `S01J` / `S01K` / `S01L` / `S04H` / `S05I` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
 - `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
 - latest push 後の Codex review / PR checks は `pass`。main 差分全体の fresh review が `pass` になれば merge-ready 判定を更新する
