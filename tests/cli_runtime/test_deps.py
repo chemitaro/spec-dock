@@ -1397,6 +1397,93 @@ class TestCliDeps(CliRuntimeHarness):
             data = json.loads(p.stdout)
             self.assertEqual(data["effective_depends_on"], ["iss-local-00003", "iss-local-00004"])
 
+    def test_deps_check_initiative_and_epic_target_status_does_not_fall_back_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
+
+            for target_id in ("init-local-00001", "epic-local-00001"):
+                with self.subTest(target_id=target_id):
+                    p_json = self._run_runtime_capture(target, ["deps", "check", target_id, "--json"])
+                    self.assertEqual(p_json.returncode, 0, p_json.stdout + p_json.stderr)
+                    data = json.loads(p_json.stdout)
+                    self.assertEqual(data["target"], target_id)
+                    self.assertEqual(data["target_status"]["source"], "local")
+                    self.assertEqual(data["target_status"]["authority"], "local")
+                    self.assertFalse(data["target_status"]["stale"])
+
+                    p_text = self._run_runtime_capture(target, ["deps", "check", target_id])
+                    self.assertEqual(p_text.returncode, 0, p_text.stdout + p_text.stderr)
+                    self.assertIn("source=local", p_text.stdout)
+                    self.assertIn("stale=false", p_text.stdout)
+
+    def test_deps_check_initiative_and_epic_target_status_uses_github_when_linked(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {
+                        "number": 101,
+                        "state": "OPEN",
+                        "title": "Initiative",
+                        "labels": [],
+                        "updatedAt": "2026-03-20T10:00:00Z",
+                        "url": "u",
+                    },
+                    {
+                        "number": 201,
+                        "state": "OPEN",
+                        "title": "Epic",
+                        "labels": [],
+                        "updatedAt": "2026-03-20T11:00:00Z",
+                        "url": "u",
+                    },
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            for target_id, expected_last_sync_at in (
+                ("init-00101", "2026-03-20T10:00:00Z"),
+                ("epic-00201", "2026-03-20T11:00:00Z"),
+            ):
+                with self.subTest(target_id=target_id):
+                    p_json = self._run_runtime_capture(
+                        target,
+                        ["deps", "check", target_id, "--github", "--json"],
+                        env=test_env,
+                    )
+                    self.assertEqual(p_json.returncode, 0, p_json.stdout + p_json.stderr)
+                    data = json.loads(p_json.stdout)
+                    self.assertEqual(data["target"], target_id)
+                    self.assertEqual(data["target_status"]["authority"], "github")
+                    self.assertEqual(data["target_status"]["effective_status"], "open")
+                    self.assertEqual(data["target_status"]["source"], "github")
+                    self.assertFalse(data["target_status"]["stale"])
+                    self.assertEqual(data["target_status"]["last_sync_at"], expected_last_sync_at)
+
+                    p_text = self._run_runtime_capture(target, ["deps", "check", target_id, "--github"], env=test_env)
+                    self.assertEqual(p_text.returncode, 0, p_text.stdout + p_text.stderr)
+                    self.assertIn("source=github", p_text.stdout)
+                    self.assertIn("stale=false", p_text.stdout)
+
     def test_deps_self_dependency_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

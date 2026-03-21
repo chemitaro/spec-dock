@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-17"
+最終更新: "2026-03-21"
 依存: ["requirement.md"]
 親: []
 ---
@@ -45,7 +45,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 - `new initiative|epic|issue|doc` と create-like な `import issue` を共通の create transaction として扱う
 - repo-global create lock は local graph-derived mutation boundary にだけ適用する
-- `new issue` の create mode で実行される `gh issue create` は lock 外で実行し、lock 内には入れない
+- `new initiative|epic|issue` の create mode で実行される `gh issue create` は lock 外で実行し、lock 内には入れない
 - lock 区間内で次を実施する
   - graph 読み取り
   - next id / next sequence 採番
@@ -57,18 +57,19 @@ ID: "issue-28-runtime-regression-bugs"
   - URL / repo identity 解析
   - required artifact preflight
   - GitHub issue metadata fetch
-- `new issue` の create mode でも次を lock の外に残す
+- `new initiative|epic|issue` の create mode でも次を lock の外に残す
   - pure input validation
-  - read-only graph precheck で判定できる stable parent existence validation
+  - read-only graph preflight で判定できる stable tree/parent validation
   - graph-independent minimal body による GitHub issue create
 - pure input validation には少なくとも次を含める
   - `--id` と GitHub mode の併用禁止
   - required parent selector (`--initiative` / `--epic`) の欠落
   - `github_repo_owner` / `github_repo_name` の片側欠落
-- pre-GitHub graph precheck には少なくとも次を含める
+- pre-GitHub graph preflight には少なくとも次を含める
+  - `load_graph(...)` により判定できる stable tree viability
   - `new epic` の parent initiative existence
   - `new issue` の parent epic existence
-- ただし pre-GitHub graph precheck は advisory ではなく no-side-effect fail-fast に使う一方、authoritative な parent resolution は lock 内で再実行する
+- ただし pre-GitHub graph preflight は advisory ではなく no-side-effect fail-fast に使う一方、authoritative な parent resolution と uniqueness 判定は lock 内で再実行する
 - ただし、graph 依存の uniqueness 判定と node planning は lock 内で再実行する
 - `new initiative|epic|issue` の create mode で `gh issue create` 完了後に local create が失敗した場合は、phase を問わず created GitHub issue number を含む failure surface と kind-aware retry/link guidance を返す
 
@@ -154,6 +155,7 @@ stop
 - prototype 段階では、GitHub authority を `--github` なしで読んだ場合は `stale=true` を安全側既定とする
 - `deps check` と `active set` は同じ readiness 判定を参照する
   - 最小 rule は `blockers=[]` かつ `effective_status=open`
+- `deps check` の `target_status` は target 自身の resolved status を返し、initiative / epic target でも `unknown/stale` へ退行しない
 
 ### 意図
 
@@ -194,6 +196,8 @@ ActiveSet --> IssueStatusResolution : uses
 
 - status surface はやや複雑になる
 - ただし「複雑さを隠して誤認させる」より「複雑さを contract として表に出す」方が安全
+- `deps check` inspection には issue graph の node states と target 自身の status payload が混在する
+  - ただし presentation 側で別経路解決するより、inspection 契約に target status を含める方が責務が明確
 
 ## 2.1 current repo slug parity for github-aware commands
 

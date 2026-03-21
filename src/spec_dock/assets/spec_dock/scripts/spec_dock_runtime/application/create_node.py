@@ -974,9 +974,9 @@ def _precheck_pre_github_create_parent(
     *,
     kind: Literal["initiative", "epic", "issue"],
 ) -> None:
+    graph = load_graph(ports, validate=False)
     if kind == "initiative":
         return
-    graph = load_graph(ports, validate=False)
     resolve_parent_for_create(req, graph, kind=kind)
 
 

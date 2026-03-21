@@ -1149,6 +1149,63 @@ class TestRuntimeNewS08(unittest.TestCase):
                         create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
                     self.assertEqual(issue_gateway.calls, [])
 
+    def test_github_create_graph_preflight_fails_before_github_create_for_initiative(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_a = specdock_dir / "initiatives" / "init-local-00001-auth-platform-a"
+            init_b = specdock_dir / "initiatives" / "init-local-00001-auth-platform-b"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform A",
+                    path=init_a,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform B",
+                    path=init_b,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+
+            issue_gateway = _StubIssueGateway([797])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+            with self.assertRaisesRegex(RuntimeError, "(?i)duplicate id"):
+                app_create_node.create_initiative(
+                    app_contracts.CreateNodeRequest(
+                        title="Payments",
+                        slug=None,
+                        parent_id=None,
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+            self.assertEqual(issue_gateway.calls, [])
+
     def test_initiative_and_epic_post_create_failures_report_retry_link_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
 

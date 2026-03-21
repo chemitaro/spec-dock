@@ -321,6 +321,9 @@ def inspect_target_deps(
             if isinstance(dep_id, str):
                 target_effective_set.add(dep_id)
 
+    inspected_status_ids = set(inspect_issue_ids)
+    inspected_status_ids.add(target_id.value)
+
     return TargetDepsInspection(
         target_id=target_id,
         evaluation=evaluation,
@@ -329,7 +332,7 @@ def inspect_target_deps(
         warnings=[],
         issue_statuses={
             issue_id: issue_statuses[issue_id]
-            for issue_id in inspect_issue_ids
+            for issue_id in _safe_sorted_node_ids(inspected_status_ids)
             if issue_id in issue_statuses
         },
     )
