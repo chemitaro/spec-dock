@@ -28,6 +28,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `AC-013 repo-aware numeric deps resolution`
   - `AC-014 stale active pathfile healing`
   - `AC-015 same-repo URL-linked sync fetch efficiency`
+  - `AC-016 current-repo-aware branch inference under repo overlap`
 - EC:
   - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
 - 制約:
@@ -134,6 +135,19 @@ ID: "issue-28-runtime-regression-bugs"
     - PR #29 R23 pre-GitHub graph preflight
   - review gate:
     - create lock narrowing を壊さず、pre-GH で防げる orphan issue だけを減らしている
+- S03J:
+  - 観測可能な振る舞い: current repo の unscoped linked initiative / epic / issue が index incomplete 時でも repo-aware fallback fetch で stale 化しない
+  - closes:
+    - PR #29 R28 current-repo fallback fetch for unscoped epic/initiative links
+  - review gate:
+    - `sync` / `active` / `deps` が current repo slug を helper まで渡し、unscoped current-repo linked node を `(current_repo_slug, issue_number)` として fallback fetch できる
+- S03K:
+  - 観測可能な振る舞い: numeric branch inference が repo overlap 後も current repo issue を優先し、active auto-update が止まらない
+  - closes:
+    - PR #29 R29 current-repo-aware branch inference under repo overlap
+  - review gate:
+    - explicit id match の優先順位を壊さず、numeric fallback だけ repo-aware 化している
+    - current repo slug 不明時は ambiguity / no-match の fail-closed を維持する
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -157,10 +171,12 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-010` -> `S90`, `S90F`
   - corrective scopes: `S01M`, `S01N`, `S01O`
 - `AC-011` -> `S05F`, `S05I`
+  - corrective scopes: `S03J`
 - `AC-012` -> `S04F`
 - `AC-013` -> `S05G`
 - `AC-014` -> `S04G`
 - `AC-015` -> `S05H`
+- `AC-016` -> `S03K`
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
@@ -170,6 +186,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R25` -> `S01M`
 - `PR29-R26` -> `S01N`
 - `PR29-R27` -> `S01O`
+- `PR29-R28` -> `S03J`
+- `PR29-R29` -> `S03K`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -827,6 +845,85 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S03` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03J — current repo の unscoped linked epic/initiative に issue-view fallback を揃える
+- target:
+  - `issue_index()` が current repo linked epic / initiative / issue を取りこぼした場合でも、repo-aware fallback fetch で `unknown/stale` 退行を防ぐ
+- design refs:
+  - `design.md` の `2.1 current repo slug parity for github-aware commands`
+  - `design.md` の `2.4 current-repo fallback fetch for unscoped initiative/epic links`
+- step boundary:
+  - same-repo indexed dedup 契約は維持し、current repo slug を helper と call site へ渡す補強だけを扱う
+
+#### Red
+- failing test:
+  - unscoped current-repo linked epic が index 未掲載時に fallback fetch されず `unknown/stale` のままになる regression
+  - unscoped current-repo linked initiative も同様に stale のままになる regression
+  - checked-in parity path に同 helper がある場合、同じ取りこぼしが再発する regression
+
+#### Green
+- minimum implementation:
+  - `collect_repo_scoped_issue_view_targets()` に `current_repo_slug` を通し、unscoped linked node を `(current_repo_slug, issue_number)` として fallback target 化する
+  - `sync_state` / `set_active` / `check_deps` の call site を同 helper 契約へ揃える
+  - checked-in parity path に同 helper / call site があれば追随させる
+
+#### Refactor
+- cleanup target:
+  - current-repo vs foreign-repo target 判定 helper の責務を整理する
+- invariants to keep green:
+  - index 済み same-repo target への extra `issue_view_snapshot()` は復活させない
+  - foreign scoped fetch は引き続き維持する
+
+#### step gate
+- review:
+  - current repo linked issue / epic / initiative が index incomplete 時でも repo-aware fallback で status を回復できる
+- expected tests:
+  - sync current-repo unscoped epic/initiative fallback regression
+  - active/deps current-repo fallback parity regression
+  - checked-in parity regression（該当 path がある場合）
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03K — repo overlap 後も numeric branch inference を current-repo-aware に保つ
+- target:
+  - foreign same-number coexistence 後も numeric branch 名から current repo issue を安定に推論し、branch auto-update を止めない
+- design refs:
+  - `design.md` の `2.5 current-repo-aware numeric branch inference`
+- step boundary:
+  - explicit id match 優先は変えず、numeric fallback と `sync_state` からの current repo slug 伝播だけを扱う
+
+#### Red
+- failing test:
+  - current repo `#123` と foreign `other/repo#123` が共存すると `123-fix-login` が ambiguity に落ちる regression
+  - current repo slug 不明時の ambiguity fail-closed が失われる regression
+  - checked-in parity path に同 inference がある場合、同じ ambiguity が再発する regression
+
+#### Green
+- minimum implementation:
+  - `infer_active_node_from_branch()` の numeric fallback を repo-aware candidate selection に更新する
+  - `maybe_auto_update_from_branch()` から current repo slug を渡す
+  - checked-in parity path に同 inference があれば追随させる
+
+#### Refactor
+- cleanup target:
+  - numeric branch candidate selection と reason message の責務を整理する
+- invariants to keep green:
+  - explicit node id を含む branch の優先順位は維持する
+  - current repo slug 不明時は ambiguity/no-match の fail-closed を維持する
+
+#### step gate
+- review:
+  - numeric branch auto-update が current repo overlap では継続し、repo context 不明時だけ fail-closed になる
+- expected tests:
+  - branch overlap current-repo preferred regression
+  - branch overlap slug-unknown ambiguity regression
+  - checked-in parity regression（該当 path がある場合）
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S04 — artifact/repair/active fallback contract を整える
 - target:
@@ -1730,7 +1827,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ## final exit contract
 - AC/EC 達成:
-  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015` が対応 step の review/QA 付きで満たされている
+  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016` が対応 step の review/QA 付きで満たされている
   - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
 - docs impact resolved:
   - provider-side docs と dogfooding 確認が完了し、`report.md` に判断と結果が残っている

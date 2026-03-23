@@ -297,14 +297,26 @@ ID: "issue-28-runtime-regression-bugs"
 
 - Given:
   - current repo origin が解決できる
-  - current repo の unscoped linked issue と GitHub snapshot が存在する
+  - current repo の unscoped linked issue / epic / initiative と GitHub snapshot が存在する
 - When:
-  - `active set --github` または `deps check --github` を実行する
+  - `sync --github` または `active set --github` または `deps check --github` を実行する
 - Then:
   - `sync --github` と同じ current repo slug-aware status resolution が使われる
   - current repo linked issue が `unknown/stale` に退行せず、GitHub の実 status を readiness / JSON / activation 判定へ反映できる
+  - `issue_index()` が current repo の unscoped linked epic / initiative / issue を取りこぼした場合でも、current repo slug を補って `issue_view_snapshot()` fallback が行われ、`unknown/stale` のまま放置されない
   - `deps check` は initiative / epic / issue の target 自身の resolved status を inspection / JSON の `target_status` として含み、target が issue 以外でも `unknown/stale` に退行しない
   - 上記の `target_status` 契約は local target と `--github` target の両方で維持される
+
+### AC-016 current-repo-aware branch inference under repo overlap
+
+- Given:
+  - current repo issue `#123` を指す numeric branch 名（例: `123-fix-login`, `issue-123`）で作業している
+  - foreign repo issue `other/repo#123` が同じ tree に共存している
+- When:
+  - `sync --github` または branch auto-update を伴う `sync` を実行する
+- Then:
+  - branch-based active inference は bare `github_issue_number` だけで曖昧化せず、current repo slug を解決できる限り current repo `#123` を優先して active auto-update できる
+  - current repo slug が解決できない場合だけ ambiguity / no-match の fail-closed を維持する
 
 ### AC-012 domain/application validation boundary
 

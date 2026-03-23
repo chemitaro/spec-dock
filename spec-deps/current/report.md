@@ -20,6 +20,7 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-22 latest GitHub/Codex review 1 件により、corrective scope `S04I placeholder active entrypoint recovery` を追加した
 - 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S01M executable doctor guidance` と `S01N runnable post-create retry hint` を追加した
 - 2026-03-23 latest GitHub/Codex review 1 件により、corrective scope `S01O cwd-independent create guidance path` を追加した
+- 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S03J current-repo fallback fetch for unscoped linked nodes` と `S03K current-repo-aware numeric branch inference` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -30,6 +31,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `S04I` では placeholder active entrypoint recovery を補修し、invalid directory conflict の follow-up を含めて spec review / implementation review / QA review を通過した
 - current working tree では、`S01M` と `S01N` で create guidance surface を executable/runnable へ補修し、fresh spec review / implementation review / QA review を通過した
 - current working tree では、`S01O` で create guidance path を cwd-independent に補修し、fresh spec review / implementation review / QA review を通過した
+- current working tree では、`S03J` / `S03K` の corrective scope を issue 文書へ反映し、fresh spec review を `pass` している
 - `S90 docs impact resolution` を完了
 - `S90F checked-in dogfooding runtime parity` を完了
 - `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
@@ -58,6 +60,33 @@ ID: "issue-28-runtime-regression-bugs"
 - `S01H` では provider/checked-in runtime の import path を create transaction 契約へ統合し、import/import・import/new・active-parent fallback の precheck parity を補完して、spec review / implementation review / QA review を通過した
 - `S90G` では checked-in runtime の `json_state` / `deps_reader` parity drift を補修し、checked-in executable-path regression と合わせて spec review / implementation review / QA review を通過した
 - 先行時点での `S99 final diff review pass` / `merge-ready` 判断は `S04H` 追加前の状態を含むため、最新 head に対して fresh whole-diff review を再実施する前提で superseded として扱う
+
+- 2026-03-23 latest PR review follow-up `S03J` / `S03K` docs closure:
+  - background:
+    - latest GitHub/Codex review 2 件で、unscoped current-repo linked epic/initiative の fallback fetch 漏れと、repo overlap 後の numeric branch active inference 停止が指摘された
+  - docs:
+    - `discussions/044` に `current-repo fallback fetch for unscoped linked nodes` の分析を記録した
+    - `discussions/045` に `current-repo-aware numeric branch inference` の分析を記録した
+    - `requirement.md` では `AC-011` を current-repo linked issue/epic/initiative と fallback fetch まで拡張し、`AC-016 current-repo-aware branch inference under repo overlap` を追加した
+    - `design.md` では `2.4 current-repo fallback fetch for unscoped initiative/epic links` と `2.5 current-repo-aware numeric branch inference` を追加した
+    - `plan.md` では `S03J` / `S03K` と `PR29-R28` / `PR29-R29` 対応、および `AC-016` の top-level scope / final exit contract 反映を追加した
+  - review status:
+    - fresh spec review 初回 `fail`
+    - 指摘:
+      - `plan.md` の top-level scope と final exit contract に `AC-016` が入っていなかった
+      - `report.md` に R28/R29 corrective handoff の docs traceability と pending gate が不足していた
+    - 対応:
+      - `plan.md` に `AC-016` を top-level scope と final exit contract へ追記した
+      - この closure entry を追加し、関連 discussions / docs / pending review gates を明示した
+    - 再レビュー:
+      - `pass`
+  - pending gates:
+    - implementation review
+    - QA review
+    - targeted tests:
+      - current-repo unscoped epic/initiative fallback regression
+      - branch overlap current-repo preferred regression
+      - slug-unknown ambiguity fail-closed regression
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:
