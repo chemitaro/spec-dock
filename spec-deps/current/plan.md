@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28", "https://github.com/chemitaro/spec-dock/issues/28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-22"
+最終更新: "2026-03-23"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -150,9 +150,12 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-006` -> `S04`
   - corrective scopes: `S04I`
 - `AC-007` -> `S05`
+  - corrective scopes: `S01N`
 - `AC-008` -> `S04`
+  - corrective scopes: `S01M`
 - `AC-009` -> `S02`
 - `AC-010` -> `S90`, `S90F`
+  - corrective scopes: `S01M`, `S01N`
 - `AC-011` -> `S05F`, `S05I`
 - `AC-012` -> `S04F`
 - `AC-013` -> `S05G`
@@ -164,6 +167,8 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R22` -> `S05I`
 - `PR29-R23` -> `S01L`
 - `PR29-R24` -> `S04I`
+- `PR29-R25` -> `S01M`
+- `PR29-R26` -> `S01N`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -429,6 +434,65 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S01K` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01M — create lock failure guidance を executable doctor command に揃える
+- target:
+  - create lock acquisition / metadata write / release failure message が、repo-local shortcut の有無に依存しない executable doctor command を案内する
+- design refs:
+  - `design.md` の create lock / doctor guidance 方針
+- step boundary:
+  - create lock failure guidance の文言と parity test に限定し、doctor 自体の診断ロジックは変えない
+
+#### Red
+- failing test:
+  - create lock contention/stale/release failure message が repo 上で実行不能な `spec doctor` だけを案内する regression
+  - checked-in dogfooding runtime parity でも同じ guidance が維持される regression
+
+#### Green
+- minimum implementation:
+  - create lock failure guidance builder を導入し、managed repo で実行可能な stable doctor command へ統一する
+  - provider runtime と checked-in runtime parity を揃える
+
+#### step gate
+- review:
+  - create lock 系 failure から案内される doctor command が repo-local shortcut 非依存で executable である
+- expected tests:
+  - lock contention/stale/release failure guidance
+  - checked-in runtime doctor guidance parity
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01M` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01N — post-create recovery hint を runnable command に揃える
+- target:
+  - GitHub issue 作成後の local failure guidance が、kind ごとの required flags を含む runnable retry command を返す
+- design refs:
+  - `design.md` の create flow / post-create guidance 方針
+- step boundary:
+  - created issue number を含む recovery hint の生成に限定し、create transaction や lock scope は変えない
+
+#### Red
+- failing test:
+  - initiative create の post-failure guidance が `--title` を欠く regression
+  - epic / issue create の post-failure guidance が `--title` と parent selector を欠く regression
+  - checked-in runtime parity でも同じ guidance が維持される regression
+
+#### Green
+- minimum implementation:
+  - post-create failure message builder に original request context を渡し、`--title` と required parent flags を含む command を組み立てる
+  - provider runtime と checked-in runtime parity を揃える
+
+#### step gate
+- review:
+  - initiative / epic / issue の post-create recovery hint が runnable で、required flags を欠かない
+- expected tests:
+  - initiative/epic/issue の post-create failure guidance
+  - checked-in runtime post-create guidance parity
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01N` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S01L — create-mode 全 kind に pre-GitHub graph preflight を揃える
 - target:
