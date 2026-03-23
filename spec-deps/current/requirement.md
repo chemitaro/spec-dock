@@ -66,6 +66,8 @@ ID: "issue-28-runtime-regression-bugs"
   - `new issue` にも explicit GitHub create surface を用意すること
 - GitHub-linked issue の freshness 契約を改善する
   - stale projection を authoritative と誤読しにくくすること
+- create/post-create failure 契約を閉じる
+  - GitHub issue 作成後の local failure / cleanup failure が outcome 別に安全な guidance を返すこと
 
 ### SHOULD
 
@@ -261,6 +263,22 @@ ID: "issue-28-runtime-regression-bugs"
   - ただし `--github-issue <n>` が複数 node に一致する場合は、曖昧成功ではなく ambiguity error になり、operator は `--id <node-id>` で対象を確定できる
   - post-create local failure の recovery hint は kind ごとに再実行可能であり、`--title` と必要な parent selector（`--initiative` / `--epic`）を欠いた不完全コマンドを案内しない
   - その recovery hint は repo root 前提の相対 path に依存せず、その時の cwd からでも実行できる command surface である
+
+### AC-017 create outcome-specific recovery guidance
+
+- Given:
+  - `new initiative|epic|issue --create-github-issue` の create path が GitHub issue 作成前または作成後に失敗する
+- When:
+  - failure surface を operator が確認する
+- Then:
+  - outcome class `pre_github_fail` / `post_github_remote_only_fail` / `post_github_local_write_fail` / `post_github_local_write_success_cleanup_fail` / `post_github_body_and_cleanup_fail` が設計/実装/検証で対応付けられている
+  - `pre_github_fail` は remote side effect がない no-side-effect failure として扱われ、created issue number をでっち上げない
+  - `post_github_remote_only_fail` は created issue number を保持したまま rerun/link または remote cleanup の guidance を返してよい
+  - `post_github_local_write_fail` は local write 未コミット枝では rerun/link guidance を返してよいが、local write committed 済み枝では doctor-first guidance を返し、blind rerun を促さない
+  - `local-write-committed cleanup failure` では raw `release_error` 単独露出に退行せず、`created_github_issue_number` を保持したまま「まず local node と doctor を確認する」guidance を返す
+  - `post_github_body_and_cleanup_fail` では primary local failure と cleanup failure を併記しつつ、上記 outcome class に応じた guidance を失わない
+  - blind rerun を促す guidance は `local-write-committed cleanup failure` に適用しない
+  - provider-side runtime と checked-in dogfooding runtime の両方で、上記 5 class の outcome-specific guidance contract を同じ粒度で維持する
 
 ### AC-008 doctor guidance
 

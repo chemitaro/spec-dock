@@ -72,6 +72,8 @@ ID: "issue-28-runtime-regression-bugs"
 - ただし pre-GitHub graph preflight は advisory ではなく no-side-effect fail-fast に使う一方、authoritative な parent resolution と uniqueness 判定は lock 内で再実行する
 - ただし、graph 依存の uniqueness 判定と node planning は lock 内で再実行する
 - `new initiative|epic|issue` の create mode で `gh issue create` 完了後に local create が失敗した場合は、phase を問わず created GitHub issue number を含む failure surface と kind-aware retry/link guidance を返す
+- ただし `gh issue create` 後の failure surface は一枚岩ではなく、outcome class ごとに guidance を分ける
+  - `remote-only failure` と `local-write-committed cleanup failure` を同じ rerun hint で扱わない
 
 ### 意図
 
@@ -95,6 +97,30 @@ ID: "issue-28-runtime-regression-bugs"
 - post-write duplicate guard は full graph invariant を再検証するものではない
   - 役割は「書いた node id が reread で materialize していること」と exact duplicate id の異常を最終境界で検知すること
   - repo-aware GitHub linkage uniqueness などの graph 依存判定は lock 内の pre-write uniqueness 再検証で担保する
+- `gh issue create` 後の error surface は outcome matrix として扱う
+  - `pre_github_fail`
+  - `post_github_remote_only_fail`
+  - `post_github_local_write_fail`
+  - `post_github_local_write_success_cleanup_fail`
+  - `post_github_body_and_cleanup_fail`
+- guidance 生成は exception site ごとの ad-hoc 分岐ではなく、上記 outcome class と evidence から組み立てる
+- evidence には少なくとも次を含める
+  - `created_github_issue_number`
+  - `kind`
+  - `title`
+  - parent selector 再構成に必要な request context
+  - local write committed 済みか
+  - cleanup failure の有無
+- `post_github_remote_only_fail`
+  - rerun/link guidance を返してよい
+- `post_github_local_write_fail`
+  - local write 未コミット枝では rerun/link guidance を返してよい
+  - local write committed 済み枝では doctor-first guidance を返し、blind rerun を促さない
+- `post_github_local_write_success_cleanup_fail`
+  - raw `release_error` へ退行させない
+  - `create は成功している可能性が高い` と明示し、blind rerun ではなく local node / `doctor` 確認を優先させる
+- `post_github_body_and_cleanup_fail`
+  - primary local failure と cleanup failure を併記しつつ、outcome class に応じた guidance を返す
 
 ### 構造
 
@@ -134,6 +160,8 @@ stop
 - pre-lock GitHub body は graph-independent minimal body とする
   - 少なくとも kind は表現する
   - `Epic:` / `Initiative:` など graph 依存の親文脈は pre-lock body に入れない
+- outcome matrix を導入すると create failure surface の実装は少し厚くなる
+  - ただし review-driven な枝修正を繰り返すより、message / guidance / parity test を中央集約した方が再発率を下げられる
 
 ## 2. status/readiness contract
 

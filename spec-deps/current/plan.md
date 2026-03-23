@@ -29,6 +29,7 @@ ID: "issue-28-runtime-regression-bugs"
   - `AC-014 stale active pathfile healing`
   - `AC-015 same-repo URL-linked sync fetch efficiency`
   - `AC-016 current-repo-aware branch inference under repo overlap`
+  - `AC-017 create outcome-specific recovery guidance`
 - EC:
   - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
 - 制約:
@@ -154,6 +155,14 @@ ID: "issue-28-runtime-regression-bugs"
     - final diff review quality gate
   - review gate:
     - reviewer が「この diff を merge してよい」と判断できる
+- S01P:
+  - 観測可能な振る舞い: `gh issue create` 後の failure surface が outcome class ごとに guidance を返し、local-write-committed cleanup failure で blind rerun を案内しない
+  - closes:
+    - PR #29 R30 post-create cleanup failure guidance
+    - root-cause remediation for repeated review loop in create/post-create failure handling
+  - review gate:
+    - `remote-only failure` と `local-write-committed cleanup failure` が別 outcome class として説明できる
+    - raw `release_error` 単独露出が provider / checked-in runtime で残っていない
 
 ## 要件 ↔ ステップ対応
 - `AC-001` -> `S01`, `S01L`, `S02`
@@ -177,6 +186,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-014` -> `S04G`
 - `AC-015` -> `S05H`
 - `AC-016` -> `S03K`
+- `AC-017` -> `S01P`
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
@@ -188,6 +198,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R27` -> `S01O`
 - `PR29-R28` -> `S03J`
 - `PR29-R29` -> `S03K`
+- `PR29-R30` -> `S01P`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -543,6 +554,56 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S01O` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01P — create/post-create failure contract を outcome matrix で閉じる
+- target:
+  - `gh issue create` 後の create failure surface を outcome class で再編し、cleanup failure でも safe guidance と evidence を失わないようにする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/046`
+  - `discussions/047`
+  - `discussions/048`
+- step boundary:
+  - create transaction や lock scope は変えず、failure classification / guidance assembly / parity test の中央集約に集中する
+  - local write committed と remote-only の区別を guidance contract と test exit criteria に昇格させる
+
+#### Red
+- failing test:
+  - `pre_github_fail` が no-side-effect guidance として表面化し、created issue number を持ち込まない regression
+  - `gh create + lock acquire failure` または同等の `post_github_remote_only_fail` で created issue number と rerun/link guidance が返る regression
+  - `gh create + body failure` により `post_github_local_write_fail` が created issue number を保持したまま guidance を返す regression
+  - `gh create + local write success + release failure` で raw `release_error` ではなく created issue number と doctor-first guidance が返る regression
+  - `gh create + body failure + release failure` で primary failure と cleanup failure を併記しつつ context を失わない regression
+  - checked-in runtime parity でも上記 outcome class が provider と同じ guidance contract を返す regression
+
+#### Green
+- minimum implementation:
+  - create flow の post-GitHub evidence を outcome builder へ集約する
+  - `remote-only failure` と `local-write-committed cleanup failure` を別 guidance surface に分離する
+  - provider runtime と checked-in runtime parity を揃える
+
+#### Refactor
+- cleanup target:
+  - ad-hoc な post-create wrapper / release-error 分岐を outcome-specific helper へ寄せる
+  - message builder と evidence collection の責務を分離する
+
+#### step gate
+- review:
+  - outcome matrix の class / guidance / evidence surface が `design.md` の契約どおり説明できる
+  - blind rerun guidance が local-write-committed cleanup failure へ誤適用されていない
+  - `post_github_local_write_fail` の committed-local 枝でも doctor-first guidance へ切り替わる
+- expected tests:
+  - pre-github-fail guidance regression
+  - remote-only guidance regression
+  - local-write-fail guidance regression
+  - committed-local local-write-fail guidance regression
+  - cleanup-failure guidance regression
+  - body+cleanup combined failure regression
+  - checked-in runtime full-matrix parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01P` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S01L — create-mode 全 kind に pre-GitHub graph preflight を揃える
 - target:
@@ -1747,11 +1808,15 @@ ID: "issue-28-runtime-regression-bugs"
   - 影響範囲テスト一式
   - local/stub manual regression の再確認
   - GitHub live regression の実行結果と証跡
+  - create outcome matrix full coverage evidence
   - `rg --files | rg '[A-Z]'` による path rule 再確認
 - reviewer approvals:
   - implementation review
   - QA review
   - spec/docs review
+  - create/post-create outcome matrix の 5 class について、raw `release_error` 単独露出が残っていない
+  - create/post-create outcome matrix の committed-local branch で blind rerun guidance が残っていない
+  - provider / checked-in runtime の guidance contract drift が残っていない
 - git commit:
   - `S99` は最終 review/no-op 判定であり、この step 自体を理由に新規コミットは作らない
 
@@ -1832,8 +1897,9 @@ ID: "issue-28-runtime-regression-bugs"
 
 ## final exit contract
 - AC/EC 達成:
-  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016` が対応 step の review/QA 付きで満たされている
+  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016`、`AC-017` が対応 step の review/QA 付きで満たされている
   - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
+  - create/post-create outcome matrix の 5 class が provider / checked-in runtime で同じ guidance contract と review evidence を持つ
 - docs impact resolved:
   - provider-side docs と dogfooding 確認が完了し、`report.md` に判断と結果が残っている
 - final diff approved:
