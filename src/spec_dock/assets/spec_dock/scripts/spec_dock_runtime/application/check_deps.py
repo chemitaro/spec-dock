@@ -121,6 +121,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     if not records:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
     graph = build_graph([_to_spec_node_seed(record) for record in records])
+    current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
 
     topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
@@ -158,6 +159,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
         repo_scoped_targets = collect_repo_scoped_issue_view_targets(
             graph,
             issue_index_snapshots=issue_index_snapshots,
+            current_repo_slug=current_repo_slug,
         )
         for repo_slug, issue_number in repo_scoped_targets:
             try:
@@ -183,7 +185,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
-        current_repo_slug=resolve_current_repo_slug(ports),
+        current_repo_slug=current_repo_slug,
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)

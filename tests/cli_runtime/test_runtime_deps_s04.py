@@ -691,6 +691,106 @@ class TestRuntimeDepsS04(unittest.TestCase):
         self.assertNotIn("gh_fetch_failed", result.warnings)
         self.assertNotIn("gh_index_incomplete", result.warnings)
 
+    def test_check_deps_falls_back_to_current_repo_view_for_unscoped_linked_epic_when_index_missing_key(self) -> None:
+        (
+            _runtime_app,
+            app_check_deps,
+            app_contracts,
+            app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            domain_models,
+            infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        records = [
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-local-00001",
+                title="Auth Platform",
+                slug="auth-platform",
+                path="spec-dock/initiatives/init-local-00001-auth-platform",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="spec-dock/initiatives/init-local-00001-auth-platform/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-local-00001",
+                title="JWT Auth",
+                slug="jwt-auth",
+                path="spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=201,
+                meta_path="spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-local-00001",
+                title="Target",
+                slug="target",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00001-target"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+                meta_path=(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/"
+                    "epics/epic-local-00001-jwt-auth/issues/iss-local-00001-target/.meta.json"
+                ),
+            ),
+        ]
+        issue_gateway = _StubIssueGateway(
+            snapshots=[],
+            foreign_snapshots={
+                ("current/repo", 201): domain_models.IssueSnapshot(
+                    issue_number=201,
+                    state="CLOSED",
+                    title="Current repo #201",
+                    labels=["done"],
+                    updated_at="2026-03-23T00:00:00Z",
+                    url="https://github.com/current/repo/issues/201",
+                    repo_owner="current",
+                    repo_name="repo",
+                )
+            },
+        )
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(records),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open"}),
+            issue_gateway=issue_gateway,
+            active_state_store=_StubActiveStateStore(None),
+            deps_topology_reader=_StubDepsTopologyReader({"iss-local-00001": []}),
+            git_gateway=_StubGitGateway("current/repo"),
+        )
+
+        result = app_check_deps.check_deps(
+            app_contracts.CheckDepsRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="epic-local-00001", github_issue_number=None),
+                use_github=True,
+                issue_limit=10000,
+            ),
+            ports,
+        )
+
+        target_status = result.inspection.issue_statuses["epic-local-00001"]
+        self.assertEqual(target_status.source, "github")
+        self.assertEqual(target_status.effective_status, "done")
+        self.assertFalse(target_status.stale)
+        self.assertEqual(issue_gateway.view_calls, [("/repo", 201, "current/repo")])
+        self.assertNotIn("gh_fetch_failed", result.warnings)
+        self.assertNotIn("gh_index_incomplete", result.warnings)
+
     def test_check_deps_github_uses_current_repo_slug_for_unscoped_current_issue_and_keeps_foreign_same_number(self) -> None:
         (
             _runtime_app,

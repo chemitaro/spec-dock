@@ -263,7 +263,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 parent_id=None,
                 initiative_id=None,
                 epic_id=None,
-                github_issue_number=101,
+                github_issue_number=None,
             ),
             _record(
                 infra_contracts,
@@ -274,7 +274,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 parent_id="init-local-00001",
                 initiative_id="init-local-00001",
                 epic_id=None,
-                github_issue_number=201,
+                github_issue_number=None,
             ),
             _record(
                 infra_contracts,
@@ -794,6 +794,189 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(status.source, "github")
             self.assertEqual(status.effective_status, "done")
 
+    def test_sync_skips_issue_view_target_for_malformed_partial_repo_scope_linkage(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        partial_scopes = (("current", None), (None, "repo"))
+
+        for repo_owner, repo_name in partial_scopes:
+            with self.subTest(repo_owner=repo_owner, repo_name=repo_name):
+                with tempfile.TemporaryDirectory() as td:
+                    repo_root = Path(td)
+                    specdock_dir = repo_root / "spec-dock"
+                    specdock_dir.mkdir(parents=True, exist_ok=True)
+                    records = self._records(infra_contracts, repo_root)
+                    records[2] = _record(
+                        infra_contracts,
+                        kind="issue",
+                        node_id="iss-local-00001",
+                        title="API",
+                        path=Path(records[2].path),
+                        parent_id="epic-local-00001",
+                        initiative_id="init-local-00001",
+                        epic_id="epic-local-00001",
+                        github_issue_number=301,
+                        github_repo_owner=repo_owner,
+                        github_repo_name=repo_name,
+                    )
+                    records[3] = _record(
+                        infra_contracts,
+                        kind="issue",
+                        node_id="iss-local-00002",
+                        title="DB",
+                        path=Path(records[3].path),
+                        parent_id="epic-local-00001",
+                        initiative_id="init-local-00001",
+                        epic_id="epic-local-00001",
+                        github_issue_number=None,
+                    )
+                    issue_gateway = _StubIssueGateway(snapshots=[])
+                    ports = app_ports.Ports(
+                        node_reader=_StubNodeReader(records),
+                        repo_root=repo_root,
+                        specdock_dir=specdock_dir,
+                        deps_topology_reader=_StubDepsTopologyReader(
+                            infra_contracts,
+                            {"iss-local-00001": [], "iss-local-00002": []},
+                        ),
+                        derived_state_reader=_StubDerivedStateReader(
+                            {"iss-local-00001": "open", "iss-local-00002": "open"}
+                        ),
+                        issue_gateway=issue_gateway,
+                        active_state_store=_StubActiveStateStore(infra_contracts, []),
+                        git_gateway=_StubGitGateway("main"),
+                        artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                        clock=_StubClock(),
+                    )
+
+                    result = app_sync_state.sync(
+                        app_contracts.SyncRequest(
+                            force=False,
+                            github_enabled=True,
+                            issue_limit=10000,
+                            update_active_from_branch=False,
+                        ),
+                        ports,
+                    )
+                    self.assertIsNone(result.artifact_failure)
+                    self.assertEqual(issue_gateway.view_calls, [])
+                    self.assertNotIn("gh_fetch_failed", result.state.warnings)
+                    status = result.state.issue_statuses["iss-local-00001"]
+                    self.assertEqual(status.source, "unknown")
+                    self.assertTrue(status.stale)
+
+    def test_sync_falls_back_to_current_repo_view_for_unscoped_linked_epic_when_index_missing_key(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth"
+            epic_dir = init_dir / "epics" / "epic-local-00001-core"
+            issue_dir = epic_dir / "issues" / "iss-local-00001-api"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="Core",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=201,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="issue",
+                    node_id="iss-local-00001",
+                    title="API",
+                    path=issue_dir,
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=None,
+                ),
+            ]
+            self._materialize_required_artifacts(records)
+
+            issue_gateway = _StubIssueGateway(
+                snapshots=[],
+                foreign_snapshots={
+                    ("current/repo", 201): domain_models.IssueSnapshot(
+                        issue_number=201,
+                        state="CLOSED",
+                        title="Current repo #201 via fallback",
+                        labels=["done"],
+                        updated_at="2026-03-23T00:00:00Z",
+                        url="https://github.com/current/repo/issues/201",
+                        repo_owner="current",
+                        repo_name="repo",
+                    )
+                },
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({"iss-local-00001": "open"}),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIsNone(result.artifact_failure)
+            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 201, "current/repo")])
+            epic_status = result.state.issue_statuses["epic-local-00001"]
+            self.assertEqual(epic_status.source, "github")
+            self.assertEqual(epic_status.effective_status, "done")
+            self.assertFalse(epic_status.stale)
+            self.assertNotIn("gh_fetch_failed", result.state.warnings)
+
     def test_sync_mixed_same_repo_and_foreign_repo_scoped_targets_keeps_foreign_fetch(self) -> None:
         (
             _runtime_app,
@@ -1090,7 +1273,14 @@ class TestRuntimeSyncS07(unittest.TestCase):
             )
             self.assertIsNone(result.artifact_failure)
             self.assertIn("gh_index_incomplete", result.state.warnings)
-            self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "other/repo")])
+            self.assertIn("gh_fetch_failed", result.state.warnings)
+            self.assertEqual(
+                issue_gateway.view_calls,
+                [
+                    (str(repo_root), 301, "current/repo"),
+                    (str(repo_root), 301, "other/repo"),
+                ],
+            )
 
             current_status = result.state.issue_statuses["iss-local-00001"]
             foreign_status = result.state.issue_statuses["iss-local-00002"]

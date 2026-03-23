@@ -24,7 +24,13 @@ def collect_repo_scoped_issue_view_targets(
     graph: SpecGraph,
     *,
     issue_index_snapshots: Iterable[IssueSnapshot],
+    current_repo_slug: str | None = None,
 ) -> list[tuple[str, int]]:
+    normalized_current_repo_slug = str(current_repo_slug or "").strip().lower()
+    owner, sep, repo = normalized_current_repo_slug.partition("/")
+    if not sep or not owner or not repo:
+        normalized_current_repo_slug = ""
+
     indexed_keys: set[tuple[str, int]] = set()
     for snapshot in issue_index_snapshots:
         scoped_key = snapshot_repo_issue_key(snapshot)
@@ -37,7 +43,13 @@ def collect_repo_scoped_issue_view_targets(
             continue
         repo_slug = normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
         if repo_slug is None:
-            continue
+            # Keep fail-closed behavior for malformed partial scoped linkage.
+            has_partial_scope = bool(str(node.github_repo_owner or "").strip()) or bool(str(node.github_repo_name or "").strip())
+            if has_partial_scope:
+                continue
+            if not normalized_current_repo_slug:
+                continue
+            repo_slug = normalized_current_repo_slug
         target = (repo_slug, int(node.github_issue_number))
         if target in indexed_keys:
             continue
