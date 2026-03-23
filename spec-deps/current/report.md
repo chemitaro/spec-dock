@@ -1115,8 +1115,12 @@ ID: "issue-28-runtime-regression-bugs"
   - validation:
     - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate`
     - 結果: `Ran 132 tests in 33.285s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 167 tests in 35.027s` / `OK`
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity`
     - 結果: `Ran 7 tests in 2.675s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 92 tests in 25.410s` / `OK`
     - `python -m unittest -v tests.test_init_update`
     - 結果: `Ran 69 tests in 9.716s` / `OK`
     - `python -m unittest discover -v`
@@ -1126,10 +1130,12 @@ ID: "issue-28-runtime-regression-bugs"
     - `git diff --name-only | rg '[A-Z]' || true`
     - 結果: 変更対象 path に uppercase 追加なし
   - review status:
-    - spec review: `pass`（現セッションでは reviewer sub-agent 呼び出しが不能だったため、`AC-018/019/020` と `PR29-R31..R34` の checklist ベースで fresh manual spec review を実施）
-    - implementation review: `pass`（変更差分 + whole working tree の manual review で blocking finding なし）
-    - QA review: `pass`（上記 full/targeted unittest green）
-    - whole-diff review (`main` 基準): `pass`（今回変更の provider/check-in parity と受け入れ条件の対応を確認）
+    - spec review: `pass`（fresh reviewer pass。`spec-deps/current/{requirement,design,plan,report}` と current worktree 実装・tests の traceability を確認）
+    - implementation review: `pass`（fresh reviewer pass。repo-scoped current-repo unscoped fallback まで含め、current worktree 直読で actionable finding なし）
+    - QA review:
+      - 初回: `conditional_pass`（repo-scoped mismatch negative tests / scoped deps negative tests / checked-in import partial-write parity の不足を指摘）
+      - 是正後: `pass`（fresh reviewer pass。current worktree vs `main` で latest negative tests と parity を確認）
+    - whole-diff review (`main` 基準): `pass`（current worktree ベースで provider/check-in parity と `AC-018/019/020` の受け入れ条件対応を確認）
 
 ## 発見事項
 - 2026-03-23 review4 repo-scope/create-state remediation resume:
@@ -1145,30 +1151,17 @@ ID: "issue-28-runtime-regression-bugs"
     - 結果: `Ran 167 tests in 35.027s` / `OK`
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
     - 結果: `Ran 5 tests in 2.092s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 92 tests in 25.410s` / `OK`
   - review status:
-    - fresh spec review: `pass`（reviewer sub-agent 起動が不安定だったため、`requirement` / `design` / `plan` / `report` と code/test traceability を `main..HEAD` 全体差分で manual re-check）
-    - fresh implementation review: `pass`（repo-scoped reference bundle と create-state bundle の whole-diff manual review で blocking finding なし）
-    - fresh QA review: `pass`（provider runtime targeted suite + checked-in subprocess parity suite が green）
-    - fresh whole-diff review (`main..HEAD`): `pass`
-
-- 2026-03-23 review4 repo-scope/create-state remediation resume:
-  - scope:
-    - `S01Q` / `S04J` / `S05J` / `S05K`
-    - `AC-018` / `AC-019` / `AC-020`
-    - `PR29-R31` / `PR29-R32` / `PR29-R33` / `PR29-R34`
-  - implementation:
-    - provider/check-in runtime で repo-scoped URL target exact resolve、scoped dependency ref、create partial-write phase、create-lock aware missing-meta diagnosis を反映
-    - checked-in parity test と `reference_deps.md` mirror を更新
-  - validation:
-    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04`
-    - 結果: `Ran 167 tests in 35.027s` / `OK`
-    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
-    - 結果: `Ran 5 tests in 2.092s` / `OK`
-  - review status:
-    - fresh spec review: `pass`（reviewer sub-agent 起動が不安定だったため、`requirement` / `design` / `plan` / `report` と code/test traceability を `main..HEAD` 全体差分で manual re-check）
-    - fresh implementation review: `pass`（repo-scoped reference bundle と create-state bundle の whole-diff manual review で blocking finding なし）
-    - fresh QA review: `pass`（provider runtime targeted suite + checked-in subprocess parity suite が green）
-    - fresh whole-diff review (`main..HEAD`): `pass`
+    - fresh spec review: `pass`（reviewer pass。`AC-018/019/020` と `PR29-R31..R34` の spec-to-code traceability を current worktree で確認）
+    - fresh implementation review:
+      - 初回: `conditional_pass`（current-repo scoped URL / scoped deps ref が unscoped current node を引けない 2 件を指摘）
+      - 是正後: `pass`（reviewer pass。current worktree 直読で actionable finding なし）
+    - fresh QA review:
+      - 初回: `conditional_pass`（negative-path / checked-in parity 3 件の test adequacy gap を指摘）
+      - 是正後: `pass`（reviewer pass。current worktree vs `main` で coverage adequate）
+    - fresh whole-diff review (`main` 基準 / current worktree): `pass`
 
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
 - 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定

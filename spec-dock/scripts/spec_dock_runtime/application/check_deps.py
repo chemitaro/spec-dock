@@ -51,7 +51,7 @@ def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: 
     return None
 
 
-def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
+def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo_slug: str | None = None) -> str:
     if target.kind == "github_issue":
         if target.github_issue_number is None:
             raise RuntimeError("TargetRef.github_issue_number is required")
@@ -62,10 +62,17 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
         ]
         target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
         if target_repo_slug is not None:
+            allow_current_unscoped = current_repo_slug is not None and target_repo_slug == current_repo_slug
             scoped = [
                 node
                 for node in matches
-                if normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
+                if (
+                    normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
+                    or (
+                        allow_current_unscoped
+                        and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+                    )
+                )
             ]
             if not scoped:
                 raise RuntimeError(
@@ -210,7 +217,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
 
-    target_node_id = _resolve_target_node_id(graph, req.target)
+    target_node_id = _resolve_target_node_id(graph, req.target, current_repo_slug=current_repo_slug)
     active_issue_id = None
     if ports.active_state_store is not None:
         active_issue_id = ports.active_state_store.load_active_issue_id(specdock_dir)
