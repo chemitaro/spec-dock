@@ -3191,6 +3191,7 @@ with tempfile.TemporaryDirectory() as td:
         except RuntimeError as exc:
             message = str(exc)
         assert expected_error in message, (case_name, message)
+        assert "Outcome: pre_github_fail" in message, (case_name, message)
         assert "GitHub issue was created:" not in message, (case_name, message)
         assert issue_gateway.calls == [], (case_name, issue_gateway.calls)
 """ % str(runtime_scripts_dir)
@@ -3535,6 +3536,8 @@ with tempfile.TemporaryDirectory() as td:
     except RuntimeError as exc:
         message = str(exc)
     assert "duplicate id" in message.lower(), message
+    assert "Outcome: pre_github_fail" in message, message
+    assert "GitHub issue was created:" not in message, message
     assert issue_gateway.calls == [], issue_gateway.calls
 """ % str(runtime_scripts_dir)
         result = subprocess.run(
@@ -4867,6 +4870,63 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertNotIn("import_post_sync_failed", import_result.stderr)
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+
+    def test_checked_in_dogfooding_runtime_subprocess_issue_create_gateway_failure_pre_github_parity(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, _current_issue_dir = self._create_minimal_local_tree(target)
+
+            issues_dir = epic_dir / "issues"
+            before_issue_dirs = sorted(p.name for p in issues_dir.iterdir() if p.is_dir())
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                f'echo "$1 $2" >> "{log_path.as_posix()}"\n'
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "simulated issue_create failure" >&2\n'
+                "  exit 1\n"
+                "fi\n"
+                'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
+                "  echo '[]'\n"
+                "  exit 0\n"
+                "fi\n"
+                'echo "unexpected gh args: $@" >&2\n'
+                "exit 99\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            create_result = self._run_runtime_capture(
+                target,
+                ["new", "issue", "--epic", "epic-local-00001", "--title", "Gateway failure issue"],
+                env=test_env,
+            )
+            self.assertEqual(
+                create_result.returncode,
+                1,
+                msg=f"new issue stdout:\n{create_result.stdout}\nnew issue stderr:\n{create_result.stderr}",
+            )
+            self.assertIn("Outcome: pre_github_fail", create_result.stderr)
+            self.assertNotIn("GitHub issue was created:", create_result.stderr)
+
+            after_issue_dirs = sorted(p.name for p in issues_dir.iterdir() if p.is_dir())
+            self.assertEqual(after_issue_dirs, before_issue_dirs)
+            self.assertFalse(any(name.endswith("-gateway-failure-issue") for name in after_issue_dirs))
+
+            gh_calls = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            self.assertEqual(len(gh_calls), 1, msg=f"unexpected gh calls: {gh_calls}")
+            self.assertEqual(gh_calls[0], "issue create", msg=f"unexpected gh calls: {gh_calls}")
 
     def test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

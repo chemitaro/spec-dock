@@ -249,9 +249,46 @@ ID: "issue-28-runtime-regression-bugs"
     - provider / checked-in runtime の `create_node` で、`local_write_committed=True` かつ `local_error` 単独枝でも doctor-first guidance を返すよう補修した
     - provider / checked-in parity の post-write-guard failure regression を追加した
     - issue docs も `post_github_local_write_fail` の committed-local subcase を明記するよう整合させた
-  - pending:
-    - fresh implementation re-review
-    - fresh QA re-review
+  - re-review:
+    - fresh implementation re-review:
+      - `pass`
+    - fresh QA re-review:
+      - `pass`
+
+- 2026-03-23 fresh whole-diff spec review follow-up for `S01P`:
+  - verdict:
+    - 初回 `fail`
+  - findings:
+    - `AC-017` で定義した 5 class のうち、`pre_github_fail` が実装・テスト・report で閉じていなかった
+    - `report.md` に `S01P` の review 状態が二重記録され、`pass` と `pending` が同居していた
+  - fix:
+    - provider / checked-in `create_node.py` の pre-GitHub create-mode failure を `Outcome: pre_github_fail` で包み、`GitHub issue was created:` を出さない fail-fast guidance に統一した
+    - provider / checked-in parity test に pre-GitHub create-mode failure regression を追加した
+    - 本 entry 追加により、`S01P` の review 状態を `pass` ベースの単一記録へ正規化した
+  - execution:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_pure_input_validation_fails_before_github_create tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_create_parent_precheck_fails_before_github_create tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_create_graph_preflight_fails_before_github_create_for_initiative tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity`
+  - result:
+    - `Ran 6 tests / OK`
+  - review:
+    - fresh implementation review:
+      - `pass`
+    - fresh QA review:
+      - 初回 `fail`
+      - finding:
+        - provider-side に `issue_create` failure の `pre_github_fail` regression がなく、checked-in parity の graph preflight 側でも outcome contract が未固定だった
+      - fix:
+        - provider-side に `issue_create` failure regression を追加した
+        - checked-in parity の graph preflight / pre-validation 側へ `Outcome: pre_github_fail` と `GitHub issue was created:` 非表示の断言を追加した
+      - fresh re-review:
+        - 初回 `conditional_pass`
+        - finding:
+          - checked-in subprocess parity に `issue_create` failure 自体の `pre_github_fail` regression が残っていた
+        - fix:
+          - checked-in runtime の `gh issue create` failure を直接起こす subprocess parity test を追加し、`Outcome: pre_github_fail` / created-hint absence / no local write を固定した
+        - final re-review:
+          - `pass`
+    - post-commit:
+      - fresh whole-diff spec review
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:
