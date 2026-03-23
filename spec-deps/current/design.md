@@ -271,6 +271,55 @@ ActiveSet --> IssueStatusResolution : uses
   - mixed same-repo + foreign target でも foreign fetch が維持される回帰
   - helper を共通利用する command parity の回帰
 
+## 2.4 current-repo fallback fetch for unscoped initiative/epic links
+
+### 変更方針
+
+- `collect_repo_scoped_issue_view_targets()` は persisted `repo_owner/repo_name` を持つ node だけでなく、current repo slug が解決できる unscoped linked `initiative` / `epic` / `issue` も fallback fetch 対象へ含める
+- indexed key 判定は引き続き `(repo_slug, issue_number)` で行い、current repo index 済み target は skip し、index 未掲載 target だけ `issue_view_snapshot(repo_slug=current_repo_slug)` を送る
+- この helper は `sync_state` / `set_active` / `check_deps` の GitHub-aware read path で共通利用し、`gh_index_incomplete` warning の意味を current repo linked epic / initiative にも揃える
+
+### 意図
+
+- `new ... --create-github-issue` で作られた unscoped current-repo linked epic / initiative が index limit 超過時に `unknown/stale` へ退行するのを防ぐ
+- same-repo indexed target dedup 契約を壊さず、missing current-repo target にだけ cheap で明示的な fallback fetch を許す
+
+### 実装境界
+
+- application:
+  - `github_issue_targets` helper に `current_repo_slug` を受け渡し、unscoped current-repo linked node を `(current_repo_slug, issue_number)` として fallback target 化する
+  - `sync_state` / `set_active` / `check_deps` から同 helper へ `current_repo_slug` を渡す
+- checked-in dogfooding runtime:
+  - 同 helper / call site が checked-in runtime に存在する場合は parity を取る
+- tests:
+  - unscoped current-repo linked epic / initiative が index 未掲載時に view fetch fallback で status を回復する回帰
+  - foreign same-number coexistence でも current-repo fallback と foreign scoped fetch が混線しない回帰
+
+## 2.5 current-repo-aware numeric branch inference
+
+### 変更方針
+
+- `infer_active_node_from_branch()` の numeric fallback は bare `github_issue_number` 一致だけで候補集合を作らず、`current_repo_slug` が解決できるときは `(current_repo_slug or explicit repo slug, issue_number)` を使って current repo candidate を優先する
+- branch 文字列に explicit node id がある場合の優先順位は維持し、numeric fallback のみ repo-aware 化する
+- `sync_state.maybe_auto_update_from_branch()` は current repo slug を解決して domain inference へ渡し、slug 不明時だけ既存の ambiguity / no-match fail-closed を維持する
+
+### 意図
+
+- foreign overlap 許容で numeric branch naming (`123-fix-login`, `issue-123`) を壊さない
+- current repo issue を対象にした既存の active auto-update 導線を、repo-aware uniqueness 導入後も保つ
+
+### 実装境界
+
+- domain:
+  - branch inference の numeric fallback を repo-aware candidate selection へ更新する
+- application:
+  - `sync_state` から current repo slug を伝播する
+- checked-in dogfooding runtime:
+  - checked-in runtime に同 inference path がある場合は parity を取る
+- tests:
+  - current repo `#123` と foreign `other/repo#123` が共存しても numeric branch が current repo node を指し続ける回帰
+  - current repo slug 不明時は ambiguity fail-closed を維持する回帰
+
 ## 3. artifact/repair contract
 
 対象:
