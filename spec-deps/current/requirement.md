@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-21"
+最終更新: "2026-03-23"
 親: []
 ---
 
@@ -252,12 +252,14 @@ ID: "issue-28-runtime-regression-bugs"
 
 - Given:
   - create / active target を script または agent から操作する
+  - または GitHub issue 作成後に local phase が失敗し、既存 issue を relink する recovery hint が必要になる
 - When:
   - explicit GitHub create intent や target intent を指定する
 - Then:
   - `new issue` でも explicit GitHub create を表現できる
   - `active set` などで node id と GitHub issue number を明示指定できる
   - ただし `--github-issue <n>` が複数 node に一致する場合は、曖昧成功ではなく ambiguity error になり、operator は `--id <node-id>` で対象を確定できる
+  - post-create local failure の recovery hint は kind ごとに再実行可能であり、`--title` と必要な parent selector（`--initiative` / `--epic`）を欠いた不完全コマンドを案内しない
 
 ### AC-008 doctor guidance
 
@@ -268,6 +270,7 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - 問題の種別と修復方針が supported path として提示される
   - current repo `#123` と foreign repo `other/repo#123` が併存する正常系では、current repo slug を解決できる限り ambiguity false positive を返さない
+  - create lock failure / release failure / metadata write failure の error message から案内される doctor command は、repo-local shortcut の有無に依存せず、その repo 上で実際に実行できる command である
 
 ### AC-009 duplicate sequence validation
 

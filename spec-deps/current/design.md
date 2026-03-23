@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-22"
+最終更新: "2026-03-23"
 依存: ["requirement.md"]
 親: []
 ---
@@ -88,6 +88,7 @@ ID: "issue-28-runtime-regression-bugs"
 - lock acquire は bounded wait とし、取得失敗時は create を failure にする
 - stale lock / crash 後 lock は `doctor` で検知・案内できるようにする
 - doctor は create lock path / metadata を読める範囲で露出し、stale create lock を他の repairable finding と同じ supported path で扱う
+- create lock 系の failure message は repo-local shortcut `./spec` の存在を前提にせず、その managed repo で常に実行可能な doctor command surface を案内する
 - post-write duplicate guard failure 時は自動 rollback しない
   - file delete を伴う rollback は second failure を招きやすいため
   - transaction failure として終了し、repair guidance を返す
@@ -129,7 +130,7 @@ stop
   - ただし現行でも local write failure 後の remote rollback は未実装であり、今回の corrective fix は lock scope 是正を優先する
 - pre-GitHub graph precheck は stable parent absence を減らすが、lock 取得後の graph 変化までは防げない
 - `new initiative|epic|issue` の create mode で `gh issue create` 完了後の lock acquire timeout / stale failure、parent/uniqueness revalidation failure、write failure でも remote-only side effect は起こりうる
-  - そのため error には created issue number を含め、`new <kind> --github-issue <n>` で retry/link できる guidance を返す
+  - そのため error には created issue number を含め、`new <kind> --github-issue <n>` をベースにしつつ、`--title` と必要な parent selector を含む runnable な retry/link guidance を返す
 - pre-lock GitHub body は graph-independent minimal body とする
   - 少なくとも kind は表現する
   - `Epic:` / `Initiative:` など graph 依存の親文脈は pre-lock body に入れない

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import time
 import uuid
 from dataclasses import replace
@@ -135,8 +136,12 @@ def _lock_failure_message(
         "create lock acquisition failed: "
         f"wait_s={elapsed_seconds:.3f} wait_limit_s={wait_seconds:.3f} stale={stale_flag} "
         f"path={lock_path} lock_meta=[{lock_meta_summary}]. "
-        "No files were written. Run `spec doctor` for guidance."
+        f"No files were written. {_doctor_guidance_message()}"
     )
+
+
+def _doctor_guidance_message() -> str:
+    return "Run `spec-dock/scripts/spec-dock doctor` for guidance."
 
 
 def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
@@ -198,7 +203,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
         except OSError as exc:
             raise RuntimeError(
                 "create lock acquisition failed: "
-                f"path={lock_path} error={exc}. Run `spec doctor` for guidance."
+                f"path={lock_path} error={exc}. {_doctor_guidance_message()}"
             ) from exc
         else:
             try:
@@ -212,7 +217,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
                 raise RuntimeError(
                     "create lock metadata write failed: "
                     f"path={lock_path} error={exc} {cleanup_result}. "
-                    "No files were written. Run `spec doctor` for guidance."
+                    f"No files were written. {_doctor_guidance_message()}"
                 ) from exc
             return lock_path, token
 
@@ -224,7 +229,7 @@ def _release_create_lock(lock_path: Path, token: str) -> None:
             raise RuntimeError(
                 "create lock release failed: "
                 f"path={lock_path} reason=ownership_mismatch. "
-                "Create may have already written files. Run `spec doctor` for guidance."
+                f"Create may have already written files. {_doctor_guidance_message()}"
             )
         return
     try:
@@ -233,7 +238,7 @@ def _release_create_lock(lock_path: Path, token: str) -> None:
         raise RuntimeError(
             "create lock release failed: "
             f"path={lock_path} error={exc}. "
-            "Create may have already written files. Run `spec doctor` for guidance."
+            f"Create may have already written files. {_doctor_guidance_message()}"
         ) from exc
 
 
@@ -980,11 +985,26 @@ def _post_github_create_local_failure_message(
     local_error: Exception,
     github_issue_number: int,
     kind: Literal["initiative", "epic", "issue"],
+    req: CreateNodeRequest,
+    title: str,
 ) -> str:
+    command_args = [
+        "spec-dock/scripts/spec-dock",
+        "new",
+        kind,
+        "--title",
+        title,
+    ]
+    if kind == "epic" and req.parent_id is not None:
+        command_args.extend(["--initiative", req.parent_id])
+    if kind == "issue" and req.parent_id is not None:
+        command_args.extend(["--epic", req.parent_id])
+    command_args.extend(["--github-issue", str(github_issue_number)])
+    recovery_command = " ".join(shlex.quote(part) for part in command_args)
     return (
         f"{local_error} "
         f"GitHub issue was created: #{github_issue_number}. "
-        f"Recovery: rerun `new {kind} --github-issue {github_issue_number}` to link the existing GitHub issue, "
+        f"Recovery: rerun `{recovery_command}` to link the existing GitHub issue, "
         "or close/cleanup that GitHub issue before retrying."
     )
 
@@ -994,6 +1014,8 @@ def _wrap_post_github_create_local_failure(
     error: Exception,
     created_github_issue_number: int | None,
     kind: Literal["initiative", "epic", "issue"],
+    req: CreateNodeRequest,
+    title: str,
 ) -> RuntimeError | None:
     if created_github_issue_number is None:
         return None
@@ -1002,6 +1024,8 @@ def _wrap_post_github_create_local_failure(
             local_error=error,
             github_issue_number=created_github_issue_number,
             kind=kind,
+            req=req,
+            title=title,
         )
     )
 
@@ -1041,6 +1065,8 @@ def create_node_core(
             error=exc,
             created_github_issue_number=created_github_issue_number,
             kind=kind,
+            req=req,
+            title=title,
         )
         if wrapped_error is not None:
             raise wrapped_error from exc
@@ -1085,6 +1111,8 @@ def create_node_core(
                 error=body_error,
                 created_github_issue_number=created_github_issue_number,
                 kind=kind,
+                req=req,
+                title=title,
             )
             effective_body_error: Exception = wrapped_body_error if wrapped_body_error is not None else body_error
             if release_error is not None:

@@ -2358,7 +2358,9 @@ with tempfile.TemporaryDirectory() as td:
     message = str(errors[0])
     assert "Epic not found: epic-local-00001" in message, message
     assert "GitHub issue was created: #812" in message, message
-    assert "new issue --github-issue 812" in message, message
+    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert "--epic epic-local-00001" in message, message
+    assert "--github-issue 812" in message, message
     assert events == [], events
 
 with tempfile.TemporaryDirectory() as td:
@@ -2432,8 +2434,11 @@ with tempfile.TemporaryDirectory() as td:
     except RuntimeError as exc:
         message = str(exc)
     assert "create lock acquisition failed" in message, message
+    assert "spec-dock/scripts/spec-dock doctor" in message, message
     assert "GitHub issue was created: #813" in message, message
-    assert "new issue --github-issue 813" in message, message
+    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert "--epic epic-local-00001" in message, message
+    assert "--github-issue 813" in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert events == [], events
     assert not (epic_dir / "issues").exists()
@@ -2522,7 +2527,9 @@ with tempfile.TemporaryDirectory() as td:
     assert "github linkage is already linked" in message, message
     assert "github.issue_number=814" in message, message
     assert "GitHub issue was created: #814" in message, message
-    assert "new issue --github-issue 814" in message, message
+    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert "--epic epic-local-00001" in message, message
+    assert "--github-issue 814" in message, message
     assert events == [], events
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert not (epic_dir / "issues" / "iss-00814-refresh-token").exists()
@@ -2590,7 +2597,9 @@ with tempfile.TemporaryDirectory() as td:
     assert started.is_set(), "issue_create was not called"
     assert "simulated write seam failure" in message, message
     assert "GitHub issue was created: #815" in message, message
-    assert "new issue --github-issue 815" in message, message
+    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert "--epic epic-local-00001" in message, message
+    assert "--github-issue 815" in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert events == [], events
     assert not (epic_dir / "issues" / "iss-00815-refresh-token").exists()
@@ -2933,7 +2942,8 @@ with tempfile.TemporaryDirectory() as td:
     except RuntimeError as exc:
         message = str(exc)
     assert "GitHub issue was created: #960" in message, message
-    assert "new initiative --github-issue 960" in message, message
+    assert "spec-dock/scripts/spec-dock new initiative --title 'Auth platform'" in message, message
+    assert "--github-issue 960" in message, message
 
 with tempfile.TemporaryDirectory() as td:
     repo_root = Path(td)
@@ -2979,7 +2989,9 @@ with tempfile.TemporaryDirectory() as td:
         except RuntimeError as exc:
             message = str(exc)
     assert "GitHub issue was created: #961" in message, message
-    assert "new epic --github-issue 961" in message, message
+    assert "spec-dock/scripts/spec-dock new epic --title 'JWT auth'" in message, message
+    assert "--initiative init-local-00001" in message, message
+    assert "--github-issue 961" in message, message
 """ % str(runtime_scripts_dir)
         result = subprocess.run(
             [sys.executable, "-c", check_code],

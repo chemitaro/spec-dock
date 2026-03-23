@@ -18,6 +18,7 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
 - 2026-03-21 latest GitHub/Codex review 2 件により、corrective scope `S05I deps target status payload` と `S01L pre-GitHub graph preflight` を追加した
 - 2026-03-22 latest GitHub/Codex review 1 件により、corrective scope `S04I placeholder active entrypoint recovery` を追加した
+- 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S01M executable doctor guidance` と `S01N runnable post-create retry hint` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -26,6 +27,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
 - `S04I` では placeholder active entrypoint recovery を補修し、invalid directory conflict の follow-up を含めて spec review / implementation review / QA review を通過した
+- current working tree では、`S01M` と `S01N` で create guidance surface を executable/runnable へ補修し、fresh spec review / implementation review / QA review を通過した
 - `S90 docs impact resolution` を完了
 - `S90F checked-in dogfooding runtime parity` を完了
 - `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
@@ -711,6 +713,40 @@ ID: "issue-28-runtime-regression-bugs"
     - implementation review: `pass`
     - QA review: `pass`
 - latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/041-disc-pr29-r25-create-lock-doctor-command-analysis.md`
+  - `spec-deps/current/discussions/042-disc-pr29-r26-post-create-rerun-hint-analysis.md`
+  - docs:
+    - `requirement.md` の `AC-007` に、post-create local failure guidance が `--title` と required parent selector を欠かない runnable command である契約を追記した
+    - `requirement.md` の `AC-008` に、create lock failure から案内される doctor command が repo 上で実行可能な command である契約を追記した
+    - `design.md` に、create lock guidance は stable doctor command を返すことと、post-create recovery hint は CLI entrypoint を含む runnable command であることを追記した
+    - `plan.md` に `S01M` / `S01N` を追加し、`AC-007` / `AC-008` / `AC-010` へのトレースを更新した
+  - spec review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `plan.md` の AC traceability が `S01M` / `S01N` を含んでいなかった
+    - 対応:
+      - `AC-007` / `AC-008` / `AC-010` に corrective scope の紐付けを追加した
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - create lock acquisition / metadata write / release failure guidance を `spec-dock/scripts/spec-dock doctor` に統一し、repo-local shortcut や PATH 非依存の executable doctor command を返すよう補修した
+    - post-create local failure guidance は `spec-dock/scripts/spec-dock new <kind> ...` 形式へ統一し、`--title` と kind ごとの required parent selector を含む runnable retry command を返すよう補修した
+    - recovery command の引数は `shlex.quote` で quoting し、provider runtime と checked-in dogfooding runtime の parity を揃えた
+    - fresh QA で見つかった assertion gap に対し、provider lock-failure path と checked-in parity path の両方で executable doctor guidance assertion を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_issue_create_pre_lock_window_rerevalidates_parent_state tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_issue_create_pre_lock_window_rerevalidates_github_uniqueness_state tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_initiative_and_epic_post_create_failures_report_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_contention_timeout_is_no_write_and_reports_metadata tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_stale_is_no_write_and_reports_metadata tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_metadata_write_failure_cleans_orphan_lock tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_fails_when_release_unlink_fails`
+    - 結果: `Ran 9 tests` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 2 tests` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_initiative_and_epic_post_create_failures_report_retry_link_guidance tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 4 tests in 0.226s` / `OK`
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - 結果: `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
   - `spec-deps/current/discussions/038-disc-pr29-r22-deps-target-status-payload-analysis.md`
   - `spec-deps/current/discussions/039-disc-pr29-r23-pre-github-graph-preflight-analysis.md`
   - docs:
@@ -768,7 +804,7 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- latest head では `S01I` / `S01J` / `S01K` / `S01L` / `S04H` / `S04I` / `S05I` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
+- current working tree では `S01I` / `S01J` / `S01K` / `S01L` / `S01M` / `S01N` / `S04H` / `S04I` / `S05I` / `S90G` まで corrective scope を反映済みで、push 後に PR #29 の latest checks と main 差分全体の fresh review を再確認する
 - `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
-- latest push 後の Codex review / PR checks は `pass`。main 差分全体の fresh review が `pass` になれば merge-ready 判定を更新する
+- pushed head では前回までの Codex review / PR checks は `pass`。今回の S01M/S01N を push 後、latest checks と latest Codex review を再確認して merge-ready 判定を更新する
