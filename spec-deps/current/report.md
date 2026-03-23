@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-21"
+最終更新: "2026-03-23"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: []
 ---
@@ -17,6 +17,7 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-20 fresh whole-diff review で見つかった import create transaction 漏れに対し、corrective scope `S01H` を追加した
 - 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
 - 2026-03-21 latest GitHub/Codex review 2 件により、corrective scope `S05I deps target status payload` と `S01L pre-GitHub graph preflight` を追加した
+- 2026-03-22 latest GitHub/Codex review 1 件により、corrective scope `S04I placeholder active entrypoint recovery` を追加した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -24,6 +25,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `S03 status/readiness contract を統一し stale projection を明示する` を完了
 - `S04 sync artifact / doctor / validator 契約を揃える` を完了
 - `S05 GitHub targeting と CLI intent surface を安全化する` を完了
+- `S04I` では placeholder active entrypoint recovery を補修し、invalid directory conflict の follow-up を含めて spec review / implementation review / QA review を通過した
 - `S90 docs impact resolution` を完了
 - `S90F checked-in dogfooding runtime parity` を完了
 - `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
@@ -674,6 +676,41 @@ ID: "issue-28-runtime-regression-bugs"
     - implementation review: `pass`
     - QA review: `pass`
 - latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/040-disc-pr29-r24-placeholder-active-recovery-analysis.md`
+  - docs:
+    - `requirement.md` の `AC-006` に、placeholder fallback が残っていても persisted active manifest から real node を解決できるなら `spec-dock update` が active entrypoint を復元する契約を追記した
+    - `design.md` の `active entrypoint recovery` に、placeholder は healthy state ではなく recoverable fallback であることを追記した
+    - `plan.md` に `S04I placeholder active entrypoint recovery` を追加し、`S04G` との境界と expected tests を固定した
+  - spec review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `AC-006` が placeholder fallback 残置ケースを明示していなかった
+      - head summary が `S04I` 未了時点なのに pass 済みへ読めた
+    - 対応:
+      - `AC-006` を placeholder fallback recovery まで拡張した
+      - report の summary を `S04I` 反映後の時点へ揃えた
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - `_ensure_active_fallback_entrypoints()` は healthy real entrypoint がある時に persisted target 解決を行わず即 `continue` するよう整理した
+    - placeholder symlink / placeholder `.path` fallback は recoverable fallback として扱い、persisted active manifest から実 node を解決できる時だけ real node へ rebuild するよう補修した
+    - persisted target が解決できない場合は placeholder fallback を維持し、`context-pack.md` も最終 active entrypoint 実体と一致する `(none)` 側へ戻すよう維持した
+    - mixed state では healthy real entrypoint を維持し、placeholder layer だけ rebuild する
+    - performance follow-up として、healthy real entrypoint がある時は `_resolve_manifest_target_dir()` を呼ばない guard test を追加した
+    - fresh implementation review で見つかった `placeholder pathfile + invalid directory conflict + valid persisted manifest` の取りこぼしに対し、placeholder entrypoint でも `desired_target != existing_target` なら rebuild 対象とみなし、managed pointer directory conflict を削除して real target へ復旧できるよう補修した
+    - conflict 削除に失敗した場合は従来どおり `continue` で停止し、valid `.path` を先に消してしまわない安全側の挙動を維持した
+  - validation:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_pathfile_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_mixed_entrypoints_keep_healthy_real_and_rebuild_placeholder_layers tests.test_init_update.TestInitUpdate.test_update_keeps_placeholder_and_none_context_pack_when_persisted_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack`
+    - 結果: `Ran 8 tests in 1.387s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_invalid_directory_conflict_using_real_pathfile_target tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_non_symlink_file_conflict_using_real_pathfile_target tests.test_init_update.TestInitUpdate.test_update_prefers_real_pathfile_entrypoint_over_placeholder_symlink_when_manifest_is_stale`
+    - 結果: `Ran 3 tests in 0.522s` / `OK`
+    - `python -m unittest -v tests.test_init_update`
+    - 結果: `Ran 60 tests in 6.938s` / `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
   - `spec-deps/current/discussions/038-disc-pr29-r22-deps-target-status-payload-analysis.md`
   - `spec-deps/current/discussions/039-disc-pr29-r23-pre-github-graph-preflight-analysis.md`
   - docs:
@@ -731,7 +768,7 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- latest head では `S01I` / `S01J` / `S01K` / `S01L` / `S04H` / `S05I` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
+- latest head では `S01I` / `S01J` / `S01K` / `S01L` / `S04H` / `S04I` / `S05I` / `S90G` まで corrective scope を反映済みで、PR #29 の latest checks と main 差分全体の fresh review を再確認する
 - `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
 - latest push 後の Codex review / PR checks は `pass`。main 差分全体の fresh review が `pass` になれば merge-ready 判定を更新する

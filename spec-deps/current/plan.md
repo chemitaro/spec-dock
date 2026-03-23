@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28", "https://github.com/chemitaro/spec-dock/issues/28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-21"
+最終更新: "2026-03-22"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -148,6 +148,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-004` -> `S05`
 - `AC-005` -> `S03`, `S05`
 - `AC-006` -> `S04`
+  - corrective scopes: `S04I`
 - `AC-007` -> `S05`
 - `AC-008` -> `S04`
 - `AC-009` -> `S02`
@@ -162,6 +163,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R21` -> `S01K`
 - `PR29-R22` -> `S05I`
 - `PR29-R23` -> `S01L`
+- `PR29-R24` -> `S04I`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -1107,6 +1109,65 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S04G` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04I — placeholder active entrypoint を persisted active recovery で上書きできるようにする
+- target:
+  - `spec-dock/active/{initiative,epic,issue}` が placeholder を向いていても、persisted active manifest から実 node を解決できるなら `update` が active entrypoint を実 node へ rebuild する
+- design refs:
+  - `design.md` の `active entrypoint recovery`
+  - `discussions/040`
+- step boundary:
+  - healthy な real entrypoint は保持し、placeholder fallback と broken entrypoint の recovery だけを扱う
+  - `context-pack.md` の再生成 source of truth は既存方針どおり最終 active entrypoint 実体とする
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04I` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — placeholder fallback recovery
+- purpose:
+  - placeholder を healthy state と誤認して persisted active recovery を skip する分岐を閉じる
+- files:
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+
+##### I1 — placeholder を recoverable fallback として再構築する
+- slice goal:
+  - valid persisted manifest がある時、placeholder symlink / `.path` fallback から real active node へ rebuild する
+
+###### Red
+- failing test:
+  - placeholder symlink が残っていると `update` が persisted active manifest を見ても rebuild しない regression
+  - placeholder `.path` fallback が残っていると `update` が `(none)` context-pack へ退行する regression
+  - mixed state で healthy real entrypoint は維持し、placeholder layer だけ rebuild される regression
+- expected failure:
+  - placeholder を healthy existing entrypoint と誤認して `continue` してしまう
+
+###### Green
+- minimum implementation:
+  - placeholder entrypoint を recoverable fallback として識別し、persisted/recovered target が解決できる時だけ実 node へ張り替える
+  - persisted target が壊れている場合は placeholder を維持し、`context-pack.md` も `(none)` 側を維持する
+- pass condition:
+  - placeholder recovery regression が通る
+
+###### Refactor
+- cleanup target:
+  - healthy real entrypoint / placeholder fallback / broken entrypoint の優先順位整理
+- invariants to keep green:
+  - stale persisted manifest で healthy real entrypoint を上書きしない
+
+#### step gate
+- review:
+  - `healthy real entrypoint > valid persisted target > placeholder fallback` の優先順位が説明できる
+- expected tests:
+  - placeholder symlink -> persisted target recovery
+  - placeholder `.path` -> persisted target recovery
+  - mixed state で placeholder layer のみ rebuild
+  - broken persisted manifest では placeholder fallback を維持
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04I` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S05G — repo-aware numeric deps resolution で foreign overlap 後も既存 shorthand を守る
 - target:

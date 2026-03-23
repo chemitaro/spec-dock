@@ -341,6 +341,7 @@ def _resolve_existing_active_entrypoint(
         if rel_target:
             candidates.append((active_dir / rel_target).resolve())
 
+    placeholder_candidate: tuple[Path, str | None] | None = None
     for candidate in candidates:
         try:
             candidate.relative_to(repo_root)
@@ -349,7 +350,9 @@ def _resolve_existing_active_entrypoint(
         if not candidate.is_dir():
             continue
         if candidate == placeholder:
-            return (candidate, None)
+            if placeholder_candidate is None:
+                placeholder_candidate = (candidate, None)
+            continue
         meta_path = candidate / ".meta.json"
         if not meta_path.is_file():
             continue
@@ -366,7 +369,7 @@ def _resolve_existing_active_entrypoint(
         if not entry_id:
             continue
         return (candidate, entry_id)
-    return None
+    return placeholder_candidate
 
 
 def _render_context_pack(*, initiative_id: str | None, epic_id: str | None, issue_id: str | None) -> str:
@@ -435,17 +438,78 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
         if link.is_symlink() and not link.exists():
             link.unlink(missing_ok=True)
 
+        persisted_id, persisted_path = persisted[layer]
         existing_entrypoint = _resolve_existing_active_entrypoint(
             specdock_dir,
             active_dir=active_dir,
             layer=layer,
         )
+        force_rebuild = False
+        if existing_entrypoint is not None and existing_entrypoint[1] is not None:
+            existing_target, _existing_id = existing_entrypoint
+            resolved_link_target: Path | None = None
+            if link.exists() or link.is_symlink():
+                try:
+                    resolved_link_target = link.resolve()
+                except OSError:
+                    resolved_link_target = None
+            # Keep healthy real entrypoints as highest priority, but if the
+            # user-visible pointer disagrees (e.g. placeholder link + real
+            # `.path`), normalize the pointer to the same real target.
+            if link.is_symlink() and resolved_link_target != existing_target:
+                force_rebuild = True
+            elif link.exists() and not link.is_symlink() and resolved_link_target != existing_target:
+                force_rebuild = True
+            desired_target = existing_target
+            if not force_rebuild:
+                continue
+        else:
+            desired_target = _resolve_manifest_target_dir(
+                specdock_dir,
+                layer,
+                expected_id=persisted_id,
+                persisted_path=persisted_path,
+            )
+            if desired_target is None:
+                desired_target = _resolve_persisted_path_dir(
+                    specdock_dir,
+                    layer=layer,
+                    persisted_path=persisted_path,
+                )
+            if desired_target is None:
+                desired_target = _active_placeholder_dir(specdock_dir, layer)
+
         if existing_entrypoint is not None:
-            continue
+            existing_target, _existing_id = existing_entrypoint
+            should_rebuild = force_rebuild or existing_target != desired_target.resolve()
+            # Placeholder is already the desired fallback target.
+            if not should_rebuild:
+                continue
+
+            # Placeholder entrypoint exists but persisted target resolved to real node.
+            # For managed pointer conflicts, clear `active/<layer>` first. If that
+            # fails, keep `.path` untouched so we do not lose the valid target hint.
+            if link.exists() or link.is_symlink():
+                if link.is_symlink() or link.is_file():
+                    link.unlink(missing_ok=True)
+                elif link.is_dir():
+                    try:
+                        shutil.rmtree(link)
+                    except OSError:
+                        pass
+            if link.exists() or link.is_symlink():
+                continue
+            if pathfile.exists():
+                try:
+                    pathfile.unlink()
+                except OSError:
+                    pass
+            if pathfile.exists():
+                continue
 
         # If `.path` exists but does not resolve to a valid active entrypoint,
         # treat it as stale so recovery can rebuild from persisted state/placeholder.
-        if pathfile.exists():
+        elif pathfile.exists():
             try:
                 pathfile.unlink()
             except OSError:
@@ -454,27 +518,11 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
         if link.exists() or link.is_symlink() or pathfile.exists():
             continue
 
-        target = _active_placeholder_dir(specdock_dir, layer)
-        persisted_id, persisted_path = persisted[layer]
-        resolved_target = _resolve_manifest_target_dir(
-            specdock_dir,
-            layer,
-            expected_id=persisted_id,
-            persisted_path=persisted_path,
-        )
-        if resolved_target is None:
-            resolved_target = _resolve_persisted_path_dir(
-                specdock_dir,
-                layer=layer,
-                persisted_path=persisted_path,
-            )
-        if resolved_target is not None:
-            target = resolved_target
-        rel_target = os.path.relpath(target, start=active_dir)
+        rel_target = os.path.relpath(desired_target, start=active_dir)
         try:
             os.symlink(rel_target, link)
         except OSError:
-            _write_active_pathfile(active_dir, layer, target)
+            _write_active_pathfile(active_dir, layer, desired_target)
 
     # Context pack must come from currently-resolved active entrypoints only.
     resolved_ids: dict[str, str | None] = {"initiative": None, "epic": None, "issue": None}
