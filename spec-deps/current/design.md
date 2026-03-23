@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-21"
+最終更新: "2026-03-22"
 依存: ["requirement.md"]
 親: []
 ---
@@ -439,6 +439,7 @@ CLI --> User : safe success or explicit failure
 ### 変更方針
 
 - installer/update の active recovery は placeholder 再生成だけで終わらせず、persisted active manifest が健全なら `spec-dock/active/{initiative,epic,issue}` の entrypoint 自体を実 node に戻す
+- `spec-dock/system/active-none/{layer}` を向く placeholder entrypoint は healthy active state ではなく recoverable fallback と扱い、persisted active manifest から実 node を解決できる時は `continue` せず張り替える
 - `context-pack.md` は raw persisted manifest ではなく、最終的に解決できた active entrypoint 実体を source of truth として再生成する
 - 既存 symlink/pathfile が健全に残っている場合も、その実体から active id を再計算し、persisted manifest 欠損・破損・stale に引きずられて `context-pack.md` だけ退行しないようにする
 - persisted manifest が壊れている、または path が解決できない場合だけ placeholder fallback に落とす

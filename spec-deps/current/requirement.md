@@ -239,12 +239,14 @@ ID: "issue-28-runtime-regression-bugs"
 
 - Given:
   - active が未設定である、または persisted active manifest は残っているが `spec-dock/active/*` entrypoint が欠損している
+  - または `spec-dock/active/*` が `system/active-none/*` を向く placeholder fallback のまま残っているが、persisted active manifest から real node を解決できる
 - When:
   - `active show` または `spec-dock/active` を参照する、または `spec-dock update` で recovery を実行する
 - Then:
   - `spec-dock/active` は未設定でも解決可能な入口として存在する
   - 未設定であることと、次に取るべき action/fallback path が分かる
   - persisted active manifest が健全な場合は、`spec-dock update` が `context-pack.md` だけでなく `spec-dock/active/{initiative,epic,issue}` の entrypoint も同じ active state に復元する
+  - placeholder fallback は healthy active state ではなく recoverable fallback として扱われ、persisted active manifest から実 node を解決できる場合は placeholder のまま残らない
 
 ### AC-007 CLI symmetry and disambiguation
 
