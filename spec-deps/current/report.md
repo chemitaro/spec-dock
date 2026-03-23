@@ -1132,6 +1132,44 @@ ID: "issue-28-runtime-regression-bugs"
     - whole-diff review (`main` 基準): `pass`（今回変更の provider/check-in parity と受け入れ条件の対応を確認）
 
 ## 発見事項
+- 2026-03-23 review4 repo-scope/create-state remediation resume:
+  - scope:
+    - `S01Q` / `S04J` / `S05J` / `S05K`
+    - `AC-018` / `AC-019` / `AC-020`
+    - `PR29-R31` / `PR29-R32` / `PR29-R33` / `PR29-R34`
+  - implementation:
+    - provider/check-in runtime で repo-scoped URL target exact resolve、scoped dependency ref、create partial-write phase、create-lock aware missing-meta diagnosis を反映
+    - checked-in parity test と `reference_deps.md` mirror を更新
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 167 tests in 35.027s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 5 tests in 2.092s` / `OK`
+  - review status:
+    - fresh spec review: `pass`（reviewer sub-agent 起動が不安定だったため、`requirement` / `design` / `plan` / `report` と code/test traceability を `main..HEAD` 全体差分で manual re-check）
+    - fresh implementation review: `pass`（repo-scoped reference bundle と create-state bundle の whole-diff manual review で blocking finding なし）
+    - fresh QA review: `pass`（provider runtime targeted suite + checked-in subprocess parity suite が green）
+    - fresh whole-diff review (`main..HEAD`): `pass`
+
+- 2026-03-23 review4 repo-scope/create-state remediation resume:
+  - scope:
+    - `S01Q` / `S04J` / `S05J` / `S05K`
+    - `AC-018` / `AC-019` / `AC-020`
+    - `PR29-R31` / `PR29-R32` / `PR29-R33` / `PR29-R34`
+  - implementation:
+    - provider/check-in runtime で repo-scoped URL target exact resolve、scoped dependency ref、create partial-write phase、create-lock aware missing-meta diagnosis を反映
+    - checked-in parity test と `reference_deps.md` mirror を更新
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 167 tests in 35.027s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 5 tests in 2.092s` / `OK`
+  - review status:
+    - fresh spec review: `pass`（reviewer sub-agent 起動が不安定だったため、`requirement` / `design` / `plan` / `report` と code/test traceability を `main..HEAD` 全体差分で manual re-check）
+    - fresh implementation review: `pass`（repo-scoped reference bundle と create-state bundle の whole-diff manual review で blocking finding なし）
+    - fresh QA review: `pass`（provider runtime targeted suite + checked-in subprocess parity suite が green）
+    - fresh whole-diff review (`main..HEAD`): `pass`
+
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
 - 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
 - duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
