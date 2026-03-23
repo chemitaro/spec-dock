@@ -15,6 +15,28 @@ _KEYWORD_ISSUE_IN_TEXT_RE = re.compile(r"(?i)(?:issue|gh)[-_]?(?P<num>[0-9]+)\b"
 _LEADING_NUMBER_IN_TEXT_RE = re.compile(r"^(?P<num>[0-9]+)[-_].+")
 
 
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
+def _effective_repo_slug(node: SpecNode, *, current_repo_slug: str | None) -> str | None:
+    return _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) or current_repo_slug
+
+
 def resolve_branch_decision(node: SpecNode, *, candidate_is_valid: bool = True) -> BranchDecision:
     candidate = f"{node.id}-{node.slug}"
     fallback = node.id
@@ -31,10 +53,16 @@ def resolve_branch_decision(node: SpecNode, *, candidate_is_valid: bool = True) 
     return BranchDecision(desired=candidate, candidates=(candidate, fallback), warnings=tuple(warnings))
 
 
-def infer_active_node_from_branch(graph: SpecGraph, *, branch: str) -> tuple[SpecNode | None, str | None]:
+def infer_active_node_from_branch(
+    graph: SpecGraph,
+    *,
+    branch: str,
+    current_repo_slug: str | None = None,
+) -> tuple[SpecNode | None, str | None]:
     s = branch.strip().lower()
     if not s:
         return (None, None)
+    normalized_current_repo_slug = _normalize_repo_slug_value(current_repo_slug)
 
     id_candidates: list[str] = []
     for match in _ID_IN_TEXT_RE.finditer(s):
@@ -102,6 +130,30 @@ def infer_active_node_from_branch(graph: SpecGraph, *, branch: str) -> tuple[Spe
         for node in graph.nodes_by_id.values()
         if node.kind in ("initiative", "epic", "issue") and node.github_issue_number in nums
     ]
+    if normalized_current_repo_slug is not None:
+        current_repo_matches = [
+            node
+            for node in matches
+            if _effective_repo_slug(node, current_repo_slug=normalized_current_repo_slug) == normalized_current_repo_slug
+        ]
+        if len(current_repo_matches) == 1:
+            node = current_repo_matches[0]
+            return (node, f"matched github.issue_number={node.github_issue_number} from branch")
+        if len(current_repo_matches) > 1:
+            ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in current_repo_matches))
+            return (
+                None,
+                f"ambiguous github issue numbers {sorted(nums)} in current repo scope ({normalized_current_repo_slug}): {ids}",
+            )
+        if matches:
+            ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in matches))
+            return (
+                None,
+                (
+                    "no current-repo matches for github issue numbers "
+                    f"{sorted(nums)} in scope ({normalized_current_repo_slug}); refusing foreign fallback: {ids}"
+                ),
+            )
     if len(matches) == 1:
         node = matches[0]
         return (node, f"matched github.issue_number={node.github_issue_number} from branch")

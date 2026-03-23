@@ -893,11 +893,14 @@ ID: "issue-28-runtime-regression-bugs"
   - `design.md` の `2.5 current-repo-aware numeric branch inference`
 - step boundary:
   - explicit id match 優先は変えず、numeric fallback と `sync_state` からの current repo slug 伝播だけを扱う
+  - current repo slug が既知のとき、foreign-only numeric match や current-scope multiple match は fail-closed に固定する
 
 #### Red
 - failing test:
   - current repo `#123` と foreign `other/repo#123` が共存すると `123-fix-login` が ambiguity に落ちる regression
   - current repo slug 不明時の ambiguity fail-closed が失われる regression
+  - current repo slug が既知でも foreign-only numeric match を暗黙採用してしまう regression
+  - current repo scope に複数 numeric match があるのに scoped ambiguity fail-closed にならない regression
   - checked-in parity path に同 inference がある場合、同じ ambiguity が再発する regression
 
 #### Green
@@ -919,6 +922,8 @@ ID: "issue-28-runtime-regression-bugs"
 - expected tests:
   - branch overlap current-repo preferred regression
   - branch overlap slug-unknown ambiguity regression
+  - branch foreign-only known-scope fail-closed regression
+  - branch scoped-ambiguity fail-closed regression
   - checked-in parity regression（該当 path がある場合）
 - report update:
   - `spec-deps/current/report.md`

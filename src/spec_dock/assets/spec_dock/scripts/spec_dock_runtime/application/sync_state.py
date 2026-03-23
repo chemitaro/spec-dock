@@ -376,7 +376,11 @@ def maybe_auto_update_from_branch(
     if not branch:
         return (state, None)
 
-    inferred_node, reason = infer_active_node_from_branch(state.graph, branch=branch)
+    inferred_node, reason = infer_active_node_from_branch(
+        state.graph,
+        branch=branch,
+        current_repo_slug=resolve_current_repo_slug(ports),
+    )
     if inferred_node is None:
         return (state, ActiveUpdateOutcome(applied=False, reason=reason))
 

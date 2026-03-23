@@ -803,6 +803,69 @@ class TestRuntimeActiveS06(unittest.TestCase):
         self.assertFalse(any(w.startswith("deps_blocked:") for w in result.warnings))
         self.assertNotIn("gh_fetch_failed", result.warnings)
 
+    def test_sync_branch_inference_propagates_current_repo_slug(self) -> None:
+        app_contracts, _app_ports, _app_set_active, infra_contracts = _runtime_modules()
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import sync_state as app_sync_state
+            from spec_dock_runtime.domain import models as domain_models
+        finally:
+            sys.path.pop(0)
+
+        git_gateway = _StubGitGateway(origin_repo_slug="current/repo")
+        git_gateway.current_branch = "123-fix-login"
+        ports = self._ports(
+            issue_depends_on_map={"iss-local-00001": [], "iss-local-00002": []},
+            statuses={},
+            git_gateway=git_gateway,
+            active_state_store=_StubActiveStateStore(infra_contracts),
+        )
+        state = app_contracts.SyncStateResult(
+            graph=domain_models.SpecGraph(nodes_by_id={}),
+            active=None,
+            issue_statuses={},
+            progress=domain_models.ProgressMap(
+                by_node_id={},
+                counts={"total": 0, "done": 0, "open": 0, "unknown": 0},
+            ),
+            deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+            deps_eval_by_id={},
+            generated_at="2026-03-23T00:00:00+00:00",
+            warnings=[],
+            deps_preflight_error=None,
+            repo_root=Path("/repo"),
+        )
+
+        observed: dict[str, str | None] = {}
+        original_infer = app_sync_state.infer_active_node_from_branch
+
+        def _fake_infer(graph, *, branch, current_repo_slug=None):
+            del graph
+            observed["branch"] = branch
+            observed["current_repo_slug"] = current_repo_slug
+            return (None, "no branch match")
+
+        app_sync_state.infer_active_node_from_branch = _fake_infer
+        try:
+            next_state, outcome = app_sync_state.maybe_auto_update_from_branch(state, ports)
+        finally:
+            app_sync_state.infer_active_node_from_branch = original_infer
+
+        self.assertIs(next_state, state)
+        self.assertIsNotNone(outcome)
+        assert outcome is not None
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "no branch match")
+        self.assertEqual(observed, {"branch": "123-fix-login", "current_repo_slug": "current/repo"})
+
     def test_set_active_checkout_pre_step7_failure_has_no_rollback(self) -> None:
         app_contracts, _app_ports, app_set_active, _infra_contracts = _runtime_modules()
         git_gateway = _StubGitGateway()
