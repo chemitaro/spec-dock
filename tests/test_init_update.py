@@ -5039,6 +5039,57 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
             self.assertIn('"target": "iss-local-00002"', scoped_deps.stdout)
 
+    def test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            current_meta_path = current_issue_dir / ".meta.json"
+            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_meta_path, current_meta)
+
+            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
+            foreign_meta_path = foreign_issue_dir / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {
+                "issue_number": 123,
+                "repo_owner": "other",
+                "repo_name": "repo",
+            }
+            self._write_json_force(foreign_meta_path, foreign_meta)
+
+            active_current = self._run_runtime_capture(
+                target,
+                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
+            )
+            self.assertEqual(
+                active_current.returncode,
+                0,
+                msg=f"active(current) stdout:\n{active_current.stdout}\nactive(current) stderr:\n{active_current.stderr}",
+            )
+            active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active_manifest["issue"]["id"], "iss-local-00001")
+
+            deps_current = self._run_runtime_capture(
+                target,
+                ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
+            )
+            self.assertIn(
+                deps_current.returncode,
+                (0, 3),
+                msg=f"deps(current) stdout:\n{deps_current.stdout}\ndeps(current) stderr:\n{deps_current.stderr}",
+            )
+            self.assertIn('"target": "iss-local-00001"', deps_current.stdout)
+
     def test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -5053,7 +5104,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             current_meta_path = current_issue_dir / ".meta.json"
             current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
-            current_meta["github"] = {"issue_number": 123, "repo_owner": "current", "repo_name": "repo"}
+            current_meta["github"] = {"issue_number": 123}
             self._write_json_force(current_meta_path, current_meta)
 
             foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
@@ -5067,7 +5118,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self._write_json_force(foreign_meta_path, foreign_meta)
 
             depends_issue_dir = epic_dir / "issues" / "iss-local-00003-depends-issue"
-            for dep_ref in ("other/repo#123", "https://github.com/other/repo/issues/123"):
+            expected_by_ref = {
+                "other/repo#123": "iss-local-00002",
+                "https://github.com/other/repo/issues/123": "iss-local-00002",
+                "current/repo#123": "iss-local-00001",
+                "https://github.com/current/repo/issues/123": "iss-local-00001",
+            }
+            for dep_ref, expected_dep in expected_by_ref.items():
                 with self.subTest(dep_ref=dep_ref):
                     self._write_json_force(
                         depends_issue_dir / "deps.json",
@@ -5083,8 +5140,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
                     )
                     payload = json.loads(deps_result.stdout)
-                    self.assertEqual(payload.get("effective_depends_on"), ["iss-local-00002"])
-                    self.assertEqual(payload.get("blockers"), ["iss-local-00002"])
+                    self.assertEqual(payload.get("effective_depends_on"), [expected_dep])
+                    self.assertEqual(payload.get("blockers"), [expected_dep])
 
     def test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5285,6 +5342,71 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
             if log_path.exists():
                 self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+
+    def test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            self._create_minimal_local_tree(target)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            runtime_scripts_dir = target / "spec-dock" / "scripts"
+            check_code = f"""
+import io
+import os
+import sys
+from contextlib import redirect_stderr
+from pathlib import Path
+from unittest.mock import patch
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime import app as runtime_app
+    from spec_dock_runtime.application import create_node as app_create_node
+    from spec_dock_runtime.application import import_node as app_import_node
+finally:
+    sys.path.pop(0)
+
+os.chdir({str(target)!r})
+stderr_buffer = io.StringIO()
+with patch.object(
+    app_import_node,
+    "execute_create_plan",
+    side_effect=app_create_node.CreatePlanExecutionError(
+        phase="scaffold_copied",
+        message="simulated import partial write",
+    ),
+):
+    with redirect_stderr(stderr_buffer):
+        exit_code = runtime_app.main(
+            ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"]
+        )
+
+stderr_text = stderr_buffer.getvalue()
+runtime_cmd = str((Path({str(target)!r}) / "spec-dock" / "scripts" / "spec-dock").resolve())
+assert exit_code == 1, exit_code
+assert "Outcome: import_local_write_fail." in stderr_text, stderr_text
+assert "simulated import partial write" in stderr_text, stderr_text
+assert "Import may have partially written local files. Do not rerun blindly." in stderr_text, stderr_text
+assert f"{{runtime_cmd}} doctor" in stderr_text, stderr_text
+assert "Recovery: rerun" not in stderr_text, stderr_text
+"""
+            result = subprocess.run(
+                [sys.executable, "-c", check_code],
+                cwd=str(target),
+                capture_output=True,
+                text=True,
+                env=test_env,
+            )
+            self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
     def test_checked_in_dogfooding_runtime_subprocess_sync_force_degrades_when_required_artifact_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

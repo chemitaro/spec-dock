@@ -176,6 +176,61 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-local-00001")
 
+    def test_active_set_repo_scoped_url_fails_closed_when_repo_scope_does_not_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+
+            mismatch = self._run_runtime_capture(
+                target,
+                ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
+            )
+            self.assertNotEqual(mismatch.returncode, 0, mismatch.stdout + mismatch.stderr)
+            self.assertIn("No node found for github.issue_number=123 in repo scope (other/repo)", mismatch.stderr)
+            self.assertNotIn("spec-dock: ok (active set)", mismatch.stdout)
+
+    def test_active_set_repo_scoped_current_url_resolves_unscoped_current_node(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            by_url = self._run_runtime_capture(
+                target,
+                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
+            )
+            self.assertEqual(by_url.returncode, 0, by_url.stdout + by_url.stderr)
+            self.assertIn("spec-dock: ok (active set)", by_url.stdout)
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-00123")
+
     def test_active_set_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

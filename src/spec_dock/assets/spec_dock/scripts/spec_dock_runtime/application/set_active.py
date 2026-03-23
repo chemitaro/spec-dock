@@ -82,7 +82,7 @@ def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: 
     return None
 
 
-def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
+def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo_slug: str | None = None) -> str:
     if target.kind == "github_issue":
         if target.github_issue_number is None:
             raise RuntimeError("TargetRef.github_issue_number is required")
@@ -93,10 +93,17 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
         ]
         target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
         if target_repo_slug is not None:
+            allow_current_unscoped = current_repo_slug is not None and target_repo_slug == current_repo_slug
             scoped = [
                 node
                 for node in matches
-                if normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
+                if (
+                    normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
+                    or (
+                        allow_current_unscoped
+                        and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+                    )
+                )
             ]
             if not scoped:
                 raise RuntimeError(
@@ -335,7 +342,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     for warning in current.warnings:
         _append_unique(warnings, warning)
 
-    target_id = _resolve_target_node_id(graph, req.target)
+    target_id = _resolve_target_node_id(graph, req.target, current_repo_slug=current_repo_slug)
     target_node = graph.nodes_by_id.get(target_id)
     if target_node is None:
         raise RuntimeError(f"Node not found: {target_id}")

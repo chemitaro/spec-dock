@@ -129,16 +129,23 @@ def _find_node_by_scoped_github_issue_number(
     issue_number: int,
     repo_owner: str,
     repo_name: str,
+    current_repo_slug: str | None = None,
 ) -> str:
     repo_slug = _normalize_repo_slug(repo_owner, repo_name)
     if repo_slug is None:
         raise RuntimeError("repo scope is required")
+    allow_current_unscoped = current_repo_slug is not None and repo_slug == current_repo_slug
     matches = [
         node
         for node in graph.nodes_by_id.values()
         if node.github_issue_number == issue_number
         and node.kind in ("initiative", "epic", "issue")
-        and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == repo_slug
+        and (
+            _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == repo_slug
+            or (
+                allow_current_unscoped and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+            )
+        )
     ]
     if not matches:
         raise RuntimeError(
@@ -183,6 +190,7 @@ def _resolve_dep_ref(
                     issue_number=int(scoped_match.group("num")),
                     repo_owner=scoped_match.group("owner"),
                     repo_name=scoped_match.group("repo"),
+                    current_repo_slug=current_repo_slug,
                 )
             except RuntimeError as e:
                 raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
@@ -194,6 +202,7 @@ def _resolve_dep_ref(
                     issue_number=int(full_url_match.group("num")),
                     repo_owner=full_url_match.group("owner"),
                     repo_name=full_url_match.group("repo"),
+                    current_repo_slug=current_repo_slug,
                 )
             except RuntimeError as e:
                 raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
