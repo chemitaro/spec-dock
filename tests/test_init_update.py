@@ -3412,6 +3412,411 @@ with tempfile.TemporaryDirectory() as td:
         )
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
+    def test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_sync_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.application import sync_state as app_sync_state
+    from spec_dock_runtime.domain import models as domain_models
+    from spec_dock_runtime.infra import contracts as infra_contracts
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number, github_repo_owner=None, github_repo_name=None):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
+    )
+
+class _StubNodeReader:
+    def __init__(self, records):
+        self._records = list(records)
+    def load_node_records(self):
+        return list(self._records)
+
+class _StubDepsTopologyReader:
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return infra_contracts.DepsTopologyLoadResult(
+            issue_depends_on_map={{"iss-local-00001": []}},
+            warnings=[],
+        )
+
+class _StubDerivedStateReader:
+    def load_cached_issue_status_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{"iss-local-00001": "open"}}
+    def load_cached_issue_last_sync_at_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+
+class _StubIssueGateway:
+    def __init__(self, snapshots, foreign_snapshots):
+        self._snapshots = list(snapshots)
+        self._foreign_snapshots = dict(foreign_snapshots)
+        self.view_calls = []
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return list(self._snapshots)
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
+        key = (str(repo_slug or ""), int(issue_number))
+        return self._foreign_snapshots[key]
+
+class _StubActiveStateStore:
+    def load_active_manifest(self, specdock_dir):
+        del specdock_dir
+        return infra_contracts.ActiveManifestLoadResult(manifest=None, source="none", warnings=[])
+    def load_active_manifest_no_migrate(self, specdock_dir):
+        del specdock_dir
+        return infra_contracts.ActiveManifestLoadResult(manifest=None, source="none", warnings=[])
+
+class _StubGitGateway:
+    def current_branch_or_none(self, repo_root):
+        del repo_root
+        return "main"
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+def _materialize_required_artifacts(records):
+    for record in records:
+        node_dir = Path(record.path)
+        node_dir.mkdir(parents=True, exist_ok=True)
+        (node_dir / ".meta.json").write_text("{{}}", encoding="utf-8")
+        for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+            (node_dir / filename).write_text(f"{{record.id}}:{{filename}}\\n", encoding="utf-8")
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    specdock_dir.mkdir(parents=True, exist_ok=True)
+    records = [
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Platform",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform",
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=101,
+        ),
+        _record(
+            kind="epic",
+            node_id="epic-local-00001",
+            title="Delivery",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery",
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=201,
+        ),
+        _record(
+            kind="issue",
+            node_id="iss-local-00001",
+            title="Local issue",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery" / "issues" / "iss-local-00001-local",
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=None,
+        ),
+    ]
+    _materialize_required_artifacts(records)
+    issue_gateway = _StubIssueGateway(
+        snapshots=[],
+        foreign_snapshots={{
+            ("current/repo", 101): domain_models.IssueSnapshot(
+                issue_number=101,
+                state="OPEN",
+                title="Current #101",
+                labels=[],
+                updated_at="2026-03-23T00:00:00Z",
+                url="https://github.com/current/repo/issues/101",
+                repo_owner="current",
+                repo_name="repo",
+            ),
+            ("current/repo", 201): domain_models.IssueSnapshot(
+                issue_number=201,
+                state="CLOSED",
+                title="Current #201",
+                labels=["done"],
+                updated_at="2026-03-23T00:01:00Z",
+                url="https://github.com/current/repo/issues/201",
+                repo_owner="current",
+                repo_name="repo",
+            ),
+        }},
+    )
+    ports = app_ports.Ports(
+        node_reader=_StubNodeReader(records),
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+        deps_topology_reader=_StubDepsTopologyReader(),
+        derived_state_reader=_StubDerivedStateReader(),
+        issue_gateway=issue_gateway,
+        active_state_store=_StubActiveStateStore(),
+        git_gateway=_StubGitGateway(),
+    )
+
+    result = app_sync_state.collect_sync_state(
+        app_contracts.SyncRequest(
+            force=False,
+            github_enabled=True,
+            issue_limit=10000,
+            update_active_from_branch=False,
+        ),
+        ports,
+    )
+    init_status = result.issue_statuses["init-local-00001"]
+    epic_status = result.issue_statuses["epic-local-00001"]
+    assert init_status.source == "github"
+    assert init_status.effective_status == "open"
+    assert epic_status.source == "github"
+    assert epic_status.effective_status == "done"
+    assert issue_gateway.view_calls == [
+        (str(repo_root), 101, "current/repo"),
+        (str(repo_root), 201, "current/repo"),
+    ]
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
+    def test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_active_deps_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import check_deps as app_check_deps
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.application import set_active as app_set_active
+    from spec_dock_runtime.domain import models as domain_models
+    from spec_dock_runtime.infra import contracts as infra_contracts
+finally:
+    sys.path.pop(0)
+
+def _record(*, kind, node_id, title, path, parent_id, initiative_id, epic_id, github_issue_number, github_repo_owner=None, github_repo_name=None):
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=title,
+        slug=title.lower().replace(" ", "-"),
+        path=path.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(path / ".meta.json").as_posix(),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
+    )
+
+class _StubNodeReader:
+    def __init__(self, records):
+        self._records = list(records)
+    def load_node_records(self):
+        return list(self._records)
+
+class _StubDepsTopologyReader:
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return infra_contracts.DepsTopologyLoadResult(
+            issue_depends_on_map={{"iss-local-00001": []}},
+            warnings=[],
+        )
+
+class _StubDerivedStateReader:
+    def load_cached_issue_status_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{"iss-local-00001": "open"}}
+    def load_cached_issue_last_sync_at_by_id(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+
+class _StubIssueGateway:
+    def __init__(self, snapshots, foreign_snapshots):
+        self._snapshots = list(snapshots)
+        self._foreign_snapshots = dict(foreign_snapshots)
+        self.view_calls = []
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return list(self._snapshots)
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        self.view_calls.append((str(repo_root), int(issue_number), repo_slug))
+        key = (str(repo_slug or ""), int(issue_number))
+        return self._foreign_snapshots[key]
+
+class _StubActiveStateStore:
+    def load_active_manifest(self, specdock_dir):
+        del specdock_dir
+        return infra_contracts.ActiveManifestLoadResult(manifest=None, source="none", warnings=[])
+    def load_active_issue_id(self, specdock_dir):
+        del specdock_dir
+        return None
+    def snapshot_current_state(self, specdock_dir):
+        del specdock_dir
+        return {{}}
+    def write_active_manifest(self, specdock_dir, manifest):
+        del specdock_dir
+        return manifest
+    def apply_active_pointers(self, specdock_dir, manifest, context_pack_text):
+        del specdock_dir, manifest, context_pack_text
+    def patch_agent_state_active_fields(self, specdock_dir, manifest):
+        del specdock_dir, manifest
+    def rollback_to_snapshot(self, specdock_dir, snapshot):
+        del specdock_dir, snapshot
+
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+with tempfile.TemporaryDirectory() as td:
+    repo_root = Path(td)
+    specdock_dir = repo_root / "spec-dock"
+    records = [
+        _record(
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Platform",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform",
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=101,
+        ),
+        _record(
+            kind="epic",
+            node_id="epic-local-00001",
+            title="Delivery",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery",
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=201,
+        ),
+        _record(
+            kind="issue",
+            node_id="iss-local-00001",
+            title="Local issue",
+            path=specdock_dir / "initiatives" / "init-local-00001-platform" / "epics" / "epic-local-00001-delivery" / "issues" / "iss-local-00001-local",
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=None,
+        ),
+    ]
+    issue_gateway = _StubIssueGateway(
+        snapshots=[],
+        foreign_snapshots={{
+            ("current/repo", 101): domain_models.IssueSnapshot(
+                issue_number=101,
+                state="OPEN",
+                title="Current #101",
+                labels=[],
+                updated_at="2026-03-23T00:00:00Z",
+                url="https://github.com/current/repo/issues/101",
+                repo_owner="current",
+                repo_name="repo",
+            ),
+            ("current/repo", 201): domain_models.IssueSnapshot(
+                issue_number=201,
+                state="CLOSED",
+                title="Current #201",
+                labels=["done"],
+                updated_at="2026-03-23T00:01:00Z",
+                url="https://github.com/current/repo/issues/201",
+                repo_owner="current",
+                repo_name="repo",
+            ),
+        }},
+    )
+    ports = app_ports.Ports(
+        node_reader=_StubNodeReader(records),
+        repo_root=repo_root,
+        specdock_dir=specdock_dir,
+        deps_topology_reader=_StubDepsTopologyReader(),
+        derived_state_reader=_StubDerivedStateReader(),
+        issue_gateway=issue_gateway,
+        active_state_store=_StubActiveStateStore(),
+        git_gateway=_StubGitGateway(),
+    )
+
+    set_result = app_set_active.set_active(
+        app_contracts.SetActiveRequest(
+            target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None),
+            force=False,
+            checkout=False,
+            use_github=True,
+            issue_limit=10000,
+        ),
+        ports,
+    )
+    assert set_result.selection.issue_id == "iss-local-00001"
+    assert issue_gateway.view_calls == [
+        (str(repo_root), 101, "current/repo"),
+        (str(repo_root), 201, "current/repo"),
+    ]
+
+    for target_id, expected_status in (
+        ("init-local-00001", "open"),
+        ("epic-local-00001", "done"),
+    ):
+        issue_gateway.view_calls.clear()
+        deps_result = app_check_deps.check_deps(
+            app_contracts.CheckDepsRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id=target_id, github_issue_number=None),
+                use_github=True,
+                issue_limit=10000,
+            ),
+            ports,
+        )
+        target_status = deps_result.inspection.issue_statuses[target_id]
+        assert target_status.source == "github"
+        assert target_status.effective_status == expected_status
+        assert issue_gateway.view_calls == [
+            (str(repo_root), 101, "current/repo"),
+            (str(repo_root), 201, "current/repo"),
+        ]
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_validation_doctor_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"

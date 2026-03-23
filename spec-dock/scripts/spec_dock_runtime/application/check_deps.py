@@ -159,6 +159,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
         repo_scoped_targets = collect_repo_scoped_issue_view_targets(
             graph,
             issue_index_snapshots=issue_index_snapshots,
+            current_repo_slug=current_repo_slug,
         )
         for repo_slug, issue_number in repo_scoped_targets:
             try:

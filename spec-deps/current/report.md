@@ -32,6 +32,7 @@ ID: "issue-28-runtime-regression-bugs"
 - current working tree では、`S01M` と `S01N` で create guidance surface を executable/runnable へ補修し、fresh spec review / implementation review / QA review を通過した
 - current working tree では、`S01O` で create guidance path を cwd-independent に補修し、fresh spec review / implementation review / QA review を通過した
 - current working tree では、`S03J` / `S03K` の corrective scope を issue 文書へ反映し、fresh spec review を `pass` している
+- current working tree では、`S03J` で current-repo fallback fetch for unscoped linked nodes を provider/checked-in runtime へ反映し、fresh implementation review / QA review を `pass` している
 - `S90 docs impact resolution` を完了
 - `S90F checked-in dogfooding runtime parity` を完了
 - `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
@@ -87,6 +88,23 @@ ID: "issue-28-runtime-regression-bugs"
       - current-repo unscoped epic/initiative fallback regression
       - branch overlap current-repo preferred regression
       - slug-unknown ambiguity fail-closed regression
+
+- 2026-03-23 `S03J` 実装:
+  - 実装:
+    - provider-side / checked-in runtime の `application/github_issue_targets.py` に `current_repo_slug` 入力を追加し、unscoped current-repo linked node を `(current_repo_slug, issue_number)` fallback target として扱えるようにした
+    - `sync_state.py` / `set_active.py` / `check_deps.py` の call site から同 helper へ `current_repo_slug` を伝播した
+  - tests:
+    - `tests/presentation_runtime.test_runtime_sync_s07`
+    - `tests.cli_runtime.test_runtime_deps_s04`
+    - `tests.cli_runtime.test_runtime_active_s06`
+    - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_sync_parity`
+    - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_active_deps_parity`
+    - above targeted suite rerun: `44 tests / OK`
+    - provider-side fail-closed regression:
+      - malformed partial repo scope linkage は `issue_view_snapshot()` target へ入らないことを `tests/presentation_runtime.test_runtime_sync_s07` で固定した
+  - review:
+    - implementation review: `pass`
+    - QA review: 初回 `conditional_pass`（checked-in active/deps parity 追加要求）-> 追加 test 後に `pass`
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:

@@ -307,6 +307,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if not records:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
     graph = build_graph([_to_spec_node_seed(record) for record in records])
+    current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
     warnings: list[str] = []
 
@@ -342,6 +343,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
         repo_scoped_targets = collect_repo_scoped_issue_view_targets(
             graph,
             issue_index_snapshots=issue_index_snapshots,
+            current_repo_slug=current_repo_slug,
         )
         for repo_slug, issue_number in repo_scoped_targets:
             try:
@@ -367,7 +369,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
         cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
-        current_repo_slug=resolve_current_repo_slug(ports),
+        current_repo_slug=current_repo_slug,
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
