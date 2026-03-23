@@ -277,12 +277,13 @@ ActiveSet --> IssueStatusResolution : uses
 
 - `collect_repo_scoped_issue_view_targets()` は persisted `repo_owner/repo_name` を持つ node だけでなく、current repo slug が解決できる unscoped linked `initiative` / `epic` / `issue` も fallback fetch 対象へ含める
 - indexed key 判定は引き続き `(repo_slug, issue_number)` で行い、current repo index 済み target は skip し、index 未掲載 target だけ `issue_view_snapshot(repo_slug=current_repo_slug)` を送る
-- この helper は `sync_state` / `set_active` / `check_deps` の GitHub-aware read path で共通利用し、`gh_index_incomplete` warning の意味を current repo linked epic / initiative にも揃える
+- この helper は `sync_state` / `set_active` / `check_deps` の GitHub-aware read path で共通利用し、current repo linked epic / initiative でも fallback fetch の解決基準を揃える
 
 ### 意図
 
 - `new ... --create-github-issue` で作られた unscoped current-repo linked epic / initiative が index limit 超過時に `unknown/stale` へ退行するのを防ぐ
 - same-repo indexed target dedup 契約を壊さず、missing current-repo target にだけ cheap で明示的な fallback fetch を許す
+- `gh_index_incomplete` warning 自体は既存どおり issue-centric な surface に留め、今回の corrective scope では status recovery 契約だけを拡張する
 
 ### 実装境界
 
