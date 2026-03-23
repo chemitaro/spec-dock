@@ -3971,6 +3971,286 @@ with tempfile.TemporaryDirectory() as td:
         )
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
+    def test_checked_in_dogfooding_runtime_keeps_numeric_branch_current_repo_overlap_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.application import ports as app_ports
+    from spec_dock_runtime.application import sync_state as app_sync_state
+    from spec_dock_runtime.domain import active as domain_active
+    from spec_dock_runtime.domain import models as domain_models
+    from spec_dock_runtime.domain import tree as domain_tree
+finally:
+    sys.path.pop(0)
+
+seeds = [
+    domain_models.SpecNodeSeed(
+        kind="initiative",
+        id="init-local-00001",
+        title="Platform",
+        slug="platform",
+        path=Path("/repo/spec-dock/initiatives/init-local-00001-platform"),
+        meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/.meta.json"),
+        parent_id=None,
+        initiative_id=None,
+        epic_id=None,
+        github_issue_number=None,
+    ),
+    domain_models.SpecNodeSeed(
+        kind="epic",
+        id="epic-local-00001",
+        title="Delivery",
+        slug="delivery",
+        path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery"),
+        meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/.meta.json"),
+        parent_id="init-local-00001",
+        initiative_id="init-local-00001",
+        epic_id=None,
+        github_issue_number=None,
+    ),
+    domain_models.SpecNodeSeed(
+        kind="issue",
+        id="iss-local-00001",
+        title="Current issue",
+        slug="current-issue",
+        path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00001-current-issue"),
+        meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00001-current-issue/.meta.json"),
+        parent_id="epic-local-00001",
+        initiative_id="init-local-00001",
+        epic_id="epic-local-00001",
+        github_issue_number=123,
+    ),
+    domain_models.SpecNodeSeed(
+        kind="issue",
+        id="iss-local-00002",
+        title="Foreign issue",
+        slug="foreign-issue",
+        path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00002-foreign-issue"),
+        meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00002-foreign-issue/.meta.json"),
+        parent_id="epic-local-00001",
+        initiative_id="init-local-00001",
+        epic_id="epic-local-00001",
+        github_issue_number=123,
+        github_repo_owner="other",
+        github_repo_name="repo",
+    ),
+]
+graph = domain_tree.build_graph(seeds)
+
+matched, reason = domain_active.infer_active_node_from_branch(
+    graph,
+    branch="123-fix-login",
+    current_repo_slug="current/repo",
+)
+assert matched is not None
+assert matched.id == "iss-local-00001", matched
+assert reason == "matched github.issue_number=123 from branch", reason
+
+unknown_matched, unknown_reason = domain_active.infer_active_node_from_branch(
+    graph,
+    branch="issue-123",
+    current_repo_slug=None,
+)
+assert unknown_matched is None
+assert unknown_reason == "ambiguous github issue numbers [123]: issue:iss-local-00001, issue:iss-local-00002", unknown_reason
+
+foreign_only_graph = domain_tree.build_graph(
+    [
+        domain_models.SpecNodeSeed(
+            kind="initiative",
+            id="init-local-00001",
+            title="Platform",
+            slug="platform",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/.meta.json"),
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        domain_models.SpecNodeSeed(
+            kind="epic",
+            id="epic-local-00001",
+            title="Delivery",
+            slug="delivery",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/.meta.json"),
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        domain_models.SpecNodeSeed(
+            kind="issue",
+            id="iss-local-00001",
+            title="Foreign issue",
+            slug="foreign-issue",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00001-foreign-issue"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00001-foreign-issue/.meta.json"),
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=123,
+            github_repo_owner="other",
+            github_repo_name="repo",
+        ),
+    ]
+)
+foreign_only_matched, foreign_only_reason = domain_active.infer_active_node_from_branch(
+    foreign_only_graph,
+    branch="123-fix-login",
+    current_repo_slug="current/repo",
+)
+assert foreign_only_matched is None
+assert (
+    foreign_only_reason
+    == "no current-repo matches for github issue numbers [123] in scope (current/repo); refusing foreign fallback: issue:iss-local-00001"
+), foreign_only_reason
+
+scoped_ambiguity_graph = domain_tree.build_graph(
+    [
+        domain_models.SpecNodeSeed(
+            kind="initiative",
+            id="init-local-00001",
+            title="Platform",
+            slug="platform",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/.meta.json"),
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        domain_models.SpecNodeSeed(
+            kind="epic",
+            id="epic-local-00001",
+            title="Delivery",
+            slug="delivery",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/.meta.json"),
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=None,
+        ),
+        domain_models.SpecNodeSeed(
+            kind="issue",
+            id="iss-local-00001",
+            title="Current issue a",
+            slug="current-issue-a",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00001-current-issue-a"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00001-current-issue-a/.meta.json"),
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=123,
+        ),
+        domain_models.SpecNodeSeed(
+            kind="issue",
+            id="iss-local-00002",
+            title="Current issue b",
+            slug="current-issue-b",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00002-current-issue-b"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00002-current-issue-b/.meta.json"),
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=123,
+            github_repo_owner="current",
+            github_repo_name="repo",
+        ),
+        domain_models.SpecNodeSeed(
+            kind="issue",
+            id="iss-local-00003",
+            title="Foreign issue",
+            slug="foreign-issue",
+            path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00003-foreign-issue"),
+            meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-platform/epics/epic-local-00001-delivery/issues/iss-local-00003-foreign-issue/.meta.json"),
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=123,
+            github_repo_owner="other",
+            github_repo_name="repo",
+        ),
+    ]
+)
+scoped_ambiguity_matched, scoped_ambiguity_reason = domain_active.infer_active_node_from_branch(
+    scoped_ambiguity_graph,
+    branch="issue-123",
+    current_repo_slug="current/repo",
+)
+assert scoped_ambiguity_matched is None
+assert (
+    scoped_ambiguity_reason
+    == "ambiguous github issue numbers [123] in current repo scope (current/repo): issue:iss-local-00001, issue:iss-local-00002"
+), scoped_ambiguity_reason
+
+class _StubNodeReader:
+    def load_node_records(self):
+        return []
+
+class _StubGitGateway:
+    def current_branch_or_none(self, repo_root):
+        del repo_root
+        return "123-fix-login"
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+ports = app_ports.Ports(
+    node_reader=_StubNodeReader(),
+    repo_root=Path("/repo"),
+    git_gateway=_StubGitGateway(),
+    active_state_store=object(),
+)
+state = app_contracts.SyncStateResult(
+    graph=domain_models.SpecGraph(nodes_by_id={{}}),
+    active=None,
+    issue_statuses={{}},
+    progress=domain_models.ProgressMap(by_node_id={{}}, counts={{"total": 0, "done": 0, "open": 0, "unknown": 0}}),
+    deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+    deps_eval_by_id={{}},
+    generated_at="2026-03-23T00:00:00+00:00",
+    warnings=[],
+    deps_preflight_error=None,
+    repo_root=Path("/repo"),
+)
+observed = {{}}
+original_infer = app_sync_state.infer_active_node_from_branch
+
+def _fake_infer(graph, *, branch, current_repo_slug=None):
+    del graph
+    observed["branch"] = branch
+    observed["current_repo_slug"] = current_repo_slug
+    return (None, "no branch match")
+
+app_sync_state.infer_active_node_from_branch = _fake_infer
+try:
+    next_state, outcome = app_sync_state.maybe_auto_update_from_branch(state, ports)
+finally:
+    app_sync_state.infer_active_node_from_branch = original_infer
+
+assert next_state is state
+assert outcome is not None
+assert outcome.applied is False
+assert outcome.reason == "no branch match"
+assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/repo"}}
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
     def test_tool_version_fallback_reads_pyproject(self) -> None:
         import spec_dock.cli as cli
 

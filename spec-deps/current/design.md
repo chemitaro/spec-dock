@@ -300,6 +300,8 @@ ActiveSet --> IssueStatusResolution : uses
 ### 変更方針
 
 - `infer_active_node_from_branch()` の numeric fallback は bare `github_issue_number` 一致だけで候補集合を作らず、`current_repo_slug` が解決できるときは `(current_repo_slug or explicit repo slug, issue_number)` を使って current repo candidate を優先する
+- `current_repo_slug` が解決できる場合、current repo scope candidate が 0 件なら foreign-only numeric match へは落ちず fail-closed にする
+- `current_repo_slug` が解決できる場合、current repo scope candidate が複数なら scoped ambiguity として fail-closed にする
 - branch 文字列に explicit node id がある場合の優先順位は維持し、numeric fallback のみ repo-aware 化する
 - `sync_state.maybe_auto_update_from_branch()` は current repo slug を解決して domain inference へ渡し、slug 不明時だけ既存の ambiguity / no-match fail-closed を維持する
 
@@ -318,6 +320,8 @@ ActiveSet --> IssueStatusResolution : uses
   - checked-in runtime に同 inference path がある場合は parity を取る
 - tests:
   - current repo `#123` と foreign `other/repo#123` が共存しても numeric branch が current repo node を指し続ける回帰
+  - current repo slug が既知で foreign-only numeric match しかない場合は fail-closed に倒れる回帰
+  - current repo scope に複数 numeric match がある場合は scoped ambiguity として fail-closed に倒れる回帰
   - current repo slug 不明時は ambiguity fail-closed を維持する回帰
 
 ## 3. artifact/repair contract

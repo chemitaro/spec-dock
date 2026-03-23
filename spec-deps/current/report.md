@@ -33,6 +33,7 @@ ID: "issue-28-runtime-regression-bugs"
 - current working tree では、`S01O` で create guidance path を cwd-independent に補修し、fresh spec review / implementation review / QA review を通過した
 - current working tree では、`S03J` / `S03K` の corrective scope を issue 文書へ反映し、fresh spec review を `pass` している
 - current working tree では、`S03J` で current-repo fallback fetch for unscoped linked nodes を provider/checked-in runtime へ反映し、fresh implementation review / QA review を `pass` している
+- current working tree では、`S03K` で numeric branch inference の edge semantics を補強し、fresh spec review / implementation review / QA review を `pass` している
 - `S90 docs impact resolution` を完了
 - `S90F checked-in dogfooding runtime parity` を完了
 - `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
@@ -105,6 +106,23 @@ ID: "issue-28-runtime-regression-bugs"
   - review:
     - implementation review: `pass`
     - QA review: 初回 `conditional_pass`（checked-in active/deps parity 追加要求）-> 追加 test 後に `pass`
+
+- 2026-03-23 `S03K` 実装:
+  - 実装:
+    - provider-side / checked-in runtime の `domain/active.py` に current-repo-aware numeric branch inference を導入した
+    - `current_repo_slug` 既知時は current repo candidate を優先し、foreign-only match と current-scope multiple match は fail-closed にした
+    - `application/sync_state.py` の `maybe_auto_update_from_branch()` から `current_repo_slug` を domain inference へ伝播した
+  - docs:
+    - `AC-016` と `design.md 2.5` / `plan.md S03K` に foreign-only known-scope fail-closed と scoped ambiguity fail-closed の契約を追記した
+  - tests:
+    - `tests.domain_runtime.test_runtime_domain_s03`
+    - `tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06.test_sync_branch_inference_propagates_current_repo_slug`
+    - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_numeric_branch_current_repo_overlap_parity`
+    - targeted suite rerun: `7 tests / OK`
+  - review:
+    - spec review: 初回 `conditional_pass`（design test bullets の不足）-> 追記後 `pass`
+    - implementation review: `pass`
+    - QA review: 初回 `conditional_pass`（edge semantics regression の不足）-> 追加 test 後 `pass`
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:

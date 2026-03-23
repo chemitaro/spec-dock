@@ -316,6 +316,8 @@ ID: "issue-28-runtime-regression-bugs"
   - `sync --github` または branch auto-update を伴う `sync` を実行する
 - Then:
   - branch-based active inference は bare `github_issue_number` だけで曖昧化せず、current repo slug を解決できる限り current repo `#123` を優先して active auto-update できる
+  - current repo slug を解決できるのに current repo scope に一致する numeric candidate が 0 件の場合、foreign repo numeric match を暗黙採用せず fail-closed に倒れる
+  - current repo scope に一致する numeric candidate が複数ある場合も ambiguity として fail-closed に倒れる
   - current repo slug が解決できない場合だけ ambiguity / no-match の fail-closed を維持する
 
 ### AC-012 domain/application validation boundary
