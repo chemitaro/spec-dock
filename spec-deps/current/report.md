@@ -34,6 +34,7 @@ ID: "issue-28-runtime-regression-bugs"
 - current working tree では、`S03J` / `S03K` の corrective scope を issue 文書へ反映し、fresh spec review を `pass` している
 - current working tree では、`S03J` で current-repo fallback fetch for unscoped linked nodes を provider/checked-in runtime へ反映し、fresh implementation review / QA review を `pass` している
 - current working tree では、`S03K` で numeric branch inference の edge semantics を補強し、fresh spec review / implementation review / QA review を `pass` している
+- whole-diff spec review では、`S03J` の `gh_index_incomplete` warning 文言が design だけ過剰だったため、warning surface を widening しない現行契約へ design を補正している
 - `S90 docs impact resolution` を完了
 - `S90F checked-in dogfooding runtime parity` を完了
 - `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
