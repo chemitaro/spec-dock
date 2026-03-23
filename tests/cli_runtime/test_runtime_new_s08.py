@@ -1419,8 +1419,75 @@ class TestRuntimeNewS08(unittest.TestCase):
                             app_contracts.CreateNodeRequest(**request_kwargs),
                             ports,
                         )
+                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
                     self.assertNotIn("GitHub issue was created:", str(raised.exception))
                     self.assertEqual(issue_gateway.calls, [])
+
+    def test_issue_create_gateway_failure_is_pre_github_fail_without_created_issue_hint(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+
+            class _IssueCreateFailureGateway(_StubIssueGateway):
+                def issue_create(self, repo_root, title, body):
+                    self.calls.append((str(repo_root), title, body))
+                    raise RuntimeError("simulated issue_create failure")
+
+            issue_gateway = _IssueCreateFailureGateway([799])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+            with self.assertRaisesRegex(RuntimeError, "simulated issue_create failure") as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+
+            self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+            self.assertNotIn("GitHub issue was created:", str(raised.exception))
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
 
     def test_github_create_parent_precheck_fails_before_github_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1484,6 +1551,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
                     with self.assertRaisesRegex(RuntimeError, expected_error) as raised:
                         create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
+                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
                     self.assertNotIn("GitHub issue was created:", str(raised.exception))
                     self.assertEqual(issue_gateway.calls, [])
 
@@ -1530,7 +1598,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 events=events,
                 issue_gateway=issue_gateway,
             )
-            with self.assertRaisesRegex(RuntimeError, "(?i)duplicate id"):
+            with self.assertRaisesRegex(RuntimeError, "(?i)duplicate id") as raised:
                 app_create_node.create_initiative(
                     app_contracts.CreateNodeRequest(
                         title="Payments",
@@ -1542,6 +1610,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                     ),
                     ports,
                 )
+            self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+            self.assertNotIn("GitHub issue was created:", str(raised.exception))
             self.assertEqual(issue_gateway.calls, [])
 
     def test_initiative_and_epic_post_create_failures_report_retry_link_guidance(self) -> None:

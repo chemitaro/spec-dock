@@ -1060,6 +1060,10 @@ def _post_github_doctor_first_guidance(
     )
 
 
+def _build_pre_github_create_failure(*, error: Exception) -> RuntimeError:
+    return RuntimeError("Outcome: pre_github_fail. " f"{error}")
+
+
 def _build_post_github_create_failure(
     *,
     local_error: Exception | None,
@@ -1152,25 +1156,34 @@ def create_node_core(
 ) -> CreateNodeResult:
     mode = _resolve_github_mode(req, kind)
     title, _slug = resolve_input_title_and_slug(req.title, req.slug)
-    _validate_pre_github_create_inputs(req, kind=kind, mode=mode)
-    specdock_dir = _resolve_specdock_dir(ports)
     github_issue_number = req.github_issue_number
     created_github_issue_number: int | None = None
+    specdock_dir: Path | None = None
 
-    if mode == "link_existing" and github_issue_number is None:
-        raise RuntimeError("github_issue_number is required for link_existing mode")
+    try:
+        _validate_pre_github_create_inputs(req, kind=kind, mode=mode)
+        specdock_dir = _resolve_specdock_dir(ports)
 
-    if mode == "create" and github_issue_number is None:
-        if ports.issue_gateway is None:
-            raise RuntimeError("issue_gateway is required for github issue creation")
-        _precheck_pre_github_create_parent(req, ports, kind=kind)
-        repo_root = _resolve_repo_root(ports)
-        github_issue_number = ports.issue_gateway.issue_create(
-            repo_root,
-            title=title,
-            body=_github_issue_body(kind=kind),
-        )
-        created_github_issue_number = int(github_issue_number)
+        if mode == "link_existing" and github_issue_number is None:
+            raise RuntimeError("github_issue_number is required for link_existing mode")
+
+        if mode == "create" and github_issue_number is None:
+            if ports.issue_gateway is None:
+                raise RuntimeError("issue_gateway is required for github issue creation")
+            _precheck_pre_github_create_parent(req, ports, kind=kind)
+            repo_root = _resolve_repo_root(ports)
+            github_issue_number = ports.issue_gateway.issue_create(
+                repo_root,
+                title=title,
+                body=_github_issue_body(kind=kind),
+            )
+            created_github_issue_number = int(github_issue_number)
+    except Exception as exc:
+        if mode == "create" and req.github_issue_number is None and created_github_issue_number is None:
+            raise _build_pre_github_create_failure(error=exc) from exc
+        raise
+
+    assert specdock_dir is not None
 
     try:
         lock_path, lock_token = _acquire_create_lock(specdock_dir)
