@@ -22,6 +22,39 @@ class GitHubIssueTarget:
     repo_name: str | None
 
 
+def _normalize_repo_scope(owner: str | None, repo: str | None) -> tuple[str, str] | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return (normalized_owner, normalized_repo)
+
+
+def _make_github_issue_target(
+    *,
+    issue_number: int,
+    repo_owner: str | None = None,
+    repo_name: str | None = None,
+) -> TargetRef:
+    scope = _normalize_repo_scope(repo_owner, repo_name)
+    owner = scope[0] if scope is not None else None
+    repo = scope[1] if scope is not None else None
+    return TargetRef(
+        kind="github_issue",
+        node_id=None,
+        github_issue_number=int(issue_number),
+        github_repo_owner=owner,
+        github_repo_name=repo,
+    )
+
+
+def _github_target_display(*, issue_number: int, repo_owner: str | None = None, repo_name: str | None = None) -> str:
+    scope = _normalize_repo_scope(repo_owner, repo_name)
+    if scope is None:
+        return f"github#{int(issue_number)}"
+    return f"github:{scope[0]}/{scope[1]}#{int(issue_number)}"
+
+
 def parse_github_issue_target(target: str) -> int:
     return parse_github_issue_target_ref(target).issue_number
 
@@ -69,18 +102,37 @@ def parse_active_like_target(target: str) -> tuple[TargetRef, str]:
     if not raw:
         raise RuntimeError("target is required")
 
+    full_url_match = _gh_issue_url_full_re.fullmatch(raw)
+    if full_url_match:
+        issue_number = int(full_url_match.group("num"))
+        owner = full_url_match.group("owner")
+        repo = full_url_match.group("repo")
+        return (
+            _make_github_issue_target(
+                issue_number=issue_number,
+                repo_owner=owner,
+                repo_name=repo,
+            ),
+            _github_target_display(issue_number=issue_number, repo_owner=owner, repo_name=repo),
+        )
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        raise RuntimeError(
+            "Invalid target. Use a GitHub issue URL like https://github.com/<owner>/<repo>/issues/123."
+        )
+
     match = _gh_issue_url_re.search(raw)
     if match:
         issue_number = int(match.group("num"))
-        return (TargetRef(kind="github_issue", node_id=None, github_issue_number=issue_number), f"github#{issue_number}")
+        return (_make_github_issue_target(issue_number=issue_number), _github_target_display(issue_number=issue_number))
 
     if raw.startswith("#") and _num_re.fullmatch(raw[1:]):
         issue_number = int(raw[1:])
-        return (TargetRef(kind="github_issue", node_id=None, github_issue_number=issue_number), f"github#{issue_number}")
+        return (_make_github_issue_target(issue_number=issue_number), _github_target_display(issue_number=issue_number))
 
     if _num_re.fullmatch(raw):
         issue_number = int(raw)
-        return (TargetRef(kind="github_issue", node_id=None, github_issue_number=issue_number), f"github#{issue_number}")
+        return (_make_github_issue_target(issue_number=issue_number), _github_target_display(issue_number=issue_number))
 
     lowered = raw.lower()
     matches = [item.group("id") for item in _id_in_text_re.finditer(lowered)]
@@ -145,8 +197,8 @@ def parse_explicit_target_flags(
             raise RuntimeError("--github-issue must be a positive integer.")
         issue_number = int(github_issue)
         return (
-            TargetRef(kind="github_issue", node_id=None, github_issue_number=issue_number),
-            f"github#{issue_number}",
+            _make_github_issue_target(issue_number=issue_number),
+            _github_target_display(issue_number=issue_number),
         )
     return parse_active_like_target(raw_target)
 

@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -366,6 +367,114 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("spec-dock: doctor: findings=1", p.stderr)
             self.assertIn("[missing_artifact]", p.stderr)
             self.assertIn(meta_rel_path.as_posix(), p.stderr)
+
+    def test_validate_sync_and_doctor_classify_missing_meta_with_create_lock_in_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / ".meta.json").unlink(missing_ok=False)
+
+            lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=active",
+                        "pid=1234",
+                        "user=tester",
+                        f"created_unix={time.time():.6f}",
+                        "created_iso=2026-03-23",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Create in-progress state detected", p_validate.stderr)
+            self.assertIn(".meta.json", p_validate.stderr)
+            self.assertNotIn("Missing required artifact", p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("Create in-progress state detected", p_sync.stderr)
+            self.assertNotIn("Missing required artifact", p_sync.stderr)
+
+            p_doctor = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
+            self.assertIn("[stale_create_lock]", p_doctor.stderr)
+            self.assertIn("Create in-progress state detected", p_doctor.stderr)
+            self.assertNotIn("[missing_artifact]", p_doctor.stderr)
+
+    def test_validate_sync_and_doctor_classify_missing_meta_with_stale_create_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / ".meta.json").unlink(missing_ok=False)
+
+            lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=stale",
+                        "pid=4321",
+                        "user=tester",
+                        "created_unix=0",
+                        "created_iso=1970-01-01",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Stale create-lock state detected", p_validate.stderr)
+            self.assertIn(".meta.json", p_validate.stderr)
+            self.assertNotIn("Missing required artifact", p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("Stale create-lock state detected", p_sync.stderr)
+            self.assertNotIn("Missing required artifact", p_sync.stderr)
+
+            p_doctor = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
+            self.assertIn("[stale_create_lock]", p_doctor.stderr)
+            self.assertIn("Stale create-lock state detected", p_doctor.stderr)
+            self.assertNotIn("[missing_artifact]", p_doctor.stderr)
 
     def test_validate_sync_and_doctor_detect_missing_required_plan_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

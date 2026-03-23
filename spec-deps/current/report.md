@@ -24,6 +24,10 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-23 latest GitHub/Codex review 1 件 `R30` を分析し、`post-create cleanup failure guidance` は妥当と判断した
 - 2026-03-23 repeated review loop の根本原因分析を行い、`create/post-create failure contract` が outcome matrix で閉じていないこと、provider / checked-in parity drift、matrix-based exit criteria 不足が潜在問題であると整理した
 - 2026-03-23 consultant を踏まえ、抜本対策として `create/post-create outcome matrix` を design/plan 正本へ昇格させる方針を採用した
+- 2026-03-23 latest review 4 件を分析し、`repo-scoped reference model` と `create state model` の 2 系統に根本問題を整理した
+- 2026-03-23 latest review 4 件（`R31`/`R32`/`R33`/`R34`）の corrective scope `S05J`/`S05K`/`S01Q`/`S04J` を provider-side / checked-in runtime parity まで実装し、targeted + parity 回帰を完了した
+- 2026-03-23 `tests.test_init_update` の parity failure（create write seam の guidance 契約）を `AC-020` に合わせて補正し、fresh rerun で `pass` へ収束した
+- 2026-03-23 branch 全体差分に対して `python -m unittest discover -v` を実行し、`Ran 434 tests` / `OK` を確認した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -290,6 +294,45 @@ ID: "issue-28-runtime-regression-bugs"
     - post-commit:
       - fresh whole-diff spec review:
         - `pass`
+
+- 2026-03-23 latest review 4 件の分析:
+  - scope:
+    - `commands/targets.py` URL target repo scope preservation
+    - `infra/deps_reader.py` numeric deps scope contract
+    - `application/create_node.py` partial create write phase classification
+    - `infra/fs_repo.py` in-progress scaffold diagnosis
+  - evidence:
+    - `discussions/049-disc-pr29-r31-url-target-repo-scope-analysis.md`
+    - `discussions/050-disc-pr29-r32-numeric-deps-scope-contract-analysis.md`
+    - `discussions/051-disc-pr29-r33-partial-create-write-phase-analysis.md`
+    - `discussions/052-disc-pr29-r34-in-progress-scaffold-diagnosis-analysis.md`
+    - `discussions/053-disc-pr29-root-cause-repo-scope-and-create-state-analysis.md`
+  - verdict:
+    - R31 URL target repo scope loss:
+      - `valid`
+      - `must`
+    - R32 numeric deps current-repo-only contract:
+      - `valid`
+      - `should`
+      - note:
+        - bare numeric ref を foreign へ自動解決するのではなく、scoped dependency ref syntax を設計追加する方向を推奨
+    - R33 partial create write phase:
+      - `valid`
+      - `must`
+    - R34 in-progress scaffold diagnosis:
+      - `valid`
+      - `should`
+  - root cause:
+    - repo scope を end-to-end で保持する参照モデルがない
+    - create 中間状態を shared state machine ではなく lossy な flag で扱っている
+    - regression matrix が `repo overlap` と `mid-write partial failure` を横断できていない
+  - recommended bundles:
+    - `create transaction/state bundle`
+      - partial write classification
+      - in-progress scaffold diagnosis
+    - `repo-scoped reference bundle`
+      - URL target repo scope preservation
+      - scoped dependency ref support / docs alignment
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:
@@ -1053,6 +1096,40 @@ ID: "issue-28-runtime-regression-bugs"
     - spec review: `pass`
     - implementation review: `pass`
     - QA review: `pass`
+
+- 2026-03-23 restart follow-up (`S01Q` / `S04J` / `S05J` / `S05K`):
+  - docs contract fix:
+    - `requirement/design/plan` に `AC-018` / `AC-019` / `AC-020` と review trace (`PR29-R31`..`R34`) を追記
+    - discussions:
+      - `spec-deps/current/discussions/049-disc-pr29-r31-url-target-repo-scope-analysis.md`
+      - `spec-deps/current/discussions/050-disc-pr29-r32-numeric-deps-scope-contract-analysis.md`
+      - `spec-deps/current/discussions/051-disc-pr29-r33-partial-create-write-phase-analysis.md`
+      - `spec-deps/current/discussions/052-disc-pr29-r34-in-progress-scaffold-diagnosis-analysis.md`
+      - `spec-deps/current/discussions/053-disc-pr29-root-cause-repo-scope-and-create-state-analysis.md`
+  - finding resolution:
+    - `active set` / `deps check` の URL target で `owner/repo` を保持し、repo overlap 時でも exact target 解決できるよう補修
+    - `depends_on` で scoped ref（`owner/repo#123` / canonical issue URL）を解決可能にし、bare numeric は current-repo scope 優先 + fail-closed を維持
+    - `create_node` / `import_node` に create write phase（`none/scaffold_copied/meta_written/post_write_verified`）を導入し、partial write を doctor-first guidance へ分類
+    - `fs_repo` の missing `.meta.json` 判定に create-lock state（`in_progress` / `stale_create_lock`）を導入し、`validate/sync/doctor` で corruption と進行中状態を分離
+    - provider-side source of truth と checked-in dogfooding runtime を parity 更新
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate`
+    - 結果: `Ran 132 tests in 33.285s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity`
+    - 結果: `Ran 7 tests in 2.675s` / `OK`
+    - `python -m unittest -v tests.test_init_update`
+    - 結果: `Ran 69 tests in 9.716s` / `OK`
+    - `python -m unittest discover -v`
+    - 結果: `Ran 434 tests in 60.668s` / `OK`
+    - `git diff --check`
+    - 結果: whitespace error なし
+    - `git diff --name-only | rg '[A-Z]' || true`
+    - 結果: 変更対象 path に uppercase 追加なし
+  - review status:
+    - spec review: `pass`（現セッションでは reviewer sub-agent 呼び出しが不能だったため、`AC-018/019/020` と `PR29-R31..R34` の checklist ベースで fresh manual spec review を実施）
+    - implementation review: `pass`（変更差分 + whole working tree の manual review で blocking finding なし）
+    - QA review: `pass`（上記 full/targeted unittest green）
+    - whole-diff review (`main` 基準): `pass`（今回変更の provider/check-in parity と受け入れ条件の対応を確認）
 
 ## 発見事項
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証

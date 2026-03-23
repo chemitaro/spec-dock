@@ -60,6 +60,26 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
             for node in graph.nodes_by_id.values()
             if node.github_issue_number == int(target.github_issue_number) and node.kind in ("initiative", "epic", "issue")
         ]
+        target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
+        if target_repo_slug is not None:
+            scoped = [
+                node
+                for node in matches
+                if normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
+            ]
+            if not scoped:
+                raise RuntimeError(
+                    "No node found for "
+                    f"github.issue_number={int(target.github_issue_number)} in repo scope ({target_repo_slug}). "
+                    "Create/link the node first."
+                )
+            if len(scoped) > 1:
+                ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in scoped))
+                raise RuntimeError(
+                    f"Ambiguous github.issue_number={int(target.github_issue_number)} in repo scope "
+                    f"({target_repo_slug}): {ids}"
+                )
+            return scoped[0].id
         if not matches:
             raise RuntimeError(
                 f"No node found for github.issue_number={int(target.github_issue_number)}. Create/link the node first."

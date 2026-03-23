@@ -40,14 +40,16 @@
     "iss-00123",
     "epic-local-00001",
     456,
-    "789"
+    "789",
+    "owner/repo#123",
+    "https://github.com/owner/repo/issues/123"
   ]
 }
 ```
 
 ルール:
 - `schema_version` は `1` 固定
-- `depends_on` 要素は node id または GitHub issue番号（int / 数字文字列）
+- `depends_on` 要素は node id、GitHub issue番号（int / 数字文字列）、repo-scoped ref（`owner/repo#123` / canonical issue URL）
 - shorthand は最終的に issue->issue edge へ還元されます
 - `deps.json` が無い場合は `depends_on=[]`
 

@@ -48,6 +48,19 @@ _DEFAULT_CREATE_LOCK_WAIT_SECONDS = 3.0
 _DEFAULT_CREATE_LOCK_POLL_SECONDS = 0.05
 _DEFAULT_CREATE_LOCK_STALE_SECONDS = 600.0
 
+CreateWritePhase = Literal["none", "scaffold_copied", "meta_written", "post_write_verified"]
+_PARTIAL_LOCAL_WRITE_PHASES: tuple[CreateWritePhase, ...] = (
+    "scaffold_copied",
+    "meta_written",
+    "post_write_verified",
+)
+
+
+class CreatePlanExecutionError(RuntimeError):
+    def __init__(self, *, phase: CreateWritePhase, message: str):
+        super().__init__(message)
+        self.phase = phase
+
 
 def _resolve_duration_seconds(env_name: str, default: float, *, minimum: float) -> float:
     raw = os.environ.get(env_name)
@@ -404,10 +417,11 @@ def load_graph(ports: Ports, *, validate: bool) -> SpecGraph:
     graph = build_graph([_to_spec_node_seed(record) for record in records])
     if validate:
         repo_root = _resolve_repo_root(ports)
+        current_repo_slug = _resolve_current_repo_slug(ports)
         report = validate_graph_and_deps(
             graph,
             repo_root=repo_root,
-            current_repo_slug=_resolve_current_repo_slug(ports),
+            current_repo_slug=current_repo_slug,
         )
         if report.errors:
             raise RuntimeError(report.errors[0])
@@ -510,6 +524,8 @@ def guard_github_issue_uniqueness(
         ],
         key=lambda node: (node.kind, node.id, node.meta_path.as_posix()),
     )
+    # Fail closed: when current repo cannot be resolved, mixing scoped and unscoped linkage
+    # for the same issue number can represent the same logical GitHub issue.
     if linked_same_number:
         mixed_scope_conflict = []
         for node in linked_same_number:
@@ -674,6 +690,8 @@ def plan_node_creation(
         existing = graph.nodes_by_id[existing_id]
         existing_repo_slug = _normalize_repo_slug(existing.github_repo_owner, existing.github_repo_name) or current_repo_slug
         requested_repo_slug = _normalize_repo_slug(req.github_repo_owner, req.github_repo_name) or current_repo_slug
+        # Cross-repo overlap is allowed; keep deterministic github-number IDs when possible,
+        # but fall back to a local ID when the same numeric github ID is already occupied.
         if existing_repo_slug != requested_repo_slug:
             node_id = _next_id(graph, prefix, local=True)
             parsed_prefix, is_local, num = parse_id(node_id)
@@ -742,6 +760,16 @@ def _resolve_template_dir(plan: CreatePlan) -> Path:
     raise RuntimeError(f"spec-dock root not found from destination: {plan.dest_dir}")
 
 
+def create_write_phase_has_local_writes(phase: CreateWritePhase) -> bool:
+    return phase in _PARTIAL_LOCAL_WRITE_PHASES
+
+
+def resolve_create_write_phase(error: Exception, *, default: CreateWritePhase = "none") -> CreateWritePhase:
+    if isinstance(error, CreatePlanExecutionError):
+        return error.phase
+    return default
+
+
 def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
     node_repo = _resolve_node_repo(ports)
     template_scaffolder = _resolve_template_scaffolder(ports)
@@ -751,12 +779,20 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
         raise RuntimeError(f"Destination already exists: {collisions[0]}")
 
     template_dir = _resolve_template_dir(plan)
-    created_paths = template_scaffolder.copy_scaffolded_tree(
-        src_dir=template_dir,
-        dest_dir=plan.dest_dir,
-        replacements=plan.replacements,
-    )
-    node_repo.write_meta(plan.dest_dir, plan.meta)
+    try:
+        created_paths = template_scaffolder.copy_scaffolded_tree(
+            src_dir=template_dir,
+            dest_dir=plan.dest_dir,
+            replacements=plan.replacements,
+        )
+    except Exception as exc:
+        # copy seam failures can leave partially materialized files; fail closed as partial local write.
+        raise CreatePlanExecutionError(phase="scaffold_copied", message=str(exc)) from exc
+
+    try:
+        node_repo.write_meta(plan.dest_dir, plan.meta)
+    except Exception as exc:
+        raise CreatePlanExecutionError(phase="scaffold_copied", message=str(exc)) from exc
     return [*created_paths, Path(plan.meta.meta_path)]
 
 
@@ -1068,7 +1104,7 @@ def _build_post_github_create_failure(
     req: CreateNodeRequest,
     title: str,
     specdock_dir: Path,
-    local_write_committed: bool,
+    local_write_phase: CreateWritePhase,
     local_node_id: str | None,
     lock_acquired: bool,
 ) -> RuntimeError | None:
@@ -1095,7 +1131,7 @@ def _build_post_github_create_failure(
     if local_error is not None and release_error is not None:
         guidance = (
             _post_github_doctor_first_guidance(specdock_dir=specdock_dir, local_node_id=local_node_id)
-            if local_write_committed
+            if create_write_phase_has_local_writes(local_write_phase)
             else _post_github_retry_or_cleanup_guidance(
                 github_issue_number=created_github_issue_number,
                 kind=kind,
@@ -1115,7 +1151,7 @@ def _build_post_github_create_failure(
     if local_error is not None:
         guidance = (
             _post_github_doctor_first_guidance(specdock_dir=specdock_dir, local_node_id=local_node_id)
-            if local_write_committed
+            if create_write_phase_has_local_writes(local_write_phase)
             else _post_github_retry_or_cleanup_guidance(
                 github_issue_number=created_github_issue_number,
                 kind=kind,
@@ -1191,7 +1227,7 @@ def create_node_core(
             req=req,
             title=title,
             specdock_dir=specdock_dir,
-            local_write_committed=False,
+            local_write_phase="none",
             local_node_id=None,
             lock_acquired=False,
         )
@@ -1201,10 +1237,11 @@ def create_node_core(
 
     result: CreateNodeResult | None = None
     body_error: Exception | None = None
-    local_write_committed = False
+    local_write_phase: CreateWritePhase = "none"
     local_node_id: str | None = None
     try:
         graph = load_graph(ports, validate=False)
+        current_repo_slug = _resolve_current_repo_slug(ports)
 
         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
         plan = plan_node_creation(
@@ -1217,12 +1254,13 @@ def create_node_core(
             kind=kind,
             specdock_dir=specdock_dir,
             today=today,
-            current_repo_slug=_resolve_current_repo_slug(ports),
+            current_repo_slug=current_repo_slug,
         )
         local_node_id = plan.meta.id
         created_paths = execute_create_plan(plan, ports)
-        local_write_committed = True
+        local_write_phase = "meta_written"
         _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+        local_write_phase = "post_write_verified"
         result = CreateNodeResult(
             node=_to_spec_node(plan.meta),
             created_paths=created_paths,
@@ -1230,6 +1268,7 @@ def create_node_core(
         )
     except Exception as exc:
         body_error = exc
+        local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
     finally:
         release_error: Exception | None = None
         try:
@@ -1245,8 +1284,8 @@ def create_node_core(
             req=req,
             title=title,
             specdock_dir=specdock_dir,
-            local_write_committed=local_write_committed,
-            local_node_id=local_node_id if local_write_committed else None,
+            local_write_phase=local_write_phase,
+            local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
             lock_acquired=True,
         )
         if wrapped_outcome_error is not None:

@@ -63,6 +63,8 @@ class TargetRef:
     kind: str
     node_id: str | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)

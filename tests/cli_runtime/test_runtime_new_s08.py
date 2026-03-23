@@ -32,6 +32,28 @@ def _runtime_modules():
     return runtime_app, app_contracts, app_create_node, app_ports, new_commands, infra_contracts, presentation_cli_text
 
 
+def _runtime_modules_import():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.application import contracts as app_contracts
+        from spec_dock_runtime.application import create_node as app_create_node
+        from spec_dock_runtime.application import import_node as app_import_node
+        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.domain import models as domain_models
+        from spec_dock_runtime.infra import contracts as infra_contracts
+    finally:
+        sys.path.pop(0)
+    return app_contracts, app_create_node, app_import_node, app_ports, domain_models, infra_contracts
+
+
 def _quoted_runtime_entrypoint(specdock_dir: Path) -> str:
     return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
 
@@ -165,6 +187,29 @@ class _BlockingIssueGateway(_StubIssueGateway):
         if not self.created_numbers:
             raise RuntimeError("no issue numbers configured")
         return self.created_numbers.pop(0)
+
+
+class _StubImportIssueGateway:
+    def __init__(self, domain_models):
+        self._domain_models = domain_models
+        self.calls = []
+
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return []
+
+    def issue_view_minimal(self, repo_root, issue_number, *, repo_slug=None):
+        self.calls.append((str(repo_root), int(issue_number), repo_slug))
+        return self._domain_models.IssueSnapshot(
+            issue_number=int(issue_number),
+            state="open",
+            title=f"Imported #{int(issue_number)}",
+            labels=[],
+            updated_at="2026-03-12T00:00:00Z",
+            url=f"https://github.com/example/repo/issues/{int(issue_number)}",
+            repo_owner="example",
+            repo_name="repo",
+        )
 
 
 class _StubClock:
@@ -1014,6 +1059,241 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertIn("close/cleanup", message)
             self.assertEqual(len(issue_gateway.calls), 1)
             self.assertEqual(events, [])
+
+    def test_issue_create_partial_copy_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        class _PartialCopyFailureTemplateScaffolder(_StubTemplateScaffolder):
+            def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
+                self.events.append("copy_scaffolded_tree")
+                created = []
+                for src_path in sorted(src_dir.rglob("*"), key=lambda p: p.as_posix()):
+                    if src_path.is_dir():
+                        continue
+                    rel = src_path.relative_to(src_dir)
+                    dest_path = dest_dir / rel
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    text = src_path.read_text(encoding="utf-8")
+                    dest_path.write_text(self.render_text(text, replacements), encoding="utf-8")
+                    created.append(dest_path)
+                    raise RuntimeError("simulated partial copy failure")
+                return created
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([712])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+                template_scaffolder=_PartialCopyFailureTemplateScaffolder(events=events),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #712") as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_local_write_fail", message)
+            self.assertIn("simulated partial copy failure", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00712-refresh-token").exists())
+            self.assertFalse((epic_dir / "issues" / "iss-00712-refresh-token" / ".meta.json").exists())
+
+    def test_issue_create_meta_write_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        class _MetaWriteFailureNodeRepo(_StubNodeRepo):
+            def write_meta(self, dest_dir, record):
+                self.events.append("write_meta")
+                del dest_dir, record
+                raise RuntimeError("simulated write_meta failure")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([713])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+                node_repo=_MetaWriteFailureNodeRepo(records, events=events),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #713") as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_local_write_fail", message)
+            self.assertIn("simulated write_meta failure", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00713-refresh-token" / "README.md").exists())
+            self.assertFalse((epic_dir / "issues" / "iss-00713-refresh-token" / ".meta.json").exists())
+
+    def test_import_partial_write_failure_reports_doctor_first_guidance(self) -> None:
+        app_contracts, app_create_node, app_import_node, app_ports, domain_models, infra_contracts = _runtime_modules_import()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            for node_dir in (init_dir, epic_dir):
+                node_dir.mkdir(parents=True, exist_ok=True)
+                (node_dir / ".meta.json").write_text("{}\n", encoding="utf-8")
+                for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+                    (node_dir / name).write_text(f"{name}\n", encoding="utf-8")
+            issue_gateway = _StubImportIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            with patch.object(
+                app_import_node,
+                "execute_create_plan",
+                side_effect=app_create_node.CreatePlanExecutionError(
+                    phase="scaffold_copied",
+                    message="simulated import partial write",
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Outcome: import_local_write_fail") as raised:
+                    app_import_node.import_issue(
+                        app_contracts.ImportNodeRequest(
+                            issue_number=714,
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("simulated import partial write", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn("local node `iss-00714`", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn("Recovery: rerun", message)
 
     def test_issue_create_cleanup_failure_after_local_write_reports_doctor_first_guidance(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
