@@ -21,6 +21,9 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S01M executable doctor guidance` と `S01N runnable post-create retry hint` を追加した
 - 2026-03-23 latest GitHub/Codex review 1 件により、corrective scope `S01O cwd-independent create guidance path` を追加した
 - 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S03J current-repo fallback fetch for unscoped linked nodes` と `S03K current-repo-aware numeric branch inference` を追加した
+- 2026-03-23 latest GitHub/Codex review 1 件 `R30` を分析し、`post-create cleanup failure guidance` は妥当と判断した
+- 2026-03-23 repeated review loop の根本原因分析を行い、`create/post-create failure contract` が outcome matrix で閉じていないこと、provider / checked-in parity drift、matrix-based exit criteria 不足が潜在問題であると整理した
+- 2026-03-23 consultant を踏まえ、抜本対策として `create/post-create outcome matrix` を design/plan 正本へ昇格させる方針を採用した
 - 2026-03-19 R7/R8/R9 corrective patch を完了した
 - 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
 - `S01 create transaction で duplicate id を予防する` を完了
@@ -124,6 +127,131 @@ ID: "issue-28-runtime-regression-bugs"
     - spec review: 初回 `conditional_pass`（design test bullets の不足）-> 追記後 `pass`
     - implementation review: `pass`
     - QA review: 初回 `conditional_pass`（edge semantics regression の不足）-> 追加 test 後 `pass`
+
+- 2026-03-23 latest PR review / root-cause analysis:
+  - latest review:
+    - commit: `ebd53853f41e5df56dc66f1b5c89b625d5cf1095`
+    - inline comment: `2973591749`
+    - topic: `post-create cleanup failure guidance`
+    - conclusion:
+      - `valid`
+      - `required`
+    - rationale:
+      - `gh issue create` 済みかつ local write 済みの後に `_release_create_lock()` が失敗すると、生の `release_error` だけが露出し、`created_github_issue_number` と safe recovery guidance を失う
+    - evidence:
+      - `discussions/046-disc-pr29-r30-post-create-cleanup-failure-analysis.md`
+  - root-cause analysis:
+    - consultant discussion を踏まえ、review loop の潜在問題を次の 4 点に整理した
+      - create/recovery contract が branch patch の集合で、outcome matrix として閉じていない
+      - guidance 生成が outcome 中心でなく exception-point 中心である
+      - provider runtime と checked-in runtime の parity drift が corrective loop を長引かせている
+      - exit criteria が representative regression 止まりで combined failure branch を固定できていない
+    - root-cause report:
+      - `discussions/047-disc-pr29-review-loop-root-cause-analysis.md`
+  - pending:
+    - 次の corrective unit では、R30 の個別修正と同時に create/post-create outcome matrix を design/plan に固定する
+
+- 2026-03-23 create/post-create outcome matrix remediation:
+  - discussion:
+    - `discussions/048-disc-pr29-create-outcome-matrix-remediation.md`
+  - docs:
+    - `requirement.md` に `AC-017 create outcome-specific recovery guidance` を追加した
+    - `design.md` に create/post-create outcome matrix と evidence/guidance contract を追加した
+    - `plan.md` に `S01P create/post-create failure contract を outcome matrix で閉じる` を追加した
+  - intent:
+    - R30 個別修正だけでなく、review loop の主因だった post-create failure branching を outcome class で中央集約する
+  - pending:
+    - fresh spec review
+    - `S01P` implementation / implementation review / QA review
+    - `main..HEAD` 全体スコープの fresh spec review
+
+- 2026-03-23 fresh spec review for outcome-matrix remediation:
+  - verdict:
+    - 初回 `fail`
+  - findings:
+    - `AC-017` と `S01P` が outcome matrix の 5 class を fully close しておらず、`pre_github_fail` / `post_github_local_write_fail` の acceptance/test ownership が不足していた
+    - checked-in parity coverage が representative branch なのか full matrix なのか曖昧だった
+    - `S99` / final exit contract が matrix-specific stop condition を要求していなかった
+  - fix:
+    - `AC-017` を 5 class 全体の guidance contract へ拡張した
+    - `S01P` の failing/expected tests を 5 class full matrix と checked-in full-matrix parity に拡張した
+    - `discussions/047` / `048` を checked-in full-matrix parity に統一した
+    - `S99` と final exit contract に matrix-specific review/validation を追加した
+  - pending:
+    - fresh spec re-review
+
+- 2026-03-23 fresh spec re-review for outcome-matrix remediation:
+  - verdict:
+    - 2 回目 `fail`
+  - findings:
+    - `AC-017` の Given が post-GitHub failure に限定されたままで、`pre_github_fail` を同じ AC に含める Then と矛盾していた
+    - `discussions/048` の test matrix が provider 4-case のままで、5 class full-matrix 化の fix 記録と食い違っていた
+  - fix:
+    - `AC-017` の Given を create path の pre/post GitHub failure 両方に広げた
+    - `discussions/048` の provider / checked-in test matrix を 5 class へ更新した
+  - pending:
+    - fresh spec re-review
+
+- 2026-03-23 fresh spec re-review for outcome-matrix remediation:
+  - verdict:
+    - 3 回目 `pass`
+  - summary:
+    - `AC-017` の Given/Then scope、discussion 048 の 5 class matrix、checked-in parity、`S99` の matrix-specific stop condition が整合した
+
+- 2026-03-23 S01P implementation:
+  - 実装:
+    - provider / checked-in `application/create_node.py` に post-GitHub outcome builder を導入した
+    - `post_github_remote_only_fail`
+    - `post_github_local_write_fail`
+    - `post_github_local_write_success_cleanup_fail`
+    - `post_github_body_and_cleanup_fail`
+    - の guidance surface を中央集約し、GitHub create 成功後の raw `release_error` 単独露出をなくした
+    - committed-local cleanup failure では `Create may already have succeeded` / `Do not rerun blindly` / local node hint / doctor-first guidance を返すよう補修した
+    - committed-local local-error 単独枝（post-write guard failure + release success）でも doctor-first guidance へ切り替えるよう追加補修した
+  - tests:
+    - provider:
+      - `tests.cli_runtime.test_runtime_new_s08`
+    - checked-in parity:
+      - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity`
+      - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity`
+      - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+  - execution:
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+  - results:
+    - targeted suite: `32 tests / OK`
+    - QA reviewer evidence: `93 tests / OK`
+  - review:
+    - implementation review:
+      - 初回 `fail`
+      - finding:
+        - committed-local local-error 単独枝で rerun/link guidance が残っていた
+      - fix:
+        - provider / checked-in `create_node.py` を補修し、committed-local local-error 単独枝でも doctor-first guidance を返すようにした
+      - fresh re-review:
+        - `pass`
+    - QA review:
+      - 初回 `conditional_pass`
+      - finding:
+        - committed-local body+cleanup 分岐の test coverage が不足していた
+      - fix:
+        - provider / checked-in parity の post-write-guard + cleanup failure regression を追加した
+      - fresh re-review:
+        - `pass`
+
+- 2026-03-23 S01P implementation review follow-up:
+  - verdict:
+    - 初回 implementation review `fail`
+  - finding:
+    - committed-local の body-failure である `execute_create_plan` 後 / `_post_write_duplicate_guard` failure + release success の枝が、まだ rerun/link guidance を返していた
+  - fix:
+    - provider / checked-in runtime の `create_node` で、`local_write_committed=True` かつ `local_error` 単独枝でも doctor-first guidance を返すよう補修した
+    - provider / checked-in parity の post-write-guard failure regression を追加した
+    - issue docs も `post_github_local_write_fail` の committed-local subcase を明記するよう整合させた
+  - pending:
+    - fresh implementation re-review
+    - fresh QA re-review
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:

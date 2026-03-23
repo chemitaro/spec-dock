@@ -995,9 +995,8 @@ def _precheck_pre_github_create_parent(
     resolve_parent_for_create(req, graph, kind=kind)
 
 
-def _post_github_create_local_failure_message(
+def _post_github_recovery_command(
     *,
-    local_error: Exception,
     github_issue_number: int,
     kind: Literal["initiative", "epic", "issue"],
     req: CreateNodeRequest,
@@ -1016,36 +1015,128 @@ def _post_github_create_local_failure_message(
     if kind == "issue" and req.parent_id is not None:
         command_args.extend(["--epic", req.parent_id])
     command_args.extend(["--github-issue", str(github_issue_number)])
-    recovery_command = " ".join(shlex.quote(part) for part in command_args)
+    return " ".join(shlex.quote(part) for part in command_args)
+
+
+def _post_github_retry_or_cleanup_guidance(
+    *,
+    github_issue_number: int,
+    kind: Literal["initiative", "epic", "issue"],
+    req: CreateNodeRequest,
+    title: str,
+    specdock_dir: Path,
+) -> str:
+    recovery_command = _post_github_recovery_command(
+        github_issue_number=github_issue_number,
+        kind=kind,
+        req=req,
+        title=title,
+        specdock_dir=specdock_dir,
+    )
     return (
-        f"{local_error} "
-        f"GitHub issue was created: #{github_issue_number}. "
         f"Recovery: rerun `{recovery_command}` to link the existing GitHub issue, "
         "or close/cleanup that GitHub issue before retrying."
     )
 
 
-def _wrap_post_github_create_local_failure(
+def _post_github_doctor_first_guidance(
     *,
-    error: Exception,
+    specdock_dir: Path,
+    local_node_id: str | None,
+) -> str:
+    node_hint = (
+        f"local node `{local_node_id}`"
+        if local_node_id is not None
+        else "the local node created by this request"
+    )
+    return (
+        "Create may already have succeeded. Do not rerun blindly. "
+        f"First inspect {node_hint}. {_doctor_guidance_message(specdock_dir)}"
+    )
+
+
+def _build_post_github_create_failure(
+    *,
+    local_error: Exception | None,
+    release_error: Exception | None,
     created_github_issue_number: int | None,
     kind: Literal["initiative", "epic", "issue"],
     req: CreateNodeRequest,
     title: str,
     specdock_dir: Path,
+    local_write_committed: bool,
+    local_node_id: str | None,
+    lock_acquired: bool,
 ) -> RuntimeError | None:
     if created_github_issue_number is None:
         return None
-    return RuntimeError(
-        _post_github_create_local_failure_message(
-            local_error=error,
+
+    if not lock_acquired:
+        if local_error is None:
+            return None
+        guidance = _post_github_retry_or_cleanup_guidance(
             github_issue_number=created_github_issue_number,
             kind=kind,
             req=req,
             title=title,
             specdock_dir=specdock_dir,
         )
-    )
+        return RuntimeError(
+            "Outcome: post_github_remote_only_fail. "
+            f"{local_error} "
+            f"GitHub issue was created: #{created_github_issue_number}. "
+            f"{guidance}"
+        )
+
+    if local_error is not None and release_error is not None:
+        guidance = (
+            _post_github_doctor_first_guidance(specdock_dir=specdock_dir, local_node_id=local_node_id)
+            if local_write_committed
+            else _post_github_retry_or_cleanup_guidance(
+                github_issue_number=created_github_issue_number,
+                kind=kind,
+                req=req,
+                title=title,
+                specdock_dir=specdock_dir,
+            )
+        )
+        return RuntimeError(
+            "Outcome: post_github_body_and_cleanup_fail. "
+            f"Primary local failure: {local_error}. "
+            f"Cleanup failure: {release_error}. "
+            f"GitHub issue was created: #{created_github_issue_number}. "
+            f"{guidance}"
+        )
+
+    if local_error is not None:
+        guidance = (
+            _post_github_doctor_first_guidance(specdock_dir=specdock_dir, local_node_id=local_node_id)
+            if local_write_committed
+            else _post_github_retry_or_cleanup_guidance(
+                github_issue_number=created_github_issue_number,
+                kind=kind,
+                req=req,
+                title=title,
+                specdock_dir=specdock_dir,
+            )
+        )
+        return RuntimeError(
+            "Outcome: post_github_local_write_fail. "
+            f"{local_error} "
+            f"GitHub issue was created: #{created_github_issue_number}. "
+            f"{guidance}"
+        )
+
+    if release_error is not None:
+        guidance = _post_github_doctor_first_guidance(specdock_dir=specdock_dir, local_node_id=local_node_id)
+        return RuntimeError(
+            "Outcome: post_github_local_write_success_cleanup_fail. "
+            f"Cleanup failure: {release_error}. "
+            f"GitHub issue was created: #{created_github_issue_number}. "
+            f"{guidance}"
+        )
+
+    return None
 
 
 def create_node_core(
@@ -1079,13 +1170,17 @@ def create_node_core(
     try:
         lock_path, lock_token = _acquire_create_lock(specdock_dir)
     except Exception as exc:
-        wrapped_error = _wrap_post_github_create_local_failure(
-            error=exc,
+        wrapped_error = _build_post_github_create_failure(
+            local_error=exc,
+            release_error=None,
             created_github_issue_number=created_github_issue_number,
             kind=kind,
             req=req,
             title=title,
             specdock_dir=specdock_dir,
+            local_write_committed=False,
+            local_node_id=None,
+            lock_acquired=False,
         )
         if wrapped_error is not None:
             raise wrapped_error from exc
@@ -1093,6 +1188,8 @@ def create_node_core(
 
     result: CreateNodeResult | None = None
     body_error: Exception | None = None
+    local_write_committed = False
+    local_node_id: str | None = None
     try:
         graph = load_graph(ports, validate=False)
 
@@ -1109,7 +1206,9 @@ def create_node_core(
             today=today,
             current_repo_slug=_resolve_current_repo_slug(ports),
         )
+        local_node_id = plan.meta.id
         created_paths = execute_create_plan(plan, ports)
+        local_write_committed = True
         _post_write_duplicate_guard(ports, node_id=plan.meta.id)
         result = CreateNodeResult(
             node=_to_spec_node(plan.meta),
@@ -1125,20 +1224,27 @@ def create_node_core(
         except Exception as exc:
             release_error = exc
 
+        wrapped_outcome_error = _build_post_github_create_failure(
+            local_error=body_error,
+            release_error=release_error,
+            created_github_issue_number=created_github_issue_number,
+            kind=kind,
+            req=req,
+            title=title,
+            specdock_dir=specdock_dir,
+            local_write_committed=local_write_committed,
+            local_node_id=local_node_id if local_write_committed else None,
+            lock_acquired=True,
+        )
+        if wrapped_outcome_error is not None:
+            cause = body_error if body_error is not None else release_error
+            if cause is not None:
+                raise wrapped_outcome_error from cause
+            raise wrapped_outcome_error
+
         if body_error is not None:
-            wrapped_body_error = _wrap_post_github_create_local_failure(
-                error=body_error,
-                created_github_issue_number=created_github_issue_number,
-                kind=kind,
-                req=req,
-                title=title,
-                specdock_dir=specdock_dir,
-            )
-            effective_body_error: Exception = wrapped_body_error if wrapped_body_error is not None else body_error
             if release_error is not None:
-                raise RuntimeError(f"{effective_body_error}; additionally {release_error}") from body_error
-            if wrapped_body_error is not None:
-                raise wrapped_body_error from body_error
+                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
             raise body_error
         if release_error is not None:
             raise release_error
