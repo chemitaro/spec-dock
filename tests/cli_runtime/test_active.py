@@ -141,6 +141,41 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
 
+    def test_active_set_repo_scoped_url_resolves_exact_match_when_number_is_ambiguous(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            ambiguous = self._run_runtime_capture(target, ["active", "set", "123", "--force"])
+            self.assertNotEqual(ambiguous.returncode, 0, ambiguous.stdout + ambiguous.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous.stderr)
+
+            by_url = self._run_runtime_capture(target, ["active", "set", "https://github.com/other/repo/issues/123", "--force"])
+            self.assertEqual(by_url.returncode, 0, by_url.stdout + by_url.stderr)
+            self.assertIn("spec-dock: ok (active set)", by_url.stdout)
+
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-local-00001")
+
     def test_active_set_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -734,6 +769,20 @@ class TestCliActive(CliRuntimeHarness):
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+            issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+                / ".meta.json"
+            )
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta["github"] = {"issue_number": 123, "repo_owner": "example", "repo_name": "repo"}
+            self._write_json_force(issue_meta_path, issue_meta)
 
             # Make the working tree clean so checkout is allowed.
             self._run_git(target, ["add", "-A"])
@@ -769,7 +818,7 @@ class TestCliActive(CliRuntimeHarness):
                 gh_path.chmod(0o755)
                 test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-                # Both `#123` and issue URL should be accepted and behave the same.
+                # Both `#123` and repo-scoped issue URL should be accepted and behave the same.
                 # Default is no-checkout, so gh should not be invoked.
                 self._run_runtime(target, ["active", "set", "#123", "--force"], env=test_env)
                 self._run_runtime(

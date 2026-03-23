@@ -30,6 +30,9 @@ ID: "issue-28-runtime-regression-bugs"
   - `AC-015 same-repo URL-linked sync fetch efficiency`
   - `AC-016 current-repo-aware branch inference under repo overlap`
   - `AC-017 create outcome-specific recovery guidance`
+  - `AC-018 repo-scoped exact target resolution`
+  - `AC-019 scoped dependency reference contract`
+  - `AC-020 create intermediate state safety`
 - EC:
   - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
 - 制約:
@@ -163,6 +166,32 @@ ID: "issue-28-runtime-regression-bugs"
   - review gate:
     - `remote-only failure` と `local-write-committed cleanup failure` が別 outcome class として説明できる
     - raw `release_error` 単独露出が provider / checked-in runtime で残っていない
+- S01Q:
+  - 観測可能な振る舞い: partial local write は create phase として分類され、blind rerun ではなく doctor-first guidance を返す
+  - closes:
+    - AC-020 create intermediate state safety の write-phase 分
+    - PR29 latest review partial execute_create_plan write classification
+  - review gate:
+    - `none/scaffold_copied/meta_written/post_write_verified` の phase contract が guidance と parity test で説明できる
+- S04J:
+  - 観測可能な振る舞い: create lock 下の missing `.meta.json` は in-progress/stale-create 系として分類され、恒久 corruption と混同しない
+  - closes:
+    - AC-020 create intermediate state safety の read-side 分
+    - PR29 latest review in-progress scaffold diagnosis
+  - review gate:
+    - reader/doctor/validate が create state classification を共有している
+- S05J:
+  - 観測可能な振る舞い: active/deps の URL target は exact repo scope を保持したまま foreign node を選べる
+  - closes:
+    - AC-018 repo-scoped exact target resolution
+  - review gate:
+    - URL target と bare numeric target の契約差が parser/application/test で一貫している
+- S05K:
+  - 観測可能な振る舞い: dependency ref は bare current-repo shorthand と scoped foreign ref を区別できる
+  - closes:
+    - AC-019 scoped dependency reference contract
+  - review gate:
+    - bare numeric ref の fail-closed contract と scoped ref exact resolution が docs/impl/tests で一貫している
 
 ## 要件 ↔ ステップ対応
 - `AC-001` -> `S01`, `S01L`, `S02`
@@ -187,6 +216,9 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-015` -> `S05H`
 - `AC-016` -> `S03K`
 - `AC-017` -> `S01P`
+- `AC-018` -> `S05J`
+- `AC-019` -> `S05K`
+- `AC-020` -> `S01Q`, `S04J`
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
@@ -199,6 +231,10 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R28` -> `S03J`
 - `PR29-R29` -> `S03K`
 - `PR29-R30` -> `S01P`
+- `PR29-R31` -> `S05J`
+- `PR29-R32` -> `S05K`
+- `PR29-R33` -> `S01Q`
+- `PR29-R34` -> `S04J`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -642,6 +678,48 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S01L` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01Q — create intermediate state を partial write まで区別する
+- target:
+  - `new` と create-like `import` の両方で、`execute_create_plan()` の partial local write を phase として分類し、remote-only failure と誤分類しない
+  - post-create guidance を phase-aware にして blind rerun を unsafe 枝へ出さない
+- design refs:
+  - `design.md` の `1.1 create intermediate state model`
+  - `discussions/051`
+- step boundary:
+  - create transaction 境界や repo lock 自体は変えず、phase evidence / guidance / parity test の是正に集中する
+  - `new` だけでなく create-like `import` の write path も同じ phase model で閉じる
+
+#### Red
+- failing test:
+  - `new` の `copy scaffold success + write_meta failure` が rerun-safe guidance を返してしまう regression
+  - `new` の `copy scaffold` 途中 failure でも partial local write を remote-only と誤分類する regression
+  - create-like `import` でも partial local write が remote-only guidance へ誤分類される regression
+  - checked-in parity でも同じ guidance drift が起きる regression
+
+#### Green
+- minimum implementation:
+  - create phase evidence を `none/scaffold_copied/meta_written/post_write_verified` 相当へ拡張する
+  - phase に応じて doctor-first / partial-cleanup guidance を返す
+  - `new` と create-like `import` の両方で phase model を共有する
+  - provider runtime と checked-in runtime parity を揃える
+
+#### Refactor
+- cleanup target:
+  - create / import の write-phase evidence 収集 helper を整理する
+
+#### step gate
+- review:
+  - partial local write が remote-only failure と明確に分離されている
+- expected tests:
+  - `new` の scaffold-copied meta-write-failure regression
+  - `new` の partial-copy failure regression
+  - create-like `import` partial-write guidance regression
+  - checked-in parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01Q` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S02 — discussion seq を同じ transaction に統合し validator でも守る
 - target:
@@ -1428,6 +1506,41 @@ ID: "issue-28-runtime-regression-bugs"
 - git commit:
   - `S04I` の review と expected tests が通り、`report.md` 更新後にコミットする
 
+### S04J — create-in-progress scaffold を corruption と誤診断しない
+- target:
+  - create lock 下の missing `.meta.json` を in-progress/stale-create 系として分類し、恒久 corruption と区別する
+- design refs:
+  - `design.md` の `3.1 create-in-progress / partial-write diagnosis`
+  - `discussions/052`
+- step boundary:
+  - required artifact contract 自体は維持し、reader-side classification と doctor guidance の是正に限定する
+
+#### Red
+- failing test:
+  - create lock 下の node-like directory without `.meta.json` を `validate` / `doctor` / `sync` が即 corruption 扱いする regression
+  - lock なし missing `.meta.json` が corruption でなくなる regression を防ぐ
+
+#### Green
+- minimum implementation:
+  - reader が create lock と missing `.meta.json` を合わせて分類する
+  - application 側が in-progress/stale-create と corruption を別 guidance へ写像する
+
+#### Refactor
+- cleanup target:
+  - stale create lock / missing artifact / in-progress create の分類責務整理
+
+#### step gate
+- review:
+  - in-progress create と恒久 corruption の境界が lock/state で説明できる
+- expected tests:
+  - create-lock-present missing-meta regression
+  - lock-absent missing-meta remains-corruption regression
+  - checked-in parity または executable smoke
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
 ### S05G — repo-aware numeric deps resolution で foreign overlap 後も既存 shorthand を守る
 - target:
   - foreign overlap 導入後も bare numeric deps ref が current repo issue shorthand として解決されるようにする
@@ -1602,6 +1715,81 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S05I` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05J — active/deps URL target で repo scope を保持する
+- target:
+  - canonical GitHub URL target が `owner/repo` を落とさず exact foreign node を選べるようにする
+- design refs:
+  - `design.md` の `4.1 repo-scoped exact target surface`
+  - `discussions/049`
+- step boundary:
+  - bare numeric target や `--github-issue` の convenience selector は維持し、URL target の exact scope だけを追加する
+
+#### Red
+- failing test:
+  - current/foreign same-number coexistence で `active set <foreign-url>` が ambiguous fail または誤解決する regression
+  - `deps check <foreign-url>` でも同じ regression
+  - checked-in parity でも URL target scope が失われる regression
+
+#### Green
+- minimum implementation:
+  - `TargetRef` を repo-aware に拡張し、URL parse で repo scope を保持する
+  - `set_active` / `check_deps` の target resolution を exact repo scope aware にする
+
+#### Refactor
+- cleanup target:
+  - URL / bare number / `--github-issue` の contract を parser 層で整理する
+
+#### step gate
+- review:
+  - URL target と bare target の意味差が command/application/test で一貫している
+- expected tests:
+  - active URL exact-foreign resolution regression
+  - deps URL exact-foreign resolution regression
+  - checked-in parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05K — scoped dependency ref syntax を導入して docs を整合させる
+- target:
+  - dependency ref に scoped foreign syntax を追加し、bare numeric shorthand の current-repo-only contract を docs/impl/tests で一致させる
+- design refs:
+  - `design.md` の `4.2 scoped dependency reference contract`
+  - `discussions/050`
+- step boundary:
+  - bare numeric ref を foreign-only match に自動フォールバックさせない
+  - foreign dependency は explicit scoped ref で解決する contract へ寄せる
+
+#### Red
+- failing test:
+  - `owner/repo#123` または canonical URL dependency ref が foreign imported issue を解決できない regression
+  - bare numeric ref `123` が foreign-only match を暗黙採用してしまう regression
+  - docs / error message が新 contract と食い違う regression
+
+#### Green
+- minimum implementation:
+  - deps ref parser / resolver に scoped ref syntax を追加する
+  - reference docs と error guidance を current-repo-only shorthand + scoped foreign ref の契約へ更新する
+  - checked-in runtime parity を揃える
+
+#### Refactor
+- cleanup target:
+  - bare ref / scoped ref / URL ref のエラーメッセージを整理する
+
+#### step gate
+- review:
+  - bare numeric ref を fail-closed に保ちつつ foreign dependency support が explicit syntax で閉じている
+- expected tests:
+  - scoped foreign dep ref resolution regression
+  - bare numeric current-repo-only regression
+  - docs/help contract regression
+  - checked-in parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -1817,6 +2005,9 @@ ID: "issue-28-runtime-regression-bugs"
   - create/post-create outcome matrix の 5 class について、raw `release_error` 単独露出が残っていない
   - create/post-create outcome matrix の committed-local branch で blind rerun guidance が残っていない
   - provider / checked-in runtime の guidance contract drift が残っていない
+  - repo-overlap matrix と create-state matrix の bundle-level regression が通っている
+    - repo-overlap matrix: URL target exact resolution / bare numeric current-repo-only / scoped dep ref exact-foreign
+    - create-state matrix: remote-only / partial local write / in-progress missing-meta / stale create lock が区別されている
 - git commit:
   - `S99` は最終 review/no-op 判定であり、この step 自体を理由に新規コミットは作らない
 
@@ -1897,7 +2088,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ## final exit contract
 - AC/EC 達成:
-  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016`、`AC-017` が対応 step の review/QA 付きで満たされている
+  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016`、`AC-017`、`AC-018`、`AC-019`、`AC-020` が対応 step の review/QA 付きで満たされている
   - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
   - create/post-create outcome matrix の 5 class が provider / checked-in runtime で同じ guidance contract と review evidence を持つ
 - docs impact resolved:

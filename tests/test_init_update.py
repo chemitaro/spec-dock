@@ -2660,9 +2660,12 @@ with tempfile.TemporaryDirectory() as td:
     assert "Outcome: post_github_local_write_fail" in message, message
     assert "simulated write seam failure" in message, message
     assert "GitHub issue was created: #815" in message, message
-    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
-    assert "--epic epic-local-00001" in message, message
-    assert "--github-issue 815" in message, message
+    assert "Create may already have succeeded" in message, message
+    assert "Do not rerun blindly" in message, message
+    assert "local node `iss-00815`" in message, message
+    assert f"{runtime_cmd} doctor" in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message, message
+    assert "close/cleanup" not in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert events == [], events
     assert not (epic_dir / "issues" / "iss-00815-refresh-token").exists()
@@ -2900,10 +2903,12 @@ with tempfile.TemporaryDirectory() as td:
     assert "Primary local failure: simulated write seam failure" in message, message
     assert "Cleanup failure: create lock release failed" in message, message
     assert "GitHub issue was created: #817" in message, message
-    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
-    assert "--epic epic-local-00001" in message, message
-    assert "--github-issue 817" in message, message
-    assert "close/cleanup" in message, message
+    assert "Create may already have succeeded" in message, message
+    assert "Do not rerun blindly" in message, message
+    assert "local node `iss-00817`" in message, message
+    assert f"{runtime_cmd} doctor" in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" not in message, message
+    assert "close/cleanup" not in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     assert events == [], events
     assert not (epic_dir / "issues" / "iss-00817-refresh-token").exists()
@@ -4975,6 +4980,155 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(payload.get("blockers"), ["iss-local-00001"])
             self.assertNotIn("Ambiguous github.issue_number=123", deps_result.stderr)
 
+    def test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            current_meta_path = current_issue_dir / ".meta.json"
+            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123, "repo_owner": "current", "repo_name": "repo"}
+            self._write_json_force(current_meta_path, current_meta)
+
+            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
+            foreign_meta_path = foreign_issue_dir / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {
+                "issue_number": 123,
+                "repo_owner": "other",
+                "repo_name": "repo",
+            }
+            self._write_json_force(foreign_meta_path, foreign_meta)
+
+            ambiguous_active = self._run_runtime_capture(target, ["active", "set", "123", "--force"])
+            self.assertEqual(
+                ambiguous_active.returncode,
+                1,
+                msg=f"active(ambiguous) stdout:\n{ambiguous_active.stdout}\nactive(ambiguous) stderr:\n{ambiguous_active.stderr}",
+            )
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous_active.stderr)
+
+            scoped_active = self._run_runtime_capture(
+                target,
+                ["active", "set", "https://github.com/other/repo/issues/123", "--force"],
+            )
+            self.assertEqual(
+                scoped_active.returncode,
+                0,
+                msg=f"active(scoped) stdout:\n{scoped_active.stdout}\nactive(scoped) stderr:\n{scoped_active.stderr}",
+            )
+            self.assertIn("spec-dock: ok (active set)", scoped_active.stdout)
+
+            active_manifest = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active_manifest["issue"]["id"], "iss-local-00002")
+
+            scoped_deps = self._run_runtime_capture(
+                target,
+                ["deps", "check", "https://github.com/other/repo/issues/123", "--json"],
+            )
+            self.assertIn(
+                scoped_deps.returncode,
+                (0, 3),
+                msg=f"deps(scoped) stdout:\n{scoped_deps.stdout}\ndeps(scoped) stderr:\n{scoped_deps.stderr}",
+            )
+            self.assertIn('"target": "iss-local-00002"', scoped_deps.stdout)
+
+    def test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Depends issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            current_meta_path = current_issue_dir / ".meta.json"
+            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123, "repo_owner": "current", "repo_name": "repo"}
+            self._write_json_force(current_meta_path, current_meta)
+
+            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
+            foreign_meta_path = foreign_issue_dir / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {
+                "issue_number": 123,
+                "repo_owner": "other",
+                "repo_name": "repo",
+            }
+            self._write_json_force(foreign_meta_path, foreign_meta)
+
+            depends_issue_dir = epic_dir / "issues" / "iss-local-00003-depends-issue"
+            for dep_ref in ("other/repo#123", "https://github.com/other/repo/issues/123"):
+                with self.subTest(dep_ref=dep_ref):
+                    self._write_json_force(
+                        depends_issue_dir / "deps.json",
+                        {"schema_version": 1, "depends_on": [dep_ref]},
+                    )
+                    deps_result = self._run_runtime_capture(
+                        target,
+                        ["deps", "check", "--id", "iss-local-00003", "--json"],
+                    )
+                    self.assertEqual(
+                        deps_result.returncode,
+                        3,
+                        msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
+                    )
+                    payload = json.loads(deps_result.stdout)
+                    self.assertEqual(payload.get("effective_depends_on"), ["iss-local-00002"])
+                    self.assertEqual(payload.get("blockers"), ["iss-local-00002"])
+
+    def test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, _current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Depends issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            foreign_issue_dir = epic_dir / "issues" / "iss-local-00002-foreign-issue"
+            foreign_meta_path = foreign_issue_dir / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {
+                "issue_number": 123,
+                "repo_owner": "other",
+                "repo_name": "repo",
+            }
+            self._write_json_force(foreign_meta_path, foreign_meta)
+
+            depends_issue_dir = epic_dir / "issues" / "iss-local-00003-depends-issue"
+            self._write_json_force(
+                depends_issue_dir / "deps.json",
+                {"schema_version": 1, "depends_on": [123]},
+            )
+
+            deps_result = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-local-00003"],
+            )
+            self.assertEqual(
+                deps_result.returncode,
+                1,
+                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
+            )
+            self.assertIn(
+                "No node found for github.issue_number=123 in current repo scope (current/repo)",
+                deps_result.stderr,
+            )
+            self.assertIn("Create/link the node first.", deps_result.stderr)
+
     def test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -5217,6 +5371,101 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
             self.assertIn("[missing_artifact] Missing required artifact", doctor_result.stderr)
             self.assertIn("design.md", doctor_result.stderr)
+
+    def test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
+
+            meta_path = issue_dir / ".meta.json"
+            meta_path.chmod(meta_path.stat().st_mode | 0o200)
+            meta_path.unlink()
+
+            lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=active",
+                        "pid=1234",
+                        "user=tester",
+                        "created_unix=9999999999",
+                        "created_iso=2286-11-20T17:46:39Z",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            validate_in_progress = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_in_progress.returncode,
+                1,
+                msg=f"validate(in_progress) stdout:\n{validate_in_progress.stdout}\nvalidate(in_progress) stderr:\n{validate_in_progress.stderr}",
+            )
+            self.assertIn("Create in-progress state detected", validate_in_progress.stderr)
+            self.assertNotIn("Missing required artifact", validate_in_progress.stderr)
+
+            sync_in_progress = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(
+                sync_in_progress.returncode,
+                1,
+                msg=f"sync(in_progress) stdout:\n{sync_in_progress.stdout}\nsync(in_progress) stderr:\n{sync_in_progress.stderr}",
+            )
+            self.assertIn("Create in-progress state detected", sync_in_progress.stderr)
+
+            doctor_in_progress = self._run_runtime_capture(target, ["doctor"])
+            self.assertEqual(
+                doctor_in_progress.returncode,
+                1,
+                msg=f"doctor(in_progress) stdout:\n{doctor_in_progress.stdout}\ndoctor(in_progress) stderr:\n{doctor_in_progress.stderr}",
+            )
+            self.assertIn("[stale_create_lock]", doctor_in_progress.stderr)
+            self.assertIn("Create in-progress state detected", doctor_in_progress.stderr)
+            self.assertNotIn("[missing_artifact]", doctor_in_progress.stderr)
+
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=stale",
+                        "pid=4321",
+                        "user=tester",
+                        "created_unix=0",
+                        "created_iso=1970-01-01T00:00:00Z",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            validate_stale = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_stale.returncode,
+                1,
+                msg=f"validate(stale) stdout:\n{validate_stale.stdout}\nvalidate(stale) stderr:\n{validate_stale.stderr}",
+            )
+            self.assertIn("Stale create-lock state detected", validate_stale.stderr)
+            self.assertNotIn("Missing required artifact", validate_stale.stderr)
+
+            sync_stale = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(
+                sync_stale.returncode,
+                1,
+                msg=f"sync(stale) stdout:\n{sync_stale.stdout}\nsync(stale) stderr:\n{sync_stale.stderr}",
+            )
+            self.assertIn("Stale create-lock state detected", sync_stale.stderr)
+
+            doctor_stale = self._run_runtime_capture(target, ["doctor"])
+            self.assertEqual(
+                doctor_stale.returncode,
+                1,
+                msg=f"doctor(stale) stdout:\n{doctor_stale.stdout}\ndoctor(stale) stderr:\n{doctor_stale.stderr}",
+            )
+            self.assertIn("[stale_create_lock]", doctor_stale.stderr)
+            self.assertIn("Stale create-lock state detected", doctor_stale.stderr)
+            self.assertNotIn("[missing_artifact]", doctor_stale.stderr)
 
     def test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

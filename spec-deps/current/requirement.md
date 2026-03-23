@@ -62,12 +62,16 @@ ID: "issue-28-runtime-regression-bugs"
 - GitHub target 解釈を安全化する
   - URL import で `owner/repo` を無視した誤リンクを防ぐこと
   - numeric target の曖昧性を下げること
+  - active/deps の URL target でも `owner/repo` を失わず exact node を選べること
+  - dependency ref でも current-repo shorthand と foreign scoped ref を区別できること
 - create CLI contract を整える
   - `new issue` にも explicit GitHub create surface を用意すること
 - GitHub-linked issue の freshness 契約を改善する
   - stale projection を authoritative と誤読しにくくすること
 - create/post-create failure 契約を閉じる
   - GitHub issue 作成後の local failure / cleanup failure が outcome 別に安全な guidance を返すこと
+  - create 中間状態や partial local write を remote-only failure と誤分類しないこと
+  - create 中の一時状態を read-side corruption と誤診断しないこと
 
 ### SHOULD
 
@@ -141,6 +145,16 @@ ID: "issue-28-runtime-regression-bugs"
 - `active set` などで target intent を明示指定できること
 - pure number の誤解釈が減ること
   - bare number の fail 化は本 issue の対象外とし、まずは explicit flags の追加を優先すること
+
+### B11 repo-scoped reference surface gap
+
+- foreign repo を link/import できても、active/deps target や dependency ref が repo scope を表現できなければ運用が閉じない
+- canonical GitHub URL や scoped dependency ref を、number-only shorthand と区別して扱える必要がある
+
+### B12 create intermediate state gap
+
+- create は GitHub side effect、scaffold copy、meta write、post-write verify という段階を持つ
+- これを単一 bool や missing artifact だけで扱うと、partial local write と in-progress state を誤診断し、unsafe rerun や誤った corruption guidance を返す
 
 ## 境界
 
@@ -369,3 +383,39 @@ ID: "issue-28-runtime-regression-bugs"
 - Then:
   - stale `.path` は残置されず、persisted/recovered target があればそこへ再生成される
   - target も壊れていれば placeholder へ戻る
+
+### AC-018 repo-scoped exact target resolution
+
+- Given:
+  - current repo `#123` と foreign repo `other/repo#123` が同じ tree に共存している
+- When:
+  - `active set https://github.com/other/repo/issues/123` または `deps check https://github.com/other/repo/issues/123` を実行する
+- Then:
+  - canonical GitHub URL に含まれる `owner/repo` は parse/application の途中で失われない
+  - target 解決は exact repo scope で foreign node を選べる
+  - bare `123` / `--github-issue 123` の unscoped selectorは convenience selector のまま残してよいが、repo-scoped URL target と同じ意味に潰さない
+
+### AC-019 scoped dependency reference contract
+
+- Given:
+  - current repo `#123` と foreign repo `other/repo#123` が同じ tree に共存している
+  - dependency ref は bare numeric shorthand と scoped ref の両方を使い得る
+- When:
+  - `validate` / `sync` / `deps check` が dependency topology を解決する
+- Then:
+  - bare numeric ref `123` は current-repo-only shorthand として fail-closed に扱われる
+  - foreign issue を dependency にしたい場合は `owner/repo#123` または canonical GitHub URL のような scoped ref で exact に解決できる
+  - docs / error message は上記 contract と矛盾しない
+
+### AC-020 create intermediate state safety
+
+- Given:
+  - `new` または create-like `import` が GitHub side effect 後、scaffold copy / meta write / post-write verify の途中で失敗する
+  - または read-only command が create 中間相と競合する
+- When:
+  - operator が failure surface、`validate`、`doctor`、`sync` などを確認する
+- Then:
+  - partial local write は remote-only failure と誤分類されず、blind rerun ではなく doctor-first / partial cleanup guidance へ倒れる
+  - create lock 下の missing `.meta.json` は create-in-progress / stale create 系として分類でき、恒久 corruption と混同しない
+  - lock が無い missing `.meta.json` は引き続き corruption / missing artifact として扱われる
+  - provider-side runtime と checked-in dogfooding runtime の両方で同じ中間状態 contract を維持する

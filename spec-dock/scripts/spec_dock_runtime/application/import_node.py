@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -14,16 +15,20 @@ from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
 from .create_node import (
+    CreateWritePhase,
     _acquire_create_lock,
+    _doctor_guidance_message,
+    _runtime_entrypoint_path,
     _post_write_duplicate_guard,
     _release_create_lock,
+    create_write_phase_has_local_writes,
     execute_create_plan,
     guard_github_issue_uniqueness,
     load_graph,
     plan_node_creation,
+    resolve_create_write_phase,
 )
 from .ports import Ports
-from .repo_context import resolve_current_repo_slug
 from .sync_state import sync_after_import
 
 
@@ -45,6 +50,29 @@ def _resolve_issue_gateway(ports: Ports):
     if ports.issue_gateway is None:
         raise RuntimeError("issue_gateway is required")
     return ports.issue_gateway
+
+
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(_resolve_repo_root(ports))
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
 
 
 def _active_selection_from_manifest(manifest: ActiveManifest | None) -> ActiveSelection:
@@ -160,6 +188,115 @@ def _target_repo_slug(req: ImportNodeRequest) -> str | None:
     return f"{owner}/{repo}"
 
 
+def _import_target_ref(req: ImportNodeRequest) -> str:
+    owner = (req.target_repo_owner or "").strip().lower()
+    repo = (req.target_repo_name or "").strip().lower()
+    if owner and repo:
+        return f"https://github.com/{owner}/{repo}/issues/{int(req.issue_number)}"
+    return str(int(req.issue_number))
+
+
+def _post_import_recovery_command(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    req: ImportNodeRequest,
+    title: str,
+    specdock_dir: Path,
+) -> str:
+    command_args = [
+        str(_runtime_entrypoint_path(specdock_dir)),
+        "import",
+        kind,
+        _import_target_ref(req),
+        "--title",
+        title,
+    ]
+    if kind == "epic" and req.parent_id is not None:
+        command_args.extend(["--initiative", req.parent_id])
+    if kind == "issue" and req.parent_id is not None:
+        command_args.extend(["--epic", req.parent_id])
+    if req.allow_foreign_url:
+        command_args.append("--allow-foreign-url")
+    return " ".join(shlex.quote(part) for part in command_args)
+
+
+def _post_import_retry_guidance(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    req: ImportNodeRequest,
+    title: str,
+    specdock_dir: Path,
+) -> str:
+    recovery_command = _post_import_recovery_command(
+        kind=kind,
+        req=req,
+        title=title,
+        specdock_dir=specdock_dir,
+    )
+    return f"Recovery: rerun `{recovery_command}`."
+
+
+def _post_import_doctor_first_guidance(
+    *,
+    specdock_dir: Path,
+    local_node_id: str | None,
+) -> str:
+    node_hint = (
+        f"local node `{local_node_id}`"
+        if local_node_id is not None
+        else "the local node targeted by this import"
+    )
+    return (
+        "Import may have partially written local files. Do not rerun blindly. "
+        f"First inspect {node_hint}. {_doctor_guidance_message(specdock_dir)}"
+    )
+
+
+def _build_post_import_failure(
+    *,
+    local_error: Exception | None,
+    release_error: Exception | None,
+    kind: Literal["initiative", "epic", "issue"],
+    req: ImportNodeRequest,
+    title: str,
+    specdock_dir: Path,
+    local_write_phase: CreateWritePhase,
+    local_node_id: str | None,
+) -> RuntimeError | None:
+    rerun_guidance = _post_import_retry_guidance(
+        kind=kind,
+        req=req,
+        title=title,
+        specdock_dir=specdock_dir,
+    )
+    doctor_guidance = _post_import_doctor_first_guidance(
+        specdock_dir=specdock_dir,
+        local_node_id=local_node_id,
+    )
+    guidance = doctor_guidance if create_write_phase_has_local_writes(local_write_phase) else rerun_guidance
+
+    if local_error is not None and release_error is not None:
+        return RuntimeError(
+            "Outcome: import_body_and_cleanup_fail. "
+            f"Primary local failure: {local_error}. "
+            f"Cleanup failure: {release_error}. "
+            f"{guidance}"
+        )
+    if local_error is not None:
+        return RuntimeError(
+            "Outcome: import_local_write_fail. "
+            f"{local_error} "
+            f"{guidance}"
+        )
+    if release_error is not None:
+        return RuntimeError(
+            "Outcome: import_local_write_success_cleanup_fail. "
+            f"Cleanup failure: {release_error}. "
+            f"{doctor_guidance}"
+        )
+    return None
+
+
 def import_node_core(
     req: ImportNodeRequest,
     ports: Ports,
@@ -169,7 +306,7 @@ def import_node_core(
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     req = replace(req, title=title, slug=slug)
 
-    current_repo_slug = resolve_current_repo_slug(ports)
+    current_repo_slug = _resolve_current_repo_slug(ports)
     try:
         graph = load_graph(ports, validate=False)
         report = validate_graph_and_deps(
@@ -220,6 +357,8 @@ def import_node_core(
     lock_path, lock_token = _acquire_create_lock(specdock_dir)
     result_node: SpecNode | None = None
     body_error: Exception | None = None
+    local_write_phase: CreateWritePhase = "none"
+    local_node_id: str | None = None
     try:
         graph = load_graph(ports, validate=False)
         guard_github_issue_uniqueness(
@@ -239,17 +378,37 @@ def import_node_core(
             today=today,
             current_repo_slug=current_repo_slug,
         )
+        local_node_id = plan.meta.id
         execute_create_plan(plan, ports)
+        local_write_phase = "meta_written"
         _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+        local_write_phase = "post_write_verified"
         result_node = _to_spec_node(plan.meta)
     except Exception as exc:
         body_error = exc
+        local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
     finally:
         release_error: Exception | None = None
         try:
             _release_create_lock(lock_path, lock_token)
         except Exception as exc:
             release_error = exc
+
+        wrapped_outcome_error = _build_post_import_failure(
+            local_error=body_error,
+            release_error=release_error,
+            kind=kind,
+            req=req,
+            title=title,
+            specdock_dir=specdock_dir,
+            local_write_phase=local_write_phase,
+            local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
+        )
+        if wrapped_outcome_error is not None:
+            cause = body_error if body_error is not None else release_error
+            if cause is not None:
+                raise wrapped_outcome_error from cause
+            raise wrapped_outcome_error
 
         if body_error is not None:
             if release_error is not None:

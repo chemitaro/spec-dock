@@ -63,6 +63,25 @@ def _finding_from_error(error_message: str) -> DoctorFinding:
                 "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )
+    if "Create in-progress state detected" in error_message:
+        return DoctorFinding(
+            code="stale_create_lock",
+            message=error_message,
+            guidance=[
+                "create 実行中であれば完了を待ってください。",
+                "実行中プロセスがない場合は create lock の stale を疑い `spec-dock/scripts/spec-dock doctor` で再確認してください。",
+            ],
+        )
+    if "Stale create-lock state detected" in error_message:
+        return DoctorFinding(
+            code="stale_create_lock",
+            message=error_message,
+            guidance=[
+                "create 実行中プロセスがないことを確認してください。",
+                "stale create lock を修復してから再実行してください。",
+                "`spec-dock/scripts/spec-dock doctor` で再診断してください。",
+            ],
+        )
     if "Missing required artifact" in error_message:
         return DoctorFinding(
             code="missing_artifact",
@@ -317,8 +336,9 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     if stale_pointer is not None:
         findings.append(stale_pointer)
 
-    stale_create_lock = _stale_create_lock_finding(specdock_dir)
-    if stale_create_lock is not None:
-        findings.append(stale_create_lock)
+    if not any(finding.code == "stale_create_lock" for finding in findings):
+        stale_create_lock = _stale_create_lock_finding(specdock_dir)
+        if stale_create_lock is not None:
+            findings.append(stale_create_lock)
 
     return DoctorResult(ok=(len(findings) == 0), findings=findings, warnings=warnings)

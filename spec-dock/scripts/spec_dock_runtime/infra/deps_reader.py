@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,14 @@ from ..domain.models import SpecGraph
 from .contracts import DepsTopologyLoadResult
 from .git_cli import origin_github_repo_slug
 from .json_store import load_json
+
+_scoped_issue_ref_re = re.compile(
+    r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$"
+)
+_gh_issue_url_full_re = re.compile(
+    r"^(?:https?://)?(?:www\.)?github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)/issues/(?P<num>[0-9]+)(?:[/?#].*)?$",
+    re.IGNORECASE,
+)
 
 
 def _load_deps_json(path: Path) -> dict[str, Any]:
@@ -114,6 +123,34 @@ def _find_node_by_github_issue_number(
     return matches[0].id
 
 
+def _find_node_by_scoped_github_issue_number(
+    graph: SpecGraph,
+    *,
+    issue_number: int,
+    repo_owner: str,
+    repo_name: str,
+) -> str:
+    repo_slug = _normalize_repo_slug(repo_owner, repo_name)
+    if repo_slug is None:
+        raise RuntimeError("repo scope is required")
+    matches = [
+        node
+        for node in graph.nodes_by_id.values()
+        if node.github_issue_number == issue_number
+        and node.kind in ("initiative", "epic", "issue")
+        and _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == repo_slug
+    ]
+    if not matches:
+        raise RuntimeError(
+            f"No node found for github.issue_number={issue_number} in repo scope ({repo_slug}). "
+            "Create/link the node first."
+        )
+    if len(matches) > 1:
+        ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in matches))
+        raise RuntimeError(f"Ambiguous github.issue_number={issue_number} in repo scope ({repo_slug}): {ids}")
+    return matches[0].id
+
+
 def _resolve_dep_ref(
     graph: SpecGraph,
     ref: Any,
@@ -138,6 +175,28 @@ def _resolve_dep_ref(
         raw = ref.strip()
         if not raw:
             raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path})")
+        scoped_match = _scoped_issue_ref_re.fullmatch(raw)
+        if scoped_match:
+            try:
+                return _find_node_by_scoped_github_issue_number(
+                    graph,
+                    issue_number=int(scoped_match.group("num")),
+                    repo_owner=scoped_match.group("owner"),
+                    repo_name=scoped_match.group("repo"),
+                )
+            except RuntimeError as e:
+                raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
+        full_url_match = _gh_issue_url_full_re.fullmatch(raw)
+        if full_url_match:
+            try:
+                return _find_node_by_scoped_github_issue_number(
+                    graph,
+                    issue_number=int(full_url_match.group("num")),
+                    repo_owner=full_url_match.group("owner"),
+                    repo_name=full_url_match.group("repo"),
+                )
+            except RuntimeError as e:
+                raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
         if raw.isdigit():
             try:
                 return _find_node_by_github_issue_number(

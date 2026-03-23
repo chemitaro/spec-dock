@@ -139,6 +139,34 @@ stop
 @enduml
 ```
 
+### 1.1 create intermediate state model
+
+### 変更方針
+
+- create-like write の local progress は単一 bool ではなく phase として扱う
+  - `none`
+  - `scaffold_copied`
+  - `meta_written`
+  - `post_write_verified`
+- post-create guidance は `どこで例外が起きたか` ではなく `どこまで local state が進んだか` で分岐する
+- `execute_create_plan()` 途中失敗でも partial local write を evidence として保持できるようにする
+- 同じ phase model を `new` と create-like `import` の両方で再利用する
+
+### 意図
+
+- `copy 成功 / meta 失敗` を remote-only failure と誤分類しない
+- blind rerun が unsafe になる枝を phase contract で明示化する
+
+### state evidence
+
+- application:
+  - phase evidence の収集
+  - outcome/guidance builder への phase 伝播
+- infra:
+  - copy / meta write の事実を返す
+- tests:
+  - partial write / meta failure / post-write verify failure を別ケースで固定する
+
 ### 実装境界
 
 - application:
@@ -375,7 +403,30 @@ ActiveSet --> IssueStatusResolution : uses
   - `spec-dock/active` は常に解決可能な symlink とする
   - `active show` は fallback path と次アクションを返す
 
-## 3.1 stale active pathfile healing
+## 3.1 create-in-progress / partial-write diagnosis
+
+### 変更方針
+
+- `load_node_records()` の missing `.meta.json` 判定は create state と切り離して扱わない
+- create lock が存在し、node-like directory の `.meta.json` が未生成な場合は `create_in_progress` / `stale_create_lock` 系の診断へ寄せる
+- lock が無い missing `.meta.json` は従来どおり corruption / missing artifact として扱う
+- `doctor` / `validate` / `sync` は reader 側 classification を共有し、create 中間相に対して misleading な corruption guidance を出さない
+
+### 意図
+
+- create 中の一時状態と恒久 corruption を分ける
+- stale create lock と partial write を同じ state model で観測できるようにする
+
+### 実装境界
+
+- infra:
+  - reader が create lock と missing meta を合わせて分類する
+- application:
+  - doctor / validate / sync が分類結果を supported guidance へ写像する
+- tests:
+  - read-only command と in-progress scaffold の race を固定する
+
+## 3.2 stale active pathfile healing
 
 ### 変更方針
 
@@ -516,6 +567,53 @@ CLI --> User : safe success or explicit failure
 - presentation:
   - ambiguity / mismatch error message
   - ambiguous `--github-issue` guidance
+
+## 4.1 repo-scoped exact target surface
+
+### 変更方針
+
+- `TargetRef` は bare number と repo-scoped URL target を同じ shape に潰さず、repo scope を保持できる値オブジェクトへ拡張する
+- `parse_active_like_target()` は canonical GitHub URL のときだけ `owner/repo` を抽出して target に保持する
+- `active set` / `deps check` の target 解決は repo scope がある場合 exact match、ない場合だけ従来の unscoped selector として扱う
+
+### 意図
+
+- foreign URL target を current repo の同番号 node と取り違えない
+- bare numeric selector の後方互換を保ちつつ、URL が持つ disambiguation 情報を失わない
+
+### 実装境界
+
+- commands:
+  - target parser と explicit flag surface
+- application:
+  - repo-aware target resolution
+- tests:
+  - same-number current/foreign coexistence 下の URL target exact resolution
+
+## 4.2 scoped dependency reference contract
+
+### 変更方針
+
+- bare numeric dependency ref は current-repo-only shorthand として維持する
+- foreign issue を dependency にしたい場合の explicit syntax を追加する
+  - `owner/repo#123`
+  - canonical GitHub issue URL
+- docs / error message は bare shorthand と scoped ref の意味差を明示する
+
+### 意図
+
+- overlap ambiguity を fail-closed のまま保ちつつ、foreign issue dependency の表現力を持たせる
+- current repo 向け shorthand を silent foreign fallback に変えない
+
+### 実装境界
+
+- infra:
+  - deps ref parser / resolver
+- docs:
+  - dependency ref syntax を reference docs へ反映する
+- tests:
+  - bare shorthand current-repo-only
+  - scoped ref exact-foreign resolution
 
 ## active entrypoint recovery
 
