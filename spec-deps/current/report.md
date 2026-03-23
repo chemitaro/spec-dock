@@ -288,7 +288,8 @@ ID: "issue-28-runtime-regression-bugs"
         - final re-review:
           - `pass`
     - post-commit:
-      - fresh whole-diff spec review
+      - fresh whole-diff spec review:
+        - `pass`
 
 ## 記録
 - 2026-03-20 `S90G` corrective docs refresh:
