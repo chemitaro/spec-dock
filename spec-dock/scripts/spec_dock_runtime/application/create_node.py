@@ -125,6 +125,7 @@ def _is_stale_lock(meta: dict[str, str], *, stale_after_seconds: float) -> bool:
 
 def _lock_failure_message(
     *,
+    specdock_dir: Path,
     lock_path: Path,
     wait_seconds: float,
     elapsed_seconds: float,
@@ -136,12 +137,23 @@ def _lock_failure_message(
         "create lock acquisition failed: "
         f"wait_s={elapsed_seconds:.3f} wait_limit_s={wait_seconds:.3f} stale={stale_flag} "
         f"path={lock_path} lock_meta=[{lock_meta_summary}]. "
-        f"No files were written. {_doctor_guidance_message()}"
+        f"No files were written. {_doctor_guidance_message(specdock_dir)}"
     )
 
 
-def _doctor_guidance_message() -> str:
-    return "Run `spec-dock/scripts/spec-dock doctor` for guidance."
+def _runtime_entrypoint_path(specdock_dir: Path) -> Path:
+    return (specdock_dir / "scripts" / "spec-dock").resolve()
+
+
+def _specdock_dir_from_lock_path(lock_path: Path) -> Path:
+    if len(lock_path.parents) >= 3:
+        return lock_path.parents[2].resolve()
+    return lock_path.parent.resolve()
+
+
+def _doctor_guidance_message(specdock_dir: Path) -> str:
+    command = " ".join(shlex.quote(part) for part in (str(_runtime_entrypoint_path(specdock_dir)), "doctor"))
+    return f"Run `{command}` for guidance."
 
 
 def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
@@ -178,6 +190,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
             if _is_stale_lock(meta, stale_after_seconds=stale_after_seconds):
                 raise RuntimeError(
                     _lock_failure_message(
+                        specdock_dir=specdock_dir,
                         lock_path=lock_path,
                         wait_seconds=wait_seconds,
                         elapsed_seconds=elapsed,
@@ -188,6 +201,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
             if elapsed >= wait_seconds:
                 raise RuntimeError(
                     _lock_failure_message(
+                        specdock_dir=specdock_dir,
                         lock_path=lock_path,
                         wait_seconds=wait_seconds,
                         elapsed_seconds=elapsed,
@@ -203,7 +217,7 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
         except OSError as exc:
             raise RuntimeError(
                 "create lock acquisition failed: "
-                f"path={lock_path} error={exc}. {_doctor_guidance_message()}"
+                f"path={lock_path} error={exc}. {_doctor_guidance_message(specdock_dir)}"
             ) from exc
         else:
             try:
@@ -217,19 +231,20 @@ def _acquire_create_lock(specdock_dir: Path) -> tuple[Path, str]:
                 raise RuntimeError(
                     "create lock metadata write failed: "
                     f"path={lock_path} error={exc} {cleanup_result}. "
-                    f"No files were written. {_doctor_guidance_message()}"
+                    f"No files were written. {_doctor_guidance_message(specdock_dir)}"
                 ) from exc
             return lock_path, token
 
 
-def _release_create_lock(lock_path: Path, token: str) -> None:
+def _release_create_lock(lock_path: Path, token: str, *, specdock_dir: Path | None = None) -> None:
+    effective_specdock_dir = specdock_dir if specdock_dir is not None else _specdock_dir_from_lock_path(lock_path)
     meta, _summary = _read_create_lock_metadata(lock_path)
     if meta.get("token") != token:
         if lock_path.exists():
             raise RuntimeError(
                 "create lock release failed: "
                 f"path={lock_path} reason=ownership_mismatch. "
-                f"Create may have already written files. {_doctor_guidance_message()}"
+                f"Create may have already written files. {_doctor_guidance_message(effective_specdock_dir)}"
             )
         return
     try:
@@ -238,7 +253,7 @@ def _release_create_lock(lock_path: Path, token: str) -> None:
         raise RuntimeError(
             "create lock release failed: "
             f"path={lock_path} error={exc}. "
-            f"Create may have already written files. {_doctor_guidance_message()}"
+            f"Create may have already written files. {_doctor_guidance_message(effective_specdock_dir)}"
         ) from exc
 
 
@@ -900,7 +915,7 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
     finally:
         release_error: Exception | None = None
         try:
-            _release_create_lock(lock_path, lock_token)
+            _release_create_lock(lock_path, lock_token, specdock_dir=specdock_dir)
         except Exception as exc:
             release_error = exc
 
@@ -987,9 +1002,10 @@ def _post_github_create_local_failure_message(
     kind: Literal["initiative", "epic", "issue"],
     req: CreateNodeRequest,
     title: str,
+    specdock_dir: Path,
 ) -> str:
     command_args = [
-        "spec-dock/scripts/spec-dock",
+        str(_runtime_entrypoint_path(specdock_dir)),
         "new",
         kind,
         "--title",
@@ -1016,6 +1032,7 @@ def _wrap_post_github_create_local_failure(
     kind: Literal["initiative", "epic", "issue"],
     req: CreateNodeRequest,
     title: str,
+    specdock_dir: Path,
 ) -> RuntimeError | None:
     if created_github_issue_number is None:
         return None
@@ -1026,6 +1043,7 @@ def _wrap_post_github_create_local_failure(
             kind=kind,
             req=req,
             title=title,
+            specdock_dir=specdock_dir,
         )
     )
 
@@ -1067,6 +1085,7 @@ def create_node_core(
             kind=kind,
             req=req,
             title=title,
+            specdock_dir=specdock_dir,
         )
         if wrapped_error is not None:
             raise wrapped_error from exc
@@ -1102,7 +1121,7 @@ def create_node_core(
     finally:
         release_error: Exception | None = None
         try:
-            _release_create_lock(lock_path, lock_token)
+            _release_create_lock(lock_path, lock_token, specdock_dir=specdock_dir)
         except Exception as exc:
             release_error = exc
 
@@ -1113,6 +1132,7 @@ def create_node_core(
                 kind=kind,
                 req=req,
                 title=title,
+                specdock_dir=specdock_dir,
             )
             effective_body_error: Exception = wrapped_body_error if wrapped_body_error is not None else body_error
             if release_error is not None:

@@ -1,4 +1,5 @@
 import os
+import shlex
 import threading
 import time
 import tempfile
@@ -29,6 +30,10 @@ def _runtime_modules():
     finally:
         sys.path.pop(0)
     return runtime_app, app_contracts, app_create_node, app_ports, new_commands, infra_contracts, presentation_cli_text
+
+
+def _quoted_runtime_entrypoint(specdock_dir: Path) -> str:
+    return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
 
 
 def _record(
@@ -748,9 +753,10 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
             self.assertEqual(len(errors), 1)
             message = str(errors[0])
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("Epic not found: epic-local-00001", message)
             self.assertIn("GitHub issue was created: #702", message)
-            self.assertIn("spec-dock/scripts/spec-dock new issue --title 'Refresh token'", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
             self.assertIn("--epic epic-local-00001", message)
             self.assertIn("--github-issue 702", message)
             self.assertEqual(events, [])
@@ -843,10 +849,11 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
             self.assertEqual(len(errors), 1)
             message = str(errors[0])
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("github linkage is already linked", message)
             self.assertIn("github.issue_number=705", message)
             self.assertIn("GitHub issue was created: #705", message)
-            self.assertIn("spec-dock/scripts/spec-dock new issue --title 'Refresh token'", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
             self.assertIn("--epic epic-local-00001", message)
             self.assertIn("--github-issue 705", message)
             self.assertIn("close/cleanup", message)
@@ -927,9 +934,10 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("create lock acquisition failed", message)
-            self.assertIn("spec-dock/scripts/spec-dock doctor", message)
-            self.assertIn("spec-dock/scripts/spec-dock new issue --title 'Refresh token'", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
             self.assertIn("--epic epic-local-00001", message)
             self.assertIn("--github-issue 703", message)
             self.assertIn("close/cleanup", message)
@@ -996,8 +1004,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("simulated write failure", message)
-            self.assertIn("spec-dock/scripts/spec-dock new issue --title 'Refresh token'", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
             self.assertIn("--epic epic-local-00001", message)
             self.assertIn("--github-issue 704", message)
             self.assertIn("close/cleanup", message)
@@ -1262,8 +1271,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("create lock acquisition failed", message)
-            self.assertIn("spec-dock/scripts/spec-dock new initiative --title 'Auth platform'", message)
+            self.assertIn(f"{runtime_cmd} new initiative --title 'Auth platform'", message)
             self.assertIn("--github-issue 706", message)
             self.assertIn("close/cleanup", message)
             self.assertEqual(len(issue_gateway.calls), 1)
@@ -1312,8 +1322,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("simulated epic write failure", message)
-            self.assertIn("spec-dock/scripts/spec-dock new epic --title 'JWT auth'", message)
+            self.assertIn(f"{runtime_cmd} new epic --title 'JWT auth'", message)
             self.assertIn("--initiative init-local-00001", message)
             self.assertIn("--github-issue 707", message)
             self.assertIn("close/cleanup", message)
@@ -1358,10 +1369,11 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("wait_s=", message)
             self.assertIn(lock_path.as_posix(), message)
             self.assertIn("user=lock-holder", message)
-            self.assertIn("spec-dock/scripts/spec-dock doctor", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
             self.assertEqual(events, [])
             self.assertFalse((specdock_dir / "initiatives").exists())
             self.assertTrue(lock_path.exists())
@@ -1404,10 +1416,11 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn("stale=true", message)
             self.assertIn(lock_path.as_posix(), message)
             self.assertIn("created_iso=1970-01-01", message)
-            self.assertIn("spec-dock/scripts/spec-dock doctor", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
             self.assertEqual(events, [])
             self.assertFalse((specdock_dir / "initiatives").exists())
             self.assertTrue(lock_path.exists())
@@ -1427,9 +1440,10 @@ class TestRuntimeNewS08(unittest.TestCase):
                     app_create_node._acquire_create_lock(specdock_dir)
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn(lock_path.as_posix(), message)
             self.assertIn("cleanup_unlink=ok", message)
-            self.assertIn("spec-dock/scripts/spec-dock doctor", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
             self.assertFalse(lock_path.exists())
 
     def test_create_fails_when_release_unlink_fails(self) -> None:
@@ -1462,8 +1476,9 @@ class TestRuntimeNewS08(unittest.TestCase):
                     )
 
             message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
             self.assertIn(lock_path.as_posix(), message)
-            self.assertIn("spec-dock/scripts/spec-dock doctor", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
             self.assertTrue((specdock_dir / "initiatives").exists())
             self.assertTrue(lock_path.exists())
 

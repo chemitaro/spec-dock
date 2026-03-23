@@ -526,6 +526,56 @@ with tempfile.TemporaryDirectory() as td:
         )
         self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
 
+    def test_checked_in_dogfooding_runtime_import_release_lock_backward_compat_parity(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
+        check_code = f"""
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, {str(runtime_scripts_dir)!r})
+try:
+    from spec_dock_runtime.application import import_node as app_import_node
+finally:
+    sys.path.pop(0)
+
+with tempfile.TemporaryDirectory() as td:
+    specdock_dir = Path(td) / "spec-dock"
+    lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_payload = (
+        "token=holder\\n"
+        "pid=222\\n"
+        "user=lock-holder\\n"
+        "created_unix=9999999999\\n"
+        "created_iso=2099-01-01T00:00:00Z\\n"
+    )
+    lock_path.write_text(lock_payload, encoding="utf-8")
+
+    try:
+        app_import_node._release_create_lock(lock_path, "other")
+        raise AssertionError("expected ownership mismatch")
+    except RuntimeError as exc:
+        message = str(exc)
+
+    runtime_cmd = str((specdock_dir / "scripts" / "spec-dock").resolve())
+    assert "reason=ownership_mismatch" in message, message
+    assert f"{{runtime_cmd}} doctor" in message, message
+    assert lock_path.exists(), "lock unexpectedly removed on ownership mismatch"
+
+    lock_path.write_text(lock_payload, encoding="utf-8")
+    app_import_node._release_create_lock(lock_path, "holder")
+    assert not lock_path.exists(), "lock was not removed"
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", check_code],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+
     def test_checked_in_dogfooding_runtime_import_import_race_revalidation_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
@@ -2086,6 +2136,7 @@ with tempfile.TemporaryDirectory() as td:
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = """
 import os
+import shlex
 import sys
 import tempfile
 import threading
@@ -2120,6 +2171,9 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs").mkdir(parents=True, exist_ok=True)
         (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+
+def _runtime_cmd(specdock_dir):
+    return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
 
 class _DummyNodeReader:
     def load_node_records(self):
@@ -2356,9 +2410,10 @@ with tempfile.TemporaryDirectory() as td:
     assert not thread.is_alive(), "github create thread did not finish"
     assert len(errors) == 1, errors
     message = str(errors[0])
+    runtime_cmd = _runtime_cmd(specdock_dir)
     assert "Epic not found: epic-local-00001" in message, message
     assert "GitHub issue was created: #812" in message, message
-    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
     assert "--epic epic-local-00001" in message, message
     assert "--github-issue 812" in message, message
     assert events == [], events
@@ -2433,10 +2488,11 @@ with tempfile.TemporaryDirectory() as td:
         raise AssertionError("expected lock failure after github create")
     except RuntimeError as exc:
         message = str(exc)
+    runtime_cmd = _runtime_cmd(specdock_dir)
     assert "create lock acquisition failed" in message, message
-    assert "spec-dock/scripts/spec-dock doctor" in message, message
+    assert f"{runtime_cmd} doctor" in message, message
     assert "GitHub issue was created: #813" in message, message
-    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
     assert "--epic epic-local-00001" in message, message
     assert "--github-issue 813" in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
@@ -2524,10 +2580,11 @@ with tempfile.TemporaryDirectory() as td:
     assert not thread.is_alive(), "github create thread did not finish"
     assert len(errors) == 1, errors
     message = str(errors[0])
+    runtime_cmd = _runtime_cmd(specdock_dir)
     assert "github linkage is already linked" in message, message
     assert "github.issue_number=814" in message, message
     assert "GitHub issue was created: #814" in message, message
-    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
     assert "--epic epic-local-00001" in message, message
     assert "--github-issue 814" in message, message
     assert events == [], events
@@ -2595,9 +2652,10 @@ with tempfile.TemporaryDirectory() as td:
     except RuntimeError as exc:
         message = str(exc)
     assert started.is_set(), "issue_create was not called"
+    runtime_cmd = _runtime_cmd(specdock_dir)
     assert "simulated write seam failure" in message, message
     assert "GitHub issue was created: #815" in message, message
-    assert "spec-dock/scripts/spec-dock new issue --title 'Refresh token'" in message, message
+    assert f"{runtime_cmd} new issue --title 'Refresh token'" in message, message
     assert "--epic epic-local-00001" in message, message
     assert "--github-issue 815" in message, message
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
@@ -2815,6 +2873,7 @@ with tempfile.TemporaryDirectory() as td:
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = """
 import os
+import shlex
 import sys
 import tempfile
 from pathlib import Path
@@ -2849,6 +2908,9 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs").mkdir(parents=True, exist_ok=True)
         (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+
+def _runtime_cmd(specdock_dir):
+    return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
 
 class _DummyNodeReader:
     def load_node_records(self):
@@ -2941,8 +3003,9 @@ with tempfile.TemporaryDirectory() as td:
         raise AssertionError("expected initiative failure")
     except RuntimeError as exc:
         message = str(exc)
+    runtime_cmd = _runtime_cmd(specdock_dir)
     assert "GitHub issue was created: #960" in message, message
-    assert "spec-dock/scripts/spec-dock new initiative --title 'Auth platform'" in message, message
+    assert f"{runtime_cmd} new initiative --title 'Auth platform'" in message, message
     assert "--github-issue 960" in message, message
 
 with tempfile.TemporaryDirectory() as td:
@@ -2988,8 +3051,9 @@ with tempfile.TemporaryDirectory() as td:
             raise AssertionError("expected epic failure")
         except RuntimeError as exc:
             message = str(exc)
+    runtime_cmd = _runtime_cmd(specdock_dir)
     assert "GitHub issue was created: #961" in message, message
-    assert "spec-dock/scripts/spec-dock new epic --title 'JWT auth'" in message, message
+    assert f"{runtime_cmd} new epic --title 'JWT auth'" in message, message
     assert "--initiative init-local-00001" in message, message
     assert "--github-issue 961" in message, message
 """ % str(runtime_scripts_dir)

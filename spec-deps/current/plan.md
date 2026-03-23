@@ -150,12 +150,12 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-006` -> `S04`
   - corrective scopes: `S04I`
 - `AC-007` -> `S05`
-  - corrective scopes: `S01N`
+  - corrective scopes: `S01N`, `S01O`
 - `AC-008` -> `S04`
-  - corrective scopes: `S01M`
+  - corrective scopes: `S01M`, `S01O`
 - `AC-009` -> `S02`
 - `AC-010` -> `S90`, `S90F`
-  - corrective scopes: `S01M`, `S01N`
+  - corrective scopes: `S01M`, `S01N`, `S01O`
 - `AC-011` -> `S05F`, `S05I`
 - `AC-012` -> `S04F`
 - `AC-013` -> `S05G`
@@ -169,6 +169,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R24` -> `S04I`
 - `PR29-R25` -> `S01M`
 - `PR29-R26` -> `S01N`
+- `PR29-R27` -> `S01O`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -493,6 +494,37 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S01N` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S01O — create guidance path を cwd-independent に揃える
+- target:
+  - create lock failure guidance と post-create retry hint が、repo root でない cwd からでも実行できる command path を返す
+- design refs:
+  - `design.md` の create lock / post-create guidance 方針
+- step boundary:
+  - guidance surface の command path 解決に限定し、create semantics 自体は変えない
+
+#### Red
+- failing test:
+  - nested cwd から見た post-create retry hint が `spec-dock/scripts/spec-dock` の repo-root-relative path のままで失敗する regression
+  - nested cwd から見た doctor guidance も同様に cwd-dependent で失敗する regression
+  - checked-in parity でも同 guidance が維持される regression
+
+#### Green
+- minimum implementation:
+  - managed repo root から runtime entrypoint の absolute executable path を組み立て、doctor guidance と retry hint の両方へ使う
+  - provider runtime と checked-in runtime parity を揃える
+
+#### step gate
+- review:
+  - guidance surface が repo-local shortcut / repo-root-relative cwd 前提に依存せず、nested cwd からでも実行可能である
+- expected tests:
+  - nested cwd post-create retry guidance
+  - nested cwd doctor guidance
+  - checked-in runtime parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S01O` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S01L — create-mode 全 kind に pre-GitHub graph preflight を揃える
 - target:

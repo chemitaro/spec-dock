@@ -412,6 +412,43 @@ class TestRuntimeImportS10(unittest.TestCase):
             specdock_dir=specdock_dir,
         )
 
+    def test_release_create_lock_compat_for_import_old_call_signature(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            app_import_node,
+            _app_ports,
+            _domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            lock_path = specdock_dir / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_payload = (
+                "token=holder\n"
+                "pid=222\n"
+                "user=lock-holder\n"
+                "created_unix=9999999999\n"
+                "created_iso=2099-01-01T00:00:00Z\n"
+            )
+            lock_path.write_text(lock_payload, encoding="utf-8")
+
+            with self.assertRaises(RuntimeError) as raised:
+                app_import_node._release_create_lock(lock_path, "other")
+
+            message = str(raised.exception)
+            runtime_cmd = str((specdock_dir / "scripts" / "spec-dock").resolve())
+            self.assertIn("reason=ownership_mismatch", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertTrue(lock_path.exists())
+
+            lock_path.write_text(lock_payload, encoding="utf-8")
+            app_import_node._release_create_lock(lock_path, "holder")
+            self.assertFalse(lock_path.exists())
+
     def test_parent_fallback_regression(self) -> None:
         (
             _runtime_app,
