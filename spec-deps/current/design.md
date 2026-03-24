@@ -378,8 +378,93 @@ ActiveSet --> IssueStatusResolution : uses
 - tests:
   - current repo `#123` と foreign `other/repo#123` が共存しても numeric branch が current repo node を指し続ける回帰
   - current repo slug が既知で foreign-only numeric match しかない場合は fail-closed に倒れる回帰
+
+## 2.6 no-origin continuity via current-repo linkage normalization
+
+### 変更方針
+
+- current repo slug を解決できる write path では、current-repo linked node を unscoped のまま保存せず、`github.repo_owner/name` を current repo slug で明示保存する
+- legacy unscoped linkage に対する mutate-time backfill は、current repo slug が解決できるだけでは足りず、current repo target intent を positive に示す trusted context がある場合に限って safe backfill を行う
+- no-origin では新しい heuristic 推測を増やさず、正規化済み metadata を使って repo-aware validation / deps / sync を継続させる
+- current repo slug を解決できず、なお mixed scoped/unscoped が残る graph だけ fail-closed を維持する
+
+### safe backfill predicate
+
+- eligible:
+  - node が `github.issue_number` を持つ
+  - `github.repo_owner` / `github.repo_name` が両方 absent で、partial scope ではない
+  - current repo slug を解決できる
+  - current repo target intent を明示できる trusted context がある
+  - trusted context は current repo 所属を positive に示すものであり、「current repo と仮定しても衝突しない」だけでは足りない
+- ineligible:
+  - current repo slug を解決できない
+  - lone unscoped legacy linkage を bulk `sync --github` のような target-less mutate path から扱う場合
+  - `github.repo_owner` または `github.repo_name` の片側だけが入った partial scope
+  - same-number foreign scoped coexistence しか evidence がなく、current repo 所属を positive に示せない場合
+  - same `(current_repo_slug, issue_number)` に属しうる unscoped node が複数ある
+  - explicit current-repo scoped duplicate が既に存在する
+  - backfill 後も effective current-repo linkage key が一意にならない
+
+### normalization flow
+
+- write-time normalization:
+  - create / import / link のように current repo issue を新規に persisted metadata へ書く path では、slug が解決できる限り最初から explicit scope を保存する
+- mutate-time backfill:
+  - `sync --github` のように graph を reload し metadata 更新責務を持つ path では、legacy unscoped node を safe predicate で判定してから backfill する
+  - ただし bulk `sync --github` は explicit target context を持たないため、lone unscoped legacy linkage を current repo と uniqueness だけでみなして backfill してはならない
+  - backfill は metadata normalization に限定し、target selection convenience や no-origin heuristic 推測は増やさない
+- read-side continuity:
+  - no-origin では正規化済み explicit scope をそのまま読み、validation / deps / doctor / sync preflight の repo-aware uniqueness を継続する
+  - safe predicate を満たさない legacy mixed scope は従来どおり fail-closed に残し、「正規化できない曖昧 graph」であることを error/doctor guidance へ渡す
+
+### metadata permission contract
+
+- `.meta.json` は persisted metadata として readonly lock policy を持ち、write-time create と mutate-time backfill が同じ lock/unlock 契約を共有する
+- readonly 化は `write_meta()` だけのローカル事情ではなく、後続の supported mutate path が一時 writable 化して更新し、成功後に意図した lock state へ戻せることまで含めた contract とする
+- current corrective scope では Windows を含む cross-platform 契約として扱い、`write_meta()` が readonly 化した `.meta.json` を `backfill_github_repo_scope()` が OS 差分だけで書き換え不能にしない
+- successful create/backfill 後の final `.meta.json` lock state は「その時点の persisted metadata は readonly に揃える」を正とし、`write_meta()` / `backfill_github_repo_scope()` とも成功時に same final readonly state を残す
+- permission helper は汎用 filesystem abstraction ではなく `.meta.json` mutation 専用に留め、次の責務だけを持つ
+  - 現在の lock state / mode を読む
+  - 必要なら一時 writable 化する
+  - metadata write を実行する
+  - 成功後に final readonly lock state へ戻す
+  - restore/relock failure は既存 `readonly_lock_failed` warning surface と整合する形で返し、metadata write 自体が成功している場合は warning として観測できる
+- `sync --github` の safe backfill は permission helper failure を silent skip せず failure surface に乗せてよいが、Windows readonly file だけを理由に supported self-healing が失敗する状態は corrective patch で解消する
+- conflicting scope / partial scope / ambiguous candidate の fail-closed policy と、permission helper の writable/readonly 制御は別責務として保つ
+
+### 意図
+
+- fail-closed safety を崩さずに、copy / temp checkout / exported workspace の継続運用性を確保する
+- current repo と確定できる linkage を unscoped のまま残して no-origin で自滅する状態を防ぐ
+- positive evidence がない legacy linkage を current repo へ silent mutation しない
+- readonly metadata lock policy と supported mutate path の契約 drift を防ぎ、Windows でも self-healing を同じ surface で使えるようにする
+
+### 実装境界
+
+- write path:
+  - current repo issue を link/create/import する時点で explicit `repo_owner/name` を保存する
+- normalization path:
+  - current repo slug が解決できる `sync --github` などの mutate path で legacy unscoped current-repo linkage を backfill する
+  - current repo evidence を持たない lone unscoped legacy linkage は fail-closed / manual remediation に残す
+- permission path:
+  - `write_meta()` と `backfill_github_repo_scope()` は `.meta.json` mutation 専用 helper を共有し、Windows / posix の両方で readonly file を一時 writable 化して更新後に lock state を戻す
+- validation / deps / doctor:
+  - no-origin では normalized metadata を用いて継続し、真に不明な mixed scope のみ fail-closed に残す
+- tests:
+  - current-origin で normalize/backfill 後、no-origin copy に移っても `sync --github` / `validate` / `doctor` が継続できる回帰
+  - 同じ正規化済み metadata を使って no-origin `deps check` も継続できる回帰
+  - create/import 直後の newly persisted current-repo linkage が explicit scope を持つ回帰
+  - safe backfill predicate を満たす legacy unscoped node だけが mutate path で backfill される回帰
+  - lone unscoped legacy linkage は bulk `sync --github` で current repo scope へ silent backfill されない回帰
+  - same-number foreign scoped coexistence があるだけでは lone unscoped node を backfill しない回帰
+  - overlap 下でも canonical GitHub URL target と `--id` selector は no-origin 継続で exact resolution を維持する回帰
+  - normalized metadata がある状態でも bare numeric / `--github-issue` の overlap fail-closed は維持される回帰
+  - truly ambiguous legacy mixed scope graph は no-origin で引き続き fail-closed に倒れる回帰
   - current repo scope に複数 numeric match がある場合は scoped ambiguity として fail-closed に倒れる回帰
   - current repo slug 不明時は ambiguity fail-closed を維持する回帰
+  - readonly `.meta.json` を backfill する current-repo safe case が Windows 相当契約でも成功し、更新後に final lock state を維持する回帰
+  - relock/restore failure が起きても metadata write 成功時は `readonly_lock_failed` warning surface で観測できる回帰
+  - checked-in dogfooding runtime でも readonly `.meta.json` backfill の permission contract が parity を保つ回帰
 
 ## 3. artifact/repair contract
 
@@ -614,6 +699,67 @@ CLI --> User : safe success or explicit failure
 - tests:
   - bare shorthand current-repo-only
   - scoped ref exact-foreign resolution
+
+## 4.3 manual verification topology for repo scope and active recovery
+
+### 変更方針
+
+- 今回ラウンドの手動テストは、local baseline、mixed live current-origin、no-origin copied、pathfile parity の 4 workspace を分離し、`current_repo_slug` あり/なし、foreign repo URL、`.path` fallback の条件を切り分けて観測する
+- `active set` / `deps check` の canonical GitHub URL target は、`origin` がある時は current/foreign repo scope を exact に見分け、`origin` がない時は URL 自体が持つ `owner/repo` 情報を失わずに unique linked node を解決できるかを確認対象に含める
+- `spec-dock update` の active recovery は、persisted active manifest の `path` が same-layer の別 node を指す stale 条件でも wrong-node repoint を起こさず、id-based recovery か placeholder fallback に倒れることを手動でも確認する
+- 手動テスト成果物は `manual-tests/` 配下の round-specific workspace / report に分離し、`checklist.md` / `execution-log.md` / `summary.md` の 3 点セットで evidence を残す
+
+### トポロジ
+
+- workspace A: local baseline
+  - fresh local repo
+  - create / validate / doctor / local-only deps / active の基線確認
+- workspace B: mixed live current-origin
+  - `origin` を持つ fresh GitHub test repo
+  - same-repo URL import、same-repo numeric/bare target、current-repo scoped resolution を確認する主 workspace
+  - foreign repo fixture URL もこの workspace B から扱い、`MT-00` の fixture seed と `MT-02` から `MT-04` の same-repo / foreign-repo / live churn cases を実行する
+- workspace C: no-origin copy
+  - workspace B を copy し、`git remote origin` を外した派生 repo
+  - workspace B で作った same-number overlap fixture と imported linked node を引き継いだまま、`MT-05` の no-origin continuation と `MT-07` の resume-after-copy-update phase を実行する
+  - canonical GitHub URL target が no-origin 条件でも unscoped linked node を解決できるか、foreign-only fallback や hard mismatch に誤って倒れないかを確認する
+- workspace D: no-origin pathfile parity
+  - workspace C を複製した dedicated parity workspace
+  - helper launcher で active entrypoint write 時だけ `os.symlink` を `OSError` に倒し、`MT-06` の `.path` fallback evidence を isolation して採る
+
+### fixture contract
+
+- current repo role と foreign repo role には、少なくとも同じ issue number を 4 組以上作る
+  - exploratory round では minimum を引き上げ、各 repo に少なくとも 6 issue を作る
+  - 推奨: current `#1` から `#4`、foreign `#1` から `#4` を overlap 比較用、`#5` / `#6` を live churn 用に使う
+- same-repo / foreign / no-origin の live case は、同じ overlap issue pair を再利用して repo-scope・freshness・identity 保持を比較する
+- `MT-06` では stale active manifest の wrong-id path と、`expected_id` が解決できるケース / 解決できないケースの両方を作る
+- exploratory long-run case では、複数 initiative / epic / issue を跨ぎ、issue だけでなく epic にも dependency を登録し、close / reopen / import / copy / update をまたぐ churn を観測する
+
+### completion contract
+
+- repo-scoped URL verification は `active set <canonical-url>` と `deps check <canonical-url>` の両方で evidence を残す
+- live GitHub verification では `sync --github` と status/readiness 観測を mutation 前後で必須化する
+- stale active recovery は id-based recovery と placeholder fallback の両分岐を別 evidence として残す
+- active entrypoint parity は symlink / `.path` fallback の両方で `context-pack.md` と `spec-dock/active/*` の一致を記録する
+- recovery / parity evidence は generic 成功ログではなく、`context-pack.md` と `spec-dock/active/{initiative,epic,issue}` の対応関係を case record に明示する
+- organic long-run session は 1 本で終わらせず、build-up / churn / resume-after-copy-update の 3 checkpoint を持つ
+
+### 意図
+
+- 自動テストで通っている条件に加えて、実運用で起きやすい「コピーした workspace」「stale active path」「same-number current/foreign coexistence」を操作列として再現する
+- GitHub review で指摘された repo-scope / no-origin 境界を、実 repo / 実 issue / 実 persisted state で確認できる状態を先に作る
+
+### 実装境界
+
+- issue docs:
+- 手動テストの scope / topology / completion contract を固定する
+- manual-tests:
+  - workspace scaffold 4 種
+  - checklist / execution log / summary template
+- live fixtures:
+  - current-repo role 用 GitHub repo 1 つ
+  - foreign-repo role 用 GitHub repo 1 つ
+  - overlap corpus と churn corpus を分けて seed する
 
 ## active entrypoint recovery
 

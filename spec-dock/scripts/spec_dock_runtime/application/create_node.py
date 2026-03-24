@@ -33,6 +33,7 @@ from .contracts import (
     CreatePlan,
 )
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug, split_repo_slug
 
 _META_FILENAME = ".meta.json"
 _DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
@@ -321,29 +322,6 @@ def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
     return f"{normalized_owner}/{normalized_repo}"
 
 
-def _normalize_repo_slug_value(slug: str | None) -> str | None:
-    text = str(slug or "").strip().lower()
-    if not text:
-        return None
-    owner, sep, repo = text.partition("/")
-    if not sep or not owner or not repo:
-        return None
-    return f"{owner}/{repo}"
-
-
-def _resolve_current_repo_slug(ports: Ports) -> str | None:
-    if ports.git_gateway is None or ports.repo_root is None:
-        return None
-    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
-    if not callable(resolver):
-        return None
-    try:
-        raw = resolver(_resolve_repo_root(ports))
-    except RuntimeError:
-        return None
-    return _normalize_repo_slug_value(raw)
-
-
 def _resolve_node_repo(ports: Ports):
     if ports.node_repo is not None:
         return ports.node_repo
@@ -417,7 +395,7 @@ def load_graph(ports: Ports, *, validate: bool) -> SpecGraph:
     graph = build_graph([_to_spec_node_seed(record) for record in records])
     if validate:
         repo_root = _resolve_repo_root(ports)
-        current_repo_slug = _resolve_current_repo_slug(ports)
+        current_repo_slug = resolve_current_repo_slug(ports)
         report = validate_graph_and_deps(
             graph,
             repo_root=repo_root,
@@ -728,6 +706,10 @@ def plan_node_creation(
                 raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
             github_repo_owner = owner
             github_repo_name = repo
+        else:
+            current_scope = split_repo_slug(current_repo_slug)
+            if current_scope is not None:
+                github_repo_owner, github_repo_name = current_scope
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
     planned_paths.append(dest_dir / _META_FILENAME)
@@ -1241,7 +1223,7 @@ def create_node_core(
     local_node_id: str | None = None
     try:
         graph = load_graph(ports, validate=False)
-        current_repo_slug = _resolve_current_repo_slug(ports)
+        current_repo_slug = resolve_current_repo_slug(ports)
 
         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
         plan = plan_node_creation(

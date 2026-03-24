@@ -421,3 +421,22 @@ ID: "issue-28-runtime-regression-bugs"
   - create lock 下の missing `.meta.json` は create-in-progress / stale create 系として分類でき、恒久 corruption と混同しない
   - lock が無い missing `.meta.json` は引き続き corruption / missing artifact として扱われる
   - provider-side runtime と checked-in dogfooding runtime の両方で同じ中間状態 contract を維持する
+
+### AC-021 no-origin continuity for current-repo linked nodes
+
+- Given:
+  - current repo linked node が `github.issue_number` を持つ
+  - same-number foreign repo node が共存しうる
+  - workspace を copy するなどして `origin` を解決できない環境へ移ることがある
+- When:
+  - current repo slug を解決できる状態で create/import/sync などが current-repo linked node を扱う
+  - またはその後に no-origin workspace で `sync --github` / `validate` / `doctor` / `deps check` を実行する
+- Then:
+  - current-repo linked node は、current repo slug を解決できるうちに persisted metadata へ repo scope を正規化/backfill できる
+  - safe backfill 対象は、少なくとも `github.issue_number` を持ち、`github.repo_owner` / `github.repo_name` が両方未設定で、current repo slug を解決でき、かつ current repo target intent を明示できる trusted context を持つ node に限る
+  - `sync --github` のような bulk mutate path で lone unscoped legacy linkage を current repo と uniqueness だけでみなして silent backfill してはならない
+  - same-number foreign repo node の共存自体は safe backfill の禁止理由ではないが、それだけで current repo evidence と見なしてはならない
+  - `github.repo_owner` または `github.repo_name` の片側だけが入った partial scope、同じ `(current_repo_slug, issue_number)` へ 2 件以上の unscoped/current-repo candidate が見える状態、または explicit current-repo scoped duplicate がある状態は safe backfill せず fail-closed に残す
+  - no-origin へ移った後も、その正規化済み current-repo linkage だけを理由に scoped/unscoped ambiguity fail-closed へ落ちない
+  - truly ambiguous mixed scope graph は引き続き fail-closed に倒れてよい
+  - `--github-issue <n>` の convenience selector は overlap 下で fail-closed を維持してよいが、canonical URL と `--id` は no-origin 継続でも使い続けられる

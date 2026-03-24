@@ -5233,6 +5233,89 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
             self.assertIn("spec-dock: ok (doctor) findings=0", doctor_result.stdout)
 
+    def test_checked_in_dogfooding_runtime_subprocess_keeps_lone_unscoped_legacy_without_backfill_parity(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            current_meta_path = current_issue_dir / ".meta.json"
+            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_meta_path, current_meta)
+
+            foreign_meta_path = epic_dir / "issues" / "iss-local-00002-foreign-issue" / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_meta_path, foreign_meta)
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
+            self.assertEqual(
+                sync_result.returncode,
+                0,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+
+            current_meta_after = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
+            self.assertNotIn("repo_owner", current_meta_after["github"])
+            self.assertNotIn("repo_name", current_meta_after["github"])
+
+    def test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+            _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            current_meta_path = current_issue_dir / ".meta.json"
+            current_meta = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_meta_path, current_meta)
+            current_meta_path.chmod(current_meta_path.stat().st_mode & ~0o222)
+
+            foreign_meta_path = epic_dir / "issues" / "iss-local-00002-foreign-issue" / ".meta.json"
+            foreign_meta = json.loads(foreign_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_meta_path, foreign_meta)
+
+            runtime_fs_repo = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
+            runtime_fs_repo.write_text(
+                runtime_fs_repo.read_text(encoding="utf-8")
+                + "\n\n"
+                + "def _runtime_os_name() -> str:\n"
+                + '    return "nt"\n',
+                encoding="utf-8",
+            )
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
+            self.assertEqual(
+                sync_result.returncode,
+                0,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+
+            current_meta_after = json.loads(current_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
+            self.assertNotIn("repo_owner", current_meta_after["github"])
+            self.assertNotIn("repo_name", current_meta_after["github"])
+            self.assertEqual(current_meta_path.stat().st_mode & 0o222, 0)
+
     def test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
