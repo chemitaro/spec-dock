@@ -624,6 +624,8 @@ CLI --> User : safe success or explicit failure
 - `context-pack.md` は raw persisted manifest ではなく、最終的に解決できた active entrypoint 実体を source of truth として再生成する
 - 既存 symlink/pathfile が健全に残っている場合も、その実体から active id を再計算し、persisted manifest 欠損・破損・stale に引きずられて `context-pack.md` だけ退行しないようにする
 - persisted manifest が壊れている、または path が解決できない場合だけ placeholder fallback に落とす
+- persisted manifest の `path` は prefix-based fallback (`iss-` / `epic-` / `init-`) だけで信用せず、`.meta.json` の `id` / `type` が manifest entry と一致する時だけ recovery target として採用する
+- same-layer の別 node を誤採用しないため、`path` が存在しても id mismatch なら `path` fallback は破棄し、`expected_id` による探索か placeholder fallback へ倒す
 
 ### 意図
 

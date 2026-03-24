@@ -6270,6 +6270,108 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             self.assertIn("- `spec-dock/active/epic/README.md`", context_pack_text)
             self.assertIn("- `spec-dock/active/issue/README.md`", context_pack_text)
 
+    def test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            active_dir = self._clear_active_entrypoints(target)
+
+            wrong_issue_dir = issue_dir.parent / "iss-local-00002-other-issue"
+            wrong_issue_dir.mkdir(parents=True, exist_ok=True)
+            self._write_json_force(
+                wrong_issue_dir / ".meta.json",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00002",
+                    "title": "Other issue",
+                    "slug": "other-issue",
+                    "parent_id": "epic-local-00001",
+                    "initiative_id": "init-local-00001",
+                    "epic_id": "epic-local-00001",
+                },
+            )
+            for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+                (wrong_issue_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {"id": "init-local-99999", "path": "spec-dock/initiatives/init-local-99999-missing"},
+                    "epic": {
+                        "id": "epic-local-99999",
+                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
+                    },
+                    "issue": {
+                        "id": "iss-local-99999",
+                        "path": wrong_issue_dir.relative_to(target).as_posix(),
+                    },
+                },
+            )
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            placeholder_root = target / "spec-dock" / "system" / "active-none"
+            self.assertEqual(
+                self._read_active_pointer_text(target, "issue", "README.md"),
+                (placeholder_root / "issue" / "README.md").read_text(encoding="utf-8"),
+            )
+
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- issue: (none)", context_pack_text)
+            self.assertNotIn("iss-local-00002", context_pack_text)
+            self.assertNotIn("iss-local-99999", context_pack_text)
+
+    def test_update_prefers_id_based_recovery_when_same_layer_wrong_id_path_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            _initiative_dir, _epic_dir, issue_dir = self._create_minimal_local_tree(target)
+            active_dir = self._clear_active_entrypoints(target)
+
+            wrong_issue_dir = issue_dir.parent / "iss-local-00002-other-issue"
+            wrong_issue_dir.mkdir(parents=True, exist_ok=True)
+            self._write_json_force(
+                wrong_issue_dir / ".meta.json",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00002",
+                    "title": "Other issue",
+                    "slug": "other-issue",
+                    "parent_id": "epic-local-00001",
+                    "initiative_id": "init-local-00001",
+                    "epic_id": "epic-local-00001",
+                },
+            )
+            for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+                (wrong_issue_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
+
+            self._write_json_force(
+                target / "spec-dock" / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": {"id": "init-local-99999", "path": "spec-dock/initiatives/init-local-99999-missing"},
+                    "epic": {
+                        "id": "epic-local-99999",
+                        "path": "spec-dock/initiatives/init-local-99999-missing/epics/epic-local-99999-missing",
+                    },
+                    "issue": {
+                        "id": "iss-local-00001",
+                        "path": wrong_issue_dir.relative_to(target).as_posix(),
+                    },
+                },
+            )
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            self.assertIn("iss-local-00001", self._read_active_pointer_text(target, "issue", "requirement.md"))
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- issue: iss-local-00001", context_pack_text)
+            self.assertNotIn("iss-local-00002", context_pack_text)
+
     def test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

@@ -263,6 +263,8 @@ ID: "issue-28-runtime-regression-bugs"
   - 未設定であることと、次に取るべき action/fallback path が分かる
   - persisted active manifest が健全な場合は、`spec-dock update` が `context-pack.md` だけでなく `spec-dock/active/{initiative,epic,issue}` の entrypoint も同じ active state に復元する
   - placeholder fallback は healthy active state ではなく recoverable fallback として扱われ、persisted active manifest から実 node を解決できる場合は placeholder のまま残らない
+  - persisted active manifest の `path` は hint に過ぎず、その path が repo 内の別 node を指していても `.meta.json` の `id` / `type` が manifest entry と一致しない限り recovery target として採用されない
+  - `path` が same-layer prefix (`iss-` / `epic-` / `init-`) だけ合う誤 node を指している場合も fail-closed とし、id-based recovery か placeholder fallback へ倒れる
 
 ### AC-007 CLI symmetry and disambiguation
 
