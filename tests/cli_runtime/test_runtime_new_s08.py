@@ -1,7 +1,12 @@
+import os
+import shlex
+import threading
+import time
 import tempfile
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _runtime_modules():
@@ -25,6 +30,32 @@ def _runtime_modules():
     finally:
         sys.path.pop(0)
     return runtime_app, app_contracts, app_create_node, app_ports, new_commands, infra_contracts, presentation_cli_text
+
+
+def _runtime_modules_import():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.application import contracts as app_contracts
+        from spec_dock_runtime.application import create_node as app_create_node
+        from spec_dock_runtime.application import import_node as app_import_node
+        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.domain import models as domain_models
+        from spec_dock_runtime.infra import contracts as infra_contracts
+    finally:
+        sys.path.pop(0)
+    return app_contracts, app_create_node, app_import_node, app_ports, domain_models, infra_contracts
+
+
+def _quoted_runtime_entrypoint(specdock_dir: Path) -> str:
+    return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
 
 
 def _record(
@@ -72,6 +103,26 @@ class _StubNodeRepo:
         dest_dir.mkdir(parents=True, exist_ok=True)
         (dest_dir / ".meta.json").write_text(f"id={record.id}\n", encoding="utf-8")
         self._records.append(record)
+
+
+class _RacyNodeRepo(_StubNodeRepo):
+    def __init__(self, records, events=None, *, first_load_delay_seconds=0.1):
+        super().__init__(records, events=events)
+        self._first_load_delay_seconds = first_load_delay_seconds
+        self._first_load_pending = True
+        self._first_load_lock = threading.Lock()
+
+    def load_node_records(self, specdock_dir):
+        del specdock_dir
+        snapshot = list(self._records)
+        should_delay = False
+        with self._first_load_lock:
+            if self._first_load_pending:
+                self._first_load_pending = False
+                should_delay = True
+        if should_delay:
+            time.sleep(self._first_load_delay_seconds)
+        return snapshot
 
 
 class _StubTemplateScaffolder:
@@ -122,6 +173,45 @@ class _StubIssueGateway:
         return self.created_numbers.pop(0)
 
 
+class _BlockingIssueGateway(_StubIssueGateway):
+    def __init__(self, created_numbers, *, started_event: threading.Event, release_event: threading.Event):
+        super().__init__(created_numbers)
+        self._started_event = started_event
+        self._release_event = release_event
+
+    def issue_create(self, repo_root, title, body):
+        self.calls.append((str(repo_root), title, body))
+        self._started_event.set()
+        if not self._release_event.wait(timeout=5.0):
+            raise RuntimeError("timed out waiting for release_event")
+        if not self.created_numbers:
+            raise RuntimeError("no issue numbers configured")
+        return self.created_numbers.pop(0)
+
+
+class _StubImportIssueGateway:
+    def __init__(self, domain_models):
+        self._domain_models = domain_models
+        self.calls = []
+
+    def issue_index(self, repo_root, *, limit):
+        del repo_root, limit
+        return []
+
+    def issue_view_minimal(self, repo_root, issue_number, *, repo_slug=None):
+        self.calls.append((str(repo_root), int(issue_number), repo_slug))
+        return self._domain_models.IssueSnapshot(
+            issue_number=int(issue_number),
+            state="open",
+            title=f"Imported #{int(issue_number)}",
+            labels=[],
+            updated_at="2026-03-12T00:00:00Z",
+            url=f"https://github.com/example/repo/issues/{int(issue_number)}",
+            repo_owner="example",
+            repo_name="repo",
+        )
+
+
 class _StubClock:
     def today(self):
         return "2026-03-12"
@@ -135,16 +225,55 @@ class TestRuntimeNewS08(unittest.TestCase):
             (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\n", encoding="utf-8")
             (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\n", encoding="utf-8")
 
-    def _ports(self, app_ports, *, specdock_dir: Path, records, events=None, issue_gateway=None):
+    def _ports(
+        self,
+        app_ports,
+        *,
+        specdock_dir: Path,
+        records,
+        events=None,
+        issue_gateway=None,
+        node_repo=None,
+        template_scaffolder=None,
+    ):
+        resolved_node_repo = node_repo if node_repo is not None else _StubNodeRepo(records, events=events)
+        resolved_template_scaffolder = (
+            template_scaffolder if template_scaffolder is not None else _StubTemplateScaffolder(events=events)
+        )
         return app_ports.Ports(
             node_reader=_DummyNodeReader(),
-            node_repo=_StubNodeRepo(records, events=events),
-            template_scaffolder=_StubTemplateScaffolder(events=events),
+            node_repo=resolved_node_repo,
+            template_scaffolder=resolved_template_scaffolder,
             issue_gateway=issue_gateway or _StubIssueGateway([501]),
             clock=_StubClock(),
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
         )
+
+    def _run_parallel_create(self, create_fn, request_a, request_b):
+        node_ids = []
+        errors = []
+        lock = threading.Lock()
+
+        def _worker(req):
+            try:
+                result = create_fn(req)
+                with lock:
+                    node_ids.append(result.node.id)
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        thread_a = threading.Thread(target=_worker, args=(request_a,))
+        thread_b = threading.Thread(target=_worker, args=(request_b,))
+        thread_a.start()
+        thread_b.start()
+        thread_a.join(timeout=5.0)
+        thread_b.join(timeout=5.0)
+        self.assertFalse(thread_a.is_alive(), "parallel create thread A did not finish")
+        self.assertFalse(thread_b.is_alive(), "parallel create thread B did not finish")
+        self.assertEqual(errors, [])
+        return sorted(node_ids)
 
     def test_planning_regression_create_plan_contains_all_candidates(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -361,6 +490,1670 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(issue_result.node.parent_id, "epic-local-00001")
             self.assertEqual(issue_result.node.initiative_id, "init-local-00001")
 
+    def test_parallel_create_initiative_allocates_unique_local_ids(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            node_repo = _RacyNodeRepo([], first_load_delay_seconds=0.1)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], node_repo=node_repo)
+            ids = self._run_parallel_create(
+                lambda req: app_create_node.create_initiative(req, ports),
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform A",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform B",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+            )
+
+            self.assertEqual(ids, ["init-local-00001", "init-local-00002"])
+
+    def test_parallel_create_epic_allocates_unique_local_ids(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                )
+            ]
+            node_repo = _RacyNodeRepo(records, first_load_delay_seconds=0.1)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records, node_repo=node_repo)
+            ids = self._run_parallel_create(
+                lambda req: app_create_node.create_epic(req, ports),
+                app_contracts.CreateNodeRequest(
+                    title="Epic A",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+                app_contracts.CreateNodeRequest(
+                    title="Epic B",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+            )
+
+            self.assertEqual(ids, ["epic-local-00001", "epic-local-00002"])
+
+    def test_parallel_create_issue_allocates_unique_local_ids(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            node_repo = _RacyNodeRepo(records, first_load_delay_seconds=0.1)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records, node_repo=node_repo)
+            ids = self._run_parallel_create(
+                lambda req: app_create_node.create_issue(req, ports),
+                app_contracts.CreateNodeRequest(
+                    title="Issue A",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+                app_contracts.CreateNodeRequest(
+                    title="Issue B",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                ),
+            )
+
+            self.assertEqual(ids, ["iss-local-00001", "iss-local-00002"])
+
+    def test_github_issue_create_delay_does_not_block_parallel_local_create(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            started = threading.Event()
+            release = threading.Event()
+            issue_gateway = _BlockingIssueGateway([701], started_event=started, release_event=release)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            issue_result: dict[str, object] = {}
+            issue_errors: list[Exception] = []
+
+            def _run_issue_create() -> None:
+                try:
+                    issue_result["value"] = app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+                except Exception as exc:
+                    issue_errors.append(exc)
+
+            issue_thread = threading.Thread(target=_run_issue_create)
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.005",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
+                },
+                clear=False,
+            ):
+                issue_thread.start()
+                self.assertTrue(started.wait(timeout=1.0), "issue_create was not called")
+                try:
+                    local_result = app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Payments",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+                finally:
+                    release.set()
+                issue_thread.join(timeout=5.0)
+
+            self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
+            self.assertEqual(issue_errors, [])
+            self.assertEqual(local_result.node.id, "init-local-00002")
+            self.assertIn("value", issue_result)
+            self.assertEqual(issue_result["value"].node.id, "iss-00701")
+            self.assertEqual(len(issue_gateway.calls), 1)
+            body = issue_gateway.calls[0][2]
+            self.assertIn("Type: issue", body)
+            self.assertNotIn("Epic:", body)
+            self.assertNotIn("Initiative:", body)
+
+    def test_github_issue_create_pre_lock_window_rerevalidates_parent_state(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            node_repo = _StubNodeRepo(records, events=events)
+            started = threading.Event()
+            release = threading.Event()
+            issue_gateway = _BlockingIssueGateway([702], started_event=started, release_event=release)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+                node_repo=node_repo,
+            )
+
+            errors: list[Exception] = []
+
+            def _run_issue_create() -> None:
+                try:
+                    app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+                except Exception as exc:
+                    errors.append(exc)
+
+            issue_thread = threading.Thread(target=_run_issue_create)
+            issue_thread.start()
+            self.assertTrue(started.wait(timeout=1.0), "issue_create was not called")
+            node_repo._records = [record for record in node_repo._records if record.id != "epic-local-00001"]
+            release.set()
+            issue_thread.join(timeout=5.0)
+
+            self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
+            self.assertEqual(len(errors), 1)
+            message = str(errors[0])
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Epic not found: epic-local-00001", message)
+            self.assertIn("GitHub issue was created: #702", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertIn("--epic epic-local-00001", message)
+            self.assertIn("--github-issue 702", message)
+            self.assertEqual(events, [])
+            self.assertEqual(len(issue_gateway.calls), 1)
+
+    def test_github_issue_create_pre_lock_window_rerevalidates_github_uniqueness_state(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            node_repo = _StubNodeRepo(records, events=events)
+            started = threading.Event()
+            release = threading.Event()
+            issue_gateway = _BlockingIssueGateway([705], started_event=started, release_event=release)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+                node_repo=node_repo,
+            )
+
+            errors: list[Exception] = []
+
+            def _run_issue_create() -> None:
+                try:
+                    app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+                except Exception as exc:
+                    errors.append(exc)
+
+            issue_thread = threading.Thread(target=_run_issue_create)
+            issue_thread.start()
+            self.assertTrue(started.wait(timeout=1.0), "issue_create was not called")
+            node_repo._records.append(
+                _record(
+                    infra_contracts,
+                    kind="issue",
+                    node_id="iss-local-00042",
+                    title="Competing link",
+                    path=epic_dir / "issues" / "iss-local-00042-competing-link",
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=705,
+                )
+            )
+            release.set()
+            issue_thread.join(timeout=5.0)
+
+            self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
+            self.assertEqual(len(errors), 1)
+            message = str(errors[0])
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("github linkage is already linked", message)
+            self.assertIn("github.issue_number=705", message)
+            self.assertIn("GitHub issue was created: #705", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertIn("--epic epic-local-00001", message)
+            self.assertIn("--github-issue 705", message)
+            self.assertIn("close/cleanup", message)
+            self.assertEqual(events, [])
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertFalse((epic_dir / "issues" / "iss-00705-refresh-token").exists())
+
+    def test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([703])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "token=holder\npid=222\nuser=lock-holder\ncreated_unix=9999999999\ncreated_iso=2099-01-01\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.005",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #703") as raised:
+                    app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_remote_only_fail", message)
+            self.assertIn("create lock acquisition failed", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertIn("--epic epic-local-00001", message)
+            self.assertIn("--github-issue 703", message)
+            self.assertIn("close/cleanup", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
+            self.assertFalse((epic_dir / "issues").exists())
+            self.assertTrue(lock_path.exists())
+
+    def test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([704])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
+                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #704") as raised:
+                    app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_local_write_fail", message)
+            self.assertIn("simulated write failure", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertIn("--epic epic-local-00001", message)
+            self.assertIn("--github-issue 704", message)
+            self.assertIn("close/cleanup", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
+
+    def test_issue_create_partial_copy_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        class _PartialCopyFailureTemplateScaffolder(_StubTemplateScaffolder):
+            def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
+                self.events.append("copy_scaffolded_tree")
+                created = []
+                for src_path in sorted(src_dir.rglob("*"), key=lambda p: p.as_posix()):
+                    if src_path.is_dir():
+                        continue
+                    rel = src_path.relative_to(src_dir)
+                    dest_path = dest_dir / rel
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    text = src_path.read_text(encoding="utf-8")
+                    dest_path.write_text(self.render_text(text, replacements), encoding="utf-8")
+                    created.append(dest_path)
+                    raise RuntimeError("simulated partial copy failure")
+                return created
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([712])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+                template_scaffolder=_PartialCopyFailureTemplateScaffolder(events=events),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #712") as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_local_write_fail", message)
+            self.assertIn("simulated partial copy failure", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00712-refresh-token").exists())
+            self.assertFalse((epic_dir / "issues" / "iss-00712-refresh-token" / ".meta.json").exists())
+
+    def test_issue_create_meta_write_failure_after_github_create_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        class _MetaWriteFailureNodeRepo(_StubNodeRepo):
+            def write_meta(self, dest_dir, record):
+                self.events.append("write_meta")
+                del dest_dir, record
+                raise RuntimeError("simulated write_meta failure")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([713])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+                node_repo=_MetaWriteFailureNodeRepo(records, events=events),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #713") as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_local_write_fail", message)
+            self.assertIn("simulated write_meta failure", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00713-refresh-token" / "README.md").exists())
+            self.assertFalse((epic_dir / "issues" / "iss-00713-refresh-token" / ".meta.json").exists())
+
+    def test_import_partial_write_failure_reports_doctor_first_guidance(self) -> None:
+        app_contracts, app_create_node, app_import_node, app_ports, domain_models, infra_contracts = _runtime_modules_import()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            for node_dir in (init_dir, epic_dir):
+                node_dir.mkdir(parents=True, exist_ok=True)
+                (node_dir / ".meta.json").write_text("{}\n", encoding="utf-8")
+                for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+                    (node_dir / name).write_text(f"{name}\n", encoding="utf-8")
+            issue_gateway = _StubImportIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            with patch.object(
+                app_import_node,
+                "execute_create_plan",
+                side_effect=app_create_node.CreatePlanExecutionError(
+                    phase="scaffold_copied",
+                    message="simulated import partial write",
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Outcome: import_local_write_fail") as raised:
+                    app_import_node.import_issue(
+                        app_contracts.ImportNodeRequest(
+                            issue_number=714,
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("simulated import partial write", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn("local node `iss-00714`", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn("Recovery: rerun", message)
+
+    def test_issue_create_cleanup_failure_after_local_write_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([708])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            original_unlink = app_create_node.Path.unlink
+
+            def _unlink_with_failure(path_self, *args, **kwargs):
+                if path_self == lock_path:
+                    raise OSError("permission denied")
+                return original_unlink(path_self, *args, **kwargs)
+
+            with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "Outcome: post_github_local_write_success_cleanup_fail",
+                ) as raised:
+                    app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("GitHub issue was created: #708", message)
+            self.assertIn("create lock release failed", message)
+            self.assertIn("Create may already have succeeded", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn("local node `iss-00708`", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00708-refresh-token" / ".meta.json").exists())
+
+    def test_issue_create_body_and_cleanup_failure_keeps_outcome_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([709])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            original_unlink = app_create_node.Path.unlink
+
+            def _unlink_with_failure(path_self, *args, **kwargs):
+                if path_self == lock_path:
+                    raise OSError("permission denied")
+                return original_unlink(path_self, *args, **kwargs)
+
+            with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated write failure")):
+                with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                    with self.assertRaisesRegex(RuntimeError, "Outcome: post_github_body_and_cleanup_fail") as raised:
+                        app_create_node.create_issue(
+                            app_contracts.CreateNodeRequest(
+                                title="Refresh token",
+                                slug=None,
+                                parent_id="epic-local-00001",
+                                requested_node_id=None,
+                                github_mode="create",
+                                github_issue_number=None,
+                            ),
+                            ports,
+                        )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Primary local failure: simulated write failure", message)
+            self.assertIn("Cleanup failure: create lock release failed", message)
+            self.assertIn("GitHub issue was created: #709", message)
+            self.assertIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertIn("--epic epic-local-00001", message)
+            self.assertIn("--github-issue 709", message)
+            self.assertIn("close/cleanup", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
+            self.assertFalse((epic_dir / "issues" / "iss-00709-refresh-token").exists())
+
+    def test_issue_create_post_write_guard_failure_after_local_write_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([711])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            with patch.object(
+                app_create_node,
+                "_post_write_duplicate_guard",
+                side_effect=RuntimeError("simulated post-write duplicate guard failure"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Outcome: post_github_local_write_fail") as raised:
+                    app_create_node.create_issue(
+                        app_contracts.CreateNodeRequest(
+                            title="Refresh token",
+                            slug=None,
+                            parent_id="epic-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("simulated post-write duplicate guard failure", message)
+            self.assertIn("GitHub issue was created: #711", message)
+            self.assertIn("Create may already have succeeded", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn("local node `iss-00711`", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertNotIn("close/cleanup", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00711-refresh-token" / ".meta.json").exists())
+
+    def test_issue_create_post_write_guard_and_cleanup_failure_reports_doctor_first_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([710])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            original_unlink = app_create_node.Path.unlink
+
+            def _unlink_with_failure(path_self, *args, **kwargs):
+                if path_self == lock_path:
+                    raise OSError("permission denied")
+                return original_unlink(path_self, *args, **kwargs)
+
+            with patch.object(
+                app_create_node,
+                "_post_write_duplicate_guard",
+                side_effect=RuntimeError("simulated post-write duplicate guard failure"),
+            ):
+                with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                    with self.assertRaisesRegex(RuntimeError, "Outcome: post_github_body_and_cleanup_fail") as raised:
+                        app_create_node.create_issue(
+                            app_contracts.CreateNodeRequest(
+                                title="Refresh token",
+                                slug=None,
+                                parent_id="epic-local-00001",
+                                requested_node_id=None,
+                                github_mode="create",
+                                github_issue_number=None,
+                            ),
+                            ports,
+                        )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Primary local failure: simulated post-write duplicate guard failure", message)
+            self.assertIn("Cleanup failure: create lock release failed", message)
+            self.assertIn("GitHub issue was created: #710", message)
+            self.assertIn("Create may already have succeeded", message)
+            self.assertIn("Do not rerun blindly", message)
+            self.assertIn("local node `iss-00710`", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertNotIn(f"{runtime_cmd} new issue --title 'Refresh token'", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertTrue((epic_dir / "issues" / "iss-00710-refresh-token" / ".meta.json").exists())
+
+    def test_issue_create_pure_input_validation_fails_before_github_create(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            cases = [
+                (
+                    "requested-id-with-github-mode",
+                    {
+                        "requested_node_id": "iss-local-00100",
+                        "parent_id": "epic-local-00001",
+                    },
+                    "Cannot combine '--id' with GitHub mode",
+                ),
+                (
+                    "missing-epic",
+                    {
+                        "requested_node_id": None,
+                        "parent_id": None,
+                    },
+                    "--epic is required",
+                ),
+                (
+                    "partial-repo-identity",
+                    {
+                        "requested_node_id": None,
+                        "parent_id": "epic-local-00001",
+                        "github_repo_owner": "chemitaro",
+                        "github_repo_name": None,
+                    },
+                    "github_repo_owner and github_repo_name must be provided together",
+                ),
+            ]
+            for case_name, overrides, expected_error in cases:
+                with self.subTest(case=case_name):
+                    issue_gateway = _StubIssueGateway([799])
+                    ports = self._ports(
+                        app_ports,
+                        specdock_dir=specdock_dir,
+                        records=records,
+                        events=events,
+                        issue_gateway=issue_gateway,
+                    )
+                    request_kwargs = {
+                        "title": "Refresh token",
+                        "slug": None,
+                        "parent_id": "epic-local-00001",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                        "github_repo_owner": None,
+                        "github_repo_name": None,
+                    }
+                    request_kwargs.update(overrides)
+                    with self.assertRaisesRegex(RuntimeError, expected_error) as raised:
+                        app_create_node.create_issue(
+                            app_contracts.CreateNodeRequest(**request_kwargs),
+                            ports,
+                        )
+                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
+                    self.assertEqual(issue_gateway.calls, [])
+
+    def test_issue_create_gateway_failure_is_pre_github_fail_without_created_issue_hint(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+
+            class _IssueCreateFailureGateway(_StubIssueGateway):
+                def issue_create(self, repo_root, title, body):
+                    self.calls.append((str(repo_root), title, body))
+                    raise RuntimeError("simulated issue_create failure")
+
+            issue_gateway = _IssueCreateFailureGateway([799])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+            with self.assertRaisesRegex(RuntimeError, "simulated issue_create failure") as raised:
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+
+            self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+            self.assertNotIn("GitHub issue was created:", str(raised.exception))
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
+
+    def test_github_create_parent_precheck_fails_before_github_create(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            cases = [
+                (
+                    "epic-missing-initiative",
+                    app_create_node.create_epic,
+                    {
+                        "title": "JWT auth",
+                        "slug": None,
+                        "parent_id": "init-local-99999",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                    "Initiative not found: init-local-99999",
+                ),
+                (
+                    "issue-missing-epic",
+                    app_create_node.create_issue,
+                    {
+                        "title": "Refresh token",
+                        "slug": None,
+                        "parent_id": "epic-local-99999",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                    "Epic not found: epic-local-99999",
+                ),
+            ]
+            for case_name, create_fn, request_kwargs, expected_error in cases:
+                with self.subTest(case=case_name):
+                    issue_gateway = _StubIssueGateway([798])
+                    ports = self._ports(
+                        app_ports,
+                        specdock_dir=specdock_dir,
+                        records=records,
+                        events=events,
+                        issue_gateway=issue_gateway,
+                    )
+                    with self.assertRaisesRegex(RuntimeError, expected_error) as raised:
+                        create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
+                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
+                    self.assertEqual(issue_gateway.calls, [])
+
+    def test_github_create_graph_preflight_fails_before_github_create_for_initiative(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+
+            init_a = specdock_dir / "initiatives" / "init-local-00001-auth-platform-a"
+            init_b = specdock_dir / "initiatives" / "init-local-00001-auth-platform-b"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform A",
+                    path=init_a,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform B",
+                    path=init_b,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+
+            issue_gateway = _StubIssueGateway([797])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+            with self.assertRaisesRegex(RuntimeError, "(?i)duplicate id") as raised:
+                app_create_node.create_initiative(
+                    app_contracts.CreateNodeRequest(
+                        title="Payments",
+                        slug=None,
+                        parent_id=None,
+                        requested_node_id=None,
+                        github_mode="create",
+                        github_issue_number=None,
+                    ),
+                    ports,
+                )
+            self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+            self.assertNotIn("GitHub issue was created:", str(raised.exception))
+            self.assertEqual(issue_gateway.calls, [])
+
+    def test_initiative_and_epic_post_create_failures_report_retry_link_guidance(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events: list[str] = []
+            issue_gateway = _StubIssueGateway([706])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "token=holder\npid=222\nuser=lock-holder\ncreated_unix=9999999999\ncreated_iso=2099-01-01\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.005",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #706") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_remote_only_fail", message)
+            self.assertIn("create lock acquisition failed", message)
+            self.assertIn(f"{runtime_cmd} new initiative --title 'Auth platform'", message)
+            self.assertIn("--github-issue 706", message)
+            self.assertIn("close/cleanup", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events = []
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            issue_gateway = _StubIssueGateway([707])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                events=events,
+                issue_gateway=issue_gateway,
+            )
+
+            with patch.object(app_create_node, "execute_create_plan", side_effect=RuntimeError("simulated epic write failure")):
+                with self.assertRaisesRegex(RuntimeError, "GitHub issue was created: #707") as raised:
+                    app_create_node.create_epic(
+                        app_contracts.CreateNodeRequest(
+                            title="JWT auth",
+                            slug=None,
+                            parent_id="init-local-00001",
+                            requested_node_id=None,
+                            github_mode="create",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("Outcome: post_github_local_write_fail", message)
+            self.assertIn("simulated epic write failure", message)
+            self.assertIn(f"{runtime_cmd} new epic --title 'JWT auth'", message)
+            self.assertIn("--initiative init-local-00001", message)
+            self.assertIn("--github-issue 707", message)
+            self.assertIn("close/cleanup", message)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(events, [])
+
+    def test_create_lock_contention_timeout_is_no_write_and_reports_metadata(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "token=holder\npid=222\nuser=lock-holder\ncreated_unix=9999999999\ncreated_iso=2099-01-01\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.02",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.005",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "3600",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "create lock acquisition failed") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("wait_s=", message)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("user=lock-holder", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertEqual(events, [])
+            self.assertFalse((specdock_dir / "initiatives").exists())
+            self.assertTrue(lock_path.exists())
+
+    def test_create_lock_stale_is_no_write_and_reports_metadata(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "token=stale-holder\npid=333\nuser=stale-holder\ncreated_unix=0\ncreated_iso=1970-01-01\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    app_create_node._ENV_CREATE_LOCK_WAIT_SECONDS: "0.2",
+                    app_create_node._ENV_CREATE_LOCK_POLL_SECONDS: "0.01",
+                    app_create_node._ENV_CREATE_LOCK_STALE_SECONDS: "0",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "create lock acquisition failed") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn("stale=true", message)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("created_iso=1970-01-01", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertEqual(events, [])
+            self.assertFalse((specdock_dir / "initiatives").exists())
+            self.assertTrue(lock_path.exists())
+
+    def test_create_lock_metadata_write_failure_cleans_orphan_lock(self) -> None:
+        _runtime_app, _app_contracts, app_create_node, _app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+
+            def _raise_write_failure(fd, _payload):
+                os.close(fd)
+                raise OSError("disk full")
+
+            with patch.object(app_create_node, "_write_create_lock_payload", side_effect=_raise_write_failure):
+                with self.assertRaisesRegex(RuntimeError, "create lock metadata write failed") as raised:
+                    app_create_node._acquire_create_lock(specdock_dir)
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn("cleanup_unlink=ok", message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertFalse(lock_path.exists())
+
+    def test_create_fails_when_release_unlink_fails(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[])
+
+            lock_path = app_create_node._resolve_create_lock_path(specdock_dir)
+            original_unlink = app_create_node.Path.unlink
+
+            def _unlink_with_failure(path_self, missing_ok=False):
+                if path_self == lock_path:
+                    raise OSError("permission denied")
+                return original_unlink(path_self, missing_ok=missing_ok)
+
+            with patch.object(app_create_node.Path, "unlink", new=_unlink_with_failure):
+                with self.assertRaisesRegex(RuntimeError, "create lock release failed") as raised:
+                    app_create_node.create_initiative(
+                        app_contracts.CreateNodeRequest(
+                            title="Auth platform",
+                            slug=None,
+                            parent_id=None,
+                            requested_node_id=None,
+                            github_mode="local_only",
+                            github_issue_number=None,
+                        ),
+                        ports,
+                    )
+
+            message = str(raised.exception)
+            runtime_cmd = _quoted_runtime_entrypoint(specdock_dir)
+            self.assertIn(lock_path.as_posix(), message)
+            self.assertIn(f"{runtime_cmd} doctor", message)
+            self.assertTrue((specdock_dir / "initiatives").exists())
+            self.assertTrue(lock_path.exists())
+
     def test_github_mode_default_no_side_effect_matrix(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -450,12 +2243,14 @@ class TestRuntimeNewS08(unittest.TestCase):
 
             calls = []
             original_execute = app_create_node.execute_create_plan
+            original_guard = app_create_node._post_write_duplicate_guard
 
             def _fake_execute(plan, ports_arg):
                 calls.append((plan.meta.id, ports_arg))
                 return [plan.dest_dir / "README.md", plan.dest_dir / ".meta.json"]
 
             app_create_node.execute_create_plan = _fake_execute
+            app_create_node._post_write_duplicate_guard = lambda _ports_arg, *, node_id: None
             try:
                 result = app_create_node.create_initiative(
                     app_contracts.CreateNodeRequest(
@@ -470,6 +2265,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 )
             finally:
                 app_create_node.execute_create_plan = original_execute
+                app_create_node._post_write_duplicate_guard = original_guard
 
             self.assertEqual(len(calls), 1)
             self.assertEqual(result.created_paths[-1].name, ".meta.json")

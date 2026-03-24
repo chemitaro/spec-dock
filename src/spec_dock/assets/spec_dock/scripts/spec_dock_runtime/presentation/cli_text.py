@@ -7,6 +7,7 @@ from ..application.contracts import (
     CreateDiscussionDocResult,
     CreateNodeResult,
     DepsCheckResult,
+    DoctorResult,
     ImportNodeResult,
     SyncCommandResult,
     ValidationResult,
@@ -25,6 +26,27 @@ def render_validate_text(result: ValidationResult) -> CliText:
         stdout_lines=[f"spec-dock: ok (validate) nodes={result.checked_node_count}"],
         stderr_lines=[],
         warnings=result.report.warnings,
+    )
+
+
+def render_doctor_text(result: DoctorResult) -> CliText:
+    if result.ok:
+        return CliText(
+            stdout_lines=["spec-dock: ok (doctor) findings=0"],
+            stderr_lines=[],
+            warnings=list(result.warnings),
+        )
+
+    stderr_lines = [f"spec-dock: doctor: findings={len(result.findings)}"]
+    for finding in result.findings:
+        stderr_lines.append(f"- [{finding.code}] {finding.message}")
+        for guidance in finding.guidance:
+            stderr_lines.append(f"  -> {guidance}")
+
+    return CliText(
+        stdout_lines=[],
+        stderr_lines=stderr_lines,
+        warnings=list(result.warnings),
     )
 
 
@@ -94,17 +116,38 @@ def render_import_text(result: ImportNodeResult) -> CliText:
 
 def render_deps_check_text(result: DepsCheckResult) -> CliText:
     target_id = result.inspection.target_id.value
+    target_status = result.inspection.issue_statuses.get(target_id)
+    authority = target_status.authority if target_status is not None else "unknown"
+    effective_status = target_status.effective_status if target_status is not None else "unknown"
+    source = target_status.source if target_status is not None else "unknown"
+    stale = "true" if (target_status.stale if target_status is not None else True) else "false"
+    last_sync_at = target_status.last_sync_at if target_status is not None else None
+    last_sync_display = last_sync_at if isinstance(last_sync_at, str) and last_sync_at.strip() else "-"
     blockers = list(result.inspection.evaluation.blockers)
     if result.inspection.evaluation.ready:
         return CliText(
-            stdout_lines=[f"spec-dock: ok (deps check) target={target_id} ready=true blockers=0"],
+            stdout_lines=[
+                (
+                    "spec-dock: ok (deps check) "
+                    f"target={target_id} "
+                    f"authority={authority} effective_status={effective_status} "
+                    f"source={source} stale={stale} last_sync_at={last_sync_display} "
+                    "ready=true blockers=0"
+                )
+            ],
             stderr_lines=[],
             warnings=list(result.warnings),
         )
     return CliText(
         stdout_lines=[],
         stderr_lines=[
-            f"spec-dock: blocked (deps check) target={target_id} ready=false blockers={len(blockers)}",
+            (
+                "spec-dock: blocked (deps check) "
+                f"target={target_id} "
+                f"authority={authority} effective_status={effective_status} "
+                f"source={source} stale={stale} last_sync_at={last_sync_display} "
+                f"ready=false blockers={len(blockers)}"
+            ),
             *[f"- {blocker}" for blocker in blockers],
         ],
         warnings=list(result.warnings),
@@ -125,7 +168,11 @@ def render_active_show_text(result: ActiveViewResult) -> CliText:
         and result.issue.id is None
     )
     if all_none:
-        stdout_lines = ["spec-dock: active: (not set)"]
+        stdout_lines = [
+            "spec-dock: active: (not set)",
+            "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}",
+            "next: spec-dock/scripts/spec-dock active set <target>",
+        ]
     else:
         stdout_lines = [
             f"initiative: {_format_entry(result.initiative.id, result.initiative.path)}",

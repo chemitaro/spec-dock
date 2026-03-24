@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
+from typing import Literal
 
 from .clock import now_iso
 from .contracts import StoredMetaRecord
@@ -12,6 +15,14 @@ from .json_store import load_json, write_json
 _INITIATIVES_DIRNAME = "initiatives"
 _META_FILENAME = ".meta.json"
 _LEGACY_META_FILENAME = "meta.json"
+_NODE_DIRNAME_PATTERNS: dict[str, re.Pattern[str]] = {
+    "initiative": re.compile(r"^(?P<id>init(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    "epic": re.compile(r"^(?P<id>epic(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    "issue": re.compile(r"^(?P<id>iss(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*$"),
+}
+_CREATE_LOCK_RELATIVE_PATH = Path("system") / ".runtime" / "create.lock"
+_ENV_CREATE_LOCK_STALE_SECONDS = "SPEC_DOCK_CREATE_LOCK_STALE_SECONDS"
+_DEFAULT_CREATE_LOCK_STALE_SECONDS = 600.0
 
 
 def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
@@ -47,6 +58,170 @@ def _find_legacy_meta_paths(initiatives_root: Path) -> list[Path]:
     return sorted(initiatives_root.rglob(_LEGACY_META_FILENAME), key=lambda p: p.as_posix())
 
 
+def _sorted_child_dirs(path: Path) -> list[Path]:
+    if not path.exists():
+        return []
+    return sorted((p for p in path.iterdir() if p.is_dir()), key=lambda p: p.as_posix())
+
+
+def _parse_node_id_from_dirname(kind: str, dirname: str) -> str | None:
+    pattern = _NODE_DIRNAME_PATTERNS[kind]
+    matched = pattern.fullmatch(dirname)
+    if matched is None:
+        return None
+    return str(matched.group("id"))
+
+
+def _iter_expected_node_dirs(initiatives_root: Path) -> list[tuple[str, str, Path]]:
+    rows: list[tuple[str, str, Path]] = []
+    for initiative_dir in _sorted_child_dirs(initiatives_root):
+        initiative_id = _parse_node_id_from_dirname("initiative", initiative_dir.name)
+        if initiative_id is None:
+            continue
+        rows.append(("initiative", initiative_id, initiative_dir))
+
+        epics_root = initiative_dir / "epics"
+        for epic_dir in _sorted_child_dirs(epics_root):
+            epic_id = _parse_node_id_from_dirname("epic", epic_dir.name)
+            if epic_id is None:
+                continue
+            rows.append(("epic", epic_id, epic_dir))
+
+            issues_root = epic_dir / "issues"
+            for issue_dir in _sorted_child_dirs(issues_root):
+                issue_id = _parse_node_id_from_dirname("issue", issue_dir.name)
+                if issue_id is None:
+                    continue
+                rows.append(("issue", issue_id, issue_dir))
+    return rows
+
+
+def _meta_path_for_output(meta_path: Path, *, repo_root: Path) -> str:
+    try:
+        return meta_path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return meta_path.as_posix()
+
+
+def _parse_create_lock_metadata_text(text: str) -> dict[str, str]:
+    meta: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        normalized_key = key.strip()
+        if not normalized_key:
+            continue
+        meta[normalized_key] = value.strip()
+    return meta
+
+
+def _read_create_lock_metadata(lock_path: Path) -> tuple[dict[str, str], str]:
+    try:
+        text = lock_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return {}, f"unreadable={exc}"
+    meta = _parse_create_lock_metadata_text(text)
+    if not meta:
+        stripped = text.strip()
+        if stripped:
+            return {}, f"raw={stripped}"
+        return {}, "empty"
+    fields = []
+    for key in ("pid", "user", "created_unix", "created_iso"):
+        if key in meta:
+            fields.append(f"{key}={meta[key]}")
+    if not fields:
+        fields = [f"{key}={value}" for key, value in sorted(meta.items())]
+    return meta, ", ".join(fields)
+
+
+def _resolve_create_lock_stale_after_seconds() -> tuple[float, str | None]:
+    raw = os.environ.get(_ENV_CREATE_LOCK_STALE_SECONDS)
+    if raw is None or not raw.strip():
+        return (_DEFAULT_CREATE_LOCK_STALE_SECONDS, None)
+    try:
+        value = float(raw)
+    except ValueError:
+        return (_DEFAULT_CREATE_LOCK_STALE_SECONDS, f"invalid_env={_ENV_CREATE_LOCK_STALE_SECONDS}:{raw!r}")
+    if value < 0:
+        return (_DEFAULT_CREATE_LOCK_STALE_SECONDS, f"invalid_env={_ENV_CREATE_LOCK_STALE_SECONDS}:{value}")
+    return (value, None)
+
+
+def _parse_created_unix(meta: dict[str, str]) -> float | None:
+    raw = str(meta.get("created_unix", "")).strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _classify_create_lock_state(specdock_dir: Path) -> tuple[Literal["absent", "in_progress", "stale_create_lock"], str]:
+    lock_path = specdock_dir / _CREATE_LOCK_RELATIVE_PATH
+    if not lock_path.exists():
+        return ("absent", f"path={lock_path} present=false")
+    if not lock_path.is_file():
+        return ("stale_create_lock", f"path={lock_path} stale=unknown reason=not_regular_file")
+
+    meta, summary = _read_create_lock_metadata(lock_path)
+    stale_after_seconds, stale_threshold_issue = _resolve_create_lock_stale_after_seconds()
+    required = ("token", "pid", "user", "created_unix")
+    missing = [key for key in required if not str(meta.get(key, "")).strip()]
+    if missing:
+        return (
+            "stale_create_lock",
+            f"path={lock_path} stale=unknown reason=missing_fields={','.join(missing)} lock_meta=[{summary}]",
+        )
+    if stale_threshold_issue is not None:
+        return (
+            "stale_create_lock",
+            f"path={lock_path} stale=unknown reason={stale_threshold_issue} lock_meta=[{summary}]",
+        )
+
+    created_unix = _parse_created_unix(meta)
+    if created_unix is None:
+        return (
+            "stale_create_lock",
+            f"path={lock_path} stale=unknown reason=invalid_created_unix lock_meta=[{summary}]",
+        )
+
+    stale = (time.time() - created_unix) >= stale_after_seconds
+    if stale:
+        return ("stale_create_lock", f"path={lock_path} stale=true lock_meta=[{summary}]")
+    return ("in_progress", f"path={lock_path} stale=false lock_meta=[{summary}]")
+
+
+def _ensure_expected_node_meta_present(*, specdock_dir: Path, initiatives_root: Path) -> None:
+    repo_root = specdock_dir.parent
+    lock_state, lock_summary = _classify_create_lock_state(specdock_dir)
+    for kind, node_id, node_dir in _iter_expected_node_dirs(initiatives_root):
+        meta_path = node_dir / _META_FILENAME
+        if meta_path.is_file():
+            continue
+        artifact_path = _meta_path_for_output(meta_path, repo_root=repo_root)
+        if lock_state == "in_progress":
+            raise RuntimeError(
+                "Create in-progress state detected: "
+                f"kind={kind} id={node_id} artifact={artifact_path} lock={lock_summary}. "
+                "Wait for create completion or run `spec-dock/scripts/spec-dock doctor`."
+            )
+        if lock_state == "stale_create_lock":
+            raise RuntimeError(
+                "Stale create-lock state detected: "
+                f"kind={kind} id={node_id} artifact={artifact_path} lock={lock_summary}. "
+                "Confirm no active create process, repair lock state, then run `spec-dock/scripts/spec-dock doctor`."
+            )
+        raise RuntimeError(
+            "Missing required artifact: "
+            f"kind={kind} id={node_id} "
+            f"artifact={artifact_path} "
+            "(restore .meta.json for this node directory)"
+        )
+
+
 def ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
     initiatives_root = _initiatives_root(specdock_dir)
     if not initiatives_root.exists():
@@ -66,6 +241,7 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
     initiatives_root = _initiatives_root(specdock_dir)
     if not initiatives_root.exists():
         return []
+    _ensure_expected_node_meta_present(specdock_dir=specdock_dir, initiatives_root=initiatives_root)
 
     records: list[StoredMetaRecord] = []
     seen_ids: set[str] = set()
@@ -85,14 +261,41 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
         seen_ids.add(node_id)
 
         github_issue_number: int | None = None
+        github_repo_owner: str | None = None
+        github_repo_name: str | None = None
         github = meta.get("github")
-        if isinstance(github, dict) and github.get("issue_number") is not None:
-            try:
-                github_issue_number = int(github.get("issue_number"))
-            except (TypeError, ValueError) as exc:
-                raise RuntimeError(
-                    f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}"
-                ) from exc
+        if isinstance(github, dict):
+            if github.get("issue_number") is not None:
+                try:
+                    github_issue_number = int(github.get("issue_number"))
+                except (TypeError, ValueError) as exc:
+                    raise RuntimeError(
+                        f"Invalid github.issue_number in {meta_path}: {github.get('issue_number')}"
+                    ) from exc
+
+            owner_raw = github.get("repo_owner")
+            name_raw = github.get("repo_name")
+            if owner_raw is not None or name_raw is not None:
+                if owner_raw is None or name_raw is None:
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required"
+                    )
+                if not isinstance(owner_raw, str) or not isinstance(name_raw, str):
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: both fields must be strings"
+                    )
+                owner = owner_raw.strip().lower()
+                name = name_raw.strip().lower()
+                if not owner or not name:
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: empty value is not allowed"
+                    )
+                if github_issue_number is None:
+                    raise RuntimeError(
+                        f"Invalid github.repo_owner/repo_name in {meta_path}: github.issue_number is required"
+                    )
+                github_repo_owner = owner
+                github_repo_name = name
 
         records.append(
             StoredMetaRecord(
@@ -106,6 +309,8 @@ def load_node_records(specdock_dir: Path) -> list[StoredMetaRecord]:
                 epic_id=meta.get("epic_id") or None,
                 github_issue_number=github_issue_number,
                 meta_path=meta_path.as_posix(),
+                github_repo_owner=github_repo_owner,
+                github_repo_name=github_repo_name,
             )
         )
     return records
@@ -130,7 +335,15 @@ def _build_meta_payload(record: StoredMetaRecord) -> dict[str, Any]:
         },
     }
     if record.github_issue_number is not None:
-        payload["github"] = {"issue_number": int(record.github_issue_number)}
+        github_payload: dict[str, Any] = {"issue_number": int(record.github_issue_number)}
+        owner = (record.github_repo_owner or "").strip().lower()
+        name = (record.github_repo_name or "").strip().lower()
+        if owner or name:
+            if not owner or not name:
+                raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+            github_payload["repo_owner"] = owner
+            github_payload["repo_name"] = name
+        payload["github"] = github_payload
     return payload
 
 

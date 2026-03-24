@@ -51,6 +51,7 @@ from .github import (
     _gh_issue_index,
     _gh_issue_view_minimal,
 )
+from .infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
 from .domain.models import SpecGraph, SpecNodeSeed
 from .domain.tree import build_graph as _domain_build_graph
 from .domain.validation import (
@@ -1811,7 +1812,97 @@ def _load_deps_json(path: Path) -> dict[str, Any]:
     return {"schema_version": 1, "depends_on": depends_on}
 
 
-def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> str:
+def _normalize_repo_slug_for_deps(owner: str | None, repo: str | None) -> str | None:
+    normalized_owner = str(owner or "").strip().lower()
+    normalized_repo = str(repo or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        return None
+    return f"{normalized_owner}/{normalized_repo}"
+
+
+def _normalize_repo_slug_value_for_deps(slug: str | None) -> str | None:
+    normalized = str(slug or "").strip().lower()
+    if not normalized:
+        return None
+    owner, sep, repo = normalized.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug_for_deps() -> str | None:
+    try:
+        specdock_dir = _find_specdock_dir()
+    except RuntimeError:
+        return None
+    try:
+        raw = _origin_github_repo_slug(specdock_dir.parent)
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value_for_deps(raw)
+
+
+def _find_dep_node_by_github_issue_number(
+    nodes: dict[str, _Node],
+    *,
+    issue_number: int,
+    current_repo_slug: str | None = None,
+) -> _Node:
+    matches = [
+        n
+        for n in nodes.values()
+        if n.github_issue_number == issue_number and n.type in ("initiative", "epic", "issue")
+    ]
+    if not matches:
+        raise RuntimeError(f"No node found for github.issue_number={issue_number}. Create/link the node first.")
+
+    if current_repo_slug is not None:
+        current_scoped = [
+            node
+            for node in matches
+            if (_normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) or current_repo_slug)
+            == current_repo_slug
+        ]
+        if not current_scoped:
+            raise RuntimeError(
+                f"No node found for github.issue_number={issue_number} in current repo scope ({current_repo_slug}). "
+                "Create/link the node first."
+            )
+        if len(current_scoped) > 1:
+            ids = ", ".join(sorted(f"{node.type}:{node.id}" for node in current_scoped))
+            raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
+        return current_scoped[0]
+
+    has_scoped = any(_normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) is not None for node in matches)
+    has_unscoped = any(
+        _normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) is None for node in matches
+    )
+    if has_scoped and has_unscoped:
+        ids = ", ".join(
+            sorted(
+                f"{node.type}:{node.id}"
+                f"[repo={_normalize_repo_slug_for_deps(node.github_repo_owner, node.github_repo_name) or '(current-or-unknown)'}]"
+                for node in matches
+            )
+        )
+        raise RuntimeError(
+            f"Ambiguous github.issue_number={issue_number}: mixed scoped/unscoped linkage (fail-closed): {ids}. "
+            "Configure current repo remote (origin) or normalize linkage scope before retrying."
+        )
+
+    if len(matches) > 1:
+        ids = ", ".join(sorted(f"{m.type}:{m.id}" for m in matches))
+        raise RuntimeError(f"Ambiguous github.issue_number={issue_number}: {ids}")
+    return matches[0]
+
+
+def _resolve_dep_ref(
+    nodes: dict[str, _Node],
+    ref: Any,
+    *,
+    src_path: Path,
+    current_repo_slug: str | None = None,
+) -> str:
     """Resolve a dependency reference into a canonical node id.
 
     Supported ref forms:
@@ -1824,7 +1915,11 @@ def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> st
 
     if isinstance(ref, int):
         try:
-            node = _find_node_by_github_issue_number(nodes, issue_number=int(ref))
+            node = _find_dep_node_by_github_issue_number(
+                nodes,
+                issue_number=int(ref),
+                current_repo_slug=current_repo_slug,
+            )
         except RuntimeError as e:
             raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
         return node.id
@@ -1836,7 +1931,11 @@ def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> st
         if _NUM_RE.fullmatch(raw):
             num = int(raw)
             try:
-                node = _find_node_by_github_issue_number(nodes, issue_number=num)
+                node = _find_dep_node_by_github_issue_number(
+                    nodes,
+                    issue_number=num,
+                    current_repo_slug=current_repo_slug,
+                )
             except RuntimeError as e:
                 raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): {e}") from e
             return node.id
@@ -1857,7 +1956,12 @@ def _resolve_dep_ref(nodes: dict[str, _Node], ref: Any, *, src_path: Path) -> st
     raise RuntimeError(f"Unresolved dependency ref: {ref!r} (in {src_path}): unsupported type: {type(ref).__name__}")
 
 
-def _resolved_direct_depends_on(nodes: dict[str, _Node], node_id: str) -> list[str]:
+def _resolved_direct_depends_on(
+    nodes: dict[str, _Node],
+    node_id: str,
+    *,
+    current_repo_slug: str | None = None,
+) -> list[str]:
     """Return resolved direct dependencies for `node_id` (stable order)."""
     node = nodes.get(node_id)
     if not node:
@@ -1866,7 +1970,12 @@ def _resolved_direct_depends_on(nodes: dict[str, _Node], node_id: str) -> list[s
     deps_path = node.path / "deps.json"
     deps = _load_deps_json(deps_path)
     direct = [
-        _resolve_dep_ref(nodes, ref, src_path=deps_path)
+        _resolve_dep_ref(
+            nodes,
+            ref,
+            src_path=deps_path,
+            current_repo_slug=current_repo_slug,
+        )
         for ref in (deps.get("depends_on") or [])
     ]
 
@@ -1925,12 +2034,17 @@ def _effective_depends_on(
 
 def _build_effective_deps_map_all(nodes: dict[str, _Node]) -> dict[str, list[str]]:
     """Build an effective dependency map for all nodes (sync=global scope)."""
+    current_repo_slug = _resolve_current_repo_slug_for_deps()
     dep_node_ids = sorted(
         node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")
     )
     direct_map: dict[str, list[str]] = {}
     for node_id in dep_node_ids:
-        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+        direct_map[node_id] = _resolved_direct_depends_on(
+            nodes,
+            node_id,
+            current_repo_slug=current_repo_slug,
+        )
 
     effective_map: dict[str, list[str]] = {}
     for node_id in dep_node_ids:
@@ -1961,6 +2075,7 @@ def _issue_ids_for_dep_node(nodes: dict[str, _Node], node_id: str) -> list[str]:
 
 def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[str, list[str]], list[str]]:
     """Compile deps shorthand into canonical issue->issue direct dependencies."""
+    current_repo_slug = _resolve_current_repo_slug_for_deps()
     dep_node_ids = sorted(
         [node_id for node_id, node in nodes.items() if node.type in ("initiative", "epic", "issue")],
         key=_deps_node_sort_key,
@@ -1978,7 +2093,11 @@ def _compile_issue_direct_depends_on_map(nodes: dict[str, _Node]) -> tuple[dict[
             continue
 
         deps_path = src_node.path / "deps.json"
-        direct_dep_node_ids = _resolved_direct_depends_on(nodes, src_id)
+        direct_dep_node_ids = _resolved_direct_depends_on(
+            nodes,
+            src_id,
+            current_repo_slug=current_repo_slug,
+        )
 
         for dep_node_id in direct_dep_node_ids:
             dep_issue_ids = _issue_ids_for_dep_node(nodes, dep_node_id)
@@ -2165,13 +2284,18 @@ def _build_reachable_effective_deps_map(nodes: dict[str, _Node], start_id: str) 
     if start_id not in nodes:
         raise RuntimeError(f"Node not found: {start_id}")
 
+    current_repo_slug = _resolve_current_repo_slug_for_deps()
     direct_map: dict[str, list[str]] = {}
     effective_map: dict[str, list[str]] = {}
 
     def ensure_direct(node_id: str) -> None:
         if node_id in direct_map:
             return
-        direct_map[node_id] = _resolved_direct_depends_on(nodes, node_id)
+        direct_map[node_id] = _resolved_direct_depends_on(
+            nodes,
+            node_id,
+            current_repo_slug=current_repo_slug,
+        )
 
     def get_effective(node_id: str) -> list[str]:
         cached = effective_map.get(node_id)

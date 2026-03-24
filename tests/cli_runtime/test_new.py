@@ -731,11 +731,12 @@ class TestCliNew(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             self.assertTrue((init_dir / ".meta.json").is_file())
 
-    def test_new_initiative_and_epic_github_flags_are_mutually_exclusive(self) -> None:
+    def test_new_github_flags_are_mutually_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth"])
 
             p1 = self._run_runtime_capture(
                 target,
@@ -799,6 +800,84 @@ class TestCliNew(CliRuntimeHarness):
             )
             self.assertEqual(p4.returncode, 2, p4.stdout + p4.stderr)
             self.assertIn("not allowed with argument", p4.stderr)
+
+            p5 = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "1",
+                    "--title",
+                    "Issue 1",
+                    "--create-github-issue",
+                    "--github-issue",
+                    "123",
+                ],
+            )
+            self.assertEqual(p5.returncode, 2, p5.stdout + p5.stderr)
+            self.assertIn("not allowed with argument", p5.stderr)
+
+            p6 = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "1",
+                    "--title",
+                    "Issue 2",
+                    "--create-github-issue",
+                    "--no-github",
+                ],
+            )
+            self.assertEqual(p6.returncode, 2, p6.stdout + p6.stderr)
+            self.assertIn("not allowed with argument", p6.stderr)
+
+    def test_new_issue_create_github_issue_flag_alias_is_accepted(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
+                "  echo \"https://github.com/example/repo/issues/123\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo \"unexpected gh args: $@\" >&2\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--create-github-issue"],
+                env=test_env,
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-add-refresh-token"
+            )
+            self.assertTrue(issue_dir.is_dir())
 
     def test_new_issue_can_create_github_issue_and_use_its_number(self) -> None:
         if os.name == "nt":

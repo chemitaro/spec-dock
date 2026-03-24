@@ -105,16 +105,20 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 
 ```bash
 ./spec-dock/scripts/spec-dock active show
-./spec-dock/scripts/spec-dock active set 123          # GitHub issue number（checkout + active + sync）
-./spec-dock/scripts/spec-dock active set iss-00123     # node id（issue）
-./spec-dock/scripts/spec-dock active set epic-00123    # node id（epic）
-./spec-dock/scripts/spec-dock active set init-00123    # node id（initiative）
+./spec-dock/scripts/spec-dock active set 123
+./spec-dock/scripts/spec-dock active set --github-issue 123
+./spec-dock/scripts/spec-dock active set iss-00123
+./spec-dock/scripts/spec-dock active set --id iss-00123
+./spec-dock/scripts/spec-dock active set epic-00123
+./spec-dock/scripts/spec-dock active set init-00123
 ./spec-dock/scripts/spec-dock active clear
 ```
 
 - `active` は生成物（gitignore）で、**「いま触る対象」の入口**だけを提供する。
 - エージェントは `spec-dock/active/context-pack.md` を入口にする。
-- GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set` した場合、`active set` は checkout も行う。
+- `active set` のデフォルトは no-checkout。checkout が必要な場合だけ `--checkout` を付ける。
+- `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える。
+- GitHub Issue に紐づくノード（`github.issue_number` があるノード）を `active set --checkout` した場合は checkout も行う。
 - active が未設定のレイヤーは placeholder（`spec-dock/system/active-none/**`）へ向く。
   - placeholder は編集対象外（best-effortで read-only）
 

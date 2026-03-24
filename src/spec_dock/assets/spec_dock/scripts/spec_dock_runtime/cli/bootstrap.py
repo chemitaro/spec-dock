@@ -8,6 +8,7 @@ from ..application.create_node import create_discussion_doc as application_creat
 from ..application.create_node import create_epic as application_create_epic
 from ..application.create_node import create_initiative as application_create_initiative
 from ..application.create_node import create_issue as application_create_issue
+from ..application.doctor import doctor as application_doctor
 from ..application.contracts import UseCases
 from ..application.import_node import import_epic as application_import_epic
 from ..application.import_node import import_initiative as application_import_initiative
@@ -72,6 +73,9 @@ class _DerivedStateReader:
     def load_cached_issue_status_by_id(self, specdock_dir: Path) -> dict[str, str]:
         return infra_derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
 
+    def load_cached_issue_last_sync_at_by_id(self, specdock_dir: Path) -> dict[str, str | None]:
+        return infra_derived_state_reader.load_cached_issue_last_sync_at_by_id(specdock_dir)
+
 
 @dataclass(frozen=True)
 class _IssueGateway:
@@ -81,8 +85,19 @@ class _IssueGateway:
     def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         return infra_github_cli.issue_create(repo_root, title=title, body=body)
 
-    def issue_view_minimal(self, repo_root: Path, issue_number: int):
-        return infra_github_cli.issue_view_minimal(repo_root, issue_number=issue_number)
+    def issue_view_minimal(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
+        return infra_github_cli.issue_view_minimal(
+            repo_root,
+            issue_number=issue_number,
+            repo_slug=repo_slug,
+        )
+
+    def issue_view_snapshot(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
+        return infra_github_cli.issue_view_snapshot(
+            repo_root,
+            issue_number=issue_number,
+            repo_slug=repo_slug,
+        )
 
 
 @dataclass(frozen=True)
@@ -137,6 +152,9 @@ class _GitGateway:
 
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.check_ref_format_branch(repo_root, branch)
+
+    def origin_github_repo_slug(self, repo_root: Path) -> str | None:
+        return infra_git_cli.origin_github_repo_slug(repo_root)
 
 
 @dataclass(frozen=True)
@@ -193,5 +211,6 @@ def build_runtime(specdock_dir: Path) -> BootstrapContext:
         sync=lambda req: application_sync(req, ports),
         check_deps=lambda req: application_check_deps(req, ports),
         validate_tree=lambda req: application_validate_tree(req, ports),
+        doctor=lambda req: application_doctor(req, ports),
     )
     return BootstrapContext(use_cases=use_cases)

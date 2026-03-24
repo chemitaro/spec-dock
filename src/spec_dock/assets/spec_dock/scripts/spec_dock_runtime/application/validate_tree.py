@@ -3,12 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from ..domain.models import SpecNodeKind, SpecNodeSeed
+from ..domain.models import SpecNodeKind, SpecNodeSeed, ValidationReport
 from ..domain.tree import build_graph
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import StoredMetaRecord
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import ValidateTreeRequest, ValidationResult
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -23,6 +25,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -41,5 +45,15 @@ def validate_tree(req: ValidateTreeRequest, ports: Ports) -> ValidationResult:
         topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
         issue_depends_on_map = dict(topology.issue_depends_on_map)
 
-    report = validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
+    report = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=issue_depends_on_map,
+        repo_root=ports.repo_root,
+        current_repo_slug=resolve_current_repo_slug(ports),
+    )
+    if not report.errors:
+        try:
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
+        except RuntimeError as error:
+            report = ValidationReport(errors=[str(error)], warnings=list(report.warnings))
     return ValidationResult(report=report, checked_node_count=len(records))

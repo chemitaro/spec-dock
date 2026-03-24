@@ -1,1461 +1,2164 @@
 ---
 種別: 実装計画書（Issue）
-ID: "issue-25"
-タイトル: "巨大な app.py を複数 module に分割し tests/test_cli.py を領域別に再編する"
-関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/25"]
-状態: "approved"
+ID: "issue-28-runtime-regression-bugs"
+タイトル: "manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する"
+関連GitHub: ["28", "https://github.com/chemitaro/spec-dock/issues/28"]
+状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-12"
+最終更新: "2026-03-23"
 依存: ["requirement.md", "design.md"]
-親: ["#25"]
+親: []
 ---
 
-# issue-25 巨大な app.py を複数 module に分割し tests/test_cli.py を領域別に再編する — 実装計画
+# issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装計画（Execution Contract）
 
 ## この計画で満たす要件ID
 - AC:
-  - AC-001
-  - AC-002
-  - AC-003
-  - AC-004
-  - AC-005
+  - `AC-001 create atomicity`
+  - `AC-002 local-only readiness`
+  - `AC-003 required artifact validation`
+  - `AC-004 GitHub URL safety`
+  - `AC-005 freshness clarity`
+  - `AC-006 active pathway`
+  - `AC-007 CLI symmetry and disambiguation`
+  - `AC-008 doctor guidance`
+  - `AC-009 duplicate sequence validation`
+  - `AC-011 current repo slug parity across github-aware commands`
+  - `AC-012 domain/application validation boundary`
+  - `AC-013 repo-aware numeric deps resolution`
+  - `AC-014 stale active pathfile healing`
+  - `AC-015 same-repo URL-linked sync fetch efficiency`
+  - `AC-016 current-repo-aware branch inference under repo overlap`
+  - `AC-017 create outcome-specific recovery guidance`
+  - `AC-018 repo-scoped exact target resolution`
+  - `AC-019 scoped dependency reference contract`
+  - `AC-020 create intermediate state safety`
 - EC:
-  - EC-001
-  - EC-002
-  - EC-003
-  - EC-004
-
-## 実装原則
-- 正しさを速度より優先する。
-- 実装順は `leaf-first / dependency-first` を正本とする。
-- 先に「低依存な pure rule / DTO / mapper / read model」を固定し、その後に use case、その後に adapter、その後に command/wiring を作る。
-- speculative abstraction を禁止する。
-  - 具体的な消費者が 1 つもない `registry` / `bootstrap` / shared contract shell を先に増やさない。
-  - shared contract は「最初の消費者 step」で additive に導入する。
-- `1 step = 1 review scope = 1 git commit scope` を原則とする。
-- `1 iteration = 1 Red -> Green -> Refactor` を守る。
-- step の exit は「その step の観測点が閉じたこと」を意味し、AC/EC 全体の達成完了は `S99` と `final exit contract` で判定する。
-
-## 実装順の設計判断
-- 旧版計画では `S01` に `cli/parser.py`, `cli/registry.py`, `cli/bootstrap.py`, `commands/*` など command 側の shell が先行していた。
-- この issue は最終アーキテクチャとしては layered だが、TDD の実装順としては command 側から入る必要はない。
-- 設計書の依存関係に従うと、まず固定すべきなのは次の順序である。
-  1. `domain/ids.py`, `domain/models.py`, `domain/tree.py`, `domain/validation.py`
-  2. `application/validate_tree.py` と最小 reader seam
-  3. `domain/status.py`, `domain/deps.py`
-  4. `application/check_deps.py`, `application/status_context.py`, `infra/deps_reader.py`
-  5. `application/set_active.py` の read path
-  6. `application/set_active.py` の write path
-  7. `application/sync_state.py`
-  8. `application/create_node.py`
-  9. `application/create_node.py` の `new doc` branch
-  10. `application/import_node.py`
-  11. `commands/*`, `cli/*` の共通 shell
-- したがって、本計画では command shell を後段へ送り、vertical slice ごとに bottom-up で積み上げる。
+  - requirement に個別 EC は未定義のため、本計画では `design.md` の 4 設計テーマと `workflow_issue.md` の quality gate を実行契約として扱う
+- 制約:
+  - 既存の file-based runtime と layered architecture を維持する
+  - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` を優先する
+  - `issue --no-github` を含む local-first の逃げ道を維持する
+  - backward compatibility を壊す破壊的 CLI 変更は避け、additive change を基本とする
+  - docs impact と final diff review quality gate を省略しない
 
 ## マイルストーン一覧
-- M1 pure core:
-  - 対象:
-    - `domain/ids.py`
-    - `domain/models.py`
-    - `domain/tree.py`
-    - `domain/validation.py`
-    - `domain/status.py`
-    - `domain/deps.py`
-    - `infra/contracts.py`
+- M1:
+  - 対象: create transaction を導入し、parallel create で duplicate id / seq を予防する
   - exit:
-    - low-dependency rule / DTO / stored-shape が pure test で固定される
-- M2 read-side slices:
-  - 対象:
-    - `application/validate_tree.py`
-    - `application/check_deps.py`
-    - `application/status_context.py`
-    - `infra/derived_state_reader.py`
-    - `presentation/cli_text.py`
-    - `presentation/json_state.py`
+    - `new initiative|epic|issue|doc` が共通 lock/transaction 配下で動く
+    - duplicate id / duplicate seq の regression test が通る
+- M2:
+  - 対象: status/readiness と artifact/repair contract を整え、local-only / broken state / active 未設定を安全に扱う
   - exit:
-    - `validate` と `deps check` の core が新 layered path で green
-- M3 active/sync slices:
-  - 対象:
-    - `domain/active.py`
-    - `application/set_active.py`
-    - `application/sync_state.py`
-    - `infra/active_store.py`
-    - `infra/git_cli.py`
-    - `infra/json_store.py`
-    - `infra/artifact_writer.py`
-    - `infra/clock.py`
-    - `presentation/markdown.py`
-    - `presentation/puml.py`
+    - `deps check` と `active set` が同じ readiness contract を使う
+    - required artifact 欠損、duplicate seq、broken meta、stale active pointer を validate/doctor で扱える
+- M3:
+  - 対象: GitHub targeting と CLI intent surface を安全化し、docs impact と最終 quality gate を閉じる
   - exit:
-    - `active show`, `active set/clear`, `sync` が新 core で green
-- M4 create/import slices:
-  - 対象:
-    - `application/create_node.py`
-    - `application/create_node.py` の `new doc` branch
-    - `application/import_node.py`
-    - `infra/template_scaffolder.py`
-    - `infra/fs_repo.py`
-    - `infra/github_cli.py`
-  - exit:
-    - `new node`, `new doc`, `import` が新 core で green
-- M5 shell/cleanup:
-  - 対象:
-    - `commands/*`
-    - `cli/parser.py`
-    - `cli/registry.py`
-    - `cli/bootstrap.py`
-    - `cli/dispatch.py`
-    - `tests/*` 再編
-    - 旧 helper detachment
-  - exit:
-    - shell の正本化、test tree 分割、旧 helper 直依存解消、final diff gate が完了する
+    - wrong-repo URL import を safe default で防ぐ
+    - `new issue` / `active set` の explicit intent surface が揃う
+    - stale projection の source/freshness が CLI/json に露出する
 
 ## ステップ一覧
-- 注記:
-  - ここでの `requirement trace` は step が当該 AC/EC の観測点へ寄与することを示す。
-  - AC/EC の達成完了判定は `S99 final diff review quality gate` と `final exit contract` を正本とする。
 - S01:
-  - 観測可能な振る舞い:
-    - ids / graph / validation の pure core が `app.py` 非依存でテストできる
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - EC-001
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
+  - 観測可能な振る舞い: 並列 `new initiative|epic|issue` でも duplicate id が発生しない
+  - closes:
+    - B01 create allocator race
   - review gate:
-    - pure core review
+    - create transaction と repo-level lock の責務分離が review で説明できる
 - S02:
-  - 観測可能な振る舞い:
-    - `validate` の use case core が最小 adapter 経由で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-    - EC-001
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
+  - 観測可能な振る舞い: 並列 `new doc` でも duplicate seq が発生せず、壊れた seq 重複は validate で fail する
+  - closes:
+    - B02 discussion sequence race
+    - AC-009 duplicate sequence validation
   - review gate:
-    - validate core slice review
+    - discussion allocator が S01 と同じ safety model に統合されている
 - S03:
-  - 観測可能な振る舞い:
-    - status / deps の pure core が fixed input で評価できる
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - EC-003
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
+  - 観測可能な振る舞い: local-only / GitHub-linked issue の status/readiness が `deps check` と `active set` で一致する
+  - closes:
+    - B03 local-only deps/active inconsistency
+    - B09 stale projection
   - review gate:
-    - deps pure core review
+    - `authority / effective_status / source / stale` contract が domain/application/presentation で整合している
 - S04:
-  - 観測可能な振る舞い:
-    - `deps check` が新 use case + renderer で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-    - EC-003
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
+  - 観測可能な振る舞い: required artifact 欠損、broken meta、stale active pointer を validate/doctor/active fallback が supported path として扱う
+  - closes:
+    - B04 validate gap
+    - B05 repair gap
+    - B06 active-not-set pathway gap
   - review gate:
-    - deps command slice review
+    - artifact matrix と doctor guidance が同じ contract を再利用している
+    - persisted active manifest recovery で `context-pack.md` と active entrypoint が不整合にならない
+    - persisted manifest が stale/欠損でも、既存 active entrypoint 実体が健全なら `context-pack.md` がその実体へ追従する
 - S05:
-  - 観測可能な振る舞い:
-    - `active show` の read model が migration-capable loader で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
+  - 観測可能な振る舞い: import/create/active の GitHub target 解釈が safe default かつ explicit intent で操作できる
+  - closes:
+    - B07 import wrong-repo risk
+    - B08 create UX asymmetry
+    - B10 numeric target ambiguity
   - review gate:
-    - active read slice review
-- S06:
-  - 観測可能な振る舞い:
-    - `active set/clear` の guard/order/rollback が新 core で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-    - EC-003
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - active write slice review
-- S07:
-  - 観測可能な振る舞い:
-    - `sync` の collect/auto-update/artifact write が新 core で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-    - EC-004
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - sync slice review
-- S08:
-  - 観測可能な振る舞い:
-    - `new initiative|epic|issue` が no-write preflight を含む new core で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - new node slice review
-- S09:
-  - 観測可能な振る舞い:
-    - `new doc` が discussion sequence/path/template write 契約で動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - new doc slice review
-- S10:
-  - 観測可能な振る舞い:
-    - `import initiative|epic|issue` が `import -> sync` 契約を維持して動く
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-    - EC-002
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - import slice review
-- S11:
-  - 観測可能な振る舞い:
-    - `commands/*` と `cli/*` の shell が、すでにある use case を束ねるだけの薄い層として成立する
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-004
-    - EC-001
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - shell integration review
-- S12:
-  - 観測可能な振る舞い:
-    - test tree 分割が physical refactor として独立に完了する
-  - requirement trace:
-    - AC-003
-    - AC-005
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - test tree split review
-- S13:
-  - 観測可能な振る舞い:
-    - 旧 helper 直依存の解消と rollback basis の commit-level への切替が完了する
-  - requirement trace:
-    - AC-001
-    - AC-005
-    - EC-001
-  - trace status:
-    - partial contribution only; final AC/EC closure is validated in `S99`
-  - review gate:
-    - helper detachment / rollback transition review
+    - URL/number/id の曖昧性が command surface と error/help message の両方で説明可能になっている
+    - foreign repo linked uniqueness が `repo + issue_number` 契約で説明可能になっている
+    - sync/export の GitHub snapshot lookup も repo-aware key で整合し、current/foreign 同番号が混線しない
 - S90:
-  - 観測可能な振る舞い:
-    - docs impact が refresh または no-op 理由付きで閉じる
+  - 観測可能な振る舞い: shipped docs/help/dogfooding workspace が新 contract を誤読させない
+  - closes:
+    - docs impact resolution
   - review gate:
-    - docs impact review
+    - provider-side docs と consumer-side dogfooding 確認が両方完了している
+    - checked-in dogfooding runtime で `doctor` と issue-28 追加 surface の executable smoke が通る
+- S90F:
+  - 観測可能な振る舞い: checked-in dogfooding runtime でも repo-scoped GitHub uniqueness / snapshot resolution が provider-side runtime と同じ contract で動く
+  - closes:
+    - AC-010 dogfooding runtime parity の runtime behavior 部分
+  - review gate:
+    - checked-in `spec-dock/scripts/...` の対象 runtime file が provider-side source of truth と同じ契約へ refresh されている
+    - same-number coexistence の checked-in runtime regression test が通る
+- S01I:
+  - 観測可能な振る舞い: `new issue --create-github-issue` の GitHub create latency が repo-wide local create contention を起こさない
+  - closes:
+    - PR #29 R18 create lock scope narrowing
+  - review gate:
+    - `gh issue create` は lock 外、graph reload / parent re-resolve / uniqueness revalidation / local write は lock 内、という境界が review で説明できる
+- S01J:
+  - 観測可能な振る舞い: stable parent-not-found は GitHub issue 作成前に no-side-effect fail する
+  - closes:
+    - PR #29 R20 pre-GitHub parent validation
+  - review gate:
+    - pre-lock graph precheck は GH side effect を減らすが、authoritative parent revalidation は lock 内で維持する
+- S01K:
+  - 観測可能な振る舞い: initiative / epic / issue の post-create local failure がいずれも created issue number と kind-aware recovery guidance を返す
+  - closes:
+    - PR #29 R21 all-kinds post-create guidance
+  - review gate:
+    - supported `new <kind>` surface と recovery guidance surface が一致している
+- S01L:
+  - 観測可能な振る舞い: create-mode 全 kind が pre-GitHub graph preflight を通し、stable tree failure では remote side effect を起こさない
+  - closes:
+    - PR #29 R23 pre-GitHub graph preflight
+  - review gate:
+    - create lock narrowing を壊さず、pre-GH で防げる orphan issue だけを減らしている
+- S03J:
+  - 観測可能な振る舞い: current repo の unscoped linked initiative / epic / issue が index incomplete 時でも repo-aware fallback fetch で stale 化しない
+  - closes:
+    - PR #29 R28 current-repo fallback fetch for unscoped epic/initiative links
+  - review gate:
+    - `sync` / `active` / `deps` が current repo slug を helper まで渡し、unscoped current-repo linked node を `(current_repo_slug, issue_number)` として fallback fetch できる
+- S03K:
+  - 観測可能な振る舞い: numeric branch inference が repo overlap 後も current repo issue を優先し、active auto-update が止まらない
+  - closes:
+    - PR #29 R29 current-repo-aware branch inference under repo overlap
+  - review gate:
+    - explicit id match の優先順位を壊さず、numeric fallback だけ repo-aware 化している
+    - current repo slug 不明時は ambiguity / no-match の fail-closed を維持する
 - S99:
-  - 観測可能な振る舞い:
-    - branch diff 全体で AC/EC trace と blocking finding `0` 件が確認される
-  - requirement trace:
-    - AC-001
-    - AC-002
-    - AC-003
-    - AC-004
-    - AC-005
-    - EC-001
-    - EC-002
-    - EC-003
-    - EC-004
-  - review gate:
+  - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
+  - closes:
     - final diff review quality gate
+  - review gate:
+    - reviewer が「この diff を merge してよい」と判断できる
+- S01P:
+  - 観測可能な振る舞い: `gh issue create` 後の failure surface が outcome class ごとに guidance を返し、local-write-committed cleanup failure で blind rerun を案内しない
+  - closes:
+    - PR #29 R30 post-create cleanup failure guidance
+    - root-cause remediation for repeated review loop in create/post-create failure handling
+  - review gate:
+    - `remote-only failure` と `local-write-committed cleanup failure` が別 outcome class として説明できる
+    - raw `release_error` 単独露出が provider / checked-in runtime で残っていない
+- S01Q:
+  - 観測可能な振る舞い: partial local write は create phase として分類され、blind rerun ではなく doctor-first guidance を返す
+  - closes:
+    - AC-020 create intermediate state safety の write-phase 分
+    - PR29 latest review partial execute_create_plan write classification
+  - review gate:
+    - `none/scaffold_copied/meta_written/post_write_verified` の phase contract が guidance と parity test で説明できる
+- S04J:
+  - 観測可能な振る舞い: create lock 下の missing `.meta.json` は in-progress/stale-create 系として分類され、恒久 corruption と混同しない
+  - closes:
+    - AC-020 create intermediate state safety の read-side 分
+    - PR29 latest review in-progress scaffold diagnosis
+  - review gate:
+    - reader/doctor/validate が create state classification を共有している
+- S04K:
+  - 観測可能な振る舞い: persisted active manifest の stale path が same-layer の別 node を指していても、`update` はその node を誤採用せず id-based recovery か placeholder fallback へ倒れる
+  - closes:
+    - AC-006 active pathway の persisted path trust boundary
+    - PR29 latest review persisted active path must match manifest id
+  - review gate:
+    - persisted path は `.meta.json` の `id` / `type` 一致がない限り recovery target にならない
+- S05J:
+  - 観測可能な振る舞い: active/deps の URL target は exact repo scope を保持したまま foreign node を選べる
+  - closes:
+    - AC-018 repo-scoped exact target resolution
+  - review gate:
+    - URL target と bare numeric target の契約差が parser/application/test で一貫している
+- S05K:
+  - 観測可能な振る舞い: dependency ref は bare current-repo shorthand と scoped foreign ref を区別できる
+  - closes:
+    - AC-019 scoped dependency reference contract
+  - review gate:
+    - bare numeric ref の fail-closed contract と scoped ref exact resolution が docs/impl/tests で一貫している
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S13, S14, S99
-- AC-002 -> S01, S02, S03, S04, S05, S06, S07, S08, S09, S10, S11, S14
-- AC-003 -> S12
-- AC-004 -> S02, S04, S05, S06, S07, S08, S09, S10, S11, S14, S99
-- AC-005 -> S12, S13, S14, S99
-- EC-001 -> S01, S02, S04, S05, S06, S07, S08, S09, S10, S11, S13
-- EC-002 -> S10
-- EC-003 -> S03, S04, S06
-- EC-004 -> S07, S14
-
-## shared contract / stored-shape 導入順の正本
-- S01:
-  - `domain/ids.py`
-  - `domain/models.py` の `SpecNodeSeed`, `SpecNode`, `SpecGraph`, `ValidationReport`
-  - `domain/tree.py`
-  - `domain/validation.py`
-- S02:
-  - `application/contracts.py` の `ValidateTreeRequest`, `ValidationResult`
-  - `application/ports.py` の validate slice に必要な最小 reader seam
-  - `infra/contracts.py` の `StoredMetaRecord`
-  - `presentation/contracts.py` の `CliText` を validate text renderer の最初の消費者として導入する
-- S03:
-  - `domain/models.py` の `IssueSnapshot`, `IssueStatusSnapshot`, `ProgressMap`, `Deps*`
-- S04:
-  - `application/contracts.py` の `TargetRef`, `CheckDepsRequest`, `DepsCheckResult`
-  - `infra/contracts.py` の `StoredIssueSnapshot`, `ActiveManifestEntry`, `ActiveManifest`, `ActiveManifestLoadResult`
-- S05:
-  - `application/contracts.py` の `ShowActiveRequest`, `ActiveViewEntry`, `ActiveViewResult`
-- S06:
-  - `application/contracts.py` の `SetActiveRequest`, `ActiveSetResult`, `ClearActiveRequest`, `ActiveClearResult`
-  - `domain/models.py` の `ActiveSelection`, `BranchDecision`
-  - `application/ports.py` の active write 用 port seam
-  - `infra/contracts.py` の `ActiveStateSnapshot`
-- S07:
-  - `application/contracts.py` の `SyncRequest`, `SyncStateResult`, `ActiveUpdateOutcome`, `ArtifactWriteFailure`, `SyncCommandResult`, `ArtifactWriteResult`
-  - `application/ports.py` の sync slice に必要な write-side seam
-  - `presentation/contracts.py` の `ArtifactBundle` と下位 artifact contract
-  - `S06` の `commit_active_state()` を再利用する internal seam
-- S08:
-  - `application/contracts.py` の `CreateNodeRequest`, `CreatePlan`, `CreateNodeResult`
-- S09:
-  - `application/contracts.py` の `CreateDiscussionDocRequest`, `CreateDiscussionDocResult`
-- S10:
-  - `application/contracts.py` の `ImportNodeRequest`, `ImportNodeResult`
-  - `load_active_manifest_no_migrate()` と `execute_create_plan()` を消費する reuse seam
-- S11:
-  - `commands/contracts.py`
-  - `application/contracts.py` の `UseCases` facade
-  - `cli/bootstrap.py` が組み立てる `application/ports.py` の bootstrap seam / Ports assembly
-- ルール:
-  - final-state interface 一覧は `design.md` を正本とする。
-  - ただし実装導入は上記の最初の消費者 step で additive に行う。
-  - 未消費の shell / facade / registry のために contract を前倒し導入しない。
-
-## legacy shim matrix
-| 旧 module | 中間段階の扱い | 正式移設先 | 削除/最終整理 step | rollback unit |
-| --- | --- | --- | --- | --- |
-| `ids.py` | wrapper 維持可 | `domain/ids.py` | `S13` | `S01/S03/S08` |
-| `io_json.py` | wrapper 維持可 | `infra/json_store.py` | `S13` | `S04/S07` |
-| `github.py` | wrapper 維持可 | `infra/github_cli.py` | `S13` | `S04/S08/S10` |
-| `render_md.py` | wrapper 維持可 | `presentation/markdown.py` | `S13` | `S07` |
-| `render_puml.py` | wrapper 維持可 | `presentation/puml.py` | `S13` | `S07` |
-| `active.py` | thin delegation のみ許容 | `application/set_active.py`, `domain/active.py`, `infra/active_store.py` | `S13` | `S05/S06/S07` |
-| `nodes.py` | thin delegation のみ許容 | `application/create_node.py`, `application/import_node.py`, `domain/*` | `S13` | `S08/S09/S10` |
+- `AC-001` -> `S01`, `S01L`, `S02`
+- `AC-002` -> `S03`
+- `AC-003` -> `S04`
+- `AC-004` -> `S05`
+- `AC-005` -> `S03`, `S05`
+- `AC-006` -> `S04`
+  - corrective scopes: `S04I`, `S04K`
+- `AC-007` -> `S05`
+  - corrective scopes: `S01N`, `S01O`
+- `AC-008` -> `S04`
+  - corrective scopes: `S01M`, `S01O`
+- `AC-009` -> `S02`
+- `AC-010` -> `S90`, `S90F`
+  - corrective scopes: `S01M`, `S01N`, `S01O`
+- `AC-011` -> `S05F`, `S05I`
+  - corrective scopes: `S03J`
+- `AC-012` -> `S04F`
+- `AC-013` -> `S05G`
+- `AC-014` -> `S04G`
+- `AC-015` -> `S05H`
+- `AC-016` -> `S03K`
+- `AC-017` -> `S01P`
+- `AC-018` -> `S05J`
+- `AC-019` -> `S05K`
+- `AC-020` -> `S01Q`, `S04J`
+- `PR29-R18` -> `S01I`
+- `PR29-R20` -> `S01J`
+- `PR29-R21` -> `S01K`
+- `PR29-R22` -> `S05I`
+- `PR29-R23` -> `S01L`
+- `PR29-R24` -> `S04I`
+- `PR29-R25` -> `S01M`
+- `PR29-R26` -> `S01N`
+- `PR29-R27` -> `S01O`
+- `PR29-R28` -> `S03J`
+- `PR29-R29` -> `S03K`
+- `PR29-R30` -> `S01P`
+- `PR29-R31` -> `S05J`
+- `PR29-R32` -> `S05K`
+- `PR29-R33` -> `S01Q`
+- `PR29-R34` -> `S04J`
+- `PR29-R35` -> `S04K`
 
 ## レビュー / QA ゲート方針
-- RG1 step review:
+- RG1 implementation review:
   - timing:
-    - 各 step の Green/Refactor 完了後
+    - `S01` step gate 通過時
+    - `S02` step gate 通過時
   - scope:
-    - 当該 step の staged diff のみ
-  - policy:
-    - `1 step = 1 review scope = 1 commit scope`
-    - 指摘修正も同じ scope に閉じる
-    - 各 step で新しい direct cross-layer dependency を増やしていないことを diff review で確認する
-- QG1 slice QA:
+    - `S01`: lock 契約、allocator integration、failure mode、duplicate guard、回帰テスト
+    - `S02`: discussion seq integration、duplicate seq validation、`AC-001` の残差確認
+- RG2 implementation review:
   - timing:
-    - 各 step の review 前
+    - `S03` step gate 通過時
+    - `S04` step gate 通過時
   - scope:
-    - 当該 step の focused test + 既存互換 smoke
-  - policy:
-    - failing test を先に 1 本ずつ追加する
-    - Green は最小実装に留める
-- SG1 final diff gate:
+    - `S03`: status/readiness/freshness contract、presentation 露出、backward compatibility
+    - `S04`: artifact matrix、doctor、active fallback、read-only meta と recoverability の整合
+- RG3 implementation review:
   - timing:
-    - S99
+    - `S05` 完了時に command surface と GitHub targeting をレビューする
   - scope:
-    - `git diff origin/main...HEAD`
-  - policy:
-    - `spec_reviewer` による branch 全体レビューを pass させる
+    - argparse surface、repo identity validation、ambiguity handling、error/help text
+- QG1 QA review:
+  - timing:
+    - 各 step gate で対象テストを通し、`S99` 前に full relevant suite と manual regression 再実行方針を確認する
+  - scope:
+    - `tests/cli_runtime/`, `tests/domain_runtime/`, `tests/presentation_runtime/`, `tests/test_init_update.py` のうち影響範囲
+- SG1 spec review:
+  - timing:
+    - `S90` で docs impact を閉じた時点
+  - scope:
+    - `requirement.md` / `design.md` / `plan.md` / `report.md` と shipped docs/help の整合
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
-- cadence / approval policy は `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` を正本とする。
-- 互換参照は `Red -> Green -> Refactor -> review -> fix -> re-review -> report -> commit` とする。
-- step は 1 つの観測可能な振る舞いを単位とする。
-- `iteration` は 1 回の TDD cycle とし、各 iteration は `Red -> Green -> Refactor` で閉じる。
-- read-only / pure core を先に、write path を後に、shell と cleanup は最後に行う。
-- docs impact は `S90` で必ず確認する。
-- 最後に `S99 final diff review quality gate` を実施する。
-- reviewer verdict は `report.md` に残す。
-- command shell のためだけの abstraction を先行実装しない。
+- cadence / approval policy は `workflow_issue.md` を正本とする。
+- 互換参照: `Red → Green → Refactor → review → fix → re-review → report → commit/no-op`
+- 各 step は 1 つの観測可能な振る舞いを単位とする。
+- `block` は optional concern group。単純な step では最小 wrapper 1 個でよい。
+- `iteration` は 1 回の TDD cycle とし、各 iteration は `Red → Green → Refactor` で閉じる。
+- failing test は iteration ごとに 1 本ずつ進める。
+- `Green` は最小実装、`Refactor` は green 維持を前提とする。
+- shared minimum gate と scope-specific readiness contract / final exit contract を満たす。
+- docs impact が `none` でなければ `S90` を実行する。
+- 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
+- reviewer verdict は `spec-deps/current/report.md` に残す。
+- review の合格単位と git commit の単位は一致させる。各 step は step gate の review/QA/report 更新が完了したタイミングでコミットする。
+- `S90` は docs/spec review 完了後にコミットする。
+- `S99` は最終 review の完了確認であり、新規コミットの前提にはしない。
 
 ## 実装ステップ
 
-### S01 — ids / graph / validation の pure core を抽出する
+### S01 — create transaction で duplicate id を予防する
 - target:
-  - `app.py`
-  - `ids.py`
-  - `domain/ids.py`
-  - `domain/models.py`
-  - `domain/tree.py`
-  - `domain/validation.py`
-  - 対応 pure test
+  - `new initiative|epic|issue` を repo-level create transaction 配下へ移す
+  - duplicate id を post-facto ではなく preventive control で防ぐ
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/005`, `007`
 - step boundary:
-  - command / presentation / gh/git/json I/O は含めない
-  - `app.py` の helper から pure な rule と dataclass を切り出すところまで
-  - staged coexistence 中の delegation owner は `app.py` とし、この step の rollback unit も `app.py` を含む staged diff とする
+  - discussion seq と validator 追加は `S02` へ分離し、ここでは node id race に集中する
+  - stale lock の診断導線は `S04` で扱うが、S01 の時点で acquire-side policy 自体は固定する
+  - S01 では stale lock を自動破壊しない。lock acquire は metadata を読める範囲で露出し、timeout または stale 判定時は no-write で失敗し `doctor` へ誘導する
+  - `AC-001` の完了は `S01L` / `S02` を含めて判定する。S01 単体では B01 と node create 側の atomicity を閉じる
 
-#### B1 — ids and graph
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S01` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — lock 基盤と node create orchestration
 - purpose:
-  - 最小依存の pure core を最初に固定する
+  - application/infra に create lock を導入し、`load -> allocate -> write -> post-write guard` を 1 critical section に収める
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/...`
+  - `tests/cli_runtime/...`
 
-##### I1a — title / local id helpers
-- Red:
-  - `resolve_input_title_and_slug` / `normalize_local_id_input` pure test を 1 本追加
-- Green:
-  - `resolve_input_title_and_slug`, `normalize_local_id_input` を `domain/ids.py` へ移す
-- Refactor:
-  - `app.py` 側の title/local-id helper delegation を整理する
+##### I1 — failing regression を先に固定する
+- slice goal:
+  - 並列 `new initiative` / `new epic` / `new issue` で duplicate id が再現するテストを追加する
 
-##### I1b — parse / format helpers
-- Red:
-  - `parse_id` / `format_id` pure test を 1 本追加
-- Green:
-  - `parse_id`, `format_id` を `domain/ids.py` へ移す
-- Refactor:
-  - parse/format helper の責務境界を整理する
+###### Red
+- failing test:
+  - 並列 `new initiative` / `new epic` / `new issue` のいずれでも duplicate id で壊れうる現在挙動を再現する runtime test
+- expected failure:
+  - duplicate id が成立する、または duplicate guard が後段で落ちる
 
-##### I1c — deps sort helper
-- Red:
-  - `deps_node_sort_key` pure test を 1 本追加
-- Green:
-  - `deps_node_sort_key` を `domain/ids.py` へ移す
-- Refactor:
-  - deps sort helper の delegation を整理する
+###### Green
+- minimum implementation:
+  - repo-global lock acquire/release と bounded wait/failure surface を導入する
+- pass condition:
+  - 並列 create の duplicate id regression test が通る
 
-##### I2 — graph dataclasses
-- Red:
-  - `SpecNodeSeed -> SpecGraph` の pure test を 1 本追加
-- Green:
-  - `SpecNodeSeed`, `SpecNode`, `SpecGraph` を導入し、`build_graph()` を `domain/tree.py` へ切り出す
-- Refactor:
-  - `app.py` 内の node scan 後処理を mapper に整理する
+###### Refactor
+- cleanup target:
+  - lock API の責務分離と error surface の整形
+- invariants to keep green:
+  - file-based runtime と既存 ID モデルを維持する
 
-##### I3 — validation rules
-- Red:
-  - structural validation pure test を 1 本追加
-- Green:
-  - `validate_graph()`, `validate_graph_and_deps()` を `domain/validation.py` へ切り出す
-- Refactor:
-  - validation helper 群の責務を `tree` と `validation` に分割する
+##### I2 — contention failure contract を固定する
+- slice goal:
+  - lock が取得できない場合に bounded wait と stale-lock policy に従って安全側 failure することを固定する
+
+###### Red
+- failing test:
+  - 先行 create が lock を保持している間に後続 create が timeout/failure surface を返す regression test
+  - stale metadata を持つ lock file が存在する場合に acquire が no-write failure と `doctor` 誘導を返す regression test
+- expected failure:
+  - 現状は lock 契約自体がなく、競合時の失敗形と stale lock の扱いが未定義
+
+###### Green
+- minimum implementation:
+  - lock acquire timeout の契約値を固定し、テストでは短い設定値を注入できる形にする
+  - timeout/stale lock の failure message に wait 時間、lock path、読めた lock metadata、`doctor` 誘導を含める
+  - bounded wait、stale-lock safe failure、後続 create の no-write 保証を導入する
+- pass condition:
+  - contention failure regression test と stale lock regression test が通る
+  - 失敗時に partial create を増やさず、観測可能な failure surface が安定している
+
+###### Refactor
+- cleanup target:
+  - lock metadata、timeout 設定、error rendering の整理
+- invariants to keep green:
+  - timeout/failure contract が後続の `doctor` 診断導線と矛盾しない
 
 #### step gate
 - review:
-  - pure core review
+  - lock scope、timeout 契約、stale lock acquire-side policy、post-write duplicate guard の位置と責務境界を説明できる
 - expected tests:
-  - ids pure tests
-  - graph build pure tests
-  - validation pure tests
-  - legacy `ids.py` / `app.py` delegation smoke
-  - `domain/*` no-I/O import assertion
+  - duplicate id prevention regression（initiative/epic/issue を含む）
+  - lock contention failure regression
+  - stale lock safe failure regression
+  - 既存 create command 回帰
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S02 — validate の use case core を作る
+### S01I — external GitHub create を create lock の外へ出す
 - target:
-  - `app.py`
-  - `application/validate_tree.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `infra/contracts.py`
-  - 最小 reader seam
-  - `presentation/cli_text.py`
-  - `presentation/contracts.py`
-  - 対応 test
+  - `new issue` の create mode で実行される `gh issue create` を repo-global create lock の外へ出す
+  - external GitHub latency が `new doc` / local-only `new` / `import issue` を false contention で block しないようにする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/035`
 - step boundary:
-  - 先に pure core を消費する最小 use case だけを導入する
-  - command shell の一般化はまだしない
-  - parser/help/dispatch ownership は `S11` へ defer し、この step では renderer/output compatibility と legacy delegated validate path だけを閉じる
-  - 最小 reader seam の concrete owner は staged delegation 中の `app.py` とし、`infra/fs_repo.py` 正本化までは暫定 adapter を増やさない
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> validate_tree` seam を含む staged diff とする
+  - lock scope を狭める corrective fix に限定し、remote rollback や GitHub issue close 補償処理までは扱わない
+  - graph-derived parent resolution / uniqueness revalidation / write / post-write duplicate guard は lock 内のまま維持する
+  - provider-side source of truth の修正後、checked-in dogfooding runtime にも parity を反映する
 
-#### B1 — validate core
-- purpose:
-  - 最初の consumer slice として shared contract を最小導入する
+#### Red
+- failing test:
+  - slow `issue_create()` 中でも別 thread の local-only create が timeout せず成功する runtime regression
+  - delayed `issue_create()` の pre-lock window 中に parent もしくは competing graph state が変化しても、lock 内 reload / revalidation で no-write fail または deterministic success になる regression
+  - `issue_create()` 成功後に lock acquire / parent revalidation / uniqueness revalidation / write failure になった場合、created GitHub issue number と retry/link guidance を返す regression
+  - invalid title / invalid slug が引き続き `gh issue create` 前に失敗する regression を維持
+- expected failure:
+  - 現行実装では slow `issue_create()` が lock を保持し、後続 local create が `create lock acquisition failed` で落ちる
 
-##### I1 — validate request/result
-- Red:
-  - `ValidateTreeRequest`, `ValidationResult` を使う use case test を 1 本追加
-- Green:
-  - `validate_tree(req, ports)` を導入し、最小 node reader seam を接続する
-- Refactor:
-  - mapper と ports boundary を整理する
+#### Green
+- minimum implementation:
+  - `create_node_core()` で pure input validation と optional `gh issue create` を lock 外へ移す
+  - pre-lock GitHub body は graph-independent minimal body とし、`Epic:` / `Initiative:` など graph 依存文脈を含めない
+  - pure input validation は、少なくとも `--id + github mode`、required parent selector 欠落、partial repo identity を pre-GH で reject する
+  - lock 取得後は graph reload、current parent/context の再解決、repo-aware uniqueness 再検証、write、post-write duplicate guard を維持する
+- pass condition:
+  - GitHub create latency regression と既存 create regression がともに通る
 
-##### I2 — validate text rendering
-- Red:
-  - validate CLI text regression を 1 本追加
-- Green:
-  - `render_validate_text()` を導入し、既存 CLI 文言互換を固定する
-- Refactor:
-  - stdout/stderr ownership を renderer 側に閉じる
+#### Refactor
+- cleanup target:
+  - pre-lock / in-lock responsibilities を helper 境界で整理する
+- invariants to keep green:
+  - duplicate id / duplicate GitHub linkage の preventive control を弱めない
+  - checked-in dogfooding runtime parity を含む corrective scope であることを report に残す
 
 #### step gate
 - review:
-  - validate core slice review
+  - lock scope の縮小で local atomicity が損なわれていないことを説明できる
 - expected tests:
-  - validate use case tests
-  - validate text regression
-  - minimal reader seam tests
-  - validate exit `0/1`
-  - stdout/stderr split regression
-  - legacy delegated validate smoke
+  - slow GitHub create non-blocking regression
+  - delayed GitHub create + parent/context revalidation regression
+  - post-GitHub-create local failure guidance regression
+  - post-GitHub-create uniqueness revalidation failure guidance regression
+  - minimal GH body invariant regression
+  - pure input invalid request が `gh issue create` 前に no-side-effect failure する regression
+  - invalid title / invalid slug no-gh-call regression
+  - checked-in dogfooding runtime の executable parity regression
+  - checked-in runtime でも post-GitHub-create local failure 時に created issue number と `--github-issue <n>` guidance を返す parity regression
+  - 既存 create command 回帰
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01I` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S03 — status / deps の pure core を抽出する
+### S01J — stable parent-not-found を pre-GitHub で fail-fast する
 - target:
-  - `domain/status.py`
-  - `domain/deps.py`
-  - `domain/models.py`
-  - 対応 pure test
+  - `new epic` / `new issue` の create mode で、stable parent absence を GitHub issue 作成前に no-side-effect fail にする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/036`
 - step boundary:
-  - status resolution / progress / deps evaluation の pure rule まで
-  - command / renderer はまだつなげない
-  - dependency topology の canonical source はこの step では導入しない
-  - `domain/deps.py` は `SpecGraph` から dependency edge を compile せず、supplied `issue_depends_on_map` / `effective_deps_map` を受ける pure rule に限定する
-  - この step は additive pure core のみで live consumer は導入しない。legacy path の切替は `S04` / `S06` で開始し、rollback unit は `S03` 単独 commit/staged diff とする
+  - pre-lock では read-only graph precheck のみ追加し、authoritative parent resolution は lock 内の `plan_node_creation()` に残す
+  - lock narrowing (`gh issue create` is outside lock) 自体は維持する
 
-#### B1 — status and deps rules
-- purpose:
-  - `deps check`, `active set`, `sync` が共有する rule を先に固定する
+#### Red
+- failing test:
+  - nonexistent initiative を指定した `new epic --create-github-issue` が `issue_create()` 未呼び出しで失敗する regression
+  - nonexistent epic を指定した `new issue --create-github-issue` が `issue_create()` 未呼び出しで失敗する regression
+  - checked-in dogfooding runtime でも同じ no-side-effect regression
 
-##### I1 — issue status resolution
-- Red:
-  - issue status source selection pure test を 1 本追加
-- Green:
-  - `resolve_issue_statuses()`, `build_progress_map()` を導入する
-- Refactor:
-  - cached/github snapshot normalization を mapper に閉じる
+#### Green
+- minimum implementation:
+  - pre-GH phase に read-only graph load を追加する
+  - create-mode で stable parent existence precheck を行い、missing parent は remote side effect 前に fail-fast する
+  - lock 取得後は従来どおり graph reload と authoritative parent revalidation を維持する
 
-##### I2a — readiness evaluation
-- Red:
-  - `evaluate_readiness()` pure test を 1 本追加
-- Green:
-  - `DepsEvaluation`, `evaluate_readiness(graph, issue_depends_on_map, ...)` を導入する
-- Refactor:
-  - closure / blockers / guard_reason を pure path に整理する
-
-##### I2b — deps inspection decoration
-- Red:
-  - `inspect_target_deps()` pure test を 1 本追加
-- Green:
-  - `inspect_target_deps(graph, issue_depends_on_map, ...)` を導入する
-- Refactor:
-  - active issue decoration と view-facing state を整理する
-
-##### I2c — deps state / cycle validation
-- Red:
-  - `build_deps_state()` pure test と deps cycle validation pure test を 1 本追加
-- Green:
-  - `build_effective_deps_map(graph, issue_depends_on_map)`, `build_deps_state()`, `validate_deps_cycles(issue_depends_on_map)` を導入する
-- Refactor:
-  - `effective_depends_on` / node-state assembly を `S04` と `S07` の共有 pure path に整理する
+#### Refactor
+- cleanup target:
+  - pre-GH stable validation と in-lock authoritative validation の責務境界を helper に分離する
 
 #### step gate
 - review:
-  - deps pure core review
+  - orphan GitHub issue を減らしつつ、R18 の lock narrowing を壊していないことを説明できる
 - expected tests:
-  - status pure tests
-  - deps pure tests
-  - deps state / cycle validation pure tests
-  - shared readiness fixture regression
-  - explicit `issue_depends_on_map` input regression
-  - `active_issue_id` が `inspect_target_deps()` の decoration にのみ影響し、`evaluate_readiness()` の結果を変えない pure regression
-  - `domain/status.py`, `domain/deps.py` no-I/O assertion
+  - provider runtime の no-gh-call parent-not-found regression
+  - checked-in runtime parity regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01J` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S04 — deps check slice を組み立てる
+### S01K — all-kinds post-create local failure guidance を揃える
 - target:
-  - `app.py`
-  - `application/status_context.py`
-  - `application/check_deps.py`
-  - `application/validate_tree.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `infra/contracts.py`
-  - `infra/deps_reader.py`
-  - `infra/derived_state_reader.py`
-  - `infra/github_cli.py`
-  - `infra/active_store.py`
-  - `presentation/cli_text.py`
-  - `presentation/json_state.py`
-  - 対応 test
+  - initiative / epic / issue の GitHub create path で、post-create local failure 時の recovery guidance を kind-aware に揃える
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/037`
 - step boundary:
-  - primary user-facing scope は `deps check`
-  - `active set` 再利用 seam はこの step で固定する
-  - canonical dependency topology provider の first consumer はこの step とする
-  - `validate_tree` は同じ topology provider へ internal reconnect するが、この step の primary user-facing review scope には含めない
-  - parser/help/dispatch ownership は `S11` へ defer し、この step では `deps check` の use case/result/renderer と legacy delegated path だけを閉じる
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> check_deps` seam を含む staged diff とする
+  - command surface を狭めず、recovery message surface を supported kind 全体へ合わせる
 
-#### B1 — deps command core
-- purpose:
-  - 最初の read-side reusable seam を固定する
+#### Red
+- failing test:
+  - initiative create の lock failure が created issue number と `new initiative --github-issue <n>` を返す regression
+  - epic create の write/template failure が created issue number と `new epic --github-issue <n>` を返す regression
+  - checked-in dogfooding runtime でも同 guidance parity regression
 
-##### I1 — status context seam
-- Red:
-  - `status_context` use case test を 1 本追加
-- Green:
-  - `resolve_issue_status_context()` を導入し、github/cached 選択を ports に閉じる
-- Refactor:
-  - active issue context の扱いを state decoration 専用に整理する
+#### Green
+- minimum implementation:
+  - post-create local failure wrapper の kind restriction を外す
+  - recovery guidance を `new <kind> --github-issue <n>` ベースの kind-aware message builder にする
 
-##### I1b — deps topology seam
-- Red:
-  - `deps topology reader -> canonical issue_depends_on_map` test を 1 本追加
-- Green:
-  - `infra/deps_reader.py` と ports 経由の topology provider を導入する
-  - `validate_tree()` を same topology provider に再接続する
-- Refactor:
-  - `deps.json` / shorthand / ref resolve の ownership を topology provider に閉じる
-
-##### I2 — deps text path
-- Red:
-  - `deps check` text regression を 1 本追加
-- Green:
-  - `check_deps()` と text rendering をつなぐ
-- Refactor:
-  - `TargetRef` / target normalization を command-local boundary に整理する
-
-##### I3 — deps json path
-- Red:
-  - `deps check --json` regression を 1 本追加
-- Green:
-  - JSON payload ownership を `presentation/json_state.py` に固定する
-- Refactor:
-  - raw dict は JSON boundary に限定する
+#### Refactor
+- cleanup target:
+  - kind-aware guidance text と wrapper call site の重複をなくす
 
 #### step gate
 - review:
-  - deps command slice review
+  - supported create surface と orphan recovery surface が kind 間で整合している
 - expected tests:
-  - deps use case/result regression
-  - deps text/json renderer regression
-  - status context tests
-  - deps topology provider tests
-  - validate topology reconnect regression
-  - shared readiness seam contract regression
-  - deps cycle fail-fast regression
-  - deps exit code `0/3/1`
-  - `--json` stdout-only regression
-  - source selection regression
-  - warnings/stderr order regression
-  - target normalization boundary regression
-  - legacy delegated deps smoke
+  - initiative guidance regression
+  - epic guidance regression
+  - checked-in parity regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S05 — active show の read model を作る
+### S01M — create lock failure guidance を executable doctor command に揃える
 - target:
-  - `app.py`
-  - `application/set_active.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `infra/active_store.py`
-  - `presentation/cli_text.py`
-  - 対応 test
+  - create lock acquisition / metadata write / release failure message が、repo-local shortcut の有無に依存しない executable doctor command を案内する
+- design refs:
+  - `design.md` の create lock / doctor guidance 方針
 - step boundary:
-  - `show_active()` のみ
-  - write/rollback は含めない
-  - `load_active_manifest_no_migrate()` はまだ使わず、read path は `load_active_manifest()` のみを consumer とする
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> show_active` seam を含む staged diff とする
+  - create lock failure guidance の文言と parity test に限定し、doctor 自体の診断ロジックは変えない
 
-#### B1 — active read
-- purpose:
-  - write path から独立した active read side を先に固定する
+#### Red
+- failing test:
+  - create lock contention/stale/release failure message が repo 上で実行不能な `spec doctor` だけを案内する regression
+  - checked-in dogfooding runtime parity でも同じ guidance が維持される regression
 
-##### I1 — current manifest read model
-- Red:
-  - `agent.active -> ActiveViewResult` read model test を 1 本追加
-- Green:
-  - `load_active_manifest()` と `show_active()` の current-path を導入する
-- Refactor:
-  - `ActiveViewEntry` への mapping を整理する
-
-##### I2 — legacy migration-capable loader
-- Red:
-  - `.work/active.json` / `.work/current.json` priority + no write-back regression を 1 本追加
-- Green:
-  - legacy fallback を `load_active_manifest()` に閉じる
-- Refactor:
-  - source/warnings ownership と read-time/in-memory normalization を固定する
-
-##### I3 — active show rendering
-- Red:
-  - `active show` text rendering regression を 1 本追加
-- Green:
-  - `render_active_show_text()` を導入する
-- Refactor:
-  - source/warnings ownership を read result に揃える
+#### Green
+- minimum implementation:
+  - create lock failure guidance builder を導入し、managed repo で実行可能な stable doctor command へ統一する
+  - provider runtime と checked-in runtime parity を揃える
 
 #### step gate
 - review:
-  - active read slice review
+  - create lock 系 failure から案内される doctor command が repo-local shortcut 非依存で executable である
 - expected tests:
-  - active show read/result regression
-  - `active show` text/stdout/stderr/warnings compatibility regression
-  - legacy manifest fixture matrix
-  - `active show` zero-input / exit `0` regression
-  - legacy source priority regression
-  - read-time/in-memory normalization with no write-back
-  - `load_active_manifest_no_migrate()` 非使用確認
-  - legacy delegated active-show smoke
+  - lock contention/stale/release failure guidance
+  - checked-in runtime doctor guidance parity
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01M` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S06 — active set/clear の write path を作る
+### S01N — post-create recovery hint を runnable command に揃える
 - target:
-  - `app.py`
-  - `domain/active.py`
-  - `domain/models.py`
-  - `domain/tree.py`
-  - `application/set_active.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `application/status_context.py`
-  - `infra/active_store.py`
-  - `infra/contracts.py`
-  - `infra/git_cli.py`
-  - `presentation/cli_text.py`
-  - `presentation/json_state.py`
-  - 対応 test
+  - GitHub issue 作成後の local failure guidance が、kind ごとの required flags を含む runnable retry command を返す
+- design refs:
+  - `design.md` の create flow / post-create guidance 方針
 - step boundary:
-  - `active set` / `active clear` の guard/order/rollback
-  - sync auto-update は含めない
-  - `pre-step7 failure` は rollback 対象外、`commit_active_state()` 内の step 7-9 failure のみ snapshot/restore 対象とする
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> set_active/clear_active` seam を含む staged diff とする
+  - created issue number を含む recovery hint の生成に限定し、create transaction や lock scope は変えない
 
-#### B1 — active write
-- purpose:
-  - 最初の高リスク write path を小さい iteration に分割して固定する
+#### Red
+- failing test:
+  - initiative create の post-failure guidance が `--title` を欠く regression
+  - epic / issue create の post-failure guidance が `--title` と parent selector を欠く regression
+  - checked-in runtime parity でも同じ guidance が維持される regression
 
-##### I1 — active selection + deps guard
-- Red:
-  - blocked/unknown/force regression を 1 本追加
-- Green:
-  - `select_active_chain()` と `S04` の topology provider を再利用した readiness guard を導入する
-- Refactor:
-  - shared readiness seam reuse を固定する
-  - invalid/cyclic topology は readiness 判定より前に fail-fast する順序を固定する
-
-##### I2 — branch decision / checkout pre-write
-- Red:
-  - branch policy failure regression を 1 本追加
-- Green:
-  - `resolve_branch_decision()` と manifest write 前 checkout を導入する
-- Refactor:
-  - pre-step7 failure ownership を明文化する
-
-##### I3 — shared commit_active_state
-- Red:
-  - write-order regression を 1 本追加
-- Green:
-  - `commit_active_state()` を導入する
-- Refactor:
-  - context-pack render ownership を整理する
-
-##### I4 — set command path
-- Red:
-  - `active set` success regression を 1 本追加
-- Green:
-  - `set_active()` の success path を閉じる
-- Refactor:
-  - stdout/stderr ownership を整理する
-
-##### I5 — clear command path
-- Red:
-  - `active clear` placeholder regression を 1 本追加
-- Green:
-  - `clear_active()` の placeholder path を閉じる
-- Refactor:
-  - `patch_manifest=None` 契約を固定する
-
-##### I6 — rollback injection
-- Red:
-  - rollback failure injection を 1 本追加
-- Green:
-  - snapshot/restore と dual-error reporting を実装する
-- Refactor:
-  - rollback reporting を整理する
+#### Green
+- minimum implementation:
+  - post-create failure message builder に original request context を渡し、`--title` と required parent flags を含む command を組み立てる
+  - provider runtime と checked-in runtime parity を揃える
 
 #### step gate
 - review:
-  - active write slice review
+  - initiative / epic / issue の post-create recovery hint が runnable で、required flags を欠かない
 - expected tests:
-  - active set/clear use case regression
-  - branch policy failure regression
-  - managed agent state invalid JSON pre-step7 failure with no snapshot/rollback regression
-  - no manifest write before guard success
-  - shared readiness seam reuse regression
-  - `commit_active_state` authoritative order regression
-  - `active clear` zero-input / exit `0` / clear-text regression
-  - `active clear` placeholder manifest/pointer/context-pack/agent-state clear regression
-  - git rollback 非対象 regression
-  - rollback injection
-  - blocked/unknown/force-path regressions
-  - renderer stdout/stderr/warnings regression
-  - legacy delegated active-write smoke
+  - initiative/epic/issue の post-create failure guidance
+  - checked-in runtime post-create guidance parity
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01N` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S07 — sync core を作る
+### S01O — create guidance path を cwd-independent に揃える
 - target:
-  - `app.py`
-  - `domain/active.py`
-  - `application/sync_state.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `infra/json_store.py`
-  - `infra/artifact_writer.py`
-  - `infra/clock.py`
-  - `presentation/contracts.py`
-  - `presentation/json_state.py`
-  - `presentation/markdown.py`
-  - `presentation/puml.py`
-  - `presentation/cli_text.py`
-  - 対応 test
+  - create lock failure guidance と post-create retry hint が、repo root でない cwd からでも実行できる command path を返す
+- design refs:
+  - `design.md` の create lock / post-create guidance 方針
 - step boundary:
-  - `sync` と artifact write のみ
-  - create/import 再利用はまだ含めない
-  - `S06` の `commit_active_state()` を再利用し、active 更新後 artifact 失敗は non-atomic だが観測可能な failure として扱う
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> sync` seam を含む staged diff とする
+  - guidance surface の command path 解決に限定し、create semantics 自体は変えない
 
-#### B1 — sync pipeline
-- purpose:
-  - state collection と artifact write を分離して固定する
+#### Red
+- failing test:
+  - nested cwd から見た post-create retry hint が `spec-dock/scripts/spec-dock` の repo-root-relative path のままで失敗する regression
+  - nested cwd から見た doctor guidance も同様に cwd-dependent で失敗する regression
+  - checked-in parity でも同 guidance が維持される regression
 
-##### I1 — collect_sync_state
-- Red:
-  - sync state collection regression を 1 本追加
-- Green:
-  - `collect_sync_state()` を導入する
-- Refactor:
-  - state result mapper を整理する
-
-##### I2 — active auto-update
-- Red:
-  - active-before-artifact ordering regression を 1 本追加
-- Green:
-  - `infer_active_node_from_branch()` と `maybe_auto_update_from_branch()` を導入する
-- Refactor:
-  - `ActiveUpdateOutcome` を整理する
-
-##### I3 — json artifacts
-- Red:
-  - sync JSON artifact regression を 1 本追加
-- Green:
-  - `index/tree/deps-issues.json` を固定する
-- Refactor:
-  - JSON bundle を整理する
-
-##### I4 — markdown / puml artifacts
-- Red:
-  - markdown / puml artifact regression を 1 本追加
-- Green:
-  - `dashboard.md`, `tree*.puml`, `deps-issues.puml` を固定する
-- Refactor:
-  - render/write ownership を整理する
-
-##### I5 — sync text/outcome
-- Red:
-  - `sync` text/outcome regression を 1 本追加
-- Green:
-  - `render_sync_text()` と `SyncCommandResult` を閉じる
-- Refactor:
-  - artifact failure reporting を整理する
+#### Green
+- minimum implementation:
+  - managed repo root から runtime entrypoint の absolute executable path を組み立て、doctor guidance と retry hint の両方へ使う
+  - provider runtime と checked-in runtime parity を揃える
 
 #### step gate
 - review:
-  - sync slice review
+  - guidance surface が repo-local shortcut / repo-root-relative cwd 前提に依存せず、nested cwd からでも実行可能である
 - expected tests:
-  - sync use case/result regression
-  - sync deps cycle fail-fast regression
-  - JSON artifact path/name/content snapshots
-  - dashboard/tree PUML snapshots
-  - deps-issues PUML / disabled placeholder regression
-  - `sync --force` placeholder semantics regression
-  - deps.valid=false / deps.error regression
-  - active update after branch / before artifact regression
-  - sync success/failure exit behavior regression
-  - sync stderr/warnings ordering regression
-  - non-atomic artifact failure with `failed_partial_or_stale` regression
-  - artifact failure contract regression
-  - renderer text regression
-  - legacy delegated sync smoke
+  - nested cwd post-create retry guidance
+  - nested cwd doctor guidance
+  - checked-in runtime parity regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01O` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S08 — new node core を作る
+### S01P — create/post-create failure contract を outcome matrix で閉じる
 - target:
-  - `app.py`
-  - `application/create_node.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `infra/template_scaffolder.py`
-  - `infra/fs_repo.py`
-  - `infra/github_cli.py`
-  - `presentation/cli_text.py`
-  - 対応 test
+  - `gh issue create` 後の create failure surface を outcome class で再編し、cleanup failure でも safe guidance と evidence を失わないようにする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/046`
+  - `discussions/047`
+  - `discussions/048`
 - step boundary:
-  - `initiative|epic|issue` の create のみ
-  - `new doc` と `import` はまだ含めない
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> create_node` seam を含む staged diff とする
+  - create transaction や lock scope は変えず、failure classification / guidance assembly / parity test の中央集約に集中する
+  - local write committed と remote-only の区別を guidance contract と test exit criteria に昇格させる
 
-#### B1 — create core
-- purpose:
-  - no-write preflight と planned write を core 側で固定する
+#### Red
+- failing test:
+  - `pre_github_fail` が no-side-effect guidance として表面化し、created issue number を持ち込まない regression
+  - `gh create + lock acquire failure` または同等の `post_github_remote_only_fail` で created issue number と rerun/link guidance が返る regression
+  - `gh create + body failure` により `post_github_local_write_fail` が created issue number を保持したまま guidance を返す regression
+  - `gh create + local write success + release failure` で raw `release_error` ではなく created issue number と doctor-first guidance が返る regression
+  - `gh create + body failure + release failure` で primary failure と cleanup failure を併記しつつ context を失わない regression
+  - checked-in runtime parity でも上記 outcome class が provider と同じ guidance contract を返す regression
 
-##### I1 — planning
-- Red:
-  - create planning regression を 1 本追加
-- Green:
-  - `plan_node_creation()` と `CreatePlan` を導入する
-- Refactor:
-  - GitHub mode default を整理する
+#### Green
+- minimum implementation:
+  - create flow の post-GitHub evidence を outcome builder へ集約する
+  - `remote-only failure` と `local-write-committed cleanup failure` を別 guidance surface に分離する
+  - provider runtime と checked-in runtime parity を揃える
 
-##### I2 — execution
-- Red:
-  - create execution regression を 1 本追加
-- Green:
-  - `execute_create_plan()` を導入する
-- Refactor:
-  - created_paths ordering を整理する
-
-##### I3 — CLI contract
-- Red:
-  - create result/text regression を 1 本追加
-- Green:
-  - `CreateNodeResult` と text rendering を固定する
-- Refactor:
-  - collision fail-fast no-write を整理する
+#### Refactor
+- cleanup target:
+  - ad-hoc な post-create wrapper / release-error 分岐を outcome-specific helper へ寄せる
+  - message builder と evidence collection の責務を分離する
 
 #### step gate
 - review:
-  - new node slice review
+  - outcome matrix の class / guidance / evidence surface が `design.md` の契約どおり説明できる
+  - blind rerun guidance が local-write-committed cleanup failure へ誤適用されていない
+  - `post_github_local_write_fail` の committed-local 枝でも doctor-first guidance へ切り替わる
 - expected tests:
-  - planning regression
-  - execution regression
-  - full candidate-set no-write preflight regression
-  - `copy_scaffolded_tree -> write_meta` order regression
-  - `created_paths` ordering regression
-  - collision/no-write regression
-  - per-kind parity regression
-  - GitHub mode default / no-side-effect matrix regression
-  - `execute_create_plan()` reuse seam regression
-  - renderer text regression
-  - legacy delegated new smoke
+  - pre-github-fail guidance regression
+  - remote-only guidance regression
+  - local-write-fail guidance regression
+  - committed-local local-write-fail guidance regression
+  - cleanup-failure guidance regression
+  - body+cleanup combined failure regression
+  - checked-in runtime full-matrix parity regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01P` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S09 — new doc core を作る
+### S01L — create-mode 全 kind に pre-GitHub graph preflight を揃える
 - target:
-  - `app.py`
-  - `application/create_node.py`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `infra/template_scaffolder.py`
-  - `presentation/cli_text.py`
-  - 対応 test
+  - `new initiative|epic|issue` の create mode で、stable tree validation failure を GitHub issue 作成前に no-side-effect fail にする
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `discussions/039`
 - step boundary:
-  - `new doc` のみ
-  - node create core とは別枝に保つ
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> create_discussion_doc` seam を含む staged diff とする
+  - pre-lock では read-only graph preflight のみ追加し、authoritative な parent/uniqueness revalidation は lock 内に残す
+  - repo 全体 validate を create の必須前提へ広げるのではなく、まず `load_graph(...)` ベースで防げる orphan issue を減らす
 
-#### B1 — discussion doc
-- purpose:
-  - shared sequence/path/template write 契約を独立に固定する
+#### Red
+- failing test:
+  - broken existing tree で `new initiative --create-github-issue` が `issue_create()` 未呼び出しのまま fail する regression
+  - broken existing tree で `new epic` / `new issue` も pre-GH graph preflight で no-side-effect fail する regression
+  - checked-in dogfooding runtime でも同じ no-side-effect regression
 
-##### I1 — sequence / planning
-- Red:
-  - discussion sequence regression を 1 本追加
-- Green:
-  - `plan_discussion_doc()` を導入する
-- Refactor:
-  - nonconforming file ignore ルールを整理する
+#### Green
+- minimum implementation:
+  - create-mode 全 kind で `gh issue create` 前に read-only graph preflight を実行する
+  - `epic` / `issue` は preflight graph を使って stable parent existence も確認する
+  - lock 取得後は既存どおり graph reload と authoritative parent/uniqueness revalidation を維持する
 
-##### I2 — render / write
-- Red:
-  - new doc file generation regression を 1 本追加
-- Green:
-  - template load/render/write を導入する
-- Refactor:
-  - duplicate fail-fast no-write を整理する
-
-##### I3 — CLI contract
-- Red:
-  - `new doc` result/text regression を 1 本追加
-- Green:
-  - `CreateDiscussionDocResult` と `render_new_doc_text()` を固定する
-- Refactor:
-  - duplicate / invalid-sequence failure message と warnings ownership を整理する
+#### Refactor
+- cleanup target:
+  - pure input validation / graph preflight / in-lock authoritative validation の helper 境界を整理する
 
 #### step gate
 - review:
-  - new doc slice review
+  - tree preflight 追加で orphan issue を減らしつつ、S01I/S01J の create-lock 契約を壊していないことを説明できる
 - expected tests:
-  - sequence regression
-  - generated path/name/content regression
-  - doc_type (`adr|disc|research|note`) parity / template selection regression
-  - duplicate/no-write regression
-  - new node non-regression for shared-file edits
-  - invalid slug / duplicate sequence regression
-  - renderer text regression
-  - legacy delegated new-doc smoke
+  - provider runtime の broken-tree no-GH-call regression
+  - provider runtime の parent-not-found regression が引き続き通ること
+  - checked-in runtime parity regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01L` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S10 — import core を作る
+### S01Q — create intermediate state を partial write まで区別する
 - target:
-  - `app.py`
-  - `domain/tree.py`
-  - `application/import_node.py`
-  - `application/contracts.py`
-  - `application/create_node.py`
-  - `application/sync_state.py`
-  - `infra/github_cli.py`
-  - `infra/active_store.py`
-  - `presentation/cli_text.py`
-  - 対応 test
+  - `new` と create-like `import` の両方で、`execute_create_plan()` の partial local write を phase として分類し、remote-only failure と誤分類しない
+  - post-create guidance を phase-aware にして blind rerun を unsafe 枝へ出さない
+- design refs:
+  - `design.md` の `1.1 create intermediate state model`
+  - `discussions/051`
 - step boundary:
-  - `import` と `sync_after_import()` のみ
-  - shell 一般化はまだしない
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py -> import_node` seam を含む staged diff とする
+  - create transaction 境界や repo lock 自体は変えず、phase evidence / guidance / parity test の是正に集中する
+  - `new` だけでなく create-like `import` の write path も同じ phase model で閉じる
 
-#### B1 — import flow
-- purpose:
-  - create core と sync core を再利用しながら `import -> sync` を固定する
+#### Red
+- failing test:
+  - `new` の `copy scaffold success + write_meta failure` が rerun-safe guidance を返してしまう regression
+  - `new` の `copy scaffold` 途中 failure でも partial local write を remote-only と誤分類する regression
+  - create-like `import` でも partial local write が remote-only guidance へ誤分類される regression
+  - checked-in parity でも同じ guidance drift が起きる regression
 
-##### I1 — parent fallback
-- Red:
-  - import parent fallback regression を 1 本追加
-- Green:
-  - `resolve_parent_from_active()` と `resolve_parent_for_import()` を導入する
-- Refactor:
-  - `load_active_manifest_no_migrate()` 専用利用を固定する
+#### Green
+- minimum implementation:
+  - create phase evidence を `none/scaffold_copied/meta_written/post_write_verified` 相当へ拡張する
+  - phase に応じて doctor-first / partial-cleanup guidance を返す
+  - `new` と create-like `import` の両方で phase model を共有する
+  - provider runtime と checked-in runtime parity を揃える
 
-##### I2 — import preflight / duplicate no-write
-- Red:
-  - import duplicate / no-write regression を 1 本追加
-- Green:
-  - duplicate guard と no-write preflight を import flow に固定する
-- Refactor:
-  - preflight ownership と failure source を整理する
-
-##### I3 — linked create reuse
-- Red:
-  - linked create reuse regression を 1 本追加
-- Green:
-  - `build_linked_create_request()` と create core 再利用を導入する
-- Refactor:
-  - graph load / collision planning の二重実行を排除する
-
-##### I4 — post-import sync
-- Red:
-  - `import -> sync` regression を 1 本追加
-- Green:
-  - `sync_after_import()` を導入する
-- Refactor:
-  - `post_import_sync` ownership を固定する
+#### Refactor
+- cleanup target:
+  - create / import の write-phase evidence 収集 helper を整理する
 
 #### step gate
 - review:
-  - import slice review
+  - partial local write が remote-only failure と明確に分離されている
 - expected tests:
-  - parent fallback regression
-  - duplicate/no-write regression
-  - import then sync regression
-  - import -> sync artifact path/name/content assertions
-  - post-import sync negative-path regression
-  - `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` 鎖 regression
-  - `execute_create_plan()` reuse seam regression
-  - renderer text regression
-  - legacy delegated import smoke
+  - `new` の scaffold-copied meta-write-failure regression
+  - `new` の partial-copy failure regression
+  - create-like `import` partial-write guidance regression
+  - checked-in parity regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01Q` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S11 — commands / cli shell を正本化する
+### S02 — discussion seq を同じ transaction に統合し validator でも守る
 - target:
-  - `commands/contracts.py`
-  - `commands/*`
-  - `application/contracts.py`
-  - `application/ports.py`
-  - `cli/parser.py`
-  - `cli/registry.py`
-  - `cli/bootstrap.py`
-  - `cli/dispatch.py`
-  - `app.py`
-  - 対応 test
+  - `new doc` の seq 採番を S01 と同じ safety model に乗せる
+  - duplicate seq を validator failure として検知する
+- design refs:
+  - `design.md` の `1. create transaction`
+  - `design.md` の `3. artifact/repair contract`
+  - `discussions/008`
 - step boundary:
-  - use case 実装は増やさない
-  - すでにある core を束ねる shell に限定する
-  - staged coexistence 中の delegation owner は `app.py` とし、rollback unit は `app.py / cli/parser.py / cli/registry.py / cli/bootstrap.py / cli/dispatch.py / commands/* / commands/contracts.py / application/contracts.py / application/ports.py / presentation/contracts.py` を含む staged diff とする
+  - doctor guidance までは広げず、discussion create と validate safety net に限定する
+  - `S01` / `S01L` と合わせて `AC-001 create atomicity` を完了させる step として扱う
 
-#### B1 — shell integration
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S02` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — discussion allocator と validate safety net
 - purpose:
-  - speculative abstraction を避けつつ、最後に shell を整理する
+  - discussion sequence uniqueness を create transaction に統合し、壊れた既存状態は validate で fail させる
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
+  - `tests/cli_runtime/...`
+  - `tests/domain_runtime/...`
 
-##### I1 — command wrappers
-- Red:
-  - command wrapper contract regression を 1 本追加
-- Green:
-  - `commands/*` を薄い request normalization + renderer selection 層として導入する
-- Refactor:
-  - command-local validation failure と business outcome の ownership を整理する
+##### I1 — parallel new doc regression
+- slice goal:
+  - 並列 `new doc` で seq が重複しないことを先に test で固定する
 
-##### I2 — registry / bootstrap
-- Red:
-  - registry/bootstrap seam regression を 1 本追加
-- Green:
-  - 実需のある command だけで `registry` と `bootstrap` を導入する
-- Refactor:
-  - parser と registry の正本を 1 か所に揃える
+###### Red
+- failing test:
+  - 同一 issue 配下で discussion seq が重複する regression test
+- expected failure:
+  - duplicate seq が成立する
 
-##### I3 — dispatch thinness
-- Red:
-  - CLI dispatch ownership regression を 1 本追加
-- Green:
-  - `app.py` は parser 起動と dispatch 起動前後の最小責務に縮小する
-- Refactor:
-  - uncaught runtime / argparse / business exit ownership を整理する
+###### Green
+- minimum implementation:
+  - discussion seq 採番を create transaction 配下に移す
+- pass condition:
+  - parallel `new doc` regression test が通る
+
+###### Refactor
+- cleanup target:
+  - node id allocator と discussion seq allocator の共有ロジック整理
+- invariants to keep green:
+  - `new doc` の既存 naming/format を壊さない
+
+##### I2 — duplicate seq validation
+- slice goal:
+  - 既に壊れた discussion seq 重複を validate で fail にする
+
+###### Red
+- failing test:
+  - duplicate seq を含む tree に対する validate failure test
+- expected failure:
+  - 現状は validate が通ってしまう
+
+###### Green
+- minimum implementation:
+  - discussion seq uniqueness check を validator contract に追加する
+- pass condition:
+  - duplicate seq validation test が通る
+
+###### Refactor
+- cleanup target:
+  - artifact/uniqueness rule の domain 表現を整理する
+- invariants to keep green:
+  - 正常系 validate の既存出力互換を必要以上に壊さない
 
 #### step gate
 - review:
-  - shell integration review
+  - discussion race の preventive control と detective control の役割分担が明確
 - expected tests:
-  - parser/help regression
-  - argparse failure `2`
-  - business exit ownership
-  - representative command wrapper smoke
-  - staged delegation path regression
-  - rollback-ready wrapper swap smoke
-  - `commands/* -> UseCases facade + application DTO + presentation renderer + commands/contracts only` structural checks
-  - `commands/*` が `domain/*` / `infra/*` / 旧 `app.py` helper に直接依存しない structural checks
+  - parallel `new doc` test
+  - duplicate seq validate test
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S02` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S12 — test tree 分割を独立 review scope で完了する
+### S01H — import を create transaction 契約へ統合する
 - target:
-  - `tests/test_cli.py`
+  - `import issue` を `new issue` と同じ repo-level create transaction 契約へ揃える
+  - import/import、import/new が競合しても duplicate id / duplicate GitHub linkage を残さない
+- design refs:
+  - `requirement.md` の `AC-001 create atomicity`
+  - `design.md` の `1. create transaction`
+- step boundary:
+  - URL safety や foreign/current repo identity の仕様自体は `S05` 系で固定済みとし、ここでは create-like write path の atomicity だけを閉じる
+  - discussion seq は引き続き `S02` の責務であり、`import issue` は新しい seq allocator 義務を持ち込まない
+  - lock の外に残すのは URL/repo identity 解析、artifact preflight、GitHub metadata fetch とし、graph 読み取り以降の uniqueness 再検証 / plan / write / post-write duplicate guard は lock 内で行う
+
+#### B1 — provider-side import transaction closure
+- purpose:
+  - provider-side `import issue` を create lock + post-write duplicate guard 配下へ入れ、stale graph 競合を防ぐ
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/...`
+
+##### I1 — import/import race
+- slice goal:
+  - 並列 `import issue` が duplicate id / duplicate GitHub linkage を作らない
+
+###### Red
+- failing test:
+  - 同一 issue を別 slug で並列 import すると、両方が stale graph を通って duplicate id/linkage を残す regression test
+- expected failure:
+  - import path が repo-level create transaction 外で動き、pre-write uniqueness check が競合を防げない
+
+###### Green
+- minimum implementation:
+  - provider-side `import_node.py` で create lock acquire/release と post-write duplicate guard を `new issue` と同じ契約で適用する
+- pass condition:
+  - import/import race regression test が通る
+
+##### I2 — import/new race
+- slice goal:
+  - `import issue` と `new issue --github-issue` が同じ GitHub target で競合しても duplicate を残さない
+
+###### Red
+- failing test:
+  - import/new の並列 create-like 競合で duplicate id/linkage が残る regression test
+- expected failure:
+  - create transaction が `new` 系だけに閉じていて import が atomicity 契約から漏れる
+
+###### Green
+- minimum implementation:
+  - provider-side import path を `new` 系と同じ critical section に入れる
+- pass condition:
+  - import/new race regression test が通る
+
+#### B2 — checked-in runtime parity
+- purpose:
+  - checked-in dogfooding runtime でも import path の create transaction 契約を provider-side と一致させる
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
   - `tests/test_init_update.py`
-  - `tests/__init__.py`
-  - `tests/cli_runtime/*`
-  - `tests/cli_runtime/__init__.py`
-  - `tests/domain_runtime/*`
-  - `tests/domain_runtime/__init__.py`
-  - `tests/presentation_runtime/*`
-  - `tests/presentation_runtime/__init__.py`
-- step boundary:
-  - test file の physical split のみ
-  - shell / core の分離が終わったあとに safety net を整理する
-  - `unittest discover` は regular package (`__init__.py`) 方式を正本とし、`load_tests` は採用しない
-  - semantic-no-change refactor とし、pure move / helper extraction / import path 修正以外の意味変更を持ち込まない
 
-#### B1 — test tree split
-- purpose:
-  - reviewer が command ごとの失敗面を追える test tree を独立 scope で先に固定する
+##### I1 — checked-in import/import race parity
+- slice goal:
+  - checked-in runtime の import/import race でも create lock / duplicate guard が効く
 
-##### I1 — installer / wrapper split
-- Red:
-  - installer/wrapper discovery regression を 1 本追加
-- Green:
-  - `tests/test_init_update.py`, `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_wrappers.py`, 各 package `__init__.py` を導入する
-- Refactor:
-  - shared runtime harness import を整理する
+###### Red
+- failing test:
+  - checked-in runtime で import/import race が duplicate node/linkage を残す subprocess regression test
+- expected failure:
+  - checked-in runtime だけが import transaction 契約から漏れる
 
-##### I2 — command runtime split
-- Red:
-  - command runtime discovery regression を 1 本追加
-- Green:
-  - `tests/cli_runtime/test_new.py`, `test_active.py`, `test_sync.py`, `test_deps.py`, `test_import.py`, `test_validate.py` を分割する
-- Refactor:
-  - duplicated command fixtures を整理する
+###### Green
+- minimum implementation:
+  - checked-in `import_node.py` を provider-side と同じ create transaction 契約へ refresh する
+- pass condition:
+  - checked-in runtime の import/import race subprocess parity regression test が通る
 
-##### I3 — domain / presentation split
-- Red:
-  - pure test discovery regression を 1 本追加
-- Green:
-  - `tests/domain_runtime/*`, `tests/presentation_runtime/*` を分割する
-- Refactor:
-  - pure subtree 内 helper 境界を整理する
+##### I2 — checked-in import/new race parity
+- slice goal:
+  - checked-in runtime の import/new race でも provider-side と同じ atomicity 契約が効く
+
+###### Red
+- failing test:
+  - checked-in runtime で `import issue` と `new issue --github-issue` の race が duplicate node/linkage を残す subprocess regression test
+- expected failure:
+  - checked-in runtime parity が generic import path だけを見ており、cross-command create-like contention を未固定
+
+###### Green
+- minimum implementation:
+  - checked-in subprocess parity test で import/new contention も固定する
+- pass condition:
+  - checked-in runtime の import/new race subprocess parity regression test が通る
 
 #### step gate
 - review:
-  - test tree split review
+  - import path が `new issue` と同じ lock scope / failure surface を使い、post-write duplicate guard は created-id materialization boundary として整合している
 - expected tests:
-  - `python -m unittest discover -v`
-  - touched test modules
-  - test module existence + command grouping assertions
-  - regular package (`__init__.py`) discovery assertions
-  - critical inventory still covered:
-    - staged delegation path
-    - active rollback failure-injection
-    - import->sync regeneration
-    - sync artifact path/name/content snapshots
+  - provider-side import/import race regression
+  - provider-side import/new race regression
+  - checked-in runtime import/import race parity regression
+  - checked-in runtime import/new race parity regression
+  - 既存 import success/non-race 回帰
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S01H` の review と expected tests が通り、`report.md` 更新後にコミットする
 
-### S13 — helper detachment と rollback basis 切替を完了する
+### S03 — status/readiness contract を統一し stale projection を明示する
 - target:
-  - `app.py`
-  - `commands/*`
-  - `application/*`
-  - `ids.py`
-  - `io_json.py`
-  - `github.py`
-  - `render_md.py`
-  - `render_puml.py`
-  - `active.py`
-  - `nodes.py`
-  - `tests/cli_runtime/*`
-  - `tests/domain_runtime/*`
-  - `tests/presentation_runtime/*`
-  - 旧 helper call site 一式
+  - local-only issue の初期 status を deterministic にし、`deps check` と `active set` を同一 readiness contract に揃える
+  - linked issue の cache read に `source/stale` を露出する
+- design refs:
+  - `design.md` の `2. status/readiness contract`
+  - `discussions/006`, `009`, `015`
 - step boundary:
-  - 旧 helper 直依存の解消のみ
-  - user-facing behavior change は含めない
-  - rollback basis は staged seam から `git revert / commit rollback` へこの step で切り替える
+  - import/CLI explicit flags は `S05` に分離し、ここでは status resolution 契約だけを扱う
 
-#### B1 — helper detachment and rollback transition
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S03` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — domain/application/presentation の status resolution
 - purpose:
-  - 段階移行で残した delegation を最後に除去し、rollback 根拠を commit 単位へ切り替える
+  - `authority / effective_status / source / stale / last_sync_at` を持つ共通解決モデルを導入し、CLI/json の両方へ露出する
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/...`
+  - `tests/domain_runtime/...`
+  - `tests/cli_runtime/...`
+  - `tests/presentation_runtime/...`
 
-##### I1 — final API call-site detachment
-- Red:
-  - final API call-site regression を 1 本追加
-- Green:
-  - 旧 helper 直依存を final layered API へ切り替える
-- Refactor:
-  - compatibility shim の縮小を整理する
+##### I1 — local-only readiness regression
+- slice goal:
+  - local-only issue で `blockers=[]` かつ `effective_status=open` なら ready になることを固定する
 
-##### I2 — legacy shim cleanup
-- Red:
-  - legacy shim import assertion regression を 1 本追加
-- Green:
-  - `ids.py`, `io_json.py`, `github.py`, `render_md.py`, `render_puml.py`, `active.py`, `nodes.py` を matrix どおり削除または thin wrapper 限定へ整理する
-- Refactor:
-  - layer direction assertions を整理する
+###### Red
+- failing test:
+  - local-only issue の `deps check` / `active set` 不整合 regression test
+- expected failure:
+  - `ready=false` または `state=unknown` に落ちる
+
+###### Green
+- minimum implementation:
+  - local-only 初期 authority/effective/source を決め、共通 readiness rule を参照させる
+- pass condition:
+  - `deps check` と `active set` の回帰テストが両方通る
+
+###### Refactor
+- cleanup target:
+  - readiness 判定の共通化と status field naming の整理
+- invariants to keep green:
+  - linked issue の既存正常系を壊さない
+
+##### I2 — stale projection visibility
+- slice goal:
+  - linked issue を `--github` なしで読むと `source=cache` と stale 情報が見えることを固定する
+
+###### Red
+- failing test:
+  - cache read が freshness を露出しない regression test
+- expected failure:
+  - source/stale 情報が出力されない
+
+###### Green
+- minimum implementation:
+  - presentation/json/text に source/stale/last_sync_at を追加する
+- pass condition:
+  - linked issue cache read regression test が通る
+
+###### Refactor
+- cleanup target:
+  - status render と internal model の境界整理
+- invariants to keep green:
+  - `--github` 指定時の authoritative read が維持される
 
 #### step gate
 - review:
-  - helper detachment / rollback transition review
+  - local-only と GitHub-linked の status authority が誤解なく説明できる
 - expected tests:
-  - `python -m unittest discover -v`
-  - focused regressions:
-    - `import -> sync`
-    - `active set` guard/order
-    - `deps check`
-    - markdown/puml/json artifact contracts
-  - final API call-site regression
-  - `app.py` thin-entrypoint / no live wrapper / no bootstrap->app wiring structural check
-  - legacy import prohibition / layer direction assertions:
-    - `commands/* -> UseCases facade + presentation renderer`
-    - `domain/*` no I/O import
-    - `infra/*` only through ports
-  - rollback basis transition evidence:
-    - pre-switch rollback unit は staged seam であったこと
-    - この step 完了後は `git revert / commit rollback` が唯一の rollback 基準であること
-    - partial import rollback は対象外で rollback unit は commit 単位であること
+  - deps/active readiness regression
+  - stale/source/last_sync_at の text/json presentation regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S03` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03J — current repo の unscoped linked epic/initiative に issue-view fallback を揃える
+- target:
+  - `issue_index()` が current repo linked epic / initiative / issue を取りこぼした場合でも、repo-aware fallback fetch で `unknown/stale` 退行を防ぐ
+- design refs:
+  - `design.md` の `2.1 current repo slug parity for github-aware commands`
+  - `design.md` の `2.4 current-repo fallback fetch for unscoped initiative/epic links`
+- step boundary:
+  - same-repo indexed dedup 契約は維持し、current repo slug を helper と call site へ渡す補強だけを扱う
+
+#### Red
+- failing test:
+  - unscoped current-repo linked epic が index 未掲載時に fallback fetch されず `unknown/stale` のままになる regression
+  - unscoped current-repo linked initiative も同様に stale のままになる regression
+  - checked-in parity path に同 helper がある場合、同じ取りこぼしが再発する regression
+
+#### Green
+- minimum implementation:
+  - `collect_repo_scoped_issue_view_targets()` に `current_repo_slug` を通し、unscoped linked node を `(current_repo_slug, issue_number)` として fallback target 化する
+  - `sync_state` / `set_active` / `check_deps` の call site を同 helper 契約へ揃える
+  - checked-in parity path に同 helper / call site があれば追随させる
+
+#### Refactor
+- cleanup target:
+  - current-repo vs foreign-repo target 判定 helper の責務を整理する
+- invariants to keep green:
+  - index 済み same-repo target への extra `issue_view_snapshot()` は復活させない
+  - foreign scoped fetch は引き続き維持する
+
+#### step gate
+- review:
+  - current repo linked issue / epic / initiative が index incomplete 時でも repo-aware fallback で status を回復できる
+- expected tests:
+  - sync current-repo unscoped epic/initiative fallback regression
+  - active/deps current-repo fallback parity regression
+  - checked-in parity regression（該当 path がある場合）
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03K — repo overlap 後も numeric branch inference を current-repo-aware に保つ
+- target:
+  - foreign same-number coexistence 後も numeric branch 名から current repo issue を安定に推論し、branch auto-update を止めない
+- design refs:
+  - `design.md` の `2.5 current-repo-aware numeric branch inference`
+- step boundary:
+  - explicit id match 優先は変えず、numeric fallback と `sync_state` からの current repo slug 伝播だけを扱う
+  - current repo slug が既知のとき、foreign-only numeric match や current-scope multiple match は fail-closed に固定する
+
+#### Red
+- failing test:
+  - current repo `#123` と foreign `other/repo#123` が共存すると `123-fix-login` が ambiguity に落ちる regression
+  - current repo slug 不明時の ambiguity fail-closed が失われる regression
+  - current repo slug が既知でも foreign-only numeric match を暗黙採用してしまう regression
+  - current repo scope に複数 numeric match があるのに scoped ambiguity fail-closed にならない regression
+  - checked-in parity path に同 inference がある場合、同じ ambiguity が再発する regression
+
+#### Green
+- minimum implementation:
+  - `infer_active_node_from_branch()` の numeric fallback を repo-aware candidate selection に更新する
+  - `maybe_auto_update_from_branch()` から current repo slug を渡す
+  - checked-in parity path に同 inference があれば追随させる
+
+#### Refactor
+- cleanup target:
+  - numeric branch candidate selection と reason message の責務を整理する
+- invariants to keep green:
+  - explicit node id を含む branch の優先順位は維持する
+  - current repo slug 不明時は ambiguity/no-match の fail-closed を維持する
+
+#### step gate
+- review:
+  - numeric branch auto-update が current repo overlap では継続し、repo context 不明時だけ fail-closed になる
+- expected tests:
+  - branch overlap current-repo preferred regression
+  - branch overlap slug-unknown ambiguity regression
+  - branch foreign-only known-scope fail-closed regression
+  - branch scoped-ambiguity fail-closed regression
+  - checked-in parity regression（該当 path がある場合）
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03K` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04 — artifact/repair/active fallback contract を整える
+- target:
+  - required artifact matrix を validate に入れる
+  - doctor を supported repair path として追加する
+  - active 未設定でも path と CLI の両方に fallback 導線を持たせる
+- design refs:
+  - `design.md` の `3. artifact/repair contract`
+  - `discussions/010`, `011`, `012`
+- step boundary:
+  - GitHub target ambiguity や create flags は `S05` に分離する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — validate と artifact matrix
+- purpose:
+  - node kind ごとの required artifact contract を runtime preflight として扱い、validate/sync の safety net を強化する
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/domain_runtime/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — required artifact validation
+- slice goal:
+  - initiative/epic/issue の required artifact 欠損と discussion markdown/integrity contract の破損が validate failure になることを固定する
+
+###### Red
+- failing test:
+  - `requirement.md` や `.meta.json` 欠損を見逃す回帰テスト
+- expected failure:
+  - validate が成功してしまう
+
+###### Green
+- minimum implementation:
+  - required artifact matrix と preflight integration を追加する
+- pass condition:
+  - `initiative` / `epic` / `issue` の required artifact 欠損を検知する validation test が通る
+  - discussion は markdown file 本体の不整合または seq uniqueness 破損を検知する validation test が通る
+
+###### Refactor
+- cleanup target:
+  - artifact contract の共通化
+- invariants to keep green:
+  - discussion seq uniqueness と矛盾しない
+
+#### B2 — doctor と active fallback
+- purpose:
+  - recoverability と onboarding 導線を supported path として整備する
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — doctor guidance
+- slice goal:
+  - duplicate id/seq、missing artifact、broken meta、stale active pointer を doctor が診断し guidance を返す
+  - repo-aware uniqueness 導入後も、doctor の validation context が `validate` / `sync` と一致し、current/foreign 同番号の正常系を false positive にしない
+
+###### Red
+- failing test:
+  - 壊れた状態で doctor が supported guidance を返さない regression test
+- expected failure:
+  - doctor command がない、または必要情報が出ない
+
+###### Green
+- minimum implementation:
+  - doctor command/use case/presentation を追加する
+- pass condition:
+  - `duplicate id/seq`、`missing artifact`、`broken meta`、`stale active pointer`、`stale create lock` をそれぞれ診断する doctor guidance test が通る
+
+###### Refactor
+- cleanup target:
+  - validate と doctor の責務分離
+- invariants to keep green:
+  - `.meta.json` read-only 方針を維持する
+
+##### I2 — active-not-set fallback
+- slice goal:
+  - active 未設定でも `spec-dock/active` と `active show` から次アクションが分かることを固定する
+  - persisted active manifest が残っている recovery では、placeholder ではなく active entrypoint 自体を復元する
+
+###### Red
+- failing test:
+  - active 未設定時に path/CLI fallback がない regression test
+- expected failure:
+  - `(not set)` のみ、または path が存在しない
+
+###### Green
+- minimum implementation:
+  - `spec-dock/active -> system/active-none` の一貫した入口と fallback guidance を追加する
+  - persisted active manifest が健全な場合は `spec-dock/active/{initiative,epic,issue}` を対応 node へ再構築し、壊れている場合だけ placeholder fallback に落とす
+- pass condition:
+  - `spec-dock/active` の path 入口と `active show` の CLI 入口の両方で fallback guidance が機能する test が通る
+  - active dir 欠損 recovery 後に `context-pack.md` と active entrypoint が同じ persisted active state を指す test が通る
+
+###### Refactor
+- cleanup target:
+  - active pointer 管理と presentation の整理
+- invariants to keep green:
+  - active が設定済みの通常フローを壊さない
+
+#### step gate
+- review:
+  - validate と doctor の契約境界、active fallback の UX 意図が説明できる
+- expected tests:
+  - `initiative` / `epic` / `issue` の required artifact validation
+  - discussion markdown/integrity validation
+  - `duplicate id/seq` / `missing artifact` / `broken meta` / `stale active pointer` / `stale create lock` の doctor guidance
+  - current repo `#123` と foreign repo `#123` を併存した正常 graph に対して doctor が ambiguity false positive を出さない
+  - `spec-dock/active` path 入口と `active show` CLI 入口の active fallback
+  - persisted active manifest からの active entrypoint rebuild
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05 — GitHub targeting と CLI intent surface を安全化する
+- target:
+  - URL import の repo identity mismatch を safe default で防ぐ
+  - `new issue` に explicit GitHub create flag を追加する
+  - `active set` と numeric target を受ける関連コマンドに explicit target flags を追加する
+- design refs:
+  - `design.md` の `4. GitHub targeting and CLI intent surface`
+  - `discussions/013`, `014`, `016`
+- step boundary:
+  - status freshness の内部契約は `S03`、docs/help 反映は `S90` に分ける
+  - S05 は target parsing / create intent / repo identity validation だけを扱い、status freshness の意味づけ変更は扱わない
+  - docs/help 文言、usage examples、dogfooding workspace 反映は `S90` で閉じる
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — wrong-repo safety と explicit flags
+- purpose:
+  - import/create/active の command contract を repo-aware / intent-aware にする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — repo-aware import
+- slice goal:
+  - GitHub URL の `owner/repo` mismatch を default failure にする
+
+###### Red
+- failing test:
+  - foreign repo URL を current repo issue に誤リンクできてしまう regression test
+- expected failure:
+  - mismatch を見逃して成功してしまう
+
+###### Green
+- minimum implementation:
+  - repo identity validation と foreign URL 用の explicit opt-in flag（例: `--allow-foreign-url`）を追加する
+  - foreign repo import を許可した node には repo identity を persisted metadata として保持し、後続の sync/deps/status refresh が同じ foreign repo を参照するようにする
+  - linked uniqueness を `repo + issue_number` で評価し、same-repo duplicate は防ぎつつ foreign 同番号は許可する
+- pass condition:
+  - foreign URL mismatch が default fail する regression test と、explicit opt-in でのみ成功する regression test が通る
+  - foreign repo import 後の `sync --github` / `deps check --github` が current repo の同番号 issue に誤 hydrate しない regression test が通る
+  - current repo `#123` と foreign repo `#123` を併存でき、same-repo duplicate だけが fail する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - target parser と repo identity resolver の責務分離
+- invariants to keep green:
+  - current repo URL / issue number の既存正常系を維持する
+
+##### I2 — create/active explicit intent
+- slice goal:
+  - `new issue --create-github-issue` と `--id` / `--github-issue` を通じて意図を明示できるようにする
+  - `--id` / `--github-issue` の対象コマンドを少なくとも `active set` と numeric target を受ける同系 command に固定する
+
+###### Red
+- failing test:
+  - explicit flag が受理されない、または target intent が指定できない regression test
+- expected failure:
+  - parser error、または曖昧解釈のまま
+
+###### Green
+- minimum implementation:
+  - additive flags と help/error guidance を追加する
+- pass condition:
+  - create/active explicit intent regression test が通る
+  - overlapping foreign/current issue number が存在する時、`--github-issue <n>` は ambiguity error となり、`--id <node-id>` でのみ確定できる regression test が通る
+
+###### Refactor
+- cleanup target:
+  - shared target parsing と help text の整形
+- invariants to keep green:
+  - bare number の後方互換は維持しつつ、explicit 形へ誘導する
+
+#### step gate
+- review:
+  - safe default と additive backward compatibility の両立が説明できる
+- expected tests:
+  - foreign URL mismatch default fail
+  - foreign URL explicit opt-in success
+  - foreign repo identity persistence across sync/deps refresh
+  - foreign overlap issue number allow / same-repo duplicate fail
+  - explicit create flag
+  - `active set --id`
+  - `active set --github-issue`
+  - ambiguous `--github-issue` fail with overlapping foreign/current issue numbers
+  - numeric target を受ける同系 command の explicit target flags
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05F — current repo slug parity を github-aware command 全体へ揃える
+- target:
+  - `active set --github` と `deps check --github` が `sync --github` と同じ current repo slug-aware status resolution を使う
+- design refs:
+  - `design.md` の `2.1 current repo slug parity for github-aware commands`
+  - `discussions/023`, `024`
+- step boundary:
+  - foreign repo uniqueness や explicit flags の仕様自体は `S05` で固定済みとし、ここでは command 間の context parity だけを補修する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05F` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — active/deps status context parity
+- purpose:
+  - current repo linked issue が `active set --github` / `deps check --github` で `unknown/stale` に退行しないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — current repo slug propagation
+- slice goal:
+  - `set_active` と `check_deps` が current repo slug を status resolution へ渡す
+
+###### Red
+- failing test:
+  - current repo linked issue の `active set --github` / `deps check --github` が `unknown` になって誤 block / 誤 JSON となる regression test
+- expected failure:
+  - current repo snapshot を current issue に再結合できない
+
+###### Green
+- minimum implementation:
+  - current repo slug 解決 helper を parity させ、status resolution 呼び出しへ渡す
+- pass condition:
+  - current repo linked issue の `active set --github` が readiness を正しく評価する regression test が通る
+  - current repo linked issue の `deps check --github` が GitHub status を readiness / JSON に反映する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - current repo slug helper の重複整理
+- invariants to keep green:
+  - current repo slug 未解決時の fail-closed/unknown 契約は維持する
+
+#### step gate
+- review:
+  - current repo slug-aware status resolution が `sync` / `active` / `deps` で揃っている
+- expected tests:
+  - `active set --github` current repo linked issue regression
+  - `deps check --github` current repo linked issue regression
+  - foreign same-number coexist の non-regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05F` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04F — domain/application validation boundary を再分離する
+- target:
+  - domain validation API を graph/deps/linkage の structural invariant に戻し、artifact matrix 検査は application preflight へ寄せる
+- design refs:
+  - `design.md` の `3. artifact/repair contract`
+  - `discussions/025`
+- step boundary:
+  - artifact matrix 契約自体は維持し、責務の置き場だけを修正する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04F` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — domain purity recovery
+- purpose:
+  - in-memory/synthetic graph の structural validation が on-disk artifact 欠損に先回りされないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/domain_runtime/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — move artifact existence checks to application preflight
+- slice goal:
+  - domain validation から filesystem 依存を外し、validate/sync/doctor の artifact 契約は application 側で維持する
+
+###### Red
+- failing test:
+  - synthetic graph の structural error が `Missing required artifact` に先回りされる regression test
+- expected failure:
+  - domain validation API が graph ではなく filesystem 欠損に引きずられる
+
+###### Green
+- minimum implementation:
+  - required artifact existence check を application preflight へ移し、domain validation から外す
+- pass condition:
+  - domain test が structural error を artifact 欠損なしで検証できる
+  - `validate` / `sync` / `doctor` は引き続き missing artifact を検出する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - graph validation と artifact preflight の API 境界整理
+- invariants to keep green:
+  - human-facing missing artifact 診断と guidance は維持する
+
+#### step gate
+- review:
+  - domain validation API が filesystem 非依存であること、artifact 契約が application 側で維持されていることを説明できる
+- expected tests:
+  - domain structural validation regression
+  - validate/sync/doctor の missing artifact regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04F` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04G — stale active pathfile healing を self-healing contract に含める
+- target:
+  - symlink 制限環境の `spec-dock/active/*.path` stale fallback も `update` で repair できるようにする
+- design refs:
+  - `design.md` の `3.1 stale active pathfile healing`
+  - `discussions/029`
+- step boundary:
+  - recovery surface は `cli.py` と installer/update regression に限定する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04G` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — stale pathfile repair
+- purpose:
+  - `.path` が stale でも persisted/recovered target または placeholder へ自動復旧する
+- files:
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+
+##### I1 — stale pathfile を除去して再生成する
+- slice goal:
+  - `existing_entrypoint is None` なのに `.path` があるだけで recovery が止まる分岐を閉じる
+
+###### Red
+- failing test:
+  - symlink 制限下で stale `.path` が persisted active target に repair されない regression
+  - symlink 制限下で persisted target も stale の時 placeholder に戻らない regression
+- expected failure:
+  - stale `.path` 存在だけで `update` が `continue` してしまう
+
+###### Green
+- minimum implementation:
+  - stale `.path` を削除してから既存 resolved target 判定へ流す
+- pass condition:
+  - stale pathfile recovery regression が通る
+
+###### Refactor
+- cleanup target:
+  - stale symlink と stale pathfile の recovery 分岐整理
+- invariants to keep green:
+  - 健全な entrypoint は触らない
+
+#### step gate
+- review:
+  - symlink/pathfile 両 fallback の self-healing 契約が説明できる
+- expected tests:
+  - stale `.path` -> persisted target recovery
+  - stale `.path` -> placeholder fallback
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04G` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04I — placeholder active entrypoint を persisted active recovery で上書きできるようにする
+- target:
+  - `spec-dock/active/{initiative,epic,issue}` が placeholder を向いていても、persisted active manifest から実 node を解決できるなら `update` が active entrypoint を実 node へ rebuild する
+- design refs:
+  - `design.md` の `active entrypoint recovery`
+  - `discussions/040`
+- step boundary:
+  - healthy な real entrypoint は保持し、placeholder fallback と broken entrypoint の recovery だけを扱う
+  - `context-pack.md` の再生成 source of truth は既存方針どおり最終 active entrypoint 実体とする
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04I` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — placeholder fallback recovery
+- purpose:
+  - placeholder を healthy state と誤認して persisted active recovery を skip する分岐を閉じる
+- files:
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+
+##### I1 — placeholder を recoverable fallback として再構築する
+- slice goal:
+  - valid persisted manifest がある時、placeholder symlink / `.path` fallback から real active node へ rebuild する
+
+###### Red
+- failing test:
+  - placeholder symlink が残っていると `update` が persisted active manifest を見ても rebuild しない regression
+  - placeholder `.path` fallback が残っていると `update` が `(none)` context-pack へ退行する regression
+  - mixed state で healthy real entrypoint は維持し、placeholder layer だけ rebuild される regression
+- expected failure:
+  - placeholder を healthy existing entrypoint と誤認して `continue` してしまう
+
+###### Green
+- minimum implementation:
+  - placeholder entrypoint を recoverable fallback として識別し、persisted/recovered target が解決できる時だけ実 node へ張り替える
+  - persisted target が壊れている場合は placeholder を維持し、`context-pack.md` も `(none)` 側を維持する
+- pass condition:
+  - placeholder recovery regression が通る
+
+###### Refactor
+- cleanup target:
+  - healthy real entrypoint / placeholder fallback / broken entrypoint の優先順位整理
+- invariants to keep green:
+  - stale persisted manifest で healthy real entrypoint を上書きしない
+
+#### step gate
+- review:
+  - `healthy real entrypoint > valid persisted target > placeholder fallback` の優先順位が説明できる
+- expected tests:
+  - placeholder symlink -> persisted target recovery
+  - placeholder `.path` -> persisted target recovery
+  - mixed state で placeholder layer のみ rebuild
+  - broken persisted manifest では placeholder fallback を維持
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04I` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04J — create-in-progress scaffold を corruption と誤診断しない
+- target:
+  - create lock 下の missing `.meta.json` を in-progress/stale-create 系として分類し、恒久 corruption と区別する
+- design refs:
+  - `design.md` の `3.1 create-in-progress / partial-write diagnosis`
+  - `discussions/052`
+- step boundary:
+  - required artifact contract 自体は維持し、reader-side classification と doctor guidance の是正に限定する
+
+#### Red
+- failing test:
+  - create lock 下の node-like directory without `.meta.json` を `validate` / `doctor` / `sync` が即 corruption 扱いする regression
+  - lock なし missing `.meta.json` が corruption でなくなる regression を防ぐ
+
+#### Green
+- minimum implementation:
+  - reader が create lock と missing `.meta.json` を合わせて分類する
+  - application 側が in-progress/stale-create と corruption を別 guidance へ写像する
+
+#### Refactor
+- cleanup target:
+  - stale create lock / missing artifact / in-progress create の分類責務整理
+
+#### step gate
+- review:
+  - in-progress create と恒久 corruption の境界が lock/state で説明できる
+- expected tests:
+  - create-lock-present missing-meta regression
+  - lock-absent missing-meta remains-corruption regression
+  - checked-in parity または executable smoke
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04K — persisted active path fallback は manifest id/type 一致なしに信用しない
+- target:
+  - persisted active manifest の `path` が same-layer の別 node を指していても、`update` が wrong node へ repoint しないようにする
+- design refs:
+  - `design.md` の `active entrypoint recovery`
+  - `discussions/054`
+- step boundary:
+  - installer/update の active recovery (`src/spec_dock/cli.py`) と installer regression (`tests/test_init_update.py`) に限定する
+  - healthy active entrypoint や id-based recovery、placeholder fallback の既存 contract は維持する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04K` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — persisted path trust boundary
+- purpose:
+  - same-layer / correct-prefix だが wrong-id の stale path を fail-closed に倒す
+- files:
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+
+##### I1 — same-layer wrong-id path を recovery target にしない
+- slice goal:
+  - `_resolve_persisted_path_dir()` が prefix だけ合う別 node を誤採用する分岐を閉じる
+
+###### Red
+- failing test:
+  - persisted active manifest の `issue.id=iss-local-99999` と `path=.../iss-local-00002-*` で、`update` が `iss-local-00002` へ repoint してしまう regression
+  - same-layer wrong-id persisted path は id-based recovery が失敗した時 placeholder fallback へ落ちる regression
+  - same-layer wrong-id persisted path でも、tree 内に `expected_id` の正しい node が別 path に存在する時は id-based recovery を優先してその node へ戻る regression
+- expected failure:
+  - `context-pack.md` と active entrypoint が persisted id ではなく wrong node id を指す
+
+###### Green
+- minimum implementation:
+  - persisted path fallback でも `.meta.json` を読み、`expected_id` / `layer` 一致がある場合だけ recovery target として返す
+  - 一致しない時は `None` を返し、既存 id-based recovery / placeholder fallback へ流す
+- pass condition:
+  - same-layer wrong-id persisted path regression が通る
+
+###### Refactor
+- cleanup target:
+  - persisted path / manifest id recovery の責務境界整理
+- invariants to keep green:
+  - valid persisted path は従来どおり復旧できる
+  - healthy active entrypoint を stale manifest で上書きしない
+
+#### step gate
+- review:
+  - path hint と id authority の優先順位を説明できる
+- expected tests:
+  - same-layer wrong-id persisted path -> placeholder fallback
+  - same-layer wrong-id persisted path + valid `expected_id` elsewhere -> id-based recovery
+  - valid persisted path -> existing recovery contract 維持
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04K` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05G — repo-aware numeric deps resolution で foreign overlap 後も既存 shorthand を守る
+- target:
+  - foreign overlap 導入後も bare numeric deps ref が current repo issue shorthand として解決されるようにする
+- design refs:
+  - `design.md` の `2.2 repo-aware numeric deps resolution`
+  - `discussions/028`
+- step boundary:
+  - numeric deps ref 自体は後方互換のため維持し、repo-aware 解決だけを追加する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05G` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — numeric dep ref resolution parity
+- purpose:
+  - `depends_on: [123]` が overlap 後に `Ambiguous github.issue_number` へ退行しないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py`
+  - 必要なら `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py`
+  - `tests/cli_runtime/...`
+
+##### I1 — current repo context で bare number を解決する
+- slice goal:
+  - bare numeric ref を current repo 文脈で解決し、current repo slug 不明時だけ fail-closed にする
+
+###### Red
+- failing test:
+  - existing `depends_on: [123]` が foreign overlap 導入後に `Ambiguous github.issue_number=123` へ退行する regression
+- expected failure:
+  - bare numeric deps ref が bare issue number key のまま曖昧化する
+
+###### Green
+- minimum implementation:
+  - `deps_reader` の numeric ref 解決を repo-aware にし、必要なら legacy app path も parity させる
+- pass condition:
+  - overlap 導入後も existing numeric deps ref が current repo issue を解決する regression test が通る
+
+###### Refactor
+- cleanup target:
+  - bare ref / scoped ref / fail-closed 条件の整理
+- invariants to keep green:
+  - current repo slug 不明時の fail-closed 契約は維持する
+
+#### step gate
+- review:
+  - numeric deps shorthand と foreign overlap の後方互換契約が説明できる
+- expected tests:
+  - current repo numeric deps shorthand survives foreign overlap
+  - current repo slug unknown mixed-scope fail-closed
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05G` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05H — same-repo URL-linked issue の indexed fetch dedup を github-aware read path に揃える
+- target:
+  - current repo issue を canonical URL で link/import した場合でも、index 済み target へ重複 `issue_view_snapshot()` を送らない
+  - index incomplete 時の same-repo fallback fetch は維持し、foreign target fetch は引き続き許可する
+- design refs:
+  - `design.md` の `2.3 indexed target dedup for same-repo URL-linked GitHub reads`
+  - `discussions/030-disc-pr29-r14-same-repo-url-linked-fetch-dedup-analysis.md`
+- step boundary:
+  - current repo/fallback dedup helper と、その helper を利用する github-aware read path に限定する
+  - snapshot binding / status contract 自体は `S05F` / `S05G` の契約を再利用し、今回 step では fetch selection の無駄取りに集中する
+  - checked-in dogfooding runtime に同じ helper/read path がある場合は、この step 内で parity を取る
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S05H` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — indexed snapshot key による same-repo dedup helper
+- purpose:
+  - same-repo indexed target は view fetch を省略し、index missing target だけ fallback fetch する
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `tests/presentation_runtime/...`
+  - `tests/cli_runtime/...`
+
+##### I1 — sync same-repo indexed dedup regression
+- slice goal:
+  - same-repo URL-linked issue が index 済みのとき `sync --github` が追加 view fetch を行わないことを固定する
+
+###### Red
+- failing test:
+  - current repo issue を URL-linked で保存し、index に same `(repo_slug, issue_number)` snapshot がある状態で `collect_sync_state()` を呼ぶと `issue_view_snapshot()` が呼ばれてしまう regression test
+- expected failure:
+  - current repo target に対する redundant view fetch が発生する
+
+###### Green
+- minimum implementation:
+  - indexed snapshot key 集合を作り、same-repo indexed target は view fetch 対象から外す helper を導入する
+- pass condition:
+  - sync same-repo indexed dedup regression test が通る
+
+###### Refactor
+- cleanup target:
+  - target filtering helper を `sync_state` 以外でも再利用できる形に整理する
+- invariants to keep green:
+  - foreign target fetch は維持される
+  - same-repo target が index missing の場合は fallback fetch を維持する
+
+##### I2 — command parity regression
+- slice goal:
+  - `check_deps` / `set_active` でも同じ helper を使い、same-repo indexed target へ redundant view fetch を送らないことを固定する
+
+###### Red
+- failing test:
+  - current repo URL-linked issue + indexed snapshot がある状態で `deps check --github` / `active set --github` が extra view fetch を送る regression test
+- expected failure:
+  - github-aware read path ごとに fetch selection drift が発生する
+
+###### Green
+- minimum implementation:
+  - same helper を `check_deps` / `set_active` に適用し、indexed target skip を揃える
+- pass condition:
+  - command parity regression test が通る
+
+###### Refactor
+- cleanup target:
+  - helper の責務と naming を整理し、repo-aware status resolution helper 群と整合させる
+- invariants to keep green:
+  - current repo binding correctness を変えない
+  - index incomplete fallback は維持する
+
+#### step gate
+- review:
+  - same-repo indexed target skip と index-incomplete fallback の両立を説明できる
+- expected tests:
+  - sync same-repo indexed dedup regression
+  - sync same-repo index-missing fallback regression
+  - mixed same-repo + foreign target で foreign fetch 維持 regression
+  - `deps check --github` / `active set --github` parity regression
+  - checked-in dogfooding runtime parity regression または executable smoke
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05H` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05I — deps target 自身の status 解決を inspection 契約へ含める
+- target:
+  - `deps check` が initiative / epic target 自身の resolved status を `target_status` に正しく露出する
+- design refs:
+  - `design.md` の `2. status/readiness contract`
+  - `discussions/038`
+- step boundary:
+  - `inspection.issue_statuses` の target payload を補う局所 corrective fix に限定し、node_states の issue-only contract は変えない
+
+#### Red
+- failing test:
+  - `deps check init-local-... --json` が ready target でも `target_status.authority=unknown` / `stale=true` に落ちる regression
+  - `deps check epic-local-... --json` でも同じ regression
+  - text render でも target status が `unknown/stale` に退行しないこと
+
+#### Green
+- minimum implementation:
+  - `inspect_target_deps()` が target 自身の resolved status を `inspection.issue_statuses` に含める
+  - presentation 側の target_status 参照経路はそのまま活かす
+
+#### Refactor
+- cleanup target:
+  - issue-only node state と target status payload の責務境界をコメント/命名で明確にする
+
+#### step gate
+- review:
+  - inspection 契約に target status を含める理由と presentation 側へ責務を漏らさないことを説明できる
+- expected tests:
+  - initiative target JSON regression
+  - epic target JSON regression
+  - target text render regression
+  - checked-in parity または executable smoke
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05I` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05J — active/deps URL target で repo scope を保持する
+- target:
+  - canonical GitHub URL target が `owner/repo` を落とさず exact foreign node を選べるようにする
+- design refs:
+  - `design.md` の `4.1 repo-scoped exact target surface`
+  - `discussions/049`
+- step boundary:
+  - bare numeric target や `--github-issue` の convenience selector は維持し、URL target の exact scope だけを追加する
+
+#### Red
+- failing test:
+  - current/foreign same-number coexistence で `active set <foreign-url>` が ambiguous fail または誤解決する regression
+  - `deps check <foreign-url>` でも同じ regression
+  - checked-in parity でも URL target scope が失われる regression
+
+#### Green
+- minimum implementation:
+  - `TargetRef` を repo-aware に拡張し、URL parse で repo scope を保持する
+  - `set_active` / `check_deps` の target resolution を exact repo scope aware にする
+
+#### Refactor
+- cleanup target:
+  - URL / bare number / `--github-issue` の contract を parser 層で整理する
+
+#### step gate
+- review:
+  - URL target と bare target の意味差が command/application/test で一貫している
+- expected tests:
+  - active URL exact-foreign resolution regression
+  - deps URL exact-foreign resolution regression
+  - checked-in parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S05K — scoped dependency ref syntax を導入して docs を整合させる
+- target:
+  - dependency ref に scoped foreign syntax を追加し、bare numeric shorthand の current-repo-only contract を docs/impl/tests で一致させる
+- design refs:
+  - `design.md` の `4.2 scoped dependency reference contract`
+  - `discussions/050`
+- step boundary:
+  - bare numeric ref を foreign-only match に自動フォールバックさせない
+  - foreign dependency は explicit scoped ref で解決する contract へ寄せる
+
+#### Red
+- failing test:
+  - `owner/repo#123` または canonical URL dependency ref が foreign imported issue を解決できない regression
+  - bare numeric ref `123` が foreign-only match を暗黙採用してしまう regression
+  - docs / error message が新 contract と食い違う regression
+
+#### Green
+- minimum implementation:
+  - deps ref parser / resolver に scoped ref syntax を追加する
+  - reference docs と error guidance を current-repo-only shorthand + scoped foreign ref の契約へ更新する
+  - checked-in runtime parity を揃える
+
+#### Refactor
+- cleanup target:
+  - bare ref / scoped ref / URL ref のエラーメッセージを整理する
+
+#### step gate
+- review:
+  - bare numeric ref を fail-closed に保ちつつ foreign dependency support が explicit syntax で閉じている
+- expected tests:
+  - scoped foreign dep ref resolution regression
+  - bare numeric current-repo-only regression
+  - docs/help contract regression
+  - checked-in parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S05K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S90 — docs impact resolution / docs refresh
+- 対象:
+  - docs / assets / workflow / help text / dogfooding confirmation
+- 対応:
+  - provider-side source of truth の docs/help/template を更新する
+  - 必要に応じて `spec-dock/` 側 dogfooding workspace で生成結果と導線を確認する
+  - `doctor`, `active show`, explicit flags, stale/source 表示, wrong-repo safety の利用方法を docs に反映する
+- git commit:
+  - docs/spec review が通り、`report.md` 更新後にコミットする
+
+### S90F — checked-in dogfooding runtime parity を repo-scoped GitHub behavior まで揃える
 - target:
-  - docs / assets / workflow / skill / none
+  - checked-in consumer workspace `spec-dock/scripts/` の `create_node` / `sync_state` を provider-side runtime と同じ repo-aware contract へ refresh する
+- design refs:
+  - `requirement.md` の `AC-010 dogfooding runtime parity`
+  - `design.md` の `dogfooding runtime parity`
+  - `discussions/026`, `027`
 - step boundary:
-  - docs impact の確認と必要な refresh のみ
-  - implementation scope の追加は行わない
-  - docs impact が `none` でも no-op resolution step として必ず実行する
+  - provider-side source of truth の仕様変更は行わず、checked-in dogfooding runtime の parity drift を補修する
+  - full workspace rewrite は避け、review で指摘された runtime file と回帰テストに scope を限定する
 
-#### B1 — docs impact gate
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S90F` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — checked-in runtime refresh and parity tests
 - purpose:
-  - docs impact を no-op か更新かで閉じる
+  - checked-in dogfooding runtime 上でも foreign/current same-number coexistence が provider-side runtime と同じ contract で動くようにする
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/application/...`
+  - `tests/...`
 
-##### I1 — docs impact detect
-- Red:
-  - docs impact checklist regression
-- Green:
-  - changed assets/workflow/docs を棚卸しし `docs / assets / workflow / skill / none` を判定する
-  - actual touched doc paths list を記録する
-- Refactor:
-  - docs impact checklist を整理する
+##### I1 — checked-in import uniqueness parity
+- slice goal:
+  - checked-in `create_node.py` が repo-aware uniqueness 契約を使う
 
-##### I2 — docs refresh or no-op record
-- Red:
-  - docs resolution record regression
-- Green:
-  - 必要更新または no-op 理由を `report.md` へ残す
-- Refactor:
-  - docs refresh note を整理する
+###### Red
+- failing test:
+  - checked-in runtime で current repo `#123` と foreign repo `other/repo#123` が overlap した時、`import issue <foreign-url> --allow-foreign-url` が bare issue number duplicate として誤 reject される regression test
+- expected failure:
+  - checked-in runtime だけが bare `github_issue_number` uniqueness に留まる
+
+###### Green
+- minimum implementation:
+  - checked-in `create_node.py` を provider-side runtime と同じ repo-aware uniqueness 契約へ refresh する
+- pass condition:
+  - checked-in runtime の cross-repo overlap import regression test が通る
+
+###### Refactor
+- cleanup target:
+  - checked-in/provider 差分のうち本 step に不要な churn を持ち込まない
+- invariants to keep green:
+  - provider-side source of truth は変更しない
+
+##### I2 — checked-in sync snapshot parity
+- slice goal:
+  - checked-in `sync_state.py` が current/foreign same-number coexistence で snapshot を混線させない
+
+###### Red
+- failing test:
+  - checked-in runtime で current repo issue `#123` と foreign issue `other/repo#123` が共存すると、`sync --github` で foreign snapshot が current repo node に混入する regression test
+- expected failure:
+  - checked-in runtime だけが bare `issue_number` key の snapshot 集約に留まる
+
+###### Green
+- minimum implementation:
+  - checked-in `sync_state.py` を provider-side runtime と同じ repo-aware snapshot 集約 / current-repo-first 契約へ refresh する
+- pass condition:
+  - checked-in runtime の same-number coexistence sync regression test が通る
+
+###### Refactor
+- cleanup target:
+  - checked-in runtime parity 対象を review 指摘の 2 file と必要最小 tests に閉じる
+- invariants to keep green:
+  - checked-in runtime の command surface 既存回帰を壊さない
 
 #### step gate
 - review:
-  - docs impact review
-- expected checks:
-  - docs impact checklist:
-    - `docs / assets / workflow / skill / none` の判定根拠
-    - docs refresh が必要な場合は対象パスと理由
-    - no-op の場合は no-op 理由
-  - plan/design/requirement との整合
-- report update:
-  - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
-
-### S14 — relative path canonical regression を修正する
-- target:
-  - `application/set_active.py`
-  - `infra/active_store.py`
-  - `presentation/json_state.py`
-  - `tests/cli_runtime/test_active.py`
-  - `tests/cli_runtime/test_sync.py`
-  - 追加の focused regression tests
-- step boundary:
-  - `active.json` と state artifact の path canonical を repo-relative へ戻す
-  - absolute path persistence/artifact regression の修正に限定する
-  - user-facing command 名や exit code の変更は含めない
-
-#### B1 — repo-relative canonicalization
-- purpose:
-  - portability / stable diff / repo move durability の回帰を閉じる
-
-##### I1 — active manifest canonical path
-- Red:
-  - `active.json` path durability regression を 1 本追加
-- Green:
-  - `build_active_manifest()` が repo-relative path を canonical として書く
-  - `active_store` の read/write path が repo-relative 正本と整合する
-  - 既存の legacy absolute-path `active.json` は best-effort 互換で読める
-- Refactor:
-  - active path normalization helper を整理する
-
-##### I2 — state artifact canonical path
-- Red:
-  - `index*.json` / `tree*.json` path portability regression を 1 本追加
-- Green:
-  - `presentation/json_state.py` が node `path` を `spec-dock/...` 形式で出力する
-  - absolute host path が artifact に漏れないことを固定する
-- Refactor:
-  - relative path helper / mapper の重複を整理する
-
-#### step gate
-- review:
-  - relative path regression review
+  - checked-in runtime parity drift が provider-side contract と同じ意味で閉じている
 - expected tests:
-  - focused regressions:
-    - `active.json` path is repo-relative
-    - legacy absolute-path `active.json` remains readable
-    - `index-all.json` / `index.json` / `tree-all.json` / `tree.json` node paths are repo-relative
-    - repo move / workspace rename durability smoke または同等の portability regression
-  - `python -m unittest discover -v`
+  - checked-in runtime import uniqueness regression
+  - checked-in runtime sync snapshot coexistence regression
+  - 既存 checked-in runtime smoke の non-regression
 - report update:
   - `spec-deps/current/report.md`
-- commit policy:
-  - 1 commit
+- git commit:
+  - `S90F` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04H — import preflight と checked-in executable-path evidence を補完する
+- target:
+  - `AC-012` の application preflight 契約を `import` にも適用し、required artifact 欠損時に create 前で fail-fast させる
+  - checked-in runtime の executable-path parity で `import` fail-fast と `sync --force` degraded artifact contract を固定する
+- design refs:
+  - `requirement.md` の `AC-012 domain/application validation boundary`
+  - `design.md` の `domain/application validation boundary`
+  - `design.md` の `dogfooding runtime parity`
+- step boundary:
+  - domain validation は引き続き filesystem 非依存の構造検証に留める
+  - required artifact existence check は application preflight helper に寄せ、provider/checked-in 両 runtime の import entrypoint へ同じ契約で適用する
+
+#### B1 — provider-side import preflight closure
+- purpose:
+  - required artifact 欠損時に `import` が partial write を残さないよう provider-side runtime の fail-fast 契約を閉じる
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/...`
+
+##### I1 — import fail-fast before create
+- slice goal:
+  - `import issue <url>` が artifact 欠損時に create 前の preflight で止まり、新規 node を作らない
+
+###### Red
+- failing test:
+  - required artifact 欠損下で `import issue` を実行すると、preflight ではなく post-import sync で落ちて partial write が残る regression test
+- expected failure:
+  - domain validation だけでは artifact 欠損を捕まえられず create が先に進む
+
+###### Green
+- minimum implementation:
+  - provider-side `import_node.py` で application artifact preflight を create 前に実行する
+- pass condition:
+  - import preflight failure 時に `preflight validate failed` で止まり、新規 node が作成されない regression test が通る
+
+###### Refactor
+- cleanup target:
+  - preflight helper 呼び出しを既存 validate/sync/doctor 契約と揃える
+- invariants to keep green:
+  - structure error 優先順序を壊さない
+
+#### B2 — checked-in runtime executable-path evidence closure
+- purpose:
+  - checked-in consumer runtime の executable-path parity を import fail-fast、sync degraded artifact contract、structure-error precedence まで閉じる
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/test_init_update.py`
+
+##### I1 — checked-in import preflight parity
+- slice goal:
+  - checked-in `spec-dock/scripts/spec-dock import issue ...` でも artifact 欠損時に create 前で fail-fast する
+
+###### Red
+- failing test:
+  - checked-in runtime で required artifact を欠損させた状態の `import issue <url>` が新規 issue node を残してから失敗する subprocess regression test
+- expected failure:
+  - checked-in runtime の import path に artifact preflight がなく partial write を残しうる
+
+###### Green
+- minimum implementation:
+  - checked-in `import_node.py` に provider-side と同じ application preflight を適用する
+- pass condition:
+  - checked-in runtime subprocess test が `preflight validate failed` と `新規 node 未作成` を確認して通る
+
+##### I2 — checked-in sync --force artifact output parity
+- slice goal:
+  - checked-in `sync --force` が warning degradation 時も generated artifact 契約を保持する
+
+###### Red
+- failing test:
+  - checked-in runtime subprocess の `sync --force` が stderr だけ warning し、`.agent/index.json` / `.agent/tree.json` の `deps.valid=false` / `deps.error` を壊しても検知されない regression test
+- expected failure:
+  - executable-path parity がログ文言だけに依存し、generated artifact 契約の崩れを見逃す
+
+###### Green
+- minimum implementation:
+  - subprocess parity test で degraded sync 後の generated artifact を読み、`deps.valid=false` と `deps.error` を固定する
+- pass condition:
+  - checked-in runtime subprocess `sync --force` parity regression test が通る
+
+##### I3 — checked-in structure-error precedence parity
+- slice goal:
+  - checked-in `validate` / `doctor` / `sync` が structure error と artifact 欠損の同時発生時に structure error を優先する
+
+###### Red
+- failing test:
+  - checked-in runtime subprocess で structure error と artifact 欠損を同時に作ると、artifact error が先に出て structure corruption を隠す regression test
+- expected failure:
+  - executable-path parity が combined-fault precedence を固定しておらず、artifact preflight の適用位置変更で priority が逆転しても検知できない
+
+###### Green
+- minimum implementation:
+  - checked-in subprocess parity test で `validate` / `doctor` / `sync` の structure-error precedence を明示固定する
+- pass condition:
+  - combined-fault subprocess regression が通り、`Missing required artifact` より構造エラーを優先して返す
+
+#### step gate
+- review:
+  - provider/checked-in 両 runtime で import preflight と degraded sync artifact contract が `AC-012` に整合している
+- expected tests:
+  - provider-side import missing-artifact fail-fast regression
+  - checked-in runtime import missing-artifact subprocess regression
+  - checked-in runtime `sync --force` degraded artifact output regression
+  - checked-in runtime combined-fault structure precedence regression
+  - 既存 validation boundary non-regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04H` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S99 — final diff review quality gate
-- target:
-  - branch diff
-  - final gate evidence
-  - `spec-deps/current/report.md`
 - branch diff scope:
-  - `git diff origin/main...HEAD`
+  - `fix/issue-28-runtime-regression-bugs` の差分全体
+- required validation:
+  - 影響範囲テスト一式
+  - local/stub manual regression の再確認
+  - GitHub live regression の実行結果と証跡
+  - create outcome matrix full coverage evidence
+  - `rg --files | rg '[A-Z]'` による path rule 再確認
+- reviewer approvals:
+  - implementation review
+  - QA review
+  - spec/docs review
+  - create/post-create outcome matrix の 5 class について、raw `release_error` 単独露出が残っていない
+  - create/post-create outcome matrix の committed-local branch で blind rerun guidance が残っていない
+  - provider / checked-in runtime の guidance contract drift が残っていない
+  - repo-overlap matrix と create-state matrix の bundle-level regression が通っている
+    - repo-overlap matrix: URL target exact resolution / bare numeric current-repo-only / scoped dep ref exact-foreign
+    - create-state matrix: remote-only / partial local write / in-progress missing-meta / stale create lock が区別されている
+- git commit:
+  - `S99` は最終 review/no-op 判定であり、この step 自体を理由に新規コミットは作らない
+
+### S90G — checked-in parity の stale json/deps paths を閉じる
+- target:
+  - checked-in consumer runtime の `presentation/json_state.py` と `infra/deps_reader.py` を provider-side parity へ refresh する
+  - checked-in import post-sync と repo-aware numeric deps resolution が provider-side と同じ contract で動くようにする
+- design refs:
+  - `requirement.md` の `AC-010 dogfooding runtime parity`
+  - `requirement.md` の `AC-013 repo-aware numeric deps resolution`
+  - `design.md` の `dogfooding runtime parity`
+  - `discussions/033`, `034`
 - step boundary:
-  - review-only step とする
-  - blocking finding が出た場合は元 step に差し戻す
-  - `S99` 自体では新規設計や scope 拡張を入れない
+  - provider-side source of truth の仕様変更は行わず、checked-in runtime の stale parity drift のみを補修する
+  - `json_state` と `deps_reader` の two-file parity と、それを通す checked-in runtime regression に scope を限定する
 
-#### B1 — final validation
+#### B1 — checked-in rendering parity
 - purpose:
-  - branch 全体の品質と trace を閉じる
+  - checked-in import post-sync が linked node の snapshot fallback 経路で crash しないようにし、実行経路でも provider-side と同じ artifact rendering 契約を示す
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/presentation/json_state.py`
+  - `tests/test_init_update.py`
 
-##### I1 — full validation sweep
-- Red:
-  - final validation checklist regression
-- Green:
-  - `python -m unittest discover -v`
-  - requirement/design/plan との trace check
-  - runtime packaging / shipped asset check
-  - lowercase path 増分なし確認: `rg --files | rg '[A-Z]'`
-  - fresh repo smoke check:
-    - `validate`
-    - `deps check --json`
-    - `active show`
-    - `active set`
-    - `sync --force`
-    - `new issue`
-    - `import issue`
-- Refactor:
-  - final validation checklist を整理する
+##### I1 — import post-sync no-crash parity
+- slice goal:
+  - checked-in runtime の import/sync artifact rendering が provider-side と同じ repo-aware fallback helper を使う
 
-##### I2 — architecture/spec gate
-- Red:
-  - architecture/spec gate regression
-- Green:
-  - `spec_reviewer` pass
-  - branch diff review の blocking finding 0 件
-  - staged delegation history / rollback basis transition evidence 完了
-  - `app.py` live thinness check
-  - command thinness check
-  - layer violation check
-  - DTO / contract check
-  - touched file / AC-EC trace check:
-    - `AC-001`: runtime package tree / `app.py` live thin entrypoint / `commands|application|domain|infra|presentation` の物理導入
-    - `AC-002`: shared rule / workflow / side effect / rendering の責務分離
-    - `AC-003`: `tests/test_init_update.py`, `tests/cli_runtime/*`, `tests/domain_runtime/*`, `tests/presentation_runtime/*` の分割差分
-    - `AC-004`: `sync --force`, `deps check`, `active set`, `import -> sync`, scaffold collision no-write の回帰 test 群
-    - `AC-005`: `python -m unittest discover -v` green
-    - `EC-001`: staged delegation history / rollback basis transition evidence
-    - `EC-002`: import 後のみ `sync_after_import()` 起動
-    - `EC-003`: deps readiness / active guard/order
-    - `EC-004`: JSON/Markdown/PUML artifact path/name/content 契約
-- Refactor:
-  - final gate report を整理する
+###### Red
+- failing test:
+  - checked-in linked import の post-sync で `NameError: _normalize_repo_slug` が出る regression test
+- expected failure:
+  - checked-in `json_state.py` に provider-side helper parity がない
+
+###### Green
+- minimum implementation:
+  - checked-in `presentation/json_state.py` を provider-side helper 契約へ refresh する
+- pass condition:
+  - checked-in `spec-dock/scripts/spec-dock` 実行経路の import post-sync no-crash regression test が通る
+
+#### B2 — checked-in repo-aware numeric deps parity
+- purpose:
+  - checked-in runtime の numeric `depends_on: [123]` が current/foreign same-number coexistence でも provider-side と同じ repo-aware 解決を行い、実行経路でも ambiguity を再発させない
+- files:
+  - `spec-dock/scripts/spec_dock_runtime/infra/deps_reader.py`
+  - `tests/test_init_update.py`
+
+##### I1 — deps overlap parity
+- slice goal:
+  - checked-in `deps check` / `sync` / `validate` が current repo `#123` と foreign `other/repo#123` の coexistence でも bare numeric ref を current repo scope へ解決する
+
+###### Red
+- failing test:
+  - checked-in runtime で same-number overlap 下の numeric deps が `Ambiguous github.issue_number=123` になる regression test
+- expected failure:
+  - checked-in `deps_reader.py` が bare numeric ref を repo-aware に解決できない
+
+###### Green
+- minimum implementation:
+  - checked-in `infra/deps_reader.py` を provider-side の current-repo-aware numeric deps 契約へ refresh する
+- pass condition:
+  - checked-in `spec-dock/scripts/spec-dock` 実行経路の numeric deps overlap regression test が通る
+
+#### step gate
+- review:
+  - checked-in runtime の json rendering と numeric deps resolution が provider-side contract と同じ意味で閉じている
+- expected tests:
+  - checked-in executable-path import post-sync no-crash regression
+  - checked-in executable-path numeric deps overlap parity regression
+  - 既存 checked-in runtime parity non-regression
 - report update:
   - `spec-deps/current/report.md`
+- git commit:
+  - `S90G` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+## 未確定事項
+- なし
+  - freshness contract は本計画で `source / stale / last_sync_at` をまとめて first fix に含める前提で固定する
 
 ## final exit contract
 - AC/EC 達成:
-  - S01-S14, S90, S99 完了後に requirement の AC/EC をすべて満たす
+  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016`、`AC-017`、`AC-018`、`AC-019`、`AC-020` が対応 step の review/QA 付きで満たされている
+  - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
+  - create/post-create outcome matrix の 5 class が provider / checked-in runtime で同じ guidance contract と review evidence を持つ
 - docs impact resolved:
-  - `none` または必要更新反映済み
-- rollback basis transitioned:
-  - staged seam から `git revert / commit rollback` へ切り替わっている
+  - provider-side docs と dogfooding 確認が完了し、`report.md` に判断と結果が残っている
 - final diff approved:
-  - `spec_reviewer` pass
-  - branch diff review の blocking finding 0 件
+  - `S99` の required validation が完了し、GitHub live regression を含む最終 diff review で重大懸念が解消されている

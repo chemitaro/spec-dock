@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -9,9 +10,24 @@ from typing import cast
 from ..domain.ids import resolve_id_input, resolve_input_title_and_slug
 from ..domain.models import ActiveSelection, SpecGraph, SpecNode, SpecNodeKind
 from ..domain.tree import resolve_parent_from_active
+from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import CreateNodeRequest, ImportNodeRequest, ImportNodeResult
-from .create_node import execute_create_plan, guard_github_issue_uniqueness, load_graph, plan_node_creation
+from .create_node import (
+    CreateWritePhase,
+    _acquire_create_lock,
+    _doctor_guidance_message,
+    _runtime_entrypoint_path,
+    _post_write_duplicate_guard,
+    _release_create_lock,
+    create_write_phase_has_local_writes,
+    execute_create_plan,
+    guard_github_issue_uniqueness,
+    load_graph,
+    plan_node_creation,
+    resolve_create_write_phase,
+)
 from .ports import Ports
 from .sync_state import sync_after_import
 
@@ -36,6 +52,29 @@ def _resolve_issue_gateway(ports: Ports):
     return ports.issue_gateway
 
 
+def _normalize_repo_slug_value(slug: str | None) -> str | None:
+    text = str(slug or "").strip().lower()
+    if not text:
+        return None
+    owner, sep, repo = text.partition("/")
+    if not sep or not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _resolve_current_repo_slug(ports: Ports) -> str | None:
+    if ports.git_gateway is None or ports.repo_root is None:
+        return None
+    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
+    if not callable(resolver):
+        return None
+    try:
+        raw = resolver(_resolve_repo_root(ports))
+    except RuntimeError:
+        return None
+    return _normalize_repo_slug_value(raw)
+
+
 def _active_selection_from_manifest(manifest: ActiveManifest | None) -> ActiveSelection:
     if manifest is None:
         return ActiveSelection(initiative_id=None, epic_id=None, issue_id=None)
@@ -58,6 +97,8 @@ def _to_spec_node(record: StoredMetaRecord) -> SpecNode:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -96,6 +137,10 @@ def resolve_parent_for_import(
 
 
 def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -> CreateNodeRequest:
+    owner = (req.target_repo_owner or "").strip().lower()
+    repo = (req.target_repo_name or "").strip().lower()
+    github_repo_owner = owner if owner and repo else None
+    github_repo_name = repo if owner and repo else None
     return CreateNodeRequest(
         title=req.title,
         slug=req.slug,
@@ -103,7 +148,153 @@ def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -
         requested_node_id=None,
         github_mode="link_existing",
         github_issue_number=int(req.issue_number),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
     )
+
+
+def _validate_url_repo_identity(
+    req: ImportNodeRequest,
+    *,
+    current_repo_slug: str | None,
+) -> None:
+    owner = (req.target_repo_owner or "").strip().lower()
+    repo = (req.target_repo_name or "").strip().lower()
+    if not owner or not repo:
+        return
+    if req.allow_foreign_url:
+        return
+
+    if current_repo_slug is None:
+        raise RuntimeError(
+            "Cannot verify GitHub URL repository against current repo. "
+            "Configure git remote.origin.url or pass '--allow-foreign-url'."
+        )
+    expected = f"{owner}/{repo}"
+    actual = current_repo_slug
+    if actual != expected:
+        raise RuntimeError(
+            "GitHub URL repository mismatch for import target: "
+            f"target={expected}, current={actual}. "
+            "Use '--allow-foreign-url' only when cross-repo import is intentional."
+        )
+
+
+def _target_repo_slug(req: ImportNodeRequest) -> str | None:
+    owner = (req.target_repo_owner or "").strip()
+    repo = (req.target_repo_name or "").strip()
+    if not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def _import_target_ref(req: ImportNodeRequest) -> str:
+    owner = (req.target_repo_owner or "").strip().lower()
+    repo = (req.target_repo_name or "").strip().lower()
+    if owner and repo:
+        return f"https://github.com/{owner}/{repo}/issues/{int(req.issue_number)}"
+    return str(int(req.issue_number))
+
+
+def _post_import_recovery_command(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    req: ImportNodeRequest,
+    title: str,
+    specdock_dir: Path,
+) -> str:
+    command_args = [
+        str(_runtime_entrypoint_path(specdock_dir)),
+        "import",
+        kind,
+        _import_target_ref(req),
+        "--title",
+        title,
+    ]
+    if kind == "epic" and req.parent_id is not None:
+        command_args.extend(["--initiative", req.parent_id])
+    if kind == "issue" and req.parent_id is not None:
+        command_args.extend(["--epic", req.parent_id])
+    if req.allow_foreign_url:
+        command_args.append("--allow-foreign-url")
+    return " ".join(shlex.quote(part) for part in command_args)
+
+
+def _post_import_retry_guidance(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    req: ImportNodeRequest,
+    title: str,
+    specdock_dir: Path,
+) -> str:
+    recovery_command = _post_import_recovery_command(
+        kind=kind,
+        req=req,
+        title=title,
+        specdock_dir=specdock_dir,
+    )
+    return f"Recovery: rerun `{recovery_command}`."
+
+
+def _post_import_doctor_first_guidance(
+    *,
+    specdock_dir: Path,
+    local_node_id: str | None,
+) -> str:
+    node_hint = (
+        f"local node `{local_node_id}`"
+        if local_node_id is not None
+        else "the local node targeted by this import"
+    )
+    return (
+        "Import may have partially written local files. Do not rerun blindly. "
+        f"First inspect {node_hint}. {_doctor_guidance_message(specdock_dir)}"
+    )
+
+
+def _build_post_import_failure(
+    *,
+    local_error: Exception | None,
+    release_error: Exception | None,
+    kind: Literal["initiative", "epic", "issue"],
+    req: ImportNodeRequest,
+    title: str,
+    specdock_dir: Path,
+    local_write_phase: CreateWritePhase,
+    local_node_id: str | None,
+) -> RuntimeError | None:
+    rerun_guidance = _post_import_retry_guidance(
+        kind=kind,
+        req=req,
+        title=title,
+        specdock_dir=specdock_dir,
+    )
+    doctor_guidance = _post_import_doctor_first_guidance(
+        specdock_dir=specdock_dir,
+        local_node_id=local_node_id,
+    )
+    guidance = doctor_guidance if create_write_phase_has_local_writes(local_write_phase) else rerun_guidance
+
+    if local_error is not None and release_error is not None:
+        return RuntimeError(
+            "Outcome: import_body_and_cleanup_fail. "
+            f"Primary local failure: {local_error}. "
+            f"Cleanup failure: {release_error}. "
+            f"{guidance}"
+        )
+    if local_error is not None:
+        return RuntimeError(
+            "Outcome: import_local_write_fail. "
+            f"{local_error} "
+            f"{guidance}"
+        )
+    if release_error is not None:
+        return RuntimeError(
+            "Outcome: import_local_write_success_cleanup_fail. "
+            f"Cleanup failure: {release_error}. "
+            f"{doctor_guidance}"
+        )
+    return None
 
 
 def import_node_core(
@@ -115,38 +306,123 @@ def import_node_core(
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     req = replace(req, title=title, slug=slug)
 
+    current_repo_slug = _resolve_current_repo_slug(ports)
     try:
-        graph = load_graph(ports, validate=True)
+        graph = load_graph(ports, validate=False)
+        report = validate_graph_and_deps(
+            graph,
+            repo_root=_resolve_repo_root(ports),
+            current_repo_slug=current_repo_slug,
+        )
+        if report.errors:
+            raise RuntimeError(report.errors[0])
+    except RuntimeError as error:
+        raise RuntimeError(f"preflight validate failed: {error}") from error
+    try:
+        validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
     except RuntimeError as error:
         raise RuntimeError(f"preflight validate failed: {error}") from error
 
     issue_number = int(req.issue_number)
-    guard_github_issue_uniqueness(graph, issue_number)
-
-    parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
-    create_req = build_linked_create_request(req, parent_id)
-
+    _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
     specdock_dir = _resolve_specdock_dir(ports)
     today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-    plan = plan_node_creation(
-        create_req,
+    guard_github_issue_uniqueness(
+        graph,
+        issue_number,
+        github_repo_owner=req.target_repo_owner,
+        github_repo_name=req.target_repo_name,
+        current_repo_slug=current_repo_slug,
+    )
+    precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+    precheck_req = build_linked_create_request(req, precheck_parent_id)
+    precheck_plan = plan_node_creation(
+        precheck_req,
         graph,
         kind=kind,
         specdock_dir=specdock_dir,
         today=today,
+        current_repo_slug=current_repo_slug,
     )
-
-    collisions = [path for path in plan.planned_paths if path.exists()]
-    if collisions:
-        raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
+    if precheck_collisions:
+        raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
 
     issue_gateway = _resolve_issue_gateway(ports)
-    imported_issue = issue_gateway.issue_view_minimal(_resolve_repo_root(ports), issue_number)
+    imported_issue = issue_gateway.issue_view_minimal(
+        _resolve_repo_root(ports),
+        issue_number,
+        repo_slug=_target_repo_slug(req),
+    )
+    lock_path, lock_token = _acquire_create_lock(specdock_dir)
+    result_node: SpecNode | None = None
+    body_error: Exception | None = None
+    local_write_phase: CreateWritePhase = "none"
+    local_node_id: str | None = None
+    try:
+        graph = load_graph(ports, validate=False)
+        guard_github_issue_uniqueness(
+            graph,
+            issue_number,
+            github_repo_owner=req.target_repo_owner,
+            github_repo_name=req.target_repo_name,
+            current_repo_slug=current_repo_slug,
+        )
+        locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
+        create_req = build_linked_create_request(req, locked_parent_id)
+        plan = plan_node_creation(
+            create_req,
+            graph,
+            kind=kind,
+            specdock_dir=specdock_dir,
+            today=today,
+            current_repo_slug=current_repo_slug,
+        )
+        local_node_id = plan.meta.id
+        execute_create_plan(plan, ports)
+        local_write_phase = "meta_written"
+        _post_write_duplicate_guard(ports, node_id=plan.meta.id)
+        local_write_phase = "post_write_verified"
+        result_node = _to_spec_node(plan.meta)
+    except Exception as exc:
+        body_error = exc
+        local_write_phase = resolve_create_write_phase(exc, default=local_write_phase)
+    finally:
+        release_error: Exception | None = None
+        try:
+            _release_create_lock(lock_path, lock_token)
+        except Exception as exc:
+            release_error = exc
 
-    execute_create_plan(plan, ports)
+        wrapped_outcome_error = _build_post_import_failure(
+            local_error=body_error,
+            release_error=release_error,
+            kind=kind,
+            req=req,
+            title=title,
+            specdock_dir=specdock_dir,
+            local_write_phase=local_write_phase,
+            local_node_id=local_node_id if create_write_phase_has_local_writes(local_write_phase) else None,
+        )
+        if wrapped_outcome_error is not None:
+            cause = body_error if body_error is not None else release_error
+            if cause is not None:
+                raise wrapped_outcome_error from cause
+            raise wrapped_outcome_error
+
+        if body_error is not None:
+            if release_error is not None:
+                raise RuntimeError(f"{body_error}; additionally {release_error}") from body_error
+            raise body_error
+        if release_error is not None:
+            raise release_error
+
+    if result_node is None:
+        raise RuntimeError("import failed without result")
+
     post_import_sync = sync_after_import(ports)
     return ImportNodeResult(
-        node=_to_spec_node(plan.meta),
+        node=result_node,
         imported_issue=imported_issue,
         post_import_sync=post_import_sync,
         warnings=[],

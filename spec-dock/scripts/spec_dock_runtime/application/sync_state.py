@@ -8,7 +8,7 @@ from typing import Literal, cast
 from ..domain.active import infer_active_node_from_branch
 from ..domain.deps import build_deps_state, build_effective_deps_map, evaluate_readiness, validate_deps_cycles
 from ..domain.models import ActiveSelection, DepsEvaluation, DepsState, IssueSnapshot, NodeId, SpecNodeKind, SpecNodeSeed
-from ..domain.status import build_progress_map
+from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
 from ..domain.tree import build_graph, select_active_chain
 from ..domain.validation import validate_graph_and_deps
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
@@ -20,6 +20,7 @@ from ..presentation.json_state import (
     render_tree_artifact,
 )
 from ..presentation.markdown import render_dashboard
+from .artifact_preflight import validate_required_artifacts_for_graph
 from .contracts import (
     ActiveUpdateOutcome,
     ArtifactWriteFailure,
@@ -28,7 +29,13 @@ from .contracts import (
     SyncRequest,
     SyncStateResult,
 )
+from .github_issue_targets import (
+    collect_repo_scoped_issue_view_targets,
+    normalize_repo_slug,
+    snapshot_repo_issue_key,
+)
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .set_active import build_active_manifest, commit_active_state
 from .status_context import resolve_issue_status_context
 
@@ -45,6 +52,41 @@ def _append_unique(values: list[str], value: str) -> None:
         values.append(value)
 
 
+def _is_safe_unscoped_snapshot(
+    snapshot: IssueSnapshot,
+    *,
+    current_repo_slug: str | None,
+) -> bool:
+    scoped_key = snapshot_repo_issue_key(snapshot)
+    if scoped_key is None:
+        return True
+    if current_repo_slug is None:
+        return False
+    return scoped_key[0] == current_repo_slug
+
+
+def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
+    if ports.derived_state_reader is None:
+        return {}
+    loader = getattr(ports.derived_state_reader, "load_cached_issue_last_sync_at_by_id", None)
+    if not callable(loader):
+        return {}
+    loaded = loader(specdock_dir)
+    if not isinstance(loaded, dict):
+        return {}
+    out: dict[str, str | None] = {}
+    for issue_id, value in loaded.items():
+        if not isinstance(issue_id, str):
+            continue
+        if value is None:
+            out[issue_id] = None
+            continue
+        if isinstance(value, str):
+            normalized = value.strip()
+            out[issue_id] = normalized or None
+    return out
+
+
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
     return SpecNodeSeed(
         kind=cast(SpecNodeKind, record.kind),
@@ -57,6 +99,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -136,8 +180,14 @@ def collect_sync_state(
     warnings: list[str] = []
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
+    current_repo_slug = resolve_current_repo_slug(ports)
 
-    validation = validate_graph_and_deps(graph, issue_depends_on_map=None, repo_root=ports.repo_root)
+    validation = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=None,
+        repo_root=ports.repo_root,
+        current_repo_slug=current_repo_slug,
+    )
     if validation.errors:
         if req.force:
             deps_preflight_error = f"preflight validate failed: {validation.errors[0]}"
@@ -145,60 +195,118 @@ def collect_sync_state(
         else:
             raise RuntimeError(f"preflight validate failed: {validation.errors[0]}")
     else:
-        topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
-        issue_depends_on_map = dict(topology.issue_depends_on_map)
-        for warning in topology.warnings:
-            _append_unique(warnings, warning)
         try:
-            validate_deps_cycles(issue_depends_on_map)
-            validate_graph_and_deps(graph, issue_depends_on_map=issue_depends_on_map, repo_root=ports.repo_root)
-            effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
-            validate_deps_cycles(effective_deps_map)
+            validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
         except RuntimeError as error:
             if req.force:
-                deps_preflight_error = str(error)
+                deps_preflight_error = f"preflight validate failed: {error}"
                 _append_unique(warnings, "deps_preflight_failed")
             else:
-                raise
+                raise RuntimeError(f"preflight validate failed: {error}")
+        else:
+            topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
+            issue_depends_on_map = dict(topology.issue_depends_on_map)
+            for warning in topology.warnings:
+                _append_unique(warnings, warning)
+            try:
+                validate_deps_cycles(issue_depends_on_map)
+                validate_graph_and_deps(
+                    graph,
+                    issue_depends_on_map=issue_depends_on_map,
+                    repo_root=ports.repo_root,
+                    current_repo_slug=current_repo_slug,
+                )
+                effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
+                validate_deps_cycles(effective_deps_map)
+            except RuntimeError as error:
+                if req.force:
+                    deps_preflight_error = str(error)
+                    _append_unique(warnings, "deps_preflight_failed")
+                else:
+                    raise
 
-    issue_snapshots = None
-    github_snapshot_by_issue_number: dict[int, IssueSnapshot] = {}
+    issue_snapshots: list[IssueSnapshot] | None = None
+    github_snapshot_by_repo_and_issue_number: dict[tuple[str, int], IssueSnapshot] = {}
+    github_snapshot_by_repo_scope_and_issue_number: dict[tuple[str | None, int], IssueSnapshot] = {}
+    github_snapshot_by_issue_id: dict[str, IssueSnapshot] = {}
     if req.github_enabled:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required when --github is enabled")
         if ports.repo_root is None:
             raise RuntimeError("repo_root is required when --github is enabled")
+        issue_snapshots = []
+        issue_index_snapshots: list[IssueSnapshot] = []
+        foreign_issue_snapshots: list[IssueSnapshot] = []
         try:
-            issue_snapshots = ports.issue_gateway.issue_index(ports.repo_root, limit=int(req.issue_limit))
+            issue_index_snapshots = ports.issue_gateway.issue_index(ports.repo_root, limit=int(req.issue_limit))
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
-            issue_snapshots = []
         else:
-            github_snapshot_by_issue_number = {
-                int(snapshot.issue_number): snapshot
-                for snapshot in issue_snapshots
-            }
             linked_numbers = sorted(
                 {
                     int(node.github_issue_number)
                     for node in graph.nodes_by_id.values()
-                    if node.kind == "issue" and node.github_issue_number is not None
+                    if node.kind == "issue"
+                    and node.github_issue_number is not None
+                    and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
                 }
             )
-            indexed_numbers = {int(snapshot.issue_number) for snapshot in issue_snapshots}
+            indexed_numbers = {int(snapshot.issue_number) for snapshot in issue_index_snapshots}
             missing = [num for num in linked_numbers if num not in indexed_numbers]
             if missing:
                 _append_unique(warnings, "gh_index_incomplete")
+        repo_scoped_targets = collect_repo_scoped_issue_view_targets(
+            graph,
+            issue_index_snapshots=issue_index_snapshots,
+            current_repo_slug=current_repo_slug,
+        )
+        for repo_slug, issue_number in repo_scoped_targets:
+            try:
+                snapshot = ports.issue_gateway.issue_view_snapshot(
+                    ports.repo_root,
+                    issue_number,
+                    repo_slug=repo_slug,
+                )
+            except RuntimeError:
+                _append_unique(warnings, "gh_fetch_failed")
+                continue
+            foreign_issue_snapshots.append(snapshot)
+        issue_snapshots = [*issue_index_snapshots, *foreign_issue_snapshots]
+        for snapshot in issue_index_snapshots:
+            if not _is_safe_unscoped_snapshot(snapshot, current_repo_slug=current_repo_slug):
+                continue
+            issue_number = int(snapshot.issue_number)
+            unscoped_key = (None, issue_number)
+            if unscoped_key not in github_snapshot_by_repo_scope_and_issue_number:
+                github_snapshot_by_repo_scope_and_issue_number[unscoped_key] = snapshot
+
+        for snapshot in issue_snapshots:
+            scoped_key = snapshot_repo_issue_key(snapshot)
+            if scoped_key is not None:
+                if scoped_key not in github_snapshot_by_repo_and_issue_number:
+                    github_snapshot_by_repo_and_issue_number[scoped_key] = snapshot
+                if scoped_key not in github_snapshot_by_repo_scope_and_issue_number:
+                    github_snapshot_by_repo_scope_and_issue_number[scoped_key] = snapshot
 
     cached_issue_status_by_id: dict[str, str] = {}
+    cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
+        cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
     status_context = resolve_issue_status_context(
         graph,
         github_enabled=req.github_enabled,
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
+        cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=current_repo_slug,
     )
+    if req.github_enabled:
+        github_snapshot_by_issue_id = resolve_issue_snapshot_by_issue_id(
+            graph,
+            issue_snapshots,
+            current_repo_slug=current_repo_slug,
+        )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
 
@@ -242,8 +350,11 @@ def collect_sync_state(
         generated_at=_now_iso_from_ports(ports),
         warnings=warnings,
         deps_preflight_error=deps_preflight_error,
+        repo_root=ports.repo_root,
         issue_depends_on_map=issue_depends_on_map,
-        github_snapshot_by_issue_number=github_snapshot_by_issue_number,
+        github_snapshot_by_repo_and_issue_number=github_snapshot_by_repo_and_issue_number,
+        github_snapshot_by_repo_scope_and_issue_number=github_snapshot_by_repo_scope_and_issue_number,
+        github_snapshot_by_issue_id=github_snapshot_by_issue_id,
     )
 
 
@@ -263,7 +374,11 @@ def maybe_auto_update_from_branch(
     if not branch:
         return (state, None)
 
-    inferred_node, reason = infer_active_node_from_branch(state.graph, branch=branch)
+    inferred_node, reason = infer_active_node_from_branch(
+        state.graph,
+        branch=branch,
+        current_repo_slug=resolve_current_repo_slug(ports),
+    )
     if inferred_node is None:
         return (state, ActiveUpdateOutcome(applied=False, reason=reason))
 
@@ -271,7 +386,7 @@ def maybe_auto_update_from_branch(
     if state.active == selection:
         return (state, ActiveUpdateOutcome(applied=False, reason=reason or "already active"))
 
-    manifest = build_active_manifest(selection, state.graph)
+    manifest = build_active_manifest(selection, state.graph, repo_root=ports.repo_root)
     context_pack_text = render_context_pack(selection)
     commit_active_state(
         persisted_manifest=manifest,

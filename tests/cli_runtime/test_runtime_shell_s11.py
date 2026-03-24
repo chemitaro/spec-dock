@@ -111,7 +111,8 @@ class RuntimeShellS11Tests(unittest.TestCase):
         self.assertEqual(cm.exception.code, 2)
         error_text = stderr.getvalue()
         self.assertIn("unrecognized arguments: --initiative", error_text)
-        self.assertIn("'active set' is now: active set <target>", error_text)
+        self.assertIn("'active set' supports explicit targets:", error_text)
+        self.assertIn("active set --id <node-id>", error_text)
 
     def test_dispatch_business_exit_ownership(self) -> None:
         (_runtime_app, _app_contracts, cli_dispatch, _cli_parser, _cli_registry, cmd_contracts, _domain_models) = (

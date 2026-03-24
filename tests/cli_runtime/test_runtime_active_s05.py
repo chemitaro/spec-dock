@@ -546,7 +546,14 @@ class TestRuntimeActiveS05(unittest.TestCase):
             warnings=[],
         )
         none_text = presentation_cli_text.render_active_show_text(none_result)
-        self.assertEqual(none_text.stdout_lines, ["spec-dock: active: (not set)"])
+        self.assertEqual(
+            none_text.stdout_lines,
+            [
+                "spec-dock: active: (not set)",
+                "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}",
+                "next: spec-dock/scripts/spec-dock active set <target>",
+            ],
+        )
         self.assertEqual(none_text.stderr_lines, [])
 
     def test_active_show_main_uses_use_case_and_returns_zero(self) -> None:
@@ -591,6 +598,10 @@ class TestRuntimeActiveS05(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(
             stdout.getvalue(),
-            "spec-dock: active: (not set)\n",
+            (
+                "spec-dock: active: (not set)\n"
+                "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}\n"
+                "next: spec-dock/scripts/spec-dock active set <target>\n"
+            ),
         )
         self.assertIn("spec-dock: (warn) active_show_warning", stderr.getvalue())
