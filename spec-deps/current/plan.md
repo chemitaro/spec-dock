@@ -153,7 +153,7 @@ ID: "issue-28-runtime-regression-bugs"
     - explicit id match の優先順位を壊さず、numeric fallback だけ repo-aware 化している
     - current repo slug 不明時は ambiguity / no-match の fail-closed を維持する
 - S03L:
-  - 観測可能な振る舞い: current-repo linked node は repo scope が正規化/backfill され、no-origin copy 後も `sync --github` / `validate` / `doctor` が mixed scoped/unscoped legacy だけを理由に止まらない
+  - 観測可能な振る舞い: current-repo linked node の no-origin continuity は write-time normalization と already-normalized metadata を中心に成立し、legacy unscoped current-repo linkage の automatic persistence upgrade は後続 `S03N` / `S03O` で縮退された
   - closes:
     - AC-021 no-origin continuity for current-repo linked nodes
     - manual test finding: no-origin mixed scoped/unscoped linkage ambiguity
@@ -172,6 +172,12 @@ ID: "issue-28-runtime-regression-bugs"
     - latest review finding: lone unscoped legacy linkage silent current-repo backfill
   - review gate:
     - `safe backfill` が uniqueness-only heuristic ではなく positive current-repo evidence に限定されていることを説明できる
+- S03O:
+  - 観測可能な振る舞い: bulk `sync --github` の dead sync-time backfill path は撤去され、no-origin continuity contract は write-time normalization 済み metadata に限定して説明される
+  - closes:
+    - latest review finding: dead sync-time backfill contract in bulk sync
+  - review gate:
+    - bulk sync が trusted evidence を持たない以上 mutate しない、という safety rationale と docs/impl parity を説明できる
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
@@ -260,9 +266,10 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-018` -> `S05J`
 - `AC-019` -> `S05K`
 - `AC-020` -> `S01Q`, `S04J`
-- `AC-021` -> `S03L`
+- `AC-021` -> `S03L`, `S03N`, `S03O`
 - `windows-readonly-backfill-gap` -> `S03M`
 - `lone-unscoped-backfill-gap` -> `S03N`
+- `dead-sync-backfill-gap` -> `S03O`
 - `manual verification prep` -> `S98`
 - `manual verification execution` -> `S98A`
 - `PR29-R18` -> `S01I`
@@ -285,6 +292,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R35` -> `S04K`
 - `PR29-R36` -> `S03M`
 - `PR29-R37` -> `S03N`
+- `PR29-R38` -> `S03O`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -1133,9 +1141,9 @@ ID: "issue-28-runtime-regression-bugs"
   - partial scope や same effective key duplicate のような truly ambiguous graph は read/write とも fail-closed に残す
   - provider-side source of truth の修正後、checked-in dogfooding runtime にも parity を反映する
 
-#### B1 — write-time normalization と legacy backfill
+#### B1 — write-time normalization と no-origin continuity baseline
 - purpose:
-  - current repo issue を新規に保存する path と、legacy unscoped metadata を mutate しうる path の双方で explicit scope persistence/backfill を固定する
+  - current repo issue を新規に保存する path で explicit scope persistence を固定し、already-normalized metadata の no-origin continuity baseline を作る
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
@@ -1144,24 +1152,23 @@ ID: "issue-28-runtime-regression-bugs"
   - `tests/domain_runtime/...`
   - `tests/test_init_update.py`
 
-##### I1 — safe backfill predicate を failing regression で固定する
+##### I1 — fail-closed 境界と explicit persistence baseline を failing regression で固定する
 - slice goal:
-  - safe backfill 対象と fail-closed 残置対象の境界を regression で固定する
+  - explicit scope persistence 対象と fail-closed 残置対象の境界を regression で固定する
 
 ###### Red
 - failing test:
-  - safe predicate を満たす legacy unscoped current-repo linked node が mutate path で explicit current-repo scope へ backfill される regression
-  - same-number foreign scoped coexistence は backfill を妨げない regression
-  - partial scope / same effective key duplicate / slug unknown は backfill せず fail-closed を維持する regression
+  - current repo slug 既知の write path が explicit current-repo scope persistence を行わない regression
+  - partial scope / same effective key duplicate / slug unknown は fail-closed を維持する regression
 - expected failure:
-  - 現状は predicate が未実装で、safe case が未正規化のまま no-origin で止まる
+  - 現状は write path が unscoped metadata を残し、後続 continuity の土台が作れない
 
 ###### Green
 - minimum implementation:
-  - current repo slug 既知時に利用できる safe backfill helper を導入し、eligible node だけ explicit `repo_owner/name` へ変換する
-  - ambiguity を増やす graph では helper が no-op + fail-closed を維持する
+  - current repo slug 既知の create/import/link write path で explicit `repo_owner/name` persistence を導入する
+  - ambiguity を増やす graph では write path 自体が fail-closed を維持する
 - pass condition:
-  - safe predicate / ineligible predicate の回帰テストが通る
+  - explicit persistence baseline / ineligible predicate の回帰テストが通る
 
 ###### Refactor
 - cleanup target:
@@ -1171,37 +1178,36 @@ ID: "issue-28-runtime-regression-bugs"
 
 ##### I2 — no-origin continuity と write-time persistence を閉じる
 - slice goal:
-  - newly created/imported current-repo linkage が最初から explicit scope を持ち、legacy graph も mutate 後は no-origin continuity を保てるようにする
+  - newly created/imported current-repo linkage が最初から explicit scope を持ち、already-normalized metadata は no-origin continuity を保てるようにする
 
 ###### Red
 - failing test:
   - current repo slug 既知の create/import path が explicit current-repo scope を persisted metadata へ保存する regression
-  - normalize/backfill 後の no-origin copy で `sync --github` / `validate` / `doctor` / `deps check` が mixed scoped/unscoped legacy だけを理由に fail-closed しない regression
+  - normalized metadata の no-origin copy で `sync --github` / `validate` / `doctor` / `deps check` が mixed scoped/unscoped legacy だけを理由に fail-closed しない regression
   - overlap 下でも canonical GitHub URL target と `--id` selector が no-origin 継続で exact resolution を維持する regression
   - normalized metadata が存在しても `--github-issue <n>` / bare numeric overlap fail-closed が維持される regression
   - checked-in dogfooding runtime が同じ continuity contract を維持する parity regression
 - expected failure:
-  - 新規 write path が unscoped metadata を残し、no-origin continuity が provider/checked-in のどちらかで壊れる
+  - 新規 write path が unscoped metadata を残し、normalized metadata continuity が provider/checked-in のどちらかで壊れる
 
 ###### Green
 - minimum implementation:
   - current-repo create/import/link write path で explicit scope persistence を導入する
-  - `sync --github` などの mutate path で safe backfill を呼び、no-origin continuity を作る
+  - already-normalized metadata が no-origin でも read-side continuity を保てるようにする
   - provider-side / checked-in runtime の parity を揃える
 - pass condition:
   - no-origin continuity regression と checked-in parity regression が通る
 
 ###### Refactor
 - cleanup target:
-  - write-time normalization と mutate-time backfill の呼び出し境界整理
+  - write-time normalization と read-side continuity の責務整理
 - invariants to keep green:
   - command target UX、doctor classification、repo-aware validation boundary の既存契約を壊さない
 
 #### step gate
 - review:
-  - safe backfill predicate、write-time normalization、mutate-time backfill、no-origin read-side continuity、selector continuity の責務分離を説明できる
+  - write-time normalization、no-origin read-side continuity、selector continuity の責務分離を説明できる
 - expected tests:
-  - safe backfill predicate regression
   - partial scope / duplicate effective key / slug-unknown fail-closed regression
   - create/import explicit scope persistence regression
   - no-origin `sync --github` / `validate` / `doctor` / `deps check` continuity regression
@@ -1311,6 +1317,58 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S03N` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03O — bulk sync の dead sync-time backfill contract を撤去する
+- target:
+  - `collect_sync_state()` は trusted current-repo evidence を持たない bulk `sync --github` で legacy unscoped linkage を mutate しない
+  - `AC-021` / `S03L` の no-origin continuity 契約を write-time normalization 済み metadata 中心へ補正する
+- design refs:
+  - `design.md` の `2.6 no-origin continuity via current-repo linkage normalization`
+  - `discussions/059`
+- step boundary:
+  - write-time create/import/link の explicit current repo persistence は維持する
+  - lone unscoped no-backfill contract は `S03N` を継承する
+  - new provenance schema や manual remediation command の新設までは扱わない
+  - provider-side source of truth の修正後、checked-in dogfooding runtime に parity を反映する
+
+#### Red
+- failing test:
+  - bulk `sync --github` に dead bulk backfill call path が残り、trusted candidate なしの helper を呼んでしまう regression
+  - current repo `issue_index()` の存在だけで legacy unscoped node を backfill してしまう regression
+  - checked-in dogfooding runtime で同じ dead path が再発する parity regression
+- expected failure:
+  - 現状は docs が trusted mutate-time backfill を謳う一方で、bulk sync は trusted candidate を供給していない
+
+#### Green
+- minimum implementation:
+  - provider/check-in runtime から dead bulk sync backfill call path を除去し、bulk sync は legacy unscoped linkage を mutate しない
+  - already-normalized metadata の no-origin continuity と write-time current-repo explicit scope persistence は維持する
+  - issue docs と runtime 実装の契約を一致させる
+- pass condition:
+  - dead path removal regression、current repo `issue_index()` 非trust regression、already-normalized continuity non-regression、checked-in parity regression が通る
+
+#### Refactor
+- cleanup target:
+  - dead helper call site の除去と関連 explanation/test naming の整理
+- invariants to keep green:
+  - `S03N` の fail-closed predicate を壊さない
+  - `S03M` の permission helper 契約と write-time current repo persistence を壊さない
+
+#### step gate
+- review:
+  - bulk sync が trusted evidence を持たず、write-time normalization 済み metadata continuity を正契約とする理由を説明できる
+- expected tests:
+  - bulk `sync --github` dead backfill path removal regression
+  - current repo `issue_index()` only では legacy unscoped node を backfill しない regression
+  - write-time current-repo explicit scope persistence non-regression
+  - already-normalized metadata no-origin continuity non-regression
+  - normalized metadata を使った no-origin `deps check` continuity non-regression
+  - normalized metadata を使った canonical GitHub URL / `--id` exact selector continuity non-regression
+  - checked-in dogfooding runtime dead-path removal parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03O` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S04 — artifact/repair/active fallback contract を整える
 - target:

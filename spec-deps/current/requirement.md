@@ -432,11 +432,11 @@ ID: "issue-28-runtime-regression-bugs"
   - current repo slug を解決できる状態で create/import/sync などが current-repo linked node を扱う
   - またはその後に no-origin workspace で `sync --github` / `validate` / `doctor` / `deps check` を実行する
 - Then:
-  - current-repo linked node は、current repo slug を解決できるうちに persisted metadata へ repo scope を正規化/backfill できる
-  - safe backfill 対象は、少なくとも `github.issue_number` を持ち、`github.repo_owner` / `github.repo_name` が両方未設定で、current repo slug を解決でき、かつ current repo target intent を明示できる trusted context を持つ node に限る
-  - `sync --github` のような bulk mutate path で lone unscoped legacy linkage を current repo と uniqueness だけでみなして silent backfill してはならない
-  - same-number foreign repo node の共存自体は safe backfill の禁止理由ではないが、それだけで current repo evidence と見なしてはならない
-  - `github.repo_owner` または `github.repo_name` の片側だけが入った partial scope、同じ `(current_repo_slug, issue_number)` へ 2 件以上の unscoped/current-repo candidate が見える状態、または explicit current-repo scoped duplicate がある状態は safe backfill せず fail-closed に残す
-  - no-origin へ移った後も、その正規化済み current-repo linkage だけを理由に scoped/unscoped ambiguity fail-closed へ落ちない
+  - current-repo linked node は、current repo slug を解決できる write path で persisted metadata へ explicit repo scope を保存できる
+  - current corrective scope では、bulk `sync --github` のような target-less mutate path を trusted current-repo evidence source と見なさず、legacy unscoped linkage を silent backfill しない
+  - safe backfill を将来再導入する場合でも、少なくとも `github.issue_number` を持ち、`github.repo_owner` / `github.repo_name` が両方未設定で、current repo slug を解決でき、かつ explicit request intent または persisted provenance のような trusted context を持つ node に限る
+  - `current_repo_slug` 単独、issue-number uniqueness、same-number foreign repo node の共存、current repo `issue_index()` の存在だけを trusted current-repo evidence と見なしてはならない
+  - `github.repo_owner` または `github.repo_name` の片側だけが入った partial scope、同じ `(current_repo_slug, issue_number)` へ 2 件以上の unscoped/current-repo candidate が見える状態、または explicit current-repo scoped duplicate がある状態は fail-closed に残す
+  - no-origin へ移った後も、既に正規化済みの current-repo linkage はその explicit scope だけを理由に scoped/unscoped ambiguity fail-closed へ落ちない
   - truly ambiguous mixed scope graph は引き続き fail-closed に倒れてよい
   - `--github-issue <n>` の convenience selector は overlap 下で fail-closed を維持してよいが、canonical URL と `--id` は no-origin 継続でも使い続けられる

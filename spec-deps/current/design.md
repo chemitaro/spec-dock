@@ -384,7 +384,8 @@ ActiveSet --> IssueStatusResolution : uses
 ### 変更方針
 
 - current repo slug を解決できる write path では、current-repo linked node を unscoped のまま保存せず、`github.repo_owner/name` を current repo slug で明示保存する
-- legacy unscoped linkage に対する mutate-time backfill は、current repo slug が解決できるだけでは足りず、current repo target intent を positive に示す trusted context がある場合に限って safe backfill を行う
+- current corrective scope では、bulk `sync --github` のような target-less mutate path を trusted current-repo evidence source と扱わず、legacy unscoped linkage の sync-time backfill contract を持たない
+- legacy unscoped linkage に対する mutate-time backfill を将来再導入するなら、explicit request intent または persisted provenance のような trusted context がある場合に限って safe backfill を行う
 - no-origin では新しい heuristic 推測を増やさず、正規化済み metadata を使って repo-aware validation / deps / sync を継続させる
 - current repo slug を解決できず、なお mixed scoped/unscoped が残る graph だけ fail-closed を維持する
 
@@ -394,13 +395,13 @@ ActiveSet --> IssueStatusResolution : uses
   - node が `github.issue_number` を持つ
   - `github.repo_owner` / `github.repo_name` が両方 absent で、partial scope ではない
   - current repo slug を解決できる
-  - current repo target intent を明示できる trusted context がある
+  - explicit request intent または persisted provenance のような trusted context がある
   - trusted context は current repo 所属を positive に示すものであり、「current repo と仮定しても衝突しない」だけでは足りない
 - ineligible:
   - current repo slug を解決できない
   - lone unscoped legacy linkage を bulk `sync --github` のような target-less mutate path から扱う場合
   - `github.repo_owner` または `github.repo_name` の片側だけが入った partial scope
-  - same-number foreign scoped coexistence しか evidence がなく、current repo 所属を positive に示せない場合
+  - `current_repo_slug` 単独、issue-number uniqueness、same-number foreign scoped coexistence、current repo `issue_index()` の存在しか evidence がなく、current repo 所属を positive に示せない場合
   - same `(current_repo_slug, issue_number)` に属しうる unscoped node が複数ある
   - explicit current-repo scoped duplicate が既に存在する
   - backfill 後も effective current-repo linkage key が一意にならない
@@ -410,8 +411,8 @@ ActiveSet --> IssueStatusResolution : uses
 - write-time normalization:
   - create / import / link のように current repo issue を新規に persisted metadata へ書く path では、slug が解決できる限り最初から explicit scope を保存する
 - mutate-time backfill:
-  - `sync --github` のように graph を reload し metadata 更新責務を持つ path では、legacy unscoped node を safe predicate で判定してから backfill する
-  - ただし bulk `sync --github` は explicit target context を持たないため、lone unscoped legacy linkage を current repo と uniqueness だけでみなして backfill してはならない
+  - current corrective scope では、bulk `sync --github` は metadata 更新責務を持っていても trusted current-repo evidence を生成できないため、legacy unscoped node を mutate しない
+  - mutate-time backfill を再導入するなら、explicit target intent か persisted provenance を request contract として渡せる call path に限定する
   - backfill は metadata normalization に限定し、target selection convenience や no-origin heuristic 推測は増やさない
 - read-side continuity:
   - no-origin では正規化済み explicit scope をそのまま読み、validation / deps / doctor / sync preflight の repo-aware uniqueness を継続する
@@ -419,23 +420,23 @@ ActiveSet --> IssueStatusResolution : uses
 
 ### metadata permission contract
 
-- `.meta.json` は persisted metadata として readonly lock policy を持ち、write-time create と mutate-time backfill が同じ lock/unlock 契約を共有する
-- readonly 化は `write_meta()` だけのローカル事情ではなく、後続の supported mutate path が一時 writable 化して更新し、成功後に意図した lock state へ戻せることまで含めた contract とする
-- current corrective scope では Windows を含む cross-platform 契約として扱い、`write_meta()` が readonly 化した `.meta.json` を `backfill_github_repo_scope()` が OS 差分だけで書き換え不能にしない
-- successful create/backfill 後の final `.meta.json` lock state は「その時点の persisted metadata は readonly に揃える」を正とし、`write_meta()` / `backfill_github_repo_scope()` とも成功時に same final readonly state を残す
+- `.meta.json` は persisted metadata として readonly lock policy を持ち、write-time create と helper-level metadata mutation が同じ lock/unlock 契約を共有する
+- readonly 化は `write_meta()` だけのローカル事情ではなく、将来 explicit trusted context を伴う mutate path や isolated helper verification が一時 writable 化して更新し、成功後に意図した lock state へ戻せることまで含めた contract とする
+- current corrective scope では Windows を含む cross-platform 契約として扱い、`write_meta()` が readonly 化した `.meta.json` を `backfill_github_repo_scope()` helper が OS 差分だけで書き換え不能にしない
+- successful create/helper-backfill 後の final `.meta.json` lock state は「その時点の persisted metadata は readonly に揃える」を正とし、`write_meta()` / `backfill_github_repo_scope()` とも成功時に same final readonly state を残す
 - permission helper は汎用 filesystem abstraction ではなく `.meta.json` mutation 専用に留め、次の責務だけを持つ
   - 現在の lock state / mode を読む
   - 必要なら一時 writable 化する
   - metadata write を実行する
   - 成功後に final readonly lock state へ戻す
   - restore/relock failure は既存 `readonly_lock_failed` warning surface と整合する形で返し、metadata write 自体が成功している場合は warning として観測できる
-- `sync --github` の safe backfill は permission helper failure を silent skip せず failure surface に乗せてよいが、Windows readonly file だけを理由に supported self-healing が失敗する状態は corrective patch で解消する
+- bulk `sync --github` 自体は current corrective scope で helper を呼ばないが、permission helper failure を silent skip せず failure surface に乗せてよい、という helper-level 契約は維持する
 - conflicting scope / partial scope / ambiguous candidate の fail-closed policy と、permission helper の writable/readonly 制御は別責務として保つ
 
 ### 意図
 
 - fail-closed safety を崩さずに、copy / temp checkout / exported workspace の継続運用性を確保する
-- current repo と確定できる linkage を unscoped のまま残して no-origin で自滅する状態を防ぐ
+- current repo と確定できる linkage は write-time に explicit scope 化し、no-origin で自滅する状態を防ぐ
 - positive evidence がない legacy linkage を current repo へ silent mutation しない
 - readonly metadata lock policy と supported mutate path の契約 drift を防ぎ、Windows でも self-healing を同じ surface で使えるようにする
 
@@ -444,25 +445,25 @@ ActiveSet --> IssueStatusResolution : uses
 - write path:
   - current repo issue を link/create/import する時点で explicit `repo_owner/name` を保存する
 - normalization path:
-  - current repo slug が解決できる `sync --github` などの mutate path で legacy unscoped current-repo linkage を backfill する
-  - current repo evidence を持たない lone unscoped legacy linkage は fail-closed / manual remediation に残す
+  - current corrective scope では bulk `sync --github` の dead sync-time backfill path を撤去し、legacy unscoped current-repo linkage は fail-closed / manual remediation に残す
+  - 将来の mutate-time backfill は explicit trusted context を運べる call path に限る
 - permission path:
   - `write_meta()` と `backfill_github_repo_scope()` は `.meta.json` mutation 専用 helper を共有し、Windows / posix の両方で readonly file を一時 writable 化して更新後に lock state を戻す
 - validation / deps / doctor:
   - no-origin では normalized metadata を用いて継続し、真に不明な mixed scope のみ fail-closed に残す
 - tests:
-  - current-origin で normalize/backfill 後、no-origin copy に移っても `sync --github` / `validate` / `doctor` が継続できる回帰
+  - current-origin で write-time normalize 済み metadata が no-origin copy 後も `sync --github` / `validate` / `doctor` で継続できる回帰
   - 同じ正規化済み metadata を使って no-origin `deps check` も継続できる回帰
   - create/import 直後の newly persisted current-repo linkage が explicit scope を持つ回帰
-  - safe backfill predicate を満たす legacy unscoped node だけが mutate path で backfill される回帰
   - lone unscoped legacy linkage は bulk `sync --github` で current repo scope へ silent backfill されない回帰
   - same-number foreign scoped coexistence があるだけでは lone unscoped node を backfill しない回帰
+  - current repo `issue_index()` の存在だけでは lone unscoped node を backfill しない回帰
   - overlap 下でも canonical GitHub URL target と `--id` selector は no-origin 継続で exact resolution を維持する回帰
   - normalized metadata がある状態でも bare numeric / `--github-issue` の overlap fail-closed は維持される回帰
   - truly ambiguous legacy mixed scope graph は no-origin で引き続き fail-closed に倒れる回帰
   - current repo scope に複数 numeric match がある場合は scoped ambiguity として fail-closed に倒れる回帰
   - current repo slug 不明時は ambiguity fail-closed を維持する回帰
-  - readonly `.meta.json` を backfill する current-repo safe case が Windows 相当契約でも成功し、更新後に final lock state を維持する回帰
+  - readonly `.meta.json` backfill helper 自体は isolated helper contract として Windows 相当契約でも成功し、更新後に final lock state を維持する回帰
   - relock/restore failure が起きても metadata write 成功時は `readonly_lock_failed` warning surface で観測できる回帰
   - checked-in dogfooding runtime でも readonly `.meta.json` backfill の permission contract が parity を保つ回帰
 
