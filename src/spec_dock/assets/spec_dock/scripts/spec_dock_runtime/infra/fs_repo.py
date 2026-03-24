@@ -25,6 +25,10 @@ _ENV_CREATE_LOCK_STALE_SECONDS = "SPEC_DOCK_CREATE_LOCK_STALE_SECONDS"
 _DEFAULT_CREATE_LOCK_STALE_SECONDS = 600.0
 
 
+def _runtime_os_name() -> str:
+    return os.name
+
+
 def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
     try:
         mode = path.stat().st_mode
@@ -32,7 +36,7 @@ def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
     except OSError as e:
         return False, str(e)
 
-    if os.name == "posix":
+    if _runtime_os_name() == "posix":
         try:
             if path.stat().st_mode & 0o222:
                 return False, "write bit still set after chmod"
@@ -44,6 +48,30 @@ def _try_make_readonly(path: Path) -> tuple[bool, str | None]:
 
 def _warn(message: str) -> None:
     print(f"spec-dock: (warn) {message}", file=sys.stderr)
+
+
+def _is_readonly_mode(mode: int) -> bool:
+    return (mode & 0o222) == 0
+
+
+def _write_meta_json_with_permission_contract(meta_path: Path, payload: dict[str, Any]) -> None:
+    unlocked_for_write = False
+    write_succeeded = False
+    try:
+        if meta_path.exists():
+            mode = meta_path.stat().st_mode
+            if _is_readonly_mode(mode):
+                meta_path.chmod(mode | 0o200)
+                unlocked_for_write = True
+        write_json(meta_path, payload)
+        write_succeeded = True
+    finally:
+        if not (write_succeeded or unlocked_for_write):
+            return
+        readonly_ok, readonly_err = _try_make_readonly(meta_path)
+        if not readonly_ok:
+            reason = readonly_err or "unknown error"
+            _warn(f"readonly_lock_failed: {meta_path} ({reason})")
 
 
 def _initiatives_root(specdock_dir: Path) -> Path:
@@ -349,8 +377,57 @@ def _build_meta_payload(record: StoredMetaRecord) -> dict[str, Any]:
 
 def write_meta(dest_dir: Path, record: StoredMetaRecord) -> None:
     meta_path = dest_dir / _META_FILENAME
-    write_json(meta_path, _build_meta_payload(record))
-    readonly_ok, readonly_err = _try_make_readonly(meta_path)
-    if not readonly_ok:
-        reason = readonly_err or "unknown error"
-        _warn(f"readonly_lock_failed: {meta_path} ({reason})")
+    _write_meta_json_with_permission_contract(meta_path, _build_meta_payload(record))
+
+
+def backfill_github_repo_scope(meta_path: Path, *, repo_owner: str, repo_name: str) -> bool:
+    normalized_owner = str(repo_owner or "").strip().lower()
+    normalized_repo = str(repo_name or "").strip().lower()
+    if not normalized_owner or not normalized_repo:
+        raise RuntimeError("repo_owner/repo_name are required for github scope backfill")
+
+    meta = load_json(meta_path)
+    if not isinstance(meta, dict):
+        raise RuntimeError(f"Invalid .meta.json (expected object): {meta_path}")
+
+    github = meta.get("github")
+    if not isinstance(github, dict):
+        raise RuntimeError(f"Invalid github payload in {meta_path}: expected object")
+    if github.get("issue_number") is None:
+        raise RuntimeError(
+            f"Invalid github payload in {meta_path}: github.issue_number is required for scope backfill"
+        )
+
+    existing_owner_raw = github.get("repo_owner")
+    existing_repo_raw = github.get("repo_name")
+    if existing_owner_raw is not None or existing_repo_raw is not None:
+        if existing_owner_raw is None or existing_repo_raw is None:
+            raise RuntimeError(
+                f"Invalid github.repo_owner/repo_name in {meta_path}: both fields are required"
+            )
+        if not isinstance(existing_owner_raw, str) or not isinstance(existing_repo_raw, str):
+            raise RuntimeError(
+                f"Invalid github.repo_owner/repo_name in {meta_path}: both fields must be strings"
+            )
+        existing_owner = existing_owner_raw.strip().lower()
+        existing_repo = existing_repo_raw.strip().lower()
+        if not existing_owner or not existing_repo:
+            raise RuntimeError(
+                f"Invalid github.repo_owner/repo_name in {meta_path}: empty value is not allowed"
+            )
+        if existing_owner == normalized_owner and existing_repo == normalized_repo:
+            return False
+        raise RuntimeError(
+            "Refusing github scope backfill due to conflicting existing scope: "
+            f"{meta_path} existing={existing_owner}/{existing_repo} requested={normalized_owner}/{normalized_repo}"
+        )
+
+    github["repo_owner"] = normalized_owner
+    github["repo_name"] = normalized_repo
+    meta["github"] = github
+
+    try:
+        _write_meta_json_with_permission_contract(meta_path, meta)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to backfill github scope: {meta_path}: {exc}") from exc
+    return True

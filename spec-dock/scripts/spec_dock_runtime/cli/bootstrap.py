@@ -52,6 +52,13 @@ class _NodeRepository:
     def write_meta(self, dest_dir: Path, record):
         infra_fs_repo.write_meta(dest_dir, record)
 
+    def backfill_github_repo_scope(self, meta_path: Path, *, repo_owner: str, repo_name: str) -> bool:
+        return infra_fs_repo.backfill_github_repo_scope(
+            meta_path,
+            repo_owner=repo_owner,
+            repo_name=repo_name,
+        )
+
 
 @dataclass(frozen=True)
 class _TemplateScaffolder:

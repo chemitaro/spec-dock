@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-23"
+最終更新: "2026-03-24"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: []
 ---
@@ -55,6 +55,51 @@ ID: "issue-28-runtime-regression-bugs"
 - `sev-3: generated runtime command surface mismatch` は継続観測として残るが、issue-28 の blocking condition ではない
 - comprehensive manual rerun `RT-01` から `RT-10` を fresh GitHub repository で実施し、overall verdict は `pass`
 - rerun では `foreign URL + --allow-foreign-url` は live で再現せず、same-repo / foreign / local-only / organic long-run の各経路で blocker は確認されなかった
+- 2026-03-24 manual test round preparation として、repo-scope / no-origin / stale-active recovery を切り分ける `discussions/055` と `S98` を追加した
+- 2026-03-24 `S98 manual verification preparation` は spec review を `pass` し、外部依存は `spec-dock-manual-current-issue-28-20260324` / `spec-dock-manual-foreign-issue-28-20260324` の 2 repo provisioning と定義した
+- 2026-03-24 `manual-tests/` 配下に workspace 4 種、report skeleton 3 点、`.path` fallback 用 helper launcher を用意した
+- 2026-03-24 consultant 分析により、current plan は targeted regression round としては十分だが、長時間 exploratory round としては fixture seed、live churn、checkpoint 付き organic session、記録粒度が不足すると判定した
+- 2026-03-24 `discussions/055` と `S98` を consultant 提案に合わせて拡張し、GitHub current/foreign live corpus、multi-resource local corpus、close-reopen churn、recovery submatrix、3-phase organic session を必須化した
+- 2026-03-24 enriched exploratory manual round の execution を plan 上で `S98A` として追加し、準備と実行の gate を分離した
+- 2026-03-24 enriched exploratory manual round を utility worker で実施し、overall verdict は `conditional-pass` だった
+- 2026-03-24 manual test findings の根本原因分析を `discussions/056` に記録し、main blocker は `no-origin + mixed scoped/unscoped linkage ambiguity` と整理した
+- 2026-03-24 root-cause analysis を踏まえ、`AC-021 no-origin continuity for current-repo linked nodes` と corrective scope `S03L` を requirement/design/plan に追加した
+- 2026-03-24 `S03L` の fresh spec review 初回は `fail` で、safe backfill predicate の明文化不足と executable step block 不足が指摘された
+- 2026-03-24 requirement/design/plan を補正し、`AC-021` に safe backfill/ineligible 条件、`design.md 2.6` に normalization flow、`plan.md S03L` に Red/Green/Refactor と parity obligations を追加した
+- 2026-03-24 `S03L` の spec re-review 2 回目は `fail` で、`deps check` continuity と canonical URL / `--id` continuity が design/plan の executable verification に不足していると指摘された
+- 2026-03-24 `design.md 2.6` と `plan.md S03L` を補正し、no-origin continuity 対象を `sync --github` / `validate` / `doctor` / `deps check` まで明示し、canonical URL / `--id` の exact resolution continuity を expected tests に追加した
+- 2026-03-24 `S03L` の spec re-review 3 回目で、`AC-021` の no-origin continuity 対象が `deps` と広く残っていたため `deps check` へ requirement 側も揃えるよう指摘された
+- 2026-03-24 `requirement.md` の `AC-021` を補正し、source-of-truth でも no-origin continuity 対象を `deps check` と明示した
+- 2026-03-24 `S03L` docs-only final spec review は `pass` となり、safe backfill / no-origin continuity / selector continuity の契約が implementation-ready と確認された
+- 2026-03-24 `S03L` 実装では current-repo linked node の write-time normalization と `sync --github` mutate path の safe backfill を provider/check-in runtime へ反映した
+- 2026-03-24 `S03L` 実装 review は `pass` で、safe backfill predicate、責務分離、no-origin continuity、selector continuity、parity drift に correctness finding はなかった
+- 2026-03-24 `S03L` 初回 QA review は `fail` で、no-origin 後の `sync --github` continuity assertion、不適格 predicate（partial scope / slug unknown）coverage、checked-in parity での exact active resolution と bare numeric ambiguity coverage が不足していると指摘された
+- 2026-03-24 上記 QA 指摘に対し、`tests/cli_runtime/test_validate.py`、`tests/presentation_runtime/test_runtime_sync_s07.py`、`tests/test_init_update.py` を追補し、provider/check-in の no-origin `sync --github` continuity、partial-scope / slug-unknown ineligible branch、active exact resolution、bare numeric fail-closed を固定した
+- 2026-03-24 `S03L` fresh QA re-review は `pass` となり、追加 coverage で no-origin continuity と selector continuity の regression protection が十分と確認された
+- 2026-03-24 `python -m py_compile`（provider/check-in runtime + 追加 tests）を実行し、終了コード `0` を確認した
+- 2026-03-24 `diff -u` で provider/check-in runtime の `repo_context.py` / `create_node.py` / `import_node.py` / `sync_state.py` / `fs_repo.py` / `bootstrap.py` parity を確認し、差分なしを確認した
+- 2026-03-24 targeted regression として `python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_validate tests.cli_runtime.test_deps tests.cli_runtime.test_active tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_import_s10 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_backfills_current_scope_and_keeps_no_origin_continuity` を実行し、`Ran 211 tests` / `OK` を確認した
+- 2026-03-24 latest review follow-up として、`S03L` の Windows readonly `.meta.json` backfill gap を `discussions/057` に分析し、レビュー指摘は妥当・修正必要・最良案は `.meta.json` writable/readonly 制御 helper の共有化と結論づけた
+- 2026-03-24 `discussions/057` を正本として、design に `.meta.json` permission contract を追加し、plan に corrective scope `S03M readonly .meta.json backfill cross-platform contract` を追加した
+- 2026-03-24 `S03M` docs-only spec review 初回は `fail` で、successful create/backfill 後の final `.meta.json` lock state が未固定であることと、restore failure の warning surface が expected tests に落ちていないことが指摘された
+- 2026-03-24 design/plan を補正し、successful create/backfill 後の final state を readonly に固定し、relock/restore failure が `readonly_lock_failed` warning surface に載る regression を S03M expected tests へ追加した
+- 2026-03-24 `S03M` docs-only spec re-review 2 回目は `fail` で、report が正本として参照する `discussions/057` 側に未決定表現が残っており、canonical discussion を最終契約へ追随させるよう指摘された
+- 2026-03-24 `discussions/057` を更新し、final `.meta.json` lock state は readonly、relock/restore failure は `readonly_lock_failed` warning surface で観測、という最終決定に揃えた
+- 2026-03-24 `S03M` docs-only final spec review は `conditional_pass` で、残件だった canonical discussion scope ownership も `discussions/057` 冒頭で `S03M` ownership に揃えたため implementation-ready と判断した
+- 2026-03-24 `S03M` 実装では `.meta.json` mutation 専用 helper を導入し、`write_meta()` / `backfill_github_repo_scope()` の permission contract を provider/check-in runtime で共有した
+- 2026-03-24 `S03M` では successful create/backfill 後の final readonly state と `readonly_lock_failed` warning surface をコードへ反映し、Windows readonly backfill gap を corrective patch で解消した
+- 2026-03-24 `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py tests/cli_runtime/test_validate.py tests/test_init_update.py` を実行し、終了コード `0` を確認した
+- 2026-03-24 `diff -u src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py` を実行し、provider/check-in parity に差分がないことを確認した
+- 2026-03-24 targeted regression として `python -m unittest -v tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_backfills_readonly_meta_json_under_windows_contract_and_keeps_final_readonly tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_warns_when_backfill_relock_fails_after_write tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_backfills_readonly_meta_under_windows_contract_parity tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_github_keeps_fail_closed_for_ineligible_backfill_candidates tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_github_keeps_fail_closed_for_partial_scope_backfill_candidates tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_backfills_safe_current_repo_linkage_and_keeps_no_origin_continuity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_backfills_current_scope_and_keeps_no_origin_continuity` を実行し、`Ran 7 tests` / `OK` を確認した
+- 2026-03-24 `S03M` fresh implementation/code review は `pass` で、shared permission helper、Windows readonly backfill gap、warning surface、provider/check-in parity に actionable finding はなかった
+- 2026-03-24 latest review follow-up として、lone unscoped legacy linkage が uniqueness-only predicate により current repo へ silent backfill されうる点を `discussions/058` で分析し、レビュー指摘は妥当・修正必要・最良案は `positive current-repo evidence` がある場合だけ backfill を許可する方針と結論づけた
+- 2026-03-24 `discussions/058` を正本として、`requirement.md` / `design.md` / `plan.md` を補正し、bulk `sync --github` の lone unscoped legacy linkage を safe backfill から外す corrective scope `S03N` を追加した
+- 2026-03-24 `S03N` docs-only spec review は `conditional_pass` で、design の opening wording と report handoff state の軽微補正だけが残件だった
+- 2026-03-24 design/report の軽微補正を反映し、`S03N` を implementation-ready として dev_coder へ委任した
+- 2026-03-24 `S03N` 実装では `collect_safe_current_repo_backfill_node_ids()` の current-repo candidate 判定を `trusted_current_repo_node_ids` ベースへ狭め、bulk `sync --github` で lone unscoped legacy linkage と foreign coexistence-only legacy linkage を silent backfill しないよう補正した
+- 2026-03-24 provider/check-in runtime parity は `repo_context.py` で維持し、already-normalized metadata の no-origin continuity と write-time current-repo explicit scope persistence の non-regression を維持した
+- 2026-03-24 targeted regression として `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_validate tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_keeps_lone_unscoped_legacy_without_backfill_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity tests.cli_runtime.test_new.TestCliNew.test_new_issue_persists_current_repo_scope_when_origin_is_resolved tests.cli_runtime.test_import.TestCliImport.test_import_persists_current_repo_scope_when_origin_is_resolved` を実行し、`Ran 51 tests` / `OK` を確認した
+- 2026-03-24 `S03N` fresh implementation/code review は `pass` で、lone unscoped no-backfill、foreign coexistence-only no-backfill、already-normalized continuity、checked-in parity に actionable finding はなかった
 - PR #29 の Codex review 2 件は妥当と判断し、follow-up corrective patch を追加で実施した
 - corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
 - PR #29 の追加 Codex review 3 件は妥当と判断し、current repo slug parity と domain/application validation boundary の corrective patch を追加で実施した
@@ -1210,7 +1255,6 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- current working tree では `S01I` / `S01J` / `S01K` / `S01L` / `S01M` / `S01N` / `S01O` / `S04H` / `S04I` / `S05I` / `S90G` まで corrective scope を反映済みで、push 後に latest checks と latest Codex review を再確認する
+- `S03L` / `S03M` / `S03N` corrective scope は docs / implementation / review まで反映済みで、次は必要に応じて branch 全体の fresh whole-diff review へ進める
 - `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
-- pushed head では前回までの Codex review / PR checks は `pass`。今回の S01M/S01N を push 後、latest checks と latest Codex review を再確認して merge-ready 判定を更新する

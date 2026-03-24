@@ -5,7 +5,7 @@ ID: "issue-28-runtime-regression-bugs"
 関連GitHub: ["28", "https://github.com/chemitaro/spec-dock/issues/28"]
 状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-23"
+最終更新: "2026-03-24"
 依存: ["requirement.md", "design.md"]
 親: []
 ---
@@ -152,12 +152,46 @@ ID: "issue-28-runtime-regression-bugs"
   - review gate:
     - explicit id match の優先順位を壊さず、numeric fallback だけ repo-aware 化している
     - current repo slug 不明時は ambiguity / no-match の fail-closed を維持する
+- S03L:
+  - 観測可能な振る舞い: current-repo linked node は repo scope が正規化/backfill され、no-origin copy 後も `sync --github` / `validate` / `doctor` が mixed scoped/unscoped legacy だけを理由に止まらない
+  - closes:
+    - AC-021 no-origin continuity for current-repo linked nodes
+    - manual test finding: no-origin mixed scoped/unscoped linkage ambiguity
+  - review gate:
+    - fail-closed policy は truly ambiguous graph に残しつつ、current repo と確定できる linkage だけを明示 scope 化している
+    - write path persistence と legacy backfill の責務境界が説明できる
+- S03M:
+  - 観測可能な振る舞い: readonly `.meta.json` を持つ current-repo safe backfill が Windows を含む cross-platform contract で成功し、self-healing が permission drift だけを理由に止まらない
+  - closes:
+    - latest review finding: Windows readonly `.meta.json` backfill gap
+  - review gate:
+    - `.meta.json` permission helper が `write_meta()` / `backfill_github_repo_scope()` の両方で共有され、readonly final state contract が説明できる
+- S03N:
+  - 観測可能な振る舞い: lone unscoped legacy linkage は positive current-repo evidence がない限り bulk `sync --github` で silent backfill されず、fail-closed / manual remediation に残る
+  - closes:
+    - latest review finding: lone unscoped legacy linkage silent current-repo backfill
+  - review gate:
+    - `safe backfill` が uniqueness-only heuristic ではなく positive current-repo evidence に限定されていることを説明できる
 - S99:
   - 観測可能な振る舞い: branch diff 全体が requirement/design/plan と一致し、実装・QA・spec review が通っている
   - closes:
     - final diff review quality gate
   - review gate:
     - reviewer が「この diff を merge してよい」と判断できる
+- S98:
+  - 観測可能な振る舞い: `manual-tests/` 配下に same-repo / foreign-repo / no-origin / stale-active を再現できる手動テスト環境と checklist/report scaffold が用意されている
+  - closes:
+    - comprehensive manual verification preparation for repo-scope and active recovery
+  - review gate:
+    - `discussions/055` のケース一覧、GitHub fixture repo、workspace topology、完了条件が spec review で説明可能
+    - manual test scaffold が `manual-tests/` の既存 log contract と矛盾しない
+- S98A:
+  - 観測可能な振る舞い: enriched exploratory manual round が current/foreign/no-origin/pathfile の 4 workspace で実行され、live churn・recovery submatrix・3 checkpoint organic session の evidence が report に残る
+  - closes:
+    - comprehensive manual verification execution for repo-scope, active recovery, and exploratory churn
+  - review gate:
+    - `discussions/055` の `MT-00` から `MT-08` が verdict 付きで完了している
+    - same-number overlap、live churn、recovery submatrix、organic checkpoints の evidence が report artifact に残っている
 - S01P:
   - 観測可能な振る舞い: `gh issue create` 後の failure surface が outcome class ごとに guidance を返し、local-write-committed cleanup failure で blind rerun を案内しない
   - closes:
@@ -226,6 +260,11 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-018` -> `S05J`
 - `AC-019` -> `S05K`
 - `AC-020` -> `S01Q`, `S04J`
+- `AC-021` -> `S03L`
+- `windows-readonly-backfill-gap` -> `S03M`
+- `lone-unscoped-backfill-gap` -> `S03N`
+- `manual verification prep` -> `S98`
+- `manual verification execution` -> `S98A`
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
@@ -237,12 +276,15 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R27` -> `S01O`
 - `PR29-R28` -> `S03J`
 - `PR29-R29` -> `S03K`
+- `manual-round-F1` -> `S03L`
 - `PR29-R30` -> `S01P`
 - `PR29-R31` -> `S05J`
 - `PR29-R32` -> `S05K`
 - `PR29-R33` -> `S01Q`
 - `PR29-R34` -> `S04J`
 - `PR29-R35` -> `S04K`
+- `PR29-R36` -> `S03M`
+- `PR29-R37` -> `S03N`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -272,6 +314,7 @@ ID: "issue-28-runtime-regression-bugs"
 - SG1 spec review:
   - timing:
     - `S90` で docs impact を閉じた時点
+    - `S98` で manual verification topology を閉じた時点
   - scope:
     - `requirement.md` / `design.md` / `plan.md` / `report.md` と shipped docs/help の整合
 
@@ -1076,6 +1119,198 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S03K` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03L — current-repo linkage を正規化し no-origin continuity を維持する
+- target:
+  - current repo slug を解決できる write/mutate path で current-repo linked node の repo scope を explicit metadata へ正規化する
+  - no-origin copy 後も `sync --github` / `validate` / `doctor` / deps resolution が safe backfill 済み current-repo linkage だけを理由に fail-closed しないようにする
+- design refs:
+  - `design.md` の `2.6 no-origin continuity via current-repo linkage normalization`
+  - `discussions/056`
+- step boundary:
+  - convenience selector の新仕様追加は扱わず、`--github-issue <n>` / bare numeric の overlap fail-closed は維持する
+  - no-origin での新しい heuristic 推測は追加せず、current repo slug が既知の時点で正規化できる metadata だけを対象にする
+  - partial scope や same effective key duplicate のような truly ambiguous graph は read/write とも fail-closed に残す
+  - provider-side source of truth の修正後、checked-in dogfooding runtime にも parity を反映する
+
+#### B1 — write-time normalization と legacy backfill
+- purpose:
+  - current repo issue を新規に保存する path と、legacy unscoped metadata を mutate しうる path の双方で explicit scope persistence/backfill を固定する
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/...`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/...`
+  - `tests/cli_runtime/...`
+  - `tests/domain_runtime/...`
+  - `tests/test_init_update.py`
+
+##### I1 — safe backfill predicate を failing regression で固定する
+- slice goal:
+  - safe backfill 対象と fail-closed 残置対象の境界を regression で固定する
+
+###### Red
+- failing test:
+  - safe predicate を満たす legacy unscoped current-repo linked node が mutate path で explicit current-repo scope へ backfill される regression
+  - same-number foreign scoped coexistence は backfill を妨げない regression
+  - partial scope / same effective key duplicate / slug unknown は backfill せず fail-closed を維持する regression
+- expected failure:
+  - 現状は predicate が未実装で、safe case が未正規化のまま no-origin で止まる
+
+###### Green
+- minimum implementation:
+  - current repo slug 既知時に利用できる safe backfill helper を導入し、eligible node だけ explicit `repo_owner/name` へ変換する
+  - ambiguity を増やす graph では helper が no-op + fail-closed を維持する
+- pass condition:
+  - safe predicate / ineligible predicate の回帰テストが通る
+
+###### Refactor
+- cleanup target:
+  - normalization helper と repo-aware key 判定の責務整理
+- invariants to keep green:
+  - fail-closed policy と existing scoped exact resolution contract を壊さない
+
+##### I2 — no-origin continuity と write-time persistence を閉じる
+- slice goal:
+  - newly created/imported current-repo linkage が最初から explicit scope を持ち、legacy graph も mutate 後は no-origin continuity を保てるようにする
+
+###### Red
+- failing test:
+  - current repo slug 既知の create/import path が explicit current-repo scope を persisted metadata へ保存する regression
+  - normalize/backfill 後の no-origin copy で `sync --github` / `validate` / `doctor` / `deps check` が mixed scoped/unscoped legacy だけを理由に fail-closed しない regression
+  - overlap 下でも canonical GitHub URL target と `--id` selector が no-origin 継続で exact resolution を維持する regression
+  - normalized metadata が存在しても `--github-issue <n>` / bare numeric overlap fail-closed が維持される regression
+  - checked-in dogfooding runtime が同じ continuity contract を維持する parity regression
+- expected failure:
+  - 新規 write path が unscoped metadata を残し、no-origin continuity が provider/checked-in のどちらかで壊れる
+
+###### Green
+- minimum implementation:
+  - current-repo create/import/link write path で explicit scope persistence を導入する
+  - `sync --github` などの mutate path で safe backfill を呼び、no-origin continuity を作る
+  - provider-side / checked-in runtime の parity を揃える
+- pass condition:
+  - no-origin continuity regression と checked-in parity regression が通る
+
+###### Refactor
+- cleanup target:
+  - write-time normalization と mutate-time backfill の呼び出し境界整理
+- invariants to keep green:
+  - command target UX、doctor classification、repo-aware validation boundary の既存契約を壊さない
+
+#### step gate
+- review:
+  - safe backfill predicate、write-time normalization、mutate-time backfill、no-origin read-side continuity、selector continuity の責務分離を説明できる
+- expected tests:
+  - safe backfill predicate regression
+  - partial scope / duplicate effective key / slug-unknown fail-closed regression
+  - create/import explicit scope persistence regression
+  - no-origin `sync --github` / `validate` / `doctor` / `deps check` continuity regression
+  - no-origin canonical URL target / `--id` exact resolution continuity regression
+  - overlap 下の `--github-issue <n>` / bare numeric fail-closed 維持 regression
+  - checked-in dogfooding runtime parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03L` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03M — readonly `.meta.json` backfill を cross-platform contract へ補正する
+- target:
+  - `write_meta()` と `backfill_github_repo_scope()` が同じ `.meta.json` permission contract を共有し、Windows でも readonly file を safe backfill できるようにする
+- design refs:
+  - `design.md` の `2.6 no-origin continuity via current-repo linkage normalization`
+  - `discussions/057`
+- step boundary:
+  - safe backfill predicate や selector continuity 自体は `S03L` のままとし、ここでは permission/lock state drift の補正に集中する
+  - generic filesystem abstraction へ広げず、`.meta.json` mutation 専用 helper に限定する
+  - conflicting scope / partial scope / ambiguous candidate の fail-closed policy は変えない
+  - provider-side source of truth の修正後、checked-in dogfooding runtime に parity を反映する
+
+#### Red
+- failing test:
+  - readonly `.meta.json` を持つ safe current-repo backfill case が Windows 相当契約で `sync --github` failure になる regression
+  - readonly `.meta.json` backfill 成功後に final lock state が復元されない regression
+  - checked-in dogfooding runtime で同じ readonly backfill failure が再発する parity regression
+- expected failure:
+  - 現状は writable 化と restore が `posix` 限定で、Windows readonly file を supported self-healing path で更新できない
+
+#### Green
+- minimum implementation:
+  - `.meta.json` mutation 専用 helper を導入し、現在の lock state 取得、一時 writable 化、write、restore を shared contract として実装する
+  - `write_meta()` と `backfill_github_repo_scope()` の両方から同 helper を使う
+  - successful create/backfill 後の final `.meta.json` lock state は readonly に揃える
+  - provider-side / checked-in runtime の parity を揃える
+- pass condition:
+  - Windows 相当 readonly backfill regression と final lock state regression、checked-in parity regression が通る
+
+#### Refactor
+- cleanup target:
+  - permission helper の責務整理と warning surface の整合
+- invariants to keep green:
+  - `readonly_lock_failed` warning contract を壊さない
+  - fail-closed predicate と no-origin continuity contract を壊さない
+
+#### step gate
+- review:
+  - readonly metadata lock policy と mutate-time permission control が `write_meta()` / `backfill_github_repo_scope()` で共有され、Windows 差分だけで self-healing が止まらないことを説明できる
+- expected tests:
+  - Windows 相当 readonly `.meta.json` backfill success regression
+  - readonly backfill 後の final lock state regression
+  - relock/restore failure が `readonly_lock_failed` warning surface へ載る regression
+  - partial scope / conflicting scope fail-closed non-regression
+  - checked-in dogfooding runtime readonly backfill parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03M` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S03N — lone unscoped legacy linkage を positive evidence なしに backfill しない
+- target:
+  - `collect_safe_current_repo_backfill_node_ids()` は lone unscoped legacy linkage を current repo slug と uniqueness だけで current repo candidate 扱いせず、positive current-repo evidence がある場合だけ backfill を許可する
+- design refs:
+  - `design.md` の `2.6 no-origin continuity via current-repo linkage normalization`
+  - `discussions/058`
+- step boundary:
+  - write-time create/import/link の explicit current repo persistence は維持する
+  - bulk `sync --github` の lone unscoped legacy linkage を safe から外す corrective scope に集中し、manual remediation command の新設までは扱わない
+  - permission helper / readonly contract は `S03M` に留め、ここでは evidence model と backfill predicate を補正する
+  - provider-side source of truth の修正後、checked-in dogfooding runtime に parity を反映する
+
+#### Red
+- failing test:
+  - lone unscoped legacy linkage が bulk `sync --github` で current repo scope へ silent backfill される regression
+  - same-number foreign scoped coexistence があるだけで lone unscoped node を current repo scope へ backfill してしまう regression
+  - checked-in dogfooding runtime で同じ silent backfill が再発する parity regression
+- expected failure:
+  - 現状は uniqueness-only predicate により lone unscoped legacy linkage を safe と誤判定し、current repo へ silent mutation する
+
+#### Green
+- minimum implementation:
+  - safe backfill predicate を positive current-repo evidence ベースに狭め、bulk `sync --github` の lone unscoped legacy linkage を no-op + fail-closed にする
+  - write-time create/import/link の explicit scope persistence と、already-normalized metadata の continuity は維持する
+  - provider-side / checked-in runtime の parity を揃える
+- pass condition:
+  - lone unscoped no-backfill regression、foreign coexistence no-backfill regression、checked-in parity regression が通る
+
+#### Refactor
+- cleanup target:
+  - current-repo evidence 判定 helper と reason surface の責務整理
+- invariants to keep green:
+  - `S03M` の permission contract を壊さない
+  - exact selector continuity と fail-closed ambiguity contract を壊さない
+
+#### step gate
+- review:
+  - `safe backfill` が positive evidence を要求し、bulk `sync --github` の lone unscoped legacy linkage を silent mutation しないことを説明できる
+- expected tests:
+  - lone unscoped legacy linkage no-backfill regression
+  - same-number foreign scoped coexistence only では backfill しない regression
+  - write-time current-repo explicit scope persistence non-regression
+  - already-normalized metadata no-origin continuity non-regression
+  - checked-in dogfooding runtime lone-unscoped no-backfill parity regression
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S03N` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S04 — artifact/repair/active fallback contract を整える
 - target:
@@ -2160,5 +2395,49 @@ ID: "issue-28-runtime-regression-bugs"
   - create/post-create outcome matrix の 5 class が provider / checked-in runtime で同じ guidance contract と review evidence を持つ
 - docs impact resolved:
   - provider-side docs と dogfooding 確認が完了し、`report.md` に判断と結果が残っている
+- manual verification prepared:
+  - `S98` が完了し、`manual-tests/` の workspace/report scaffold と `discussions/055` の checklist contract が揃っている
+  - same-repo / foreign-repo / no-origin / stale-active の 4 観点に対する fixture と evidence 採取手順が固定されている
+- manual verification executed:
+  - `S98A` が完了し、`MT-00` から `MT-08` の enriched exploratory round evidence が report artifact に残っている
 - final diff approved:
   - `S99` の required validation が完了し、GitHub live regression を含む最終 diff review で重大懸念が解消されている
+
+### S98 — manual verification preparation
+- target:
+  - `manual-tests/` 配下に、repo-scope / no-origin / stale-active / pathfile parity を再現する workspace と report scaffold を用意する
+- boundaries:
+  - provider 実装の追加変更は行わない
+  - manual workspace / helper / report skeleton の準備に限定する
+- concrete deliverables:
+  - `discussions/055` に一致する workspace 4 種
+  - `checklist.md` / `execution-log.md` / `summary.md` の skeleton
+  - `.path` fallback 用 helper launcher
+  - GitHub current/foreign repo URL と richer exploratory matrix を反映した checklist contract
+- verification:
+  - checklist contract に required fields がある
+  - overlap fixture / churn fixture / repo URL / workspace map / `.path` launcher / operator-time-window-resume が checklist に記入可能な欄として存在する
+  - execution log skeleton に timestamp / case / precondition / command / expected / actual / diff / verdict / evidence の欄がある
+  - execution log skeleton に checks / side effects / touched ids-urls / invariants / anomaly-hypothesis / checkpoint の欄がある
+  - summary skeleton に overall verdict / findings / residual risks / skipped-or-blocked / next actions / finding categories の欄がある
+  - `.path` helper launcher が作成され、MT-06 の再現手順として参照できる
+- report update rule:
+  - `report.md` に S98 の準備内容、spec review 結果、pending external dependency を追記する
+
+### S98A — manual verification execution
+- target:
+  - `discussions/055` の enriched exploratory round を実行し、multi-resource / live churn / no-origin / recovery evidence を収集する
+- boundaries:
+  - provider 実装の追加変更は行わない
+  - manual workspace 操作、GitHub issue mutation、report artifact 記録に限定する
+- concrete deliverables:
+  - `checklist.md` の verdict 更新
+  - `execution-log.md` の case records と checkpoint records
+  - `summary.md` の overall verdict と finding categories
+- verification:
+  - `MT-00` で provider/generated runtime parity と live fixture seed が記録されている
+  - `MT-02` / `MT-03` / `MT-05` で `active set` / `deps check` / `sync --github` / status-readiness evidence がある
+  - `MT-04` で live churn 3 種以上、`MT-06` で recovery submatrix と `context-pack.md` vs active-entrypoint parity、`MT-07` で 3 checkpoint organic session が記録されている
+  - `MT-07` では issue と epic の両方に dependency 登録がある
+- report update rule:
+  - `report.md` に S98A の execution verdict、主要 finding、residual risks を追記する

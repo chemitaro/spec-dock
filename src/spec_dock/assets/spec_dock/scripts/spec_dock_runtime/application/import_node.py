@@ -29,6 +29,7 @@ from .create_node import (
     resolve_create_write_phase,
 )
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug, split_repo_slug
 from .sync_state import sync_after_import
 
 
@@ -50,29 +51,6 @@ def _resolve_issue_gateway(ports: Ports):
     if ports.issue_gateway is None:
         raise RuntimeError("issue_gateway is required")
     return ports.issue_gateway
-
-
-def _normalize_repo_slug_value(slug: str | None) -> str | None:
-    text = str(slug or "").strip().lower()
-    if not text:
-        return None
-    owner, sep, repo = text.partition("/")
-    if not sep or not owner or not repo:
-        return None
-    return f"{owner}/{repo}"
-
-
-def _resolve_current_repo_slug(ports: Ports) -> str | None:
-    if ports.git_gateway is None or ports.repo_root is None:
-        return None
-    resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
-    if not callable(resolver):
-        return None
-    try:
-        raw = resolver(_resolve_repo_root(ports))
-    except RuntimeError:
-        return None
-    return _normalize_repo_slug_value(raw)
 
 
 def _active_selection_from_manifest(manifest: ActiveManifest | None) -> ActiveSelection:
@@ -136,11 +114,20 @@ def resolve_parent_for_import(
     return resolve_parent_from_active(graph, kind, active)
 
 
-def build_linked_create_request(req: ImportNodeRequest, parent_id: str | None) -> CreateNodeRequest:
+def build_linked_create_request(
+    req: ImportNodeRequest,
+    parent_id: str | None,
+    *,
+    current_repo_slug: str | None = None,
+) -> CreateNodeRequest:
     owner = (req.target_repo_owner or "").strip().lower()
     repo = (req.target_repo_name or "").strip().lower()
     github_repo_owner = owner if owner and repo else None
     github_repo_name = repo if owner and repo else None
+    if github_repo_owner is None and github_repo_name is None:
+        current_scope = split_repo_slug(current_repo_slug)
+        if current_scope is not None:
+            github_repo_owner, github_repo_name = current_scope
     return CreateNodeRequest(
         title=req.title,
         slug=req.slug,
@@ -306,7 +293,7 @@ def import_node_core(
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     req = replace(req, title=title, slug=slug)
 
-    current_repo_slug = _resolve_current_repo_slug(ports)
+    current_repo_slug = resolve_current_repo_slug(ports)
     try:
         graph = load_graph(ports, validate=False)
         report = validate_graph_and_deps(
@@ -335,7 +322,11 @@ def import_node_core(
         current_repo_slug=current_repo_slug,
     )
     precheck_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
-    precheck_req = build_linked_create_request(req, precheck_parent_id)
+    precheck_req = build_linked_create_request(
+        req,
+        precheck_parent_id,
+        current_repo_slug=current_repo_slug,
+    )
     precheck_plan = plan_node_creation(
         precheck_req,
         graph,
@@ -369,7 +360,11 @@ def import_node_core(
             current_repo_slug=current_repo_slug,
         )
         locked_parent_id = resolve_parent_for_import(req, graph, ports, kind=kind)
-        create_req = build_linked_create_request(req, locked_parent_id)
+        create_req = build_linked_create_request(
+            req,
+            locked_parent_id,
+            current_repo_slug=current_repo_slug,
+        )
         plan = plan_node_creation(
             create_req,
             graph,
