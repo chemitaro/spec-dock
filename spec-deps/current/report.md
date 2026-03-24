@@ -1148,18 +1148,23 @@ ID: "issue-28-runtime-regression-bugs"
     - `design.md` の `active entrypoint recovery` に、same-layer wrong-id path は `expected_id` 探索か placeholder fallback へ倒す trust boundary を追記した
     - `plan.md` に `S04K` を追加し、placeholder fallback と id-based recovery の両 regression を expected test として固定した
     - `discussions/054-disc-pr29-r35-persisted-active-path-id-trust-analysis.md` を追加した
-  - implementation:
-    - `src/spec_dock/cli.py` の `_resolve_persisted_path_dir()` を `expected_id` aware にし、persisted path fallback でも `.meta.json` の `id` / `type` 一致を必須化した
-    - `tests/test_init_update.py` に same-layer wrong-id persisted path の 2 regression（placeholder fallback / id-based recovery）を追加した
+  - review status:
+    - docs-only spec review:
+      - 初回: `conditional_pass`（same-layer wrong-id path が `expected_id` を別 path で回収できる branch も plan の expected test に含めるよう指摘）
+      - 再レビュー: `pass`（requirement/design/plan/discussion の trust boundary と expected tests が整合し、実装前契約として implementation-ready）
+    - implementation review: `pass`（current worktree 直読 review で、persisted path fallback の `id` / `type` 必須化と call site の `expected_id` 受け渡しを確認）
+    - QA review: `pass`（same-layer wrong-id -> placeholder fallback / id-based recovery と既存 active recovery 18 regression が green）
   - validation:
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id tests.test_init_update.TestInitUpdate.test_update_prefers_id_based_recovery_when_same_layer_wrong_id_path_exists tests.test_init_update.TestInitUpdate.test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken`
-    - 結果: `Ran 4 tests in 1.015s` / `OK`
+    - 結果: `Ran 4 tests in 0.818s` / `OK`
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_pathfile_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_mixed_entrypoints_keep_healthy_real_and_rebuild_placeholder_layers tests.test_init_update.TestInitUpdate.test_update_keeps_placeholder_and_none_context_pack_when_persisted_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_rewrites_stale_context_pack_when_rebuilding_active_entrypoints tests.test_init_update.TestInitUpdate.test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale tests.test_init_update.TestInitUpdate.test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_existing_active_entrypoints_when_manifest_stale tests.test_init_update.TestInitUpdate.test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale tests.test_init_update.TestInitUpdate.test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id tests.test_init_update.TestInitUpdate.test_update_prefers_id_based_recovery_when_same_layer_wrong_id_path_exists tests.test_init_update.TestInitUpdate.test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack tests.test_init_update.TestInitUpdate.test_update_prefers_real_pathfile_entrypoint_over_placeholder_symlink_when_manifest_is_stale tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_non_symlink_file_conflict_using_real_pathfile_target tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_invalid_directory_conflict_using_real_pathfile_target`
-    - 結果: `Ran 18 tests in 3.309s` / `OK`
-    - `git diff --check`
-    - 結果: whitespace error なし
-    - `git diff --name-only | rg '[A-Z]' || true`
-    - 結果: 変更対象 path に uppercase 追加なし
+    - 結果: `Ran 18 tests in 3.533s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04 tests.test_init_update`
+    - 結果: `Ran 246 tests in 42.474s` / `OK`
+  - whole-branch review status (`main` 基準 / current worktree):
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
 
 - 2026-03-24 latest GitHub/Codex review follow-up:
   - latest inline 2 件を分析した結果、`src/spec_dock/cli.py` の persisted active path trust boundary は妥当、`application/create_node.py` の implicit parent recovery hint 指摘は current CLI 契約では前提不成立と判断した
