@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -92,3 +93,37 @@ def check_ref_format_branch(repo_root: Path, branch: str) -> bool:
         check=False,
     )
     return p.returncode == 0
+
+
+_HTTPS_GH_REMOTE_RE = re.compile(
+    r"^https?://(?:[^@/]+@)?github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?/?$",
+    re.IGNORECASE,
+)
+_SSH_GH_REMOTE_RE = re.compile(
+    r"^(?:ssh://)?git@github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?/?$",
+    re.IGNORECASE,
+)
+
+
+def origin_github_repo_slug(repo_root: Path) -> str | None:
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "config", "--get", "remote.origin.url"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        return None
+    raw = (p.stdout or "").strip()
+    if not raw:
+        return None
+    match = _HTTPS_GH_REMOTE_RE.fullmatch(raw) or _SSH_GH_REMOTE_RE.fullmatch(raw)
+    if match is None:
+        return None
+    owner = match.group("owner").strip()
+    repo = match.group("repo").strip()
+    if not owner or not repo:
+        return None
+    return f"{owner}/{repo}"

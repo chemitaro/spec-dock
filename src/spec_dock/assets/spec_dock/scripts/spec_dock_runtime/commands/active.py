@@ -16,7 +16,7 @@ from ..presentation.cli_text import (
     render_active_show_text,
 )
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
-from .targets import parse_active_like_target
+from .targets import parse_explicit_target_flags
 
 
 @dataclass(frozen=True)
@@ -62,8 +62,11 @@ def command_specs() -> dict[str, CommandSpec]:
 def _add_active_set_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "target",
+        nargs="?",
         help="GitHub issue number (digits only: 123 / #123 / URL) or node id (e.g. iss-00123 / epic-local-00001)",
     )
+    parser.add_argument("--id", help="Explicit node id target (e.g. iss-00123 / epic-local-00001)")
+    parser.add_argument("--github-issue", type=int, help="Explicit GitHub issue number target (e.g. 123)")
     checkout_group = parser.add_mutually_exclusive_group()
     checkout_group.add_argument(
         "--checkout",
@@ -96,7 +99,12 @@ def _add_active_clear_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _active_set_args(ns: argparse.Namespace) -> CommandArgs:
-    target_ref, target_display = parse_active_like_target(str(ns.target))
+    target_ref, target_display = parse_explicit_target_flags(
+        positional_target=getattr(ns, "target", None),
+        node_id=getattr(ns, "id", None),
+        github_issue=getattr(ns, "github_issue", None),
+        command_label="active set",
+    )
     return ActiveSetArgs(
         target_ref=target_ref,
         target_display=target_display,
@@ -162,4 +170,3 @@ def _expect_active_clear_args(args: CommandArgs) -> ActiveClearArgs:
     if not isinstance(args, ActiveClearArgs):
         raise RuntimeError("Invalid command args for active clear")
     return args
-

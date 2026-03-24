@@ -34,7 +34,7 @@ def _issue_status(issue_id: str, issue_statuses: dict[str, IssueStatusSnapshot])
     snapshot = issue_statuses.get(issue_id)
     if snapshot is None:
         return "unknown"
-    return _normalize_issue_status(snapshot.status)
+    return _normalize_issue_status(snapshot.effective_status)
 
 
 def _issue_ids_for_target(graph: SpecGraph, target_id: NodeId) -> list[str]:
@@ -321,12 +321,20 @@ def inspect_target_deps(
             if isinstance(dep_id, str):
                 target_effective_set.add(dep_id)
 
+    inspected_status_ids = set(inspect_issue_ids)
+    inspected_status_ids.add(target_id.value)
+
     return TargetDepsInspection(
         target_id=target_id,
         evaluation=evaluation,
         node_states=node_states,
         effective_depends_on=_safe_sorted_node_ids(target_effective_set),
         warnings=[],
+        issue_statuses={
+            issue_id: issue_statuses[issue_id]
+            for issue_id in _safe_sorted_node_ids(inspected_status_ids)
+            if issue_id in issue_statuses
+        },
     )
 
 

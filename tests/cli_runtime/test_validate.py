@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -134,8 +135,9 @@ class TestCliValidate(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate github.issue_number detected", p.stderr)
+            self.assertIn("Duplicate github.linkage detected", p.stderr)
             self.assertIn("github.issue_number=1", p.stderr)
+            self.assertIn("repo=(current-or-unknown)", p.stderr)
             self.assertIn("initiative:init-local-00001", p.stderr)
             self.assertIn("issue:iss-local-00001", p.stderr)
             self.assertIn("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json", p.stderr)
@@ -143,7 +145,397 @@ class TestCliValidate(CliRuntimeHarness):
                 "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json",
                 p.stderr,
             )
-            self.assertIn("Fix github.issue_number", p.stderr)
+            self.assertIn("Fix github linkage", p.stderr)
+
+    def test_validate_rejects_same_issue_number_when_repo_linkage_is_mixed_and_current_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / ".meta.json"
+            )
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / ".meta.json"
+            )
+
+            init_data = json.loads(init_meta.read_text(encoding="utf-8"))
+            init_data["github"] = {"issue_number": 1}
+            self._write_json_force(init_meta, init_data)
+
+            issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            issue_data["github"] = {"issue_number": 1, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(issue_meta, issue_data)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Ambiguous github.linkage scope detected", p.stderr)
+            self.assertIn("fail-closed", p.stderr)
+            self.assertIn("github.issue_number=1", p.stderr)
+
+    def test_validate_allows_same_issue_number_when_current_repo_is_resolved(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            init_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / ".meta.json"
+            )
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / ".meta.json"
+            )
+
+            init_data = json.loads(init_meta.read_text(encoding="utf-8"))
+            init_data["github"] = {"issue_number": 1}
+            self._write_json_force(init_meta, init_data)
+
+            issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            issue_data["github"] = {"issue_number": 1, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(issue_meta, issue_data)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_detects_duplicate_discussion_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Duplicate discussion sequence detected", p.stderr)
+            self.assertIn("seq=001", p.stderr)
+            self.assertIn("001-adr-first.md", p.stderr)
+            self.assertIn("001-disc-second.md", p.stderr)
+
+    def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
+        artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
+        node_roots = {
+            "initiative": (
+                Path("spec-dock/initiatives/init-local-00001-auth-platform"),
+                "kind=initiative id=init-local-00001",
+            ),
+            "epic": (
+                Path("spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth"),
+                "kind=epic id=epic-local-00001",
+            ),
+            "issue": (
+                Path(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token"
+                ),
+                "kind=issue id=iss-local-00001",
+            ),
+        }
+        cases = [
+            (kind, artifact_name, node_root / artifact_name, expected)
+            for kind, (node_root, expected) in node_roots.items()
+            for artifact_name in artifact_names
+        ]
+        for _name, artifact_name, artifact_rel_path, expected in cases:
+            with self.subTest(kind=_name, artifact=artifact_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+                    self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+                    artifact_path = target / artifact_rel_path
+                    artifact_path.unlink(missing_ok=False)
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Missing required artifact", p.stderr)
+                    self.assertIn(expected, p.stderr)
+                    self.assertIn(artifact_rel_path.as_posix(), p.stderr)
+
+    def test_validate_detects_missing_required_meta_for_each_node_kind(self) -> None:
+        cases = [
+            (
+                "initiative",
+                Path("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json"),
+                "kind=initiative id=init-local-00001",
+            ),
+            (
+                "epic",
+                Path(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"
+                ),
+                "kind=epic id=epic-local-00001",
+            ),
+            (
+                "issue",
+                Path(
+                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json"
+                ),
+                "kind=issue id=iss-local-00001",
+            ),
+        ]
+        for kind, meta_rel_path, expected in cases:
+            with self.subTest(kind=kind):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+                    self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+                    meta_path = target / meta_rel_path
+                    meta_path.unlink(missing_ok=False)
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Missing required artifact", p.stderr)
+                    self.assertIn(expected, p.stderr)
+                    self.assertIn(meta_rel_path.as_posix(), p.stderr)
+
+    def test_doctor_detects_missing_required_meta_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            meta_rel_path = Path(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json"
+            )
+            (target / meta_rel_path).unlink(missing_ok=False)
+
+            p = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: doctor: findings=1", p.stderr)
+            self.assertIn("[missing_artifact]", p.stderr)
+            self.assertIn(meta_rel_path.as_posix(), p.stderr)
+
+    def test_validate_sync_and_doctor_classify_missing_meta_with_create_lock_in_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / ".meta.json").unlink(missing_ok=False)
+
+            lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=active",
+                        "pid=1234",
+                        "user=tester",
+                        f"created_unix={time.time():.6f}",
+                        "created_iso=2026-03-23",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Create in-progress state detected", p_validate.stderr)
+            self.assertIn(".meta.json", p_validate.stderr)
+            self.assertNotIn("Missing required artifact", p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("Create in-progress state detected", p_sync.stderr)
+            self.assertNotIn("Missing required artifact", p_sync.stderr)
+
+            p_doctor = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
+            self.assertIn("[stale_create_lock]", p_doctor.stderr)
+            self.assertIn("Create in-progress state detected", p_doctor.stderr)
+            self.assertNotIn("[missing_artifact]", p_doctor.stderr)
+
+    def test_validate_sync_and_doctor_classify_missing_meta_with_stale_create_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            (issue_dir / ".meta.json").unlink(missing_ok=False)
+
+            lock_path = target / "spec-dock" / "system" / ".runtime" / "create.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(
+                "\n".join(
+                    [
+                        "token=stale",
+                        "pid=4321",
+                        "user=tester",
+                        "created_unix=0",
+                        "created_iso=1970-01-01",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Stale create-lock state detected", p_validate.stderr)
+            self.assertIn(".meta.json", p_validate.stderr)
+            self.assertNotIn("Missing required artifact", p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("Stale create-lock state detected", p_sync.stderr)
+            self.assertNotIn("Missing required artifact", p_sync.stderr)
+
+            p_doctor = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
+            self.assertIn("[stale_create_lock]", p_doctor.stderr)
+            self.assertIn("Stale create-lock state detected", p_doctor.stderr)
+            self.assertNotIn("[missing_artifact]", p_doctor.stderr)
+
+    def test_validate_sync_and_doctor_detect_missing_required_plan_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            missing_rel_path = Path(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/plan.md"
+            )
+            (target / missing_rel_path).unlink(missing_ok=False)
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Missing required artifact", p_validate.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("preflight validate failed", p_sync.stderr)
+            self.assertIn("Missing required artifact", p_sync.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_sync.stderr)
+
+            p_doctor = self._run_runtime_capture(target, ["doctor"])
+            self.assertNotEqual(p_doctor.returncode, 0, p_doctor.stdout + p_doctor.stderr)
+            self.assertIn("[missing_artifact]", p_doctor.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_doctor.stderr)
+
+    def test_sync_force_continues_when_required_plan_artifact_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._run_runtime(target, ["sync", "--no-update-active"])
+
+            agent_dir = target / "spec-dock" / ".agent"
+            missing_rel_path = Path(
+                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/plan.md"
+            )
+            (target / missing_rel_path).unlink(missing_ok=False)
+
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("deps_preflight_failed", p.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p.stderr)
+
+            index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertFalse(index["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(index["deps"]["error"]))
+            self.assertIn("deps_preflight_failed", index["warnings"])
+
+            tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
+            self.assertFalse(tree["deps"]["valid"])
+            self.assertIn("preflight validate failed", str(tree["deps"]["error"]))
 
     def test_sync_fails_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -443,4 +835,3 @@ class TestCliValidate(CliRuntimeHarness):
 
             self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
             self.assertTrue(legacy_meta_path.is_file())
-

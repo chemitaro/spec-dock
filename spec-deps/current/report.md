@@ -1,1007 +1,1216 @@
 ---
 種別: 実装報告書（Issue）
-ID: "issue-25"
-タイトル: "巨大な app.py を複数 module に分割し tests/test_cli.py を領域別に再編する"
-関連GitHub: ["https://github.com/chemitaro/spec-dock/issues/25"]
-状態: "draft"
+ID: "issue-28-runtime-regression-bugs"
+タイトル: "manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する"
+関連GitHub: ["28"]
+状態: "in_progress"
 作成者: "Codex CLI"
-最終更新: "2026-03-12"
+最終更新: "2026-03-23"
 依存: ["requirement.md", "design.md", "plan.md"]
-親: ["#25"]
+親: []
 ---
 
-# issue-25 巨大な app.py を複数 module に分割し tests/test_cli.py を領域別に再編する — 実装報告（LOG）
-
-## 実装サマリー
-- `S01` として、runtime の pure core のうち `ids / graph / validation` を `domain` 層へ additive に抽出した。
-- `app.py` は staged delegation owner のまま残し、validation seam は `domain.validation.validate_graph_and_deps()` にそろえた。
-
-## 実装記録（セッションログ）
-
-### 2026-03-12 02:35 - 03:08
-
-#### 対象
-- Step: S01
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `domain/ids.py`, `domain/models.py`, `domain/tree.py`, `domain/validation.py` を追加し、pure helper / dataclass / graph build / structural validation を抽出した。
-- legacy `ids.py` は thin wrapper として維持し、既存 import 面を壊さず `domain/ids.py` へ委譲する形へ変更した。
-- `app.py` には `_build_graph_from_nodes()` mapper を追加し、`_validate_nodes()` と `_validate_github_issue_numbers_unique()` を domain validation へ委譲する構成へ切り替えた。
-- `tests/test_runtime_domain_s01.py` を追加し、pure core test / delegation smoke / no-I/O import assertion を導入した。
-- `code_reviewer` と `consultant` で S01 をレビューし、`validate_graph_and_deps()` を live seam に使う微修正まで反映した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_domain_s01 \
-  tests.test_cli.TestCli.test_validate_detects_duplicate_github_issue_numbers_with_paths \
-  tests.test_cli.TestCli.test_validate_detects_issue_initiative_id_mismatch
-
-Ran 10 tests in 0.274s
-OK
-
-python -m unittest -v tests.test_runtime_domain_s01
-
-Ran 9 tests in 0.011s
-OK
-
-python -m unittest discover -v
-
-Ran 171 tests in 21.114s
-OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - domain graph / validation への委譲 seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py` - legacy wrapper 化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__init__.py` - domain package 追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/ids.py` - pure ids helper を移設
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/models.py` - `SpecNodeSeed` / `SpecNode` / `SpecGraph` / `ValidationReport`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py` - `build_graph()`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - structural validation / github issue uniqueness validation
-- `tests/test_runtime_domain_s01.py` - S01 focused tests
-
-#### コミット
-- `8c7ab7257408b16bb1a9ef30e2671cb7da9f4658` `feat(runtime): domain層へpure coreを抽出して検証委譲を導入`
-
-#### メモ
-- `validate_graph_and_deps()` は S01 では structural-only とし、deps pure rule は計画どおり `S03` へ残した。
-- `tests/test_runtime_domain_s01.py` は一時的な focused test file として追加し、正式な test tree split は計画どおり後続 step で扱う。
-
----
-
-### 2026-03-12 03:08 - 03:28
-
-#### 対象
-- Step: S02
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/validate_tree.py`、`application/contracts.py`、`application/ports.py` を追加し、validate の最初の consumer slice を導入した。
-- `infra/contracts.py` に `StoredMetaRecord`、`presentation/contracts.py` に `CliText`、`presentation/cli_text.py` に `render_validate_text()` を追加した。
-- `app.py` の validate 経路のみを新 use case + renderer に委譲し、`app.py` は staged delegation owner のまま維持した。
-- `tests/test_runtime_validate_s02.py` を追加し、use case、reader seam、renderer、exit `0/1`、stdout/stderr split、legacy delegated validate smoke を固定した。
-- `consultant` と `code_reviewer` で S02 スコープレビューを行い、過剰抽象化に入らず validate slice に閉じたことを確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_validate_s02 \
-  tests.test_cli.TestCli.test_validate_detects_broken_parent_id \
-  tests.test_cli.TestCli.test_validate_detects_issue_initiative_id_mismatch \
-  tests.test_cli.TestCli.test_validate_reports_invalid_meta_json_shape \
-  tests.test_cli.TestCli.test_validate_detects_duplicate_github_issue_numbers_with_paths \
-  tests.test_cli.TestCli.test_validate_and_sync_fail_fast_on_legacy_meta_json \
-  tests.test_cli.TestCli.test_validate_and_sync_fail_fast_when_dot_meta_and_legacy_coexist
-
-Ran 13 tests in 0.904s
-OK
-
-python -m unittest discover -v
-
-Ran 178 tests in 22.140s
-OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - validate path を use case + renderer へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `ValidateTreeRequest` / `ValidationResult`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - validate 用最小 reader seam
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/validate_tree.py` - validate use case
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - `StoredMetaRecord`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/contracts.py` - `CliText`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - `render_validate_text()`
-- `tests/test_runtime_validate_s02.py` - S02 focused tests
-
-#### コミット
-- `a54803591b561f8f90be8f62a7bd5564d64969ba` `feat(runtime): validateのS02 sliceをapplication層へ分離`
-
-#### メモ
-- `app.py` から `SpecGraph` や `_Node` を application へ渡さず、`StoredMetaRecord` 境界に留めた。
-- validate の failure path は既存どおり main の `error: ...` 包装を維持し、renderer は stdout/stderr の正本だけを持つ形にした。
-
----
-
-## 遭遇した問題と解決
-- 問題: 初回実装では `app.py` の live seam が `validate_graph()` 直結で、将来の `application/validate_tree.py -> validate_graph_and_deps()` 形と少しずれていた。
-  - 解決: `consultant` 指摘を踏まえ、`_validate_nodes()` の委譲先を `validate_graph_and_deps()` に寄せ、smoke test も更新した。
-- 問題: 初回の S03 着手時に `domain/deps.py` が graph-only で dependency topology を導出する前提になっており、`SpecGraph` の入力契約と衝突した。
-  - 解決: discussion 003 で整理した Option B を採用し、`issue_depends_on_map` の正本を `application / infra` 側へ移し、S03 は supplied topology を受ける pure rule のみを実装する形へ設計と計画を修正した。
-
----
-
-### 2026-03-12 06:10 - 07:10
-
-#### 対象
-- Step: S03
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `domain/models.py` に `NodeId`, `IssueSnapshot`, `IssueStatusSnapshot`, `ProgressMap`, `DepsNodeState`, `DepsState`, `DepsEvaluation`, `TargetDepsInspection`, `ActiveSelection`, `BranchDecision` を追加し、S03 pure core の DTO を固定した。
-- `domain/status.py` を新規追加し、`resolve_issue_statuses()` と `build_progress_map()` を no-I/O pure function として実装した。
-- `domain/deps.py` を新規追加し、`evaluate_readiness()`, `inspect_target_deps()`, `build_effective_deps_map()`, `build_deps_state()`, `validate_deps_cycles()`, `collect_reachable_issue_ids()` を Option B 契約どおり supplied topology 前提で実装した。
-- 旧前提の S03 下書きは放棄し、graph から dependency topology を compile しない pure domain のみへ作り直した。
-- `tests/test_runtime_domain_s03.py` を追加し、status source 選択、progress 集計、explicit `issue_depends_on_map` 入力、active decoration、parent merge、cycle validation、no shell I/O import を固定した。
-- `code_reviewer` による S03 scope review を行い、重大指摘なしで pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_domain_s03
-
-Ran 8 tests in 0.011s
-OK
-
-python -m unittest -v tests.test_runtime_domain_s03 tests.test_runtime_domain_s01 tests.test_runtime_validate_s02
-
-Ran 24 tests ... OK
-
-python -m unittest discover -v
-
-Ran 186 tests in 21.525s
-OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/models.py` - S03 DTO を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py` - pure status / progress rule を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py` - pure deps / readiness / cycle validation rule を追加
-- `tests/test_runtime_domain_s03.py` - S03 focused tests
-
-#### コミット
-- `d42b3a820bb9c21f3bb41123d982b06d48cfdbe4` `feat(runtime): S03のpure domainルールとfocused testを導入`
-
-#### メモ
-- `build_effective_deps_map()` は parent merge を pure path に閉じており、S04 の topology provider が issue-only map を返す場合は issue key 部分だけを自然に消費する。
-- live consumer 接続は計画どおり `S04` 以降へ残し、S03 では `app.py` / `application` / `presentation` を変更していない。
-
----
-
-### 2026-03-12 07:15 - 08:15
-
-#### 対象
-- Step: S04
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/check_deps.py` と `application/status_context.py` を追加し、`deps check` の read-side use case と status source 正規化 seam を導入した。
-- `infra/deps_reader.py` を追加し、canonical `issue_depends_on_map` の first consumer として `deps check` へ topology provider を接続した。
-- `application/validate_tree.py` と `domain/validation.py` を更新し、topology reader が束縛されている場合のみ `validate_graph_and_deps(graph, issue_depends_on_map=...)` を使う internal reconnect を導入した。
-- `presentation/json_state.py` を追加して `deps check --json` の ownership を移し、`presentation/cli_text.py` には text 側の rendering を追加した。
-- `app.py` は staged delegation owner のまま保ち、`deps check` の経路だけを `application/check_deps.py` へ委譲した。
-- `tests/test_runtime_deps_s04.py` を追加し、use case/result、status context、topology reader、validate reconnect、legacy delegated deps smoke を固定した。
-- `tests/test_cli.py` の `deps check` 関連 regression を更新し、cycle fail-fast、json/text path、source selection、stderr/stdout の観測点を S04 契約に合わせた。
-- `code_reviewer` による S04 scope review を行い、重大指摘なしで pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_deps_s04
-
-Ran 5 tests ... OK
-
-python -m unittest -v tests.test_runtime_deps_s04 tests.test_runtime_validate_s02 tests.test_runtime_domain_s03
-
-Ran 20 tests in 0.031s
-OK
-
-python -m unittest discover -v
-
-Ran 191 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `deps check` を use case + renderer へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CheckDepsRequest` / `DepsCheckResult` など S04 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - `DepsTopologyReader` など read-side ports を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/validate_tree.py` - topology reconnect を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py` - deps use case を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/status_context.py` - issue status source 正規化 seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - optional topology を受ける validate 境界へ更新
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - `DepsTopologyLoadResult` など infra 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - topology provider を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/derived_state_reader.py` - cached status reader を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py` - github status reader を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - active manifest load seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - deps text renderer を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - deps json renderer を追加
-- `tests/test_runtime_deps_s04.py` - S04 focused tests
-- `tests/test_cli.py` - deps CLI regression を更新
-
-#### コミット
-- `74f57b9901d411861bd7fcdd7a0d8bd18c19ca37` `feat(deps): S04のdeps checkスライスとtopology providerを導入`
-
-#### メモ
-- `deps check` では topology invalid/cycle を reachable/unreachable にかかわらず fail-fast とし、`active set` / `sync` 側の再利用は計画どおり後続 step へ残した。
-- `validate_tree()` の reconnect は internal seam に留めており、S04 の primary user-facing review scope は `deps check` のまま維持している。
-
----
-
-### 2026-03-12 08:20 - 09:10
-
-#### 対象
-- Step: S05
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/set_active.py` に `show_active()` の read path を導入し、`active show` のみを `application` へ切り出した。
-- `infra/active_store.py` を read-only の migration-capable loader として拡張し、`.agent/active.json`、`.work/active.json`、`.work/current.json` の優先順と no write-back を `load_active_manifest()` に閉じた。
-- `presentation/cli_text.py` に `render_active_show_text()` を追加し、`active show` の text 出力を use case から分離した。
-- `app.py` は staged delegation owner のまま維持し、`active show` の経路だけを新 use case + renderer に委譲した。
-- `tests/test_runtime_active_s05.py` を追加し、agent manifest read model、legacy priority、no write-back、zero-input/exit 0、legacy delegated smoke を固定した。
-- 初回 review では `.agent/active.json` の `all-null` cleared manifest を invalid 扱いして stale legacy fallback が起きうる P1 指摘を受けた。
-- `infra/active_store.py` を修正し、`initiative/epic/issue` がすべて `null` の manifest を valid cleared state として `source=\"agent.active\"` のまま扱うように変更し、focused test を追加して再レビューを pass させた。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_active_s05
-
-Ran 5 tests ... OK
-
-python -m unittest -v tests.test_runtime_active_s05 tests.test_runtime_deps_s04 tests.test_runtime_validate_s02 tests.test_runtime_domain_s03
-
-Ran 25 tests in 0.033s
-OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `active show` を use case + renderer へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `ActiveViewEntry` / `ActiveViewResult` など S05 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - active read port 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - `show_active()` の read path を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - migration-capable read loader と cleared manifest fix
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - active manifest read DTO を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - `render_active_show_text()` を追加
-- `tests/test_runtime_active_s05.py` - S05 focused tests
-
-#### コミット
-- `1372b19f8b35930d1185893d567f19f495d92f0b` `feat(active): S05のactive show read sliceを導入`
-
-#### メモ
-- `load_active_manifest_no_migrate()` は S05 の user-facing path では使っていない。
-- `all-null` `.agent/active.json` は cleared state として扱い、legacy fallback を起こさないようにした。
-
----
-
-### 2026-03-12 09:15 - 10:20
-
-#### 対象
-- Step: S06
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/set_active.py` に `active set` / `active clear` の write path を導入し、guard / order / rollback を application 層へ移した。
-- `domain/active.py` を追加し、active manifest の patch / restore に必要な pure helper を分離した。
-- `S04` で導入した topology provider を readiness guard に再利用し、invalid/cyclic topology を readiness 判定より前に fail-fast する順序を固定した。
-- `commit_active_state()` の rollback 範囲を step 7-9 failure に限定し、pre-step7 failure では snapshot/restore を走らせないようにした。
-- `infra/git_cli.py` を追加し、branch decision / checkout pre-write の切り出しを行った。
-- `tests/test_runtime_active_s06.py` を追加し、blocked/unknown/force、pre-step7 no-rollback、patch failure rollback、active clear を focused に固定した。
-- 初回 review では、`initiative` / `epic` の non-issue target が `guard_reason=\"unknown\"` かつ blockers 空のときに通ってしまう P1 指摘を受けた。
-- `application/set_active.py` を修正し、non-issue でも `deps.ready` を正本に guard するよう統一し、focused test を追加して再レビューを pass させた。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_active_s06
-
-Ran 6 tests ... OK
-
-python -m unittest -v tests.test_runtime_active_s06 \
-  tests.test_cli.TestCli.test_active_set_without_github_blocks_unknown_issue_even_without_deps \
-  tests.test_cli.TestCli.test_active_set_epic_and_initiative_use_v2_deps_guard
-
-Ran 8 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `active set` / `active clear` を use case へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - S06 用 DTO を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - active write / git port 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - active write use case / rollback 制御 / guard fix
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/active.py` - active patch / restore helper を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py` - active selection helper を拡張
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - snapshot / restore / write seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py` - active write rollback DTO を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py` - git checkout / branch seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - active set/clear text path を追加
-- `tests/test_runtime_active_s06.py` - S06 focused tests
-- `tests/test_cli.py` - active set/clear CLI regression を更新
-
-#### コミット
-- `8e2c74e2495edbcb30846bef105c89454b9a9e22` `feat(active): S06のactive set/clear write sliceを導入`
-
-#### メモ
-- non-issue target でも `deps.ready` を使って `unknown` を拒否するようにしたため、dependency closure が空でも status 不明なら active mutation を止める。
-- 今回は focused tests までを再実行し、全件 `discover` は未再実行。
-
-## 今後の推奨事項
-- `S07` では `sync` の preflight / artifact write を `S04` / `S06` の shared seam に再接続する。
-- `S07` で active auto-update は `ActiveUpdateOutcome` と artifact write failure の境界を明確にしたまま導入する。
-
----
-
-### 2026-03-12 10:25 - 11:45
-
-#### 対象
-- Step: S07
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/sync_state.py` を追加し、`collect_sync_state()`、`maybe_auto_update_from_branch()`、`write_sync_artifacts()`、`sync_after_import()` を導入した。
-- `S06` の `commit_active_state()` を再利用し、branch 由来 active update を artifact write より前に適用する流れを固定した。
-- `infra/artifact_writer.py`, `infra/json_store.py`, `infra/clock.py` を追加し、artifact write と timestamp 取得の責務を分離した。
-- `presentation/json_state.py`, `presentation/markdown.py`, `presentation/puml.py`, `presentation/cli_text.py` を拡張し、JSON / markdown / PUML / text の renderer 所有境界を整理した。
-- `tests/test_runtime_sync_s07.py` を追加し、sync use case、cycle fail-fast、force placeholder、artifact failure contract、legacy delegated smoke を focused に固定した。
-- 初回 review では、artifact writer の途中失敗が `failed_before_write` と誤分類される P1 指摘を受けた。
-- `application/sync_state.py` を修正し、writer 実行中の例外は `failed_partial_or_stale` として再分類し、pre-write failure だけを `failed_before_write` に残すようにした。
-- `tests/test_cli.py` の関連 setup を `--force` 前提へ補正し、S06 で導入した unknown readiness block と衝突しないよう整理した。
-- 修正後の再レビューで重大指摘なしの pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest tests.test_runtime_sync_s07 -v
-
-Ran 9 tests ... OK
-
-python -m unittest discover -v
-
-Ran 211 tests in 32.716s
-OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - S07 用 DTO を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - sync / artifact ports を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync pipeline を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/active.py` - sync path から再利用する helper を拡張
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_writer.py` - artifact writer を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/clock.py` - clock seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/json_store.py` - JSON store seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/contracts.py` - artifact bundle 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - sync JSON renderer を拡張
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/markdown.py` - markdown renderer を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - PUML renderer を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - sync text renderer を追加
-- `tests/test_runtime_sync_s07.py` - S07 focused tests
-- `tests/test_cli.py` - sync / active setup regression を更新
-
-#### コミット
-- `f63bd9831e4914ceac22be3baaff1a751b19a5d7` `feat(sync): S07のsyncスライスとartifact書き込み契約を導入`
-
-#### メモ
-- artifact writer の途中失敗は部分書き込みの可能性を失わないよう `failed_partial_or_stale` に固定した。
-- pre-write failure は `failed_before_write` のまま維持している。
-
-## 今後の推奨事項
-- `S08` では create core を no-write preflight と planned write に分けて固定する。
-- `S09` では `new doc` を node create から独立枝として閉じる。
-
----
-
-### 2026-03-12 11:50 - 12:35
-
-#### 対象
-- Step: S08
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/create_node.py` を追加し、`plan_node_creation()` / `CreatePlan` / `execute_create_plan()` / `CreateNodeResult` を導入した。
-- `infra/fs_repo.py` と `infra/template_scaffolder.py` を追加し、scaffold copy / meta write の責務を分離した。
-- no-write preflight を `planned_paths` 全体へ適用し、collision 時は fail-fast で書き込みなしに統一した。
-- `copy_scaffolded_tree -> write_meta` の順序を core と focused test の両方で固定した。
-- `app.py` は staged delegation owner のまま維持し、`new initiative|epic|issue` のみ新 core へ委譲した。
-- `tests/test_runtime_new_s08.py` を追加し、planning/execution/order/collision/default mode/reuse seam/renderer/delegation smoke を回帰化した。
-- `code_reviewer` による S08 scope review を行い、重大指摘なしで pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest tests.test_runtime_new_s08 -v
-
-Ran 9 tests ... OK
-
-python -m unittest discover -v
-
-Ran 220 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - new node path を create core へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CreatePlan` / `CreateNodeResult` などを追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - create 用 port 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - create core を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - fs write seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py` - scaffold copy / render seam を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py` - create で使う github helper を拡張
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - new node text renderer を追加
-- `tests/test_runtime_new_s08.py` - S08 focused tests
-
-#### コミット
-- `a92445c4dad818c9c989351b213e6730e08cc523` `feat(new): S08のnew node coreを導入`
-
-#### メモ
-- `app.py` の旧 `_new_*` 実装本体は rollback しやすさのため残し、先頭 return で新 core に委譲する形にしている。
-- `github_mode=\"link_existing\"` は S08 で契約だけ整え、主な再利用は S10 側で行う前提。
-
----
-
-### 2026-03-12 12:40 - 13:20
-
-#### 対象
-- Step: S09
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `CreateDiscussionDocRequest` / `CreateDiscussionDocResult` を追加し、`new doc` を node create と別枝の use case として切り出した。
-- `application/create_node.py` に `plan_discussion_doc()` と `create_discussion_doc()` を追加し、共有シーケンス判定、duplicate/overflow fail-fast、template load/render/write を実装した。
-- `presentation/cli_text.py` に `render_new_doc_text()` を追加し、`new doc` の result/text 契約を固定した。
-- `app.py` は staged delegation owner のまま維持し、`_new_doc()` のみ新 core へ委譲した。
-- `tests/test_runtime_new_doc_s09.py` を追加し、sequence/path/content/type parity/no-write/invalid slug/renderer/delegation/new-node非退行を focused に固定した。
-- `code_reviewer` による S09 scope review を行い、重大指摘なしで pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest tests.test_runtime_new_doc_s09 -v
-
-Ran 8 tests ... OK
-
-python -m unittest discover
-
-Ran 228 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - `new doc` を use case へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CreateDiscussionDoc*` 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - `new doc` core を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - `render_new_doc_text()` を追加
-- `tests/test_runtime_new_doc_s09.py` - S09 focused tests
-
-#### コミット
-- `cc5069bd122960d9bbe3ba66cc10e70fd4c8e557` `feat(new): S09のnew doc coreを導入`
-
-#### メモ
-- `scope_node_id` は canonical id 前提で、CLI 経由では `app.py` 側で解決済みの値だけを use case に渡している。
-- `app.py` の旧 `_new_doc` 本体は staged rollback 用に残している。
-
----
-
-### 2026-03-12 13:25 - 14:20
-
-#### 対象
-- Step: S10
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `application/import_node.py` を追加し、`import` 専用 use case と `sync_after_import()` を導入した。
-- `resolve_parent_for_import()` を実装し、`parent_id` 未指定時は `load_active_manifest_no_migrate() -> ActiveSelection -> resolve_parent_from_active()` の鎖で親解決するようにした。
-- duplicate guard と no-write preflight を GitHub lookup より前へ配置し、offline/degraded な状況でも deterministic に duplicate/collision を返すよう修正した。
-- `build_linked_create_request()` で `CreateNodeRequest(github_mode=\"link_existing\")` へ変換し、`plan_node_creation()` / `execute_create_plan()` を再利用する形へ統一した。
-- `app.py` は staged delegation owner のまま維持し、`import` を `application/import_node.py` へ委譲した。
-- `presentation/cli_text.py` に `render_import_text()` を追加し、import 結果の text 契約を固定した。
-- `tests/test_runtime_import_s10.py` を追加し、parent fallback、duplicate/no-write、import->sync、artifact path/content、negative path、no_migrate chain、reuse seam、renderer、legacy delegated smoke を focused に固定した。
-- 初回 review では duplicate/collision preflight が `issue_view_minimal()` より後ろにある P1 指摘を受けた。
-- `application/import_node.py` と `tests/test_runtime_import_s10.py` を修正し、duplicate/collision ケースでは `view_calls == []` であることまで含めて再レビューを pass させた。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_import_s10
-
-Ran 9 tests ... OK
-
-python -m unittest discover -v
-
-Ran 237 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - import path を use case へ委譲
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - S10 用 DTO を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - import 用 port 契約を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py` - import core と sync_after_import を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py` - `resolve_parent_from_active()` を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - import text renderer を追加
-- `tests/test_runtime_import_s10.py` - S10 focused tests
-
-#### コミット
-- `7722d79c1ae5fa77b7d85320c0cb47d9d09be2e6` `feat(import): s10のimport coreとsync連携を導入`
-
-#### メモ
-- `post_import_sync` の artifact 書き込み失敗は `ImportNodeResult.post_import_sync.artifact_failure` と warning で表現し、CLI 終了コード変更は今回扱っていない。
-- `load_active_manifest_no_migrate()` の user-facing consumer は import parent fallback のみに限定している。
-
----
-
-### 2026-03-12 14:25 - 15:30
-
-#### 対象
-- Step: S11
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- `cli/*` と `commands/*` を追加し、parser/help/dispatch ownership を `cli` 側へ移した。
-- `application/contracts.py` に `UseCases` facade を追加し、`commands/*` は request normalization + renderer selection に限定した。
-- `app.py` を thin entrypoint 化し、`registry -> parser -> bootstrap -> dispatch` の起動に責務を縮小した。
-- `commands/sync.py` は staged coexistence のため facade 経由 legacy 委譲を維持した。
-- `tests/test_runtime_shell_s11.py` を追加し、parser/help/dispatch / wrapper / staged delegation の focused regression を固定した。
-- 初回 review では `deps --json` が stderr warning を出してしまう P2 指摘を受けた。
-- `commands/deps.py` を修正し、JSON mode では `CliText.warnings=[]` として stdout-only 契約を守るようにした。text モードの warning は維持した。
-- 修正後の focused tests と full `discover` を通し、再レビューで pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_runtime_shell_s11
-
-Ran 6 tests ... OK
-
-python -m unittest discover -v
-
-Ran 244 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - thin entrypoint 化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `UseCases` facade を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - bootstrap 用 port 契約調整
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/__init__.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/dispatch.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/__init__.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/contracts.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/targets.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/active.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/sync.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/validate.py`
-- `tests/test_runtime_shell_s11.py` - S11 focused tests
-- `tests/test_runtime_validate_s02.py` - ownership 変更に合わせて更新
-- `tests/test_cli.py` - `deps --json` stdout-only 契約を更新
-
-#### コミット
-- `7e600f6d92b1a6f8cd00ae45a96cda4166e9ed0d` `feat(cli): s11のshell integrationを正本化`
-
-#### メモ
-- `commands/*` は `UseCases facade + application DTO + presentation renderer + commands/contracts` のみに依存する方針へ揃えた。
-- `sync` は意図的に staged coexistence を残し、最終 detach は後続 step に残している。
-
----
-
-### 2026-03-12 15:35 - 16:10
-
-#### 対象
-- Step: S12
-- AC/EC: AC-003, AC-005, EC-001
-
-#### 実施内容
-- `tests/test_cli.py` を S12 inventory guard として追加し、split 後 test tree の critical inventory を package discovery 前提で固定した。
-- `tests/test_init_update.py` を追加し、installer regression を runtime split 後も独立 top-level module として維持した。
-- runtime focused test 群を `tests/cli_runtime/`, `tests/domain_runtime/`, `tests/presentation_runtime/` へ再配置し、`tests/__init__.py` と各 package `__init__.py` で regular package discovery に統一した。
-- 初回 review では `tests/cli_runtime/test_runtime_validate_s02.py`、`test_runtime_deps_s04.py`、`test_runtime_active_s05.py`、`test_runtime_new_s08.py`、`test_runtime_new_doc_s09.py` が S12 inventory/grouping guard から漏れている P1 指摘を受けた。
-- `tests/test_cli.py` を修正し、上記 5 モジュールを inventory と command-group sentinel checks の両方へ追加して、分割後 critical inventory coverage を完全化した。
-- 修正後に focused suite と full discover を通し、`code_reviewer` の再レビューで pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.test_cli tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09
-
-Ran 37 tests ... OK
-
-python -m unittest discover -v
-
-Ran 247 tests ... OK
-```
-
-#### 変更したファイル
-- `tests/__init__.py` - regular package discovery 用 package init を追加
-- `tests/test_cli.py` - S12 inventory / grouping guard を追加
-- `tests/test_init_update.py` - installer regression を top-level module へ分離
-- `tests/cli_runtime/__init__.py`
-- `tests/cli_runtime/harness.py`
-- `tests/cli_runtime/test_active.py`
-- `tests/cli_runtime/test_deps.py`
-- `tests/cli_runtime/test_import.py`
-- `tests/cli_runtime/test_new.py`
-- `tests/cli_runtime/test_runtime_active_s05.py`
-- `tests/cli_runtime/test_runtime_active_s06.py`
-- `tests/cli_runtime/test_runtime_deps_s04.py`
-- `tests/cli_runtime/test_runtime_import_s10.py`
-- `tests/cli_runtime/test_runtime_new_doc_s09.py`
-- `tests/cli_runtime/test_runtime_new_s08.py`
-- `tests/cli_runtime/test_runtime_shell_s11.py`
-- `tests/cli_runtime/test_runtime_validate_s02.py`
-- `tests/cli_runtime/test_sync.py`
-- `tests/cli_runtime/test_validate.py`
-- `tests/cli_runtime/test_wrappers.py`
-- `tests/domain_runtime/__init__.py`
-- `tests/domain_runtime/test_runtime_domain_s01.py`
-- `tests/domain_runtime/test_runtime_domain_s03.py`
-- `tests/presentation_runtime/__init__.py`
-- `tests/presentation_runtime/test_runtime_sync_s07.py`
-- `tests/test_runtime_active_s05.py` - deleted
-- `tests/test_runtime_active_s06.py` - deleted
-- `tests/test_runtime_deps_s04.py` - deleted
-- `tests/test_runtime_domain_s01.py` - deleted
-- `tests/test_runtime_domain_s03.py` - deleted
-- `tests/test_runtime_import_s10.py` - deleted
-- `tests/test_runtime_new_doc_s09.py` - deleted
-- `tests/test_runtime_new_s08.py` - deleted
-- `tests/test_runtime_shell_s11.py` - deleted
-- `tests/test_runtime_sync_s07.py` - deleted
-- `tests/test_runtime_validate_s02.py` - deleted
-
-#### コミット
-- 未実施
-
-#### メモ
-- `tests/test_cli.py` は inventory 存在確認に加えて sentinel method の存在も確認し、単なる path existence ではなく split coverage guard として機能させている。
-- S12 では runtime code 変更は行わず、test tree の再配置と discovery 契約の固定に限定した。
-
----
-
-### 2026-03-12 16:15 - 17:20
-
-#### 対象
-- Step: S13
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- layered runtime (`commands/application/infra/presentation/cli`) から legacy helper 直依存を外し、`infra/json_store.py`, `infra/clock.py`, `infra/github_cli.py`, `presentation/markdown.py`, `presentation/puml.py` を正本 owner とする方向へ整理した。
-- `io_json.py`, `github.py`, `render_md.py`, `render_puml.py` は互換 shim として残し、旧 entry/legacy path からの後方互換を維持しつつ、layered path からは直接参照しない構造へ切り替えた。
-- `tests/cli_runtime/test_runtime_shell_s11.py` に final API call-site / no legacy helper direct import / layer direction assertion の structural checks を追加した。
-- `tests/cli_runtime/test_new.py` は readonly lock seam の owner 変更に合わせて `infra/fs_repo.py` 側を観測点へ更新した。
-- `tests/domain_runtime/test_runtime_domain_s03.py` に layer detachment 後も `domain` が pure であることの回帰を維持する assertion を追加した。
-- 初回 review では layer-boundary import guard が fully-qualified import (`spec_dock_runtime.io_json`) と `from .. import io_json` を十分に検出できない P2 指摘を受けた。
-- `tests/cli_runtime/test_runtime_shell_s11.py` を修正し、`_iter_import_modules()`, `_normalize_import_module()`, `_import_root()` を導入して fully-qualified / relative import を共通正規化するよう改善した。
-- 再 review で no blocking findings / pass を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.presentation_runtime.test_runtime_sync_s07 tests.domain_runtime.test_runtime_domain_s01 tests.domain_runtime.test_runtime_domain_s03
-
-Ran 53 tests ... OK
-
-python -m unittest -v tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_import_scan_detects_legacy_helper_import_styles tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_import_root_normalizes_fully_qualified_layer_modules tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression
-
-Ran 3 tests ... OK
-
-python -m unittest discover -v
-
-Ran 247 tests ... OK
-
-rg -n "^from \\.\\.(io_json|github|render_md|render_puml|active|nodes|ids) import|^from \\.(io_json|github|render_md|render_puml|active|nodes|ids) import" src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli
-
-(no output)
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - `infra/clock.py` 正本へ切替
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - layered bootstrap から legacy `io_json.py` 直依存を除去
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py` - compatibility shim 化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - `infra/json_store.py` / `infra/clock.py` 正本へ切替
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/clock.py` - time helper 正本化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - `infra/json_store.py` 正本へ切替
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/derived_state_reader.py` - `infra/json_store.py` 正本へ切替
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - `infra/json_store.py` / `infra/clock.py` 正本へ切替
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py` - GitHub helper 正本化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/json_store.py` - JSON read/write helper 正本化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py` - compatibility shim 化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/markdown.py` - markdown renderer 正本化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py` - puml renderer 正本化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py` - compatibility shim 化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py` - compatibility shim 化
-- `tests/cli_runtime/test_new.py` - readonly lock seam regression を owner 更新
-- `tests/cli_runtime/test_runtime_shell_s11.py` - helper detachment / layer boundary structural regressions を追加
-- `tests/domain_runtime/test_runtime_domain_s03.py` - pure domain regression を補強
-
-#### コミット
-- 未実施
-
-#### メモ
-- rollback basis はこの step 以降 staged seam ではなく commit 単位 (`git revert / commit rollback`) を前提に扱う。
-- `app.py` には互換用 legacy 実装が残るが、`main` の shell path は thin entrypoint のまま維持し、layered path からの legacy helper direct import は構造テストで禁止している。
-
----
-
-### 2026-03-12 17:25 - 18:20
-
-#### 対象
-- Final review fix-up
-- AC/EC: AC-001, AC-005, EC-001
-
-#### 実施内容
-- branch-wide final review で出た `app.py` thin-entrypoint 契約違反を解消するため、`_new_*` / `_import_*` wrapper の dead legacy body を削除し、`_sync` を `application.sync_state.sync()` + `presentation.render_sync_text()` の thin shim へ置換した。
-- `cli/bootstrap.py` の sync wiring を `runtime_app._sync` legacy body 依存から `runtime_app._application_sync` 直結へ切り替え、shell path から legacy sync 実装が走らないようにした。
-- sync 互換維持のため、`SyncStateResult` / `render_sync_text()` / `render_index_artifact()` / issue status mapping を補強し、`deps.issue_edges.kind`, GitHub metadata, forced preflight stderr, non-git repo fail-open, invalid id safe sort の回帰を固定した。
-- final code review で出た 3 件の回帰を修正した:
-  - `new doc` の shorthand scope-id (`123`) 解決を復元
-  - `active set --github` の issue index failure を `gh_fetch_failed` warning + unknown-state 継続へ変更
-  - `import` の post-sync artifact failure で非0 exit を返すよう修正
-- それぞれ focused regression を追加し、full `discover` まで通している。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.cli_runtime.test_sync tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_runtime_shell_s11 tests.presentation_runtime.test_runtime_sync_s07
-
-Ran 87 tests ... OK
-
-python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_active_s06
-
-Ran 111 tests ... OK
-
-python -m unittest discover -v
-
-Ran 253 tests ... OK
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - thin shim 化と dead legacy body 削除
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - sync wiring を application use case 直結へ変更
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - sync/new-doc 互換維持向け contract 補強
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - `new doc` shorthand scope 解決を補強
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - `gh_fetch_failed` warning 化
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync thin shim 化に必要な result 補強
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py` - post-sync artifact failure 時の非0 exit
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - shorthand scope-id 受理
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py` - sync 互換 metadata 補強
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - sync text 契約補強
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - sync json contract 補強
-- `tests/cli_runtime/test_new.py` - shorthand scope regression
-- `tests/cli_runtime/test_runtime_active_s06.py` - `gh_fetch_failed` regression
-- `tests/cli_runtime/test_runtime_import_s10.py` - post-sync artifact failure exit regression
-- `tests/cli_runtime/test_runtime_shell_s11.py` - `app.py` thinness regression
-- `tests/presentation_runtime/test_runtime_sync_s07.py` - sync thin shim / output parity regression
-
-#### コミット
-- 未実施
-
-#### メモ
-- この fix-up は final review で検出した互換回帰の是正であり、新しい機能追加ではない。
-
----
-
-### 2026-03-12 18:25 - 18:35
-
-#### 対象
-- Step: S90
-
-#### docs impact 判定
-- disposition: `none`
-
-#### 実施内容
-- branch diff に含まれる issue 文書 (`spec-deps/current/*`) と shipped runtime asset (`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/*`) を棚卸しした。
-- non-issue 恒久 docs / workflow / skill / onboarding 文書への追加更新要否を確認した。
-- 今回の変更は issue #25 の requirement/design/plan/report と runtime 実装/テストに閉じており、README / docs / workflow / codex skill の追加 refresh は不要と判定した。
-
-#### touched doc / asset paths
-- issue docs:
-  - `spec-deps/current/requirement.md`
-  - `spec-deps/current/design.md`
-  - `spec-deps/current/plan.md`
-  - `spec-deps/current/report.md`
-  - `spec-deps/current/adrs/adr-001-runtime-cli-layered-architecture.md`
-  - `spec-deps/current/discussions/001-disc-runtime-cli-refactor-analysis.md`
-  - `spec-deps/current/discussions/002-disc-runtime-cli-architecture-v2.md`
-  - `spec-deps/current/discussions/003-disc-deps-topology-contract-gap-and-options.md`
-- shipped assets/runtime:
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/*`
-
-#### 判定理由
-- README / workflow / skill の user-facing usage contract は今回変更していない。
-- shipped runtime asset の構造変更は issue docs と regression tests で契約化済みであり、追加の repository-level docs refresh がなくても利用者向け整合性を損なわない。
-
-#### コミット
-- 未実施
-
-#### メモ
-- S90 は no-op resolution step として完了した。追加の non-issue doc refresh は不要。
-
----
-
-### 2026-03-12 18:40 - 19:05
-
-#### 対象
-- Final sign-off fix-up
-- AC/EC: AC-001, AC-005
-
-#### 実施内容
-- `spec_reviewer` の最終指摘に対応し、`app.py` から command 固有 wrapper (`_new_*`, `_import_*`, `_active_*`, `_deps_check`, `_sync`, `_validate`) を除去した。
-- `cli/bootstrap.py` の live wiring を `app.py` 経由 (`runtime_app._application_*`) から外し、application module 直結へ切り替えた。
-- regression は `commands / cli / application / presentation` 経路へ寄せ直し、private wrapper API ではなく final layered path を観測点に更新した。
-- `tests/cli_runtime/test_runtime_shell_s11.py` に command wrapper 不在 / bootstrap からの `app.py` wiring 不在の structural check を追加し、`app.py` live thinness 契約を固定した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_shell_s11 tests.presentation_runtime.test_runtime_sync_s07
-
-Ran 46 tests ... OK
-
-python -m unittest discover -v
-
-Ran 253 tests ... OK
-
-rg -n "^def (_new_initiative|_new_epic|_new_issue|_new_doc|_import_initiative|_import_epic|_import_issue|_active_set|_active_show|_active_clear|_deps_check|_sync|_validate)\\(" src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py
-
-(no output)
-```
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - command wrapper 群を除去
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - application module 直結へ変更
-- `tests/cli_runtime/test_runtime_validate_s02.py` - bootstrap seam 追従
-- `tests/cli_runtime/test_runtime_deps_s04.py` - bootstrap seam 追従
-- `tests/cli_runtime/test_runtime_active_s05.py` - bootstrap seam 追従
-- `tests/cli_runtime/test_runtime_new_s08.py` - final layered path へ回帰観測点を更新
-- `tests/cli_runtime/test_runtime_new_doc_s09.py` - final layered path へ回帰観測点を更新
-- `tests/cli_runtime/test_runtime_import_s10.py` - final layered path へ回帰観測点を更新
-- `tests/cli_runtime/test_runtime_shell_s11.py` - wrapper absence / thin-entrypoint structural check を追加
-- `tests/presentation_runtime/test_runtime_sync_s07.py` - sync path regression を final layered path へ更新
-- `spec-deps/current/requirement.md` - AC-001 の live thinness 観測点を明確化
-- `spec-deps/current/design.md` - dormant compatibility rule と bootstrap ownership を明確化
-- `spec-deps/current/plan.md` - S99 final gate の live thinness 表現を整合
-- `spec-deps/current/report.md` - final gate 証跡を追記
-
-#### コミット
-- 未実施
-
-#### メモ
-- `app.py` には dormant な legacy helper が残るが、`main()` / `cli/bootstrap.py` / `commands/*` からは到達しない状態に固定した。
-
----
-
-### 2026-03-12 19:05 - 19:45
-
-#### 対象
-- Step: S99
-- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
-
-#### 実施内容
-- final branch diff を `origin/main...HEAD` 観点で再確認し、`app.py` live thinness / `cli/bootstrap.py` composition root ownership / layer 依存方向の整合を再検証した。
-- `spec_reviewer` 指摘を受けて AC-001 を live shell path 基準へ明文化し、`dormant compatibility helper` は `main()` / `cli/bootstrap.py` / `commands/*` から到達しない場合のみ許容する契約へ requirement/design/plan/report を整合した。
-- DTO / contract gate として、`commands/* -> UseCases facade + application/contracts.py + presentation/*`、`cli/bootstrap.py -> Ports internal wiring`、`app.py` が `Ports` / application alias を live path で露出しないことを差分と structural test で再確認した。
-- fresh repo smoke を一時 repo で実施し、`validate`, `deps check --json`, `active show`, `active set -f --no-checkout`, `sync --force`, `new issue`, `import issue` の shipped runtime path を確認した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest discover -v
-
-Ran 253 tests ... OK
-
-rg --files | rg '[A-Z]'
-
-既存の uppercase path のみ検出。今回追加・改名した path に uppercase 増分なし。
-
-fresh repo smoke (temp repo + stub gh):
-- new initiative --title "Smoke Initiative" -> rc=0
-- new epic --initiative 1 --title "Smoke Epic" -> rc=0
-- new issue --epic 1 --title "Smoke Issue" -> rc=0
-- validate -> rc=0
-- deps check iss-00101 --json -> rc=3, stdout JSON only, ready=false/state=unknown
-- active show -> rc=0
-- active set iss-00101 --no-checkout -f -> rc=0
-- sync --force -> rc=0
-- import issue 202 --title "Imported Issue" --epic 1 -> rc=0
-```
-
-#### レビュー / 判定
-- `code_reviewer`: pass
-  - bootstrap 直結配線化と `app.py` live thinness fix に blocking finding なし
-- `spec_reviewer`: pass
-  - requirement/design/plan/report の live thinness 契約と final gate 証跡が整合
-
-#### AC/EC トレース
-- `AC-001`
-  - runtime package に `commands|application|domain|infra|presentation|cli` が存在
-  - `app.py` の live shell path は `registry -> parser -> bootstrap -> dispatch` のみに縮小
-  - `cli/bootstrap.py` は `app.py` を wiring surface として参照しない
-- `AC-002`
-  - shared rule は `domain/*`、workflow は `application/*`、副作用は `infra/*`、描画は `presentation/*` に分離済み
-  - DTO / contract gate:
-    - `commands/*` は `UseCases facade + application DTO + presentation renderer + commands/contracts` のみへ依存
-    - `cli/bootstrap.py` が `Ports` を内部 detail として閉じ、`app.py` は live path で `Ports` / `_application_*` alias を露出しない
-- `AC-003`
-  - `tests/test_init_update.py`, `tests/cli_runtime/*`, `tests/domain_runtime/*`, `tests/presentation_runtime/*` の分割状態を維持
-- `AC-004`
-  - `sync --force`, `deps check`, `active set`, `import -> sync`, scaffold collision no-write の focused/full tests を維持
-- `AC-005`
-  - `python -m unittest discover -v` green
-- `EC-001`
-  - staged delegation history は report 既存節に記録済み、final rollback basis は commit 単位へ移行済み
-- `EC-002`
-  - `import issue` smoke と existing tests で `sync_after_import()` のみが import 後に動く契約を維持
-- `EC-003`
-  - `deps check --json` / `active set -f` smoke と focused tests で readiness / guard / warning order を維持
-- `EC-004`
-  - `sync --force` smoke と presentation/runtime tests で JSON/Markdown/PUML artifact path/name/content 契約を維持
-
-#### メモ
-- `deps check --json` の fresh repo smoke は、GitHub snapshot 未取得のため `ready=false`, `rc=3` となるが、これは既存契約どおりの expected behavior として扱った。
-
----
-
-### 2026-03-13 00:10 - 02:10
-
-#### 対象
-- Step: S14
-- AC/EC: AC-001, AC-002, AC-004, AC-005, EC-004
-
-#### 実施内容
-- PR review で指摘された absolute path regression に対して、persisted/generated path を repo-relative canonical (`spec-dock/...`) へ戻す follow-up を実施した。
-- `application/set_active.py` の `build_active_manifest()` を修正し、`spec-dock/.agent/active.json` の `initiative.path` / `epic.path` / `issue.path` が repo-relative で保存されるようにした。
-- `presentation/json_state.py` を修正し、`index-all.json`, `index.json`, `tree-all.json`, `tree.json` の node `path` を repo-relative で出力するようにした。
-- `infra/active_store.py` の read path に legacy absolute-path `active.json` の best-effort 互換を実装し、repo 移動後も `spec-dock/...` suffix から現 repo へ remap できる場合は active pointer を復元するようにした。
-- reviewer 指摘を受けて、多重 `spec-dock` segment を含む legacy absolute path (`/old/spec-dock/spec-dock/...`) でも trailing `spec-dock` suffix を優先して remap できるように修正した。
-- active/sync の regression tests を追加し、canonical write path、legacy absolute-path read compatibility、4 artifact すべての repo-relative path emission を固定した。
-
-#### 実行コマンド / 結果
-```bash
-python -m unittest -v tests.cli_runtime.test_runtime_active_s05
-
-Ran 9 tests ... OK
-
-python -m unittest -v tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_active_s06 tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_active tests.cli_runtime.test_sync
-
-Ran 72 tests ... OK
-
-python -m unittest discover -v
-
-Ran 257 tests ... OK
-
-rg --files | rg '[A-Z]'
-
-既存の uppercase path のみ検出。今回追加・改名した path に uppercase 増分なし。
-```
-
-#### レビュー / 判定
-- `spec_reviewer`: pass
-  - `design.md`, `plan.md`, `discussion 004` と current diff の S14 契約整合に blocking finding なし
-- `code_reviewer`: conditional_pass -> pass
-  - 初回指摘:
-    - legacy absolute-path remap が最初の `spec-dock` segment を採用しており、`/old/spec-dock/spec-dock/...` 形で placeholder fallback しうる
-  - 修正後:
-    - trailing `spec-dock` suffix 優先へ変更し、focused regression test を追加
-    - 再レビューで blocking finding なし
-
-#### 変更したファイル
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `SyncStateResult.repo_root` を追加
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py` - active manifest path を repo-relative canonical へ変更
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - sync active auto-update の manifest build を新 signature へ追従
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py` - legacy absolute-path active manifest read compatibility と trailing `spec-dock` remap を実装
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - state artifact node path を repo-relative canonical へ変更
-- `tests/cli_runtime/test_active.py` - active.json path が repo-relative であることを回帰固定
-- `tests/cli_runtime/test_runtime_active_s05.py` - legacy absolute-path manifest read / remap / fallback regression を追加
-- `tests/cli_runtime/test_runtime_active_s06.py` - active manifest write payload の repo-relative shape を固定
-- `tests/cli_runtime/test_sync.py` - `index*.json` / `tree*.json` path portability regression を追加
-- `tests/presentation_runtime/test_runtime_sync_s07.py` - presentation layer の repo-relative path emission を固定
-- `spec-deps/current/design.md` - relative path canonicalization appendix を追加
-- `spec-deps/current/plan.md` - additive step `S14` を追加
-- `spec-deps/current/discussions/004-disc-relative-path-regression-analysis.md` - review analysis / option compare / Plan B 採用根拠を記録
-- `spec-deps/current/report.md` - 本節を追記
-
-#### コミット
-- 未実施
-
-#### メモ
-- `active.json` の read compatibility は best-effort に留め、stale absolute path で remap 不能な場合は placeholder fallback を維持した。
-- write path / generated artifact は canonical repo-relative へ収束させ、absolute path の再生成は行わない。
-
-## 省略/例外メモ
-- 該当なし
+# issue-28-runtime-regression-bugs manual regression で見つかった runtime の整合性/GitHub連携不具合を修正する — 実装報告
+
+## 実施サマリー
+- 2026-03-20 latest GitHub/Codex review と fresh whole-diff review で見つかった checked-in runtime parity drift に対し、corrective scope `S90G` を追加した
+- 2026-03-20 fresh whole-diff review で見つかった import create transaction 漏れに対し、corrective scope `S01H` を追加した
+- 2026-03-20 whole-diff follow-up QA で見つかった import preflight 漏れと checked-in executable-path evidence 不足に対し、corrective scope `S04H` を追加した
+- 2026-03-21 latest GitHub/Codex review 2 件により、corrective scope `S05I deps target status payload` と `S01L pre-GitHub graph preflight` を追加した
+- 2026-03-22 latest GitHub/Codex review 1 件により、corrective scope `S04I placeholder active entrypoint recovery` を追加した
+- 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S01M executable doctor guidance` と `S01N runnable post-create retry hint` を追加した
+- 2026-03-23 latest GitHub/Codex review 1 件により、corrective scope `S01O cwd-independent create guidance path` を追加した
+- 2026-03-23 latest GitHub/Codex review 2 件により、corrective scope `S03J current-repo fallback fetch for unscoped linked nodes` と `S03K current-repo-aware numeric branch inference` を追加した
+- 2026-03-23 latest GitHub/Codex review 1 件 `R30` を分析し、`post-create cleanup failure guidance` は妥当と判断した
+- 2026-03-23 repeated review loop の根本原因分析を行い、`create/post-create failure contract` が outcome matrix で閉じていないこと、provider / checked-in parity drift、matrix-based exit criteria 不足が潜在問題であると整理した
+- 2026-03-23 consultant を踏まえ、抜本対策として `create/post-create outcome matrix` を design/plan 正本へ昇格させる方針を採用した
+- 2026-03-23 latest review 4 件を分析し、`repo-scoped reference model` と `create state model` の 2 系統に根本問題を整理した
+- 2026-03-23 latest review 4 件（`R31`/`R32`/`R33`/`R34`）の corrective scope `S05J`/`S05K`/`S01Q`/`S04J` を provider-side / checked-in runtime parity まで実装し、targeted + parity 回帰を完了した
+- 2026-03-23 `tests.test_init_update` の parity failure（create write seam の guidance 契約）を `AC-020` に合わせて補正し、fresh rerun で `pass` へ収束した
+- 2026-03-23 branch 全体差分に対して `python -m unittest discover -v` を実行し、`Ran 434 tests` / `OK` を確認した
+- 2026-03-19 R7/R8/R9 corrective patch を完了した
+- 2026-03-19 PR #29 の追加 Codex review 2 件により、checked-in dogfooding runtime parity の corrective scope `S90F` を追加した
+- `S01 create transaction で duplicate id を予防する` を完了
+- `S02 discussion seq を同じ transaction に統合し validator でも守る` を完了
+- `S03 status/readiness contract を統一し stale projection を明示する` を完了
+- `S04 sync artifact / doctor / validator 契約を揃える` を完了
+- `S05 GitHub targeting と CLI intent surface を安全化する` を完了
+- `S04I` では placeholder active entrypoint recovery を補修し、invalid directory conflict の follow-up を含めて spec review / implementation review / QA review を通過した
+- current working tree では、`S01M` と `S01N` で create guidance surface を executable/runnable へ補修し、fresh spec review / implementation review / QA review を通過した
+- current working tree では、`S01O` で create guidance path を cwd-independent に補修し、fresh spec review / implementation review / QA review を通過した
+- current working tree では、`S03J` / `S03K` の corrective scope を issue 文書へ反映し、fresh spec review を `pass` している
+- current working tree では、`S03J` で current-repo fallback fetch for unscoped linked nodes を provider/checked-in runtime へ反映し、fresh implementation review / QA review を `pass` している
+- current working tree では、`S03K` で numeric branch inference の edge semantics を補強し、fresh spec review / implementation review / QA review を `pass` している
+- whole-diff spec review では、`S03J` の `gh_index_incomplete` warning 文言が design だけ過剰だったため、warning surface を widening しない現行契約へ design を補正している
+- `S90 docs impact resolution` を完了
+- `S90F checked-in dogfooding runtime parity` を完了
+- `S99 final diff review quality gate` は `S90F` 完了後の状態へ更新した
+- `S01` から `S05` まで implementation review と QA review を通過
+- docs/spec review は corrective scope 反映後に `pass`
+- broad final suite 262 tests を通過
+- branch diff 全体の final review を通過
+- 修正後の manual test 計画を `discussions/017` に記録
+- post-fix manual test `MT-01` から `MT-10` を実施
+- manual test で見つかった `sev-2: foreign URL + --allow-foreign-url success path failure` を追加修正で解消し、affected case rerun 後の overall verdict は `pass`
+- `sev-3: generated runtime command surface mismatch` は継続観測として残るが、issue-28 の blocking condition ではない
+- comprehensive manual rerun `RT-01` から `RT-10` を fresh GitHub repository で実施し、overall verdict は `pass`
+- rerun では `foreign URL + --allow-foreign-url` は live で再現せず、same-repo / foreign / local-only / organic long-run の各経路で blocker は確認されなかった
+- PR #29 の Codex review 2 件は妥当と判断し、follow-up corrective patch を追加で実施した
+- corrective patch では foreign repo identity の永続化と stale create lock の doctor guidance を補完し、targeted regression は `pass`
+- PR #29 の追加 Codex review 3 件は妥当と判断し、current repo slug parity と domain/application validation boundary の corrective patch を追加で実施した
+- PR #29 の最新 Codex review 2 件は妥当と判断し、checked-in dogfooding runtime の repo-aware parity drift を corrective scope として追加した
+- `S90F` では checked-in consumer runtime の import/sync/validate/doctor/active/deps parity drift を補修し、targeted regression / implementation review / QA review を通過した
+- PR #29 の新しい Codex review 2 件は妥当と判断し、provider-side corrective scope として `S04G stale active pathfile healing` / `S05G repo-aware numeric deps resolution` を追加した
+- `S04G` では stale active `.path` fallback の self-healing を補修し、targeted regression / implementation review / QA review を通過した
+- `S05G` では repo-aware numeric deps resolution を補修し、targeted regression / implementation review / QA review を通過した
+- PR #29 の最新 Codex review 1 件は妥当と判断し、provider-side corrective scope として `S05H same-repo URL-linked fetch dedup` を追加した
+- 先行時点での `final review pass` / `merge-ready` 判断は `S05H` 追加前の状態を指すものであり、現在は `S05H` 完了と再レビューまで superseded として扱う
+- `S05H` では same-repo URL-linked issue の indexed fetch dedup を provider/checked-in runtime の github-aware read path に揃え、targeted regression / implementation review / QA review を通過した
+- `S04H` では provider/checked-in runtime の import preflight fail-fast と checked-in executable-path artifact/precedence evidence を補完し、spec review / implementation review / QA review を通過した
+- `S01H` では provider/checked-in runtime の import path を create transaction 契約へ統合し、import/import・import/new・active-parent fallback の precheck parity を補完して、spec review / implementation review / QA review を通過した
+- `S90G` では checked-in runtime の `json_state` / `deps_reader` parity drift を補修し、checked-in executable-path regression と合わせて spec review / implementation review / QA review を通過した
+- 先行時点での `S99 final diff review pass` / `merge-ready` 判断は `S04H` 追加前の状態を含むため、最新 head に対して fresh whole-diff review を再実施する前提で superseded として扱う
+
+- 2026-03-23 latest PR review follow-up `S03J` / `S03K` docs closure:
+  - background:
+    - latest GitHub/Codex review 2 件で、unscoped current-repo linked epic/initiative の fallback fetch 漏れと、repo overlap 後の numeric branch active inference 停止が指摘された
+  - docs:
+    - `discussions/044` に `current-repo fallback fetch for unscoped linked nodes` の分析を記録した
+    - `discussions/045` に `current-repo-aware numeric branch inference` の分析を記録した
+    - `requirement.md` では `AC-011` を current-repo linked issue/epic/initiative と fallback fetch まで拡張し、`AC-016 current-repo-aware branch inference under repo overlap` を追加した
+    - `design.md` では `2.4 current-repo fallback fetch for unscoped initiative/epic links` と `2.5 current-repo-aware numeric branch inference` を追加した
+    - `plan.md` では `S03J` / `S03K` と `PR29-R28` / `PR29-R29` 対応、および `AC-016` の top-level scope / final exit contract 反映を追加した
+  - review status:
+    - fresh spec review 初回 `fail`
+    - 指摘:
+      - `plan.md` の top-level scope と final exit contract に `AC-016` が入っていなかった
+      - `report.md` に R28/R29 corrective handoff の docs traceability と pending gate が不足していた
+    - 対応:
+      - `plan.md` に `AC-016` を top-level scope と final exit contract へ追記した
+      - この closure entry を追加し、関連 discussions / docs / pending review gates を明示した
+    - 再レビュー:
+      - `pass`
+  - pending gates:
+    - implementation review
+    - QA review
+    - targeted tests:
+      - current-repo unscoped epic/initiative fallback regression
+      - branch overlap current-repo preferred regression
+      - slug-unknown ambiguity fail-closed regression
+
+- 2026-03-23 `S03J` 実装:
+  - 実装:
+    - provider-side / checked-in runtime の `application/github_issue_targets.py` に `current_repo_slug` 入力を追加し、unscoped current-repo linked node を `(current_repo_slug, issue_number)` fallback target として扱えるようにした
+    - `sync_state.py` / `set_active.py` / `check_deps.py` の call site から同 helper へ `current_repo_slug` を伝播した
+  - tests:
+    - `tests/presentation_runtime.test_runtime_sync_s07`
+    - `tests.cli_runtime.test_runtime_deps_s04`
+    - `tests.cli_runtime.test_runtime_active_s06`
+    - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_sync_parity`
+    - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_unscoped_current_repo_fallback_active_deps_parity`
+    - above targeted suite rerun: `44 tests / OK`
+    - provider-side fail-closed regression:
+      - malformed partial repo scope linkage は `issue_view_snapshot()` target へ入らないことを `tests/presentation_runtime.test_runtime_sync_s07` で固定した
+  - review:
+    - implementation review: `pass`
+    - QA review: 初回 `conditional_pass`（checked-in active/deps parity 追加要求）-> 追加 test 後に `pass`
+
+- 2026-03-23 `S03K` 実装:
+  - 実装:
+    - provider-side / checked-in runtime の `domain/active.py` に current-repo-aware numeric branch inference を導入した
+    - `current_repo_slug` 既知時は current repo candidate を優先し、foreign-only match と current-scope multiple match は fail-closed にした
+    - `application/sync_state.py` の `maybe_auto_update_from_branch()` から `current_repo_slug` を domain inference へ伝播した
+  - docs:
+    - `AC-016` と `design.md 2.5` / `plan.md S03K` に foreign-only known-scope fail-closed と scoped ambiguity fail-closed の契約を追記した
+  - tests:
+    - `tests.domain_runtime.test_runtime_domain_s03`
+    - `tests.cli_runtime.test_runtime_active_s06.TestRuntimeActiveS06.test_sync_branch_inference_propagates_current_repo_slug`
+    - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_numeric_branch_current_repo_overlap_parity`
+    - targeted suite rerun: `7 tests / OK`
+  - review:
+    - spec review: 初回 `conditional_pass`（design test bullets の不足）-> 追記後 `pass`
+    - implementation review: `pass`
+    - QA review: 初回 `conditional_pass`（edge semantics regression の不足）-> 追加 test 後 `pass`
+
+- 2026-03-23 latest PR review / root-cause analysis:
+  - latest review:
+    - commit: `ebd53853f41e5df56dc66f1b5c89b625d5cf1095`
+    - inline comment: `2973591749`
+    - topic: `post-create cleanup failure guidance`
+    - conclusion:
+      - `valid`
+      - `required`
+    - rationale:
+      - `gh issue create` 済みかつ local write 済みの後に `_release_create_lock()` が失敗すると、生の `release_error` だけが露出し、`created_github_issue_number` と safe recovery guidance を失う
+    - evidence:
+      - `discussions/046-disc-pr29-r30-post-create-cleanup-failure-analysis.md`
+  - root-cause analysis:
+    - consultant discussion を踏まえ、review loop の潜在問題を次の 4 点に整理した
+      - create/recovery contract が branch patch の集合で、outcome matrix として閉じていない
+      - guidance 生成が outcome 中心でなく exception-point 中心である
+      - provider runtime と checked-in runtime の parity drift が corrective loop を長引かせている
+      - exit criteria が representative regression 止まりで combined failure branch を固定できていない
+    - root-cause report:
+      - `discussions/047-disc-pr29-review-loop-root-cause-analysis.md`
+  - pending:
+    - 次の corrective unit では、R30 の個別修正と同時に create/post-create outcome matrix を design/plan に固定する
+
+- 2026-03-23 create/post-create outcome matrix remediation:
+  - discussion:
+    - `discussions/048-disc-pr29-create-outcome-matrix-remediation.md`
+  - docs:
+    - `requirement.md` に `AC-017 create outcome-specific recovery guidance` を追加した
+    - `design.md` に create/post-create outcome matrix と evidence/guidance contract を追加した
+    - `plan.md` に `S01P create/post-create failure contract を outcome matrix で閉じる` を追加した
+  - intent:
+    - R30 個別修正だけでなく、review loop の主因だった post-create failure branching を outcome class で中央集約する
+  - pending:
+    - fresh spec review
+    - `S01P` implementation / implementation review / QA review
+    - `main..HEAD` 全体スコープの fresh spec review
+
+- 2026-03-23 fresh spec review for outcome-matrix remediation:
+  - verdict:
+    - 初回 `fail`
+  - findings:
+    - `AC-017` と `S01P` が outcome matrix の 5 class を fully close しておらず、`pre_github_fail` / `post_github_local_write_fail` の acceptance/test ownership が不足していた
+    - checked-in parity coverage が representative branch なのか full matrix なのか曖昧だった
+    - `S99` / final exit contract が matrix-specific stop condition を要求していなかった
+  - fix:
+    - `AC-017` を 5 class 全体の guidance contract へ拡張した
+    - `S01P` の failing/expected tests を 5 class full matrix と checked-in full-matrix parity に拡張した
+    - `discussions/047` / `048` を checked-in full-matrix parity に統一した
+    - `S99` と final exit contract に matrix-specific review/validation を追加した
+  - pending:
+    - fresh spec re-review
+
+- 2026-03-23 fresh spec re-review for outcome-matrix remediation:
+  - verdict:
+    - 2 回目 `fail`
+  - findings:
+    - `AC-017` の Given が post-GitHub failure に限定されたままで、`pre_github_fail` を同じ AC に含める Then と矛盾していた
+    - `discussions/048` の test matrix が provider 4-case のままで、5 class full-matrix 化の fix 記録と食い違っていた
+  - fix:
+    - `AC-017` の Given を create path の pre/post GitHub failure 両方に広げた
+    - `discussions/048` の provider / checked-in test matrix を 5 class へ更新した
+  - pending:
+    - fresh spec re-review
+
+- 2026-03-23 fresh spec re-review for outcome-matrix remediation:
+  - verdict:
+    - 3 回目 `pass`
+  - summary:
+    - `AC-017` の Given/Then scope、discussion 048 の 5 class matrix、checked-in parity、`S99` の matrix-specific stop condition が整合した
+
+- 2026-03-23 S01P implementation:
+  - 実装:
+    - provider / checked-in `application/create_node.py` に post-GitHub outcome builder を導入した
+    - `post_github_remote_only_fail`
+    - `post_github_local_write_fail`
+    - `post_github_local_write_success_cleanup_fail`
+    - `post_github_body_and_cleanup_fail`
+    - の guidance surface を中央集約し、GitHub create 成功後の raw `release_error` 単独露出をなくした
+    - committed-local cleanup failure では `Create may already have succeeded` / `Do not rerun blindly` / local node hint / doctor-first guidance を返すよう補修した
+    - committed-local local-error 単独枝（post-write guard failure + release success）でも doctor-first guidance へ切り替えるよう追加補修した
+  - tests:
+    - provider:
+      - `tests.cli_runtime.test_runtime_new_s08`
+    - checked-in parity:
+      - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity`
+      - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity`
+      - `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+  - execution:
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+  - results:
+    - targeted suite: `32 tests / OK`
+    - QA reviewer evidence: `93 tests / OK`
+  - review:
+    - implementation review:
+      - 初回 `fail`
+      - finding:
+        - committed-local local-error 単独枝で rerun/link guidance が残っていた
+      - fix:
+        - provider / checked-in `create_node.py` を補修し、committed-local local-error 単独枝でも doctor-first guidance を返すようにした
+      - fresh re-review:
+        - `pass`
+    - QA review:
+      - 初回 `conditional_pass`
+      - finding:
+        - committed-local body+cleanup 分岐の test coverage が不足していた
+      - fix:
+        - provider / checked-in parity の post-write-guard + cleanup failure regression を追加した
+      - fresh re-review:
+        - `pass`
+
+- 2026-03-23 S01P implementation review follow-up:
+  - verdict:
+    - 初回 implementation review `fail`
+  - finding:
+    - committed-local の body-failure である `execute_create_plan` 後 / `_post_write_duplicate_guard` failure + release success の枝が、まだ rerun/link guidance を返していた
+  - fix:
+    - provider / checked-in runtime の `create_node` で、`local_write_committed=True` かつ `local_error` 単独枝でも doctor-first guidance を返すよう補修した
+    - provider / checked-in parity の post-write-guard failure regression を追加した
+    - issue docs も `post_github_local_write_fail` の committed-local subcase を明記するよう整合させた
+  - re-review:
+    - fresh implementation re-review:
+      - `pass`
+    - fresh QA re-review:
+      - `pass`
+
+- 2026-03-23 fresh whole-diff spec review follow-up for `S01P`:
+  - verdict:
+    - 初回 `fail`
+  - findings:
+    - `AC-017` で定義した 5 class のうち、`pre_github_fail` が実装・テスト・report で閉じていなかった
+    - `report.md` に `S01P` の review 状態が二重記録され、`pass` と `pending` が同居していた
+  - fix:
+    - provider / checked-in `create_node.py` の pre-GitHub create-mode failure を `Outcome: pre_github_fail` で包み、`GitHub issue was created:` を出さない fail-fast guidance に統一した
+    - provider / checked-in parity test に pre-GitHub create-mode failure regression を追加した
+    - 本 entry 追加により、`S01P` の review 状態を `pass` ベースの単一記録へ正規化した
+  - execution:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_pure_input_validation_fails_before_github_create tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_create_parent_precheck_fails_before_github_create tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_create_graph_preflight_fails_before_github_create_for_initiative tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity`
+  - result:
+    - `Ran 6 tests / OK`
+  - review:
+    - fresh implementation review:
+      - `pass`
+    - fresh QA review:
+      - 初回 `fail`
+      - finding:
+        - provider-side に `issue_create` failure の `pre_github_fail` regression がなく、checked-in parity の graph preflight 側でも outcome contract が未固定だった
+      - fix:
+        - provider-side に `issue_create` failure regression を追加した
+        - checked-in parity の graph preflight / pre-validation 側へ `Outcome: pre_github_fail` と `GitHub issue was created:` 非表示の断言を追加した
+      - fresh re-review:
+        - 初回 `conditional_pass`
+        - finding:
+          - checked-in subprocess parity に `issue_create` failure 自体の `pre_github_fail` regression が残っていた
+        - fix:
+          - checked-in runtime の `gh issue create` failure を直接起こす subprocess parity test を追加し、`Outcome: pre_github_fail` / created-hint absence / no local write を固定した
+        - final re-review:
+          - `pass`
+    - post-commit:
+      - fresh whole-diff spec review:
+        - `pass`
+
+- 2026-03-23 latest review 4 件の分析:
+  - scope:
+    - `commands/targets.py` URL target repo scope preservation
+    - `infra/deps_reader.py` numeric deps scope contract
+    - `application/create_node.py` partial create write phase classification
+    - `infra/fs_repo.py` in-progress scaffold diagnosis
+  - evidence:
+    - `discussions/049-disc-pr29-r31-url-target-repo-scope-analysis.md`
+    - `discussions/050-disc-pr29-r32-numeric-deps-scope-contract-analysis.md`
+    - `discussions/051-disc-pr29-r33-partial-create-write-phase-analysis.md`
+    - `discussions/052-disc-pr29-r34-in-progress-scaffold-diagnosis-analysis.md`
+    - `discussions/053-disc-pr29-root-cause-repo-scope-and-create-state-analysis.md`
+  - verdict:
+    - R31 URL target repo scope loss:
+      - `valid`
+      - `must`
+    - R32 numeric deps current-repo-only contract:
+      - `valid`
+      - `should`
+      - note:
+        - bare numeric ref を foreign へ自動解決するのではなく、scoped dependency ref syntax を設計追加する方向を推奨
+    - R33 partial create write phase:
+      - `valid`
+      - `must`
+    - R34 in-progress scaffold diagnosis:
+      - `valid`
+      - `should`
+  - root cause:
+    - repo scope を end-to-end で保持する参照モデルがない
+    - create 中間状態を shared state machine ではなく lossy な flag で扱っている
+    - regression matrix が `repo overlap` と `mid-write partial failure` を横断できていない
+  - recommended bundles:
+    - `create transaction/state bundle`
+      - partial write classification
+      - in-progress scaffold diagnosis
+    - `repo-scoped reference bundle`
+      - URL target repo scope preservation
+      - scoped dependency ref support / docs alignment
+
+## 記録
+- 2026-03-20 `S90G` corrective docs refresh:
+  - background:
+    - latest GitHub/Codex review と fresh whole-diff review で、checked-in `presentation/json_state.py` の helper parity 欠落による import post-sync crash と、checked-in `infra/deps_reader.py` の stale numeric deps resolver による repo-aware overlap drift を確認した
+  - docs:
+    - `design.md` の checked-in runtime parity 対象へ `presentation/json_state.py` と `infra/deps_reader.py` を追加した
+    - `plan.md` に `S90G checked-in parity の stale json/deps paths を閉じる` を追加した
+    - `discussions/033` と `034` に個別分析を記録した
+  - spec review:
+    - 初回 `fail`
+    - 指摘:
+      - `AC-010` が final exit contract から落ちている
+      - `S90G` が checked-in executable-path evidence を要求していない
+    - 対応:
+      - `plan.md` に `AC-010` を final exit contract へ戻し、`spec-dock/scripts/spec-dock` 実行経路の no-crash / numeric deps overlap regression を required validation として明記した
+    - 再レビュー:
+      - `pass`
+- 2026-03-20 `S90G` 実装:
+  - 実装:
+    - checked-in `presentation/json_state.py` に provider-side `_normalize_repo_slug(...)` parity を復元した
+    - checked-in `infra/deps_reader.py` を provider-side の current-repo-aware numeric deps 解決へ refresh した
+    - `tests/test_init_update.py` に checked-in executable-path の import post-sync no-crash regression と numeric deps overlap parity regression を追加した
+  - implementation review:
+    - `pass`
+  - QA review:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_post_sync_no_crash_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_keeps_sync_deps_active_validate_doctor_parity`
+    - `python -m py_compile spec-dock/scripts/spec_dock_runtime/presentation/json_state.py spec-dock/scripts/spec_dock_runtime/infra/deps_reader.py tests/test_init_update.py`
+  - 結果:
+    - `Ran 3 tests in 0.996s`
+    - `OK`
+    - `py_compile: OK`
+- 2026-03-20 `S01H` corrective docs refresh:
+  - background:
+    - fresh whole-diff review で、`import issue` だけが create lock / post-write duplicate guard 契約の外にあり、import/import と import/new の並行実行で duplicate id / duplicate GitHub linkage を再導入しうることを確認した
+  - docs:
+    - `requirement.md` の `AC-001 create atomicity` を create-like import まで明示拡張し、sequence allocator は引き続き `S02` の責務であることを明文化した
+    - `design.md` の `create transaction` に import の lock boundary を追加し、lock 外の URL/repo 解析・artifact preflight・GitHub fetch と、lock 内の graph 読み取り・uniqueness 再検証・write・post-write duplicate guard を分離した
+    - `plan.md` に `S01H import を create transaction 契約へ統合する` を追加した
+    - `discussions/032` に判断根拠と corrective plan を記録した
+  - spec review:
+    - 初回 `fail`
+    - 指摘:
+      - import lock boundary が不明確
+      - `AC-001` と seq scope の関係が曖昧
+      - checked-in parity で import/import と import/new の両 race class の ownership が明示不足
+    - 対応:
+      - requirement/design/plan/discussion を更新し、lock boundary / seq scope / checked-in race parity を明文化した
+    - 再レビュー:
+      - `pass`
+- 2026-03-20 `S01H` 実装:
+  - 実装:
+    - provider-side `application/import_node.py` を `new issue` と同じ create transaction 契約へ寄せ、cheap precheck 後に lock を取得し、lock 内で graph 再読込・uniqueness 再検証・plan/write・post-write duplicate guard を行うよう補修した
+    - checked-in `spec-dock/scripts/.../application/import_node.py` に同じ契約を反映した
+    - provider-side import/import race、import/new race、active-parent fallback collision precheck の回帰を `tests/cli_runtime/test_runtime_import_s10.py` に追加した
+    - checked-in runtime parity と active-parent fallback no-lookup parity を `tests/test_init_update.py` に追加した
+  - implementation review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - active-parent fallback 経路の cheap precheck が issue fetch より後ろへ残っている
+    - 対応:
+      - active-parent fallback でも local collision を external fetch 前に検出するよう補修した
+    - 再レビュー:
+      - `pass`
+  - QA review:
+    - 初回 `fail`
+    - 指摘:
+      - non-race import 契約が壊れ、existing import regression が green でなくなっている
+      - checked-in parity で active-parent fallback collision precheck が未保護
+    - 対応:
+      - duplicate/collision/mismatch の cheap precheck を `issue_view_minimal()` 前に戻し、seam test を新しい post-write guard 契約へ追随させた
+      - checked-in runtime に active-parent fallback no-lookup parity test を追加した
+    - 最終再レビュー:
+      - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_import.TestCliImport.test_import_url_rejects_when_origin_is_not_configured tests.cli_runtime.test_import.TestCliImport.test_import_url_rejects_when_origin_is_not_github tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_url_without_opt_in tests.test_init_update`
+  - 結果:
+    - `Ran 62 tests in 6.654s`
+    - `OK`
+- 2026-03-20 `S04H` corrective docs refresh:
+  - background:
+    - fresh whole-diff follow-up QA で、required artifact 欠損時の `import` fail-fast 回帰が provider/checked-in ともに未保護であること、checked-in `sync --force` が generated artifact 契約まで固定されていないことを確認した
+  - docs:
+    - `design.md` に checked-in executable-path parity の必須証跡として `import` fail-fast、`sync --force` degraded artifact 出力、combined-fault structure precedence を明記した
+    - `plan.md` に corrective step `S04H import preflight と checked-in executable-path evidence を補完する` を追加した
+    - `discussions/031` に判断根拠と corrective plan を記録した
+  - spec review:
+    - 初回 `fail`
+    - 指摘:
+      - `S04H` plan が checked-in combined-fault structure precedence parity を明示 ownership していない
+    - 対応:
+      - `plan.md` に `I3 checked-in structure-error precedence parity` と step gate expected test を追加
+    - 再レビュー:
+      - `conditional_pass`
+    - 追加対応:
+      - `discussions/031` を updated plan/design に合わせて precedence parity を含む decision record へ更新
+    - 最終再レビュー:
+      - `pass`
+- 2026-03-20 `S04H` 実装:
+  - 実装:
+    - provider-side `application/import_node.py` に artifact preflight を追加し、required artifact 欠損時に create 前の `preflight validate failed` で停止するよう補修した
+    - checked-in `spec-dock/scripts/.../application/import_node.py` に同じ preflight を揃えた
+    - checked-in subprocess parity test に import fail-fast / partial-write防止、`sync --force` の `.agent/index.json` / `.agent/tree.json` の `deps.valid=false` / `deps.error`、combined-fault 時の structure-error precedence を追加した
+  - implementation review:
+    - `pass`
+  - QA review:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_import.TestCliImport.test_import_fails_preflight_when_required_artifact_is_missing_without_creating_node tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_fails_fast_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_force_degrades_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing`
+  - 結果:
+    - `Ran 5 tests in 1.255s`
+    - `OK`
+- 2026-03-19 minimal corrective patch 着手:
+  - scope:
+    - `P1` same issue number の current(unscoped) と foreign(scoped) が共存しても sync/json snapshot lookup が混線しないこと
+    - `P2` `src/spec_dock/cli.py` の `_ensure_active_fallback_entrypoints` が persisted manifest より先に既存 active entrypoint の実体から `resolved_ids` を導出し、`context-pack.md` を実際の active entrypoint と整合させること
+  - provider-side target:
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`
+    - `src/spec_dock/cli.py`
+  - targeted tests:
+    - `tests/presentation_runtime/test_runtime_sync_s07.py`
+    - `tests/test_init_update.py`
+    - `tests.cli_runtime.test_active`
+    - `tests.cli_runtime.test_deps`
+    - `tests.cli_runtime.test_import`
+- 2026-03-19 minimal corrective patch 完了:
+  - 実装:
+    - sync の unscoped snapshot 集約を current-repo index 優先に固定し、repo-aware 解決へ `current_repo_slug` を渡すよう補強した
+    - status 解決は same issue number の複数 snapshot を保持し、repo 文脈がない unscoped node では cross-repo fallback しないようにした
+    - `active/context-pack.md` は persisted manifest ではなく、既存 `spec-dock/active/{initiative,epic,issue}` の解決結果を正本にして再生成するようにした
+  - 実行:
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
+  - 結果:
+    - `Ran 157 tests in 33.600s`
+    - `OK`
+- 2026-03-19 corrective docs refresh:
+  - requirement/design/plan に `R7` `R8` `R9` corrective scope を反映し、`AC-011 current repo slug parity across github-aware commands` と `AC-012 domain/application validation boundary` を追加
+  - spec review:
+    - `pass`
+- `S05F` 実装:
+  - `active set --github` / `deps check --github` / `sync` / `doctor` / `validate` が current repo slug 解決を共有 helper で扱うよう統一した
+  - current repo の unscoped issue と foreign scoped issue が同じ issue number を持っていても status/readiness が repo-aware に解決されるよう補強した
+- `S05F` implementation review:
+  - `pass`
+- `S05F` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_validate_s02`
+  - 結果:
+    - `Ran 16 tests`
+    - `OK`
+    - `Ran 40 tests`
+    - `OK`
+- `S04F` 実装:
+  - domain validation から required artifact existence check を外し、graph/in-memory 構造検証を filesystem 非依存に戻した
+  - required artifact matrix は application preflight helper `artifact_preflight.py` に移し、`validate` / `sync` / `doctor` の entrypoint で継続して enforce するよう戻した
+- `S04F` implementation review:
+  - `pass`
+- `S04F` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - `sync --force` の missing-artifact preflight 分岐に対する回帰保護が不足
+  - 対応:
+    - `tests/cli_runtime/test_validate.py` に required `plan.md` 欠損時の `sync --no-update-active --force` 契約を固定するテストを追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.domain_runtime.test_runtime_domain_s01.TestRuntimeDomainS01.test_validate_graph_and_deps_detects_structural_error tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04.test_doctor_detects_missing_artifact tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_missing_required_artifact_docs_for_each_node_kind tests.cli_runtime.test_validate.TestCliValidate.test_validate_sync_and_doctor_detect_missing_required_plan_artifact tests.cli_runtime.test_validate.TestCliValidate.test_sync_force_continues_when_required_plan_artifact_is_missing tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02.test_validate_tree_use_case_returns_result_with_checked_node_count tests.cli_runtime.test_runtime_validate_s02.TestRuntimeValidateS02.test_validate_tree_use_case_returns_domain_error tests.cli_runtime.test_validate.TestCliValidate.test_sync_force_continues_when_tree_is_invalid`
+  - 結果:
+    - `Ran 8 tests in 3.502s`
+    - `OK`
+- `S90F` 実装:
+  - checked-in consumer runtime `spec-dock/scripts/...` の `create_node` / `import_node` / `sync_state` / `set_active` / `check_deps` / `doctor` / `validate_tree` / `app.py` と repo context / status / json rendering 関連部を provider-side runtime と同じ repo-aware 契約へ揃えた
+  - current repo issue `#123` と foreign repo issue `other/repo#123` の same-number coexistence について、checked-in runtime でも import uniqueness、sync snapshot、validation/doctor、active/deps github status が provider-side と同じ振る舞いになるよう補修した
+- `S90F` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - validation entrypoint と status caller の一部に `current_repo_slug` 伝播漏れがあり、checked-in runtime で false positive / `unknown/stale` 退行が起きうる
+  - 対応:
+    - checked-in `import_node.py` の実経路へ repo context を渡す wiring を追加
+    - checked-in `doctor.py` / `validate_tree.py` / `create_node.py` / `app.py` と `set_active.py` / `check_deps.py` に `current_repo_slug` 伝播を追加
+    - checked-in runtime 実行系の parity regression を `tests/test_init_update.py` に追加
+  - 再レビュー:
+    - `pass`
+- `S90F` QA review:
+  - 初回 `fail`
+  - 指摘:
+    - helper 単体テストでは実 import path の parity regressions を保護できない
+  - 対応:
+    - checked-in `import_issue(...)` 実行経路を通す回帰テストへ置換し、`issue_view_minimal(..., repo_slug=\"other/repo\")` まで固定
+    - active/deps github status parity と validation/doctor false-positive 防止の回帰を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_validation_doctor_parity`
+  - 結果:
+    - `Ran 5 tests in 0.239s`
+    - `OK`
+- `S04G` 実装:
+  - `src/spec_dock/cli.py` の `_ensure_active_fallback_entrypoints()` で、`_resolve_existing_active_entrypoint()` が `None` を返した stale `.path` を残置せず、persisted/recovered target または placeholder へ再生成するよう補修した
+- `S04G` implementation review:
+  - `pass`
+- `S04G` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails`
+  - 結果:
+    - `Ran 4 tests in 0.580s`
+    - `OK`
+- `S05G` 実装:
+  - `infra/deps_reader.py` の bare numeric dependency ref 解決を current repo slug aware に変更し、current repo の shorthand `123` が foreign same-number linkage 共存後も current repo issue を指し続けるよう補修した
+  - current repo slug を解決できない状態で same-number の scoped/unscoped linkage が混在する場合は、cross-repo 誤束縛を避ける fail-closed error にした
+  - legacy shipped runtime `app.py` にも同等ロジックを反映し、provider 内の dependency resolution drift を防いだ
+- `S05G` implementation review:
+  - `pass`
+- `S05G` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - current repo slug が既知でも foreign scope にしか numeric target が存在しない場合の hard-failure branch を固定する回帰が不足
+  - 対応:
+    - `tests/cli_runtime/test_deps.py` に current repo known + foreign-only numeric match を reject する回帰を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds tests.cli_runtime.test_deps.TestCliDeps.test_deps_numeric_ref_prefers_current_repo_scope_when_foreign_same_number_exists tests.cli_runtime.test_deps.TestCliDeps.test_deps_numeric_ref_fail_closed_when_scope_mixed_and_current_repo_unknown tests.cli_runtime.test_deps.TestCliDeps.test_deps_numeric_ref_rejects_foreign_only_match_when_current_repo_known tests.cli_runtime.test_deps.TestCliDeps.test_deps_github_number_requires_imported_node`
+    - `python -m unittest -v tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_same_issue_number_when_repo_linkage_is_mixed_and_current_unknown tests.cli_runtime.test_validate.TestCliValidate.test_validate_allows_same_issue_number_when_current_repo_is_resolved`
+  - 結果:
+    - `Ran 5 tests in 1.475s`
+    - `OK`
+    - `Ran 2 tests in 0.488s`
+    - `OK`
+- `S05H` 実装:
+  - provider-side runtime に `github_issue_targets.py` を追加し、`issue_index()` 済みの `(repo_slug, issue_number)` を基準に same-repo indexed target の redundant `issue_view_snapshot()` を skip する helper を導入した
+  - `sync_state` / `check_deps` / `set_active` の github-aware read path をこの helper に統一し、same-repo index-missing fallback と foreign fetch 維持を両立するよう補修した
+  - checked-in dogfooding runtime `spec-dock/scripts/...` にも同じ helper/read path parity を反映した
+- `S05H` implementation review:
+  - `pass`
+- `S05H` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - `check_deps` / `set_active` と checked-in parity で same-repo index-missing fallback 回帰が不足
+  - 対応:
+    - `tests/cli_runtime/test_runtime_deps_s04.py` と `tests/cli_runtime/test_runtime_active_s06.py` に same-repo index-missing fallback regression を追加
+    - `tests/test_init_update.py` に checked-in dogfooding runtime の same-repo index-missing fallback parity regression を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_sync_snapshot_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_same_repo_index_missing_view_fallback_parity`
+    - `python -m py_compile tests/test_init_update.py`
+  - 結果:
+    - `Ran 41 tests in 0.178s`
+    - `OK`
+- `S01` 実装:
+  - `new initiative|epic|issue` の create に repo-level lock を導入
+  - bounded wait / stale lock safe failure / no-write failure / `spec doctor` 誘導メッセージを追加
+  - post-write duplicate guard を追加
+- `S01` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - lock metadata write 失敗時の orphan lock cleanup 漏れ
+    - release unlink 失敗の黙殺
+  - 対応:
+    - metadata write failure 時の cleanup を追加
+    - release unlink failure を明示的 failure として扱うよう修正
+  - 再レビュー:
+    - `pass`
+- `S01` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08`
+    - `python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10`
+    - `python -m unittest discover -v tests/cli_runtime`
+    - 競合/lock 系 7 テストの 20 回反復実行
+- `S02` 実装:
+  - `new doc` の create を S01 と同じ create lock 契約に統合
+  - post-write duplicate guard を追加し、discussion seq の重複を作成直後に検知
+  - validator に duplicate discussion sequence 検知を追加
+- `S02` implementation review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
+- `S02` QA review:
+  - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
+- `S03` 実装:
+  - local-only issue を deterministic に `open` / `ready` と解釈するよう status/readiness 契約を統一
+  - `IssueStatusSnapshot` と sync/deps JSON・text 出力に `authority` / `effective_status` / `source` / `stale` / `last_sync_at` を追加
+  - `deps check` / `active set` / `sync` が同じ status context を使うよう統一
+  - cache の `last_sync_at` は top-level `generated_at` ではなく issue node ごとの保存値を読むよう修正
+- `S03` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - cache の `last_sync_at` が local-only sync 後の `generated_at` で前進して見え、authoritative freshness を過大表示する
+  - 対応:
+    - cached `last_sync_at` を issue node の persisted field から読むよう修正
+    - GitHub authoritative / cache re-sync の freshness 回帰テストを追加
+  - 再レビュー:
+    - `pass`
+- `S03` QA review:
+  - 初回 `fail`
+  - 指摘:
+    - linked issue sync の freshness 契約が cache/live 両経路で未固定
+    - `deps check` text 出力の freshness 表示が未固定
+  - 対応:
+    - `tests/cli_runtime/test_sync.py` に authoritative / cache 両経路の `source` / `stale` / `last_sync_at` 検証を追加
+    - `tests/cli_runtime/test_runtime_deps_s04.py` に blocked / ready 両経路の text freshness 表示検証を追加
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.domain_runtime.test_runtime_domain_s03 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_deps tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.presentation_runtime.test_runtime_sync_s07`
+- `S04` 実装:
+  - `initiative` / `epic` / `issue` の required artifact presence を validate 契約へ追加し、`.meta.json` / `requirement.md` / `design.md` / `plan.md` / `report.md` 欠損を failure 化
+  - `doctor` command/use case/presentation を追加し、`duplicate_id` / `duplicate_seq` / `missing_artifact` / `broken_meta` / `stale_active_pointer` の supported guidance を返すようにした
+  - `active show` の not-set 出力に fallback path と next action を追加
+  - installer `init/update` で `spec-dock/active/{initiative,epic,issue}` と `context-pack.md` の fallback entrypoint を自動生成し、empty active dir / symlink failure / dangling symlink / missing context-pack を復旧できるようにした
+- `S04` implementation review:
+  - 初回 `fail`
+  - 指摘:
+    - `doctor` が `Invalid JSON: .../.meta.json` や required field 欠損を `broken_meta` に分類できない
+    - invalid active manifest や stale pointer の一部で `doctor` guidance が漏れる
+  - 対応:
+    - `.meta.json` 系エラーの分類条件を拡張
+    - invalid active manifest、absolute path outside repo、file path target、graph unavailable、dangling symlink / missing context-pack の各 edge case を修正
+    - stale pointer false positive を避けるため `graph is None` 時の id-side stale check を抑止
+  - 再レビュー:
+    - `pass`
+- `S04` QA review:
+  - 初回 `fail`
+  - 指摘:
+    - required artifact matrix の一部と `doctor` guidance / installer fallback edge case の回帰保護が薄い
+  - 対応:
+    - `initiative|epic|issue × requirement.md|design.md|plan.md|report.md` の欠損を全組合せで検証
+    - `doctor` の exact duplicate id / duplicate seq / broken meta / stale active pointer guidance をテスト固定
+    - installer の symlink failure / dangling symlink / persisted active からの context-pack 再生成をテスト固定
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_active tests.cli_runtime.test_runtime_doctor_s04 tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_dangling_active_symlink_entrypoint tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_persisted_active_manifest`
+- `S05` 実装:
+  - import target の canonical GitHub issue URL から `owner/repo` を抽出し、current repo と一致しない URL import を default fail に変更した
+  - `--allow-foreign-url` を追加し、cross-repo import を explicit opt-in のときだけ許可するようにした
+  - `active set` / `deps check` に `--id` / `--github-issue` を追加し、positional target との conflict / invalid input を明示的に reject するようにした
+  - `new issue --create-github-issue` を additive alias として追加し、`--no-github` / `--github-issue` との排他も固定した
+  - canonical でない URL-like import target を reject し、repo identity 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するようにした
+- `S05` implementation review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - non-canonical URL-like target が repo identity guard を回避しうる
+    - credentialed HTTPS remote を current repo 判定で解釈できない
+  - 対応:
+    - canonical GitHub issue URL 以外の URL-like target を reject するよう parser を修正
+    - `https://<userinfo>@github.com/<owner>/<repo>.git` 形式を current repo 判定で許容した
+  - 再レビュー:
+    - `pass`
+- `S05` QA review:
+  - 初回 `conditional_pass`
+  - 指摘:
+    - explicit target flag の conflict / invalid input 回帰が不足
+    - no-origin / non-GitHub-origin / SSH-origin の repo identity 分岐が未保護
+  - 対応:
+    - `active set` / `deps check` の conflict / non-positive `--github-issue` をテスト固定
+    - import の no-origin / non-GitHub-origin fail、SSH-origin success、credentialed HTTPS-origin success、non-canonical URL-like target reject をテスト固定
+  - 再レビュー:
+    - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_new tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_command_import_issue_smoke tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists`
+- `S90` docs impact:
+  - provider-side docs の `reference_github.md` / `reference_deps.md` / `README.md` / `workflow_issue.md` と `system/active-none/*/README.md` を更新した
+  - dogfooding mirror 側の対応 docs を同期し、mirror-only の旧 docs `workflow-issue.md` / `workflow-tree.md` にも `active set` no-checkout default と explicit target form を反映した
+  - 旧文言の `owner/repo は無視` / `番号抽出だけ` / `active set` が常に checkout する読まれ方を解消した
+- `S90` docs/spec review:
+  - `pass`
+  - 確認:
+    - import URL safety, `--allow-foreign-url`, `--id`, `--github-issue`, `new issue --create-github-issue` の説明が requirement/design/plan/report と整合
+    - provider-side docs と dogfooding mirror の対応ファイルが同期されている
+    - mirror-only の旧 docs に残る active set 誤読も抑止されている
+- `S99` corrective fix:
+  - broad final suite で、`tests/cli_runtime/test_runtime_deps_s04.py` と `tests/presentation_runtime/test_runtime_sync_s07.py` の fixture が S04 required artifact 契約に追随しておらず、cycle / sync artifact failure contract を見る前に preflight validate で落ちることを確認した
+  - tests-only で `.meta.json` / `requirement.md` / `design.md` / `plan.md` / `report.md` を fixture 生成する helper を追加し、元の assertion 意図を回復した
+- `S99` corrective fix review:
+  - implementation review: `pass`
+  - QA review: `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_deps_s04 tests.presentation_runtime.test_runtime_sync_s07`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_runtime_doctor_s04 tests.domain_runtime.test_runtime_domain_s03 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_deps tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_fallback_entrypoints_when_active_dir_is_empty tests.test_init_update.TestInitUpdate.test_update_bootstraps_active_path_files_when_active_symlink_creation_fails tests.test_init_update.TestInitUpdate.test_update_repairs_dangling_active_symlink_entrypoint tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_persisted_active_manifest tests.cli_runtime.test_import tests.cli_runtime.test_new tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_command_import_issue_smoke tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_import_command_returns_nonzero_when_post_sync_artifact_failure_exists`
+  - 結果:
+    - `Ran 262 tests in 41.667s`
+    - `OK`
+- post-manual blocking fix:
+  - 実装:
+    - `import issue <foreign-url> --allow-foreign-url` で `gh issue view` に target repo context を渡すため、`repo_slug` を `import_node -> IssueGateway -> infra.github_cli` まで伝播させた
+    - `gh issue view ... --repo <owner>/<repo>` の command boundary を CLI integration test で固定した
+  - implementation review:
+    - `pass`
+  - QA review:
+    - 初回 `fail`
+    - 指摘:
+      - stubbed gateway までしか検証しておらず、live failure が起きた `gh issue view --repo ...` 境界が未保護
+    - 対応:
+      - `tests/cli_runtime/test_import.py` に foreign URL default fail / allow success / same-repo no-regression の command boundary 検証を追加
+    - 再レビュー:
+      - `pass`
+  - 実行:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10`
+    - `python -m unittest -v tests.cli_runtime.test_import`
+  - 結果:
+    - `tests.cli_runtime.test_runtime_import_s10` `OK`
+    - `tests.cli_runtime.test_import` `OK`
+- manual test:
+  - report root:
+    - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/`
+  - scope:
+    - `MT-01` baseline local init
+    - `MT-02` multi-resource local create
+    - `MT-03` discussion sequence stress
+    - `MT-04` local-only status and deps
+    - `MT-05` validate and doctor recovery
+    - `MT-06` odd but plausible local flows
+    - `MT-07` GitHub live import and sync
+    - `MT-08` GitHub target safety and explicit intent
+    - `MT-10` organic long-run operator session
+    - `MT-09` summary and residue check
+  - verdict:
+    - `MT-01` `pass` ただし generated runtime と provider runtime の command surface 差異を検知
+    - `MT-02` `pass`
+    - `MT-03` `pass`
+    - `MT-04` `pass`
+    - `MT-05` `pass`
+    - `MT-06` `pass`
+    - `MT-07` `pass`
+    - `MT-08` 初回 `fail` -> rerun `pass`
+    - `MT-10` `pass`（affected subset rerun も `pass`）
+    - `MT-09` `pass`
+  - key findings:
+    - `sev-3`: `uvx init` 生成 runtime の command surface が provider runtime とずれて見え、`doctor` と issue-28 の explicit flags が生成物 help から見えない
+  - rerun result:
+    - `MT-07` rerun で same-repo import/sync/deps/active の回帰なしを確認
+    - `MT-08` rerun で foreign URL default fail + `--allow-foreign-url` success を確認
+    - `MT-10` rerun subset で GitHub issue close/reopen 後の sync/deps/active 整合を確認
+  - evidence:
+    - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/execution-log.md`
+    - `manual-tests/reports/2026-03-18-issue-28-postfix-manual/summary.md`
+- comprehensive manual rerun:
+  - report root:
+    - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/`
+  - scope:
+    - `RT-01` baseline fresh init and scaffold parity
+    - `RT-02` broad local create matrix
+    - `RT-03` discussion and artifact churn
+    - `RT-04` deps topology growth
+    - `RT-05` recovery and odd local states
+    - `RT-06` github live same-repo flows
+    - `RT-07` github live foreign-url safety
+    - `RT-08` explicit target and ambiguity stress
+    - `RT-09` organic long-run operator session
+    - `RT-10` summary and residue check
+  - verdict:
+    - `RT-01` `pass`（generated/provider help 差分は継続観測）
+    - `RT-02` `pass`
+    - `RT-03` `pass`
+    - `RT-04` `pass`
+    - `RT-05` `pass`
+    - `RT-06` `pass`
+    - `RT-07` `pass`
+    - `RT-08` `pass`
+    - `RT-09` `pass`
+    - `RT-10` `pass`
+  - findings:
+    - `resolved`: `foreign URL + --allow-foreign-url` live success path は再現せず、期待どおり成功
+    - `new`: `sev-4` `gh_index_incomplete` warning を観測したが、機能失敗には未接続
+    - `residual`: generated runtime と provider runtime の help surface 差分は継続観測
+  - evidence:
+    - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/execution-log.md`
+    - `manual-tests/reports/2026-03-18-issue-28-manual-rerun/summary.md`
+- PR review follow-up corrective patch:
+  - analysis:
+    - `spec-deps/current/discussions/019-disc-pr29-review-followup-analysis.md`
+    - `spec-deps/current/discussions/020-disc-pr29-r4-foreign-linkage-uniqueness-analysis.md`
+    - `spec-deps/current/discussions/021-disc-pr29-r5-active-entrypoint-rebuild-analysis.md`
+  - finding resolution:
+    - `R1 foreign repo identity persistence`
+      - import 時だけでなく persisted meta/model に `github.repo_owner` / `github.repo_name` を保持
+      - `sync --github` / `deps check --github` / `active set --github` が repo-aware refresh を使い、foreign linked node を current repo 同番号 issue に誤 hydrate しないよう修正
+    - `R2 stale create lock doctor guidance`
+      - `doctor` に create lock 診断を追加し、stale / non-stale contention / metadata 異常を supported finding として返すよう修正
+    - `R3 dogfooding runtime parity`
+      - checked-in consumer workspace `spec-dock/scripts/` を provider-side runtime へ refresh し、dogfooding repo 上でも `doctor` と explicit target hint が使えるよう修正
+      - `tests/test_init_update.py` に checked-in dogfooding runtime surface の executable smoke を追加し、`doctor --help` と `active set --id` hint を固定
+    - `R4 foreign github linkage uniqueness`
+      - linked uniqueness を `github.issue_number` 単独ではなく `repo + issue_number` で評価するよう修正
+      - current repo `#123` と foreign repo `#123` は併存可能にし、same-repo duplicate だけを reject する contract に更新
+      - `--github-issue <n>` は overlap 時に ambiguity fail とし、`--id` を確定 selector に固定
+      - current repo slug が未解決で scoped/unscoped linkage が衝突する場合は fail-closed で reject するよう補強
+    - `R5 active entrypoint rebuild`
+      - `spec-dock update` が persisted active manifest を使って `spec-dock/active/{initiative,epic,issue}` entrypoint 自体を rebuild するよう修正
+      - persisted path が壊れていても id から復元を試み、kind/path/id が壊れている場合だけ placeholder fallback に落とす
+      - partial recovery で active entrypoint を直した場合は `context-pack.md` も同じ state に rewrite するよう修正
+    - `R4/P1 additional review: sync snapshot repo-aware key alignment`
+      - `SyncStateResult` に `github_snapshot_by_repo_and_issue_number` を追加し、`repo + issue_number` で snapshot を保持する contract に更新
+      - `json_state` の fallback は `issue_number` 単独 lookup をやめ、repo-aware key だけを使うよう修正
+      - `domain.status` の `issue_number` index は first-wins に変更し、foreign fetch append が unscoped current issue の snapshot を上書きしないよう修正
+      - `tests.presentation_runtime.test_runtime_sync_s07` に `same issue_number current/foreign coexist` の no-mixup 回帰を追加
+    - `R5/P2 additional review: context-pack aligns with existing active entrypoints`
+      - `_ensure_active_fallback_entrypoints` で `active/{initiative,epic,issue}` の既存 symlink/pathfile 実体から id を解決し、`resolved_ids` を補正するよう修正
+      - persisted manifest が stale でも既存 active entrypoint が健全なら `context-pack.md` は実体に整合した active id を維持するよう修正
+      - `tests.test_init_update` に `stale persisted manifest + healthy active entrypoints` 回帰を追加
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_active_s06 tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_import tests.cli_runtime.test_sync tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_validate_s02 tests.domain_runtime.test_runtime_domain_s03`
+    - 結果: `Ran 156 tests in 21.267s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint`
+    - `python -m unittest -v tests.test_init_update`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_shell_s11`
+    - `python -m unittest -v tests.cli_runtime.test_new tests.cli_runtime.test_import tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_validate tests.test_init_update`
+    - 結果: `Ran 170 tests in 38.652s` / `OK`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07`
+    - 結果: `Ran 14 tests` / `OK`
+    - `python -m unittest -v tests.test_init_update`
+    - 結果: `Ran 24 tests` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
+    - 結果: `Ran 117 tests in 30.733s` / `OK`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.test_init_update`
+    - 結果: `Ran 41 tests in 2.381s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_validate`
+    - 結果: `Ran 117 tests in 31.464s` / `OK`
+  - review status:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review は reviewer 応答が不安定だったが、出た指摘（mixed-scope fail-closed / stale context-pack / repo-aware snapshot lookup / context-pack reality drift）はすべて反映し、再検証済み
+- PR review follow-up corrective patch (R6 doctor current repo slug):
+  - analysis:
+    - `spec-deps/current/discussions/022-disc-pr29-r6-doctor-current-repo-slug-analysis.md`
+  - finding resolution:
+    - `doctor` でも `validate` / `sync` と同じ current repo slug 解決を使い、`validate_graph_and_deps(..., current_repo_slug=...)` を渡すよう修正した
+    - current repo `#123` と foreign repo `other/repo#123` が共存する正常 graph を `doctor` が ambiguity false positive にしない回帰を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 18 tests in 0.053s` / `OK`
+  - review status:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review: `pass`
+- PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/023-disc-pr29-r7-active-set-current-repo-slug-analysis.md`
+  - `spec-deps/current/discussions/024-disc-pr29-r8-deps-check-current-repo-slug-analysis.md`
+  - `spec-deps/current/discussions/025-disc-pr29-r9-domain-validation-artifact-coupling-analysis.md`
+  - closure:
+    - `R7 active-set current repo slug`: `fixed`
+    - `R8 deps-check current repo slug`: `fixed`
+    - `R9 domain validation artifact coupling`: `fixed`
+    - `AC-011`: `S05F` で達成
+    - `AC-012`: `S04F` で達成
+- S05F current repo slug parity:
+  - 実装:
+    - `set_active --github` と `deps check --github` に current repo slug 解決を追加し、status resolution へ伝播するよう修正した
+    - `sync` / `doctor` / `validate_tree` も同じ application helper を使う形へ寄せ、current repo slug 文脈の drift を抑えた
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04`
+    - 結果: `Ran 16 tests` / `OK`
+    - `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_validate_s02`
+    - 結果: `Ran 40 tests` / `OK`
+  - review status:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review: `pass`
+- S01I create lock scope narrowing for GitHub create:
+  - analysis:
+    - `spec-deps/current/discussions/035-disc-pr29-r18-create-lock-gh-create-narrowing-analysis.md`
+  - review follow-up:
+    - fresh implementation review で、`issue_create()` 後に `_acquire_create_lock()` が失敗すると remote issue だけ残る新しい side-effect 経路が recovery guidance / regression coverage 不足のまま増えている、と指摘された
+    - さらに fresh reviewer から、discussion/report の wording が alias-only に読める一方で、実装契約は `new issue` create-mode 全体に掛かっていると指摘された
+    - corrective patch として、S01I の acceptance / regression 契約は `new issue` create-mode 全体を対象とし、`--create-github-issue` は explicit entrypoint として扱う方針へ統一した
+    - 追加の fresh review で、pure input validation がまだ `gh issue create` 後に残っているため、`--id + github mode`、`--epic` 欠落、partial repo identity でも remote issue を先に作りうる、と指摘された
+  - finding resolution:
+    - `new issue --create-github-issue` の `gh issue create` を repo-global create lock の外へ移し、external GitHub latency が `new doc` / local-only `new` / `import issue` を false contention で block しないよう修正した
+    - lock 内は `graph reload -> parent re-resolve / uniqueness revalidation -> local write -> post-write duplicate guard` に限定した
+    - pre-lock で stale parent 文脈を GitHub issue body へ混入させないよう、`_github_issue_body` は graph 非依存の最小本文へ縮小した
+    - provider-side source of truth と checked-in dogfooding runtime の `create_node.py` を parity 更新した
+    - runtime regression と checked-in parity regression を追加し、slow `issue_create()` の non-blocking、pre-lock parent revalidation、post-create local failure guidance、post-create uniqueness revalidation failure guidance、graph-independent minimal body 契約を固定した
+    - checked-in parity でも lock failure / parent failure / uniqueness failure / write-seam failure の guidance 分岐を executable path で確認済み
+    - pure input validation を `_validate_pre_github_create_inputs()` として `gh issue create` 前へ前倒しし、`--id + github mode`、`--epic` 欠落、partial repo identity を no-side-effect fail-fast にした
+    - provider-side runtime と checked-in dogfooding runtime の両方で、同 3 ケースが `issue_create()` 未呼び出しのまま失敗する parity regression を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update`
+    - 結果: `Ran 96 tests in 11.102s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity`
+    - 結果: `Ran 22 tests in 0.581s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity`
+    - 結果: `Ran 51 tests in 5.457s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity`
+    - 結果: `Ran 54 tests in 5.349s` / `OK`
+    - `rg --files | rg '[A-Z]'`
+    - 結果: 既存 uppercase path のみ検出、新規追加なし
+  - review status:
+    - spec review: `pass`
+    - QA review: `pass`
+    - implementation review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/036-disc-pr29-r20-pre-github-parent-precheck-analysis.md`
+  - `spec-deps/current/discussions/037-disc-pr29-r21-all-kinds-post-create-guidance-analysis.md`
+  - finding resolution:
+    - pre-GitHub phase に read-only graph precheck を追加し、stable parent absence (`new epic` の initiative 不在 / `new issue` の epic 不在) を remote side effect 前に fail-fast するよう補強した
+    - lock 取得後は引き続き graph reload と authoritative parent revalidation を実施し、R18/S01I の lock narrowing 契約は維持した
+    - post-create local failure guidance を `initiative` / `epic` / `issue` の supported create surface 全体へ広げ、`new <kind> --github-issue <n>` ベースの kind-aware recovery message に統一した
+    - provider-side source of truth と checked-in dogfooding runtime の `create_node.py` を parity 更新した
+    - provider runtime と checked-in runtime の両方に、parent-not-found no-GH-call regression と non-issue post-create guidance parity regression を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_new tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 57 tests in 5.515s` / `OK`
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - 結果: `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/040-disc-pr29-r24-placeholder-active-recovery-analysis.md`
+  - docs:
+    - `requirement.md` の `AC-006` に、placeholder fallback が残っていても persisted active manifest から real node を解決できるなら `spec-dock update` が active entrypoint を復元する契約を追記した
+    - `design.md` の `active entrypoint recovery` に、placeholder は healthy state ではなく recoverable fallback であることを追記した
+    - `plan.md` に `S04I placeholder active entrypoint recovery` を追加し、`S04G` との境界と expected tests を固定した
+  - spec review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `AC-006` が placeholder fallback 残置ケースを明示していなかった
+      - head summary が `S04I` 未了時点なのに pass 済みへ読めた
+    - 対応:
+      - `AC-006` を placeholder fallback recovery まで拡張した
+      - report の summary を `S04I` 反映後の時点へ揃えた
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - `_ensure_active_fallback_entrypoints()` は healthy real entrypoint がある時に persisted target 解決を行わず即 `continue` するよう整理した
+    - placeholder symlink / placeholder `.path` fallback は recoverable fallback として扱い、persisted active manifest から実 node を解決できる時だけ real node へ rebuild するよう補修した
+    - persisted target が解決できない場合は placeholder fallback を維持し、`context-pack.md` も最終 active entrypoint 実体と一致する `(none)` 側へ戻すよう維持した
+    - mixed state では healthy real entrypoint を維持し、placeholder layer だけ rebuild する
+    - performance follow-up として、healthy real entrypoint がある時は `_resolve_manifest_target_dir()` を呼ばない guard test を追加した
+    - fresh implementation review で見つかった `placeholder pathfile + invalid directory conflict + valid persisted manifest` の取りこぼしに対し、placeholder entrypoint でも `desired_target != existing_target` なら rebuild 対象とみなし、managed pointer directory conflict を削除して real target へ復旧できるよう補修した
+    - conflict 削除に失敗した場合は従来どおり `continue` で停止し、valid `.path` を先に消してしまわない安全側の挙動を維持した
+  - validation:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_pathfile_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_mixed_entrypoints_keep_healthy_real_and_rebuild_placeholder_layers tests.test_init_update.TestInitUpdate.test_update_keeps_placeholder_and_none_context_pack_when_persisted_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack`
+    - 結果: `Ran 8 tests in 1.387s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_invalid_directory_conflict_using_real_pathfile_target tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_non_symlink_file_conflict_using_real_pathfile_target tests.test_init_update.TestInitUpdate.test_update_prefers_real_pathfile_entrypoint_over_placeholder_symlink_when_manifest_is_stale`
+    - 結果: `Ran 3 tests in 0.522s` / `OK`
+    - `python -m unittest -v tests.test_init_update`
+    - 結果: `Ran 60 tests in 6.938s` / `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/043-disc-pr29-r27-cwd-independent-create-guidance-analysis.md`
+  - docs:
+    - `requirement.md` の `AC-007` / `AC-008` に、guidance command が cwd-independent である契約を追記した
+    - `design.md` に、doctor guidance と post-create retry hint が managed repo root から導出した cwd-independent command path を使う方針を追記した
+    - `plan.md` に `S01O` を追加し、`AC-007` / `AC-008` / `AC-010` の corrective scope へ接続した
+    - `report.md` では `S01O` を current working tree の corrective scope として追記した
+  - spec review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `report.md` に `S01O` のトレースが不足していた
+    - 対応:
+      - 実施サマリーと次アクションへ `S01O` の current working tree 状態を追記した
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - doctor guidance と post-create retry hint の両方で、`specdock_dir` から導出した runtime entrypoint の absolute path を使うよう補修し、repo root でない cwd からでも guidance command が実行できるようにした
+    - `_release_create_lock` は `specdock_dir` optional の後方互換 signature に戻し、import 経路の旧 2 引数呼び出しを壊さないようにした
+    - provider runtime と checked-in dogfooding runtime の parity を揃え、import backward-compat regression をテストで固定した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_issue_create_pre_lock_window_rerevalidates_parent_state tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_issue_create_pre_lock_window_rerevalidates_github_uniqueness_state tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_initiative_and_epic_post_create_failures_report_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_contention_timeout_is_no_write_and_reports_metadata tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_stale_is_no_write_and_reports_metadata tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_metadata_write_failure_cleans_orphan_lock tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_fails_when_release_unlink_fails`
+    - 結果: `Ran 9 tests` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 2 tests` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_release_create_lock_compat_for_import_old_call_signature tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_parent_fallback_regression tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_fails_when_release_unlink_fails tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_contention_timeout_is_no_write_and_reports_metadata`
+    - 結果: `Ran 4 tests` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_initiative_and_epic_post_create_failures_report_retry_link_guidance tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 4 tests in 0.213s` / `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/041-disc-pr29-r25-create-lock-doctor-command-analysis.md`
+  - `spec-deps/current/discussions/042-disc-pr29-r26-post-create-rerun-hint-analysis.md`
+  - docs:
+    - `requirement.md` の `AC-007` に、post-create local failure guidance が `--title` と required parent selector を欠かない runnable command である契約を追記した
+    - `requirement.md` の `AC-008` に、create lock failure から案内される doctor command が repo 上で実行可能な command である契約を追記した
+    - `design.md` に、create lock guidance は stable doctor command を返すことと、post-create recovery hint は CLI entrypoint を含む runnable command であることを追記した
+    - `plan.md` に `S01M` / `S01N` を追加し、`AC-007` / `AC-008` / `AC-010` へのトレースを更新した
+  - spec review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `plan.md` の AC traceability が `S01M` / `S01N` を含んでいなかった
+    - 対応:
+      - `AC-007` / `AC-008` / `AC-010` に corrective scope の紐付けを追加した
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - create lock acquisition / metadata write / release failure guidance を `spec-dock/scripts/spec-dock doctor` に統一し、repo-local shortcut や PATH 非依存の executable doctor command を返すよう補修した
+    - post-create local failure guidance は `spec-dock/scripts/spec-dock new <kind> ...` 形式へ統一し、`--title` と kind ごとの required parent selector を含む runnable retry command を返すよう補修した
+    - recovery command の引数は `shlex.quote` で quoting し、provider runtime と checked-in dogfooding runtime の parity を揃えた
+    - fresh QA で見つかった assertion gap に対し、provider lock-failure path と checked-in parity path の両方で executable doctor guidance assertion を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_issue_create_pre_lock_window_rerevalidates_parent_state tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_github_issue_create_pre_lock_window_rerevalidates_github_uniqueness_state tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_write_seam_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_initiative_and_epic_post_create_failures_report_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_contention_timeout_is_no_write_and_reports_metadata tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_stale_is_no_write_and_reports_metadata tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_lock_metadata_write_failure_cleans_orphan_lock tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_create_fails_when_release_unlink_fails`
+    - 結果: `Ran 9 tests` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 2 tests` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_issue_create_lock_failure_after_github_create_reports_retry_link_guidance tests.cli_runtime.test_runtime_new_s08.TestRuntimeNewS08.test_initiative_and_epic_post_create_failures_report_retry_link_guidance tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_lock_scope_narrowing_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity`
+    - 結果: `Ran 4 tests in 0.226s` / `OK`
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - 結果: `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+- latest PR review follow-up corrective scope closure:
+  - `spec-deps/current/discussions/038-disc-pr29-r22-deps-target-status-payload-analysis.md`
+  - `spec-deps/current/discussions/039-disc-pr29-r23-pre-github-graph-preflight-analysis.md`
+  - docs:
+    - `requirement.md` に `AC-001` の pre-GitHub graph preflight / no-side-effect fail-fast 契約と、`AC-011` の deps target 自身の `target_status` 契約を追記した
+    - `design.md` と `plan.md` は `S05I` / `S01L` の corrective scope と step gate を正本として維持し、`report.md` 側の latest head summary も同スコープに更新した
+  - spec self-review:
+    - 初回 `fail`
+    - 指摘:
+      - `requirement.md` に R23 の pre-GitHub graph preflight / no-side-effect fail-fast 契約が落ちていた
+      - `requirement.md` に R22 の initiative/epic target を含む `target_status` 契約が落ちていた
+      - `report.md` に docs update trace が不足していた
+    - 対応:
+      - `AC-001` と `AC-011` を latest corrective scope に合わせて拡張した
+      - R22/R23 closure に docs update trace を追加した
+    - 再レビュー:
+      - `pass`
+  - whole-diff fresh review:
+    - 初回 `conditional_pass`
+    - 指摘:
+      - `plan.md` の要件トレースが stale で、`AC-001 -> S01,S02` と `AC-011 -> S05F` のまま残っていた
+    - 対応:
+      - `plan.md` の `AC-001` を `S01 / S01L / S02` に、`AC-011` を `S05F / S05I` に更新した
+      - `S01` / `S02` の step boundary でも `S01L` を含む完了条件へ揃えた
+    - 再レビュー:
+      - `pass`
+  - finding resolution:
+    - `resolve_issue_statuses()` の対象を `initiative` / `epic` / `issue` へ広げ、`deps check` の target 自身が initiative / epic でも real status を返せるよう補強した
+    - `inspect_target_deps()` が target 自身の resolved status payload を inspection 契約に含めるよう補強した
+    - create-mode 全 kind で `gh issue create` 前に read-only graph preflight を通し、stable tree failure では no-side-effect fail にする補強を入れた
+    - checked-in dogfooding runtime の `domain/status.py` / `domain/deps.py` も provider-side contract へ揃え、deps target_status parity drift を閉じた
+    - provider runtime と checked-in runtime の両方に、initiative/epic target_status と create-mode graph preflight の回帰を追加した
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_create_mode_graph_preflight_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_deps_target_status_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_keeps_repo_scoped_active_deps_status_parity`
+    - 結果: `Ran 74 tests in 12.887s` / `OK`
+    - `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/application/create_node.py spec-dock/scripts/spec_dock_runtime/domain/status.py spec-dock/scripts/spec_dock_runtime/domain/deps.py tests/cli_runtime/test_deps.py tests/cli_runtime/test_runtime_new_s08.py tests/test_init_update.py`
+    - 結果: `OK`
+  - review status:
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+
+- 2026-03-23 restart follow-up (`S01Q` / `S04J` / `S05J` / `S05K`):
+  - docs contract fix:
+    - `requirement/design/plan` に `AC-018` / `AC-019` / `AC-020` と review trace (`PR29-R31`..`R34`) を追記
+    - discussions:
+      - `spec-deps/current/discussions/049-disc-pr29-r31-url-target-repo-scope-analysis.md`
+      - `spec-deps/current/discussions/050-disc-pr29-r32-numeric-deps-scope-contract-analysis.md`
+      - `spec-deps/current/discussions/051-disc-pr29-r33-partial-create-write-phase-analysis.md`
+      - `spec-deps/current/discussions/052-disc-pr29-r34-in-progress-scaffold-diagnosis-analysis.md`
+      - `spec-deps/current/discussions/053-disc-pr29-root-cause-repo-scope-and-create-state-analysis.md`
+  - finding resolution:
+    - `active set` / `deps check` の URL target で `owner/repo` を保持し、repo overlap 時でも exact target 解決できるよう補修
+    - `depends_on` で scoped ref（`owner/repo#123` / canonical issue URL）を解決可能にし、bare numeric は current-repo scope 優先 + fail-closed を維持
+    - `create_node` / `import_node` に create write phase（`none/scaffold_copied/meta_written/post_write_verified`）を導入し、partial write を doctor-first guidance へ分類
+    - `fs_repo` の missing `.meta.json` 判定に create-lock state（`in_progress` / `stale_create_lock`）を導入し、`validate/sync/doctor` で corruption と進行中状態を分離
+    - provider-side source of truth と checked-in dogfooding runtime を parity 更新
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate`
+    - 結果: `Ran 132 tests in 33.285s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 167 tests in 35.027s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity`
+    - 結果: `Ran 7 tests in 2.675s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 92 tests in 25.410s` / `OK`
+    - `python -m unittest -v tests.test_init_update`
+    - 結果: `Ran 69 tests in 9.716s` / `OK`
+    - `python -m unittest discover -v`
+    - 結果: `Ran 434 tests in 60.668s` / `OK`
+    - `git diff --check`
+    - 結果: whitespace error なし
+    - `git diff --name-only | rg '[A-Z]' || true`
+    - 結果: 変更対象 path に uppercase 追加なし
+  - review status:
+    - spec review: `pass`（fresh reviewer pass。`spec-deps/current/{requirement,design,plan,report}` と current worktree 実装・tests の traceability を確認）
+    - implementation review: `pass`（fresh reviewer pass。repo-scoped current-repo unscoped fallback まで含め、current worktree 直読で actionable finding なし）
+    - QA review:
+      - 初回: `conditional_pass`（repo-scoped mismatch negative tests / scoped deps negative tests / checked-in import partial-write parity の不足を指摘）
+      - 是正後: `pass`（fresh reviewer pass。current worktree vs `main` で latest negative tests と parity を確認）
+    - whole-diff review (`main` 基準): `pass`（current worktree ベースで provider/check-in parity と `AC-018/019/020` の受け入れ条件対応を確認）
+
+## 発見事項
+- 2026-03-24 latest GitHub/Codex review persisted-active-path follow-up:
+  - scope:
+    - `S04K`
+    - `AC-006`
+    - `PR29-R35`
+  - docs:
+    - `requirement.md` の `AC-006` に、persisted active manifest の `path` は `.meta.json` の `id` / `type` 一致なしに recovery target として採用しない契約を追記した
+    - `design.md` の `active entrypoint recovery` に、same-layer wrong-id path は `expected_id` 探索か placeholder fallback へ倒す trust boundary を追記した
+    - `plan.md` に `S04K` を追加し、placeholder fallback と id-based recovery の両 regression を expected test として固定した
+    - `discussions/054-disc-pr29-r35-persisted-active-path-id-trust-analysis.md` を追加した
+  - review status:
+    - docs-only spec review:
+      - 初回: `conditional_pass`（same-layer wrong-id path が `expected_id` を別 path で回収できる branch も plan の expected test に含めるよう指摘）
+      - 再レビュー: `pass`（requirement/design/plan/discussion の trust boundary と expected tests が整合し、実装前契約として implementation-ready）
+    - implementation review: `pass`（current worktree 直読 review で、persisted path fallback の `id` / `type` 必須化と call site の `expected_id` 受け渡しを確認）
+    - QA review: `pass`（same-layer wrong-id -> placeholder fallback / id-based recovery と既存 active recovery 18 regression が green）
+  - validation:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id tests.test_init_update.TestInitUpdate.test_update_prefers_id_based_recovery_when_same_layer_wrong_id_path_exists tests.test_init_update.TestInitUpdate.test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken`
+    - 結果: `Ran 4 tests in 0.818s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_update_rebuilds_active_entrypoints_from_persisted_manifest_when_valid_and_active_dir_empty tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_rebuilds_placeholder_pathfile_entrypoints_from_persisted_manifest tests.test_init_update.TestInitUpdate.test_update_mixed_entrypoints_keep_healthy_real_and_rebuild_placeholder_layers tests.test_init_update.TestInitUpdate.test_update_keeps_placeholder_and_none_context_pack_when_persisted_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_rewrites_stale_context_pack_when_rebuilding_active_entrypoints tests.test_init_update.TestInitUpdate.test_update_keeps_context_pack_aligned_with_existing_active_entrypoints_when_persisted_manifest_is_stale tests.test_init_update.TestInitUpdate.test_update_skips_persisted_target_resolution_when_active_entrypoints_are_healthy tests.test_init_update.TestInitUpdate.test_update_regenerates_context_pack_from_existing_active_entrypoints_when_manifest_stale tests.test_init_update.TestInitUpdate.test_update_keeps_context_pack_aligned_with_existing_active_pathfiles_when_persisted_manifest_is_stale tests.test_init_update.TestInitUpdate.test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_path_points_to_same_layer_wrong_id tests.test_init_update.TestInitUpdate.test_update_prefers_id_based_recovery_when_same_layer_wrong_id_path_exists tests.test_init_update.TestInitUpdate.test_update_prefers_existing_active_entrypoints_over_stale_persisted_manifest_for_context_pack tests.test_init_update.TestInitUpdate.test_update_prefers_real_pathfile_entrypoint_over_placeholder_symlink_when_manifest_is_stale tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_non_symlink_file_conflict_using_real_pathfile_target tests.test_init_update.TestInitUpdate.test_update_repairs_same_layer_invalid_directory_conflict_using_real_pathfile_target`
+    - 結果: `Ran 18 tests in 3.533s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04 tests.test_init_update`
+    - 結果: `Ran 246 tests in 42.474s` / `OK`
+  - whole-branch review status (`main` 基準 / current worktree):
+    - spec review: `pass`
+    - implementation review: `pass`
+    - QA review: `pass`
+
+- 2026-03-24 latest GitHub/Codex review follow-up:
+  - latest inline 2 件を分析した結果、`src/spec_dock/cli.py` の persisted active path trust boundary は妥当、`application/create_node.py` の implicit parent recovery hint 指摘は current CLI 契約では前提不成立と判断した
+  - 今回の corrective scope は `S04K` とし、same-layer wrong-id persisted path を fail-closed に倒す
+
+- 2026-03-23 review4 repo-scope/create-state remediation resume:
+  - scope:
+    - `S01Q` / `S04J` / `S05J` / `S05K`
+    - `AC-018` / `AC-019` / `AC-020`
+    - `PR29-R31` / `PR29-R32` / `PR29-R33` / `PR29-R34`
+  - implementation:
+    - provider/check-in runtime で repo-scoped URL target exact resolve、scoped dependency ref、create partial-write phase、create-lock aware missing-meta diagnosis を反映
+    - checked-in parity test と `reference_deps.md` mirror を更新
+  - validation:
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_runtime_doctor_s04`
+    - 結果: `Ran 167 tests in 35.027s` / `OK`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 5 tests in 2.092s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_repo_scoped_url_target_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_current_repo_url_target_resolves_unscoped_current_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_import_partial_write_doctor_first_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity`
+    - 結果: `Ran 92 tests in 25.410s` / `OK`
+  - review status:
+    - fresh spec review: `pass`（reviewer pass。`AC-018/019/020` と `PR29-R31..R34` の spec-to-code traceability を current worktree で確認）
+    - fresh implementation review:
+      - 初回: `conditional_pass`（current-repo scoped URL / scoped deps ref が unscoped current node を引けない 2 件を指摘）
+      - 是正後: `pass`（reviewer pass。current worktree 直読で actionable finding なし）
+    - fresh QA review:
+      - 初回: `conditional_pass`（negative-path / checked-in parity 3 件の test adequacy gap を指摘）
+      - 是正後: `pass`（reviewer pass。current worktree vs `main` で coverage adequate）
+    - fresh whole-diff review (`main` 基準 / current worktree): `pass`
+
+- create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
+- 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
+- duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
+- cache `last_sync_at` は issue node の persisted freshness field がない旧 index では `None` になる
+- discussion は first-class node / manifest を持たないため、S04 の required artifact presence validation は `initiative` / `epic` / `issue` に限定した。discussion は既存どおり recognized markdown の integrity contract（少なくとも seq uniqueness）を validate 対象とする
+- current repo 判定は `git remote.origin.url` に依存し、origin 未設定または GitHub 以外の host では canonical URL import も default fail する。cross-repo / non-verifiable import は `--allow-foreign-url` による explicit intent を要求する
+- `active set` / `deps check` は explicit target flag 追加により、target 未指定時は argparse exit `2` ではなく runtime error exit `1` を返す
+- current repo 判定は plain HTTPS / credentialed HTTPS / SSH origin を許容するが、origin 以外の remote を自動探索する契約にはしていない
+- `spec-dock/docs/workflow-issue.md` と `spec-dock/docs/workflow-tree.md` は dogfooding mirror 側だけに残る旧系 docs であり、今回は誤読防止のため追随修正した。長期的には canonical source 整理対象
+- manual test により、installer 経由で配布される runtime surface が provider-side source of truth と一致していないように見える事象が出た。`init/update` の配布経路、asset 同期、`uvx` キャッシュ、または検証手順のいずれかに追加切り分けが必要
+- comprehensive manual rerun では `gh_index_incomplete` warning を観測したが、今回の機能失敗やデータ破損には未接続だった
+- PR review で指摘された `foreign repo identity persistence`、`stale create lock doctor guidance`、`foreign linkage uniqueness`、`active entrypoint rebuild` は corrective patch で解消済み
+- checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
+
+## 次アクション
+- current working tree では `S01I` / `S01J` / `S01K` / `S01L` / `S01M` / `S01N` / `S01O` / `S04H` / `S04I` / `S05I` / `S90G` まで corrective scope を反映済みで、push 後に latest checks と latest Codex review を再確認する
+- `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
+- `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
+- pushed head では前回までの Codex review / PR checks は `pass`。今回の S01M/S01N を push 後、latest checks と latest Codex review を再確認して merge-ready 判定を更新する

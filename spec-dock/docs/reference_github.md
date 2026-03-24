@@ -23,6 +23,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 ### 更新する（GitHub Issue を作成する）
 
 - `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
+  - `new issue --create-github-issue` も同じ意味の explicit alias です
   - GitHub を使わない場合は `new issue --no-github` を使ってください（`gh` を呼びません）
 - `new initiative --create-github-issue` / `new epic --create-github-issue` は GitHub Issue を作ります（opt-in）
   - initiative/epic は **デフォルトでは GitHub Issue を作りません**（local-only）
@@ -43,19 +44,23 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 ## 3. `import` の URL 入力に関する注意（事故防止）
 
-`import` は `123` / `#123` / URL を受け付けますが、URL は **番号抽出のためだけ**に使います。
+`import` は `123` / `#123` / canonical GitHub issue URL を受け付けます。
 
 重要:
-- URL 内の `owner/repo` は **無視**されます
-- そのため、別リポジトリの URL を貼っても「現在の `gh` が見ているリポジトリの同番号 Issue」として解釈され得ます
-
-クロスリポジトリ対応はスキーマ拡張や安全装置が必要になるため、別案件（別ADR）です。
+- canonical URL は `https://github.com/<owner>/<repo>/issues/<n>` の形だけを受け付けます
+- `import` は URL 内の `owner/repo` を current repo（`git remote.origin.url`）と照合します
+- `owner/repo` mismatch は **default fail** です
+- cross-repo import は `--allow-foreign-url` を明示したときだけ許可されます
+- canonical でない URL-like target（例: `git@github.com:owner/repo/issues/123`）は reject します
+- current repo を検証できない場合（origin 未設定 / GitHub 以外の remote）は、canonical URL import も `--allow-foreign-url` なしでは失敗します
 
 ## 4. `active set` と checkout（安全装置）
 
 `active set` は target を active として固定します。
 
 - デフォルトは **no-checkout**（active 更新のみ）です
+- 後方互換として `active set <target>` は維持されます
+- explicit form として `active set --id <node-id>` / `active set --github-issue <n>` も使えます
 - checkout は `active set <target> --checkout` を明示したときだけ実行します
 - target 解決はローカル node（`.meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
 - `--checkout` 時に作業ツリーが dirty の場合は安全のため checkout を中断します
@@ -66,6 +71,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 `github.issue_number` は、node（initiative/epic/issue）を GitHub Issue 番号へ紐づけるためのメタデータです。
 
 - `new issue`（デフォルト）: `gh issue create` の結果（Issue番号）でリンクします
+- `new issue --create-github-issue`: デフォルトと同じく `gh issue create` の結果（Issue番号）でリンクします
 - `new {initiative,epic,issue} --github-issue <n>`: 既存番号へリンクします（新規 Issue は作りません）
 - `new initiative --create-github-issue` / `new epic --create-github-issue`: `gh issue create` の結果（Issue番号）でリンクします
 - `import <n|#n|url>`: 既存番号へリンクします（読み取り確認のみ）
@@ -87,4 +93,6 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 - Epic 配下で `issues/new-issue`（wrapper）を実行し、`gh` 不在で失敗する
   - wrapper は `--no-github` を付けられません（GitHub 作成がデフォルト）
   - local-only issue を作りたい場合は direct command: `./spec new issue --no-github --epic <id> --title \"...\"`
-- URL を貼ったのに別リポジトリの Issue が import されない → 仕様上、URL は番号抽出のみ（`owner/repo` は無視）
+- canonical URL import が失敗する → current repo（`origin`）を検証できないか、`owner/repo` mismatch の可能性があります
+  - cross-repo import を意図している場合だけ `--allow-foreign-url` を付けてください
+  - canonical でない URL-like target は受け付けません

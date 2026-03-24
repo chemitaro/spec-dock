@@ -4,7 +4,11 @@
 
 ```bash
 ./spec deps check <target> [--github] [--gh-limit N] [--json]
+./spec deps check --id <node-id> [--github] [--gh-limit N] [--json]
+./spec deps check --github-issue <n> [--github] [--gh-limit N] [--json]
 ./spec active set <target> [--github] [--gh-limit N] [--force|-f] [--checkout]
+./spec active set --id <node-id> [--github] [--gh-limit N] [--force|-f] [--checkout]
+./spec active set --github-issue <n> [--github] [--gh-limit N] [--force|-f] [--checkout]
 ./spec sync [--github] [--gh-limit N] [--no-update-active] [--force]
 ```
 
@@ -36,14 +40,16 @@
     "iss-00123",
     "epic-local-00001",
     456,
-    "789"
+    "789",
+    "owner/repo#123",
+    "https://github.com/owner/repo/issues/123"
   ]
 }
 ```
 
 ルール:
 - `schema_version` は `1` 固定
-- `depends_on` 要素は node id または GitHub issue番号（int / 数字文字列）
+- `depends_on` 要素は node id、GitHub issue番号（int / 数字文字列）、repo-scoped ref（`owner/repo#123` / canonical issue URL）
 - shorthand は最終的に issue->issue edge へ還元されます
 - `deps.json` が無い場合は `depends_on=[]`
 
@@ -70,6 +76,8 @@
 
 ```bash
 ./spec deps check <target>
+./spec deps check --id <node-id>
+./spec deps check --github-issue <n>
 ./spec deps check <target> --github
 ./spec deps check <target> --json
 ```
@@ -79,6 +87,11 @@
 - `3`: blocked（unknown を含む）
 - `1`: 実行時エラー（構造エラー等）
 - `2`: 引数エラー（argparse）
+
+target 指定:
+- 後方互換として `<target>` は維持されます
+- explicit form として `--id <node-id>` / `--github-issue <n>` も使えます
+- `<target>` / `--id` / `--github-issue` は **ちょうど1つ**だけ指定してください
 
 `--github`:
 - `gh issue list` を参照して OPEN/CLOSED を判定
@@ -110,10 +123,15 @@
 
 ```bash
 ./spec active set <issue-id>
+./spec active set --id <issue-id>
+./spec active set --github-issue <n>
 ./spec active set <issue-id> --force
 ```
 
 - issue target は v2 evaluator で判定
+- 後方互換として `<target>` は維持されます
+- explicit form として `--id <node-id>` / `--github-issue <n>` も使えます
+- `<target>` / `--id` / `--github-issue` の併用はできません
 - ブロック条件は `not ready`（`blockers` の有無ではない）
 - `ready=false` かつ `--force` なし: 失敗（exit=1）し、`spec-dock/.agent/active.json` は更新しない
 - `--force` あり: `deps_blocked` 警告を出して active 更新を続行

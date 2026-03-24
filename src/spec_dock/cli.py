@@ -11,6 +11,7 @@ are handled by the repo-local runtime script installed at:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -18,7 +19,7 @@ import sys
 from contextlib import contextmanager
 from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from spec_dock import __version__
 
@@ -131,6 +132,440 @@ def _make_readonly_tree(path: Path) -> None:
         except OSError:
             # Best-effort only.
             continue
+
+
+def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
+    """Return placeholder directory for a layer or raise if missing."""
+    path = specdock_dir / "system" / "active-none" / layer
+    if not path.is_dir():
+        raise RuntimeError(f"Missing placeholder directory: {path}")
+    return path
+
+
+def _write_active_pathfile(active_dir: Path, name: str, target: Path) -> None:
+    """Write `active/<name>.path` as symlink fallback."""
+    rel_target = os.path.relpath(target, start=active_dir)
+    (active_dir / f"{name}.path").write_text(rel_target + "\n", encoding="utf-8")
+
+
+def _normalize_active_manifest_entry_id(entry: object) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    raw_id = entry.get("id")
+    if not isinstance(raw_id, str):
+        return None
+    normalized = raw_id.strip()
+    return normalized or None
+
+
+def _normalize_active_manifest_entry_path(entry: object) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    raw_path = entry.get("path")
+    if not isinstance(raw_path, str):
+        return None
+    normalized = raw_path.strip()
+    return normalized or None
+
+
+def _normalize_active_manifest_entries(
+    current: object,
+) -> dict[str, tuple[str | None, str | None]] | None:
+    if not isinstance(current, dict):
+        return None
+
+    if all(key in current and current[key] is None for key in ("initiative", "epic", "issue")):
+        return {
+            "initiative": (None, None),
+            "epic": (None, None),
+            "issue": (None, None),
+        }
+
+    out: dict[str, tuple[str | None, str | None]] = {}
+    for layer in ("initiative", "epic", "issue"):
+        entry = current.get(layer)
+        out[layer] = (
+            _normalize_active_manifest_entry_id(entry),
+            _normalize_active_manifest_entry_path(entry),
+        )
+    if all(out[layer][0] is None for layer in ("initiative", "epic", "issue")):
+        return None
+    return out
+
+
+def _normalize_active_manifest_ids(current: object) -> tuple[str | None, str | None, str | None] | None:
+    entries = _normalize_active_manifest_entries(current)
+    if entries is None:
+        return None
+    return (entries["initiative"][0], entries["epic"][0], entries["issue"][0])
+
+
+def _load_persisted_active_ids(specdock_dir: Path) -> tuple[str | None, str | None, str | None]:
+    entries = _load_persisted_active_entries(specdock_dir)
+    return (entries["initiative"][0], entries["epic"][0], entries["issue"][0])
+
+
+def _load_persisted_active_entries(specdock_dir: Path) -> dict[str, tuple[str | None, str | None]]:
+    candidates = (
+        specdock_dir / ".agent" / "active.json",
+        specdock_dir / ".work" / "active.json",
+        specdock_dir / ".work" / "current.json",
+    )
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            loaded: Any = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        normalized = _normalize_active_manifest_entries(loaded)
+        if normalized is not None:
+            return normalized
+    return {
+        "initiative": (None, None),
+        "epic": (None, None),
+        "issue": (None, None),
+    }
+
+
+def _resolve_manifest_target_dir(
+    specdock_dir: Path,
+    layer: str,
+    *,
+    expected_id: str | None,
+    persisted_path: str | None,
+) -> Path | None:
+    if expected_id is None:
+        return None
+
+    repo_root = specdock_dir.parent.resolve()
+    candidates: list[Path] = []
+
+    if persisted_path is not None:
+        candidate = Path(persisted_path)
+        if not candidate.is_absolute():
+            candidate = repo_root / candidate
+        candidates.append(candidate)
+
+    # Fallback: persisted path can be missing/corrupt; recover by id if possible.
+    initiatives_root = specdock_dir / "initiatives"
+    for meta_path in sorted(initiatives_root.rglob(".meta.json"), key=lambda p: p.as_posix()):
+        try:
+            loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(loaded, dict):
+            continue
+        if str(loaded.get("id", "")).strip() != expected_id:
+            continue
+        candidates.append(meta_path.parent)
+        break
+
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(repo_root)
+        except ValueError:
+            continue
+        if not resolved.is_dir():
+            continue
+        meta_path = resolved / ".meta.json"
+        if not meta_path.is_file():
+            continue
+        try:
+            loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(loaded, dict):
+            continue
+        if str(loaded.get("id", "")).strip() != expected_id:
+            continue
+        if str(loaded.get("type", "")).strip() != layer:
+            continue
+        return resolved
+    return None
+
+
+def _resolve_persisted_path_dir(
+    specdock_dir: Path,
+    *,
+    layer: str,
+    expected_id: str | None,
+    persisted_path: str | None,
+) -> Path | None:
+    if persisted_path is None:
+        return None
+    candidate = Path(persisted_path)
+    repo_root = specdock_dir.parent.resolve()
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(repo_root)
+    except ValueError:
+        return None
+    if not resolved.is_dir():
+        return None
+    expected_prefix = {
+        "initiative": "init-",
+        "epic": "epic-",
+        "issue": "iss-",
+    }.get(layer)
+    if expected_prefix is not None and not resolved.name.startswith(expected_prefix):
+        return None
+    if expected_id is None:
+        return None
+    meta_path = resolved / ".meta.json"
+    if not meta_path.is_file():
+        return None
+    try:
+        loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    if str(loaded.get("id", "")).strip() != expected_id:
+        return None
+    if str(loaded.get("type", "")).strip() != layer:
+        return None
+    return resolved
+
+
+def _resolve_existing_active_entrypoint(
+    specdock_dir: Path,
+    *,
+    active_dir: Path,
+    layer: str,
+) -> tuple[Path, str | None] | None:
+    repo_root = specdock_dir.parent.resolve()
+    placeholder = _active_placeholder_dir(specdock_dir, layer).resolve()
+    link = active_dir / layer
+    pathfile = active_dir / f"{layer}.path"
+    candidates: list[Path] = []
+
+    if link.exists() or link.is_symlink():
+        try:
+            candidates.append(link.resolve())
+        except OSError:
+            pass
+
+    if pathfile.is_file():
+        try:
+            rel_target = pathfile.read_text(encoding="utf-8").strip()
+        except OSError:
+            rel_target = ""
+        if rel_target:
+            candidates.append((active_dir / rel_target).resolve())
+
+    placeholder_candidate: tuple[Path, str | None] | None = None
+    for candidate in candidates:
+        try:
+            candidate.relative_to(repo_root)
+        except ValueError:
+            continue
+        if not candidate.is_dir():
+            continue
+        if candidate == placeholder:
+            if placeholder_candidate is None:
+                placeholder_candidate = (candidate, None)
+            continue
+        meta_path = candidate / ".meta.json"
+        if not meta_path.is_file():
+            continue
+        try:
+            loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(loaded, dict):
+            continue
+        layer_value = str(loaded.get("type", loaded.get("kind", ""))).strip()
+        if layer_value != layer:
+            continue
+        entry_id = str(loaded.get("id", "")).strip()
+        if not entry_id:
+            continue
+        return (candidate, entry_id)
+    return placeholder_candidate
+
+
+def _render_context_pack(*, initiative_id: str | None, epic_id: str | None, issue_id: str | None) -> str:
+    """Render context-pack content used before runtime active commands run."""
+    has_init = initiative_id is not None
+    has_epic = epic_id is not None
+    has_issue = issue_id is not None
+    init_value = initiative_id if has_init else "(none)"
+    epic_value = epic_id if has_epic else "(none)"
+    issue_value = issue_id if has_issue else "(none)"
+    lines: list[str] = []
+    lines.append("# Context Pack (generated)")
+    lines.append("")
+    lines.append("## Active")
+    lines.append(f"- initiative: {init_value}")
+    lines.append(f"- epic: {epic_value}")
+    lines.append(f"- issue: {issue_value}")
+    lines.append("")
+    lines.append("## Generated state")
+    lines.append("- index: `spec-dock/.agent/index.json`")
+    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("")
+    lines.append("## Read order")
+    if has_init:
+        lines.append("- `spec-dock/active/initiative/requirement.md`")
+        lines.append("- `spec-dock/active/initiative/design.md`")
+        lines.append("- `spec-dock/active/initiative/plan.md`")
+    else:
+        lines.append("- `spec-dock/active/initiative/README.md`")
+    if has_epic:
+        lines.append("- `spec-dock/active/epic/requirement.md`")
+        lines.append("- `spec-dock/active/epic/design.md`")
+        lines.append("- `spec-dock/active/epic/plan.md`")
+    else:
+        lines.append("- `spec-dock/active/epic/README.md`")
+    if has_issue:
+        lines.append("- `spec-dock/active/issue/requirement.md`")
+        lines.append("- `spec-dock/active/issue/design.md`")
+        lines.append("- `spec-dock/active/issue/plan.md`")
+        lines.append("- `spec-dock/active/issue/report.md`")
+    else:
+        lines.append("- `spec-dock/active/issue/README.md`")
+    lines.append("")
+    lines.append("## Commands")
+    lines.append("- state (local): `./spec-dock/scripts/spec-dock sync`")
+    lines.append("- state (github): `./spec-dock/scripts/spec-dock sync --github`")
+    lines.append("- validate: `./spec-dock/scripts/spec-dock validate`")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _render_default_context_pack() -> str:
+    return _render_context_pack(initiative_id=None, epic_id=None, issue_id=None)
+
+
+def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
+    """Ensure `spec-dock/active/*` fallback entrypoints exist after init/update."""
+    active_dir = specdock_dir / "active"
+    active_dir.mkdir(parents=True, exist_ok=True)
+    persisted = _load_persisted_active_entries(specdock_dir)
+
+    for layer in ("initiative", "epic", "issue"):
+        link = active_dir / layer
+        pathfile = active_dir / f"{layer}.path"
+        # Repair stale symlinks so update can restore fallback pointers.
+        if link.is_symlink() and not link.exists():
+            link.unlink(missing_ok=True)
+
+        persisted_id, persisted_path = persisted[layer]
+        existing_entrypoint = _resolve_existing_active_entrypoint(
+            specdock_dir,
+            active_dir=active_dir,
+            layer=layer,
+        )
+        force_rebuild = False
+        if existing_entrypoint is not None and existing_entrypoint[1] is not None:
+            existing_target, _existing_id = existing_entrypoint
+            resolved_link_target: Path | None = None
+            if link.exists() or link.is_symlink():
+                try:
+                    resolved_link_target = link.resolve()
+                except OSError:
+                    resolved_link_target = None
+            # Keep healthy real entrypoints as highest priority, but if the
+            # user-visible pointer disagrees (e.g. placeholder link + real
+            # `.path`), normalize the pointer to the same real target.
+            if link.is_symlink() and resolved_link_target != existing_target:
+                force_rebuild = True
+            elif link.exists() and not link.is_symlink() and resolved_link_target != existing_target:
+                force_rebuild = True
+            desired_target = existing_target
+            if not force_rebuild:
+                continue
+        else:
+            desired_target = _resolve_manifest_target_dir(
+                specdock_dir,
+                layer,
+                expected_id=persisted_id,
+                persisted_path=persisted_path,
+            )
+            if desired_target is None:
+                desired_target = _resolve_persisted_path_dir(
+                    specdock_dir,
+                    layer=layer,
+                    expected_id=persisted_id,
+                    persisted_path=persisted_path,
+                )
+            if desired_target is None:
+                desired_target = _active_placeholder_dir(specdock_dir, layer)
+
+        if existing_entrypoint is not None:
+            existing_target, _existing_id = existing_entrypoint
+            should_rebuild = force_rebuild or existing_target != desired_target.resolve()
+            # Placeholder is already the desired fallback target.
+            if not should_rebuild:
+                continue
+
+            # Placeholder entrypoint exists but persisted target resolved to real node.
+            # For managed pointer conflicts, clear `active/<layer>` first. If that
+            # fails, keep `.path` untouched so we do not lose the valid target hint.
+            if link.exists() or link.is_symlink():
+                if link.is_symlink() or link.is_file():
+                    link.unlink(missing_ok=True)
+                elif link.is_dir():
+                    try:
+                        shutil.rmtree(link)
+                    except OSError:
+                        pass
+            if link.exists() or link.is_symlink():
+                continue
+            if pathfile.exists():
+                try:
+                    pathfile.unlink()
+                except OSError:
+                    pass
+            if pathfile.exists():
+                continue
+
+        # If `.path` exists but does not resolve to a valid active entrypoint,
+        # treat it as stale so recovery can rebuild from persisted state/placeholder.
+        elif pathfile.exists():
+            try:
+                pathfile.unlink()
+            except OSError:
+                pass
+
+        if link.exists() or link.is_symlink() or pathfile.exists():
+            continue
+
+        rel_target = os.path.relpath(desired_target, start=active_dir)
+        try:
+            os.symlink(rel_target, link)
+        except OSError:
+            _write_active_pathfile(active_dir, layer, desired_target)
+
+    # Context pack must come from currently-resolved active entrypoints only.
+    resolved_ids: dict[str, str | None] = {"initiative": None, "epic": None, "issue": None}
+    for layer in ("initiative", "epic", "issue"):
+        existing_entrypoint = _resolve_existing_active_entrypoint(
+            specdock_dir,
+            active_dir=active_dir,
+            layer=layer,
+        )
+        if existing_entrypoint is not None:
+            resolved_ids[layer] = existing_entrypoint[1]
+
+    context_pack_path = active_dir / "context-pack.md"
+    desired_context_pack = _render_context_pack(
+        initiative_id=resolved_ids["initiative"],
+        epic_id=resolved_ids["epic"],
+        issue_id=resolved_ids["issue"],
+    )
+    current_context_pack: str | None = None
+    if context_pack_path.exists():
+        try:
+            current_context_pack = context_pack_path.read_text(encoding="utf-8")
+        except OSError:
+            current_context_pack = None
+    if current_context_pack != desired_context_pack:
+        context_pack_path.write_text(desired_context_pack, encoding="utf-8")
 
 
 def _install_repo_root_shortcut(target_root: Path) -> None:
@@ -257,6 +692,9 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
 
         # Best-effort: placeholders are not user-authored specs; discourage edits.
         _make_readonly_tree(specdock_dir / "system" / "active-none")
+
+        # Ensure active fallback entrypoints exist before runtime `active clear/set`.
+        _ensure_active_fallback_entrypoints(specdock_dir)
 
         (specdock_dir / "spec-dock.version").write_text(f"{_tool_version()}\n", encoding="utf-8")
 

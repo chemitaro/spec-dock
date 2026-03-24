@@ -19,7 +19,9 @@ from .contracts import (
     ShowActiveRequest,
     TargetRef,
 )
+from .github_issue_targets import collect_repo_scoped_issue_view_targets, normalize_repo_slug
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 from .status_context import resolve_issue_status_context
 
 
@@ -35,6 +37,8 @@ def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
         initiative_id=record.initiative_id,
         epic_id=record.epic_id,
         github_issue_number=record.github_issue_number,
+        github_repo_owner=record.github_repo_owner,
+        github_repo_name=record.github_repo_name,
     )
 
 
@@ -52,6 +56,21 @@ def _resolve_repo_root(ports: Ports) -> Path:
     return ports.repo_root
 
 
+def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path) -> str:
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        parts = path.parts
+        if not parts:
+            raise RuntimeError(f"Cannot canonicalize empty node path: {path}")
+        if parts[0] == "spec-dock":
+            return path.as_posix()
+        if "spec-dock" in parts:
+            index = parts.index("spec-dock")
+            return Path(*parts[index:]).as_posix()
+        raise RuntimeError(f"Node path is not under repo root and missing 'spec-dock' segment: {path}")
+
+
 def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: bool) -> str | None:
     for node_id in graph.nodes_by_id.keys():
         try:
@@ -63,7 +82,7 @@ def _find_existing_id_by_num(graph: SpecGraph, *, prefix: str, num: int, local: 
     return None
 
 
-def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
+def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo_slug: str | None = None) -> str:
     if target.kind == "github_issue":
         if target.github_issue_number is None:
             raise RuntimeError("TargetRef.github_issue_number is required")
@@ -72,6 +91,33 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef) -> str:
             for node in graph.nodes_by_id.values()
             if node.github_issue_number == int(target.github_issue_number) and node.kind in ("initiative", "epic", "issue")
         ]
+        target_repo_slug = normalize_repo_slug(target.github_repo_owner, target.github_repo_name)
+        if target_repo_slug is not None:
+            allow_current_unscoped = current_repo_slug is not None and target_repo_slug == current_repo_slug
+            scoped = [
+                node
+                for node in matches
+                if (
+                    normalize_repo_slug(node.github_repo_owner, node.github_repo_name) == target_repo_slug
+                    or (
+                        allow_current_unscoped
+                        and normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None
+                    )
+                )
+            ]
+            if not scoped:
+                raise RuntimeError(
+                    "No node found for "
+                    f"github.issue_number={int(target.github_issue_number)} in repo scope ({target_repo_slug}). "
+                    "Create/link the node first."
+                )
+            if len(scoped) > 1:
+                ids = ", ".join(sorted(f"{node.kind}:{node.id}" for node in scoped))
+                raise RuntimeError(
+                    f"Ambiguous github.issue_number={int(target.github_issue_number)} in repo scope "
+                    f"({target_repo_slug}): {ids}"
+                )
+            return scoped[0].id
         if not matches:
             raise RuntimeError(
                 f"No node found for github.issue_number={int(target.github_issue_number)}. Create/link the node first."
@@ -116,6 +162,28 @@ def _to_active_selection(manifest: ActiveManifest | None) -> ActiveSelection | N
 def _append_unique(warnings: list[str], warning: str) -> None:
     if warning not in warnings:
         warnings.append(warning)
+
+
+def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> dict[str, str | None]:
+    if ports.derived_state_reader is None:
+        return {}
+    loader = getattr(ports.derived_state_reader, "load_cached_issue_last_sync_at_by_id", None)
+    if not callable(loader):
+        return {}
+    loaded = loader(specdock_dir)
+    if not isinstance(loaded, dict):
+        return {}
+    out: dict[str, str | None] = {}
+    for issue_id, value in loaded.items():
+        if not isinstance(issue_id, str):
+            continue
+        if value is None:
+            out[issue_id] = None
+            continue
+        if isinstance(value, str):
+            normalized = value.strip()
+            out[issue_id] = normalized or None
+    return out
 
 
 def _build_context_pack_text(manifest: ActiveManifest) -> str:
@@ -184,14 +252,17 @@ def show_active(req: ShowActiveRequest, ports: Ports) -> ActiveViewResult:
     )
 
 
-def build_active_manifest(selection: ActiveSelection, graph: SpecGraph) -> ActiveManifest:
+def build_active_manifest(selection: ActiveSelection, graph: SpecGraph, *, repo_root: Path) -> ActiveManifest:
     def _entry(node_id: str | None) -> ActiveManifestEntry | None:
         if node_id is None:
             return None
         node = graph.nodes_by_id.get(node_id)
         if node is None:
             raise RuntimeError(f"Node not found while building active manifest: {node_id}")
-        return ActiveManifestEntry(id=node.id, path=node.path.as_posix())
+        return ActiveManifestEntry(
+            id=node.id,
+            path=_to_repo_relative_specdock_path(node.path, repo_root=repo_root),
+        )
 
     return ActiveManifest(
         initiative=_entry(selection.initiative_id),
@@ -263,6 +334,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if not records:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
     graph = build_graph([_to_spec_node_seed(record) for record in records])
+    current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
     warnings: list[str] = []
 
@@ -270,7 +342,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     for warning in current.warnings:
         _append_unique(warnings, warning)
 
-    target_id = _resolve_target_node_id(graph, req.target)
+    target_id = _resolve_target_node_id(graph, req.target, current_repo_slug=current_repo_slug)
     target_node = graph.nodes_by_id.get(target_id)
     if target_node is None:
         raise RuntimeError(f"Node not found: {target_id}")
@@ -284,21 +356,47 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if req.use_github:
         if ports.issue_gateway is None:
             raise RuntimeError("issue_gateway is required when --github is enabled")
+        issue_snapshots = []
+        issue_index_snapshots = []
         try:
-            issue_snapshots = ports.issue_gateway.issue_index(_resolve_repo_root(ports), limit=int(req.issue_limit))
+            issue_index_snapshots = ports.issue_gateway.issue_index(
+                _resolve_repo_root(ports),
+                limit=int(req.issue_limit),
+            )
         except RuntimeError:
             _append_unique(warnings, "gh_fetch_failed")
-            issue_snapshots = []
+        else:
+            issue_snapshots.extend(issue_index_snapshots)
+        repo_scoped_targets = collect_repo_scoped_issue_view_targets(
+            graph,
+            issue_index_snapshots=issue_index_snapshots,
+            current_repo_slug=current_repo_slug,
+        )
+        for repo_slug, issue_number in repo_scoped_targets:
+            try:
+                snapshot = ports.issue_gateway.issue_view_snapshot(
+                    _resolve_repo_root(ports),
+                    issue_number,
+                    repo_slug=repo_slug,
+                )
+            except RuntimeError:
+                _append_unique(warnings, "gh_fetch_failed")
+                continue
+            issue_snapshots.append(snapshot)
 
     cached_issue_status_by_id: dict[str, str] = {}
+    cached_issue_last_sync_at_by_id: dict[str, str | None] = {}
     if ports.derived_state_reader is not None:
         cached_issue_status_by_id = ports.derived_state_reader.load_cached_issue_status_by_id(specdock_dir)
+        cached_issue_last_sync_at_by_id = _load_cached_issue_last_sync_at_by_id(ports, specdock_dir)
 
     status_context = resolve_issue_status_context(
         graph,
         github_enabled=req.use_github,
         issue_snapshots=issue_snapshots,
         cached_issue_status_by_id=cached_issue_status_by_id,
+        cached_issue_last_sync_at_by_id=cached_issue_last_sync_at_by_id,
+        current_repo_slug=current_repo_slug,
     )
     for warning in status_context.warnings:
         _append_unique(warnings, warning)
@@ -338,7 +436,7 @@ def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:
     if req.checkout:
         branch = _checkout_before_write(graph=graph, target_id=target_id, ports=ports, warnings=warnings)
 
-    manifest = build_active_manifest(selection, graph)
+    manifest = build_active_manifest(selection, graph, repo_root=_resolve_repo_root(ports))
     context_pack_text = _build_context_pack_text(manifest)
     commit_active_state(
         persisted_manifest=manifest,
@@ -365,7 +463,7 @@ def clear_active(req: ClearActiveRequest, ports: Ports) -> ActiveClearResult:
     load_result = ports.active_state_store.load_active_manifest(specdock_dir)
     previous = _to_active_selection(load_result.manifest)
     empty_selection = ActiveSelection(initiative_id=None, epic_id=None, issue_id=None)
-    manifest = build_active_manifest(empty_selection, graph)
+    manifest = build_active_manifest(empty_selection, graph, repo_root=_resolve_repo_root(ports))
     context_pack_text = _build_context_pack_text(manifest)
     commit_active_state(
         persisted_manifest=manifest,

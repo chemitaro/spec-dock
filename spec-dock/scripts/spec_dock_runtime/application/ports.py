@@ -54,7 +54,22 @@ class IssueGateway(Protocol):
     def issue_create(self, repo_root: Path, title: str, body: str) -> int:
         ...
 
-    def issue_view_minimal(self, repo_root: Path, issue_number: int) -> IssueSnapshot:
+    def issue_view_minimal(
+        self,
+        repo_root: Path,
+        issue_number: int,
+        *,
+        repo_slug: str | None = None,
+    ) -> IssueSnapshot:
+        ...
+
+    def issue_view_snapshot(
+        self,
+        repo_root: Path,
+        issue_number: int,
+        *,
+        repo_slug: str | None = None,
+    ) -> IssueSnapshot:
         ...
 
 
@@ -106,6 +121,9 @@ class GitGateway(Protocol):
         ...
 
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
+        ...
+
+    def origin_github_repo_slug(self, repo_root: Path) -> str | None:
         ...
 
 

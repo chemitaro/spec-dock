@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -19,6 +19,8 @@ class SpecNodeSeed:
     initiative_id: str | None
     epic_id: str | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,8 @@ class SpecNode:
     initiative_id: str | None
     epic_id: str | None
     github_issue_number: int | None
+    github_repo_owner: str | None = None
+    github_repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,8 @@ class IssueSnapshot:
     labels: list[str]
     updated_at: str
     url: str
+    repo_owner: str | None = None
+    repo_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -72,9 +78,17 @@ class ActiveSelection:
 @dataclass(frozen=True)
 class IssueStatusSnapshot:
     issue_id: str
-    status: str
+    authority: str
+    effective_status: str
     source: str
+    stale: bool
+    last_sync_at: str | None
     github_number: int | None
+
+    @property
+    def status(self) -> str:
+        # Backward-compatible alias for existing callers/tests.
+        return self.effective_status
 
 
 @dataclass(frozen=True)
@@ -114,6 +128,7 @@ class TargetDepsInspection:
     node_states: dict[str, DepsNodeState]
     effective_depends_on: list[str]
     warnings: list[str]
+    issue_statuses: dict[str, IssueStatusSnapshot] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

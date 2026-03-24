@@ -947,6 +947,48 @@ def _git_current_branch_or_none(repo_root: Path) -> str | None:
     return branch
 
 
+def _origin_github_repo_slug_or_none(repo_root: Path | None) -> str | None:
+    """Best-effort resolver for current GitHub repository slug from origin remote."""
+    if repo_root is None:
+        return None
+    if shutil.which("git") is None:
+        return None
+    try:
+        p = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    remote = (p.stdout or "").strip()
+    if not remote:
+        return None
+
+    # Accept common GitHub remote forms:
+    # - https://github.com/owner/repo(.git)
+    # - https://<userinfo>@github.com/owner/repo(.git)
+    # - git@github.com:owner/repo(.git)
+    # - ssh://git@github.com/owner/repo(.git)
+    patterns = (
+        r"^https?://(?:[^@/]+@)?github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$",
+        r"^git@github\.com:(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?$",
+        r"^ssh://git@github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$",
+    )
+    for pattern in patterns:
+        matched = re.match(pattern, remote)
+        if matched is None:
+            continue
+        owner = str(matched.group("owner")).strip().lower()
+        repo = str(matched.group("repo")).strip().lower()
+        if owner and repo:
+            return f"{owner}/{repo}"
+    return None
+
+
 @dataclass(frozen=True)
 class _IssueStatusResolution:
     """Internal issue status value with an explicit source."""
@@ -2260,7 +2302,11 @@ def _validate_nodes(nodes: dict[str, _Node], *, repo_root: Path | None = None) -
     - `sync` preflight (to avoid generating index/tree from an invalid tree)
     """
     graph = _build_graph_from_nodes(nodes)
-    report = _domain_validate_graph_and_deps(graph, repo_root=repo_root)
+    report = _domain_validate_graph_and_deps(
+        graph,
+        repo_root=repo_root,
+        current_repo_slug=_origin_github_repo_slug_or_none(repo_root),
+    )
     if report.errors:
         raise RuntimeError(report.errors[0])
 

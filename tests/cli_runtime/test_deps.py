@@ -288,9 +288,476 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok (deps check)", p.stdout)
+            self.assertIn("ready=true", p.stdout)
+
+    def test_deps_check_accepts_explicit_id_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001", "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn('"target": "iss-local-00001"', p.stdout)
+
+    def test_deps_check_accepts_explicit_github_issue_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Add refresh token", "--github-issue", "123"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "123", "--json"])
+            self.assertIn(p.returncode, (0, 3), p.stdout + p.stderr)
+            self.assertIn('"target": "iss-00123"', p.stdout)
+
+    def test_deps_check_github_issue_flag_is_ambiguous_with_current_foreign_overlap_but_id_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            ambiguous = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "123"])
+            self.assertNotEqual(ambiguous.returncode, 0, ambiguous.stdout + ambiguous.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous.stderr)
+
+            by_id = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00123", "--json"])
+            self.assertIn(by_id.returncode, (0, 3), by_id.stdout + by_id.stderr)
+            self.assertIn('"target": "iss-00123"', by_id.stdout)
+
+    def test_deps_check_repo_scoped_url_resolves_exact_match_when_number_is_ambiguous(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            ambiguous = self._run_runtime_capture(target, ["deps", "check", "123"])
+            self.assertNotEqual(ambiguous.returncode, 0, ambiguous.stdout + ambiguous.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous.stderr)
+
+            by_url = self._run_runtime_capture(target, ["deps", "check", "https://github.com/other/repo/issues/123", "--json"])
+            self.assertIn(by_url.returncode, (0, 3), by_url.stdout + by_url.stderr)
+            self.assertIn('"target": "iss-local-00001"', by_url.stdout)
+
+    def test_deps_check_repo_scoped_url_fails_closed_when_repo_scope_does_not_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+
+            mismatch = self._run_runtime_capture(target, ["deps", "check", "https://github.com/other/repo/issues/123"])
+            self.assertEqual(mismatch.returncode, 1, mismatch.stdout + mismatch.stderr)
+            self.assertIn("No node found for github.issue_number=123 in repo scope (other/repo)", mismatch.stderr)
+            self.assertNotIn("spec-dock: ok (deps check)", mismatch.stdout)
+
+    def test_deps_check_repo_scoped_current_url_resolves_unscoped_current_node(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            by_url = self._run_runtime_capture(
+                target,
+                ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
+            )
+            self.assertIn(by_url.returncode, (0, 3), by_url.stdout + by_url.stderr)
+            self.assertIn('"target": "iss-00123"', by_url.stdout)
+
+    def test_deps_numeric_ref_prefers_current_repo_scope_when_foreign_same_number_exists(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current blocker", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Target issue", "--github-issue", "124"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00124-target-issue"
+            )
+            (target_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            self.assertIn("spec-dock: blocked (deps check)", p.stderr)
-            self.assertIn("ready=false", p.stderr)
+            data = json.loads(p.stdout)
+            self.assertEqual(data["target"], "iss-00124")
+            self.assertEqual(data["effective_depends_on"], ["iss-00123"])
+
+    def test_deps_numeric_ref_rejects_foreign_only_match_when_current_repo_known(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Target issue", "--github-issue", "124"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00124-target-issue"
+            )
+            (target_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("No node found for github.issue_number=123 in current repo scope (example/repo)", p.stderr)
+            self.assertIn("Create/link the node first.", p.stderr)
+
+    def test_deps_numeric_ref_fail_closed_when_scope_mixed_and_current_repo_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current blocker", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Target issue", "--github-issue", "124"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00124-target-issue"
+            )
+            (target_issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", p.stderr)
+            self.assertIn("mixed scoped/unscoped linkage", p.stderr)
+            self.assertIn("fail-closed", p.stderr)
+
+    def test_deps_scoped_ref_forms_resolve_exact_repo_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current blocker", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Target issue", "--github-issue", "124"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00124-target-issue"
+            )
+            forms = (
+                "other/repo#123",
+                "https://github.com/other/repo/issues/123",
+            )
+            for ref in forms:
+                with self.subTest(ref=ref):
+                    (target_issue_dir / "deps.json").write_text(
+                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+                    p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
+                    self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+                    data = json.loads(p.stdout)
+                    self.assertEqual(data["target"], "iss-00124")
+                    self.assertEqual(data["effective_depends_on"], ["iss-local-00001"])
+
+    def test_deps_scoped_ref_forms_fail_closed_when_repo_scope_does_not_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Target issue", "--github-issue", "124"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00124-target-issue"
+            )
+            forms = (
+                "missing/repo#123",
+                "https://github.com/missing/repo/issues/123",
+            )
+            for ref in forms:
+                with self.subTest(ref=ref):
+                    (target_issue_dir / "deps.json").write_text(
+                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+                    p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
+                    self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+                    self.assertIn("Unresolved dependency ref:", p.stderr)
+                    self.assertIn("No node found for github.issue_number=123 in repo scope (missing/repo)", p.stderr)
+
+    def test_deps_scoped_ref_forms_resolve_current_repo_scope_to_unscoped_current_node(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current blocker", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign mirror"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Target issue", "--github-issue", "124"])
+
+            foreign_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-mirror"
+                / ".meta.json"
+            )
+            foreign_meta = json.loads(foreign_issue_meta.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta, foreign_meta)
+
+            target_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00124-target-issue"
+            )
+            forms = (
+                "current/repo#123",
+                "https://github.com/current/repo/issues/123",
+            )
+            for ref in forms:
+                with self.subTest(ref=ref):
+                    (target_issue_dir / "deps.json").write_text(
+                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+                    p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
+                    self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+                    data = json.loads(p.stdout)
+                    self.assertEqual(data["target"], "iss-00124")
+                    self.assertEqual(data["effective_depends_on"], ["iss-00123"])
+
+    def test_deps_check_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(target, ["deps", "check", "123", "--id", "iss-local-00001"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("choose exactly one", p.stderr)
+
+    def test_deps_check_rejects_non_positive_github_issue_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            p = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "0"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("positive integer", p.stderr)
 
     def test_deps_check_returns_ready_and_blockers_and_closure_json(self) -> None:
         if os.name == "nt":
@@ -381,7 +848,16 @@ class TestCliDeps(CliRuntimeHarness):
             data = json.loads(p.stdout)
             self.assertEqual(
                 list(data.keys()),
-                ["schema_version", "target", "ready", "effective_depends_on", "blockers", "nodes", "warnings"],
+                [
+                    "schema_version",
+                    "target",
+                    "target_status",
+                    "ready",
+                    "effective_depends_on",
+                    "blockers",
+                    "nodes",
+                    "warnings",
+                ],
             )
             self.assertEqual(data["target"], "iss-00301")
             self.assertFalse(data["ready"])
@@ -462,6 +938,10 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertTrue(data["ready"])
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
+            self.assertEqual(data["target_status"]["source"], "cache")
+            self.assertTrue(data["target_status"]["stale"])
+            self.assertEqual(data["target_status"]["last_sync_at"], "t")
+            self.assertEqual(data["nodes"]["iss-00302"]["source"], "cache")
 
     def test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -506,13 +986,20 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertFalse(data["ready"])
             self.assertEqual(data["blockers"], ["iss-00301"])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "unknown")
+            self.assertEqual(data["target_status"]["source"], "cache")
+            self.assertTrue(data["target_status"]["stale"])
+            self.assertIsNone(data["target_status"]["last_sync_at"])
+            self.assertEqual(data["target_status"]["source"], "cache")
+            self.assertTrue(data["target_status"]["stale"])
+            self.assertIsNone(data["target_status"]["last_sync_at"])
 
-    def test_deps_check_missing_target_is_argparse_exit_2_not_blocked(self) -> None:
+    def test_deps_check_missing_target_reports_runtime_target_requirement(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             p = self._run_runtime_capture(target, ["deps", "check"])
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("target is required", p.stderr)
 
     def test_deps_check_accepts_github_number_forms_and_urls(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -528,6 +1015,20 @@ class TestCliDeps(CliRuntimeHarness):
                 target,
                 ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Add refresh token"],
             )
+            issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+                / ".meta.json"
+            )
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta["github"] = {"issue_number": 301, "repo_owner": "example", "repo_name": "repo"}
+            self._write_json_force(issue_meta_path, issue_meta)
 
             forms = [
                 "301",
@@ -881,8 +1382,10 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
-            json.loads(p.stdout)  # must be valid JSON
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            data = json.loads(p.stdout)  # must be valid JSON
+            self.assertTrue(data["ready"])
+            self.assertEqual(data["target_status"]["source"], "local")
             self.assertEqual(p.stderr.strip(), "")
 
     def test_deps_check_missing_deps_json_is_empty(self) -> None:
@@ -895,8 +1398,9 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             data = json.loads(p.stdout)
+            self.assertTrue(data["ready"])
             self.assertEqual(data["effective_depends_on"], [])
 
     def test_deps_json_parse_error_fails_with_path(self) -> None:
@@ -1149,6 +1653,93 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
             self.assertEqual(data["effective_depends_on"], ["iss-local-00003", "iss-local-00004"])
+
+    def test_deps_check_initiative_and_epic_target_status_does_not_fall_back_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
+
+            for target_id in ("init-local-00001", "epic-local-00001"):
+                with self.subTest(target_id=target_id):
+                    p_json = self._run_runtime_capture(target, ["deps", "check", target_id, "--json"])
+                    self.assertEqual(p_json.returncode, 0, p_json.stdout + p_json.stderr)
+                    data = json.loads(p_json.stdout)
+                    self.assertEqual(data["target"], target_id)
+                    self.assertEqual(data["target_status"]["source"], "local")
+                    self.assertEqual(data["target_status"]["authority"], "local")
+                    self.assertFalse(data["target_status"]["stale"])
+
+                    p_text = self._run_runtime_capture(target, ["deps", "check", target_id])
+                    self.assertEqual(p_text.returncode, 0, p_text.stdout + p_text.stderr)
+                    self.assertIn("source=local", p_text.stdout)
+                    self.assertIn("stale=false", p_text.stdout)
+
+    def test_deps_check_initiative_and_epic_target_status_uses_github_when_linked(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {
+                        "number": 101,
+                        "state": "OPEN",
+                        "title": "Initiative",
+                        "labels": [],
+                        "updatedAt": "2026-03-20T10:00:00Z",
+                        "url": "u",
+                    },
+                    {
+                        "number": 201,
+                        "state": "OPEN",
+                        "title": "Epic",
+                        "labels": [],
+                        "updatedAt": "2026-03-20T11:00:00Z",
+                        "url": "u",
+                    },
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            for target_id, expected_last_sync_at in (
+                ("init-00101", "2026-03-20T10:00:00Z"),
+                ("epic-00201", "2026-03-20T11:00:00Z"),
+            ):
+                with self.subTest(target_id=target_id):
+                    p_json = self._run_runtime_capture(
+                        target,
+                        ["deps", "check", target_id, "--github", "--json"],
+                        env=test_env,
+                    )
+                    self.assertEqual(p_json.returncode, 0, p_json.stdout + p_json.stderr)
+                    data = json.loads(p_json.stdout)
+                    self.assertEqual(data["target"], target_id)
+                    self.assertEqual(data["target_status"]["authority"], "github")
+                    self.assertEqual(data["target_status"]["effective_status"], "open")
+                    self.assertEqual(data["target_status"]["source"], "github")
+                    self.assertFalse(data["target_status"]["stale"])
+                    self.assertEqual(data["target_status"]["last_sync_at"], expected_last_sync_at)
+
+                    p_text = self._run_runtime_capture(target, ["deps", "check", target_id, "--github"], env=test_env)
+                    self.assertEqual(p_text.returncode, 0, p_text.stdout + p_text.stderr)
+                    self.assertIn("source=github", p_text.stdout)
+                    self.assertIn("stale=false", p_text.stdout)
 
     def test_deps_self_dependency_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1469,7 +2060,6 @@ class TestCliDeps(CliRuntimeHarness):
             )
             before = issue_meta.read_text(encoding="utf-8")
             p = self._run_runtime_capture(target, ["deps", "check", "iss-local-00001", "--json"])
-            self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             after = issue_meta.read_text(encoding="utf-8")
             self.assertEqual(after, before)
-
