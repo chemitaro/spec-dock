@@ -180,6 +180,13 @@ ID: "issue-28-runtime-regression-bugs"
     - PR29 latest review in-progress scaffold diagnosis
   - review gate:
     - reader/doctor/validate が create state classification を共有している
+- S04K:
+  - 観測可能な振る舞い: persisted active manifest の stale path が same-layer の別 node を指していても、`update` はその node を誤採用せず id-based recovery か placeholder fallback へ倒れる
+  - closes:
+    - AC-006 active pathway の persisted path trust boundary
+    - PR29 latest review persisted active path must match manifest id
+  - review gate:
+    - persisted path は `.meta.json` の `id` / `type` 一致がない限り recovery target にならない
 - S05J:
   - 観測可能な振る舞い: active/deps の URL target は exact repo scope を保持したまま foreign node を選べる
   - closes:
@@ -200,7 +207,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `AC-004` -> `S05`
 - `AC-005` -> `S03`, `S05`
 - `AC-006` -> `S04`
-  - corrective scopes: `S04I`
+  - corrective scopes: `S04I`, `S04K`
 - `AC-007` -> `S05`
   - corrective scopes: `S01N`, `S01O`
 - `AC-008` -> `S04`
@@ -235,6 +242,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `PR29-R32` -> `S05K`
 - `PR29-R33` -> `S01Q`
 - `PR29-R34` -> `S04J`
+- `PR29-R35` -> `S04K`
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -1540,6 +1548,65 @@ ID: "issue-28-runtime-regression-bugs"
   - `spec-deps/current/report.md`
 - git commit:
   - `S04J` の review と expected tests が通り、`report.md` 更新後にコミットする
+
+### S04K — persisted active path fallback は manifest id/type 一致なしに信用しない
+- target:
+  - persisted active manifest の `path` が same-layer の別 node を指していても、`update` が wrong node へ repoint しないようにする
+- design refs:
+  - `design.md` の `active entrypoint recovery`
+  - `discussions/054`
+- step boundary:
+  - installer/update の active recovery (`src/spec_dock/cli.py`) と installer regression (`tests/test_init_update.py`) に限定する
+  - healthy active entrypoint や id-based recovery、placeholder fallback の既存 contract は維持する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に `S04K` の作業単位を登録した
+- [ ] `spec-deps/current/report.md` の追記位置を決めた
+
+#### B1 — persisted path trust boundary
+- purpose:
+  - same-layer / correct-prefix だが wrong-id の stale path を fail-closed に倒す
+- files:
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+
+##### I1 — same-layer wrong-id path を recovery target にしない
+- slice goal:
+  - `_resolve_persisted_path_dir()` が prefix だけ合う別 node を誤採用する分岐を閉じる
+
+###### Red
+- failing test:
+  - persisted active manifest の `issue.id=iss-local-99999` と `path=.../iss-local-00002-*` で、`update` が `iss-local-00002` へ repoint してしまう regression
+  - same-layer wrong-id persisted path は id-based recovery が失敗した時 placeholder fallback へ落ちる regression
+  - same-layer wrong-id persisted path でも、tree 内に `expected_id` の正しい node が別 path に存在する時は id-based recovery を優先してその node へ戻る regression
+- expected failure:
+  - `context-pack.md` と active entrypoint が persisted id ではなく wrong node id を指す
+
+###### Green
+- minimum implementation:
+  - persisted path fallback でも `.meta.json` を読み、`expected_id` / `layer` 一致がある場合だけ recovery target として返す
+  - 一致しない時は `None` を返し、既存 id-based recovery / placeholder fallback へ流す
+- pass condition:
+  - same-layer wrong-id persisted path regression が通る
+
+###### Refactor
+- cleanup target:
+  - persisted path / manifest id recovery の責務境界整理
+- invariants to keep green:
+  - valid persisted path は従来どおり復旧できる
+  - healthy active entrypoint を stale manifest で上書きしない
+
+#### step gate
+- review:
+  - path hint と id authority の優先順位を説明できる
+- expected tests:
+  - same-layer wrong-id persisted path -> placeholder fallback
+  - same-layer wrong-id persisted path + valid `expected_id` elsewhere -> id-based recovery
+  - valid persisted path -> existing recovery contract 維持
+- report update:
+  - `spec-deps/current/report.md`
+- git commit:
+  - `S04K` の review と expected tests が通り、`report.md` 更新後にコミットする
 
 ### S05G — repo-aware numeric deps resolution で foreign overlap 後も既存 shorthand を守る
 - target:

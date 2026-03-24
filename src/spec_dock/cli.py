@@ -290,6 +290,7 @@ def _resolve_persisted_path_dir(
     specdock_dir: Path,
     *,
     layer: str,
+    expected_id: str | None,
     persisted_path: str | None,
 ) -> Path | None:
     if persisted_path is None:
@@ -311,6 +312,21 @@ def _resolve_persisted_path_dir(
         "issue": "iss-",
     }.get(layer)
     if expected_prefix is not None and not resolved.name.startswith(expected_prefix):
+        return None
+    if expected_id is None:
+        return None
+    meta_path = resolved / ".meta.json"
+    if not meta_path.is_file():
+        return None
+    try:
+        loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    if str(loaded.get("id", "")).strip() != expected_id:
+        return None
+    if str(loaded.get("type", "")).strip() != layer:
         return None
     return resolved
 
@@ -474,6 +490,7 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
                 desired_target = _resolve_persisted_path_dir(
                     specdock_dir,
                     layer=layer,
+                    expected_id=persisted_id,
                     persisted_path=persisted_path,
                 )
             if desired_target is None:
