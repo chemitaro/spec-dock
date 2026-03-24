@@ -36,9 +36,7 @@ from .github_issue_targets import (
 )
 from .ports import Ports
 from .repo_context import (
-    collect_safe_current_repo_backfill_node_ids,
     resolve_current_repo_slug,
-    split_repo_slug,
 )
 from .set_active import build_active_manifest, commit_active_state
 from .status_context import resolve_issue_status_context
@@ -116,53 +114,6 @@ def _resolve_specdock_dir(ports: Ports) -> Path:
     raise RuntimeError("specdock_dir is required")
 
 
-def _resolve_scope_backfill_writer(ports: Ports):
-    if ports.node_repo is None:
-        return None
-    writer = getattr(ports.node_repo, "backfill_github_repo_scope", None)
-    if not callable(writer):
-        return None
-    return writer
-
-
-def _apply_safe_current_repo_scope_backfill(
-    records: list[StoredMetaRecord],
-    graph,
-    ports: Ports,
-    *,
-    current_repo_slug: str | None,
-) -> bool:
-    current_scope = split_repo_slug(current_repo_slug)
-    if current_scope is None:
-        return False
-    writer = _resolve_scope_backfill_writer(ports)
-    if writer is None:
-        return False
-
-    backfill_node_ids = collect_safe_current_repo_backfill_node_ids(
-        graph,
-        current_repo_slug=current_repo_slug,
-    )
-    if not backfill_node_ids:
-        return False
-
-    owner, repo = current_scope
-    records_by_id = {record.id: record for record in records}
-    changed = False
-    for node_id in backfill_node_ids:
-        record = records_by_id.get(node_id)
-        if record is None:
-            continue
-        changed = bool(
-            writer(
-                Path(record.meta_path),
-                repo_owner=owner,
-                repo_name=repo,
-            )
-        ) or changed
-    return changed
-
-
 def _manifest_to_active_selection(manifest: ActiveManifest | None) -> ActiveSelection | None:
     if manifest is None:
         return None
@@ -227,14 +178,6 @@ def collect_sync_state(
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
     current_repo_slug = resolve_current_repo_slug(ports)
     graph = build_graph([_to_spec_node_seed(record) for record in records])
-    if req.github_enabled and _apply_safe_current_repo_scope_backfill(
-        records,
-        graph,
-        ports,
-        current_repo_slug=current_repo_slug,
-    ):
-        records = ports.node_reader.load_node_records()
-        graph = build_graph([_to_spec_node_seed(record) for record in records])
     specdock_dir = _resolve_specdock_dir(ports)
 
     warnings: list[str] = []
