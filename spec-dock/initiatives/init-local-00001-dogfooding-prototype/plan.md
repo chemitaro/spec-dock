@@ -5,7 +5,7 @@ ID: "init-local-00001"
 関連GitHub: []
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-14"
+最終更新: "2026-03-25"
 依存: ["requirement.md", "design.md"]
 ---
 
@@ -13,162 +13,176 @@ ID: "init-local-00001"
 
 ## この計画が達成する Goal / Metric
 - Goal:
-  - `spec-dock` 自身を `spec-dock` で管理しながら、状態管理・authority transfer・診断系まで含む prototype を完成させる。
+  - usable dogfooding runtime の current baseline を initiative 正本へ同期し、remaining work を安全に次の投資単位へ分解できる状態にする。
 - 対象 metric:
-  - roadmap と ADR に基づいて epic が切り出せること
-  - status lifecycle と link lifecycle の実装順が固定されていること
-  - dogfooding 運用で必要な最小 command 群が明確であること
-  - 主要な dogfooding blocker が backlog 管理下にあること
+  - requirement の Metric-001:
+    - usable runtime with caveats が requirement/design/plan で一貫して読めること
+  - requirement の Metric-002:
+    - established capability と remaining work の境界が plan 上で明示されていること
 
 ## マイルストーン
 - M1:
   - deliverable:
-    - status と authority の基盤テーマが実装計画として着手可能
+    - initiative 正本が 2026-03-25 時点の runtime contract に同期している
   - exit:
-    - Epic 1 の issue 分割が完了している
+    - requirement/design/plan が manual rerun current-state と durable lessons を反映している
 - M2:
   - deliverable:
-    - link/unlink と GitHub lifecycle のテーマが実装計画として着手可能
+    - current baseline と remaining follow-up の境界が epic レベルで整理されている
   - exit:
-    - Epic 2 の issue 分割が完了している
+    - established / ongoing / remaining の整理に基づいて次の epic 分解判断ができる
 - M3:
   - deliverable:
-    - diagnostics / discovery / hardening の後半テーマが実装計画として着手可能
+    - remediation / guidance / lifecycle expansion の優先順位が投資判断として比較可能になっている
   - exit:
-    - Epic 3-4 の issue 分割が完了している
+    - remaining work の ownership が current initiative 内か follow-up initiative か判断できる
 - M4:
   - deliverable:
-    - prototype completion 判定に必要な主要 blocker と remaining backlog が整理されている
+    - prototype completion 判定と post-prototype follow-up ownership が整理されている
   - exit:
-    - prototype 完成判定が可能
+    - 「この initiative で閉じるもの」と「次へ切り出すもの」が文書上で明確である
 
 ## Epic ポートフォリオ
-- epic-0001-status-and-authority-foundation:
+- epic-0001-runtime-contract-and-architecture-baseline:
   - 目的:
-    - status と authority の土台を定義し、local path を先に成立させる。
+    - dogfooding runtime の current baseline と architecture guardrail を正本に固定する。
   - deliverable:
-    - Phase 0 に対応する machine-readable status contract
-    - `authority`, `effective`, `source`, `stale`, `reconcile_action` の surface 設計
-    - local-managed issue 向け close/reopen の基本方針
-    - `issue show/status --json` の観測導線
-    - projection/cache と authority 分離の validate 方針
+    - established:
+      - hybrid layered architecture
+      - provider/generated separation
+      - usable runtime baseline (`new/active/sync/deps/import/validate/doctor`)
+    - remaining:
+      - architecture / contract drift を継続監視する更新運用
   - metric link:
-    - M1
+    - Metric-001
   - depends on:
     - なし
-- epic-0002-link-and-github-lifecycle:
+- epic-0002-repo-scope-and-state-safety:
   - 目的:
-    - authority transfer と GitHub lifecycle を一つの設計テーマとして成立させる。
+    - repo-aware exact targeting、fail-closed ambiguity、create/recovery guardrail を prototype の中心 safety theme として維持する。
   - deliverable:
-    - Phase 2 に対応する `link` / `unlink` と authority transfer
-    - `unlink --adopt effective` の既定動作
-    - contradiction validate と migration-safe な reject rule
-    - Phase 3 に対応する GitHub close/reopen の導線
-    - repo-safe preflight と remote mutation の opt-in 原則
+    - established:
+      - canonical URL / `--id` exact resolution
+      - overlap 下の bare numeric fail-closed
+      - no-origin continuity for normalized metadata
+      - legacy unscoped metadata を auto-heal しない境界
+    - remaining:
+      - manual remediation / operator guidance の ownership 決定
   - metric link:
-    - M2
+    - Metric-001
+    - Metric-002
   - depends on:
-    - epic-0001-status-and-authority-foundation
-- epic-0003-operability-and-diagnostics:
+    - epic-0001-runtime-contract-and-architecture-baseline
+- epic-0003-operability-diagnostics-and-parity:
   - 目的:
-    - dogfooding 運用で mutate 系 command を安全かつ説明可能にし、運用上の気づきを継続投入できる受け皿を持つ。
+    - diagnostics と parity maintenance を established capability として維持し、追加改善の投資先を整理する。
   - deliverable:
-    - Phase 4 に対応する `doctor`
-    - `--dry-run` の導入方針
-    - `--explain` と reason code / next action の整理
-    - stale / partial / blocked 状態の説明契約
-    - 運用時の preflight / failure messaging の一貫化
-    - debug / ux / operability 上の気づきを issue 化するための受け皿整理
+    - established:
+      - `doctor`
+      - validate/sync の failure guidance
+      - stale active recovery / readonly non-mutation
+      - provider/check-in parity discipline
+      - manual rerun baseline
+    - remaining:
+      - operator runbook / doctor guidance 強化
+      - parity maintenance を継続できる verification discipline
   - metric link:
-    - M3
+    - Metric-001
+    - Metric-002
   - depends on:
-    - epic-0002-link-and-github-lifecycle
-- epic-0004-discovery-and-hardening:
+    - epic-0002-repo-scope-and-state-safety
+- epic-0004-remaining-lifecycle-and-follow-up-investment:
   - 目的:
-    - visibility と recoverability を後半テーマとして仕上げ、dogfooding で見つかった構造改善候補を継続投入できるようにする。
+    - prototype completion 後に残る lifecycle expansion / discovery / hardening を current initiative から切り離して整理する。
   - deliverable:
-    - Phase 5 に対応する `list` / `find` / `show` 系 discovery
-    - status filtering と stale visibility
-    - Phase 6 に対応する atomic sync/update
-    - contradiction validation hardening
-    - migration assist と rollback/recovery 方針
-    - dogfooding feedback に基づく構造改善候補の backlog 管理
+    - established:
+      - remaining work は current baseline を壊さない additive investment として扱う方針
+    - remaining:
+      - manual remediation の所在
+      - link/unlink / remote lifecycle expansion の優先順位
+      - discovery / hardening / extras を別投資へ分ける方針
   - metric link:
-    - M3
+    - Metric-002
   - depends on:
-    - epic-0003-operability-and-diagnostics
+    - epic-0003-operability-diagnostics-and-parity
 
 ## 順序と理由
 - sequencing rationale:
-  - Phase は product rollout の順序を表す。
-  - Epic はその順序を束ねる設計テーマを表す。
-  - Epic は一般的に適切な大まかな設計テーマとして維持し、細かな分割は issue に落とす。
-  - Issue は各 epic 内で実装可能な単位へ分割する。
-  - `status contract` を mutation より先に固定し、その後 local path、authority transfer、remote mutation の順で進める。
-  - diagnostics は mutation が増えるタイミングでまとめて強化し、discovery/hardening は後半テーマとして扱う。
-  - dogfooding で見つかった細かなバグ、UX 問題、構造改善候補は、適切な epic の issue として継続投入する。
+  - まず current baseline を正本化し、その上で repo-scope / state safety を remaining work と切り分ける。
+  - diagnostics / parity はすでに成立した capability なので、「これから実装するもの」ではなく「維持と深化の対象」として扱う。
+  - lifecycle expansion や extras は、current runtime を usable に保つことより優先しない。
+  - prototype completion 判定は、新機能の量ではなく current baseline と remaining ownership の明確さで行う。
 - parallelizable:
-  - Epic 3 の一部と Epic 4 の一部は並行可能。
-  - ただし Epic 2 までの authority 決定が前提になる。
+  - Epic 2 と Epic 3 の remaining follow-up は並行で整理できる。
+  - ただし Epic 4 の ownership 判断は Epic 2/3 の結論に依存する。
 
 ## 意思決定ゲート
-- G1 strategy review:
-  - 4-epic 構成と Phase 順序の受け入れ確認
-- G2 milestone readiness:
-  - Epic 1 完了時に status contract と local mutation の整合確認
-- G3 governance/docs impact:
-  - Epic 2 着手前に link/unlink と GitHub mutation の guardrail を確認
-- G4 operability review:
-  - Epic 3 着手前に diagnostics の surface を確認
+- G1 refresh strategy review:
+  - current initiative docs を roadmap-only stance から current reality へ同期する方針を確認する
+- G2 baseline contract review:
+  - usable runtime baseline、repo-scope contract、diagnostics、parity guardrail の記述が揃っていることを確認する
+- G3 remaining ownership review:
+  - manual remediation / operator guidance / lifecycle expansion の ownership を current initiative に残すか別投資へ分離するか判断する
+- G4 prototype completion review:
+  - current initiative を「usable prototype の確立」で閉じられるかを確認する
 - G9 final initiative plan review:
-  - Epic 4 着手前に remaining debt と hardening 範囲を見直す
-- G10 prototype completion review:
-  - prototype が完成し、主要な dogfooding blocker が backlog 管理下にあることを確認する
+  - remaining follow-up の切り出し方と post-prototype roadmap を確認する
 
 ## 指標レビュー計画
 - review timing:
-  - 各 milestone 完了時
+  - initiative refresh 完了時
+  - remaining ownership 判断時
+  - prototype completion 判断時
 - dashboard / source:
-  - initiative 配下の文書、ADR、epic backlog、dogfooding 実運用で得られた feedback
+  - initiative requirement/design/plan
+  - discussions/004, 005, 006, 007, 009
+  - manual rerun evidence
+  - current dogfooding runtime surface
 
 ## ロールアウト計画
 - rollout window:
-  - prototype first
-  - dogfooding を通じて段階導入
+  - usable baseline を維持しながら remaining work を切り出す
+  - unsafe automation は導入せず、fail-closed contract を保持する
 - release / communication:
-  - repo docs と AGENTS.md を基準に共有する
+  - initiative docs と ADR/discussion を正本として共有する
+  - operator guidance は canonical URL / `--id` 優先を前提にする
 
 ## Epic readiness contract
 - Epic に要求する最低条件:
-  - user-facing capability が 1 つに絞られていること
-  - compatibility guardrail が明記されていること
-  - affected layer と tests が特定されていること
+  - established capability と remaining work が分かれていること
+  - 既存 baseline を壊さない guardrail が書かれていること
+  - parity / repo-scope / diagnostics のどれに効く投資かが説明できること
+  - post-prototype へ切り出す場合は ownership が明示されていること
 
 ## final exit contract
 - milestone exit:
-  - prototype が完成し、Phase 0-6 に対する epic backlog が運用可能な粒度で整理されていること
+  - current initiative docs が current runtime baseline と remaining boundary を表現できていること
+  - usable dogfooding runtime with caveats が文書上明示されていること
 - success metrics reviewed:
-  - requirement の metric を milestone ごとに確認していること
+  - requirement の Metric-001 / Metric-002 を refresh 完了時に確認していること
 - remaining follow-up ownership:
-  - prototype 後の extras は別 initiative / epic に切り分ける
-  - 主要な dogfooding blocker は backlog 管理下にあり、残課題の行き先が明確であること
+  - manual remediation / operator guidance / lifecycle expansion の行き先が current initiative か follow-up initiative かで明示されていること
+  - issue-28 corrective trace に戻らなくても、次の投資判断ができること
 
 ## 依存 / ブロッカー
 - D-001:
-  - provider/source と generated workspace の責務分離が保たれること
+  - provider/source と generated workspace の責務分離を維持すること
 - D-002:
-  - GitHub mutation の preflight 設計が固まること
+  - current manual rerun baseline を durable contract として読み替えること
+- D-003:
+  - parity maintenance を explicit verification discipline として扱うこと
 
 ## 未確定事項
 - Q-001:
   - 質問:
-    - Phase 5 discovery を独立 epic にするか、Phase 4/6 に吸収するか。
+    - prototype completion 判定の後、manual remediation / operator guidance を current initiative の残作業として扱うか、follow-up initiative として切り出すか。
   - 選択肢:
     - A:
-      - discovery を diagnostics 側へ寄せる。
+      - current initiative の remaining epic として残す。
     - B:
-      - visibility 強化として独立させる。
+      - current initiative は baseline establishment で閉じ、follow-up initiative を切る。
   - 推奨案:
-    - B。観測可能性を一段として扱った方が運用上分かりやすい。
+    - B。current baseline は成立しており、残課題は次の運用改善投資として切り出した方が境界が明瞭になる。
   - 影響範囲:
-    - epic 粒度と並行実装の切り方。
+    - prototype completion review
+    - 次の epic / initiative backlog の構成
