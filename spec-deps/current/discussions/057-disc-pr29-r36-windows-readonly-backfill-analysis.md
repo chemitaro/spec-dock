@@ -18,7 +18,8 @@
   - `_try_make_readonly()` 自体は `chmod(mode & ~0o222)` を全 OS で実行し、`posix` 分岐は write bit が落ちたかの追加検証だけである
 - `backfill_github_repo_scope()` は `.meta.json` を更新する前に writable 化するが、その処理と mode 復元を `os.name == "posix"` に限定している
 - `backfill_github_repo_scope()` の実書き込みは `write_json()` 経由で `.meta.json` を再書き込みする
-- `sync --github` の safe backfill は `collect_sync_state()` の途中で呼ばれ、`backfill_github_repo_scope()` の失敗は握りつぶされず sync failure になる
+- 当時の `S03M` 分析時点では、`sync --github` の safe backfill は `collect_sync_state()` の途中で呼ばれ、`backfill_github_repo_scope()` の失敗は握りつぶされず sync failure になる
+- この call path は後続 `S03N` / `S03O` で final contract から外れ、current state では bulk `sync --github` が legacy unscoped linkage を backfill しない non-mutating path へ整理されている
 - 現行テストは readonly の `.meta.json` を Windows 相当契約のまま backfill するケースを固定していない
 
 ## 外部根拠

@@ -60,7 +60,11 @@ ID: "issue-28-runtime-regression-bugs"
     - `new issue` / `active set` の explicit intent surface が揃う
     - stale projection の source/freshness が CLI/json に露出する
 
-## ステップ一覧
+## 主要ステップ一覧
+
+- この節は final exit contract に直結する主要 step / corrective scope の高レベル要約であり、完全な step inventory ではない
+- exhaustive な scope と traceability は後続の各詳細 step block、および `## 要件 ↔ ステップ対応` を正本とする
+
 - S01:
   - 観測可能な振る舞い: 並列 `new initiative|epic|issue` でも duplicate id が発生しない
   - closes:
@@ -204,6 +208,12 @@ ID: "issue-28-runtime-regression-bugs"
     - manual rerun preparation after corrective scopes
   - review gate:
     - repo provisioning 依頼に必要な repo 名、workspace map、fixture map、artifact contract、case order、done criteria が揃っている
+- S98C:
+  - 観測可能な振る舞い: contract rerun が実行され、`RR-00` から `RR-07` の verdict と current-state judgment が exploratory evidence と切り分けて固定されている
+  - closes:
+    - manual rerun execution after corrective scopes
+  - review gate:
+    - `RR-00` から `RR-07` の verdict と evidence が揃い、partial/pass 判定の扱いが final exit contract と矛盾しない
 - S01P:
   - 観測可能な振る舞い: `gh issue create` 後の failure surface が outcome class ごとに guidance を返し、local-write-committed cleanup failure で blind rerun を案内しない
   - closes:
@@ -279,6 +289,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `manual verification prep` -> `S98`
 - `manual verification execution` -> `S98A`
 - `manual rerun prep` -> `S98B`
+- `manual rerun execution` -> `S98C`
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
@@ -1137,8 +1148,9 @@ ID: "issue-28-runtime-regression-bugs"
 
 ### S03L — current-repo linkage を正規化し no-origin continuity を維持する
 - target:
-  - current repo slug を解決できる write/mutate path で current-repo linked node の repo scope を explicit metadata へ正規化する
-  - no-origin copy 後も `sync --github` / `validate` / `doctor` / deps resolution が safe backfill 済み current-repo linkage だけを理由に fail-closed しないようにする
+  - current repo slug を解決できる write path で current-repo linked node の repo scope を explicit metadata へ正規化する
+  - no-origin copy 後も `sync --github` / `validate` / `doctor` / `deps check` が already-normalized current-repo linkage だけを理由に fail-closed しない baseline を整える
+  - bulk `sync --github` を trusted mutate-time backfill path と見なす契約は current scope に含めない
 - design refs:
   - `design.md` の `2.6 no-origin continuity via current-repo linkage normalization`
   - `discussions/056`
@@ -2455,7 +2467,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ## final exit contract
 - AC/EC 達成:
-  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016`、`AC-017`、`AC-018`、`AC-019`、`AC-020` が対応 step の review/QA 付きで満たされている
+  - `AC-001` から `AC-009`、`AC-010`、`AC-011`、`AC-012`、`AC-013`、`AC-014`、`AC-015`、`AC-016`、`AC-017`、`AC-018`、`AC-019`、`AC-020`、`AC-021` が対応 step の review/QA 付きで満たされている
   - 4 設計テーマの変更が application/domain/infra/presentation の責務境界を守って実装されている
   - create/post-create outcome matrix の 5 class が provider / checked-in runtime で同じ guidance contract と review evidence を持つ
 - docs impact resolved:
@@ -2465,6 +2477,13 @@ ID: "issue-28-runtime-regression-bugs"
   - same-repo / foreign-repo / no-origin / stale-active の 4 観点に対する fixture と evidence 採取手順が固定されている
 - manual verification executed:
   - `S98A` が完了し、`MT-00` から `MT-08` の enriched exploratory round evidence が report artifact に残っている
+  - `S98A` は breadth-oriented exploratory evidence として保持しつつ、最終承認は corrective scope 後の contract rerun execution を基準に判断する
+  - `S98C` が完了し、`S98B` で固定した `RR-00` から `RR-07` の rerun verdict が `discussions/062` と `manual-tests/reports/2026-03-24-issue-28-contract-rerun/` に残っている
+  - `S98C` の approval-sufficient verdict は次のいずれかに限る
+    - `RR-00` から `RR-07` がすべて `pass`
+    - `RR-00` から `RR-06` が `pass` で、`RR-07` だけが operator-authored invalid dependency など expected fail-closed guard の発火に起因する `partial-pass` であり、remediation continuation により残りの long-run coverage が完了し、unexplained runtime regression がない
+  - `RR-07 partial-pass` が unexplained runtime regression、未回収 coverage、または fail-closed 契約外の block に起因する場合は final exit contract を満たさない
+  - follow-up issue による manual remediation / operator guidance の補強は許容されるが、現行 runtime correctness に unexplained gap がないことが前提である
 - final diff approved:
   - `S99` の required validation が完了し、GitHub live regression を含む最終 diff review で重大懸念が解消されている
 
@@ -2509,7 +2528,7 @@ ID: "issue-28-runtime-regression-bugs"
 
 ### S98B — manual rerun contract preparation
 - target:
-  - corrective scope 後の rerun confirmation を exploratory round から切り出し、contract-focused manual plan として固定する
+  - corrective scope 後の rerun confirmation を exploratory round から切り出し、`RR-07 organic stress session` を含む contract-focused manual plan として固定する
 - boundaries:
   - provider 実装の追加変更は行わない
   - repo provisioning 依頼、workspace topology、fixture map、artifact contract、case order、done criteria の整理に限定する
@@ -2517,11 +2536,29 @@ ID: "issue-28-runtime-regression-bugs"
   - `discussions/061`
   - current / foreign の test repo 名
   - current-origin / no-origin / stale-active / checked-in parity workspace map
-  - `RR-00` から `RR-06` の rerun case contract
+  - `RR-00` から `RR-07` の rerun case contract
 - verification:
   - repo provisioning に必要な repository name と role が明記されている
-  - overlap fixture / legacy-unscoped negative case / stale-active recovery / readonly non-mutation / checked-in parity が case 一覧に含まれている
+  - overlap fixture / legacy-unscoped negative case / stale-active recovery / readonly non-mutation / checked-in parity / organic stress session が case 一覧に含まれている
   - `checklist.md` / `execution-log.md` / `summary.md` に残すべき evidence が明記されている
-  - done criteria が positive continuity と negative guard の両方を含む
+  - done criteria が `RR-00` から `RR-07` の verdict と、positive continuity / negative guard の両方を含む
 - report update rule:
   - `report.md` に S98B の planning verdict と pending external dependency を追記する
+
+### S98C — manual rerun execution
+- target:
+  - `S98B` で固定した contract rerun を実行し、corrective scope 後の current state judgment を exploratory evidence から切り離して確定する
+- boundaries:
+  - provider 実装の追加変更は行わない
+  - live/current-origin、no-origin、stale-active、checked-in parity の rerun execution と evidence 記録に限定する
+- concrete deliverables:
+  - `discussions/062`
+  - `manual-tests/reports/2026-03-24-issue-28-contract-rerun/`
+  - `RR-00` から `RR-07` の verdict と evidence
+- verification:
+  - `RR-00` から `RR-07` の各 case / phase / checkpoint に verdict がある
+  - current-origin exact resolution、already-normalized metadata の no-origin continuity、legacy lone-unscoped current-repo link の no-backfill / manual remediation guard が current final contract と一致している
+  - stale active recovery、readonly non-mutation、checked-in parity smoke に unexplained drift がない
+  - rerun judgment が `S98A` exploratory round の breadth evidence と矛盾しない形で `report.md` に整理されている
+- report update rule:
+  - `report.md` に S98C の execution verdict、current-state judgment、residual risks を追記する
