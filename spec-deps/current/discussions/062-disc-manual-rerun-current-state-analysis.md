@@ -99,6 +99,7 @@ ID: "062"
 ## 今の判断
 - issue-28 の current runtime は、少なくとも今回の手動 rerun で再発 blocker を示していない
 - 現在の open point は implementation correctness ではなく、manual remediation と operator guidance の不足である
+- issue-28 の final exit contract 上は、`RR-00` から `RR-06` が `pass`、`RR-07` は expected fail-closed guard 起因の `partial-pass` で remediation continuation が完了しているため、current rerun verdict は approval-sufficient とみなせる
 - したがって、次の投資先としては「さらに自動 backfill を増やす corrective patch」よりも、「explicit remediation flow を設計する」「guidance を CLI/doctor/docs に落とす」ほうが妥当である
 
 ## 推奨 next action
@@ -115,3 +116,4 @@ ID: "062"
   - 現行 runtime の fail-closed contract は manual rerun で再確認できている
   - unresolved point は product correctness の不足より UX / operability の不足に寄っている
   - 自動 backfill を再度広げるより、明示的 remediation のほうが安全で review loop を再燃させにくい
+  - これは current issue の承認可否を block する提案ではなく、merge/close 後の follow-up scope 提案として扱うのが妥当である

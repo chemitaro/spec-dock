@@ -722,7 +722,7 @@ CLI --> User : safe success or explicit failure
 - workspace C: no-origin copy
   - workspace B を copy し、`git remote origin` を外した派生 repo
   - workspace B で作った same-number overlap fixture と imported linked node を引き継いだまま、`MT-05` の no-origin continuation と `MT-07` の resume-after-copy-update phase を実行する
-  - canonical GitHub URL target が no-origin 条件でも unscoped linked node を解決できるか、foreign-only fallback や hard mismatch に誤って倒れないかを確認する
+  - canonical GitHub URL target が no-origin 条件でも already-normalized metadata を持つ linked node では continuity を維持し、legacy unscoped current-repo link は `No node found` 相当の fail-closed に残ることを確認する
 - workspace D: no-origin pathfile parity
   - workspace C を複製した dedicated parity workspace
   - helper launcher で active entrypoint write 時だけ `os.symlink` を `OSError` に倒し、`MT-06` の `.path` fallback evidence を isolation して採る

@@ -105,6 +105,7 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-24 `python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py tests/cli_runtime/test_validate.py tests/test_init_update.py` を実行し、終了コード `0` を確認した
 - 2026-03-24 `diff -u src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py` を実行し、provider/check-in parity に差分がないことを確認した
 - 2026-03-24 targeted regression として `python -m unittest -v tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_backfills_readonly_meta_json_under_windows_contract_and_keeps_final_readonly tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_warns_when_backfill_relock_fails_after_write tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_backfills_readonly_meta_under_windows_contract_parity tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_github_keeps_fail_closed_for_ineligible_backfill_candidates tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_github_keeps_fail_closed_for_partial_scope_backfill_candidates tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_backfills_safe_current_repo_linkage_and_keeps_no_origin_continuity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_backfills_current_scope_and_keeps_no_origin_continuity` を実行し、`Ran 7 tests` / `OK` を確認した
+- 2026-03-24 上記 `S03M` の backfill evidence は当時の provisional contract に対する記録であり、current final contract の bulk `sync --github` mutation 可否を示すものではない。後続 `S03N` / `S03O` で lone-unscoped no-backfill と dead sync-time backfill removal が確定し、current state では helper-level permission contract の履歴としてのみ参照する
 - 2026-03-24 `S03M` fresh implementation/code review は `pass` で、shared permission helper、Windows readonly backfill gap、warning surface、provider/check-in parity に actionable finding はなかった
 - 2026-03-24 latest review follow-up として、lone unscoped legacy linkage が uniqueness-only predicate により current repo へ silent backfill されうる点を `discussions/058` で分析し、レビュー指摘は妥当・修正必要・最良案は `positive current-repo evidence` がある場合だけ backfill を許可する方針と結論づけた
 - 2026-03-24 `discussions/058` を正本として、`requirement.md` / `design.md` / `plan.md` を補正し、bulk `sync --github` の lone unscoped legacy linkage を safe backfill から外す corrective scope `S03N` を追加した
@@ -122,6 +123,7 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-24 `S03O` 実装では provider/check-in runtime の `collect_sync_state()` から dead bulk sync backfill call path を除去し、`repo_context.py` から未使用 backfill selector helper を削除した
 - 2026-03-24 `tests/presentation_runtime/test_runtime_sync_s07.py` に `issue_index()` が存在しても bulk `sync --github` が backfill helper を使わないことを固定する regression を追加した
 - 2026-03-24 `python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07 tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_keeps_already_normalized_current_repo_linkage_no_origin_continuity tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_keeps_readonly_lone_unscoped_meta_without_backfill tests.cli_runtime.test_validate.TestCliValidate.test_sync_github_no_backfill_path_does_not_emit_readonly_lock_warning tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_keeps_lone_unscoped_legacy_without_backfill_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_keeps_readonly_lone_unscoped_without_backfill_parity` を実行し、`Ran 30 tests` / `OK` を確認した
+- 2026-03-24 current final contract では bulk `sync --github` は legacy unscoped linkage を backfill しない non-mutating path として扱い、already-normalized metadata continuity だけを維持する
 - 2026-03-24 `diff -u` で provider/check-in runtime の `sync_state.py` / `repo_context.py` parity を確認し、差分なしを確認した
 - 2026-03-24 `git diff --check` を実行し、出力なしを確認した
 - 2026-03-24 `S03O` fresh implementation/code review は `pass` で、dead bulk backfill path removal、provider/check-in parity、S07 regression coverage に actionable finding はなかった
@@ -1271,7 +1273,7 @@ ID: "issue-28-runtime-regression-bugs"
     - fresh whole-diff review (`main` 基準 / current worktree): `pass`
 
 - create lock は local filesystem 前提で、NFS 等の特殊 filesystem は未検証
-- 全 repository の test suite は未実行で、現時点の QA は runtime CLI スコープに限定
+- corrective scope ごとの重点 QA は runtime CLI スコープ中心だが、current worktree では `python -m unittest discover -v` による full repository suite も実行済み
 - duplicate discussion sequence 検知は filename 規約（`NNN-type-slug.md`）に一致する discussion file を前提とする
 - cache `last_sync_at` は issue node の persisted freshness field がない旧 index では `None` になる
 - discussion は first-class node / manifest を持たないため、S04 の required artifact presence validation は `initiative` / `epic` / `issue` に限定した。discussion は既存どおり recognized markdown の integrity contract（少なくとも seq uniqueness）を validate 対象とする
@@ -1285,7 +1287,7 @@ ID: "issue-28-runtime-regression-bugs"
 - checked-in dogfooding runtime の repo-aware parity drift は `S90F` で解消済み
 
 ## 次アクション
-- `S03L` / `S03M` / `S03N` / `S03O` corrective scope は docs / implementation / review まで反映済みで、次は必要に応じて branch 全体の fresh whole-diff review へ進める
+- `S03L` / `S03M` / `S03N` / `S03O` corrective scope は docs / implementation / review まで反映済みで、branch 全体の fresh whole-diff review も current worktree で完了済みである。以後は追加変更が入った場合だけ再実施する
 - existing legacy unscoped current-repo linkage の persistence upgrade を安全に救済するには、exact selector 必須の manual remediation scope を別 issue として切る
 - `sev-3` の checked-in runtime parity drift は command surface / repo-aware behavior / json/deps parity まで corrective patch で解消済み
 - `gh_index_incomplete` warning は発生条件と診断導線を必要に応じて別 issue で整理する
