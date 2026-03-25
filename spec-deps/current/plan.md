@@ -198,6 +198,12 @@ ID: "issue-28-runtime-regression-bugs"
   - review gate:
     - `discussions/055` の `MT-00` から `MT-08` が verdict 付きで完了している
     - same-number overlap、live churn、recovery submatrix、organic checkpoints の evidence が report artifact に残っている
+- S98B:
+  - 観測可能な振る舞い: rerun confirmation 用の contract-focused manual plan が current/foreign/no-origin/recovery/checked-in parity を最小強度で再検証できる形で固定されている
+  - closes:
+    - manual rerun preparation after corrective scopes
+  - review gate:
+    - repo provisioning 依頼に必要な repo 名、workspace map、fixture map、artifact contract、case order、done criteria が揃っている
 - S01P:
   - 観測可能な振る舞い: `gh issue create` 後の failure surface が outcome class ごとに guidance を返し、local-write-committed cleanup failure で blind rerun を案内しない
   - closes:
@@ -272,6 +278,7 @@ ID: "issue-28-runtime-regression-bugs"
 - `dead-sync-backfill-gap` -> `S03O`
 - `manual verification prep` -> `S98`
 - `manual verification execution` -> `S98A`
+- `manual rerun prep` -> `S98B`
 - `PR29-R18` -> `S01I`
 - `PR29-R20` -> `S01J`
 - `PR29-R21` -> `S01K`
@@ -2499,3 +2506,22 @@ ID: "issue-28-runtime-regression-bugs"
   - `MT-07` では issue と epic の両方に dependency 登録がある
 - report update rule:
   - `report.md` に S98A の execution verdict、主要 finding、residual risks を追記する
+
+### S98B — manual rerun contract preparation
+- target:
+  - corrective scope 後の rerun confirmation を exploratory round から切り出し、contract-focused manual plan として固定する
+- boundaries:
+  - provider 実装の追加変更は行わない
+  - repo provisioning 依頼、workspace topology、fixture map、artifact contract、case order、done criteria の整理に限定する
+- concrete deliverables:
+  - `discussions/061`
+  - current / foreign の test repo 名
+  - current-origin / no-origin / stale-active / checked-in parity workspace map
+  - `RR-00` から `RR-06` の rerun case contract
+- verification:
+  - repo provisioning に必要な repository name と role が明記されている
+  - overlap fixture / legacy-unscoped negative case / stale-active recovery / readonly non-mutation / checked-in parity が case 一覧に含まれている
+  - `checklist.md` / `execution-log.md` / `summary.md` に残すべき evidence が明記されている
+  - done criteria が positive continuity と negative guard の両方を含む
+- report update rule:
+  - `report.md` に S98B の planning verdict と pending external dependency を追記する

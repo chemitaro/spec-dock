@@ -62,6 +62,20 @@ ID: "issue-28-runtime-regression-bugs"
 - 2026-03-24 `discussions/055` と `S98` を consultant 提案に合わせて拡張し、GitHub current/foreign live corpus、multi-resource local corpus、close-reopen churn、recovery submatrix、3-phase organic session を必須化した
 - 2026-03-24 enriched exploratory manual round の execution を plan 上で `S98A` として追加し、準備と実行の gate を分離した
 - 2026-03-24 enriched exploratory manual round を utility worker で実施し、overall verdict は `conditional-pass` だった
+- 2026-03-24 consultant と manual rerun preparation を再整理し、exploratory rerun ではなく recent fixes の contract rerun に切る方針を採用した
+- 2026-03-24 `discussions/061` を追加し、current / foreign repo 2 本で回す rerun topology、`RR-00` から `RR-06` の case contract、artifact evidence contract、repo provisioning 名案を固定した
+- 2026-03-24 `plan.md` に `S98B manual rerun contract preparation` を追加し、repo 名・workspace map・fixture map・done criteria を準備完了条件として整理した
+- 2026-03-24 `S98B` docs-only spec review 初回は `fail` で、`RR-02` に no-origin `deps check` continuity が欠けていること、`S05K` scoped dependency ref を踏む manual case が無いこと、report に pending external dependency の明記が無いことが指摘された
+- 2026-03-24 `discussions/061` を補正し、`RR-01` に scoped dependency ref / bare numeric dependency ref guard を追加し、`RR-02` に no-origin `deps check <current canonical url>` continuity を追加した
+- 2026-03-24 pending external dependency は `spec-dock-manual-current-issue-28-rr1` / `spec-dock-manual-foreign-issue-28-rr1` の GitHub repo provisioning 待ちであることを handoff state として固定した
+- 2026-03-24 `S98B` docs-only spec re-review は `conditional_pass` で、repo provisioning 依頼自体は進めてよいが、checked-in parity の `deps` contract を `RR-03` にもう 1 段追加するよう指摘された
+- 2026-03-24 `discussions/061` の `RR-03` を補正し、checked-in parity smoke に `deps check <current canonical url>` continuity と scoped dependency ref または bare numeric dependency ref guard を追加した
+- 2026-03-24 user-provisioned GitHub repo `chemitaro/spec-dock-manual-current-issue-28-rr1` / `chemitaro/spec-dock-manual-foreign-issue-28-rr1` を fixture source として受領した
+- 2026-03-24 utility worker により `RR-00` から `RR-07` の contract rerun を実施し、manual artifact は `manual-tests/reports/2026-03-24-issue-28-contract-rerun/` に記録した
+- 2026-03-24 contract rerun の overall verdict は `conditional-pass` で、`RR-00` から `RR-06` は `pass`、`RR-07` は long-run 中の operator-authored invalid descendant dependency blocker を記録したうえで remediation continuation により `partial-pass` とした
+- 2026-03-24 rerun により、exact repo-scoped resolution、normalized metadata の no-origin continuity、legacy lone-unscoped current link の no-backfill fail-closed、stale active recovery、checked-in parity、readonly `.meta.json` non-mutation を再確認した
+- 2026-03-24 residual risk として、overlap-heavy/no-origin 環境では bare numeric selector が高リスクであり、canonical URL / `--id` guidance と fail-closed ambiguity behavior への依存が継続すると整理した
+- 2026-03-24 current state の読みやすい整理として `discussions/062-disc-manual-rerun-current-state-analysis.md` を追加し、manual rerun 後の「何が直ったか / 何が未解決か / 次に何へ投資すべきか」を issue-level discussion に要約した
 - 2026-03-24 manual test findings の根本原因分析を `discussions/056` に記録し、main blocker は `no-origin + mixed scoped/unscoped linkage ambiguity` と整理した
 - 2026-03-24 root-cause analysis を踏まえ、`AC-021 no-origin continuity for current-repo linked nodes` と corrective scope `S03L` を requirement/design/plan に追加した
 - 2026-03-24 `S03L` の fresh spec review 初回は `fail` で、safe backfill predicate の明文化不足と executable step block 不足が指摘された
