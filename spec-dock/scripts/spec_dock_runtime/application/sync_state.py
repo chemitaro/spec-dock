@@ -35,7 +35,9 @@ from .github_issue_targets import (
     snapshot_repo_issue_key,
 )
 from .ports import Ports
-from .repo_context import resolve_current_repo_slug
+from .repo_context import (
+    resolve_current_repo_slug,
+)
 from .set_active import build_active_manifest, commit_active_state
 from .status_context import resolve_issue_status_context
 
@@ -174,14 +176,13 @@ def collect_sync_state(
     records = ports.node_reader.load_node_records()
     if not records:
         raise RuntimeError("No nodes found. Create at least one initiative/epic/issue.")
+    current_repo_slug = resolve_current_repo_slug(ports)
     graph = build_graph([_to_spec_node_seed(record) for record in records])
     specdock_dir = _resolve_specdock_dir(ports)
 
     warnings: list[str] = []
     deps_preflight_error: str | None = None
     issue_depends_on_map: dict[str, list[str]] = {}
-    current_repo_slug = resolve_current_repo_slug(ports)
-
     validation = validate_graph_and_deps(
         graph,
         issue_depends_on_map=None,
@@ -271,6 +272,8 @@ def collect_sync_state(
                 _append_unique(warnings, "gh_fetch_failed")
                 continue
             foreign_issue_snapshots.append(snapshot)
+        # Keep current-repo index snapshots first so unscoped lookups use the
+        # current repo value when foreign repos share the same issue number.
         issue_snapshots = [*issue_index_snapshots, *foreign_issue_snapshots]
         for snapshot in issue_index_snapshots:
             if not _is_safe_unscoped_snapshot(snapshot, current_repo_slug=current_repo_slug):
