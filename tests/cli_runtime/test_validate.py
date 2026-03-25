@@ -745,6 +745,193 @@ class TestCliValidate(CliRuntimeHarness):
                     self.assertEqual(after_mode, before_modes[meta_path])
                     self.assertEqual(after_mode & 0o222, before_modes[meta_path] & 0o222)
 
+    def test_sync_github_keeps_already_normalized_current_repo_linkage_no_origin_continuity(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign issue"])
+
+            current_issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+            foreign_issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-foreign-issue"
+                / ".meta.json"
+            )
+
+            # already-normalized current linkage + explicit foreign same-number overlap.
+            current_meta_before = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(current_meta_before["github"]["issue_number"], 123)
+            self.assertEqual(current_meta_before["github"]["repo_owner"], "current")
+            self.assertEqual(current_meta_before["github"]["repo_name"], "repo")
+            foreign_meta = json.loads(foreign_issue_meta_path.read_text(encoding="utf-8"))
+            foreign_meta["github"] = {"issue_number": 123, "repo_owner": "other", "repo_name": "repo"}
+            self._write_json_force(foreign_issue_meta_path, foreign_meta)
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
+            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
+
+            current_meta_after = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
+            self.assertEqual(current_meta_after["github"]["repo_owner"], "current")
+            self.assertEqual(current_meta_after["github"]["repo_name"], "repo")
+
+            # no-origin continuity for already-normalized metadata.
+            shutil.rmtree(target / ".git", ignore_errors=True)
+
+            sync_after_no_origin = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
+            self.assertEqual(sync_after_no_origin.returncode, 0, sync_after_no_origin.stdout + sync_after_no_origin.stderr)
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+
+            doctor_result = self._run_runtime_capture(target, ["doctor"])
+            self.assertEqual(doctor_result.returncode, 0, doctor_result.stdout + doctor_result.stderr)
+
+            deps_by_url = self._run_runtime_capture(
+                target,
+                ["deps", "check", "https://github.com/current/repo/issues/123", "--json"],
+            )
+            self.assertIn(deps_by_url.returncode, (0, 3), deps_by_url.stdout + deps_by_url.stderr)
+            self.assertIn('"target": "iss-00123"', deps_by_url.stdout)
+
+            deps_by_id = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00123", "--json"])
+            self.assertIn(deps_by_id.returncode, (0, 3), deps_by_id.stdout + deps_by_id.stderr)
+            self.assertIn('"target": "iss-00123"', deps_by_id.stdout)
+
+            active_by_url = self._run_runtime_capture(
+                target,
+                ["active", "set", "https://github.com/current/repo/issues/123", "--force"],
+            )
+            self.assertEqual(active_by_url.returncode, 0, active_by_url.stdout + active_by_url.stderr)
+
+            active_by_id = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00123", "--force"])
+            self.assertEqual(active_by_id.returncode, 0, active_by_id.stdout + active_by_id.stderr)
+
+            ambiguous_number = self._run_runtime_capture(target, ["deps", "check", "123"])
+            self.assertNotEqual(ambiguous_number.returncode, 0, ambiguous_number.stdout + ambiguous_number.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous_number.stderr)
+
+            ambiguous_flag = self._run_runtime_capture(target, ["deps", "check", "--github-issue", "123"])
+            self.assertNotEqual(ambiguous_flag.returncode, 0, ambiguous_flag.stdout + ambiguous_flag.stderr)
+            self.assertIn("Ambiguous github.issue_number=123", ambiguous_flag.stderr)
+
+    def test_sync_github_keeps_readonly_lone_unscoped_meta_without_backfill(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+
+            current_issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+
+            current_meta = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_issue_meta_path, current_meta)
+            current_issue_meta_path.chmod(current_issue_meta_path.stat().st_mode & ~0o222)
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
+            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
+
+            current_meta_after = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
+            self.assertNotIn("repo_owner", current_meta_after["github"])
+            self.assertNotIn("repo_name", current_meta_after["github"])
+            self.assertEqual(current_issue_meta_path.stat().st_mode & 0o222, 0)
+
+    def test_sync_github_no_backfill_path_does_not_emit_readonly_lock_warning(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+
+            current_issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+
+            current_meta = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_issue_meta_path, current_meta)
+            current_issue_meta_path.chmod(current_issue_meta_path.stat().st_mode & ~0o222)
+
+            runtime_fs_repo = (
+                target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "fs_repo.py"
+            )
+            runtime_fs_repo.write_text(
+                runtime_fs_repo.read_text(encoding="utf-8")
+                + "\n\n"
+                + "def _try_make_readonly(path):\n"
+                + '    return False, "simulated-relock-failure"\n',
+                encoding="utf-8",
+            )
+
+            sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"])
+            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
+            self.assertNotIn("readonly_lock_failed", sync_result.stderr)
+            self.assertNotIn("simulated-relock-failure", sync_result.stderr)
+
+            current_meta_after = json.loads(current_issue_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(current_meta_after["github"]["issue_number"], 123)
+            self.assertNotIn("repo_owner", current_meta_after["github"])
+            self.assertNotIn("repo_name", current_meta_after["github"])
+
     def test_validate_and_sync_fail_fast_on_legacy_meta_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

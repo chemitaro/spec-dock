@@ -749,6 +749,12 @@ class TestCliImport(CliRuntimeHarness):
             )
             current_meta = json.loads(current_issue_meta.read_text(encoding="utf-8"))
             self.assertEqual(current_meta["github"]["issue_number"], 123)
+            self.assertEqual(current_meta["github"]["repo_owner"], "example")
+            self.assertEqual(current_meta["github"]["repo_name"], "repo")
+            # Simulate legacy unscoped linkage persisted before S03L write-time normalization.
+            current_meta["github"] = {"issue_number": 123}
+            self._write_json_force(current_issue_meta, current_meta)
+            current_meta = json.loads(current_issue_meta.read_text(encoding="utf-8"))
             self.assertNotIn("repo_owner", current_meta["github"])
             self.assertNotIn("repo_name", current_meta["github"])
 
@@ -786,6 +792,49 @@ class TestCliImport(CliRuntimeHarness):
                 / "iss-00123-duplicate-current-issue"
             )
             self.assertFalse(duplicate_issue_dir.exists())
+
+    def test_import_persists_current_repo_scope_when_origin_is_resolved(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "123", "--title", "Current issue", "--epic", "epic-local-00001"],
+                env=test_env,
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            imported_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+            imported_meta = json.loads(imported_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(imported_meta["github"]["issue_number"], 123)
+            self.assertEqual(imported_meta["github"]["repo_owner"], "example")
+            self.assertEqual(imported_meta["github"]["repo_name"], "repo")
 
     def test_import_rejects_same_issue_number_between_unscoped_and_foreign_when_current_repo_unknown(self) -> None:
         if os.name == "nt":

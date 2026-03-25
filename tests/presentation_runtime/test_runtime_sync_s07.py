@@ -81,6 +81,21 @@ class _StubNodeReader:
         return list(self._records)
 
 
+class _StubNodeRepo:
+    def __init__(self):
+        self.backfill_calls: list[tuple[str, str, str]] = []
+
+    def backfill_github_repo_scope(self, meta_path, *, repo_owner: str, repo_name: str):
+        self.backfill_calls.append((str(meta_path), str(repo_owner), str(repo_name)))
+        return True
+
+
+class _FailingBackfillNodeRepo:
+    def backfill_github_repo_scope(self, meta_path, *, repo_owner: str, repo_name: str):
+        del meta_path, repo_owner, repo_name
+        raise AssertionError("bulk sync must not invoke backfill_github_repo_scope")
+
+
 class _StubDepsTopologyReader:
     def __init__(self, infra_contracts, issue_depends_on_map, warnings=None):
         self._infra_contracts = infra_contracts
@@ -109,10 +124,11 @@ class _StubIssueGateway:
         self._snapshots = list(snapshots or [])
         self._fail = fail
         self._foreign_snapshots = dict(foreign_snapshots or {})
+        self.index_calls: list[tuple[str, int]] = []
         self.view_calls: list[tuple[str, int, str | None]] = []
 
     def issue_index(self, repo_root, *, limit):
-        del repo_root, limit
+        self.index_calls.append((str(repo_root), int(limit)))
         if self._fail:
             raise RuntimeError("gh fetch failed")
         return list(self._snapshots)
@@ -1980,3 +1996,311 @@ class TestRuntimeSyncS07(unittest.TestCase):
         sync_after_req, mode = runner.calls[1]
         self.assertEqual(mode, "no_migrate")
         self.assertFalse(sync_after_req.update_active_from_branch)
+
+    def test_sync_github_keeps_lone_unscoped_legacy_linkage_without_backfill(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            self._materialize_required_artifacts(records)
+            node_repo = _StubNodeRepo()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=node_repo,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=_StubIssueGateway([]),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug="current/repo"),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
+            self.assertEqual(node_repo.backfill_calls, [])
+
+    def test_sync_github_bulk_does_not_use_backfill_path_even_with_issue_index(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            issue_gateway = _StubIssueGateway(
+                snapshots=[
+                    domain_models.IssueSnapshot(
+                        issue_number=301,
+                        state="OPEN",
+                        title="Current repo #301",
+                        labels=[],
+                        updated_at="2026-03-18T00:00:00Z",
+                        url="https://github.com/current/repo/issues/301",
+                        repo_owner="current",
+                        repo_name="repo",
+                    ),
+                ]
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=_FailingBackfillNodeRepo(),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug="current/repo"),
+                clock=_StubClock(),
+            )
+
+            collector_called = False
+            had_attr = hasattr(app_sync_state, "collect_safe_current_repo_backfill_node_ids")
+            original_collector = getattr(app_sync_state, "collect_safe_current_repo_backfill_node_ids", None)
+
+            def _patched_collector(*args, **kwargs):
+                del args, kwargs
+                nonlocal collector_called
+                collector_called = True
+                return ["iss-local-00001"]
+
+            app_sync_state.collect_safe_current_repo_backfill_node_ids = _patched_collector
+            try:
+                state = app_sync_state.collect_sync_state(
+                    app_contracts.SyncRequest(
+                        force=False,
+                        github_enabled=True,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    ),
+                    ports,
+                )
+            finally:
+                if had_attr:
+                    app_sync_state.collect_safe_current_repo_backfill_node_ids = original_collector
+                else:
+                    delattr(app_sync_state, "collect_safe_current_repo_backfill_node_ids")
+
+            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
+            self.assertEqual(len(issue_gateway.index_calls), 1)
+            self.assertFalse(collector_called)
+
+    def test_sync_github_keeps_foreign_coexistence_only_legacy_unscoped_without_backfill(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            foreign_issue_dir = (
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-core"
+                / "issues"
+                / "iss-local-00003-foreign"
+            )
+            records.append(
+                _record(
+                    infra_contracts,
+                    kind="issue",
+                    node_id="iss-local-00003",
+                    title="Foreign 301",
+                    path=foreign_issue_dir,
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=301,
+                    github_repo_owner="other",
+                    github_repo_name="repo",
+                )
+            )
+            self._materialize_required_artifacts(records)
+            node_repo = _StubNodeRepo()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=node_repo,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": [], "iss-local-00003": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=_StubIssueGateway([]),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug="current/repo"),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
+            self.assertEqual(node_repo.backfill_calls, [])
+
+    def test_sync_github_keeps_fail_closed_for_partial_scope_backfill_candidates(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            partial_scope_issue_dir = (
+                specdock_dir
+                / "initiatives"
+                / "init-local-00001-auth"
+                / "epics"
+                / "epic-local-00001-core"
+                / "issues"
+                / "iss-local-00003-partial-scope"
+            )
+            records.append(
+                _record(
+                    infra_contracts,
+                    kind="issue",
+                    node_id="iss-local-00003",
+                    title="Partial scope #301",
+                    path=partial_scope_issue_dir,
+                    parent_id="epic-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id="epic-local-00001",
+                    github_issue_number=301,
+                    github_repo_owner="current",
+                    github_repo_name=None,
+                )
+            )
+            self._materialize_required_artifacts(records)
+            node_repo = _StubNodeRepo()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=node_repo,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": [], "iss-local-00003": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=_StubIssueGateway([]),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug="current/repo"),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=True,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIn("deps_preflight_failed", state.warnings)
+            self.assertEqual(node_repo.backfill_calls, [])
+
+    def test_sync_github_skips_backfill_when_current_repo_slug_is_unknown(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            node_repo = _StubNodeRepo()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=node_repo,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=_StubIssueGateway([]),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug=None),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=True,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+            self.assertIn("iss-local-00001", state.graph.nodes_by_id)
+            self.assertEqual(node_repo.backfill_calls, [])

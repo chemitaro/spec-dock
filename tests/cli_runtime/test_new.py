@@ -107,6 +107,36 @@ class TestCliNew(CliRuntimeHarness):
             created = list((target / "spec-dock" / "initiatives").rglob("iss-00001-*"))
             self.assertEqual(created, [])
 
+    def test_new_issue_persists_current_repo_scope_when_origin_is_resolved(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
+
+            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+
+            issue_meta_path = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(issue_meta["github"]["issue_number"], 123)
+            self.assertEqual(issue_meta["github"]["repo_owner"], "current")
+            self.assertEqual(issue_meta["github"]["repo_name"], "repo")
+
     def test_new_rejects_unsafe_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
