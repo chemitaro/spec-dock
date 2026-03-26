@@ -162,6 +162,27 @@ class TestCliImport(CliRuntimeHarness):
             self._assert_readonly_on_posix(init_dir / ".meta.json")
             self._assert_readonly_on_posix(epic_dir / ".meta.json")
 
+            expected_rules_links = {
+                init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
+                init_dir / "discussions" / "rules.md": (
+                    target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+                ),
+                epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
+                epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
+            }
+            for link_path, target_path in expected_rules_links.items():
+                self.assertTrue(link_path.is_symlink(), f"missing imported rules symlink: {link_path}")
+                self.assertEqual(link_path.resolve(), target_path.resolve())
+                self.assertEqual(os.readlink(link_path), os.path.relpath(target_path, start=link_path.parent))
+
+            for scope_dir in (
+                init_dir / "epics",
+                init_dir / "discussions",
+                epic_dir / "issues",
+                epic_dir / "discussions",
+            ):
+                self.assertEqual(list(scope_dir.glob("new-*")), [], f"unexpected wrapper(s) in {scope_dir}")
+
     def test_import_issue_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")

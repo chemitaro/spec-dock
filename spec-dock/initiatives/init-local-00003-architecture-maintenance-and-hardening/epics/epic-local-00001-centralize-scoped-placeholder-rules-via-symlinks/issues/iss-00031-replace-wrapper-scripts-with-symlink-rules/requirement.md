@@ -3,7 +3,7 @@
 ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
 関連GitHub: ["#31"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 親: ["epic-local-00001", "init-local-00003"]
@@ -12,8 +12,8 @@ ID: "iss-00031"
 # iss-00031 Replace Wrapper Scripts With Symlink Rules — 要件定義（WHAT / WHY）
 
 ## 目的
-- `new-epic` / `new-issue` wrapper script をやめ、`epics/`, `issues/`, `discussions/` に置く placeholder を `docs/rules/` の中央管理 rule sheet への symlink に統一する。
-- provider-side assets の正本を `docs/rules/` に置き、installer / runtime / docs / tests がその新規生成 contract を守る状態へ更新する。
+ - `new-epic` / `new-issue` wrapper script をやめ、`epics/`, `issues/`, `discussions/` に置く placeholder を `docs/rules/` の中央管理 rule sheet への symlink に統一する。
+ - canonical な user-facing rules source-of-truth を `spec-dock/docs/rules/**` に置き、provider-side assets 配下 `src/spec_dock/assets/spec_dock/docs/rules/**` は package に同梱する authoring/source files として installer / runtime / docs / tests がその新規生成 contract を守る状態へ更新する。
 
 ## 背景・現状
 - 現状の挙動:
@@ -56,6 +56,7 @@ ID: "iss-00031"
   - 中央管理ファイルは `docs/rules/` 側に置き、node directory 側には実体ファイルを持たせない。
   - `spec-dock init/update` は `docs/rules/` 原本を配布し、runtime `new *` は新規 node に symlink を配置する。
   - 関連 docs と tests を更新する。
+  - review で出た回帰リスクについて、今回の contract に直接関係するものは tests で固定する。
 - MUST NOT:
   - rules markdown をコピーして複製管理しない。
   - wrapper script と symlink rules を併存させない。
@@ -69,9 +70,9 @@ ID: "iss-00031"
 
 ## 境界
 - Always:
-  - provider-side `src/spec_dock/assets/spec_dock/...` を source-of-truth として修正する。
+  - provider-side `src/spec_dock/assets/spec_dock/...` は package に同梱する authoring/source files として修正し、canonical な user-facing rules source-of-truth は `spec-dock/docs/rules/**` に置く。
   - child directory の placeholder 名は `rules.md` に統一する。
-  - symlink target は repo 内の `docs/rules/` に限定する。
+  - symlink target は repo 内の `spec-dock/docs/rules/` に限定する。
 - Ask:
   - `docs/rules/` の粒度と参照先 docs が重複過多にならないか。
   - runtime create flow へ足すのが最小の責務か。
@@ -83,6 +84,7 @@ ID: "iss-00031"
 - パスは lowercase を維持する。
 - 既存の `new doc` / validate / sync / active flow を壊さない。
 - dogfooding 専用ツールとして、過剰な互換維持や汎用化を入れない。
+- docs contract test は command path / `docs/rules/**` 参照 / wrapper absence などの stable な契約を優先し、非本質な prose への結合を増やしすぎない。
 
 ## 前提
 - Linux/Unix 系の test 環境では symlink が利用できる。
@@ -124,6 +126,28 @@ ID: "iss-00031"
     - discussion 採番と関連フローが従来どおり成功する
   - 観測点:
     - regression tests
+- AC-004:
+  - Actor:
+    - coding agent
+  - Given:
+    - `new initiative` / `new epic` / `new issue --create-github-issue` の事前条件のうち、GitHub issue 作成前に判定できる local collision がある
+  - When:
+    - create flow を実行する
+  - Then:
+    - remote side effect より前に `pre_github_fail` で停止し、GitHub gateway call は発生しない
+  - 観測点:
+    - create-mode preflight regression tests
+- AC-005:
+  - Actor:
+    - maintainer
+  - Given:
+    - 既存 node tree 配下に legacy wrapper / rules 実体が残っている repo
+  - When:
+    - `spec-dock update` を実行する
+  - Then:
+    - managed docs/templates は更新されるが、既存 node tree 配下の legacy artifact は out-of-scope として preserve される
+  - 観測点:
+    - installer/update regression tests
 
 ## 例外・エッジケース
 - EC-001:
@@ -147,6 +171,13 @@ ID: "iss-00031"
     - 既存 tree は out of scope として扱い、新規生成 contract だけを保証する
   - 観測点:
     - requirement / design / plan の境界記述
+- EC-004:
+  - 条件:
+    - docs wording を軽微に調整する
+  - 期待:
+    - docs contract test は stable anchor を維持する限り不要に失敗しない
+  - 観測点:
+    - docs contract tests
 
 ## 入力→出力例（必要時）
 - EX-001:

@@ -38,6 +38,11 @@ spec_dock = [
   "assets/github/workflows/spec-dock-close.yml",
   "assets/spec_dock/templates/**/current/**",
   "assets/spec_dock/templates/**/completed/**",
+  "assets/spec_dock/templates/adr.md",
+  "assets/spec_dock/templates/**/discussions/rules.md",
+  "assets/spec_dock/templates/issue/discussions/_template.md",
+  "assets/spec_dock/templates/initiative/epics/new-epic",
+  "assets/spec_dock/templates/epic/issues/new-issue",
   # v2 node templates should not proliferate README.md; keep only `templates/README.md`.
   "assets/spec_dock/templates/*/**/README.md",
   "assets/spec_dock/templates/design.md",
