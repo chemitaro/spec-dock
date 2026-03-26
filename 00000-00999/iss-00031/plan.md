@@ -17,10 +17,13 @@ ID: "iss-00031"
   - AC-001
   - AC-002
   - AC-003
+  - AC-004
+  - AC-005
 - EC:
   - EC-001
   - EC-002
   - EC-003
+  - EC-004
 - 制約:
   - lowercase path 維持
   - wrapper と symlink の二重運用禁止
@@ -59,14 +62,24 @@ ID: "iss-00031"
     - AC-003
   - review gate:
     - QA review
+- S04:
+  - 観測可能な振る舞い:
+    - review 指摘で見つかった回帰リスクが focused tests と最小修正で固定される
+  - closes:
+    - AC-004, AC-005, EC-004
+  - review gate:
+    - implementation review + QA review + spec review
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02
 - AC-002 -> S01
 - AC-003 -> S03
+- AC-004 -> S04
+- AC-005 -> S04
 - EC-001 -> S02
 - EC-002 -> S01, S03
 - EC-003 -> S02
+- EC-004 -> S04
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -179,6 +192,24 @@ ID: "iss-00031"
   - 無関係な docs rewrite はしない
 - observable command:
   - `python -m unittest discover -v`
+
+### S04 — review 指摘を契約化して回帰を固定する
+- target:
+  - `tests/cli_runtime/test_runtime_new_s08.py`
+  - `tests/test_init_update.py`
+  - `tests/cli_runtime/test_wrappers.py`
+  - 必要最小限の runtime / docs contract 調整
+- design refs:
+  - pre-GitHub で判定可能な collision の fail-fast
+  - legacy node tree preserve 境界
+  - stable anchor 優先の docs contract test
+- step boundary:
+  - issue の public CLI contract や source-of-truth 方針は変更しない
+  - GitHub 採番依存の最終 `dest_dir` collision を pre-GitHub で完全判定する設計へは広げない
+- observable command:
+  - `python -m unittest tests.cli_runtime.test_runtime_new_s08 -v`
+  - `python -m unittest tests.test_init_update -v`
+  - `python -m unittest tests.cli_runtime.test_wrappers -v`
 
 ### nested の使い方
 - `step` は常に使う

@@ -66,10 +66,12 @@ ID: "iss-00031"
   - installer は provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` を source copy として配布し、installed / checked-in 側では `spec-dock/docs/rules/**` を canonical な user-facing rules SoR にできること。
   - runtime `new` 系は child directory 作成後に `rules.md` symlink を作成できること。
   - runtime `new` 系コマンドの public CLI contract は変えない。
+  - GitHub create 連携では、事前に判定可能な local collision / symlink capability failure / rules source 欠落は remote side effect より前に落とすこと。
 - `docs/rules` reference contract:
   - `initiative/epics.md` は `workflow_epic.md` と `reference_naming.md` を参照する。
   - `epic/issues.md` は `workflow_issue.md`, `reference_github.md`, `reference_naming.md` を参照する。
   - `*/discussions.md` は discussion command 導線と naming 参照に留め、採番詳細は既存 docs へ寄せる。
+  - docs contract tests は runtime command path、`docs/rules/**` 参照、wrapper/legacy command 不在のような stable anchor を優先して観測する。
 
 ### UML（推奨: module / dependency）
 ```plantuml
@@ -124,6 +126,9 @@ ID: "iss-00031"
 - Integration:
   - `test_new` で `rules.md` symlink と wrapper absence を確認
   - `test_init_update` で `docs/rules/` 原本配置と wrapper 廃止前提の docs を確認
+  - GitHub create preflight test で、事前判定可能な collision が remote side effect 前に止まることを確認する
+  - update test で、managed templates の legacy cleanup と既存 node tree の legacy artifact preserve の境界を確認する
+  - docs contract test で prose より stable anchor を優先する
 - E2E / manual:
   - `spec-dock init/update` 後に新規 node を作って symlink を inspect
 - migration / rollback / feature flag if needed:
@@ -140,6 +145,7 @@ ID: "iss-00031"
 ## リスク / 移行 / ロールバック（必要時）
 - packaged assets や OS 差で symlink が崩れるリスクがあるため、installer/runtime それぞれで明示テストを置く。
 - 既存 checked-in wrapper は out of scope と明記し、新規生成 contract だけを保証する。
+- GitHub が返す issue 番号に依存する最終 `dest_dir` collision までを pre-GitHub で完全判定することはこの issue の対象外とし、事前判定可能な collision の fail-fast に責務を限定する。
 
 ## 未確定事項
 - なし:
