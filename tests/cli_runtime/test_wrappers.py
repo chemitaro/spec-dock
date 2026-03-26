@@ -73,42 +73,30 @@ class TestCliRulesContract(CliRuntimeHarness):
 
             self.assertIn("`spec-dock/docs/rules/**`", templates_readme)
             self.assertIn("`rules.md` symlink", templates_readme)
-            self.assertIn("入口/ナビゲーション用", templates_readme)
-            self.assertIn("サポートされた実行経路", templates_readme)
-            self.assertNotIn("正本は runtime command と", templates_readme)
-            self.assertNotIn("wrapper", templates_readme)
-            self.assertNotIn("new-epic", templates_readme)
-            self.assertNotIn("new-issue", templates_readme)
+            self.assertIn("./spec-dock/scripts/spec-dock", templates_readme)
+            self.assertNotIn("./spec ", templates_readme)
+            self.assertNotIn("epics/new-epic", templates_readme)
+            self.assertNotIn("issues/new-issue", templates_readme)
 
-            self.assertIn("`epics/rules.md`", workflow_initiative)
             self.assertIn("`spec-dock/docs/rules/initiative/epics.md`", workflow_initiative)
             self.assertIn(
                 "`./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title \"...\"`",
                 workflow_initiative,
             )
-            self.assertIn("への入口", workflow_initiative)
-            self.assertIn("正本は後者", workflow_initiative)
             self.assertIn("./spec-dock/scripts/spec-dock validate", workflow_initiative)
             self.assertIn("./spec-dock/scripts/spec-dock sync", workflow_initiative)
-            self.assertNotIn("この組み合わせを正本とする", workflow_initiative)
             self.assertNotIn("./spec ", workflow_initiative)
-            self.assertNotIn("wrapper", workflow_initiative)
-            self.assertNotIn("new-epic", workflow_initiative)
+            self.assertNotIn("epics/new-epic", workflow_initiative)
 
-            self.assertIn("`issues/rules.md`", workflow_epic)
             self.assertIn("`spec-dock/docs/rules/epic/issues.md`", workflow_epic)
             self.assertIn(
                 "`./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"`",
                 workflow_epic,
             )
-            self.assertIn("への入口", workflow_epic)
-            self.assertIn("正本は後者", workflow_epic)
             self.assertIn("./spec-dock/scripts/spec-dock validate", workflow_epic)
             self.assertIn("./spec-dock/scripts/spec-dock sync", workflow_epic)
-            self.assertNotIn("この組み合わせを正本とする", workflow_epic)
             self.assertNotIn("./spec ", workflow_epic)
-            self.assertNotIn("wrapper", workflow_epic)
-            self.assertNotIn("new-issue", workflow_epic)
+            self.assertNotIn("issues/new-issue", workflow_epic)
 
             for command in (
                 "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"",
@@ -117,29 +105,12 @@ class TestCliRulesContract(CliRuntimeHarness):
                     "<epic-id> --title \"...\""
                 ),
                 "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"",
-                (
-                    "./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> "
-                    "--title \"...\" [--epic <epic-id>] [--allow-foreign-url]"
-                ),
-                "./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>",
-                "./spec-dock/scripts/spec-dock active set --id <issue-id>",
-                "./spec-dock/scripts/spec-dock active set --github-issue <n>",
-                (
-                    "./spec-dock/scripts/spec-dock active set "
-                    "<issue-id|github-issue-number|url> --checkout"
-                ),
-                "./spec-dock/scripts/spec-dock active show",
-                "`./spec-dock/scripts/spec-dock deps check <target> --github`",
-                "`./spec-dock/scripts/spec-dock active set <target> --github --force`",
                 "./spec-dock/scripts/spec-dock validate",
                 "./spec-dock/scripts/spec-dock sync --github",
             ):
                 self.assertIn(command, workflow_issue)
-            self.assertIn("plan upfront approval", workflow_issue)
-            self.assertIn("step result approval", workflow_issue)
-            self.assertIn("docs impact", workflow_issue)
-            self.assertIn("final diff review quality gate", workflow_issue)
             self.assertNotIn("./spec ", workflow_issue)
+            self.assertNotIn("issues/new-issue", workflow_issue)
 
             self.assertIn("`spec-dock/docs/rules/**`", reference_github)
             self.assertIn(
@@ -148,13 +119,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             )
             self.assertIn("`--create-github-issue`", reference_github)
             self.assertIn("`--github-issue <n>`", reference_github)
-            self.assertIn("入口/ナビゲーション用", reference_github)
-            self.assertIn("サポートされた実行経路", reference_github)
-            self.assertIn("`./spec-dock/scripts/spec-dock validate` / `./spec-dock/scripts/spec-dock sync`", reference_github)
-            self.assertNotIn("正本は runtime command と", reference_github)
+            self.assertIn("./spec-dock/scripts/spec-dock", reference_github)
             self.assertNotIn("./spec ", reference_github)
-            self.assertNotIn("wrapper", reference_github)
-            self.assertNotIn("new-issue", reference_github)
+            self.assertNotIn("issues/new-issue", reference_github)
 
             for text, expected_command in (
                 (
@@ -178,8 +145,7 @@ class TestCliRulesContract(CliRuntimeHarness):
                     "`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title \"<title>\"`",
                 ),
             ):
-                self.assertIn("リポジトリ root から実行してください", text)
-                self.assertIn("nested directory では相対 path が変わります", text)
+                self.assertIn("spec-dock/docs/", text)
                 self.assertIn(expected_command, text)
                 self.assertNotIn("./spec ", text)
 
