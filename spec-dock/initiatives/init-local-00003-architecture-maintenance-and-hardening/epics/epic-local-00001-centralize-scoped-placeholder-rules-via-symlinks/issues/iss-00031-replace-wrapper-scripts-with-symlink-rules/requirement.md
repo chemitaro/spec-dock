@@ -1,15 +1,15 @@
 ---
 種別: 要件定義書（Issue）
-ID: "iss-local-00001"
+ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
-関連GitHub: [""]
+関連GitHub: ["#31"]
 状態: "draft"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 親: ["epic-local-00001", "init-local-00003"]
 ---
 
-# iss-local-00001 Replace Wrapper Scripts With Symlink Rules — 要件定義（WHAT / WHY）
+# iss-00031 Replace Wrapper Scripts With Symlink Rules — 要件定義（WHAT / WHY）
 
 ## 目的
 - `new-epic` / `new-issue` wrapper script をやめ、`epics/`, `issues/`, `discussions/` に置く placeholder を `docs/rules/` の中央管理 rule sheet への symlink に統一する。
