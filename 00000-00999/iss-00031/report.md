@@ -218,16 +218,112 @@ sync --github OK
 ---
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
 
-## 学んだこと (任意)
-- ...
-- ...
+## 包括レビュー結果（2026-03-26）
 
-## 今後の推奨事項 (任意)
-- ...
-- ...
+### レビュー対象
+- branch diff:
+  - `dc31512a47ab320552faed60446534a8ac88e968...cf980ed34b4118d4a4b4ceefa9224d25c116be31`
+- 対象観点:
+  - 要件定義書 / 設計書 / 実装計画書との整合
+  - spec reviewer による仕様適合レビュー
+  - code reviewer による局所実装レビュー
+  - QA reviewer による回帰・テスト十分性レビュー
 
-## 省略/例外メモ (必須)
-- 該当なし
+### 実施した確認
+- active docs:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+- 実装差分:
+  - `git log --oneline --decorate`
+  - `git diff --name-only main...HEAD`
+  - `git diff --stat main...HEAD`
+  - `git show --stat --summary --format=fuller HEAD`
+- 手元で実行したテスト:
+  - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_wrappers -v`
+  - `python -m unittest tests.test_init_update -v`
+
+### レビュー結果サマリー
+- spec review:
+  - PASS
+  - `docs/rules` を canonical source-of-truth に寄せる方針、新規生成のみ対象、wrapper 完全廃止、legacy checked-in node tree は out of scope、という requirement/design 境界と実装差分の整合を確認した。
+- code review:
+  - PASS
+  - `create_node.py` の symlink scaffold / preflight / fail-fast、`pyproject.toml` + `setup.py` の packaging guard、provider-side assets と dogfooding mirror の整合について、diff 上の具体的不具合は確認されなかった。
+- QA review:
+  - CONDITIONAL PASS
+  - 重大な blocker はないが、追加で抑えるべき回帰リスクが 3 件ある。
+- 総合判定:
+  - implementation は requirement/design に概ね整合しており、実装方向は妥当。
+  - ただし後続の修正イシューでは、下記の P2/P3 指摘を優先順に解消してから close を判断するのが望ましい。
+
+### 指摘事項一覧
+
+#### 1. [P2] GitHub create 前の collision preflight の create-mode 実ケースを追加する
+- 観点:
+  - QA review
+- 背景:
+  - 新しい pre-GitHub checks は `Missing rules source` と `os.symlink` failure をカバーしているが、target child path に実 collision があるケースが create-mode で未検証。
+- リスク:
+  - `_precheck_pre_github_create_symlink_dest_dir()` やその call path が退行すると、local collision で落ちる前に `issue_create` が走り、不要な remote side effect を起こしうる。
+- 対象:
+  - `tests/cli_runtime/test_runtime_new_s08.py:2265`
+- 推奨修正:
+  - `epics/` または `issues/` に file / symlink collision を事前配置した create-mode ケースを追加する。
+  - `Outcome: pre_github_fail`
+  - gateway call 0 件
+  - local write なし
+  - を明示 assertion する。
+
+#### 2. [P2] legacy node tree は out-of-scope という要件境界を update テストで固定する
+- 観点:
+  - QA review
+- 背景:
+  - 現状の `update` 回帰試験は `spec-dock/templates/**` 配下の wrapper-era leftovers を prune することは確認しているが、既存 node tree 配下に残る legacy artifact は out of scope のまま preserve されることを直接固定していない。
+- リスク:
+  - 将来 broad cleanup が入ったとき、既存 `initiatives/**` node 配下の legacy artifact を誤って消しても tests が通る可能性がある。
+- 対象:
+  - `tests/test_init_update.py:509`
+- 推奨修正:
+  - 既存 node fixture に legacy wrapper / rules 実体を植えた上で `update` を実行し、node-local legacy artifact は preserve されることを確認する専用 test を追加する。
+
+#### 3. [P3] docs contract test の文言依存を弱める
+- 観点:
+  - QA review
+- 背景:
+  - `test_scaffold_docs_point_to_runtime_commands_and_rules_docs` は exact wording への依存が強く、編集上の harmless copy change でも failure しやすい。
+- リスク:
+  - 契約上の本質ではない prose の微修正で test が壊れ、保守コストと false positive が増える。
+- 対象:
+  - `tests/cli_runtime/test_wrappers.py:74`
+- 推奨修正:
+  - assertion を stable contract signal に寄せる。
+  - 例:
+    - runtime command path
+    - `docs/rules/**` reference
+    - wrapper absence
+    - `rules.md` symlink guidance
+
+### 指摘なしで通過した観点
+- `spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` との整合:
+  - 差分は `docs/rules/**` 正本、wrapper 完全廃止、新規生成 contract 限定、symlink 非対応環境は非対応、という approved scope を外していない。
+- 局所コード健全性:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+  - `pyproject.toml`
+  - `setup.py`
+  - について、code reviewer から actionable finding は出ていない。
+- packaging / mirror parity:
+  - provider-side assets と checked-in dogfooding mirror の整合を保つ方向で実装されており、意図と整合している。
+
+### 後続修正向けメモ
+- 本レビューでは実装の修正は行っていない。
+- 次の修正作業では、まず P2 を 2 件、その後に P3 を扱う順序を推奨する。
+- 追加修正後は、少なくとも以下を再実行して review を閉じる。
+  - `python -m unittest tests.cli_runtime.test_runtime_new_s08 -v`
+  - `python -m unittest tests.test_init_update -v`
+  - `python -m unittest tests.cli_runtime.test_wrappers -v`
+- 各指摘の妥当性 / 修正要否 / 修正案比較は次の分析シートを参照する。
+  - `spec-dock/active/issue/discussions/002-disc-review-analysis-github-create-collision-preflight.md`
+  - `spec-dock/active/issue/discussions/003-disc-review-analysis-legacy-node-update-boundary.md`
+  - `spec-dock/active/issue/discussions/004-disc-review-analysis-docs-contract-test-brittleness.md`
