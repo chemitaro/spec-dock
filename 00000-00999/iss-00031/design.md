@@ -3,7 +3,7 @@
 ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
 関連GitHub: ["#31"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 依存: ["requirement.md"]
@@ -37,9 +37,9 @@ ID: "iss-00031"
 - 現状理解:
   - runtime node creation は template tree を `copy_scaffolded_tree()` で materialize する。
   - installer `init/update` は `shutil.copytree()` ベースで assets を同期する。
-  - `docs/` は workflow / phase playbook の正本であり、rules 文書の SoR として自然である。
+  - canonical な user-facing rules source-of-truth は checked-in `spec-dock/docs/rules/**` に置くのが自然であり、provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` は package に同梱する authoring/source copy として扱う。
 - 採用するパターン:
-  - provider-side の `docs/rules/` に中央管理 rules 実体を置く。
+  - `spec-dock/docs/rules/**` を user-facing rules の正本とし、provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` はそれを配布するための source copy とする。
   - runtime create flow が新規 node 作成時に `rules.md` symlink を明示配置する。
 - 採用しないもの:
   - wrapper script を `rules.md` に名前変更するだけの延命。
@@ -53,17 +53,17 @@ ID: "iss-00031"
 
 ## 採用方針 / トレードオフ
 - 論点:
-  - 中央管理 rules 実体をどこに置くか。
+  - canonical な user-facing SoR と provider-side source copy の役割分担をどう明示するか。
   - symlink 配置を汎用 scaffolder で吸収するか、create flow に局所化するか。
 - 選択肢:
   - `system/` 原本 + generic symlink-aware scaffolder
   - `docs/rules/` 原本 + create flow による明示 symlink 配置
 - 決定:
-  - 後者。dogfooding 専用でシンプルさを優先し、原本の意味論も docs に一致するため。
+  - 後者。canonical な user-facing rules SoR は `spec-dock/docs/rules/**` に固定し、provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` は package 同梱用の authoring/source copy としてのみ扱うことで、権威的に見える tree を 2 つ残さない。
 
 ## インターフェース契約
 - API / function / protocol / data boundary:
-  - installer は `docs/rules/` 原本を通常の managed docs として配布できること。
+  - installer は provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` を source copy として配布し、installed / checked-in 側では `spec-dock/docs/rules/**` を canonical な user-facing rules SoR にできること。
   - runtime `new` 系は child directory 作成後に `rules.md` symlink を作成できること。
   - runtime `new` 系コマンドの public CLI contract は変えない。
 - `docs/rules` reference contract:
@@ -84,7 +84,7 @@ ID: "iss-00031"
 - responsibility:
   - テンプレ展開後に child directory と `rules.md` symlink を追加する。
 - collaboration:
-  - installer は `docs/rules/` を配り、runtime create flow はそれを target にする。
+  - installer は provider-side source copy から `spec-dock/docs/rules/**` を配り、runtime create flow はその canonical tree を target にする。
 
 ### UML（任意: class / interface）
 ```plantuml

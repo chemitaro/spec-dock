@@ -3,7 +3,7 @@
 ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
 関連GitHub: ["#31"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 親: ["epic-local-00001", "init-local-00003"]
@@ -12,8 +12,8 @@ ID: "iss-00031"
 # iss-00031 Replace Wrapper Scripts With Symlink Rules — 要件定義（WHAT / WHY）
 
 ## 目的
-- `new-epic` / `new-issue` wrapper script をやめ、`epics/`, `issues/`, `discussions/` に置く placeholder を `docs/rules/` の中央管理 rule sheet への symlink に統一する。
-- provider-side assets の正本を `docs/rules/` に置き、installer / runtime / docs / tests がその新規生成 contract を守る状態へ更新する。
+ - `new-epic` / `new-issue` wrapper script をやめ、`epics/`, `issues/`, `discussions/` に置く placeholder を `docs/rules/` の中央管理 rule sheet への symlink に統一する。
+ - canonical な user-facing rules source-of-truth を `spec-dock/docs/rules/**` に置き、provider-side assets 配下 `src/spec_dock/assets/spec_dock/docs/rules/**` は package に同梱する authoring/source files として installer / runtime / docs / tests がその新規生成 contract を守る状態へ更新する。
 
 ## 背景・現状
 - 現状の挙動:
@@ -69,9 +69,9 @@ ID: "iss-00031"
 
 ## 境界
 - Always:
-  - provider-side `src/spec_dock/assets/spec_dock/...` を source-of-truth として修正する。
+  - provider-side `src/spec_dock/assets/spec_dock/...` は package に同梱する authoring/source files として修正し、canonical な user-facing rules source-of-truth は `spec-dock/docs/rules/**` に置く。
   - child directory の placeholder 名は `rules.md` に統一する。
-  - symlink target は repo 内の `docs/rules/` に限定する。
+  - symlink target は repo 内の `spec-dock/docs/rules/` に限定する。
 - Ask:
   - `docs/rules/` の粒度と参照先 docs が重複過多にならないか。
   - runtime create flow へ足すのが最小の責務か。

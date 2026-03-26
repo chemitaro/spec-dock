@@ -3,7 +3,7 @@
 ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
 関連GitHub: ["#31"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -13,7 +13,8 @@ ID: "iss-00031"
 # iss-00031 Replace Wrapper Scripts With Symlink Rules — 実装報告（LOG）
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `new-epic` / `new-issue` wrapper を廃止し、新規 initiative / epic / issue の child directory が `rules.md` symlink 経由で `spec-dock/docs/rules/**` の canonical rules を参照する contract に揃えた。
+- provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` は package に同梱する authoring/source files として保持し、`init/update` と checked-in mirror が `spec-dock/docs/rules/**` へ同内容を展開することを tests で固定した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -152,11 +153,67 @@ python -m unittest discover -v
 - `spec-dock/active/issue/plan.md` - S03 design ref wording を SoR 決定に合わせて補正
 
 #### コミット
-- （この直後に S03 scope をコミット）
+- `1cd9be02602d42d6b77296cb783c299af022aafe` `docs(rules): wrapper 廃止後の docs と回帰試験を整合`
 
 #### メモ
 - code_reviewer / qa_reviewer / spec_reviewer による S03 scoped review は pass。
 - S03 では runtime 実装の変更は不要で、docs/tests/dogfooding parity の整理で acceptance を閉じた。
+
+---
+
+### 2026-03-26 17:45 - 18:08
+
+#### 対象
+- Step: S99
+- AC/EC: final gate evidence / actionable close-out
+
+#### 実施内容
+- final-review 指摘に従い、`pyproject.toml` の `tool.setuptools.exclude-package-data.spec_dock` guard に加えて、stale build output を混ぜた local wheel build でも wrapper-era template asset が wheel に入らないことを `tests/test_init_update.py` で可視化した。
+- `tests/test_init_update.py` に checked-in runtime mirror parity guard を追加し、`spec-dock/scripts/spec_dock_runtime/application/create_node.py` が provider runtime asset と一致し続けることを固定した。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` と checked-in runtime mirror の双方で、GitHub issue 作成前に symlink capability を preflight するように修正し、remote side effect より先に fail-fast するよう整えた。
+- `workflow_issue.md` の command examples を guaranteed runtime path に揃え、関連 docs/tests/spec artifact を最新の SoR 判断へ追随させた。
+- `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` を実行し、generated state を更新して `iss-00031` が GitHub authority / `OPEN` / `stale=false` で観測される状態まで反映した。
+- `main` merge-base `dc31512a47ab320552faed60446534a8ac88e968` との差分を最終確認し、final code review / final QA review / final spec review は PASS と判断した。
+- uppercase path non-increase を確認し、今回の最終差分で新たな uppercase path 追加はなく、変更対象は既存の uppercase filename のみであることを記録した。
+
+#### 実行コマンド / 結果
+```bash
+git --no-pager diff --name-only dc31512a47ab320552faed60446534a8ac88e968...HEAD
+python -m unittest tests.test_init_update.TestInitUpdate.test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs -v
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
+python -m unittest discover -v
+
+final diff review completed
+1 test OK
+1 test OK
+validate OK (nodes=4)
+sync --github OK
+464 tests OK
+```
+
+#### 変更したファイル
+- `pyproject.toml` - stale build output 向けの wrapper-era template asset exclusion を追加
+- `tests/test_init_update.py` - observable wheel-build packaging regression、checked-in runtime mirror parity guard、workflow_issue guidance / packaging guard を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - GitHub issue 作成前の symlink capability preflight を追加
+- `spec-dock/scripts/spec_dock_runtime/application/create_node.py` - checked-in runtime mirror を provider runtime asset に同期
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` / `spec-dock/docs/workflow_issue.md` - guaranteed runtime path guidance に更新
+- `spec-dock/active/issue/design.md` / `requirement.md` / `spec-dock/active/epic/report.md` - latest SoR / close-out wording に整合
+- `spec-dock/active/issue/report.md` - S99 final gate evidence を更新
+
+#### コミット
+- 未コミット（final-review close-out の作業ツリー差分）
+
+#### メモ
+- final diff review 対象 merge-base: `dc31512a47ab320552faed60446534a8ac88e968`
+- final code review: PASS
+- final QA review: PASS
+- final spec review: PASS（actionable close-out items 充足）
+- latest full test evidence: `python -m unittest discover -v` 464 tests OK
+- workflow finish evidence: `./spec-dock/scripts/spec-dock validate` OK / `./spec-dock/scripts/spec-dock sync --github` OK
+- generated state after sync: `iss-00031` / authority=`github` / state=`OPEN` / stale=`false`
+- uppercase path non-increase: PASS（新規 uppercase path 追加なし。既存 uppercase filename の変更のみ）
 
 ---
 
