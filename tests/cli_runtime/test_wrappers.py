@@ -1,25 +1,12 @@
-import json
 import os
-import shutil
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
 
-from tests.cli_runtime.harness import (
-    CliRuntimeHarness,
-    _EXPECTED_MANAGED_SKILL_NAMES,
-    _expected_spec_dock_version,
-    main,
-)
+from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
-class TestCliWrappers(CliRuntimeHarness):
-    def test_wrappers_are_executable(self) -> None:
-        if os.name == "nt":
-            self.skipTest("Wrapper executable bit checks are for macOS/Linux only.")
-
+class TestCliRulesContract(CliRuntimeHarness):
+    def test_new_nodes_create_rules_symlinks_and_no_wrappers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -31,50 +18,175 @@ class TestCliWrappers(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+            expected_rules_links = {
+                init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
+                init_dir / "discussions" / "rules.md": (
+                    target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+                ),
+                epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
+                epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
+                issue_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md",
+            }
+            for link_path, target_path in expected_rules_links.items():
+                self.assertTrue(link_path.is_symlink(), f"missing rules symlink: {link_path}")
+                self.assertEqual(link_path.resolve(), target_path.resolve())
+                self.assertEqual(os.readlink(link_path), os.path.relpath(target_path, start=link_path.parent))
 
-            wrappers = [
-                init_dir / "epics" / "new-epic",
-                epic_dir / "issues" / "new-issue",
-            ]
-            for wrapper in wrappers:
-                self.assertTrue(wrapper.is_file(), f"missing wrapper: {wrapper}")
-                self.assertTrue(os.access(wrapper, os.X_OK), f"wrapper is not executable: {wrapper}")
+            self.assertFalse((init_dir / "epics" / "new-epic").exists())
+            self.assertFalse((epic_dir / "issues" / "new-issue").exists())
+            self.assertEqual(list((init_dir / "epics").glob("new-*")), [])
+            self.assertEqual(list((epic_dir / "issues").glob("new-*")), [])
 
-    def test_new_epic_wrapper_creates_local_epic(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
+    def test_scaffold_docs_point_to_runtime_commands_and_rules_docs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+
+            templates_readme = (target / "spec-dock" / "templates" / "README.md").read_text(encoding="utf-8")
+            workflow_initiative = (
+                target / "spec-dock" / "docs" / "workflow_initiative.md"
+            ).read_text(encoding="utf-8")
+            workflow_epic = (target / "spec-dock" / "docs" / "workflow_epic.md").read_text(
+                encoding="utf-8"
+            )
+            reference_github = (target / "spec-dock" / "docs" / "reference_github.md").read_text(
+                encoding="utf-8"
+            )
+            initiative_epics_rules = (
+                target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md"
+            ).read_text(encoding="utf-8")
+            initiative_discussions_rules = (
+                target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+            ).read_text(encoding="utf-8")
+            epic_issues_rules = (
+                target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md"
+            ).read_text(encoding="utf-8")
+            epic_discussions_rules = (
+                target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
+            ).read_text(encoding="utf-8")
+            issue_discussions_rules = (
+                target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
+            ).read_text(encoding="utf-8")
+
+            self.assertIn("`spec-dock/docs/rules/**`", templates_readme)
+            self.assertIn("`rules.md` symlink", templates_readme)
+            self.assertIn("入口/ナビゲーション用", templates_readme)
+            self.assertIn("サポートされた実行経路", templates_readme)
+            self.assertNotIn("正本は runtime command と", templates_readme)
+            self.assertNotIn("wrapper", templates_readme)
+            self.assertNotIn("new-epic", templates_readme)
+            self.assertNotIn("new-issue", templates_readme)
+
+            self.assertIn("`epics/rules.md`", workflow_initiative)
+            self.assertIn("`spec-dock/docs/rules/initiative/epics.md`", workflow_initiative)
+            self.assertIn(
+                "`./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title \"...\"`",
+                workflow_initiative,
+            )
+            self.assertIn("への入口", workflow_initiative)
+            self.assertIn("正本は後者", workflow_initiative)
+            self.assertIn("./spec-dock/scripts/spec-dock validate", workflow_initiative)
+            self.assertIn("./spec-dock/scripts/spec-dock sync", workflow_initiative)
+            self.assertNotIn("この組み合わせを正本とする", workflow_initiative)
+            self.assertNotIn("./spec ", workflow_initiative)
+            self.assertNotIn("wrapper", workflow_initiative)
+            self.assertNotIn("new-epic", workflow_initiative)
+
+            self.assertIn("`issues/rules.md`", workflow_epic)
+            self.assertIn("`spec-dock/docs/rules/epic/issues.md`", workflow_epic)
+            self.assertIn(
+                "`./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"`",
+                workflow_epic,
+            )
+            self.assertIn("への入口", workflow_epic)
+            self.assertIn("正本は後者", workflow_epic)
+            self.assertIn("./spec-dock/scripts/spec-dock validate", workflow_epic)
+            self.assertIn("./spec-dock/scripts/spec-dock sync", workflow_epic)
+            self.assertNotIn("この組み合わせを正本とする", workflow_epic)
+            self.assertNotIn("./spec ", workflow_epic)
+            self.assertNotIn("wrapper", workflow_epic)
+            self.assertNotIn("new-issue", workflow_epic)
+
+            self.assertIn("`spec-dock/docs/rules/**`", reference_github)
+            self.assertIn(
+                "`./spec-dock/scripts/spec-dock new issue --no-github --epic <id> --title \"...\"`",
+                reference_github,
+            )
+            self.assertIn("`--create-github-issue`", reference_github)
+            self.assertIn("`--github-issue <n>`", reference_github)
+            self.assertIn("入口/ナビゲーション用", reference_github)
+            self.assertIn("サポートされた実行経路", reference_github)
+            self.assertIn("`./spec-dock/scripts/spec-dock validate` / `./spec-dock/scripts/spec-dock sync`", reference_github)
+            self.assertNotIn("正本は runtime command と", reference_github)
+            self.assertNotIn("./spec ", reference_github)
+            self.assertNotIn("wrapper", reference_github)
+            self.assertNotIn("new-issue", reference_github)
+
+            for text, expected_command in (
+                (
+                    initiative_epics_rules,
+                    "`./spec-dock/scripts/spec-dock new epic --initiative <id> --title \"<title>\" --no-github`",
+                ),
+                (
+                    initiative_discussions_rules,
+                    "`./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title \"<title>\"`",
+                ),
+                (
+                    epic_issues_rules,
+                    "`./spec-dock/scripts/spec-dock new issue --epic <id> --title \"<title>\"`",
+                ),
+                (
+                    epic_discussions_rules,
+                    "`./spec-dock/scripts/spec-dock new doc adr --epic <id> --title \"<title>\"`",
+                ),
+                (
+                    issue_discussions_rules,
+                    "`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title \"<title>\"`",
+                ),
+            ):
+                self.assertIn("リポジトリ root から実行してください", text)
+                self.assertIn("nested directory では相対 path が変わります", text)
+                self.assertIn(expected_command, text)
+                self.assertNotIn("./spec ", text)
+
+    def test_new_doc_numbering_and_validate_ignore_initiative_discussion_rules_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            wrapper = init_dir / "epics" / "new-epic"
+            initiative_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            discussions_dir = initiative_dir / "discussions"
+            rules_target = target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
 
-            bin_dir = target / ".bin-no-gh"
-            bin_dir.mkdir(parents=True, exist_ok=True)
-            for cmd in ("bash", "python3", "dirname"):
-                cmd_path = shutil.which(cmd)
-                self.assertIsNotNone(cmd_path, f"{cmd} not available")
-                link_path = bin_dir / cmd
-                try:
-                    os.symlink(cmd_path, link_path)
-                except OSError:
-                    shutil.copy2(cmd_path, link_path)
-                    link_path.chmod(0o755)
+            rules_link = discussions_dir / "rules.md"
+            self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
+            self.assertEqual(rules_link.resolve(), rules_target.resolve())
 
-            p = self._run_wrapper_capture(wrapper, ["JWT Auth"], env={"PATH": str(bin_dir)})
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
+            self._run_runtime(target, ["new", "doc", "adr", "--initiative", "1", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--initiative", "1", "--title", "Why now"])
 
-    def test_new_issue_wrapper_creates_github_issue_by_default(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
+            self.assertTrue((discussions_dir / "001-adr-decision-one.md").is_file())
+            self.assertTrue((discussions_dir / "002-disc-why-now.md").is_file())
+            self.assertEqual(
+                sorted(path.name for path in discussions_dir.iterdir()),
+                ["001-adr-decision-one.md", "002-disc-why-now.md", "rules.md"],
+            )
 
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+
+    def test_new_doc_numbering_and_validate_ignore_epic_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
 
@@ -86,40 +198,35 @@ class TestCliWrappers(CliRuntimeHarness):
                 / "epics"
                 / "epic-local-00001-jwt-auth"
             )
-            wrapper = epic_dir / "issues" / "new-issue"
+            discussions_dir = epic_dir / "discussions"
+            rules_target = target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
+            rules_link = discussions_dir / "rules.md"
+            self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
+            self.assertEqual(rules_link.resolve(), rules_target.resolve())
 
-            bin_dir = target / ".bin"
-            bin_dir.mkdir(parents=True, exist_ok=True)
-            gh_path = bin_dir / "gh"
-            gh_path.write_text(
-                "#!/usr/bin/env bash\n"
-                "set -euo pipefail\n"
-                'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
-                "  echo \"https://github.com/example/repo/issues/123\"\n"
-                "  exit 0\n"
-                "fi\n"
-                "echo \"unexpected gh args: $@\" >&2\n"
-                "exit 1\n",
-                encoding="utf-8",
+            self._run_runtime(target, ["new", "doc", "adr", "--epic", "1", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--epic", "1", "--title", "Why now"])
+
+            self.assertTrue((discussions_dir / "001-adr-decision-one.md").is_file())
+            self.assertTrue((discussions_dir / "002-disc-why-now.md").is_file())
+            self.assertEqual(
+                sorted(path.name for path in discussions_dir.iterdir()),
+                ["001-adr-decision-one.md", "002-disc-why-now.md", "rules.md"],
             )
-            gh_path.chmod(0o755)
 
-            p = self._run_wrapper_capture(
-                wrapper,
-                ["Add refresh token"],
-                env={"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"},
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            issue_meta_path = epic_dir / "issues" / "iss-00123-add-refresh-token" / ".meta.json"
-            self.assertTrue(issue_meta_path.is_file())
-            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
-            self.assertEqual(issue_meta["id"], "iss-00123")
-            self.assertEqual(issue_meta["github"]["issue_number"], 123)
+            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
 
-    def test_new_nodes_do_not_include_new_adr_wrapper(self) -> None:
+    def test_new_doc_numbering_and_validate_ignore_issue_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+
             self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
             self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
             self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
@@ -134,104 +241,29 @@ class TestCliWrappers(CliRuntimeHarness):
                 / "issues"
                 / "iss-local-00001-add-refresh-token"
             )
-            self.assertFalse((issue_dir / "adrs").exists())
-            self.assertFalse((issue_dir / "discussions" / "new-adr").exists())
+            discussions_dir = issue_dir / "discussions"
+            rules_target = target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
+            rules_link = discussions_dir / "rules.md"
+            self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
+            self.assertEqual(rules_link.resolve(), rules_target.resolve())
 
-    def test_wrappers_reject_invalid_args(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "1", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--issue", "1", "--title", "Why now"])
 
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self.assertTrue((discussions_dir / "001-adr-decision-one.md").is_file())
+            self.assertTrue((discussions_dir / "002-disc-why-now.md").is_file())
+            self.assertEqual(
+                sorted(path.name for path in discussions_dir.iterdir()),
+                ["001-adr-decision-one.md", "002-disc-why-now.md", "rules.md"],
+            )
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
-            issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
-            wrappers = [
-                init_dir / "epics" / "new-epic",
-                epic_dir / "issues" / "new-issue",
-            ]
-
-            for wrapper in wrappers:
-                p0 = self._run_wrapper_capture(wrapper, [])
-                self.assertNotEqual(p0.returncode, 0)
-                self.assertIn("usage:", p0.stderr)
-
-                p2 = self._run_wrapper_capture(wrapper, ["one", "two"])
-                self.assertNotEqual(p2.returncode, 0)
-                self.assertIn("usage:", p2.stderr)
-
-    def test_wrapper_fails_when_meta_missing_or_invalid(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            wrapper = init_dir / "epics" / "new-epic"
-            meta_path = init_dir / ".meta.json"
-
-            meta_path.unlink()
-            p_missing = self._run_wrapper_capture(wrapper, ["JWT Auth"])
-            self.assertNotEqual(p_missing.returncode, 0)
-            self.assertIn("missing .meta.json", p_missing.stderr)
-
-            self._write_text_force(meta_path, "{ invalid json")
-            p_invalid = self._run_wrapper_capture(wrapper, ["JWT Auth"])
-            self.assertNotEqual(p_invalid.returncode, 0)
-            self.assertIn("invalid .meta.json", p_invalid.stderr)
-
-    def test_wrapper_fails_when_only_legacy_meta_json_exists(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            wrapper = init_dir / "epics" / "new-epic"
-            dot_meta_path = init_dir / ".meta.json"
-            legacy_meta_path = init_dir / "meta.json"
-
-            dot_meta_path.rename(legacy_meta_path)
-            self.assertTrue(legacy_meta_path.is_file())
-            self.assertFalse(dot_meta_path.exists())
-
-            p = self._run_wrapper_capture(wrapper, ["JWT Auth"])
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("missing .meta.json", p.stderr)
-            self.assertFalse(dot_meta_path.exists())
-            self.assertTrue(legacy_meta_path.is_file())
-            self.assertFalse((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
-
-    def test_wrapper_fails_when_runtime_not_found(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            wrapper = init_dir / "epics" / "new-epic"
-            runtime_script = target / "spec-dock" / "scripts" / "spec-dock"
-            runtime_backup = target / "spec-dock" / "scripts" / "spec-dock.bak"
-            runtime_script.rename(runtime_backup)
-
-            p = self._run_wrapper_capture(wrapper, ["JWT Auth"])
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("runtime script not found", p.stderr)
-            self.assertIn("spec-dock init", p.stderr)
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
 
     def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -246,71 +278,3 @@ class TestCliWrappers(CliRuntimeHarness):
             self.assertNotEqual(p.returncode, 0)
             self.assertIn("runtime module missing", p.stderr)
             self.assertIn("spec-dock update", p.stderr)
-
-    def test_new_epic_wrapper_does_not_require_gh_even_with_github_parent(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--github-issue", "123", "--title", "Auth platform"])
-
-            init_dir = target / "spec-dock" / "initiatives" / "init-00123-auth-platform"
-            wrapper = init_dir / "epics" / "new-epic"
-
-            bin_dir = target / ".bin-no-gh"
-            bin_dir.mkdir(parents=True, exist_ok=True)
-            for cmd in ("bash", "python3", "dirname"):
-                cmd_path = shutil.which(cmd)
-                self.assertIsNotNone(cmd_path, f"{cmd} not available")
-                link_path = bin_dir / cmd
-                try:
-                    os.symlink(cmd_path, link_path)
-                except OSError:
-                    shutil.copy2(cmd_path, link_path)
-                    link_path.chmod(0o755)
-
-            p = self._run_wrapper_capture(wrapper, ["JWT Auth"], env={"PATH": str(bin_dir)})
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertTrue((init_dir / "epics" / "epic-local-00001-jwt-auth" / ".meta.json").is_file())
-
-    def test_new_issue_wrapper_fails_without_gh_and_shows_guidance(self) -> None:
-        if os.name == "nt":
-            self.skipTest("This test executes bash wrapper scripts; skip on Windows.")
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-
-            epic_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-local-00001-auth-platform"
-                / "epics"
-                / "epic-local-00001-jwt-auth"
-            )
-            wrapper = epic_dir / "issues" / "new-issue"
-
-            bin_dir = target / ".bin-no-gh"
-            bin_dir.mkdir(parents=True, exist_ok=True)
-            for cmd in ("bash", "python3", "dirname"):
-                cmd_path = shutil.which(cmd)
-                self.assertIsNotNone(cmd_path, f"{cmd} not available")
-                link_path = bin_dir / cmd
-                try:
-                    os.symlink(cmd_path, link_path)
-                except OSError:
-                    shutil.copy2(cmd_path, link_path)
-                    link_path.chmod(0o755)
-
-            p = self._run_wrapper_capture(wrapper, ["Add refresh token"], env={"PATH": str(bin_dir)})
-            self.assertNotEqual(p.returncode, 0)
-            self.assertIn("option 1)", p.stderr)
-            self.assertIn("option 2)", p.stderr)
-            self.assertIn("--no-github", p.stderr)
-            self.assertEqual(list((epic_dir / "issues").glob("iss-*")), [])
-

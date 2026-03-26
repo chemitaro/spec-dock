@@ -24,15 +24,15 @@ Initiative は投資単位です。
 ## 作成
 
 ```bash
-./spec new initiative --title "..."
-./spec new initiative --github-issue <n> --title "..."
-./spec new initiative --create-github-issue --title "..."
+./spec-dock/scripts/spec-dock new initiative --title "..."
+./spec-dock/scripts/spec-dock new initiative --github-issue <n> --title "..."
+./spec-dock/scripts/spec-dock new initiative --create-github-issue --title "..."
 
-./spec import initiative <num|#num|url> --title "..."
+./spec-dock/scripts/spec-dock import initiative <num|#num|url> --title "..."
 ```
 
 - naming 制約と GitHub 振る舞いは [reference_naming.md](reference_naming.md), [reference_github.md](reference_github.md) を参照する
-- Initiative 配下では wrapper `epics/new-epic "<title>"` で local-only Epic を追加できる
+- Initiative 配下の Epic 作成は runtime command `./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title "..."` を使う。生成される `epics/rules.md` は `spec-dock/docs/rules/initiative/epics.md` への入口で、作成ルールの正本は後者にある
 
 ## 記述
 
@@ -59,6 +59,6 @@ Initiative は投資単位です。
 ## 仕上げ
 
 ```bash
-./spec validate
-./spec sync
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync
 ```

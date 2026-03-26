@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -270,8 +271,18 @@ class TestRuntimeImportS10(unittest.TestCase):
         initiative_dir = specdock_dir / "templates" / "initiative"
         epic_dir = specdock_dir / "templates" / "epic"
         issue_dir = specdock_dir / "templates" / "issue"
+        rules_docs = {
+            specdock_dir / "docs" / "rules" / "initiative" / "discussions.md": "# initiative discussions rules\n",
+            specdock_dir / "docs" / "rules" / "initiative" / "epics.md": "# initiative epics rules\n",
+            specdock_dir / "docs" / "rules" / "epic" / "discussions.md": "# epic discussions rules\n",
+            specdock_dir / "docs" / "rules" / "epic" / "issues.md": "# epic issues rules\n",
+            specdock_dir / "docs" / "rules" / "issue" / "discussions.md": "# issue discussions rules\n",
+        }
         for path in (initiative_dir, epic_dir, issue_dir):
             path.mkdir(parents=True, exist_ok=True)
+        for path, text in rules_docs.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
         (initiative_dir / "README.md").write_text(
             "initiative=<INIT_ID> title=<INIT_TITLE> github=<GITHUB_ISSUE_NUMBER_OR_URL>\n",
             encoding="utf-8",
@@ -1219,6 +1230,12 @@ class TestRuntimeImportS10(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(calls[0][0], "iss-00909")
             self.assertEqual(result.node.id, "iss-00909")
+            rules_link = result.node.path / "discussions" / "rules.md"
+            rules_target = specdock_dir / "docs" / "rules" / "issue" / "discussions.md"
+            self.assertTrue(rules_link.is_symlink(), f"missing imported rules symlink: {rules_link}")
+            self.assertEqual(rules_link.resolve(), rules_target.resolve())
+            self.assertEqual(os.readlink(rules_link), os.path.relpath(rules_target, start=rules_link.parent))
+            self.assertEqual(list(result.node.path.rglob("new-*")), [])
 
     def test_renderer_text_regression(self) -> None:
         (
