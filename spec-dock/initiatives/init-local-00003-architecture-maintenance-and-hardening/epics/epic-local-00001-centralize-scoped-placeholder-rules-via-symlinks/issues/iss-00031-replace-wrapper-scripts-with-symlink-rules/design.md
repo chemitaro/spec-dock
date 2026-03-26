@@ -1,8 +1,8 @@
 ---
 種別: 設計書（Issue）
-ID: "iss-local-00001"
+ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
-関連GitHub: [""]
+関連GitHub: ["#31"]
 状態: "draft"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
@@ -10,7 +10,7 @@ ID: "iss-local-00001"
 親: ["epic-local-00001", "init-local-00003"]
 ---
 
-# iss-local-00001 Replace Wrapper Scripts With Symlink Rules — 設計（HOW）
+# iss-00031 Replace Wrapper Scripts With Symlink Rules — 設計（HOW）
 
 ## 目的・制約
 - 目的:
