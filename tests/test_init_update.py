@@ -34,6 +34,29 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
         ),
     }
+    _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
+        "spec-dock/docs/workflow_initiative.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
+        ),
+        "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
+        "spec-dock/docs/reference_github.md": (
+            "src/spec_dock/assets/spec_dock/docs/reference_github.md"
+        ),
+        "spec-dock/docs/rules/initiative/discussions.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
+        ),
+        "spec-dock/docs/rules/initiative/epics.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"
+        ),
+        "spec-dock/docs/rules/epic/discussions.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"
+        ),
+        "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+        "spec-dock/docs/rules/issue/discussions.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
+        ),
+    }
 
     _CANONICAL_RULES_EXPECTATIONS = {
         "docs/rules/initiative/discussions.md": {
@@ -41,6 +64,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "# discussions/rules.md",
                 "このディレクトリには initiative に紐づく議論資料を置きます。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
+                "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title",
                 "./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title",
                 "./spec-dock/scripts/spec-dock new doc research --initiative <id> --title",
@@ -56,6 +80,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "# epics/rules.md",
                 "このディレクトリには initiative 配下の epic を作成します。",
                 "Epic workflow: `spec-dock/docs/workflow_epic.md`",
+                "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new epic --initiative <id> --title",
                 "--no-github",
             ),
@@ -69,6 +94,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "# discussions/rules.md",
                 "このディレクトリには epic に紐づく議論資料を置きます。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
+                "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new doc adr --epic <id> --title",
                 "./spec-dock/scripts/spec-dock new doc disc --epic <id> --title",
                 "./spec-dock/scripts/spec-dock new doc research --epic <id> --title",
@@ -85,6 +111,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "このディレクトリには epic 配下の issue を作成します。",
                 "Issue workflow: `spec-dock/docs/workflow_issue.md`",
                 "GitHub linkage: `spec-dock/docs/reference_github.md`",
+                "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new issue --epic <id> --title",
             ),
             "absent": (
@@ -97,6 +124,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "# discussions/rules.md",
                 "このディレクトリには issue に紐づく議論資料を置きます。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
+                "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new doc adr --issue <id> --title",
                 "./spec-dock/scripts/spec-dock new doc disc --issue <id> --title",
                 "./spec-dock/scripts/spec-dock new doc research --issue <id> --title",
@@ -149,6 +177,56 @@ class TestInitUpdate(CliRuntimeHarness):
                 asset_path.read_text(encoding="utf-8"),
                 f"canonical rules file diverged from provider asset: {installed_rel_path}",
             )
+
+    def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
+        for mirror_rel_path, asset_rel_path in self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP.items():
+            mirror_path = repo_root / mirror_rel_path
+            asset_path = repo_root / asset_rel_path
+            self.assertTrue(mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}")
+            self.assertTrue(asset_path.is_file(), f"missing provider asset file: {asset_path}")
+            self.assertEqual(
+                mirror_path.read_text(encoding="utf-8"),
+                asset_path.read_text(encoding="utf-8"),
+                f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}",
+            )
+
+    def _assert_installed_templates_match_provider_assets(
+        self,
+        installed_base: Path,
+        repo_root: Path | None = None,
+    ) -> None:
+        if repo_root is None:
+            repo_root = Path(__file__).resolve().parents[1]
+        mirror_root = installed_base / "spec-dock" / "templates"
+        asset_root = repo_root / "src/spec_dock/assets/spec_dock/templates"
+
+        mirror_entries = sorted(path.relative_to(mirror_root).as_posix() for path in mirror_root.rglob("*"))
+        asset_entries = sorted(path.relative_to(asset_root).as_posix() for path in asset_root.rglob("*"))
+        self.assertEqual(
+            mirror_entries,
+            asset_entries,
+            "installed templates tree diverged from provider assets",
+        )
+
+        for rel_path in asset_entries:
+            mirror_path = mirror_root / rel_path
+            asset_path = asset_root / rel_path
+            self.assertEqual(
+                mirror_path.is_dir(),
+                asset_path.is_dir(),
+                f"installed templates entry kind diverged from provider asset: {rel_path}",
+            )
+            self.assertEqual(
+                mirror_path.is_file(),
+                asset_path.is_file(),
+                f"installed templates entry kind diverged from provider asset: {rel_path}",
+            )
+            if asset_path.is_file():
+                self.assertEqual(
+                    mirror_path.read_text(encoding="utf-8"),
+                    asset_path.read_text(encoding="utf-8"),
+                    f"installed template diverged from provider asset: {rel_path}",
+                )
 
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -252,6 +330,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
             # Legacy (v1) templates should not be installed.
             templates_dir = target / "spec-dock" / "templates"
+            self._assert_installed_templates_match_provider_assets(target)
             for legacy in ("requirement.md", "design.md", "plan.md", "report.md"):
                 self.assertFalse((templates_dir / legacy).exists(), f"legacy template leaked: {legacy}")
             self.assertEqual(list(templates_dir.rglob("current")), [])
@@ -274,6 +353,11 @@ class TestInitUpdate(CliRuntimeHarness):
                 self.assertFalse((scope_templates / "adrs").exists())
                 self.assertFalse((scope_templates / "artifacts").exists())
                 self.assertEqual(list((scope_templates / "discussions").glob("new-*")), [])
+            self.assertFalse((initiative_templates_dir / "epics" / "new-epic").exists())
+            self.assertFalse((epic_templates_dir / "issues" / "new-issue").exists())
+            self.assertFalse((initiative_templates_dir / "discussions" / "rules.md").exists())
+            self.assertFalse((epic_templates_dir / "discussions" / "rules.md").exists())
+            self.assertFalse((issue_templates_dir / "discussions" / "rules.md").exists())
 
             rules_dir = target / "spec-dock" / "docs" / "rules"
             self.assertTrue((rules_dir / "initiative" / "discussions.md").is_file())
@@ -371,14 +455,27 @@ class TestInitUpdate(CliRuntimeHarness):
                 target / "spec-dock" / "docs" / "workflow_adr.md",
                 "./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title \"...\"\n",
             )
-            legacy_rules_path = (
-                target / "spec-dock" / "templates" / "initiative" / "discussions" / "rules.md"
-            )
-            self._write_text_force(
-                legacy_rules_path,
-                "legacy naming: <type>-00001-<slug>.md\n",
-            )
-            self.assertTrue(legacy_rules_path.is_file())
+            legacy_template_text_map = {
+                "spec-dock/templates/adr.md": "# legacy adr template\n",
+                "spec-dock/templates/initiative/discussions/rules.md": (
+                    "legacy naming: <type>-00001-<slug>.md\n"
+                ),
+                "spec-dock/templates/epic/discussions/rules.md": (
+                    "legacy epic discussion rules\n"
+                ),
+                "spec-dock/templates/issue/discussions/rules.md": (
+                    "legacy issue discussion rules\n"
+                ),
+                "spec-dock/templates/issue/discussions/_template.md": (
+                    "# legacy discussion scaffold\n"
+                ),
+                "spec-dock/templates/initiative/epics/new-epic": "#!/bin/sh\n",
+                "spec-dock/templates/epic/issues/new-issue": "#!/bin/sh\n",
+            }
+            for legacy_rel_path, legacy_text in legacy_template_text_map.items():
+                legacy_path = target / legacy_rel_path
+                self._write_text_force(legacy_path, legacy_text)
+                self.assertTrue(legacy_path.is_file(), f"expected legacy template fixture: {legacy_rel_path}")
             self._write_text_force(
                 target / "spec-dock" / "scripts" / "README.md",
                 "legacy example: new adr --issue ...\n",
@@ -390,13 +487,15 @@ class TestInitUpdate(CliRuntimeHarness):
 
             self.assertEqual(main(["update", str(target)]), 0)
             self._assert_canonical_rules_files_match_provider_assets(target)
+            self._assert_installed_templates_match_provider_assets(target)
             for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
                 self.assertNotEqual(
                     (target / installed_rel_path).read_text(encoding="utf-8"),
                     corrupted_rules_text,
                     f"canonical rules file was not refreshed: {installed_rel_path}",
                 )
-            self.assertFalse(legacy_rules_path.exists())
+            for legacy_rel_path in legacy_template_text_map:
+                self.assertFalse((target / legacy_rel_path).exists(), f"legacy template survived update: {legacy_rel_path}")
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
@@ -479,6 +578,14 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertEqual(legacy_active.returncode, 2)
         self.assertIn("'active set' supports explicit targets:", legacy_active.stderr)
         self.assertIn("active set --id <node-id>", legacy_active.stderr)
+
+    def test_checked_in_dogfooding_mirror_docs_match_provider_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self._assert_checked_in_dogfooding_mirror_docs_match_provider_assets(repo_root)
+
+    def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

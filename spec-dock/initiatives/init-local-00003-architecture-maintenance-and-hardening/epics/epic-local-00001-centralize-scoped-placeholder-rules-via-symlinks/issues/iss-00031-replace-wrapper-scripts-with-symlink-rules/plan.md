@@ -174,7 +174,7 @@ ID: "iss-00031"
   - workflow/docs wording refresh
   - regression execution
 - design refs:
-  - runtime command 正本化
+  - `spec-dock/docs/rules/**` 正本 + runtime command documented execution path
 - step boundary:
   - 無関係な docs rewrite はしない
 - observable command:

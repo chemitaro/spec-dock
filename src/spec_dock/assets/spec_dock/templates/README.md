@@ -17,6 +17,6 @@
 - 生成後のファイルは自由に編集して構いません（テンプレは雛形）。
 - 命名規則は **全て小文字**（macOS のケース非区別FS対策）。
 - `new/import {initiative,epic,issue}` の `--slug` は kebab-case（小文字英数字 + `-`）です。`--slug` 省略時は `--title` から合成されます（詳細は `spec-dock/docs/reference_naming.md`）。
-- 各ノードには `discussions/rules.md` が含まれます（運用ルールの雛形）。
-- 各スコープ配下には wrapper が含まれます（`epics/new-epic`, `issues/new-issue`）。`discussions/` 配下に wrapper は含めません。
+- 各ノードの子スコープ配下には canonical guidance への `rules.md` symlink が含まれます（例: `epics/rules.md`, `issues/rules.md`, `discussions/rules.md`）。`rules.md` は入口/ナビゲーション用です。
+- 作成/運用ルールの正本は `spec-dock/docs/rules/**` です。runtime command はサポートされた実行経路です。
 - 新規ノードにはテンプレ由来の `README.md` は生成されません。

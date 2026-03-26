@@ -25,16 +25,16 @@ Epic は設計の背骨です。
 ## 作成
 
 ```bash
-./spec new epic --initiative <initiative-id> --title "..."
-./spec new epic --initiative <initiative-id> --github-issue <n> --title "..."
-./spec new epic --initiative <initiative-id> --create-github-issue --title "..."
+./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title "..."
+./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --github-issue <n> --title "..."
+./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --create-github-issue --title "..."
 
-./spec import epic <num|#num|url> --title "..." [--initiative <initiative-id>]
+./spec-dock/scripts/spec-dock import epic <num|#num|url> --title "..." [--initiative <initiative-id>]
 ```
 
 - `import epic` で `--initiative` を省略した場合は current active から親 initiative を解決する
 - naming 制約と GitHub 振る舞いは [reference_naming.md](reference_naming.md), [reference_github.md](reference_github.md) を参照する
-- Epic 配下では wrapper `issues/new-issue "<title>"` を使える。local-only issue が必要なら direct command で `--no-github` を付ける
+- Epic 配下の Issue 作成は runtime command `./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."` を使う。生成される `issues/rules.md` は `spec-dock/docs/rules/epic/issues.md` への入口で、作成ルールの正本は後者にある。GitHub linkage は [reference_github.md](reference_github.md) を参照する
 
 ## 記述
 
@@ -61,6 +61,6 @@ Epic は設計の背骨です。
 ## 仕上げ
 
 ```bash
-./spec validate
-./spec sync
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync
 ```
