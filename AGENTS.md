@@ -18,11 +18,16 @@
 
 Read these first before changing code or tests:
 
-- Use `spec-dock/active/` when an active initiative / epic / issue is set.
-- If `spec-dock/active/` is not set, use:
-  - `spec-dock/system/active-none/initiative/{requirement,design,plan,report}.md`
-  - `spec-dock/system/active-none/epic/{requirement,design,plan,report}.md`
-  - `spec-dock/system/active-none/issue/{requirement,design,plan,report}.md`
+- When an active initiative / epic / issue is set, the source of truth is the symlink paths under `spec-dock/active/`. Read these first:
+  - `spec-dock/active/initiative/requirement.md`
+  - `spec-dock/active/initiative/design.md`
+  - `spec-dock/active/initiative/plan.md`
+  - `spec-dock/active/epic/requirement.md`
+  - `spec-dock/active/epic/design.md`
+  - `spec-dock/active/epic/plan.md`
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
 - Accepted architecture and roadmap decisions are reflected in the current runtime structure and dogfooding workflow below.
 
 ## Project Structure & Module Organization
