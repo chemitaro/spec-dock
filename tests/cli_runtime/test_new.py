@@ -240,7 +240,54 @@ class TestCliNew(CliRuntimeHarness):
                 self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
             self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
 
-    def test_new_nodes_include_discussions_dir(self) -> None:
+    def test_new_missing_rules_source_fails_before_gh_issue_create(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            (target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md").unlink()
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                f'echo "$@" >> "{log_path.as_posix()}"\n'
+                'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  echo "https://github.com/example/repo/issues/999"\n'
+                "  exit 0\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "initiative",
+                    "--create-github-issue",
+                    "--title",
+                    "Add Refresh Token",
+                ],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Missing rules source", p.stderr)
+            self.assertIn("epics.md", p.stderr)
+
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+            self.assertEqual(list((target / "spec-dock" / "initiatives").glob("*")), [])
+
+    def test_new_nodes_create_rules_symlinks_without_wrappers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -252,8 +299,24 @@ class TestCliNew(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+            expected_rules_links = {
+                init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
+                init_dir / "discussions" / "rules.md": (
+                    target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+                ),
+                epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
+                epic_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md",
+                issue_dir / "discussions" / "rules.md": target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md",
+            }
+            for link_path, target_path in expected_rules_links.items():
+                self.assertTrue(link_path.is_symlink(), f"missing rules symlink: {link_path}")
+                self.assertEqual(link_path.resolve(), target_path.resolve())
+                self.assertEqual(os.readlink(link_path), os.path.relpath(target_path, start=link_path.parent))
+
+            self.assertFalse((init_dir / "epics" / "new-epic").exists())
+            self.assertFalse((epic_dir / "issues" / "new-issue").exists())
+
             for scope_dir in (init_dir, epic_dir, issue_dir):
-                self.assertTrue((scope_dir / "discussions" / "rules.md").is_file())
                 self.assertFalse((scope_dir / "adrs").exists())
                 self.assertFalse((scope_dir / "artifacts").exists())
                 self.assertEqual(list((scope_dir / "discussions").glob("new-*")), [])
