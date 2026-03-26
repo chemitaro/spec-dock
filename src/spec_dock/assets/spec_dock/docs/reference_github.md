@@ -41,6 +41,7 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 - `new initiative` / `new epic`（デフォルト）は local-only です（`gh` を呼びません）
 - `new {initiative,epic,issue} --github-issue <n>` は「既存番号へリンク」するだけで、GitHub Issue は作りません（`gh` を呼びません）
+- 生成される `epics/rules.md` / `issues/rules.md` / `discussions/rules.md` は `spec-dock/docs/rules/**` への symlink です。`rules.md` は入口/ナビゲーション用で、ルールの正本は `spec-dock/docs/rules/**` にあります。runtime command はサポートされた実行経路です
 
 ## 3. `import` の URL 入力に関する注意（事故防止）
 
@@ -83,16 +84,16 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 重複が検出された場合（復旧）:
 - エラーメッセージに `type:id (.meta.json path)` の競合一覧が出るので、どれか1つだけが `github.issue_number` を保持するように `.meta.json` を修正してください（他は削除/変更）
-- 修正後に `./spec validate` / `./spec sync` を再実行してください
+- 修正後に `./spec-dock/scripts/spec-dock validate` / `./spec-dock/scripts/spec-dock sync` を再実行してください
 
 ## 6. よくある失敗
 
 - `gh` が未導入/未認証で `new issue`（デフォルト）が失敗する
   - GitHub を使わないなら `new issue --no-github` を選ぶ（`gh` を呼びません）
   - GitHub を使うなら `gh auth login` 等を先に行う
-- Epic 配下で `issues/new-issue`（wrapper）を実行し、`gh` 不在で失敗する
-  - wrapper は `--no-github` を付けられません（GitHub 作成がデフォルト）
-  - local-only issue を作りたい場合は direct command: `./spec new issue --no-github --epic <id> --title \"...\"`
+- Epic 配下で local-only issue を作りたい
+  - `issues/rules.md` を入口にしつつ、runtime command `./spec-dock/scripts/spec-dock new issue --no-github --epic <id> --title "..."` を使う
+  - GitHub Issue を作る場合は `./spec-dock/scripts/spec-dock new issue --epic <id> --title "..."` または `--create-github-issue`、既存番号へリンクするだけなら `--github-issue <n>` を使う
 - canonical URL import が失敗する → current repo（`origin`）を検証できないか、`owner/repo` mismatch の可能性があります
   - cross-repo import を意図している場合だけ `--allow-foreign-url` を付けてください
   - canonical でない URL-like target は受け付けません

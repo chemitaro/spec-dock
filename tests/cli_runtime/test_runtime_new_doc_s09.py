@@ -153,6 +153,9 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             "issue=<ISS_ID> epic=<EPIC_ID> init=<INIT_ID>\n",
             encoding="utf-8",
         )
+        rules_path = specdock_dir / "docs" / "rules" / "issue" / "discussions.md"
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        rules_path.write_text("issue discussions rules\n", encoding="utf-8")
 
     def _ports(self, app_ports, *, specdock_dir: Path, records, events=None):
         return app_ports.Ports(
