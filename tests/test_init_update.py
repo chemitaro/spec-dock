@@ -572,6 +572,55 @@ class TestInitUpdate(CliRuntimeHarness):
             self._assert_canonical_rules_files_contract(text_map)
             self._assert_discussion_guidance_contract(text_map)
 
+    def test_update_preserves_legacy_artifacts_inside_existing_node_trees(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._write_text_force(
+                target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
+                "corrupted managed rules\n",
+            )
+            managed_legacy_artifacts = {
+                target / "spec-dock" / "templates" / "initiative" / "epics" / "new-epic": "#!/bin/sh\n",
+                target / "spec-dock" / "templates" / "epic" / "issues" / "new-issue": "#!/bin/sh\n",
+                target / "spec-dock" / "templates" / "issue" / "discussions" / "rules.md": (
+                    "managed legacy rules\n"
+                ),
+            }
+            for artifact_path, artifact_text in managed_legacy_artifacts.items():
+                self._write_text_force(artifact_path, artifact_text)
+
+            node_root = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            node_legacy_artifacts = {
+                node_root / "epics" / "new-epic": "node legacy wrapper\n",
+                node_root / "epics" / "rules.md": "node legacy rules copy\n",
+                node_root / "epics" / "epic-local-00001-jwt-auth" / "issues" / "new-issue": (
+                    "node issue wrapper\n"
+                ),
+                node_root
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-refresh-token"
+                / "discussions"
+                / "rules.md": "node issue discussion rules copy\n",
+            }
+            for artifact_path, artifact_text in node_legacy_artifacts.items():
+                artifact_path.parent.mkdir(parents=True, exist_ok=True)
+                self._write_text_force(artifact_path, artifact_text)
+                self.assertEqual(artifact_path.read_text(encoding="utf-8"), artifact_text)
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            self._assert_canonical_rules_files_match_provider_assets(target)
+            self._assert_installed_templates_match_provider_assets(target)
+            for artifact_path in managed_legacy_artifacts:
+                self.assertFalse(artifact_path.exists(), f"managed legacy artifact survived update: {artifact_path}")
+            for artifact_path, artifact_text in node_legacy_artifacts.items():
+                self.assertTrue(artifact_path.is_file(), f"node-tree artifact should be preserved: {artifact_path}")
+                self.assertEqual(artifact_path.read_text(encoding="utf-8"), artifact_text)
+
     def test_current_guidance_documents_match_discussion_numbering_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         guidance_paths = [

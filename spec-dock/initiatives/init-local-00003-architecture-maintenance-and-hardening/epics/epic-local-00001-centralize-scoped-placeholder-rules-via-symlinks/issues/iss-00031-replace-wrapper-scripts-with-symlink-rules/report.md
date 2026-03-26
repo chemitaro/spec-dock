@@ -217,6 +217,51 @@ sync --github OK
 
 ---
 
+### 2026-03-26 10:49 - 11:18
+
+#### 対象
+- Step: S04（follow-up hardening）
+- AC/EC: AC-004, AC-005, EC-004
+
+#### 実施内容
+- `tests/cli_runtime/test_runtime_new_s08.py` に create-mode pre-GitHub collision regression を追加し、GitHub採番に依存しない preflight 検知可能な local parent-path collision（initiative/epic/issue）で `Outcome: pre_github_fail`・GitHub gateway call 0 件・local write event 0 件を固定した。
+- `tests/test_init_update.py` に preservation-boundary regression を追加し、`spec-dock/templates/**` と `spec-dock/docs/rules/**` の managed cleanup/refresh は実施される一方、既存 `spec-dock/initiatives/**` node tree 内に残る legacy wrapper/rules 実体は preserve されることを固定した。
+- `tests/cli_runtime/test_wrappers.py` の docs contract assertion を stable anchor 中心へ緩和し、runtime command path / `docs/rules/**` 参照 / wrapper・legacy command 不在の契約に絞って検証するようにした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_runtime_new_s08 tests.test_init_update tests.cli_runtime.test_wrappers -v
+
+128 tests OK
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/test_runtime_new_s08.py` - create-mode pre-GitHub local collision preflight regression を追加
+- `tests/test_init_update.py` - update 時の managed cleanup と node tree legacy preserve 境界 regression を追加
+- `tests/cli_runtime/test_wrappers.py` - prose-coupled docs assertion を stable anchor 契約へ緩和
+- `spec-dock/active/issue/report.md` - S04 follow-up 実装ログを追記
+
+#### レビューサイクル / 収束
+- 1 回目の post-implementation review:
+  - spec review は `tests/cli_runtime/test_wrappers.py` がまだ broad wording を禁止しすぎているとして conditional pass
+  - code review は pass
+  - QA review は pass
+- 対応:
+  - `tests/cli_runtime/test_wrappers.py` をさらに狭め、runtime command path / `docs/rules/**` 参照 / legacy executable path 不在に限定した
+- 再実行コマンド / 結果:
+```bash
+python -m unittest tests.cli_runtime.test_wrappers -v
+python -m unittest tests.cli_runtime.test_runtime_new_s08 tests.test_init_update tests.cli_runtime.test_wrappers -v
+
+6 tests OK
+128 tests OK
+```
+- 最終レビュー結果:
+  - spec review: PASS
+  - code review: PASS
+  - QA review: PASS
+  - 残指摘なし
+
 ## 遭遇した問題と解決 (任意)
 
 ## 包括レビュー結果（2026-03-26）
