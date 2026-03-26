@@ -17,6 +17,139 @@ from tests.cli_runtime.harness import (
 
 
 class TestInitUpdate(CliRuntimeHarness):
+    _CANONICAL_RULES_PROVIDER_ASSET_MAP = {
+        "spec-dock/docs/rules/initiative/discussions.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
+        ),
+        "spec-dock/docs/rules/initiative/epics.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"
+        ),
+        "spec-dock/docs/rules/epic/discussions.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"
+        ),
+        "spec-dock/docs/rules/epic/issues.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md"
+        ),
+        "spec-dock/docs/rules/issue/discussions.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
+        ),
+    }
+
+    _CANONICAL_RULES_EXPECTATIONS = {
+        "docs/rules/initiative/discussions.md": {
+            "contains": (
+                "# discussions/rules.md",
+                "このディレクトリには initiative に紐づく議論資料を置きます。",
+                "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
+                "./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new doc research --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new doc note --initiative <id> --title",
+            ),
+            "absent": (
+                "--epic <id>",
+                "--issue <id>",
+            ),
+        },
+        "docs/rules/initiative/epics.md": {
+            "contains": (
+                "# epics/rules.md",
+                "このディレクトリには initiative 配下の epic を作成します。",
+                "Epic workflow: `spec-dock/docs/workflow_epic.md`",
+                "./spec-dock/scripts/spec-dock new epic --initiative <id> --title",
+                "--no-github",
+            ),
+            "absent": (
+                "new issue --epic",
+                "new doc adr",
+            ),
+        },
+        "docs/rules/epic/discussions.md": {
+            "contains": (
+                "# discussions/rules.md",
+                "このディレクトリには epic に紐づく議論資料を置きます。",
+                "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
+                "./spec-dock/scripts/spec-dock new doc adr --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new doc disc --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new doc research --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new doc note --epic <id> --title",
+            ),
+            "absent": (
+                "--initiative <id>",
+                "--issue <id>",
+            ),
+        },
+        "docs/rules/epic/issues.md": {
+            "contains": (
+                "# issues/rules.md",
+                "このディレクトリには epic 配下の issue を作成します。",
+                "Issue workflow: `spec-dock/docs/workflow_issue.md`",
+                "GitHub linkage: `spec-dock/docs/reference_github.md`",
+                "./spec-dock/scripts/spec-dock new issue --epic <id> --title",
+            ),
+            "absent": (
+                "--initiative <id>",
+                "new doc adr",
+            ),
+        },
+        "docs/rules/issue/discussions.md": {
+            "contains": (
+                "# discussions/rules.md",
+                "このディレクトリには issue に紐づく議論資料を置きます。",
+                "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
+                "./spec-dock/scripts/spec-dock new doc adr --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new doc disc --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new doc research --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new doc note --issue <id> --title",
+            ),
+            "absent": (
+                "--initiative <id>",
+                "--epic <id>",
+            ),
+        },
+    }
+
+    def _assert_canonical_rules_files_contract(self, text_map: dict[str, str]) -> None:
+        for rel_suffix, expected in self._CANONICAL_RULES_EXPECTATIONS.items():
+            matching_paths = [path for path in text_map if path.endswith(rel_suffix)]
+            self.assertEqual(
+                len(matching_paths),
+                1,
+                f"expected exactly one canonical rules document for {rel_suffix}: {matching_paths}",
+            )
+            rel_path = matching_paths[0]
+            text = text_map[rel_path]
+            for fragment in expected["contains"]:
+                self.assertIn(
+                    fragment,
+                    text,
+                    f"expected canonical rules fragment missing from {rel_path}: {fragment}",
+                )
+            for fragment in expected["absent"]:
+                self.assertNotIn(
+                    fragment,
+                    text,
+                    f"unexpected canonical rules fragment present in {rel_path}: {fragment}",
+                )
+
+    def _assert_canonical_rules_files_match_provider_assets(
+        self,
+        installed_base: Path,
+        repo_root: Path | None = None,
+    ) -> None:
+        if repo_root is None:
+            repo_root = Path(__file__).resolve().parents[1]
+        for installed_rel_path, asset_rel_path in self._CANONICAL_RULES_PROVIDER_ASSET_MAP.items():
+            installed_path = installed_base / installed_rel_path
+            asset_path = repo_root / asset_rel_path
+            self.assertTrue(installed_path.is_file(), f"missing canonical rules file: {installed_path}")
+            self.assertTrue(asset_path.is_file(), f"missing canonical rules asset: {asset_path}")
+            self.assertEqual(
+                installed_path.read_text(encoding="utf-8"),
+                asset_path.read_text(encoding="utf-8"),
+                f"canonical rules file diverged from provider asset: {installed_rel_path}",
+            )
+
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -137,10 +270,17 @@ class TestInitUpdate(CliRuntimeHarness):
                 epic_templates_dir,
                 issue_templates_dir,
             ):
-                self.assertTrue((scope_templates / "discussions" / "rules.md").is_file())
+                self.assertFalse((scope_templates / "discussions" / "rules.md").exists())
                 self.assertFalse((scope_templates / "adrs").exists())
                 self.assertFalse((scope_templates / "artifacts").exists())
                 self.assertEqual(list((scope_templates / "discussions").glob("new-*")), [])
+
+            rules_dir = target / "spec-dock" / "docs" / "rules"
+            self.assertTrue((rules_dir / "initiative" / "discussions.md").is_file())
+            self.assertTrue((rules_dir / "initiative" / "epics.md").is_file())
+            self.assertTrue((rules_dir / "epic" / "discussions.md").is_file())
+            self.assertTrue((rules_dir / "epic" / "issues.md").is_file())
+            self.assertTrue((rules_dir / "issue" / "discussions.md").is_file())
 
             discussions_templates_dir = templates_dir / "discussions"
             self.assertTrue((discussions_templates_dir / "adr.md").is_file())
@@ -184,12 +324,15 @@ class TestInitUpdate(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._assert_canonical_rules_files_match_provider_assets(target)
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
-                "spec-dock/templates/initiative/discussions/rules.md",
-                "spec-dock/templates/epic/discussions/rules.md",
-                "spec-dock/templates/issue/discussions/rules.md",
+                "spec-dock/docs/rules/initiative/discussions.md",
+                "spec-dock/docs/rules/initiative/epics.md",
+                "spec-dock/docs/rules/epic/discussions.md",
+                "spec-dock/docs/rules/epic/issues.md",
+                "spec-dock/docs/rules/issue/discussions.md",
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
                 "spec-dock/docs/workflow_issue.md",
@@ -204,6 +347,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
             ]
             text_map = self._read_text_map(target, guidance_paths)
+            self._assert_canonical_rules_files_contract(text_map)
             self._assert_discussion_guidance_contract(text_map)
 
     def test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
@@ -211,14 +355,30 @@ class TestInitUpdate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
+            corrupted_rules_text_map = {
+                installed_rel_path: f"corrupted canonical rules guidance for {installed_rel_path}\n"
+                for installed_rel_path in self._CANONICAL_RULES_PROVIDER_ASSET_MAP
+            }
+            for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
+                canonical_rules_path = target / installed_rel_path
+                self._write_text_force(canonical_rules_path, corrupted_rules_text)
+                self.assertEqual(
+                    canonical_rules_path.read_text(encoding="utf-8"),
+                    corrupted_rules_text,
+                )
+
             self._write_text_force(
                 target / "spec-dock" / "docs" / "workflow_adr.md",
                 "./spec-dock/scripts/spec-dock new adr --issue iss-00123 --title \"...\"\n",
             )
+            legacy_rules_path = (
+                target / "spec-dock" / "templates" / "initiative" / "discussions" / "rules.md"
+            )
             self._write_text_force(
-                target / "spec-dock" / "templates" / "initiative" / "discussions" / "rules.md",
+                legacy_rules_path,
                 "legacy naming: <type>-00001-<slug>.md\n",
             )
+            self.assertTrue(legacy_rules_path.is_file())
             self._write_text_force(
                 target / "spec-dock" / "scripts" / "README.md",
                 "legacy example: new adr --issue ...\n",
@@ -229,12 +389,22 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
             self.assertEqual(main(["update", str(target)]), 0)
+            self._assert_canonical_rules_files_match_provider_assets(target)
+            for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
+                self.assertNotEqual(
+                    (target / installed_rel_path).read_text(encoding="utf-8"),
+                    corrupted_rules_text,
+                    f"canonical rules file was not refreshed: {installed_rel_path}",
+                )
+            self.assertFalse(legacy_rules_path.exists())
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
-                "spec-dock/templates/initiative/discussions/rules.md",
-                "spec-dock/templates/epic/discussions/rules.md",
-                "spec-dock/templates/issue/discussions/rules.md",
+                "spec-dock/docs/rules/initiative/discussions.md",
+                "spec-dock/docs/rules/initiative/epics.md",
+                "spec-dock/docs/rules/epic/discussions.md",
+                "spec-dock/docs/rules/epic/issues.md",
+                "spec-dock/docs/rules/issue/discussions.md",
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
                 "spec-dock/docs/workflow_issue.md",
@@ -249,15 +419,18 @@ class TestInitUpdate(CliRuntimeHarness):
                 ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
             ]
             text_map = self._read_text_map(target, guidance_paths)
+            self._assert_canonical_rules_files_contract(text_map)
             self._assert_discussion_guidance_contract(text_map)
 
     def test_current_guidance_documents_match_discussion_numbering_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         guidance_paths = [
             "src/spec_dock/assets/spec_dock/templates/README.md",
-            "src/spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md",
-            "src/spec_dock/assets/spec_dock/templates/epic/discussions/rules.md",
-            "src/spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
             "src/spec_dock/assets/spec_dock/docs/workflow_adr.md",
             "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
@@ -270,10 +443,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/guide.md",
             "src/spec_dock/assets/spec_dock/scripts/README.md",
             "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
-            "spec-deps/current/discussions/rules.md",
-            "spec-deps/README.md",
         ]
         text_map = self._read_text_map(repo_root, guidance_paths)
+        self._assert_canonical_rules_files_contract(text_map)
         self._assert_discussion_guidance_contract(text_map)
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
