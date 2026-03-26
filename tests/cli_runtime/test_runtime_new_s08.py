@@ -2262,6 +2262,101 @@ class TestRuntimeNewS08(unittest.TestCase):
                     self.assertEqual(issue_gateway.calls, [])
                     self.assertEqual(events, [])
 
+    def test_github_create_symlink_preflight_fails_before_github_create(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            epic_dir.mkdir(parents=True, exist_ok=True)
+
+            initiative_record = _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                title="Auth platform",
+                path=init_dir,
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            )
+            epic_record = _record(
+                infra_contracts,
+                kind="epic",
+                node_id="epic-local-00001",
+                title="JWT auth",
+                path=epic_dir,
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            )
+            cases = [
+                (
+                    "initiative",
+                    app_create_node.create_initiative,
+                    [],
+                    {
+                        "title": "Payments",
+                        "slug": None,
+                        "parent_id": None,
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                ),
+                (
+                    "epic",
+                    app_create_node.create_epic,
+                    [initiative_record],
+                    {
+                        "title": "JWT auth",
+                        "slug": None,
+                        "parent_id": "init-local-00001",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                ),
+                (
+                    "issue",
+                    app_create_node.create_issue,
+                    [initiative_record, epic_record],
+                    {
+                        "title": "Refresh token",
+                        "slug": None,
+                        "parent_id": "epic-local-00001",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                ),
+            ]
+            for case_name, create_fn, records, request_kwargs in cases:
+                with self.subTest(case=case_name):
+                    events: list[str] = []
+                    issue_gateway = _StubIssueGateway([795])
+                    ports = self._ports(
+                        app_ports,
+                        specdock_dir=specdock_dir,
+                        records=records,
+                        events=events,
+                        issue_gateway=issue_gateway,
+                    )
+
+                    with patch.object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
+                        with self.assertRaisesRegex(RuntimeError, "Symlink creation preflight failed") as raised:
+                            create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
+
+                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
+                    self.assertEqual(issue_gateway.calls, [])
+                    self.assertEqual(events, [])
+
     def test_github_create_graph_preflight_fails_before_github_create_for_initiative(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

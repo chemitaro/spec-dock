@@ -3,7 +3,7 @@
 ID: "epic-local-00001"
 タイトル: "Centralize scoped placeholder rules via symlinks"
 関連GitHub: [""]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 依存: ["requirement.md"]

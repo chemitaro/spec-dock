@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -13,6 +14,24 @@ from tests.cli_runtime.harness import (
     _EXPECTED_MANAGED_SKILL_NAMES,
     _expected_spec_dock_version,
     main,
+)
+
+_ISS_00031_STALE_WHEEL_PATHS = (
+    "spec_dock/assets/spec_dock/templates/adr.md",
+    "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
+    "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
+    "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
+    "spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md",
+    "spec_dock/assets/spec_dock/templates/epic/discussions/rules.md",
+    "spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
+)
+
+_ISS_00031_EXCLUDE_PATTERNS = (
+    "assets/spec_dock/templates/adr.md",
+    "assets/spec_dock/templates/**/discussions/rules.md",
+    "assets/spec_dock/templates/issue/discussions/_template.md",
+    "assets/spec_dock/templates/initiative/epics/new-epic",
+    "assets/spec_dock/templates/epic/issues/new-issue",
 )
 
 
@@ -40,6 +59,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
         "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
+        "spec-dock/docs/workflow_issue.md": "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
         "spec-dock/docs/reference_github.md": (
             "src/spec_dock/assets/spec_dock/docs/reference_github.md"
         ),
@@ -55,6 +75,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
         "spec-dock/docs/rules/issue/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
+        ),
+    }
+    _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
         ),
     }
 
@@ -190,6 +215,18 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}",
             )
 
+    def _assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(self, repo_root: Path) -> None:
+        for mirror_rel_path, asset_rel_path in self._DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP.items():
+            mirror_path = repo_root / mirror_rel_path
+            asset_path = repo_root / asset_rel_path
+            self.assertTrue(mirror_path.is_file(), f"missing checked-in dogfooding runtime mirror file: {mirror_path}")
+            self.assertTrue(asset_path.is_file(), f"missing provider runtime asset file: {asset_path}")
+            self.assertEqual(
+                mirror_path.read_text(encoding="utf-8"),
+                asset_path.read_text(encoding="utf-8"),
+                f"checked-in dogfooding runtime mirror file diverged from provider asset: {mirror_rel_path}",
+            )
+
     def _assert_installed_templates_match_provider_assets(
         self,
         installed_base: Path,
@@ -297,6 +334,20 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("docs impact", workflow_issue)
             self.assertIn("final diff review quality gate", workflow_issue)
             self.assertIn("reviewer approval", workflow_issue)
+            for command in (
+                "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title",
+                "./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title",
+                "./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>",
+                "./spec-dock/scripts/spec-dock active set --id <issue-id>",
+                "./spec-dock/scripts/spec-dock active set --github-issue <n>",
+                "./spec-dock/scripts/spec-dock active show",
+                "./spec-dock/scripts/spec-dock deps check <target> --github",
+                "./spec-dock/scripts/spec-dock active set <target> --github --force",
+                "./spec-dock/scripts/spec-dock validate",
+                "./spec-dock/scripts/spec-dock sync --github",
+            ):
+                self.assertIn(command, workflow_issue)
+            self.assertNotIn("./spec ", workflow_issue)
 
             # v2 does not ship legacy docs/old/ (keep the published docs minimal).
             self.assertFalse((docs_dir / "old").exists())
@@ -547,6 +598,81 @@ class TestInitUpdate(CliRuntimeHarness):
         self._assert_canonical_rules_files_contract(text_map)
         self._assert_discussion_guidance_contract(text_map)
 
+    def test_pyproject_excludes_deleted_wrapper_era_assets_from_package_data(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+
+        for package_data_pattern in _ISS_00031_EXCLUDE_PATTERNS:
+            self.assertIn(
+                f'"{package_data_pattern}"',
+                pyproject_text,
+                f"missing exclude-package-data guard for stale build artifact: {package_data_pattern}",
+            )
+
+    def test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+
+            build_context.mkdir()
+            shutil.copy2(repo_root / "pyproject.toml", build_context / "pyproject.toml")
+            shutil.copy2(repo_root / "README.md", build_context / "README.md")
+            shutil.copy2(repo_root / "setup.py", build_context / "setup.py")
+            shutil.copytree(
+                repo_root / "src",
+                build_context / "src",
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+            wheel_dir.mkdir()
+
+            for stale_rel_path in _ISS_00031_STALE_WHEEL_PATHS:
+                stale_path = build_context / "build" / "lib" / stale_rel_path
+                stale_path.parent.mkdir(parents=True, exist_ok=True)
+                stale_path.write_text("stale wrapper-era artifact\n", encoding="utf-8")
+
+            build_result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "wheel",
+                    "--no-deps",
+                    "--wheel-dir",
+                    str(wheel_dir),
+                    str(build_context),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                build_result.returncode,
+                0,
+                "expected local wheel build to succeed:\n"
+                f"STDOUT:\n{build_result.stdout}\nSTDERR:\n{build_result.stderr}",
+            )
+
+            wheel_paths = list(wheel_dir.glob("*.whl"))
+            self.assertEqual(len(wheel_paths), 1, f"expected one wheel, got: {wheel_paths}")
+
+            with zipfile.ZipFile(wheel_paths[0]) as wheel_zip:
+                wheel_entries = set(wheel_zip.namelist())
+
+            self.assertIn(
+                "spec_dock/assets/spec_dock/templates/README.md",
+                wheel_entries,
+                "sanity check failed: built wheel did not include expected live template asset",
+            )
+            for stale_rel_path in _ISS_00031_STALE_WHEEL_PATHS:
+                self.assertNotIn(
+                    stale_rel_path,
+                    wheel_entries,
+                    f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}",
+                )
+
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         runtime_script = repo_root / "spec-dock" / "scripts" / "spec-dock"
@@ -586,6 +712,10 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
+
+    def test_checked_in_dogfooding_runtime_mirror_match_provider_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self._assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(repo_root)
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -729,6 +859,9 @@ with tempfile.TemporaryDirectory() as td:
     issue_template_dir.mkdir(parents=True, exist_ok=True)
     for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
+    rules_dir = specdock_dir / "docs" / "rules" / "issue"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
         _record(
@@ -998,6 +1131,9 @@ with tempfile.TemporaryDirectory() as td:
     issue_template_dir.mkdir(parents=True, exist_ok=True)
     for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
+    rules_dir = specdock_dir / "docs" / "rules" / "issue"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
         _record(
@@ -1239,6 +1375,9 @@ with tempfile.TemporaryDirectory() as td:
     issue_template_dir.mkdir(parents=True, exist_ok=True)
     for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
+    rules_dir = specdock_dir / "docs" / "rules" / "issue"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
         _record(
@@ -1484,6 +1623,9 @@ with tempfile.TemporaryDirectory() as td:
     (issue_template_dir / "README.md").write_text("issue=<ISS_ID>\\n", encoding="utf-8")
     for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
+    rules_dir = specdock_dir / "docs" / "rules" / "issue"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
         _record(
@@ -1723,6 +1865,9 @@ with tempfile.TemporaryDirectory() as td:
     (issue_template_dir / "README.md").write_text("issue=<ISS_ID>\\n", encoding="utf-8")
     for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
+    rules_dir = specdock_dir / "docs" / "rules" / "issue"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
         _record(
@@ -2451,6 +2596,17 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs").mkdir(parents=True, exist_ok=True)
         (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+    rules_root = specdock_dir / "docs" / "rules"
+    for scope, filename in (
+        ("initiative", "epics.md"),
+        ("initiative", "discussions.md"),
+        ("epic", "issues.md"),
+        ("epic", "discussions.md"),
+        ("issue", "discussions.md"),
+    ):
+        rules_path = rules_root / scope / filename
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        rules_path.write_text(f"# {scope} {filename}\\n", encoding="utf-8")
 
 def _runtime_cmd(specdock_dir):
     return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))
@@ -3324,6 +3480,17 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs").mkdir(parents=True, exist_ok=True)
         (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+    rules_root = specdock_dir / "docs" / "rules"
+    for scope, filename in (
+        ("initiative", "epics.md"),
+        ("initiative", "discussions.md"),
+        ("epic", "issues.md"),
+        ("epic", "discussions.md"),
+        ("issue", "discussions.md"),
+    ):
+        rules_path = rules_root / scope / filename
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        rules_path.write_text(f"# {scope} {filename}\\n", encoding="utf-8")
 
 class _DummyNodeReader:
     def load_node_records(self):
@@ -3527,6 +3694,17 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs").mkdir(parents=True, exist_ok=True)
         (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\\n", encoding="utf-8")
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
+    rules_root = specdock_dir / "docs" / "rules"
+    for scope, filename in (
+        ("initiative", "epics.md"),
+        ("initiative", "discussions.md"),
+        ("epic", "issues.md"),
+        ("epic", "discussions.md"),
+        ("issue", "discussions.md"),
+    ):
+        rules_path = rules_root / scope / filename
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        rules_path.write_text(f"# {scope} {filename}\\n", encoding="utf-8")
 
 def _runtime_cmd(specdock_dir):
     return shlex.quote(str((specdock_dir / "scripts" / "spec-dock").resolve()))

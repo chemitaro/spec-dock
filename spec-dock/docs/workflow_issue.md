@@ -18,17 +18,17 @@ Issue は実装の最小単位です。
 ## 作成と active set
 
 ```bash
-./spec new issue --epic <epic-id> --title "..."
-./spec new issue --create-github-issue --epic <epic-id> --title "..."
-./spec new issue --no-github --epic <epic-id> --title "..."
+./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."
+./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."
+./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title "..."
 
-./spec import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>] [--allow-foreign-url]
+./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>] [--allow-foreign-url]
 
-./spec active set <issue-id|github-issue-number|url>
-./spec active set --id <issue-id>
-./spec active set --github-issue <n>
-./spec active set <issue-id|github-issue-number|url> --checkout
-./spec active show
+./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>
+./spec-dock/scripts/spec-dock active set --id <issue-id>
+./spec-dock/scripts/spec-dock active set --github-issue <n>
+./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url> --checkout
+./spec-dock/scripts/spec-dock active show
 ```
 
 - `import issue` で `--epic` を省略した場合は current active から親 epic を解決する
@@ -36,8 +36,8 @@ Issue は実装の最小単位です。
 - canonical でない URL-like target は受け付けない
 - `active set` のデフォルトは no-checkout。ブランチ移動が必要な場合だけ `--checkout`
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
-- 依存未解決なら `active set` は通常失敗する。確認は `./spec deps check <target> --github`
-- 例外で進める場合だけ `./spec active set <target> --github --force`
+- 依存未解決なら `active set` は通常失敗する。確認は `./spec-dock/scripts/spec-dock deps check <target> --github`
+- 例外で進める場合だけ `./spec-dock/scripts/spec-dock active set <target> --github --force`
 
 ## spec authoring
 
@@ -81,6 +81,6 @@ Issue は実装の最小単位です。
 ## 仕上げ
 
 ```bash
-./spec validate
-./spec sync --github
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
 ```

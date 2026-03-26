@@ -49,6 +49,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             workflow_epic = (target / "spec-dock" / "docs" / "workflow_epic.md").read_text(
                 encoding="utf-8"
             )
+            workflow_issue = (target / "spec-dock" / "docs" / "workflow_issue.md").read_text(
+                encoding="utf-8"
+            )
             reference_github = (target / "spec-dock" / "docs" / "reference_github.md").read_text(
                 encoding="utf-8"
             )
@@ -106,6 +109,37 @@ class TestCliRulesContract(CliRuntimeHarness):
             self.assertNotIn("./spec ", workflow_epic)
             self.assertNotIn("wrapper", workflow_epic)
             self.assertNotIn("new-issue", workflow_epic)
+
+            for command in (
+                "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title \"...\"",
+                (
+                    "./spec-dock/scripts/spec-dock new issue --create-github-issue --epic "
+                    "<epic-id> --title \"...\""
+                ),
+                "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"",
+                (
+                    "./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> "
+                    "--title \"...\" [--epic <epic-id>] [--allow-foreign-url]"
+                ),
+                "./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>",
+                "./spec-dock/scripts/spec-dock active set --id <issue-id>",
+                "./spec-dock/scripts/spec-dock active set --github-issue <n>",
+                (
+                    "./spec-dock/scripts/spec-dock active set "
+                    "<issue-id|github-issue-number|url> --checkout"
+                ),
+                "./spec-dock/scripts/spec-dock active show",
+                "`./spec-dock/scripts/spec-dock deps check <target> --github`",
+                "`./spec-dock/scripts/spec-dock active set <target> --github --force`",
+                "./spec-dock/scripts/spec-dock validate",
+                "./spec-dock/scripts/spec-dock sync --github",
+            ):
+                self.assertIn(command, workflow_issue)
+            self.assertIn("plan upfront approval", workflow_issue)
+            self.assertIn("step result approval", workflow_issue)
+            self.assertIn("docs impact", workflow_issue)
+            self.assertIn("final diff review quality gate", workflow_issue)
+            self.assertNotIn("./spec ", workflow_issue)
 
             self.assertIn("`spec-dock/docs/rules/**`", reference_github)
             self.assertIn(
