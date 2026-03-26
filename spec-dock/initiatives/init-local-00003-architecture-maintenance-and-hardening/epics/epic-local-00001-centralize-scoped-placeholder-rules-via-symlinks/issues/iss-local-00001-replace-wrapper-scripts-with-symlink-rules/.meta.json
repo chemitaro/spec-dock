@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-local-00001",
+  "title": "Replace Wrapper Scripts With Symlink Rules",
+  "slug": "replace-wrapper-scripts-with-symlink-rules",
+  "created_at": "2026-03-26T14:11:44+09:00",
+  "updated_at": "2026-03-26T14:11:44+09:00",
+  "parent_id": "epic-local-00001",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-local-00001",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  }
+}
