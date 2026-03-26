@@ -675,6 +675,37 @@ def _precheck_pre_github_create_rules_sources(
             raise RuntimeError(f"Missing rules source: {target_path}")
 
 
+def _precheck_pre_github_create_symlink_dest_dir(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    specdock_dir: Path,
+    parent: SpecNode | None,
+) -> Path:
+    probe_leaf = f".spec-dock-github-create-preflight-{uuid.uuid4().hex}"
+    if kind == "initiative":
+        return specdock_dir / "initiatives" / probe_leaf
+    if parent is None:
+        raise RuntimeError("parent is required for nested GitHub create preflight")
+    if kind == "epic":
+        return parent.path / "epics" / probe_leaf
+    return parent.path / "issues" / probe_leaf
+
+
+def _precheck_pre_github_create_symlink_capability(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    specdock_dir: Path,
+    parent: SpecNode | None,
+) -> None:
+    dest_dir = _precheck_pre_github_create_symlink_dest_dir(
+        kind=kind,
+        specdock_dir=specdock_dir,
+        parent=parent,
+    )
+    rules_scaffold_specs = _rules_scaffold_specs(kind=kind, dest_dir=dest_dir, specdock_dir=specdock_dir)
+    _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+
+
 def _replacements(
     *,
     kind: Literal["initiative", "epic", "issue"],
@@ -1140,11 +1171,12 @@ def _precheck_pre_github_create_parent(
     ports: Ports,
     *,
     kind: Literal["initiative", "epic", "issue"],
-) -> None:
+) -> SpecNode | None:
     graph = load_graph(ports, validate=False)
     if kind == "initiative":
-        return
-    resolve_parent_for_create(req, graph, kind=kind)
+        return None
+    parent_id = resolve_parent_for_create(req, graph, kind=kind)
+    return graph.nodes_by_id[parent_id]
 
 
 def _post_github_recovery_command(
@@ -1317,8 +1349,9 @@ def create_node_core(
         if mode == "create" and github_issue_number is None:
             if ports.issue_gateway is None:
                 raise RuntimeError("issue_gateway is required for github issue creation")
-            _precheck_pre_github_create_parent(req, ports, kind=kind)
+            parent = _precheck_pre_github_create_parent(req, ports, kind=kind)
             _precheck_pre_github_create_rules_sources(kind=kind, specdock_dir=specdock_dir)
+            _precheck_pre_github_create_symlink_capability(kind=kind, specdock_dir=specdock_dir, parent=parent)
             repo_root = _resolve_repo_root(ports)
             github_issue_number = ports.issue_gateway.issue_create(
                 repo_root,

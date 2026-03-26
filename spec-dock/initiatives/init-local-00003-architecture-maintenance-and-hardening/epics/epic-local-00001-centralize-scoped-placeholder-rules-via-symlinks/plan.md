@@ -3,7 +3,7 @@
 ID: "epic-local-00001"
 タイトル: "Centralize scoped placeholder rules via symlinks"
 関連GitHub: [""]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 依存: ["requirement.md", "design.md"]
@@ -29,7 +29,7 @@ ID: "epic-local-00001"
   - 既存 tree cleanup や docs 本文粒度の拡張が必要になった場合だけ follow-up 化する。
 
 ## Issue 一覧（順序 / tranche 付き）
-- iss-local-00001:
+- iss-00031:
   - 目的:
     - wrapper script 依存を除去し、`docs/rules/` を正本にした新規生成向け rules symlink contract を provider assets / installer / runtime / docs / tests まで通して成立させる。
   - deliverable:

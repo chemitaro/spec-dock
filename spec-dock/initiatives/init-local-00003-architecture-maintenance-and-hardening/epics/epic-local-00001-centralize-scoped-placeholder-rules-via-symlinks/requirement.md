@@ -3,7 +3,7 @@
 ID: "epic-local-00001"
 タイトル: "Centralize scoped placeholder rules via symlinks"
 関連GitHub: [""]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 親: ["init-local-00003"]
@@ -82,9 +82,9 @@ ID: "epic-local-00001"
 
 ## 境界
 - Always:
-  - 正本は provider-side / docs-managed rules file に置く。
+  - canonical な user-facing rules source-of-truth は `spec-dock/docs/rules/**` とし、provider-side `src/spec_dock/assets/spec_dock/docs/rules/**` は package に同梱する authoring/source files として扱う。
   - node 配下の placeholder は symlink としてのみ materialize する。
-  - user-facing create flow の正本は runtime command とする。
+  - user-facing create flow は runtime command を supported execution path とする。
 - Ask:
   - `docs/rules/` の subtree 名と粒度が docs 体系に自然か。
   - `rules.md` の本文を「directory の役割 + 作成方法」までに留めるか、命名規約まで含めるか。

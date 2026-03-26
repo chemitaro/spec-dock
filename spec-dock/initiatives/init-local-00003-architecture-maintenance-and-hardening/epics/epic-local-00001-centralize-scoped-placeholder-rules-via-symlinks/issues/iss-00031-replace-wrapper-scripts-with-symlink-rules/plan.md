@@ -3,7 +3,7 @@
 ID: "iss-00031"
 タイトル: "Replace Wrapper Scripts With Symlink Rules"
 関連GitHub: ["#31"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-26"
 依存: ["requirement.md", "design.md"]
