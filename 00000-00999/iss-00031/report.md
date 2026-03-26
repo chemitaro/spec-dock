@@ -17,31 +17,51 @@ ID: "iss-00031"
 
 ## 実装記録（セッションログ） (必須)
 
-### 2026-03-26 HH:MM - HH:MM
+### 2026-03-26 06:17 - 07:04
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-002, EC-002
 
 #### 実施内容
-- ...
+- DevCoder で Red → Green → Refactor を回し、provider-side の中央管理 rules 原本を `src/spec_dock/assets/spec_dock/docs/rules/` に追加した。
+- runtime create flow を更新し、新規 initiative / epic / issue 作成時に wrapper ではなく相対 `rules.md` symlink を生成するようにした。
+- review 指摘に基づき、rules source 欠落、link collision、空 parent path collision、symlinked parent collision、symlink capability failure を scaffold copy 前に弾く preflight を追加した。
+- GitHub issue 作成前に `docs/rules` 原本欠落を検知する precheck を追加し、remote side effect 前に失敗させるようにした。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+python -m unittest tests.cli_runtime.test_runtime_new_s08 -v
+python -m unittest tests.cli_runtime.test_new -v
+python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 -v
 
-<result>
+39 tests OK
+32 tests OK
+9 tests OK
 ```
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - rules symlink 生成と preflight を追加
+- `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` - initiative 配下 epic 作成 rules 原本を追加
+- `src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md` - initiative discussion rules 原本を追加
+- `src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md` - epic 配下 issue 作成 rules 原本を追加
+- `src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md` - epic discussion rules 原本を追加
+- `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md` - issue discussion rules 原本を追加
+- `src/spec_dock/assets/spec_dock/templates/initiative/epics/new-epic` - wrapper asset を削除
+- `src/spec_dock/assets/spec_dock/templates/epic/issues/new-issue` - wrapper asset を削除
+- `src/spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md` - copied rules asset を削除
+- `src/spec_dock/assets/spec_dock/templates/epic/discussions/rules.md` - copied rules asset を削除
+- `src/spec_dock/assets/spec_dock/templates/issue/discussions/rules.md` - copied rules asset を削除
+- `tests/cli_runtime/test_new.py` - rules symlink / pre-GitHub failure coverage を追加
+- `tests/cli_runtime/test_runtime_new_s08.py` - create-flow preflight / no-write regression を追加
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - minimal fixture に rules source を追加
 
 #### コミット
-- <hash> <message>
+- （この直後に S01 scope をコミット）
 
 #### メモ
-- ...
+- code_reviewer による S01 scoped review は pass。
+- wrapper-facing docs / installer parity / broader regression cleanup は後続 step で扱う。
 
 ---
 
