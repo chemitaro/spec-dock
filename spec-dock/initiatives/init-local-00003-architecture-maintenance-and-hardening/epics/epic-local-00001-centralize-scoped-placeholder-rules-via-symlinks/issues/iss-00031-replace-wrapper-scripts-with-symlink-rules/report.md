@@ -57,7 +57,7 @@ python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 -v
 - `tests/cli_runtime/test_runtime_new_doc_s09.py` - minimal fixture に rules source を追加
 
 #### コミット
-- （この直後に S01 scope をコミット）
+- `7cda3197f53578a4e792067cea26b4c1d1cd88c7` `feat(runtime): rules.md symlink scaffold を導入`
 
 #### メモ
 - code_reviewer による S01 scoped review は pass。
@@ -65,14 +65,34 @@ python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 -v
 
 ---
 
-### 2026-03-26 HH:MM - HH:MM
+### 2026-03-26 07:04 - 07:31
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-001, EC-001, EC-003
 
 #### 実施内容
-- ...
+- DevCoder で `tests.test_init_update` の failing surface を更新し、installer の正本を削除済み template rules ではなく `spec-dock/docs/rules/**` に切り替えた。
+- `init` の検証を更新し、legacy `templates/**/discussions/rules.md` 非存在と canonical `docs/rules/**` 配布を明示した。
+- `update` の検証を強化し、5 本すべての canonical rules file を破損させた上で provider assets からの完全復元を確認した。
+- review / QA 指摘に基づき、legacy template path の削除確認、canonical rules file の個別内容確認、provider asset との exact match 確認を追加した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update -v
+
+75 tests OK
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py` - init/update の canonical rules contract、refresh、legacy path removal、asset exact-match を検証
+
+#### コミット
+- （この直後に S02 scope をコミット）
+
+#### メモ
+- code_reviewer / qa_reviewer による S02 scoped review は pass。
+- installer 実装本体の変更は不要で、provider assets 配布契約は既存実装で満たしていた。
 
 ---
 
