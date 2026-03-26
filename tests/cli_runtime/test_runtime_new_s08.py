@@ -224,6 +224,17 @@ class TestRuntimeNewS08(unittest.TestCase):
             (template_root / "docs").mkdir(parents=True, exist_ok=True)
             (template_root / "README.md").write_text(f"{kind} <INIT_ID> <EPIC_ID> <ISS_ID>\n", encoding="utf-8")
             (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\n", encoding="utf-8")
+        rules_docs = {
+            ("initiative", "epics.md"): "initiative epics rules\n",
+            ("initiative", "discussions.md"): "initiative discussions rules\n",
+            ("epic", "issues.md"): "epic issues rules\n",
+            ("epic", "discussions.md"): "epic discussions rules\n",
+            ("issue", "discussions.md"): "issue discussions rules\n",
+        }
+        for (scope, name), content in rules_docs.items():
+            rules_path = specdock_dir / "docs" / "rules" / scope / name
+            rules_path.parent.mkdir(parents=True, exist_ok=True)
+            rules_path.write_text(content, encoding="utf-8")
 
     def _ports(
         self,
@@ -308,6 +319,8 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(plan.planned_paths[-1], plan.dest_dir / ".meta.json")
             self.assertIn(plan.dest_dir / "README.md", plan.planned_paths)
             self.assertIn(plan.dest_dir / "docs" / "checklist.md", plan.planned_paths)
+            self.assertIn(plan.dest_dir / "epics" / "rules.md", plan.planned_paths)
+            self.assertIn(plan.dest_dir / "discussions" / "rules.md", plan.planned_paths)
 
     def test_execution_regression_and_write_order(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -342,6 +355,8 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertEqual(created_paths[:-1], sorted(created_paths[:-1], key=lambda p: p.as_posix()))
             self.assertTrue((plan.dest_dir / ".meta.json").exists())
             self.assertTrue((plan.dest_dir / "README.md").exists())
+            self.assertTrue((plan.dest_dir / "epics" / "rules.md").is_symlink())
+            self.assertTrue((plan.dest_dir / "discussions" / "rules.md").is_symlink())
 
     def test_full_candidate_set_no_write_preflight_collision(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -411,6 +426,322 @@ class TestRuntimeNewS08(unittest.TestCase):
 
             self.assertEqual(events, [])
             self.assertFalse((plan.dest_dir / "README.md").exists())
+
+    def test_broken_rules_symlink_collision_is_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+            graph = app_create_node.load_graph(ports, validate=False)
+            req = app_contracts.CreateNodeRequest(
+                title="Auth platform",
+                slug=None,
+                parent_id=None,
+                requested_node_id=None,
+                github_mode="local_only",
+                github_issue_number=None,
+            )
+            plan = app_create_node.plan_node_creation(
+                req,
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+            )
+            broken_link = plan.dest_dir / "epics" / "rules.md"
+            broken_link.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink("../../../docs/rules/initiative/missing.md", broken_link)
+
+            with self.assertRaisesRegex(RuntimeError, "Destination already exists"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            self.assertEqual(events, [])
+            self.assertFalse((plan.dest_dir / "README.md").exists())
+            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+
+    def test_empty_rules_parent_path_collision_is_no_write_preflight(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        def _records_for(kind: str, *, specdock_dir: Path):
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = []
+            if kind in ("epic", "issue"):
+                records.append(
+                    _record(
+                        infra_contracts,
+                        kind="initiative",
+                        node_id="init-local-00001",
+                        title="Auth platform",
+                        path=init_dir,
+                        parent_id=None,
+                        initiative_id=None,
+                        epic_id=None,
+                        github_issue_number=None,
+                    )
+                )
+            if kind == "issue":
+                records.append(
+                    _record(
+                        infra_contracts,
+                        kind="epic",
+                        node_id="epic-local-00001",
+                        title="JWT auth",
+                        path=epic_dir,
+                        parent_id="init-local-00001",
+                        initiative_id="init-local-00001",
+                        epic_id=None,
+                        github_issue_number=None,
+                    )
+                )
+            return records
+
+        def _request_for(kind: str):
+            if kind == "initiative":
+                return app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                )
+            if kind == "epic":
+                return app_contracts.CreateNodeRequest(
+                    title="JWT auth",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                )
+            return app_contracts.CreateNodeRequest(
+                title="Refresh token",
+                slug=None,
+                parent_id="epic-local-00001",
+                requested_node_id=None,
+                github_mode="local_only",
+                github_issue_number=None,
+            )
+
+        collision_paths = {
+            "initiative": ("epics", "README.md"),
+            "epic": ("issues", "README.md"),
+            "issue": ("discussions", ".meta.json"),
+        }
+
+        for kind, (collision_name, sentinel_name) in collision_paths.items():
+            with self.subTest(kind=kind, collision=collision_name), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                specdock_dir = repo_root / "spec-dock"
+                self._prepare_templates(specdock_dir)
+
+                events = []
+                ports = self._ports(
+                    app_ports,
+                    specdock_dir=specdock_dir,
+                    records=_records_for(kind, specdock_dir=specdock_dir),
+                    events=events,
+                )
+                graph = app_create_node.load_graph(ports, validate=False)
+                plan = app_create_node.plan_node_creation(
+                    _request_for(kind),
+                    graph,
+                    kind=kind,
+                    specdock_dir=specdock_dir,
+                    today="2026-03-12",
+                )
+                collision = plan.dest_dir / collision_name
+                collision.parent.mkdir(parents=True, exist_ok=True)
+                collision.write_text("existing", encoding="utf-8")
+
+                with self.assertRaisesRegex(RuntimeError, rf"Destination already exists: .*{collision_name}"):
+                    app_create_node.execute_create_plan(plan, ports)
+
+                self.assertEqual(events, [])
+                self.assertEqual(collision.read_text(encoding="utf-8"), "existing")
+                self.assertFalse((plan.dest_dir / sentinel_name).exists())
+
+    def test_missing_rules_source_is_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+            graph = app_create_node.load_graph(ports, validate=False)
+            req = app_contracts.CreateNodeRequest(
+                title="Auth platform",
+                slug=None,
+                parent_id=None,
+                requested_node_id=None,
+                github_mode="local_only",
+                github_issue_number=None,
+            )
+            plan = app_create_node.plan_node_creation(
+                req,
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+            )
+            (specdock_dir / "docs" / "rules" / "initiative" / "epics.md").unlink()
+
+            with self.assertRaisesRegex(RuntimeError, "Missing rules source"):
+                app_create_node.execute_create_plan(plan, ports)
+
+            self.assertEqual(events, [])
+            self.assertFalse((plan.dest_dir / "README.md").exists())
+            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+
+    def test_symlink_creation_capability_preflight_fails_before_copy(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            events = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], events=events)
+            graph = app_create_node.load_graph(ports, validate=False)
+            req = app_contracts.CreateNodeRequest(
+                title="Auth platform",
+                slug=None,
+                parent_id=None,
+                requested_node_id=None,
+                github_mode="local_only",
+                github_issue_number=None,
+            )
+            plan = app_create_node.plan_node_creation(
+                req,
+                graph,
+                kind="initiative",
+                specdock_dir=specdock_dir,
+                today="2026-03-12",
+            )
+
+            with patch.object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
+                with self.assertRaisesRegex(RuntimeError, "Symlink creation preflight failed"):
+                    app_create_node.execute_create_plan(plan, ports)
+
+            self.assertEqual(events, [])
+            self.assertFalse((plan.dest_dir / "README.md").exists())
+            self.assertFalse((plan.dest_dir / ".meta.json").exists())
+
+    def test_symlinked_rules_parent_dir_collision_is_no_write_preflight(self) -> None:
+        if os.name == "nt":
+            self.skipTest("symlink parent collision semantics vary on Windows")
+
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+
+        def _records_for(kind: str, *, specdock_dir: Path):
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = []
+            if kind in ("epic", "issue"):
+                records.append(
+                    _record(
+                        infra_contracts,
+                        kind="initiative",
+                        node_id="init-local-00001",
+                        title="Auth platform",
+                        path=init_dir,
+                        parent_id=None,
+                        initiative_id=None,
+                        epic_id=None,
+                        github_issue_number=None,
+                    )
+                )
+            if kind == "issue":
+                records.append(
+                    _record(
+                        infra_contracts,
+                        kind="epic",
+                        node_id="epic-local-00001",
+                        title="JWT auth",
+                        path=epic_dir,
+                        parent_id="init-local-00001",
+                        initiative_id="init-local-00001",
+                        epic_id=None,
+                        github_issue_number=None,
+                    )
+                )
+            return records
+
+        def _request_for(kind: str):
+            if kind == "initiative":
+                return app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                )
+            if kind == "epic":
+                return app_contracts.CreateNodeRequest(
+                    title="JWT auth",
+                    slug=None,
+                    parent_id="init-local-00001",
+                    requested_node_id=None,
+                    github_mode="local_only",
+                    github_issue_number=None,
+                )
+            return app_contracts.CreateNodeRequest(
+                title="Refresh token",
+                slug=None,
+                parent_id="epic-local-00001",
+                requested_node_id=None,
+                github_mode="local_only",
+                github_issue_number=None,
+            )
+
+        collision_paths = {
+            "initiative": "epics",
+            "epic": "issues",
+            "issue": "discussions",
+        }
+
+        for kind, collision_name in collision_paths.items():
+            with self.subTest(kind=kind, collision=collision_name), tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                specdock_dir = repo_root / "spec-dock"
+                self._prepare_templates(specdock_dir)
+
+                events = []
+                ports = self._ports(
+                    app_ports,
+                    specdock_dir=specdock_dir,
+                    records=_records_for(kind, specdock_dir=specdock_dir),
+                    events=events,
+                )
+                graph = app_create_node.load_graph(ports, validate=False)
+                plan = app_create_node.plan_node_creation(
+                    _request_for(kind),
+                    graph,
+                    kind=kind,
+                    specdock_dir=specdock_dir,
+                    today="2026-03-12",
+                )
+                symlink_target = repo_root / "existing-target"
+                symlink_target.mkdir(parents=True, exist_ok=True)
+                collision = plan.dest_dir / collision_name
+                collision.parent.mkdir(parents=True, exist_ok=True)
+                os.symlink(symlink_target, collision)
+
+                with self.assertRaisesRegex(RuntimeError, rf"Destination already exists: .*{collision_name}"):
+                    app_create_node.execute_create_plan(plan, ports)
+
+                self.assertEqual(events, [])
+                self.assertFalse((symlink_target / "rules.md").exists())
+                self.assertFalse((plan.dest_dir / "README.md").exists())
+                self.assertFalse((plan.dest_dir / ".meta.json").exists())
 
     def test_per_kind_parity_create_local(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -1834,6 +2165,102 @@ class TestRuntimeNewS08(unittest.TestCase):
                     self.assertIn("Outcome: pre_github_fail", str(raised.exception))
                     self.assertNotIn("GitHub issue was created:", str(raised.exception))
                     self.assertEqual(issue_gateway.calls, [])
+
+    def test_github_create_missing_rules_source_fails_before_github_create(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            cases = [
+                (
+                    "initiative",
+                    app_create_node.create_initiative,
+                    {
+                        "title": "Payments",
+                        "slug": None,
+                        "parent_id": None,
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                    specdock_dir / "docs" / "rules" / "initiative" / "epics.md",
+                ),
+                (
+                    "epic",
+                    app_create_node.create_epic,
+                    {
+                        "title": "JWT auth",
+                        "slug": None,
+                        "parent_id": "init-local-00001",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                    specdock_dir / "docs" / "rules" / "epic" / "issues.md",
+                ),
+                (
+                    "issue",
+                    app_create_node.create_issue,
+                    {
+                        "title": "Refresh token",
+                        "slug": None,
+                        "parent_id": "epic-local-00001",
+                        "requested_node_id": None,
+                        "github_mode": "create",
+                        "github_issue_number": None,
+                    },
+                    specdock_dir / "docs" / "rules" / "issue" / "discussions.md",
+                ),
+            ]
+            for case_name, create_fn, request_kwargs, missing_rules_path in cases:
+                with self.subTest(case=case_name):
+                    self._prepare_templates(specdock_dir)
+                    missing_rules_path.unlink()
+                    events: list[str] = []
+                    issue_gateway = _StubIssueGateway([796])
+                    ports = self._ports(
+                        app_ports,
+                        specdock_dir=specdock_dir,
+                        records=records,
+                        events=events,
+                        issue_gateway=issue_gateway,
+                    )
+
+                    with self.assertRaisesRegex(RuntimeError, "Missing rules source") as raised:
+                        create_fn(app_contracts.CreateNodeRequest(**request_kwargs), ports)
+
+                    self.assertIn("Outcome: pre_github_fail", str(raised.exception))
+                    self.assertNotIn("GitHub issue was created:", str(raised.exception))
+                    self.assertEqual(issue_gateway.calls, [])
+                    self.assertEqual(events, [])
 
     def test_github_create_graph_preflight_fails_before_github_create_for_initiative(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()

@@ -556,6 +556,125 @@ def _scaffold_file_paths(template_dir: Path, dest_dir: Path) -> list[Path]:
     return files
 
 
+def _rules_source_paths(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    specdock_dir: Path,
+) -> list[Path]:
+    docs_rules_dir = specdock_dir / "docs" / "rules"
+    if kind == "initiative":
+        return [
+            docs_rules_dir / "initiative" / "epics.md",
+            docs_rules_dir / "initiative" / "discussions.md",
+        ]
+    if kind == "epic":
+        return [
+            docs_rules_dir / "epic" / "issues.md",
+            docs_rules_dir / "epic" / "discussions.md",
+        ]
+    return [docs_rules_dir / "issue" / "discussions.md"]
+
+
+def _rules_scaffold_specs(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    dest_dir: Path,
+    specdock_dir: Path,
+) -> list[tuple[Path, Path]]:
+    rules_source_paths = _rules_source_paths(kind=kind, specdock_dir=specdock_dir)
+    if kind == "initiative":
+        return [
+            (dest_dir / "epics" / "rules.md", rules_source_paths[0]),
+            (dest_dir / "discussions" / "rules.md", rules_source_paths[1]),
+        ]
+    if kind == "epic":
+        return [
+            (dest_dir / "issues" / "rules.md", rules_source_paths[0]),
+            (dest_dir / "discussions" / "rules.md", rules_source_paths[1]),
+        ]
+    return [
+        (dest_dir / "discussions" / "rules.md", rules_source_paths[0]),
+    ]
+
+
+def _create_relative_symlink(link_path: Path, target_path: Path) -> None:
+    _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+    rel_target = os.path.relpath(target_path, start=link_path.parent)
+    os.symlink(rel_target, link_path)
+
+
+def _validate_parent_dir_preflight(parent_dir: Path) -> None:
+    current = parent_dir
+    while True:
+        if os.path.lexists(current):
+            if current.is_symlink():
+                raise RuntimeError(f"Destination already exists: {current}")
+            if not current.is_dir():
+                raise RuntimeError(f"Destination already exists: {current}")
+            return
+        next_parent = current.parent
+        if next_parent == current:
+            return
+        current = next_parent
+
+
+def _validate_rules_symlink_preflight(*, link_path: Path, target_path: Path) -> None:
+    if not target_path.exists() or not target_path.is_file():
+        raise RuntimeError(f"Missing rules source: {target_path}")
+    _validate_parent_dir_preflight(link_path.parent)
+    if os.path.lexists(link_path):
+        raise RuntimeError(f"Destination already exists: {link_path}")
+
+
+def _nearest_existing_parent_dir(path: Path) -> Path:
+    current = path
+    while not os.path.lexists(current):
+        next_parent = current.parent
+        if next_parent == current:
+            raise RuntimeError(f"Destination already exists: {path}")
+        current = next_parent
+    return current
+
+
+def _preflight_symlink_creation_capability(*, link_path: Path) -> None:
+    probe_dir = _nearest_existing_parent_dir(link_path.parent)
+    if probe_dir.is_symlink() or not probe_dir.is_dir():
+        raise RuntimeError(f"Destination already exists: {probe_dir}")
+    probe_path = probe_dir / f".spec-dock-symlink-probe-{os.getpid()}-{uuid.uuid4().hex}"
+    probe_target = f".spec-dock-symlink-target-{uuid.uuid4().hex}"
+    try:
+        os.symlink(probe_target, probe_path)
+    except OSError as exc:
+        raise RuntimeError(f"Symlink creation preflight failed at {link_path.parent}: {exc}") from exc
+    try:
+        probe_path.unlink()
+    except OSError as exc:
+        raise RuntimeError(f"Symlink creation preflight cleanup failed at {probe_path}: {exc}") from exc
+
+
+def _preflight_rules_symlink_creation_capability(
+    rules_scaffold_specs: list[tuple[Path, Path]],
+) -> None:
+    probed_dirs: set[Path] = set()
+    for link_path, _target_path in rules_scaffold_specs:
+        probe_dir = _nearest_existing_parent_dir(link_path.parent)
+        if probe_dir in probed_dirs:
+            continue
+        _preflight_symlink_creation_capability(link_path=link_path)
+        probed_dirs.add(probe_dir)
+
+
+def _precheck_pre_github_create_rules_sources(
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    specdock_dir: Path,
+) -> None:
+    for target_path in _rules_source_paths(kind=kind, specdock_dir=specdock_dir):
+        if not target_path.exists() or not target_path.is_file():
+            raise RuntimeError(f"Missing rules source: {target_path}")
+
+
 def _replacements(
     *,
     kind: Literal["initiative", "epic", "issue"],
@@ -712,6 +831,7 @@ def plan_node_creation(
                 github_repo_owner, github_repo_name = current_scope
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
+    planned_paths.extend(link_path for link_path, _target_path in _rules_scaffold_specs(kind=kind, dest_dir=dest_dir, specdock_dir=specdock_dir))
     planned_paths.append(dest_dir / _META_FILENAME)
     meta_path = dest_dir / _META_FILENAME
     return CreatePlan(
@@ -755,12 +875,21 @@ def resolve_create_write_phase(error: Exception, *, default: CreateWritePhase = 
 def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
     node_repo = _resolve_node_repo(ports)
     template_scaffolder = _resolve_template_scaffolder(ports)
+    specdock_dir = _resolve_specdock_dir(ports)
 
-    collisions = [path for path in plan.planned_paths if path.exists()]
+    collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
     if collisions:
         raise RuntimeError(f"Destination already exists: {collisions[0]}")
 
     template_dir = _resolve_template_dir(plan)
+    rules_scaffold_specs = _rules_scaffold_specs(
+        kind=plan.meta.kind,
+        dest_dir=plan.dest_dir,
+        specdock_dir=specdock_dir,
+    )
+    for link_path, target_path in rules_scaffold_specs:
+        _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+    _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
     try:
         created_paths = template_scaffolder.copy_scaffolded_tree(
             src_dir=template_dir,
@@ -772,10 +901,15 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
         raise CreatePlanExecutionError(phase="scaffold_copied", message=str(exc)) from exc
 
     try:
+        created_rule_links: list[Path] = []
+        for link_path, target_path in rules_scaffold_specs:
+            _create_relative_symlink(link_path, target_path)
+            created_rule_links.append(link_path)
         node_repo.write_meta(plan.dest_dir, plan.meta)
     except Exception as exc:
         raise CreatePlanExecutionError(phase="scaffold_copied", message=str(exc)) from exc
-    return [*created_paths, Path(plan.meta.meta_path)]
+    created_non_meta_paths = sorted([*created_paths, *created_rule_links], key=lambda path: path.as_posix())
+    return [*created_non_meta_paths, Path(plan.meta.meta_path)]
 
 
 def _resolve_scope_node(req: CreateDiscussionDocRequest, graph: SpecGraph) -> SpecNode:
@@ -1184,6 +1318,7 @@ def create_node_core(
             if ports.issue_gateway is None:
                 raise RuntimeError("issue_gateway is required for github issue creation")
             _precheck_pre_github_create_parent(req, ports, kind=kind)
+            _precheck_pre_github_create_rules_sources(kind=kind, specdock_dir=specdock_dir)
             repo_root = _resolve_repo_root(ports)
             github_issue_number = ports.issue_gateway.issue_create(
                 repo_root,
