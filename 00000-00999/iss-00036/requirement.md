@@ -73,7 +73,7 @@ ID: "iss-00036"
 - naming contract は validate / sync scan と整合していなければならない。
 
 ## 前提
-- issue-00034 の create contract が先行している。
+- `iss-00034` の create contract が先行している。
 - `new doc` の対象は issue / epic / initiative scope の `discussions/` である。
 - epic spec で grandfathered legacy docs の扱いが確定している。
 

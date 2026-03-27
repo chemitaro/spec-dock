@@ -1,4 +1,6 @@
 {
   "schema_version": 1,
-  "depends_on": []
+  "depends_on": [
+    "iss-00034"
+  ]
 }

@@ -17,7 +17,7 @@ ID: "iss-00037"
 
 ## 背景・現状
 - 現状の挙動:
-  - issue-1 / issue-2 で migration boundary の先行ガードを入れる前提だが、epic 全体としての final closure owner はまだ必要である。
+  - `iss-00034` / `iss-00036` で migration boundary の先行ガードを入れる前提だが、epic 全体としての final closure owner はまだ必要である。
 - 現状の課題:
   - old workspace 非サポートの方針は、条項ごとの evidence がないとレビュー時に narrative 依存になる。
   - validate が migration boundary を十分に表現しないと、docs と runtime contract がずれる。
@@ -47,7 +47,7 @@ ID: "iss-00037"
 - MUST:
   - E-AC-004 の 3 条項を clause-by-clause で閉じる。
   - validate と migration tests を boundary contract に合わせて harden する。
-  - issue-1/2 の先行ガードを final closure owner として統合する。
+  - `iss-00034` / `iss-00036` の先行ガードを final closure owner として統合する。
 - MUST NOT:
   - old workspace 自動移行 tooling を追加しない。
   - backward compatibility を強制維持する方向へ戻さない。
@@ -73,7 +73,7 @@ ID: "iss-00037"
 - final closure owner は本 issue とする。
 
 ## 前提
-- issue-00034 / issue-00036 / issue-00035 の先行 contract が存在する。
+- `iss-00034` / `iss-00036` / `iss-00035` の先行 contract が存在する。
 - old workspace は rebuildable であり、自動移行は epic の非目標である。
 - reviewer が clause-by-clause で close 判定できる必要がある。
 
@@ -144,7 +144,7 @@ ID: "iss-00037"
     - old workspace と new contract のあいだで、何を保証し何を保証しないかを示す契約
 - TERM-002:
   - final closure owner:
-    - epic acceptance を最終的に clause-by-clause で閉じる責務を持つ issue
+    - epic acceptance を最終的に clause-by-clause で閉じる責務を持つ `iss-00037`
 
 ## 未確定事項
 - なし:

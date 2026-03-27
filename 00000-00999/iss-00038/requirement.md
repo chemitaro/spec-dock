@@ -22,7 +22,7 @@ ID: "iss-00038"
   - docs parity を個別 issue に散らしたままだと、old local-only / sequential / index assumption の残存が見落とされる。
   - regression gate と final review record が曖昧だと、epic close の客観性が弱くなる。
 - 再現手順:
-  1. issue-1〜4 の実装が完了しても、provider / dogfooding docs と generated state が揃っているとは限らない。
+  1. `iss-00034` / `iss-00036` / `iss-00035` / `iss-00037` の実装が完了しても、provider / dogfooding docs と generated state が揃っているとは限らない。
   2. final review record がないと close evidence の参照先が散逸する。
 - 観測点:
   - Docs:
@@ -35,7 +35,7 @@ ID: "iss-00038"
     - targeted unittest output
 - 情報源:
   - `epic-00033` requirement / design / plan
-  - issue-1〜4 の close evidence
+  - `iss-00034` / `iss-00036` / `iss-00035` / `iss-00037` の close evidence
 
 ## 対象ユーザー / 利用シナリオ（必要時）
 - 主な利用者:
@@ -48,7 +48,7 @@ ID: "iss-00038"
 - MUST:
   - targeted docs list を provider + dogfooding で更新対象として固定する。
   - validate / sync / targeted regression / final spec review record を close evidence に入れる。
-  - issue-1〜5 の close evidence を epic exit に結び付ける。
+  - `iss-00034` / `iss-00036` / `iss-00035` / `iss-00037` / `iss-00038` の close evidence を epic exit に結び付ける。
 - MUST NOT:
   - close-out の判断を narrative だけに依存させない。
   - old local-only / sequential / index assumption を残したまま epic を閉じない。
@@ -72,7 +72,7 @@ ID: "iss-00038"
 - epic exit contract と 1:1 に対応する evidence を残す。
 
 ## 前提
-- issue-1〜4 が完了し、各 close evidence が参照可能である。
+- `iss-00034` / `iss-00036` / `iss-00035` / `iss-00037` が完了し、各 close evidence が参照可能である。
 - provider docs と dogfooding docs の両方が repo 内に存在する。
 - `validate` と `sync` が current contract を観測できる。
 
@@ -131,7 +131,7 @@ ID: "iss-00038"
 ## 入力→出力例（必要時）
 - EX-001:
   - Input:
-    - issue-1〜4 close evidence + targeted docs diff + `validate`/`sync`/unittest outputs
+    - `iss-00034` / `iss-00036` / `iss-00035` / `iss-00037` の close evidence + targeted docs diff + `validate`/`sync`/unittest outputs
   - Output:
     - epic final close に必要な final review record を作成できる
 
