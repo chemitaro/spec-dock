@@ -5,121 +5,125 @@ ID: "init-local-00003"
 関連GitHub: []
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-26"
+最終更新: "2026-03-27"
 ---
 
 # init-local-00003 Architecture Maintenance and Hardening — 要件定義（WHAT / WHY）
 
 ## 目的（Outcome）
 - Primary:
-  - prototype の継続開発を支える architecture maintenance / governance / hardening を独立 initiative として扱う。
-  - feature expansion を無理なく進められるよう、sync contract、compatibility boundary、structural invariant、state boundary cleanup を閉じる。
+  - `spec-dock` の継続開発を支える architecture maintenance / governance / hardening の受け皿を、open-ended initiative として運用する。
+  - source-of-truth、identity、sync、naming、state boundary など、構造的な architecture issue を継続的に取り込み、epic / issue として分解できる状態を維持する。
 - Secondary:
-  - 旧 initiative で混在していた architecture concern を、独立した投資単位として管理できるようにする。
-  - `大きな構造破綻はないが、放置すると後で効く課題` を先回りで整理する。
+  - feature expansion と architecture cleanup の backlog を混線させず、architecture concern を独立した投資単位として管理する。
+  - 当面の milestone として、`spec-dock` を「ちゃんと使える状態」に到達させる。
+
+## initiative の定義
+- この initiative は open-ended である。
+- 将来見つかる architecture issue を継続的に受け入れる。
+- ただし無制限に scope を広げるのではなく、「構造健全性」「運用可能性」「dogfooding 継続性」に関わる論点だけを取り込む。
+- feature value の拡張、operator-facing feature、product surface の拡張は別 initiative に置く。
 
 ## 背景と Why now
 - 現状の課題:
-  - 第三者レビューでは、全面的な architecture failure は見えなかった。
-  - しかし、provider/generated sync contract、compatibility boundary、structural verification、active-state source-of-truth、create lock layer leak など、放置すると feature expansion を不安定にする課題が見つかった。
-  - これらは細かい bugfix ではなく、architecture / governance / hardening のテーマである。
-- 影響:
-  - feature initiative に混ぜると価値拡張の優先順位が見えにくくなる。
-  - 一方で無視すると、drift、compatibility break、state divergence が後で高コスト化する。
+  - 現在の dogfooding workspace は旧 contract を前提にしており、今回の identity / naming / sync contract 変更で壊れる前提になる。
+  - 一方で、その旧 workspace を無理に延命することは architecture cleanup の足かせになる。
+  - node identity の GitHub mandatory 化、local-only 廃止、discussion / ADR の timestamp naming、ADR mirror sync などは、現在の runtime / docs / tests 全体にまたがる基盤変更である。
+- 方針:
+  - 現在の古い dogfooding workspace は放棄してよく、後で新しい workspace を再構築してからデータ移し替えする。
+  - したがって、今回は無理に後方互換性を維持しない。
+  - initiative / epic planning docs 自体は current legacy workspace 上の artifact として一時的に `*-local-*` path に存在しうるが、これは runtime policy の例外ではなく、再構築までの planning container とみなす。
 - なぜ今やるか:
-  - いまなら致命傷になる前に独立 initiative として閉じ込められる。
-  - feature expansion を始める前に、architecture concern の受け皿を切り分けておいたほうがよい。
-- 情報源:
-  - `discussions/001-disc-architecture-gap-review.md`
+  - いま contract を揃えないと、今後の epic / issue 運用そのものが local collision と stale contract を抱え続ける。
+  - single GitHub repo 前提に寄せるなら、早い段階で identity policy を固定したほうが実装の手戻りが小さい。
 
 ## 成功指標
 - Metric-001:
   - Baseline:
-    - sync / compatibility / invariant が暗黙で、feature 追加時の判断が運用者依存になりやすい。
+    - architecture issue の受け皿はあるが、open-ended initiative としての運用方針が明文化されていない。
   - Target:
-    - architecture guardrail が docs と issue backlog に落ちている。
+    - architecture issue を継続的に取り込む initiative definition と epic portfolio が docs に固定されている。
   - 計測方法:
-    - sync contract、compatibility boundary、structural invariant が docs 化されていること。
-  - 判定時期:
-    - architecture initiative の初期整理完了時。
+    - initiative requirement / design / plan が open-ended initiative として整合していること。
 - Metric-002:
   - Baseline:
-    - active-state source-of-truth や create lock の責務漏れが実装上残っている。
+    - node identity、doc naming、sync-generated views の contract が旧 dogfooding workspace に引きずられている。
   - Target:
-    - architecture cleanup 対象が明確な issue として切り出されている。
+    - GitHub-backed identity と ADR mirror workflow を扱う epic が起票され、issue 分解まで完了している。
   - 計測方法:
-    - cleanup 対象が epic / issue に配置され、feature initiative から切り離されていること。
-  - 判定時期:
-    - epic 分解時。
+    - 対象 epic の requirement / design / plan が存在し、実装 issue が定義されていること。
+- Metric-003:
+  - Baseline:
+    - backward compatibility を守るべきかどうかが曖昧で、cleanup の強度を決めにくい。
+  - Target:
+    - 「旧 workspace は再構築前提」「無理に後方互換を維持しない」が明記されている。
+  - 計測方法:
+    - initiative / epic docs に移行前提が明記されていること。
 
 ## スコープ
 - MUST:
-  - sync contract を定義する。
-  - shipped runtime / scaffold / generated workspace の compatibility boundary を定義する。
-  - architecture health review 用の structural invariant を定義する。
-  - active-state source-of-truth cleanup と create lock layer cleanup を architecture issue として扱う。
-  - unresolved safety ownership を整理する。
+  - architecture issue を継続的に受け入れる open-ended initiative として運用定義を固定する。
+  - source-of-truth、identity、sync、naming、state boundary の architecture concern を扱う。
+  - single GitHub repo 前提の contract を扱う。
+  - dogfooding workspace の再構築前提と、後方互換を無理に維持しない前提を明記する。
 - MUST NOT:
-  - 新しい feature value を主目的にしない。
-  - feature convenience のための work を architecture initiative に抱え込まない。
-  - 大規模な全面再設計を前提にしない。
+  - feature value 拡張の受け皿にしない。
+  - temporary workaround を architecture goal と誤認しない。
+  - 旧 workspace の延命をこの initiative の目的にしない。
 - OUT OF SCOPE:
-  - collaboration / lifecycle / operator value の feature expansion
-  - prototype feature breadth の拡大
+  - feature backlog
+  - 外部連携や multi-repo strategy
+  - user-facing feature expansion
 
 ## 境界
 - Always:
-  - architecture initiative は feature value ではなく、guardrail と hardening を扱う。
-  - `問題なし` を言うためではなく、`問題の所在を先に閉じる` ための initiative とする。
-  - baseline は再実装対象ではなく、差分と gap を閉じる対象とする。
+  - architecture initiative は open-ended だが、architecture concern だけを受け入れる。
+  - source-of-truth を曖昧にしない。
+  - backward compatibility より、使える新 contract を優先する。
 - Ask:
-  - その課題は release blocker か、feature enabler か、later maintenance か。
-  - その問題は docs/gov で閉じるべきか、実装 cleanup で閉じるべきか。
+  - その課題は architecture contract の問題か、feature 要求か。
+  - その変更は docs で閉じるか、runtime / scaffold 実装変更まで必要か。
 - Never:
-  - feature backlog の受け皿として使うこと。
-  - structure problem を曖昧にしたまま `大丈夫そう` で進めること。
+  - 旧 dogfooding workspace の保守を優先して architecture cleanup を止めること。
+  - cross-repo 前提を持ち込むこと。
 
 ## ステークホルダー / 影響範囲
 - 利用者:
-  - `spec-dock` を dogfooding する coding agent
+  - `spec-dock` を同一 product repo に組み込んで運用する coding agent / maintainer
 - 運用者:
-  - generated workspace と docs parity を維持する maintainer
-- 開発者:
-  - runtime / scaffold / installer の境界を守る開発者
+  - dogfooding workspace を再構築し、後からデータ移し替えを行う maintainer
 - 影響システム / 領域:
-  - `src/spec_dock/cli.py`
-  - `src/spec_dock/assets/spec_dock/`
+  - `src/spec_dock/`
   - `spec-dock/`
+  - `tests/`
 
 ## 非交渉制約
-- 互換性:
-  - additive migration を原則とする。
-- セキュリティ / 監査:
-  - fail-safe / fail-closed posture を壊さない。
-- 性能 / 可用性:
-  - validate/sync/doctor の基本信頼性を落とさない。
-- 運用:
-  - source-of-truth と sync path を曖昧にしない。
-  - feature initiative とは役割分担を維持する。
+- single GitHub repo 前提で進める。
+- initiative / epic / issue は GitHub issue mandatory とする。
+- local-only は完全廃止する。
+- discussion / ADR は timestamp-prefix naming へ移行する。
+- `spec-dock/adrs/` は sync 再生成の symlink mirror のみとする。
 
 ## リスク / 依存
 - R-001:
-  - cleanup だけに寄りすぎると終わらない maintenance initiative になる。
+  - open-ended を理由に scope が無制限化する。
 - R-002:
-  - docs/gov だけで止まると、実装上の leak が残る。
+  - backward compatibility を切る前提が曖昧だと、変更強度が中途半端になる。
+- R-003:
+  - dogfooding workspace 再構築の手順が曖昧だと、移行時に混乱する。
 - D-001:
-  - feature initiative との優先順位調整
+  - 新 contract を受け入れる epic / issue 分解が先に必要。
 
 ## 未確定事項
 - Q-001:
   - 質問:
-    - create lock layer cleanup と active-state source-of-truth cleanup のどちらを先に着手するか。
+    - dogfooding workspace の再構築手順を別 epic/issue として切るか、各 epic 内で局所対応するか。
   - 選択肢:
     - A:
-      - active-state source-of-truth cleanup
+      - 各 epic 内で局所対応
     - B:
-      - create lock layer cleanup
+      - 再構築専用 epic / issue を持つ
   - 推奨案:
-    - A。source-of-truth 二重化のほうが drift と実行経路差分を増やしやすいため。
+    - A。まずは各 epic の rollout boundary に閉じ込める。
   - 影響範囲:
-    - architecture cleanup epic の順序
+    - migration / rollout planning
