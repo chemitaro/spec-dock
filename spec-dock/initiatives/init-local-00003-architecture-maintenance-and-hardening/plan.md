@@ -5,7 +5,7 @@ ID: "init-local-00003"
 関連GitHub: []
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-26"
+最終更新: "2026-03-27"
 依存: ["requirement.md", "design.md"]
 ---
 
@@ -13,127 +13,84 @@ ID: "init-local-00003"
 
 ## この計画が達成する Goal / Metric
 - Goal:
-  - prototype の feature expansion を支える architecture guardrail と cleanup backlog を独立 initiative として閉じる。
+  - `spec-dock` を継続的に使える architecture baseline へ寄せる。
+  - architecture issue を継続的に追加できる open-ended initiative portfolio を維持する。
 - 対象 metric:
-  - requirement の Metric-001 / Metric-002
+  - requirement の Metric-001 / Metric-002 / Metric-003
 
 ## マイルストーン
 - M1:
   - deliverable:
-    - architecture gap review が initiative 正本へ取り込まれている
+    - open-ended initiative definition が docs に固定されている
   - exit:
-    - sync / compatibility / invariant / cleanup 対象が整理されている
+    - initiative requirement / design / plan が新前提に更新されている
 - M2:
   - deliverable:
-    - docs/gov 系の architecture contract が discussion で閉じ始めている
+    - GitHub-backed identity と ADR mirror workflow の epic が requirement / design / plan まで分解されている
   - exit:
-    - sync contract と compatibility boundary の論点が明文化されている
+    - 新 epic が issue 5本まで計画化されている
 - M3:
   - deliverable:
-    - code cleanup 対象が epic / issue に分解されている
+    - 新 contract に沿った実装 epic が継続追加できる状態になっている
   - exit:
-    - active-state と create lock の cleanup 着手順が決まっている
+    - initiative portfolio と epic readiness contract が明確である
 
 ## Epic ポートフォリオ
-- epic-0001-sync-and-compatibility-contract:
+- epic-00033-github-backed-identity-and-adr-mirror-workflow:
   - 目的:
-    - provider/generated sync contract と shipped runtime compatibility boundary を定義する。
-  - deliverable:
-    - sync / compatibility contract docs
+    - GitHub mandatory identity、timestamp-based discussion/ADR naming、ADR symlink mirror workflow を単一 epic で導入する。
   - metric link:
-    - Metric-001
-  - depends on:
-    - なし
-- epic-0002-architecture-invariants-and-review:
-  - 目的:
-    - architecture health review 用の structural invariant と review rule を定義する。
-  - deliverable:
-    - invariant checklist
-  - metric link:
-    - Metric-001
-  - depends on:
-    - epic-0001-sync-and-compatibility-contract
-- epic-0003-runtime-state-boundary-cleanup:
-  - 目的:
-    - active-state source-of-truth cleanup を扱う。
-  - deliverable:
-    - canonical active-state boundary へ寄せる issue 群
-  - metric link:
-    - Metric-002
-  - depends on:
-    - epic-0002-architecture-invariants-and-review
-- epic-0004-runtime-layer-hardening:
-  - 目的:
-    - create lock layer leak と unresolved safety ownership を扱う。
-  - deliverable:
-    - create/recovery/safety hardening issue 群
-  - metric link:
-    - Metric-002
-  - depends on:
-    - epic-0002-architecture-invariants-and-review
+    - Metric-002, Metric-003
+  - status:
+    - planned (current priority)
+  - portfolio role:
+    - GitHub issue #33 と連携した current epic。新 contract（GitHub-backed identity mandatory）へ移行するための優先実行対象。
 
 ## 順序と理由
 - sequencing rationale:
-  - 先に sync / compatibility を閉じる。
-  - 次に architecture invariant を置く。
-  - その後、source-of-truth cleanup と layer cleanup を実装 issue として扱う。
+  - initiative では固定的な終点を持たず、epic を追加し続ける。
+  - 当面は `epic-00033` を優先し、新 identity contract と ADR workflow を先に閉じる。
+  - その後に必要な architecture concern を追加 epic として取り込む。
 - parallelizable:
-  - epic-0003 と epic-0004 は並行着手可能。
+  - future epic は追加可能だが、contract-heavy epic は同時多発させない。
 
 ## 意思決定ゲート
-- G1 strategy review:
-  - architecture initiative の範囲が feature initiative と混ざっていないか確認する
-- G2 milestone readiness:
-  - docs/gov が先に閉じる順序になっているか確認する
-- G3 governance/docs impact:
-  - cleanup 対象が architecture risk として正しく整理されているか確認する
+- G1 initiative scope review:
+  - architecture concern だけを受け入れているか
+- G2 epic readiness review:
+  - epic が single coherent contract を持っているか
+- G3 migration boundary review:
+  - rebuildable workspace 前提と backward compatibility boundary が明示されているか
 - G9 final initiative plan review:
-  - feature initiative に渡す guardrail が十分か確認する
-
-## 指標レビュー計画
-- review timing:
-  - gap review 反映時
-  - epic 分解時
-- dashboard / source:
-  - initiative docs
-  - discussion sheet
-
-## ロールアウト計画
-- rollout window:
-  - docs/gov を先行し、code cleanup は後続で issue 化する
-- release / communication:
-  - feature initiative 側へ guardrail と dependency を共有する
+  - new epic が initiative goal に沿っているか
 
 ## Epic readiness contract
 - Epic に要求する最低条件:
-  - architecture risk が何か説明できる
-  - As-Is / To-Be / gap / risk が見える
-  - feature initiative との境界が明示されている
+  - source-of-truth / generated artifacts / migration boundary が明記されている
+  - backward compatibility をどう扱うかが明記されている
+  - 実装 issue 分解と順序がある
 
 ## final exit contract
-- milestone exit:
-  - architecture-level の主要 gap が docs と issue backlog に落ちている
-- success metrics reviewed:
-  - requirement の Metric-001 / Metric-002 を確認している
-- remaining follow-up ownership:
-  - feature initiative 側へ渡す guardrail と残件が整理されている
+- initiative は open-ended のため final close は定義しない。
+- 代わりに、各 epic が initiative guardrail と整合していることを継続条件とする。
+- 当面の milestone exit は `epic-00033` が planning 完了すること。
 
 ## 依存 / ブロッカー
 - D-001:
-  - feature initiative との優先順位調整
+  - dogfooding workspace rebuild の運用判断
 - D-002:
-  - current runtime baseline の理解
+  - single GitHub repo 前提の維持
 
 ## 未確定事項
 - Q-001:
   - 質問:
-    - epic-0003 と epic-0004 のどちらを先に実装 issue 化するか。
+    - 次に追加される architecture epic の優先順位付けを initiative plan に都度反映するか。
   - 選択肢:
     - A:
-      - active-state source-of-truth cleanup
+      - 反映する
     - B:
-      - create lock / safety hardening
+      - discussion のみで扱う
   - 推奨案:
     - A
   - 影響範囲:
-    - issue 着手順
+    - initiative portfolio maintenance

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-00033",
+  "title": "GitHub backed identity and ADR mirror workflow",
+  "slug": "github-backed-identity-and-adr-mirror-workflow",
+  "created_at": "2026-03-27T20:08:12+09:00",
+  "updated_at": "2026-03-27T20:08:12+09:00",
+  "parent_id": "init-local-00003",
+  "initiative_id": "init-local-00003",
+  "epic_id": null,
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 33,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
