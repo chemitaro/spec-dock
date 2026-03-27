@@ -72,7 +72,7 @@ ID: "iss-00035"
 - legacy grandfathered ADR を自動 rename しない。
 
 ## 前提
-- issue-00036 相当の naming contract が前段で固定される。
+- `iss-00036` の naming contract が前段で固定される。
 - ADR 原本は issue / epic / initiative 配下の `discussions/` に存在する。
 - symlink を作れない環境があり得る。
 

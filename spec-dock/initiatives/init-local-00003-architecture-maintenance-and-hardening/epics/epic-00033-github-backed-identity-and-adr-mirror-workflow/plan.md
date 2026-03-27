@@ -33,8 +33,17 @@ ID: "epic-00033"
 - rationale:
   - node identity contract を先に固定しないと、後続の naming / sync / validate が揺れるため
 
+## Issue alias -> actual issue id 対応
+- `issue-1-github-mandatory-node-creation-contract` -> `iss-00034`（GitHub #34）
+- `issue-2-timestamp-based-discussion-and-adr-naming` -> `iss-00036`（GitHub #36）
+- `issue-3-sync-adr-symlink-mirror` -> `iss-00035`（GitHub #35）
+- `issue-4-migration-guardrails-and-validation-hardening` -> `iss-00037`（GitHub #37）
+- `issue-5-docs-dogfooding-parity-and-final-regression-gate` -> `iss-00038`（GitHub #38）
+
 ## Issue 一覧（順序 / tranche 付き）
-- issue-1-github-mandatory-node-creation-contract:
+- iss-00034:
+  - actual issue id:
+    - `iss-00034`（GitHub #34）
   - 目的:
     - initiative / epic / issue を GitHub mandatory へ切り替え、local-only path を除去する
   - deliverable:
@@ -61,7 +70,9 @@ ID: "epic-00033"
     - E-AC-004 clause-2/3 pre-guard
   - depends on:
     - なし
-- issue-2-timestamp-based-discussion-and-adr-naming:
+- iss-00036:
+  - actual issue id:
+    - `iss-00036`（GitHub #36）
   - 目的:
     - discussion / ADR filename を timestamp-prefix naming に切り替える
   - deliverable:
@@ -80,8 +91,10 @@ ID: "epic-00033"
   - contributes to:
     - E-AC-004 clause-1 pre-guard
   - depends on:
-    - issue-1-github-mandatory-node-creation-contract
-- issue-3-sync-adr-symlink-mirror:
+    - iss-00034
+- iss-00035:
+  - actual issue id:
+    - `iss-00035`（GitHub #35）
   - 目的:
     - `sync` で `spec-dock/adrs/` symlink mirror を全再生成する
   - deliverable:
@@ -96,10 +109,12 @@ ID: "epic-00033"
   - closes:
     - E-RQ-004, E-AC-003
   - depends on:
-    - issue-2-timestamp-based-discussion-and-adr-naming
-- issue-4-migration-guardrails-and-validation-hardening:
+    - iss-00036
+- iss-00037:
+  - actual issue id:
+    - `iss-00037`（GitHub #37）
   - 目的:
-    - issue-1〜3 で先行固定した migration boundary を仕上げとして横断 hardening し、E-AC-004 final closure owner としてクローズする
+    - iss-00034/iss-00036/iss-00035 で先行固定した migration boundary を仕上げとして横断 hardening し、E-AC-004 final closure owner としてクローズする
   - deliverable:
     - legacy boundary docs/tests/validate の抜け漏れ解消
     - old workspace 非サポート境界の最終整合
@@ -113,10 +128,12 @@ ID: "epic-00033"
   - closes:
     - E-AC-004
   - depends on:
-    - issue-1-github-mandatory-node-creation-contract
-    - issue-2-timestamp-based-discussion-and-adr-naming
-    - issue-3-sync-adr-symlink-mirror
-- issue-5-docs-dogfooding-parity-and-final-regression-gate:
+    - iss-00034
+    - iss-00036
+    - iss-00035
+- iss-00038:
+  - actual issue id:
+    - `iss-00038`（GitHub #38）
   - 目的:
     - provider docs / tests / dogfooding mirror を新 contract に揃え、最終回帰を閉じる
   - deliverable:
@@ -133,58 +150,58 @@ ID: "epic-00033"
     - `./spec-dock/scripts/spec-dock validate` 実行 evidence（exit=0）
     - `./spec-dock/scripts/spec-dock sync` 実行 evidence（exit=0）
     - targeted unittest output（本 epic 変更対象 suite が exit=0）
-    - final spec review record（verdict=`pass`、issue-1〜5 の close evidence 参照付き）
+    - final spec review record（verdict=`pass`、iss-00034/iss-00036/iss-00035/iss-00037/iss-00038 の close evidence 参照付き）
   - tranche:
     - tranche-3 / close-out
   - closes:
     - E-RQ-005, E-AC-005
   - depends on:
-    - issue-1-github-mandatory-node-creation-contract
-    - issue-2-timestamp-based-discussion-and-adr-naming
-    - issue-3-sync-adr-symlink-mirror
-    - issue-4-migration-guardrails-and-validation-hardening
+    - iss-00034
+    - iss-00036
+    - iss-00035
+    - iss-00037
 
 ## 統合チェックポイント
 - G1 decomposition review:
-  - issue 分解が contract 単位で分かれていることを plan diff で確認できる（E-AC-004 は issue-1/2 の先行ガード + issue-4 final closure owner を明示）
+  - issue 分解が contract 単位で分かれていることを plan diff で確認できる（E-AC-004 は iss-00034/iss-00036 の先行ガード + iss-00037 final closure owner を明示）
 - G2 integration readiness:
   - create / doc / sync / validate / docs parity の依存順が issue depends-on で確認できる
 - G3 rollout/docs impact:
   - rebuildable workspace boundary が named docs diff + validate contract tests + migration boundary tests に現れている
 - G9 final epic spec review:
-  - issue-1〜5 の close evidence が全て参照可能であり、final spec review verdict=`pass` が記録される
+  - iss-00034/iss-00036/iss-00035/iss-00037/iss-00038 の close evidence が全て参照可能であり、final spec review verdict=`pass` が記録される
 
 ## 品質ゲート
 - test / observability / migration / docs:
   - gate-1:
-    - issue-1 完了時に以下 artifact が揃い、全て pass であること
+    - iss-00034 完了時に以下 artifact が揃い、全て pass であること
     - targeted unittest output（create/canonical resolver 関連 suite、exit=0）
     - `origin` 基準 canonical resolver evidence（origin missing / non-GitHub remote / fetch-push mismatch）
     - configured scope mismatch reject evidence
     - cross-repo target reject evidence
     - named docs diff（canonical resolver + migration boundary 明記）
   - gate-2:
-    - issue-2 完了時に以下 artifact が揃い、全て pass であること
+    - iss-00036 完了時に以下 artifact が揃い、全て pass であること
     - targeted unittest output（doc naming 関連 suite、exit=0）
     - filename grammar tests evidence
     - same-second collision suffix evidence
     - named docs diff（強制互換しない boundary）
     - E-AC-004 clause-1 pre-guard evidence
   - gate-3:
-    - issue-3 完了時に以下 artifact が揃い、全て pass であること
+    - iss-00035 完了時に以下 artifact が揃い、全て pass であること
     - targeted unittest output（sync mirror 関連 suite、exit=0）
     - clear-then-rebuild test evidence
     - stale symlink 不残存 evidence
     - non-symlink empty-dir warning evidence
   - gate-4:
-    - issue-4（E-AC-004 final closure owner）完了時に migration boundary 3条項の clause-by-clause objective evidence が揃い、全て pass であること
+    - iss-00037（E-AC-004 final closure owner）完了時に migration boundary 3条項の clause-by-clause objective evidence が揃い、全て pass であること
     - clause-1: 強制的 backward compatibility 非維持 -> named docs diff に明示記述あり
     - clause-2: `spec-dock update` in-place 自動移行非保証 -> named docs diff + update/validate contract tests（auto-migrate path 非保証）で確認
     - clause-3: 既存 checked-in data 無断破壊を目的にしない -> migration boundary tests（legacy mismatch 時 fail-fast / warning、checked-in data 非書き換え）で確認
     - targeted unittest output（migration/validate 関連 suite、exit=0）
     - `./spec-dock/scripts/spec-dock validate` 実行 evidence（exit=0）
   - gate-5:
-    - issue-5 完了時に以下 artifact が揃い、全て pass であること
+    - iss-00038 完了時に以下 artifact が揃い、全て pass であること
     - targeted docs list diff（6ファイル）
     - `./spec-dock/scripts/spec-dock validate` 実行 evidence（exit=0）
     - `./spec-dock/scripts/spec-dock sync` 実行 evidence（exit=0）
@@ -208,8 +225,8 @@ ID: "epic-00033"
 
 ## final exit contract
 - E-AC closure:
-  - 全 acceptance criteria に対して issue-1〜5 の close evidence が 1:1 で対応付けられている
-  - E-AC-004 は issue-1/2 の先行ガードを前提に、issue-4（final closure owner）で migration boundary 3条項（強制的 backward compatibility 非維持 / `spec-dock update` in-place 自動移行非保証 / 既存 checked-in data 無断破壊を目的にしない）が clause-by-clause で個別 evidence 化されている
+  - 全 acceptance criteria に対して iss-00034/iss-00036/iss-00035/iss-00037/iss-00038 の close evidence が 1:1 で対応付けられている
+  - E-AC-004 は iss-00034/iss-00036 の先行ガードを前提に、iss-00037（final closure owner）で migration boundary 3条項（強制的 backward compatibility 非維持 / `spec-dock update` in-place 自動移行非保証 / 既存 checked-in data 無断破壊を目的にしない）が clause-by-clause で個別 evidence 化されている
 - integration / rollout complete:
   - create / doc / sync / validate / docs parity が新 contract に揃い、各 issue の観測可能 evidence（targeted unittest exit=0、validate exit=0、sync exit=0）で確認できる
 - docs impact resolved:
