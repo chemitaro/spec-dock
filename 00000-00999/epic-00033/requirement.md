@@ -41,31 +41,69 @@ ID: "epic-00033"
 - E-RQ-001:
   - `new initiative` / `new epic` / `new issue` はすべて GitHub issue mandatory であり、local-only path を持たないこと。
 - E-RQ-002:
-  - `.meta.json` は GitHub linkage を single GitHub repo 前提で一貫して保持し、old local-only flow を前提にしないこと。
+  - canonical repo scope は consumer repo の Git remote `origin` が指す GitHub repository を唯一の正本として解決すること。
+  - canonical repo scope resolver は以下を満たす fully specified 手順であること。
+    - `origin` remote が存在しない場合は fail-fast（create/validate は即時失敗）とする。
+    - `origin` の fetch URL / push URL が両方ある場合は両方を GitHub `owner/repo` に正規化し、一致しなければ fail-fast（fetch-push mismatch）とする。
+    - `origin` URL が GitHub remote（`github.com`）へ正規化できない場合は fail-fast（non-GitHub remote）とする。
+    - SSH / HTTPS URL は同一の `owner/repo` canonical form へ正規化して比較する。
+    - `owner` / `repo` 比較は lowercase basis で行い、`.meta.json` に保持する `repo_owner` / `repo_name` も lowercase canonical form とする（少なくとも比較は lowercase basis で行う）こと。
+  - `configured repo scope` のような追加設定値を持つ場合、その値は `origin` 解決結果と一致していなければならず、不一致は fail-fast validation / create reject とすること。
+  - node は空 workspace の初回作成時から canonical repo scope に束縛されること。
+  - `.meta.json` は GitHub linkage を single GitHub repo 前提で一貫して保持し、`github.issue_number` / `repo_owner` / `repo_name` は canonical repo scope と一致すること。
+  - canonical repo scope と一致しない existing issue / target は cross-repo linkage として reject すること。
 - E-RQ-003:
-  - `new doc` の discussion / ADR filename は timestamp-prefix naming へ移行すること。
+  - `new doc` の discussion / ADR filename は timestamp-prefix naming へ移行し、lowercase path 制約に適合する以下 grammar を満たすこと。
+  - basename grammar:
+    - `<ts>-<kind>-<slug>.md`
+    - `ts = yyyymmddthhmmssz`（UTC、`t` / `z` は lowercase 固定）
+    - 同秒衝突時のみ `yyyymmddthhmmssz-<nn>-<kind>-<slug>.md`（`nn` は 2 桁）を許可
+    - `kind` は `adr` または `disc`
+  - legacy note:
+    - `001-adr...` / `002-adr...` など pre-contract legacy ADR は grandfathered planning artifacts として保持し、自動 rename 対象ではないこと。
 - E-RQ-004:
   - `sync` は `spec-dock/adrs/` を毎回クリアしてから symlink mirror を全再生成し、rename / delete 後の stale symlink を残さないこと。index/manifest は導入しないこと。
+  - symlink 非対応環境では mirror を空の generated directory として残すか再作成し、warning を出しつつ成功扱いにできること（重要なのは stale link を残さないこと）。
 - E-RQ-005:
   - docs / tests / dogfooding parity が新 contract に揃うこと。
+  - 最低限、以下 docs が更新され、old local-only / sequential / index assumption が除去されること。
+    - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+    - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+    - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+    - `spec-dock/docs/reference_github.md`
+    - `spec-dock/docs/reference_naming.md`
+    - `spec-dock/docs/reference_sync.md`
 
 ## Epic acceptance criteria
 - E-AC-001:
   - Given:
-    - 新規 node を作成する
+    - 空の workspace または既存 workspace で新規 node を作成する
   - When:
     - initiative / epic / issue create flow を実行する
   - Then:
     - GitHub issue linkage なしでは作成できない
+    - canonical repo scope（consumer repo の Git remote `origin` が指す GitHub repository）へ初回 node から束縛される
+    - `origin` remote 不在は fail-fast となる
+    - non-GitHub remote は fail-fast となる
+    - `origin` fetch/push の正規化結果不一致は fail-fast（fetch-push mismatch）となる
+    - `configured repo scope` などの追加設定値が存在する場合は `origin` と一致必須であり、不一致は fail-fast validation / create reject される
+    - `.meta.json` は `github.issue_number` / `repo_owner` / `repo_name` を canonical repo scope と一致して保持し、別 repo を指す existing issue / target は受け入れない
+    - `repo_owner` / `repo_name` は lowercase canonical basis で比較・保持される
   - 観測点:
-    - CLI tests、docs contract
+    - create contract tests
+    - `origin` 基準 canonical repo scope resolver evidence（origin missing / non-GitHub remote / fetch-push mismatch）
+    - configured scope mismatch reject evidence
+    - cross-repo target reject evidence
+    - docs contract
 - E-AC-002:
   - Given:
     - discussion / ADR を作成する
   - When:
     - `new doc` を実行する
   - Then:
-    - timestamp-prefix naming で filename が生成される
+    - basename が `<ts>-<kind>-<slug>.md` grammar で生成される（`ts = yyyymmddthhmmssz`、`kind in {adr, disc}`）
+    - 同秒衝突時のみ `-<nn>-`（2桁）suffix が付与される
+    - pre-contract legacy ADR（`001-adr...` / `002-adr...`）は grandfathered として保持され、自動 rename 対象にならない
   - 観測点:
     - CLI/runtime tests
 - E-AC-003:
@@ -75,6 +113,7 @@ ID: "epic-00033"
     - ADR 原本を走査する
   - Then:
     - `spec-dock/adrs/` は毎回クリア後に symlink mirror が全再生成され、rename / delete 済み ADR を指す stale symlink が残らない
+    - symlink 非対応環境では `spec-dock/adrs/` は空の generated directory として残るか再作成され、warning を出しつつ成功扱いになる
   - 観測点:
     - sync tests、filesystem assertions
 - E-AC-004:
@@ -83,11 +122,13 @@ ID: "epic-00033"
   - When:
     - 新 contract を適用する
   - Then:
-    - 無理に backward compatibility を維持せず、新 workspace rebuild 前提の boundary が docs と tests に明記される
-    - `spec-dock update` による in-place 自動移行を保証しないことが明記される
-    - 既存 checked-in data を無断破壊することを目的にしない境界が明記される
+    - clause-1: 強制的 backward compatibility を維持しない方針が、新 workspace rebuild 前提の boundary として docs に明記される
+    - clause-2: `spec-dock update` による in-place 自動移行を保証しない境界が docs に明記され、update/validate contract と矛盾しない
+    - clause-3: 既存 checked-in data の無断破壊を目的にしない境界が migration boundary として定義される
   - 観測点:
-    - docs、migration boundary tests
+    - docs（named docs diff）
+    - validate contract tests（auto-migrate path を約束しないこと）
+    - migration boundary tests（legacy mismatch 時は fail-fast / warning、既存 checked-in data 非書き換え）
 - E-AC-005:
   - Given:
     - provider docs / runtime / tests / dogfooding docs を確認する
@@ -95,6 +136,7 @@ ID: "epic-00033"
     - 新 contract を参照する
   - Then:
     - 表記と期待値が新 contract に揃っている
+    - `reference_github.md` / `reference_naming.md` / `reference_sync.md`（provider + dogfooding）が更新され、old local-only / sequential / index assumption 除去が closure evidence として確認できる
   - 観測点:
     - docs parity tests、spec review
 
@@ -120,6 +162,10 @@ ID: "epic-00033"
 ## 境界
 - Always:
   - single GitHub repo 前提
+  - canonical repo scope は consumer repo の Git remote `origin` が指す GitHub repository を唯一の正本として固定される
+  - canonical repo scope resolver は `origin missing` / `non-GitHub remote` / `fetch-push mismatch` を fail-fast とする
+  - SSH / HTTPS は同一 `owner/repo` canonical form に正規化し、`owner` / `repo` 比較は lowercase basis で行う
+  - `configured repo scope` のような追加設定値は `origin` と一致必須であり、不一致は fail-fast validation / create reject される
   - old workspace は rebuildable
   - `spec-dock/adrs/` は generated symlink mirror
 - Never:
