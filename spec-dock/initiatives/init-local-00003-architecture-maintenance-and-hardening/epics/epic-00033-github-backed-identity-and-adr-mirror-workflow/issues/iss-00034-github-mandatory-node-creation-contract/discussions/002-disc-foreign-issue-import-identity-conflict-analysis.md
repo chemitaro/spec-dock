@@ -29,11 +29,11 @@ ID: "002-disc"
   - [requirement.md](/srv/mount/spec-dock/spec-dock/active/epic/requirement.md)
 - active issue requirement でも `local-only fallback` を残さず、`cross-repo linkage` を許可しないと書かれている。
   - [requirement.md](/srv/mount/spec-dock/spec-dock/active/issue/requirement.md)
-- 一方で active issue docs は AC-003 の境界として、`import ... --allow-foreign-url` 由来 node を新規 reject 対象に含めない exemption も持っている。
+- 初版の active issue docs には AC-003 の境界として、`import ... --allow-foreign-url` 由来 node を新規 reject 対象に含めない exemption が残っていた。
   - [requirement.md](/srv/mount/spec-dock/spec-dock/active/issue/requirement.md)
   - [design.md](/srv/mount/spec-dock/spec-dock/active/issue/design.md)
   - [plan.md](/srv/mount/spec-dock/spec-dock/active/issue/plan.md)
-- 実装では `allow_foreign_repo=True` が import 経路から `plan_node_creation()` に渡され、repo mismatch collision のとき `iss-local-*` に退避する。
+- 問題分析時点の実装では、import 経路から foreign repo 許容 seam が create planning へ渡り、repo mismatch collision のとき `iss-local-*` に退避する構成が存在した。
   - [create_node.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py)
   - [import_node.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py)
 - テストも foreign import success 時の `iss-local-*` を期待する。
@@ -176,7 +176,7 @@ stop
   - `import ... --allow-foreign-url` を `initiative / epic / issue` node import では reject に変える。
   - error message に「single-repo / GitHub-backed identity のため foreign issue URL は node identity にできない」を含める。
 - Phase 2: implementation cleanup
-  - [create_node.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py) の `allow_foreign_repo` seam と `iss-local-*` fallback を削除する。
+  - [create_node.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py) に残る repo-unknown / mixed-scope fail-open 条件を strict reject に寄せる。
   - [import_node.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py) の foreign bypass を strict reject に寄せる。
   - [import_cmd.py](/srv/mount/spec-dock/src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py) の `--allow-foreign-url` は削除するか、reject-only deprecation に変える。
 - Phase 3: test correction
@@ -204,6 +204,6 @@ stop
 - foreign issue の将来ユースケースを external reference として扱う専用モデルを設けるか。
 
 ## 次アクション (必須)
-- `iss-00034` の active issue docs を、この discussion の推奨案に合わせて再整理する。
+- `iss-00034` の active issue docs は、この discussion の推奨案に合わせて再整理済みである。
 - `iss-local-*` fallback を削除する修正 issue / fix patch を作成する。
 - related docs と tests を strict reject モデルに揃える。
