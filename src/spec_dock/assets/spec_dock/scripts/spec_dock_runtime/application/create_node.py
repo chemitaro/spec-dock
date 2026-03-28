@@ -6,7 +6,7 @@ import shlex
 import time
 import uuid
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
 from typing import cast
@@ -38,7 +38,8 @@ from .repo_context import require_current_repo_slug, resolve_current_repo_slug, 
 _META_FILENAME = ".meta.json"
 _DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
 _DISCUSSION_DOC_FILENAME_RE = re.compile(
-    r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+    r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?-(?P<doc_type>adr|disc|research|note)-"
+    r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
 _CREATE_LOCK_DIRNAME = ".runtime"
 _CREATE_LOCK_FILENAME = "create.lock"
@@ -281,20 +282,36 @@ def _post_write_duplicate_guard(ports: Ports, *, node_id: str) -> None:
 
 
 def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
-    refs = _scan_discussion_sequence_sources(discussions_dir)
-    by_seq: dict[int, list[Path]] = {}
+    refs = _scan_discussion_timestamp_sources(discussions_dir)
+    by_standard_slot: dict[str, list[Path]] = {}
+    by_suffix_slot: dict[tuple[str, int], list[Path]] = {}
     doc_ids: set[str] = set()
-    for seq, doc_type, path in refs:
-        by_seq.setdefault(seq, []).append(path)
-        doc_ids.add(f"{seq:03d}-{doc_type}")
+    for timestamp, suffix, doc_type, path in refs:
+        if suffix is None:
+            by_standard_slot.setdefault(timestamp, []).append(path)
+            doc_ids.add(f"{timestamp}-{doc_type}")
+            continue
+        by_suffix_slot.setdefault((timestamp, suffix), []).append(path)
+        doc_ids.add(f"{timestamp}-{suffix:02d}-{doc_type}")
 
-    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
-    if duplicate_seqs:
-        dup_seq = duplicate_seqs[0]
-        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
+    duplicate_standard_slots = sorted(slot for slot, paths in by_standard_slot.items() if len(paths) > 1)
+    if duplicate_standard_slots:
+        dup_slot = duplicate_standard_slots[0]
+        files = ", ".join(path.name for path in sorted(by_standard_slot[dup_slot], key=lambda p: p.as_posix()))
         raise RuntimeError(
             "post-write duplicate guard failed: "
-            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+            f"Duplicate discussion timestamp slot detected under {discussions_dir}: slot={dup_slot} files=[{files}]"
+        )
+    duplicate_suffix_slots = sorted(slot for slot, paths in by_suffix_slot.items() if len(paths) > 1)
+    if duplicate_suffix_slots:
+        dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
+        files = ", ".join(
+            path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+        )
+        raise RuntimeError(
+            "post-write duplicate guard failed: "
+            f"Duplicate discussion timestamp suffix detected under {discussions_dir}: "
+            f"slot={dup_timestamp}-{dup_suffix:02d} files=[{files}]"
         )
     if doc_id not in doc_ids:
         raise RuntimeError(f"post-write duplicate guard failed: created discussion id not found: {doc_id}")
@@ -991,44 +1008,89 @@ def _normalize_discussion_doc_inputs(req: CreateDiscussionDocRequest) -> tuple[s
     return doc_type, title, slug
 
 
-def _scan_discussion_sequence_sources(discussions_dir: Path) -> list[tuple[int, str, Path]]:
-    refs: list[tuple[int, str, Path]] = []
+def _resolve_discussion_instant_utc(now_iso: str | None = None) -> datetime:
+    if now_iso is None:
+        return datetime.now(timezone.utc)
+    normalized = now_iso.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    dt = datetime.fromisoformat(normalized)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _format_discussion_timestamp(now_iso: str | None = None) -> str:
+    return _resolve_discussion_instant_utc(now_iso).strftime("%Y%m%dt%H%M%S") + "z"
+
+
+def _format_discussion_date(now_iso: str | None = None) -> str:
+    return _resolve_discussion_instant_utc(now_iso).date().isoformat()
+
+
+def _scan_discussion_timestamp_sources(
+    discussions_dir: Path,
+) -> list[tuple[str, int | None, str, Path]]:
+    refs: list[tuple[str, int | None, str, Path]] = []
     if not discussions_dir.exists():
         return refs
     for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
         matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
         if not matched:
             continue
-        refs.append((int(matched.group("seq")), str(matched.group("doc_type")), path))
+        suffix_raw = matched.group("nn")
+        refs.append(
+            (
+                str(matched.group("ts")),
+                int(suffix_raw) if suffix_raw is not None else None,
+                str(matched.group("doc_type")),
+                path,
+            )
+        )
     return refs
 
 
-def _next_discussion_doc_seq(discussions_dir: Path) -> int:
-    refs = _scan_discussion_sequence_sources(discussions_dir)
-    if not refs:
-        return 1
+def _format_discussion_doc_identity(
+    *, timestamp: str, doc_type: str, slug: str, suffix: int | None
+) -> tuple[str, str]:
+    stem_prefix = f"{timestamp}-{doc_type}" if suffix is None else f"{timestamp}-{suffix:02d}-{doc_type}"
+    return f"{stem_prefix}-{slug}", stem_prefix
 
-    max_seq = 0
-    by_seq: dict[int, list[Path]] = {}
-    for seq, _doc_type, path in refs:
-        max_seq = max(max_seq, seq)
-        by_seq.setdefault(seq, []).append(path)
 
-    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
-    if duplicate_seqs:
-        dup_seq = duplicate_seqs[0]
-        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
-        raise RuntimeError(
-            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+def _allocate_discussion_doc_filename(
+    discussions_dir: Path,
+    *,
+    timestamp: str,
+    doc_type: str,
+    slug: str,
+) -> tuple[Path, str]:
+    refs = _scan_discussion_timestamp_sources(discussions_dir)
+    matching = [(suffix, path) for ts, suffix, _existing_doc_type, path in refs if ts == timestamp]
+    if not matching:
+        stem, doc_id = _format_discussion_doc_identity(
+            timestamp=timestamp,
+            doc_type=doc_type,
+            slug=slug,
+            suffix=None,
         )
+        return discussions_dir / f"{stem}.md", doc_id
 
-    next_seq = max_seq + 1
-    if next_seq > 999:
-        raise RuntimeError(
-            "Discussion sequence overflow: next sequence would exceed 999. "
-            "Create a follow-up issue to decide whether to archive old discussion docs or extend sequence width."
+    used_suffixes = {suffix for suffix, _path in matching if suffix is not None}
+    for suffix in range(1, 100):
+        if suffix in used_suffixes:
+            continue
+        stem, doc_id = _format_discussion_doc_identity(
+            timestamp=timestamp,
+            doc_type=doc_type,
+            slug=slug,
+            suffix=suffix,
         )
-    return next_seq
+        return discussions_dir / f"{stem}.md", doc_id
+    raise RuntimeError(
+        "Discussion timestamp suffix exhaustion: "
+        f"timestamp={timestamp} under {discussions_dir}. "
+        "Suffix allocation is limited to 01..99 within a single-second discussion-doc family."
+    )
 
 
 def _resolve_specdock_root(path: Path) -> Path:
@@ -1042,7 +1104,10 @@ def _doc_id_from_path(path: Path) -> str:
     matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
     if matched is None:
         raise RuntimeError(f"Invalid discussion document filename: {path.name}")
-    return f"{matched.group('seq')}-{matched.group('doc_type')}"
+    suffix_raw = matched.group("nn")
+    if suffix_raw is None:
+        return f"{matched.group('ts')}-{matched.group('doc_type')}"
+    return f"{matched.group('ts')}-{suffix_raw}-{matched.group('doc_type')}"
 
 
 def plan_discussion_doc(
@@ -1050,6 +1115,7 @@ def plan_discussion_doc(
     graph: SpecGraph,
     *,
     today: str | None = None,
+    timestamp: str | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
     scope = _resolve_scope_node(req, graph)
     doc_type, title, slug = _normalize_discussion_doc_inputs(req)
@@ -1057,10 +1123,13 @@ def plan_discussion_doc(
     specdock_dir = _resolve_specdock_root(scope.path)
     template_path = specdock_dir / "templates" / "discussions" / f"{doc_type}.md"
     discussions_dir = scope.path / "discussions"
-    seq = _next_discussion_doc_seq(discussions_dir)
-    seq_text = f"{seq:03d}"
-    doc_id = f"{seq_text}-{doc_type}"
-    dest_path = discussions_dir / f"{seq_text}-{doc_type}-{slug}.md"
+    effective_timestamp = timestamp if timestamp is not None else _format_discussion_timestamp()
+    dest_path, doc_id = _allocate_discussion_doc_filename(
+        discussions_dir,
+        timestamp=effective_timestamp,
+        doc_type=doc_type,
+        slug=slug,
+    )
     if dest_path.exists():
         raise RuntimeError(f"Discussion doc already exists: {dest_path}")
 
@@ -1088,17 +1157,20 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
     body_error: Exception | None = None
     try:
         graph = load_graph(ports, validate=False)
-        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
+        now_iso = ports.clock.now_iso() if ports.clock is not None else None
+        today = _format_discussion_date(now_iso)
+        timestamp = _format_discussion_timestamp(now_iso)
+        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today, timestamp=timestamp)
 
         template_text = template_scaffolder.load_template_text(template_path)
         rendered_text = template_scaffolder.render_text(template_text, replacements)
         template_scaffolder.write_text(dest_path, rendered_text)
         doc_id = _doc_id_from_path(dest_path)
         _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
+        doc_type, _title, _slug = _normalize_discussion_doc_inputs(req)
         result = CreateDiscussionDocResult(
             doc_id=doc_id,
-            doc_type=doc_id.split("-", 1)[1],
+            doc_type=doc_type,
             scope_node_id=replacements["<SCOPE_ID>"],
             path=dest_path,
             warnings=[],

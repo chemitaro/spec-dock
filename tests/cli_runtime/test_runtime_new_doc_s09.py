@@ -125,6 +125,9 @@ class _StubIssueGateway:
 
 
 class _StubClock:
+    def now_iso(self):
+        return "2026-03-12T01:02:03+00:00"
+
     def today(self):
         return "2026-03-12"
 
@@ -209,7 +212,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             github_issue_number=None,
         )
 
-    def test_sequence_regression_and_planning(self) -> None:
+    def test_timestamp_regression_and_planning(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -225,6 +228,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             (discussions_dir / "foo.md").write_text("nonconforming\n", encoding="utf-8")
             (discussions_dir / "002-bogus-random.md").write_text("nonconforming type\n", encoding="utf-8")
             (discussions_dir / "009-disc-migrated.md").write_text("existing\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-00-disc-malformed.md").write_text("ignored malformed\n", encoding="utf-8")
             (discussions_dir / "1000-adr-legacy-overflow.md").write_text("ignored\n", encoding="utf-8")
 
             template_path, dest_path, replacements = app_create_node.plan_discussion_doc(
@@ -236,11 +240,12 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 ),
                 graph,
                 today="2026-03-12",
+                timestamp="20260312t010203z",
             )
 
             self.assertEqual(template_path, specdock_dir / "templates" / "discussions" / "adr.md")
-            self.assertEqual(dest_path.name, "010-adr-decision-one.md")
-            self.assertEqual(replacements["<ADR_ID>"], "010-adr")
+            self.assertEqual(dest_path.name, "20260312t010203z-adr-decision-one.md")
+            self.assertEqual(replacements["<ADR_ID>"], "20260312t010203z-adr")
             self.assertEqual(replacements["<SCOPE_ID>"], "iss-local-00001")
 
     def test_generated_path_name_content_regression(self) -> None:
@@ -263,15 +268,15 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.doc_id, "001-note")
+            self.assertEqual(result.doc_id, "20260312t010203z-note")
             self.assertEqual(result.doc_type, "note")
-            self.assertTrue(result.path.name.startswith("001-note-note-one"))
+            self.assertEqual(result.path.name, "20260312t010203z-note-note-one.md")
             self.assertTrue(result.path.exists())
             self.assertEqual(events, ["load_template_text", "render_text", "write_text"])
 
             content = result.path.read_text(encoding="utf-8")
             self.assertIn("type=note", content)
-            self.assertIn("id=001-note", content)
+            self.assertIn("id=20260312t010203z-note", content)
             self.assertIn("title=Note one", content)
             self.assertIn("scope=iss-local-00001", content)
             self.assertIn("date=2026-03-12", content)
@@ -286,10 +291,10 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
 
             expected_ids = {
-                "adr": "001-adr",
-                "disc": "002-disc",
-                "research": "003-research",
-                "note": "004-note",
+                "adr": "20260312t010203z-adr",
+                "disc": "20260312t010203z-01-disc",
+                "research": "20260312t010203z-02-research",
+                "note": "20260312t010203z-03-note",
             }
             for doc_type in ("adr", "disc", "research", "note"):
                 result = app_create_node.create_discussion_doc(
@@ -307,7 +312,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 self.assertIn(f"type={doc_type}", content)
                 self.assertIn(f"id={expected_ids[doc_type]}", content)
 
-    def test_duplicate_sequence_fail_fast_no_write(self) -> None:
+    def test_suffix_exhaustion_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -319,10 +324,14 @@ class TestRuntimeNewDocS09(unittest.TestCase):
 
             discussions_dir = Path(issue_record.path) / "discussions"
             discussions_dir.mkdir(parents=True, exist_ok=True)
-            (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
-            (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+            for nn in range(1, 100):
+                (discussions_dir / f"20260312t010203z-{nn:02d}-disc-second-{nn:02d}.md").write_text(
+                    "second\n",
+                    encoding="utf-8",
+                )
 
-            with self.assertRaisesRegex(RuntimeError, "Duplicate discussion sequence"):
+            with self.assertRaisesRegex(RuntimeError, "Discussion timestamp suffix exhaustion"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type="note",
@@ -334,9 +343,9 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 )
 
             self.assertEqual(events, [])
-            self.assertEqual(list(discussions_dir.glob("002-note-*.md")), [])
+            self.assertEqual(list(discussions_dir.glob("20260312t010203z-*-note-*.md")), [])
 
-    def test_parallel_new_doc_allocates_unique_sequences(self) -> None:
+    def test_parallel_new_doc_allocates_unique_suffixes(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -345,19 +354,24 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
             ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
 
-            original_next = app_create_node._next_discussion_doc_seq
+            original_allocate = app_create_node._allocate_discussion_doc_filename
             first_call_pending = {"value": True}
             first_call_lock = threading.Lock()
 
-            def _slow_next(discussions_dir):
-                seq = original_next(discussions_dir)
+            def _slow_allocate(discussions_dir, *, timestamp, doc_type, slug):
+                allocated = original_allocate(
+                    discussions_dir,
+                    timestamp=timestamp,
+                    doc_type=doc_type,
+                    slug=slug,
+                )
                 with first_call_lock:
                     if first_call_pending["value"]:
                         first_call_pending["value"] = False
                         time.sleep(0.1)
-                return seq
+                return allocated
 
-            with patch.object(app_create_node, "_next_discussion_doc_seq", side_effect=_slow_next):
+            with patch.object(app_create_node, "_allocate_discussion_doc_filename", side_effect=_slow_allocate):
                 results = self._run_parallel_doc_create(
                     lambda req: app_create_node.create_discussion_doc(req, ports),
                     app_contracts.CreateDiscussionDocRequest(
@@ -375,10 +389,10 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 )
 
             self.assertEqual(len(results), 2)
-            seqs = sorted(int(result.doc_id.split("-", 1)[0]) for result in results)
-            self.assertEqual(seqs, [1, 2])
-            doc_types = sorted(result.doc_type for result in results)
-            self.assertEqual(doc_types, ["adr", "disc"])
+            doc_ids = sorted(result.doc_id for result in results)
+            self.assertEqual(len([doc_id for doc_id in doc_ids if "-01-" in doc_id]), 1)
+            self.assertEqual(len([doc_id for doc_id in doc_ids if "-01-" not in doc_id]), 1)
+            self.assertEqual(sorted(result.doc_type for result in results), ["adr", "disc"])
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -459,12 +473,12 @@ class TestRuntimeNewDocS09(unittest.TestCase):
     def test_renderer_text_regression(self) -> None:
         _runtime_app, app_contracts, _app_create_node, _app_ports, _new_commands, _infra_contracts, presentation_cli_text = _runtime_modules()
         result = app_contracts.CreateDiscussionDocResult(
-            doc_id="003-adr",
+            doc_id="20260312t010203z-03-adr",
             doc_type="adr",
             scope_node_id="iss-local-00001",
             path=Path(
                 "/repo/spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                "issues/iss-local-00001-refresh-token/discussions/003-adr-decision-one.md"
+                "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
             ),
             warnings=[],
         )
@@ -474,9 +488,9 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             [
                 (
                     "spec-dock: ok (new doc) "
-                    "type=adr id=003-adr scope=iss-local-00001 "
+                    "type=adr id=20260312t010203z-03-adr scope=iss-local-00001 "
                     "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                    "issues/iss-local-00001-refresh-token/discussions/003-adr-decision-one.md"
+                    "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
                 )
             ],
         )
@@ -491,12 +505,12 @@ class TestRuntimeNewDocS09(unittest.TestCase):
         def _fake_create(req):
             calls.append(req)
             return app_contracts.CreateDiscussionDocResult(
-                doc_id="001-adr",
+                doc_id="20260312t010203z-adr",
                 doc_type="adr",
                 scope_node_id=req.scope_node_id,
                 path=Path(
                     "/repo/spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                    "issues/iss-local-00001-refresh-token/discussions/001-adr-decision-one.md"
+                    "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-adr-decision-one.md"
                 ),
                 warnings=[],
             )
@@ -531,7 +545,10 @@ class TestRuntimeNewDocS09(unittest.TestCase):
         self.assertEqual(calls[0].doc_type, "adr")
         self.assertEqual(calls[0].scope_node_id, "iss-local-00001")
         self.assertEqual(outcome.exit_code, 0)
-        self.assertIn("spec-dock: ok (new doc) type=adr id=001-adr", "\n".join(outcome.text.stdout_lines))
+        self.assertIn(
+            "spec-dock: ok (new doc) type=adr id=20260312t010203z-adr",
+            "\n".join(outcome.text.stdout_lines),
+        )
 
 
 if __name__ == "__main__":
