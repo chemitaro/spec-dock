@@ -29,14 +29,23 @@ def split_repo_slug(slug: str | None) -> tuple[str, str] | None:
     return (owner, repo)
 
 
-def resolve_current_repo_slug(ports: Ports) -> str | None:
-    if ports.git_gateway is None or ports.repo_root is None:
-        return None
+def require_current_repo_slug(ports: Ports) -> str:
+    if ports.repo_root is None:
+        raise RuntimeError("repo_root is required to resolve current GitHub repo scope from origin.")
+    if ports.git_gateway is None:
+        raise RuntimeError("git_gateway is required to resolve current GitHub repo scope from origin.")
     resolver = getattr(ports.git_gateway, "origin_github_repo_slug", None)
     if not callable(resolver):
-        return None
+        raise RuntimeError("git_gateway.origin_github_repo_slug(repo_root) is required.")
+    raw = resolver(ports.repo_root)
+    normalized = normalize_repo_slug_value(raw)
+    if normalized is None:
+        raise RuntimeError("Current GitHub repo scope could not be resolved from origin.")
+    return normalized
+
+
+def resolve_current_repo_slug(ports: Ports) -> str | None:
     try:
-        raw = resolver(ports.repo_root)
+        return require_current_repo_slug(ports)
     except RuntimeError:
         return None
-    return normalize_repo_slug_value(raw)

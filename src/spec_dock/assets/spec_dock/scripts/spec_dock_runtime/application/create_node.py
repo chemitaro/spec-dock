@@ -33,7 +33,7 @@ from .contracts import (
     CreatePlan,
 )
 from .ports import Ports
-from .repo_context import resolve_current_repo_slug, split_repo_slug
+from .repo_context import require_current_repo_slug, resolve_current_repo_slug, split_repo_slug
 
 _META_FILENAME = ".meta.json"
 _DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
@@ -1337,11 +1337,14 @@ def create_node_core(
     title, _slug = resolve_input_title_and_slug(req.title, req.slug)
     github_issue_number = req.github_issue_number
     created_github_issue_number: int | None = None
+    current_repo_slug: str | None = None
     specdock_dir: Path | None = None
 
     try:
         _validate_pre_github_create_inputs(req, kind=kind, mode=mode)
         specdock_dir = _resolve_specdock_dir(ports)
+        if mode in ("create", "link_existing"):
+            current_repo_slug = require_current_repo_slug(ports)
 
         if mode == "link_existing" and github_issue_number is None:
             raise RuntimeError("github_issue_number is required for link_existing mode")
@@ -1391,7 +1394,8 @@ def create_node_core(
     local_node_id: str | None = None
     try:
         graph = load_graph(ports, validate=False)
-        current_repo_slug = resolve_current_repo_slug(ports)
+        if current_repo_slug is None:
+            current_repo_slug = resolve_current_repo_slug(ports)
 
         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
         plan = plan_node_creation(

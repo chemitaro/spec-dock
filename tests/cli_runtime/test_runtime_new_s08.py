@@ -173,6 +173,19 @@ class _StubIssueGateway:
         return self.created_numbers.pop(0)
 
 
+class _StubGitGateway:
+    def __init__(self, origin_repo_slug="Example/Repo", *, error=None):
+        self.origin_repo_slug = origin_repo_slug
+        self.error = error
+        self.calls = []
+
+    def origin_github_repo_slug(self, repo_root):
+        self.calls.append(str(repo_root))
+        if self.error is not None:
+            raise RuntimeError(self.error)
+        return self.origin_repo_slug
+
+
 class _BlockingIssueGateway(_StubIssueGateway):
     def __init__(self, created_numbers, *, started_event: threading.Event, release_event: threading.Event):
         super().__init__(created_numbers)
@@ -244,6 +257,7 @@ class TestRuntimeNewS08(unittest.TestCase):
         records,
         events=None,
         issue_gateway=None,
+        git_gateway=None,
         node_repo=None,
         template_scaffolder=None,
     ):
@@ -256,6 +270,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             node_repo=resolved_node_repo,
             template_scaffolder=resolved_template_scaffolder,
             issue_gateway=issue_gateway or _StubIssueGateway([501]),
+            git_gateway=git_gateway or _StubGitGateway(),
             clock=_StubClock(),
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
@@ -2033,6 +2048,152 @@ class TestRuntimeNewS08(unittest.TestCase):
                     self.assertIn("Outcome: pre_github_fail", str(raised.exception))
                     self.assertNotIn("GitHub issue was created:", str(raised.exception))
                     self.assertEqual(issue_gateway.calls, [])
+
+    def test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            cases = [
+                (
+                    "origin-missing",
+                    "origin remote is missing; cannot resolve canonical GitHub repo scope.",
+                ),
+                (
+                    "non-github-remote",
+                    "origin remote is not a GitHub repository; cannot resolve canonical repo scope:",
+                ),
+                (
+                    "fetch-push-mismatch",
+                    "origin remote fetch/push mismatch; cannot resolve canonical repo scope:",
+                ),
+            ]
+            for case_name, git_error in cases:
+                with self.subTest(case=case_name):
+                    events: list[str] = []
+                    issue_gateway = _StubIssueGateway([799])
+                    git_gateway = _StubGitGateway(error=git_error)
+                    ports = self._ports(
+                        app_ports,
+                        specdock_dir=specdock_dir,
+                        records=records,
+                        events=events,
+                        issue_gateway=issue_gateway,
+                        git_gateway=git_gateway,
+                    )
+                    with self.assertRaisesRegex(RuntimeError, git_error):
+                        app_create_node.create_issue(
+                            app_contracts.CreateNodeRequest(
+                                title="Refresh token",
+                                slug=None,
+                                parent_id="epic-local-00001",
+                                requested_node_id=None,
+                                github_mode="create",
+                                github_issue_number=None,
+                            ),
+                            ports,
+                        )
+                    self.assertEqual(issue_gateway.calls, [])
+                    self.assertEqual(events, [])
+                    self.assertFalse((epic_dir / "issues").exists())
+                    self.assertEqual(git_gateway.calls, [str(repo_root)])
+
+    def test_issue_create_with_canonical_origin_scope_still_succeeds(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+
+            issue_gateway = _StubIssueGateway([812])
+            git_gateway = _StubGitGateway(origin_repo_slug="Example/Repo")
+            node_repo = _StubNodeRepo(records)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                issue_gateway=issue_gateway,
+                git_gateway=git_gateway,
+                node_repo=node_repo,
+            )
+
+            result = app_create_node.create_issue(
+                app_contracts.CreateNodeRequest(
+                    title="Refresh token",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    requested_node_id=None,
+                    github_mode="create",
+                    github_issue_number=None,
+                ),
+                ports,
+            )
+
+            self.assertEqual(result.node.id, "iss-00812")
+            self.assertEqual(result.node.github_issue_number, 812)
+            self.assertEqual(len(issue_gateway.calls), 1)
+            self.assertEqual(issue_gateway.calls[0][0], str(repo_root))
+            self.assertEqual(issue_gateway.calls[0][1], "Refresh token")
+            self.assertIn("Type: issue", issue_gateway.calls[0][2])
+            self.assertEqual(git_gateway.calls[0], str(repo_root))
+            created_record = node_repo._records[-1]
+            self.assertEqual(created_record.github_repo_owner, "example")
+            self.assertEqual(created_record.github_repo_name, "repo")
 
     def test_issue_create_gateway_failure_is_pre_github_fail_without_created_issue_hint(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
