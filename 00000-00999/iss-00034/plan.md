@@ -451,7 +451,7 @@ ID: "iss-00034"
 - supporting checks:
   - `./spec-dock/scripts/spec-dock validate`
 - evidence note:
-  - `tests.test_init_update` は `iss-00034` acceptance gate には含めない。S04 strict reject correction とは独立した pre-existing baseline failures が残っており、この issue では cleanup scope に含めない。
+  - follow-up で判明した checked-in runtime parity drift / helper stale contract / fixture setup gap は `iss-00034` 由来の不整合だったため、`tests.test_init_update` と broadened suite は baseline-noise ではない。green 化後は本 issue の supporting evidence として扱ってよい。
 - observes:
   - AC-004、EC-004、および `iss-local-*` fallback 不在
 - report update:
@@ -488,12 +488,13 @@ ID: "iss-00034"
   - docs diff が boundary/canonical scope の最小更新に留まっていること
   - import / sync 関連ロジックへ不要な差分が入っていないこと
 - verification command:
-  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
+  - `python -m unittest tests.test_init_update`
+  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.test_init_update tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.domain_runtime.test_runtime_domain_s03 tests.presentation_runtime.test_runtime_sync_s07`
 - supporting checks:
   - `./spec-dock/scripts/spec-dock validate`（iss-00034 の create / validation boundary pre-guard に関する issue-specific supporting evidence。sync-generated artifact regeneration は scope 外のため `sync --github` は required evidence に含めない）
   - `git diff --stat`
 - evidence note:
-  - `tests.test_init_update` は unrelated baseline failures が未解消のため informational check に留め、S99 acceptance evidence には採用しない。
+  - `tests.test_init_update` と broadened suite は、follow-up で parity/helper/fixture fixes により baseline-noise 仮説が否定されたため、S99 acceptance evidence に採用する。
 - reviewer approvals:
   - implementation review
   - spec review

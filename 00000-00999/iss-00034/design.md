@@ -185,7 +185,7 @@ CreateNodeResult --> RepoScopeResolution
 - Move/Rename:
   - なし。
 - Read only:
-  - `spec-dock/` checked-in dogfooding data（この issue では実装 source of truth にしない）
+  - `spec-dock/` checked-in dogfooding data（この issue では実装 source of truth にしない）。ただし GitHub mandatory contract 下で既に checked-in されている dogfooding initiative linkage が事実と不一致な場合に限り、証跡保存目的の最小 `.meta.json.github.issue_number` 補正は許容する（bulk migration / 再生成は行わない）。
   - sync の主処理
   - sync-generated artifact regeneration
 
