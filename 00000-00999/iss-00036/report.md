@@ -132,6 +132,319 @@ FAILED
 
 ---
 
+### 2026-03-29 01:11 - 01:35
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- validation の discussion-doc scan を sequential duplicate 前提から timestamp contract 前提へ更新した。
+- valid timestamp names は新 contract として検査し、legacy sequential names (`NNN-type-slug.md`) は grandfathered artifact として許容するようにした。
+- timestamp/discussion-doc intent を持つ malformed filenames は explicit validation error とし、`rules.md` のような unrelated files は ignore する境界を追加した。
+- duplicate detection を new contract に合わせて更新し、unsuffixed timestamp slot と suffixed timestamp slot の重複を reject するようにした。
+- validate tests を S03 観点で追加・更新し、legacy grandfathering / malformed candidates / duplicate timestamp slot / duplicate suffix slot を固定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_grandfathers_legacy_discussion_names_and_ignores_unrelated_files \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_malformed_discussion_doc_candidates \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_duplicate_discussion_timestamp_slot \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_duplicate_discussion_timestamp_suffix_slot
+
+FAILED (9 failures)
+- Red確認: validate はまだ legacy duplicate sequence を reject し、malformed / timestamp-slot duplicate を検出できなかった。
+
+python -m unittest \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_grandfathers_legacy_discussion_names_and_ignores_unrelated_files \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_malformed_discussion_doc_candidates \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_duplicate_discussion_timestamp_slot \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_detects_duplicate_discussion_timestamp_suffix_slot
+
+OK (4 tests)
+
+python -m unittest tests.cli_runtime.test_validate
+
+OK (30 tests)
+
+python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09
+
+FAILED
+- 既知の unrelated baseline failure 1 件のみ継続:
+  tests.cli_runtime.test_runtime_new_doc_s09.TestRuntimeNewDocS09.test_new_node_non_regression_for_shared_file_edits
+  RuntimeError: GitHub linkage is mandatory for issue; local_only is not supported.
+- `tests.cli_runtime.test_validate` / `tests.cli_runtime.test_new` の coverage では今回の S03 変更は green。
+
+python -m unittest tests.cli_runtime.test_new
+
+OK (33 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - timestamp discussion-doc validation、legacy grandfathering、malformed candidate error、timestamp slot duplicate detection を実装
+- `tests/cli_runtime/test_validate.py` - S03 用の validate regressions を追加し、旧 sequential duplicate 期待を新 contract へ更新
+- `spec-dock/active/issue/report.md` - S03 の実装ログを追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- known baseline failure は `tests.cli_runtime.test_runtime_new_doc_s09` の既知 1 件のみで、今回の validation 変更とは無関係。
+- S03 の review-ready evidence は full validate module green と、新規 S03 targeted tests green で補完した。
+
+---
+
+### 2026-03-29 01:36 - 01:50
+
+#### 対象
+- Step: S03 follow-up
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- malformed discussion filename candidate 判定を date-only prefix (`YYYYMMDD-...`) と compact timestamp-like prefix (`YYYYMMDDHHMMSSz-...`) まで広げ、discussion doc family への intent が見える場合は validation error にした。
+- valid upper-bound collision suffix (`-99-`) を positive coverage で固定した。
+- `research` が timestamp / legacy の両方で引き続き discussion-doc family として validate されることを positive coverage で固定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_malformed_discussion_doc_candidates \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_accepts_high_end_discussion_timestamp_suffix \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_accepts_research_discussion_docs
+
+OK (3 tests)
+
+python -m unittest tests.cli_runtime.test_validate
+
+OK (32 tests)
+
+python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09
+
+FAILED
+- 既知の unrelated baseline failure 1 件のみ継続:
+  tests.cli_runtime.test_runtime_new_doc_s09.TestRuntimeNewDocS09.test_new_node_non_regression_for_shared_file_edits
+  RuntimeError: GitHub linkage is mandatory for issue; local_only is not supported.
+- `tests.cli_runtime.test_validate` は green。combined command の failure は今回の S03 validation follow-up 変更とは無関係。
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - malformed discussion-doc candidate 判定を date-only / compact timestamp-like prefixes まで拡張
+- `tests/cli_runtime/test_validate.py` - malformed candidate regressions と `-99-` / `research` positive coverage を追加
+- `spec-dock/active/issue/report.md` - S03 review follow-up を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- combined command の既知 baseline failure は unchanged。今回追加した S03 follow-up coverage は targeted / full validate module の両方で green を確認した。
+
+---
+
+### 2026-03-29 01:51 - 02:05
+
+#### 対象
+- Step: S03 remaining review findings
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- malformed discussion filename candidate 判定を timestamp-intent token に限定し、`20260329todo.md` のような arbitrary date-prefixed file は ignore しつつ、`20260329x123456z-adr-kickoff.md` や `20260329t12345z-adr-kickoff.md` のような timestamp contract typo は reject するように絞り込んだ。
+- same timestamp で unsuffixed 1件 + distinct suffixed files (`-01-`, `-99-`) の混在が valid であることを validate coverage に追加した。
+- 既存の legacy sequential grandfathering と unrelated `rules.md` ignore が崩れていないことを focused/full validate 実行で再確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_grandfathers_legacy_discussion_names_and_ignores_unrelated_files \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_malformed_discussion_doc_candidates \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_accepts_mixed_same_timestamp_unsuffixed_and_suffixed_slots
+
+OK (3 tests)
+
+python -m unittest tests.cli_runtime.test_validate
+
+OK (33 tests)
+
+python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09
+
+FAILED
+- 既知の unrelated baseline failure 1 件のみ継続:
+  tests.cli_runtime.test_runtime_new_doc_s09.TestRuntimeNewDocS09.test_new_node_non_regression_for_shared_file_edits
+  RuntimeError: GitHub linkage is mandatory for issue; local_only is not supported.
+- `tests.cli_runtime.test_validate` は green。combined command の failure は今回の S03 remaining review findings 対応とは無関係。
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - malformed timestamp-intent classifier を discussion-doc intent に限定し、over-match を回避
+- `tests/cli_runtime/test_validate.py` - timestamp typo regressions、same-timestamp mixed-slot positive case、unrelated date-prefixed ignore coverage を追加
+- `spec-dock/active/issue/report.md` - S03 remaining review findings 対応ログを追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- 指示どおり focused/full validate を再実行し、combined command でも既知 baseline failure 1 件のみ unchanged を確認した。
+
+---
+
+### 2026-03-29 02:06 - 02:15
+
+#### 対象
+- Step: S03 remaining review findings follow-up
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- malformed discussion filename candidate 判定で discussion kind token を case-insensitive に見つけるようにし、`20260329t123456z-ADR-kickoff.md` / `20260329t123456z-01-NOTE-memo.md` のような uppercase kind typo を explicit validation error にした。
+- timestamp token の直後に空 separator slot がある `20260329t123456z--adr-kickoff.md` も malformed discussion-doc candidate として reject するように補強した。
+- unrelated `rules.md` / `20260329todo.md` ignore と legacy sequential grandfathering が維持される前提で negative coverage を追加した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_validate
+
+OK (33 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - malformed candidate 判定に uppercase discussion kind typo / empty separator slot を追加
+- `tests/cli_runtime/test_validate.py` - malformed `--` separator と uppercase kind typo の negative coverage を追加
+- `spec-dock/active/issue/report.md` - S03 follow-up log を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- 今回の指示に従い `python -m unittest tests.cli_runtime.test_validate` を再実行し green を確認した。combined command は未再実行のため、この entry では追加の baseline failure は観測していない。
+
+---
+
+### 2026-03-29 02:16 - 02:25
+
+#### 対象
+- Step: S03 latest remaining review findings
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- malformed discussion filename candidate 判定を timestamp-intent / legacy-sequence-intent prefixで fail-closed に寄せ、unknown kind token (`...-bogus-...`) と malformed suffix token (`...-0a-...`) を明示的に reject するようにした。
+- unrelated `rules.md` と `20260329todo.md` の ignore は維持したまま、review 指摘の 3 ケースを validate negative coverage に追加した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest \
+  tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_malformed_discussion_doc_candidates
+
+OK (1 test)
+
+python -m unittest tests.cli_runtime.test_validate
+
+OK (33 tests)
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - timestamp/legacy discussion filename malformed candidate 判定を fail-closed 化
+- `tests/cli_runtime/test_validate.py` - unknown kind token / malformed suffix token regressionsを追加
+- `spec-dock/active/issue/report.md` - S03 latest follow-up log を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- 今回の確認は validate の focused/full suite のみ実行。既知の unrelated baseline failure については再観測していない。
+
+---
+
+### 2026-03-29 02:26 - 02:35
+
+#### 対象
+- Step: S03 last remaining review finding
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- malformed discussion filename candidate 判定で `YYYYMMDDt...` / `YYYYMMDDT...` prefix の timestamp-intent を、`t/T` の後に time digits が続く near-miss まで広げた。
+- これにより `20260329t123456zz-adr-kickoff.md` と `20260329t1234z-adr-kickoff.md` を unrelated file ではなく malformed discussion filename として reject するようにした。
+- `20260329todo.md` のような plain date-prefixed word は引き続き ignore される前提のまま、focused negative coverage を追加した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_validate
+
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - `t/T` separated timestamp-intent near-miss を malformed candidate 判定に追加
+- `tests/cli_runtime/test_validate.py` - review 指摘 2 ケースの negative coverage を追加
+- `spec-dock/active/issue/report.md` - S03 final follow-up log を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- 今回の verification は依頼どおり `tests.cli_runtime.test_validate` のみ再実行した。
+
+---
+
+### 2026-03-28 00:00 - 00:00
+
+#### 対象
+- Step: S03 latest QA review follow-up
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- `tests.cli_runtime.test_validate` の malformed discussion filename coverage に、timestamp suffix width contract `01..99` の near-miss regression を追加した。
+- 具体的には single-digit suffix `-1-` と three-digit suffix `-100-` を malformed として reject し続けることを固定した。
+- 実装は変更せず、既存 validation contract が期待どおり fail-closed であることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_validate
+
+OK
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/test_validate.py` - `01..99` contract 境界外 near-miss (`-1-`, `-100-`) の regression coverage を追加
+- `spec-dock/active/issue/report.md` - 本 QA follow-up evidence を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- 今回は validation contract coverage gap の補完のみで、provider-side 実装コードの変更は不要だった。
+
+---
+
+### 2026-03-29 02:36 - 02:45
+
+#### 対象
+- Step: S03 latest remaining review findings follow-up
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- malformed discussion filename candidate 判定で、`YYYYMMDDt/T` の後に少なくとも 1 桁の時刻数字が続く prefix を fail-closed に扱い、`20260329t123456z_adr-kickoff.md` と `20260329t123456z01-adr-kickoff.md` を malformed discussion filename として reject するようにした。
+- legacy / discussion-kind prefix の malformed underscore variants (`001_adr-kickoff.md`, `adr_kickoff.md`) も explicit validation error として reject するように補強した。
+- validate negative coverage を review 指摘 4 ケースへ拡張し、full validate module を再実行した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_validate
+
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - timestamp-intent / malformed underscore variants の fail-closed 判定を補強
+- `tests/cli_runtime/test_validate.py` - review 指摘 4 ケースの negative coverage を追加
+- `spec-dock/active/issue/report.md` - 本 follow-up log を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- 指示どおり `python -m unittest tests.cli_runtime.test_validate` のみ再実行し、green を確認した。
+
+---
+
 ### 2026-03-27 HH:MM - HH:MM
 
 #### 対象
