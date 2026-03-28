@@ -5,7 +5,7 @@ ID: "iss-00034"
 関連GitHub: ["#34"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-28"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -52,7 +52,7 @@ ID: "iss-00034"
   - closes:
     - AC-001, AC-002, EC-003
   - review gate:
-    - create contract tests と `.meta.json` persistence 確認
+    - create contract tests と `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence 確認
 - S03:
   - 観測可能な振る舞い:
     - validation / migration boundary の先行ガードが create contract と整合する
@@ -165,7 +165,7 @@ ID: "iss-00034"
 - design refs:
   - `commands/new.py`
   - `create_node.py::_resolve_github_mode`
-  - `.meta.json` persistence rules
+  - `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence rules
 - step boundary:
   - command / application create contract と persistence に限定し、validate hardening は S03 へ分離する
 
@@ -226,7 +226,7 @@ ID: "iss-00034"
 
 ##### I3 — `.meta.json` canonical scope persistence
 - slice goal:
-  - create success 時に first node binding と lowercase canonical `repo_owner` / `repo_name` 保存が観測できる
+  - create success 時に first node binding と lowercase canonical `.meta.json.github.repo_owner` / `.meta.json.github.repo_name`、および `.meta.json.github.issue_number` 保存が観測できる
 
 ###### Red
 - failing test:
@@ -244,7 +244,7 @@ ID: "iss-00034"
 - cleanup target:
   - persistence helper と normalization 呼び出しの整理
 - invariants to keep green:
-  - `github.issue_number` と repo scope の一貫性
+  - `.meta.json.github.issue_number` と `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` の一貫性
 
 #### step gate
 - review:
@@ -322,31 +322,31 @@ ID: "iss-00034"
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
-  - docs / assets
+  - docs / spec（asset mirror は対象外）
 - 対応:
   - create contract を参照する最小 docs 差分のみ更新する
-  - full parity refresh は `iss-00038` に渡す
+  - この issue の最小 docs impact 解消対象には `spec-dock/docs/workflow_issue.md` を含める
+  - asset mirror / full parity refresh は `iss-00038` に渡し、この issue では未完了でも境界逸脱にしない
   - 更新候補:
-    - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
-    - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`（必要な contract note のみ）
-    - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`（必要な cross reference のみ）
+    - `spec-dock/docs/workflow_issue.md`（必要な contract note のみ）
+    - `spec-dock/active/issue/{requirement,design,plan}.md`
+    - `src/spec_dock/assets/spec_dock/docs/*` は parity refresh 対象としては扱わない
 - verification command:
-  - `git diff -- src/spec_dock/assets/spec_dock/docs/reference_github.md src/spec_dock/assets/spec_dock/docs/workflow_issue.md src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+  - `git diff -- spec-dock/docs/workflow_issue.md spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
 - observes:
-  - docs diff が boundary/canonical scope の最小更新に留まっていること
+  - docs diff が boundary/canonical scope の最小更新に留まり、`spec-dock/docs/workflow_issue.md` の禁止 flow 修正までで閉じていること
 
 ### S99 — final diff review quality gate
 - branch diff scope:
   - `iss-00034` ブランチ差分全体
 - required validation:
   - targeted unittest output（create / resolver / validation）
-  - `./spec-dock/scripts/spec-dock validate`
   - docs diff が boundary/canonical scope の最小更新に留まっていること
   - import / sync 関連ロジックへ不要な差分が入っていないこと
 - verification command:
   - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
 - supporting checks:
-  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock validate`（iss-00034 の create / validation boundary pre-guard に関する supporting evidence。後続 issue で閉じる unrelated finding の完了までは要求しない）
   - `git diff --stat`
 - reviewer approvals:
   - implementation review
