@@ -100,7 +100,7 @@ def _add_new_initiative_arguments(parser: argparse.ArgumentParser) -> None:
     github_group.add_argument(
         "--no-github",
         action="store_true",
-        help="Explicit local-only mode (default; id becomes init-local-NNNN)",
+        help="Rejected contract: local-only initiative creation is no longer supported",
     )
 
 
@@ -127,7 +127,7 @@ def _add_new_epic_arguments(parser: argparse.ArgumentParser) -> None:
     github_group.add_argument(
         "--no-github",
         action="store_true",
-        help="Explicit local-only mode (default; id becomes epic-local-NNNN)",
+        help="Rejected contract: local-only epic creation is no longer supported",
     )
 
 
@@ -144,7 +144,7 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
     github_group.add_argument(
         "--create-github-issue",
         action="store_true",
-        help="Create and link a new GitHub issue (default behavior for issue)",
+        help="Create and link a new GitHub issue (default behavior)",
     )
     github_group.add_argument(
         "--github-issue",
@@ -154,7 +154,7 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
     github_group.add_argument(
         "--no-github",
         action="store_true",
-        help="Do not use GitHub (default is to create a new GitHub issue; id becomes iss-local-NNNN)",
+        help="Rejected contract: local-only issue creation is no longer supported",
     )
 
 
@@ -229,9 +229,9 @@ def _new_doc_args(ns: argparse.Namespace) -> CommandArgs:
 
 def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_initiative_args(args)
-    use_github = bool(typed.create_github_issue or typed.github_issue_number is not None)
-    if typed.no_github and use_github:
-        return _command_error("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+    if typed.no_github:
+        return _github_mandatory_error("initiative")
+    use_github = True
 
     result = use_cases.create_initiative(
         CreateNodeRequest(
@@ -239,7 +239,7 @@ def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
             slug=typed.slug,
             parent_id=None,
             requested_node_id=typed.node_id,
-            github_mode="create" if use_github else "local_only",
+            github_mode="link_existing" if typed.github_issue_number is not None else "create",
             github_issue_number=typed.github_issue_number,
         )
     )
@@ -247,16 +247,16 @@ def _run_new_initiative(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
     if use_github and typed.github_issue_number is None:
         text = _prepend_stderr(
             text,
-            "spec-dock: (info) creating GitHub issue via gh (pass '--no-github' to avoid GitHub side effects)",
+            "spec-dock: (info) creating GitHub issue via gh",
         )
     return CommandOutcome(exit_code=0, text=text)
 
 
 def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_epic_args(args)
-    use_github = bool(typed.create_github_issue or typed.github_issue_number is not None)
-    if typed.no_github and use_github:
-        return _command_error("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+    if typed.no_github:
+        return _github_mandatory_error("epic")
+    use_github = True
 
     result = use_cases.create_epic(
         CreateNodeRequest(
@@ -264,7 +264,7 @@ def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             slug=typed.slug,
             parent_id=typed.initiative_id,
             requested_node_id=typed.node_id,
-            github_mode="create" if use_github else "local_only",
+            github_mode="link_existing" if typed.github_issue_number is not None else "create",
             github_issue_number=typed.github_issue_number,
         )
     )
@@ -272,15 +272,15 @@ def _run_new_epic(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     if use_github and typed.github_issue_number is None:
         text = _prepend_stderr(
             text,
-            "spec-dock: (info) creating GitHub issue via gh (pass '--no-github' to avoid GitHub side effects)",
+            "spec-dock: (info) creating GitHub issue via gh",
         )
     return CommandOutcome(exit_code=0, text=text)
 
 
 def _run_new_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_new_issue_args(args)
-    if typed.no_github and (typed.create_github_issue or typed.github_issue_number is not None):
-        return _command_error("Cannot combine '--no-github' with '--create-github-issue'/'--github-issue'.")
+    if typed.no_github:
+        return _github_mandatory_error("issue")
 
     result = use_cases.create_issue(
         CreateNodeRequest(
@@ -288,15 +288,15 @@ def _run_new_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             slug=typed.slug,
             parent_id=typed.epic_id,
             requested_node_id=typed.node_id,
-            github_mode="local_only" if typed.no_github else "create",
+            github_mode="link_existing" if typed.github_issue_number is not None else "create",
             github_issue_number=typed.github_issue_number,
         )
     )
     text = render_new_node_text(result)
-    if not typed.no_github and typed.github_issue_number is None:
+    if typed.github_issue_number is None:
         text = _prepend_stderr(
             text,
-            "spec-dock: (info) creating GitHub issue via gh (pass '--no-github' to avoid GitHub side effects)",
+            "spec-dock: (info) creating GitHub issue via gh",
         )
     return CommandOutcome(exit_code=0, text=text)
 
@@ -327,6 +327,12 @@ def _command_error(message: str) -> CommandOutcome:
     return CommandOutcome(
         exit_code=1,
         text=CliText(stdout_lines=[], stderr_lines=[f"error: {message}"], warnings=[]),
+    )
+
+
+def _github_mandatory_error(kind: Literal["initiative", "epic", "issue"]) -> CommandOutcome:
+    return _command_error(
+        f"'--no-github' is not supported for {kind}; GitHub linkage is mandatory."
     )
 
 

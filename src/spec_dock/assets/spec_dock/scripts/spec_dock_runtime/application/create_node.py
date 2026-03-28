@@ -418,9 +418,11 @@ def _resolve_github_mode(
     req: CreateNodeRequest, kind: Literal["initiative", "epic", "issue"]
 ) -> Literal["create", "link_existing", "local_only"]:
     if req.github_mode is None:
-        return "create" if kind == "issue" else "local_only"
+        return "create"
     if req.github_mode not in ("create", "link_existing", "local_only"):
         raise RuntimeError(f"Unsupported github mode: {req.github_mode}")
+    if req.github_mode == "local_only":
+        raise RuntimeError(f"GitHub linkage is mandatory for {kind}; local_only is not supported.")
     return req.github_mode
 
 
@@ -481,6 +483,22 @@ def _node_github_linkage_key(
 
 def _node_github_repo_slug(node: SpecNode) -> str | None:
     return _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+
+
+def _resolve_requested_repo_slug(req: CreateNodeRequest, *, current_repo_slug: str | None) -> str | None:
+    owner = (req.github_repo_owner or "").strip().lower()
+    repo = (req.github_repo_name or "").strip().lower()
+    if owner or repo:
+        if not owner or not repo:
+            raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+        requested_repo_slug = _normalize_repo_slug(owner, repo)
+        if current_repo_slug is not None and requested_repo_slug != current_repo_slug:
+            raise RuntimeError(
+                "cross-repo GitHub linkage is not supported: "
+                f"requested repo={requested_repo_slug} current repo={current_repo_slug}"
+            )
+        return requested_repo_slug
+    return current_repo_slug
 
 
 def guard_github_issue_uniqueness(
@@ -788,12 +806,11 @@ def plan_node_creation(
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     mode = _resolve_github_mode(req, kind)
     prefix = _prefix_for_kind(kind)
+    requested_repo_slug = _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
     if mode in ("create", "link_existing"):
         if req.requested_node_id is not None:
-            raise RuntimeError(
-                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
-            )
+            raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
         if req.github_issue_number is None:
             raise RuntimeError("github_issue_number is required for github mode")
         node_id = format_id(prefix, int(req.github_issue_number), local=False)
@@ -817,13 +834,14 @@ def plan_node_creation(
     if existing_id and mode in ("create", "link_existing") and req.github_issue_number is not None:
         existing = graph.nodes_by_id[existing_id]
         existing_repo_slug = _normalize_repo_slug(existing.github_repo_owner, existing.github_repo_name) or current_repo_slug
-        requested_repo_slug = _normalize_repo_slug(req.github_repo_owner, req.github_repo_name) or current_repo_slug
-        # Cross-repo overlap is allowed; keep deterministic github-number IDs when possible,
-        # but fall back to a local ID when the same numeric github ID is already occupied.
         if existing_repo_slug != requested_repo_slug:
-            node_id = _next_id(graph, prefix, local=True)
-            parsed_prefix, is_local, num = parse_id(node_id)
-            existing_id = find_existing_id_by_num(graph.nodes_by_id, prefix=parsed_prefix, num=num, local=is_local)
+            existing_repo_label = existing_repo_slug if existing_repo_slug is not None else "(current-or-unknown)"
+            requested_repo_label = requested_repo_slug if requested_repo_slug is not None else "(current-or-unknown)"
+            raise RuntimeError(
+                "cross-repo GitHub linkage is not supported: "
+                f"requested repo={requested_repo_label} github.issue_number={int(req.github_issue_number)} "
+                f"conflicts with existing repo={existing_repo_label}: {existing_id} ({existing.meta_path})"
+            )
     if existing_id:
         existing = graph.nodes_by_id[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
@@ -849,17 +867,9 @@ def plan_node_creation(
     github_repo_owner: str | None = None
     github_repo_name: str | None = None
     if req.github_issue_number is not None:
-        owner = (req.github_repo_owner or "").strip().lower()
-        repo = (req.github_repo_name or "").strip().lower()
-        if owner or repo:
-            if not owner or not repo:
-                raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
-            github_repo_owner = owner
-            github_repo_name = repo
-        else:
-            current_scope = split_repo_slug(current_repo_slug)
-            if current_scope is not None:
-                github_repo_owner, github_repo_name = current_scope
+        current_scope = split_repo_slug(requested_repo_slug)
+        if current_scope is not None:
+            github_repo_owner, github_repo_name = current_scope
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
     planned_paths.extend(link_path for link_path, _target_path in _rules_scaffold_specs(kind=kind, dest_dir=dest_dir, specdock_dir=specdock_dir))
@@ -1149,9 +1159,7 @@ def _validate_pre_github_create_inputs(
         return
 
     if req.requested_node_id is not None:
-        raise RuntimeError(
-            "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
-        )
+        raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
 
     if kind == "epic" and req.parent_id is None:
         raise RuntimeError("--initiative is required")
@@ -1345,6 +1353,7 @@ def create_node_core(
         specdock_dir = _resolve_specdock_dir(ports)
         if mode in ("create", "link_existing"):
             current_repo_slug = require_current_repo_slug(ports)
+            _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
         if mode == "link_existing" and github_issue_number is None:
             raise RuntimeError("github_issue_number is required for link_existing mode")

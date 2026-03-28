@@ -69,6 +69,8 @@ def _record(
     initiative_id: str | None,
     epic_id: str | None,
     github_issue_number: int | None,
+    github_repo_owner: str | None = None,
+    github_repo_name: str | None = None,
 ):
     return infra_contracts.StoredMetaRecord(
         kind=kind,
@@ -81,6 +83,8 @@ def _record(
         epic_id=epic_id,
         github_issue_number=github_issue_number,
         meta_path=(path / ".meta.json").as_posix(),
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
     )
 
 
@@ -317,8 +321,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -326,11 +330,12 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
 
-            self.assertEqual(plan.meta.id, "init-local-00001")
+            self.assertEqual(plan.meta.id, "init-00101")
             self.assertEqual(plan.meta.kind, "initiative")
-            self.assertTrue(plan.dest_dir.as_posix().endswith("init-local-00001-auth-platform"))
+            self.assertTrue(plan.dest_dir.as_posix().endswith("init-00101-auth-platform"))
             self.assertEqual(plan.planned_paths[-1], plan.dest_dir / ".meta.json")
             self.assertIn(plan.dest_dir / "README.md", plan.planned_paths)
             self.assertIn(plan.dest_dir / "docs" / "checklist.md", plan.planned_paths)
@@ -353,8 +358,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -362,6 +367,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
             created_paths = app_create_node.execute_create_plan(plan, ports)
 
@@ -388,8 +394,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -397,6 +403,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
             collision = plan.dest_dir / "docs" / "checklist.md"
             collision.parent.mkdir(parents=True, exist_ok=True)
@@ -423,8 +430,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -432,6 +439,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
             plan.dest_dir.mkdir(parents=True, exist_ok=True)
             (plan.dest_dir / ".meta.json").write_text("stale", encoding="utf-8")
@@ -457,8 +465,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -466,6 +474,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
             broken_link = plan.dest_dir / "epics" / "rules.md"
             broken_link.parent.mkdir(parents=True, exist_ok=True)
@@ -522,8 +531,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id=None,
                     requested_node_id=None,
-                    github_mode="local_only",
-                    github_issue_number=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
                 )
             if kind == "epic":
                 return app_contracts.CreateNodeRequest(
@@ -531,16 +540,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="init-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
-                    github_issue_number=None,
+                    github_mode="link_existing",
+                    github_issue_number=102,
                 )
             return app_contracts.CreateNodeRequest(
                 title="Refresh token",
                 slug=None,
                 parent_id="epic-local-00001",
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=103,
             )
 
         collision_paths = {
@@ -569,6 +578,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     kind=kind,
                     specdock_dir=specdock_dir,
                     today="2026-03-12",
+                    current_repo_slug="example/repo",
                 )
                 collision = plan.dest_dir / collision_name
                 collision.parent.mkdir(parents=True, exist_ok=True)
@@ -596,8 +606,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -605,6 +615,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
             (specdock_dir / "docs" / "rules" / "initiative" / "epics.md").unlink()
 
@@ -630,8 +641,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=101,
             )
             plan = app_create_node.plan_node_creation(
                 req,
@@ -639,6 +650,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 kind="initiative",
                 specdock_dir=specdock_dir,
                 today="2026-03-12",
+                current_repo_slug="example/repo",
             )
 
             with patch.object(app_create_node.os, "symlink", side_effect=OSError("operation not permitted")):
@@ -696,8 +708,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id=None,
                     requested_node_id=None,
-                    github_mode="local_only",
-                    github_issue_number=None,
+                    github_mode="link_existing",
+                    github_issue_number=101,
                 )
             if kind == "epic":
                 return app_contracts.CreateNodeRequest(
@@ -705,16 +717,16 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="init-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
-                    github_issue_number=None,
+                    github_mode="link_existing",
+                    github_issue_number=102,
                 )
             return app_contracts.CreateNodeRequest(
                 title="Refresh token",
                 slug=None,
                 parent_id="epic-local-00001",
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=103,
             )
 
         collision_paths = {
@@ -743,6 +755,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     kind=kind,
                     specdock_dir=specdock_dir,
                     today="2026-03-12",
+                    current_repo_slug="example/repo",
                 )
                 symlink_target = repo_root / "existing-target"
                 symlink_target.mkdir(parents=True, exist_ok=True)
@@ -792,7 +805,12 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
 
-            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                issue_gateway=_StubIssueGateway([501, 502]),
+            )
             init_result = app_create_node.create_initiative(
                 app_contracts.CreateNodeRequest(
                     title="Payment platform",
@@ -805,7 +823,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ports,
             )
             self.assertEqual(init_result.node.kind, "initiative")
-            self.assertEqual(init_result.node.id, "init-local-00002")
+            self.assertEqual(init_result.node.id, "init-00501")
 
             epic_result = app_create_node.create_epic(
                 app_contracts.CreateNodeRequest(
@@ -820,6 +838,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             )
             self.assertEqual(epic_result.node.kind, "epic")
             self.assertEqual(epic_result.node.parent_id, "init-local-00001")
+            self.assertEqual(epic_result.node.id, "epic-00502")
 
             issue_result = app_create_node.create_issue(
                 app_contracts.CreateNodeRequest(
@@ -827,23 +846,31 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="epic-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
-                    github_issue_number=None,
+                    github_mode="link_existing",
+                    github_issue_number=603,
                 ),
                 ports,
             )
             self.assertEqual(issue_result.node.kind, "issue")
             self.assertEqual(issue_result.node.parent_id, "epic-local-00001")
             self.assertEqual(issue_result.node.initiative_id, "init-local-00001")
+            self.assertEqual(issue_result.node.id, "iss-00603")
 
-    def test_parallel_create_initiative_allocates_unique_local_ids(self) -> None:
+    def test_parallel_create_initiative_allocates_unique_github_ids(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             specdock_dir = Path(tmp) / "spec-dock"
             self._prepare_templates(specdock_dir)
 
             node_repo = _RacyNodeRepo([], first_load_delay_seconds=0.1)
-            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[], node_repo=node_repo)
+            issue_gateway = _StubIssueGateway([701, 702])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                node_repo=node_repo,
+                issue_gateway=issue_gateway,
+            )
             ids = self._run_parallel_create(
                 lambda req: app_create_node.create_initiative(req, ports),
                 app_contracts.CreateNodeRequest(
@@ -851,7 +878,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id=None,
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode=None,
                     github_issue_number=None,
                 ),
                 app_contracts.CreateNodeRequest(
@@ -859,14 +886,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id=None,
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode=None,
                     github_issue_number=None,
                 ),
             )
 
-            self.assertEqual(ids, ["init-local-00001", "init-local-00002"])
+            self.assertEqual(ids, ["init-00701", "init-00702"])
 
-    def test_parallel_create_epic_allocates_unique_local_ids(self) -> None:
+    def test_parallel_create_epic_allocates_unique_github_ids(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             specdock_dir = Path(tmp) / "spec-dock"
@@ -887,7 +914,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                 )
             ]
             node_repo = _RacyNodeRepo(records, first_load_delay_seconds=0.1)
-            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records, node_repo=node_repo)
+            issue_gateway = _StubIssueGateway([701, 702])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                node_repo=node_repo,
+                issue_gateway=issue_gateway,
+            )
             ids = self._run_parallel_create(
                 lambda req: app_create_node.create_epic(req, ports),
                 app_contracts.CreateNodeRequest(
@@ -895,7 +929,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="init-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode=None,
                     github_issue_number=None,
                 ),
                 app_contracts.CreateNodeRequest(
@@ -903,14 +937,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="init-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode=None,
                     github_issue_number=None,
                 ),
             )
 
-            self.assertEqual(ids, ["epic-local-00001", "epic-local-00002"])
+            self.assertEqual(ids, ["epic-00701", "epic-00702"])
 
-    def test_parallel_create_issue_allocates_unique_local_ids(self) -> None:
+    def test_parallel_create_issue_allocates_unique_github_ids(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             specdock_dir = Path(tmp) / "spec-dock"
@@ -943,7 +977,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
             ]
             node_repo = _RacyNodeRepo(records, first_load_delay_seconds=0.1)
-            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records, node_repo=node_repo)
+            issue_gateway = _StubIssueGateway([701, 702])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                node_repo=node_repo,
+                issue_gateway=issue_gateway,
+            )
             ids = self._run_parallel_create(
                 lambda req: app_create_node.create_issue(req, ports),
                 app_contracts.CreateNodeRequest(
@@ -951,7 +992,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="epic-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode=None,
                     github_issue_number=None,
                 ),
                 app_contracts.CreateNodeRequest(
@@ -959,14 +1000,14 @@ class TestRuntimeNewS08(unittest.TestCase):
                     slug=None,
                     parent_id="epic-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode=None,
                     github_issue_number=None,
                 ),
             )
 
-            self.assertEqual(ids, ["iss-local-00001", "iss-local-00002"])
+            self.assertEqual(ids, ["iss-00701", "iss-00702"])
 
-    def test_github_issue_create_delay_does_not_block_parallel_local_create(self) -> None:
+    def test_github_issue_create_delay_does_not_block_parallel_link_existing_create(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -1049,8 +1090,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                             slug=None,
                             parent_id=None,
                             requested_node_id=None,
-                            github_mode="local_only",
-                            github_issue_number=None,
+                            github_mode="link_existing",
+                            github_issue_number=702,
                         ),
                         ports,
                     )
@@ -1060,7 +1101,7 @@ class TestRuntimeNewS08(unittest.TestCase):
 
             self.assertFalse(issue_thread.is_alive(), "github create thread did not finish")
             self.assertEqual(issue_errors, [])
-            self.assertEqual(local_result.node.id, "init-local-00002")
+            self.assertEqual(local_result.node.id, "init-00702")
             self.assertIn("value", issue_result)
             self.assertEqual(issue_result["value"].node.id, "iss-00701")
             self.assertEqual(len(issue_gateway.calls), 1)
@@ -1998,7 +2039,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                         "requested_node_id": "iss-local-00100",
                         "parent_id": "epic-local-00001",
                     },
-                    "Cannot combine '--id' with GitHub mode",
+                    "Cannot combine '--id' with GitHub-backed node creation",
                 ),
                 (
                     "missing-epic",
@@ -2194,6 +2235,211 @@ class TestRuntimeNewS08(unittest.TestCase):
             created_record = node_repo._records[-1]
             self.assertEqual(created_record.github_repo_owner, "example")
             self.assertEqual(created_record.github_repo_name, "repo")
+
+    def test_initiative_link_existing_first_node_binds_current_repo_scope(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            git_gateway = _StubGitGateway(origin_repo_slug="Example/Repo")
+            node_repo = _StubNodeRepo([])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[],
+                git_gateway=git_gateway,
+                node_repo=node_repo,
+            )
+
+            result = app_create_node.create_initiative(
+                app_contracts.CreateNodeRequest(
+                    title="Auth platform",
+                    slug=None,
+                    parent_id=None,
+                    requested_node_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=811,
+                ),
+                ports,
+            )
+
+            self.assertEqual(result.node.id, "init-00811")
+            created_record = node_repo._records[-1]
+            self.assertEqual(created_record.github_issue_number, 811)
+            self.assertEqual(created_record.github_repo_owner, "example")
+            self.assertEqual(created_record.github_repo_name, "repo")
+            self.assertEqual(git_gateway.calls, [str(repo_root)])
+
+    def test_issue_link_existing_same_repo_scope_succeeds_and_persists_canonical_scope(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            git_gateway = _StubGitGateway(origin_repo_slug="Example/Repo")
+            node_repo = _StubNodeRepo(records)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                git_gateway=git_gateway,
+                node_repo=node_repo,
+            )
+
+            result = app_create_node.create_issue(
+                app_contracts.CreateNodeRequest(
+                    title="Refresh token",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    requested_node_id=None,
+                    github_mode="link_existing",
+                    github_issue_number=812,
+                    github_repo_owner="Example",
+                    github_repo_name="Repo",
+                ),
+                ports,
+            )
+
+            self.assertEqual(result.node.id, "iss-00812")
+            created_record = node_repo._records[-1]
+            self.assertEqual(created_record.github_repo_owner, "example")
+            self.assertEqual(created_record.github_repo_name, "repo")
+            self.assertEqual(git_gateway.calls, [str(repo_root)])
+
+    def test_issue_link_existing_rejects_explicit_cross_repo_target(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-local-00001",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+                _record(
+                    infra_contracts,
+                    kind="epic",
+                    node_id="epic-local-00001",
+                    title="JWT auth",
+                    path=epic_dir,
+                    parent_id="init-local-00001",
+                    initiative_id="init-local-00001",
+                    epic_id=None,
+                    github_issue_number=None,
+                ),
+            ]
+            git_gateway = _StubGitGateway(origin_repo_slug="example/repo")
+            issue_gateway = _StubIssueGateway([812])
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=records,
+                git_gateway=git_gateway,
+                issue_gateway=issue_gateway,
+            )
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "cross-repo GitHub linkage is not supported: requested repo=other/repo current repo=example/repo",
+            ):
+                app_create_node.create_issue(
+                    app_contracts.CreateNodeRequest(
+                        title="Refresh token",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        requested_node_id=None,
+                        github_mode="link_existing",
+                        github_issue_number=812,
+                        github_repo_owner="other",
+                        github_repo_name="repo",
+                    ),
+                    ports,
+                )
+            self.assertEqual(issue_gateway.calls, [])
+            self.assertEqual(git_gateway.calls, [str(repo_root)])
+
+    def test_plan_node_creation_rejects_cross_repo_overlap_without_local_fallback(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_templates(specdock_dir)
+
+            init_dir = specdock_dir / "initiatives" / "init-00812-auth-platform"
+            records = [
+                _record(
+                    infra_contracts,
+                    kind="initiative",
+                    node_id="init-00812",
+                    title="Auth platform",
+                    path=init_dir,
+                    parent_id=None,
+                    initiative_id=None,
+                    epic_id=None,
+                    github_issue_number=812,
+                    github_repo_owner="other",
+                    github_repo_name="repo",
+                )
+            ]
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records)
+            graph = app_create_node.load_graph(ports, validate=False)
+
+            with self.assertRaisesRegex(RuntimeError, "cross-repo GitHub linkage is not supported"):
+                app_create_node.plan_node_creation(
+                    app_contracts.CreateNodeRequest(
+                        title="Payments",
+                        slug=None,
+                        parent_id=None,
+                        requested_node_id=None,
+                        github_mode="link_existing",
+                        github_issue_number=812,
+                    ),
+                    graph,
+                    kind="initiative",
+                    specdock_dir=specdock_dir,
+                    today="2026-03-12",
+                    current_repo_slug="example/repo",
+                )
 
     def test_issue_create_gateway_failure_is_pre_github_fail_without_created_issue_hint(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -2808,8 +3054,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                             slug=None,
                             parent_id=None,
                             requested_node_id=None,
-                            github_mode="local_only",
-                            github_issue_number=None,
+                            github_mode="link_existing",
+                            github_issue_number=701,
                         ),
                         ports,
                     )
@@ -2855,8 +3101,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                             slug=None,
                             parent_id=None,
                             requested_node_id=None,
-                            github_mode="local_only",
-                            github_issue_number=None,
+                            github_mode="link_existing",
+                            github_issue_number=701,
                         ),
                         ports,
                     )
@@ -2915,8 +3161,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                             slug=None,
                             parent_id=None,
                             requested_node_id=None,
-                            github_mode="local_only",
-                            github_issue_number=None,
+                            github_mode="link_existing",
+                            github_issue_number=701,
                         ),
                         ports,
                     )
@@ -2928,7 +3174,7 @@ class TestRuntimeNewS08(unittest.TestCase):
             self.assertTrue((specdock_dir / "initiatives").exists())
             self.assertTrue(lock_path.exists())
 
-    def test_github_mode_default_no_side_effect_matrix(self) -> None:
+    def test_github_mode_default_create_matrix(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -2961,7 +3207,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                     github_issue_number=None,
                 ),
             ]
-            issue_gateway = _StubIssueGateway([777])
+            issue_gateway = _StubIssueGateway([701, 702, 703])
             ports = self._ports(
                 app_ports,
                 specdock_dir=specdock_dir,
@@ -2991,7 +3237,7 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(issue_gateway.calls, [])
+            self.assertEqual(len(issue_gateway.calls), 2)
 
             issue_result = app_create_node.create_issue(
                 app_contracts.CreateNodeRequest(
@@ -3004,8 +3250,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                 ),
                 ports,
             )
-            self.assertEqual(len(issue_gateway.calls), 1)
-            self.assertEqual(issue_result.node.id, "iss-00777")
+            self.assertEqual(len(issue_gateway.calls), 3)
+            self.assertEqual(issue_result.node.id, "iss-00703")
 
     def test_execute_create_plan_reuse_seam(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, _infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -3032,8 +3278,8 @@ class TestRuntimeNewS08(unittest.TestCase):
                         slug=None,
                         parent_id=None,
                         requested_node_id=None,
-                        github_mode=None,
-                        github_issue_number=None,
+                        github_mode="link_existing",
+                        github_issue_number=701,
                     ),
                     ports,
                 )
@@ -3121,13 +3367,13 @@ class TestRuntimeNewS08(unittest.TestCase):
                 node_id=None,
                 create_github_issue=False,
                 github_issue_number=None,
-                no_github=True,
+                no_github=False,
             ),
             use_cases,
         )
 
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0].github_mode, "local_only")
+        self.assertEqual(calls[0].github_mode, "create")
         self.assertEqual(outcome.exit_code, 0)
         self.assertIn("spec-dock: ok (new initiative)", "\n".join(outcome.text.stdout_lines))
 
