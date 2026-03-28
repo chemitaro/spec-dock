@@ -55,7 +55,7 @@ ID: "iss-00034"
     - create contract tests と `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence 確認
 - S03:
   - 観測可能な振る舞い:
-    - validation / migration boundary の先行ガードが create contract と整合する
+    - validation / migration boundary の先行ガードが create contract と整合し、import / sync main processing を変えずに preflight boundary だけを最小調整する
   - closes:
     - AC-003
   - review gate:
@@ -269,7 +269,7 @@ ID: "iss-00034"
 
 #### B1 — validation hardening
 - purpose:
-  - local-only node 禁止と repo scope ambiguity を validation で観測可能にする
+  - local-only node 禁止と repo scope ambiguity を validation で観測可能にしつつ、legacy/import behavior を壊さない preflight boundary へ限定する
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
   - `tests/cli_runtime/test_runtime_new_s08.py`
@@ -289,6 +289,7 @@ ID: "iss-00034"
 ###### Green
 - minimum implementation:
   - validation に mandatory contract checks を追加し、legacy mismatch の error/warning 区分を explicit error に固定する
+  - import / sync は main processing を変えず、preflight validation boundary だけを最小調整して malformed partial scope を fail-closed にする
 - pass condition:
   - targeted validation tests が通る
 
@@ -325,16 +326,14 @@ ID: "iss-00034"
   - docs / spec（asset mirror は対象外）
 - 対応:
   - create contract を参照する最小 docs 差分のみ更新する
-  - この issue の最小 docs impact 解消対象には `spec-dock/docs/workflow_issue.md` を含める
   - asset mirror / full parity refresh は `iss-00038` に渡し、この issue では未完了でも境界逸脱にしない
   - 更新候補:
-    - `spec-dock/docs/workflow_issue.md`（必要な contract note のみ）
     - `spec-dock/active/issue/{requirement,design,plan}.md`
     - `src/spec_dock/assets/spec_dock/docs/*` は parity refresh 対象としては扱わない
 - verification command:
-  - `git diff -- spec-dock/docs/workflow_issue.md spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
+  - `git diff -- spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
 - observes:
-  - docs diff が boundary/canonical scope の最小更新に留まり、`spec-dock/docs/workflow_issue.md` の禁止 flow 修正までで閉じていること
+  - docs diff が boundary/canonical scope の最小更新に留まり、issue docs だけで reviewer blocker を解消できること
 
 ### S99 — final diff review quality gate
 - branch diff scope:
@@ -346,7 +345,7 @@ ID: "iss-00034"
 - verification command:
   - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
 - supporting checks:
-  - `./spec-dock/scripts/spec-dock validate`（iss-00034 の create / validation boundary pre-guard に関する supporting evidence。後続 issue で閉じる unrelated finding の完了までは要求しない）
+  - `./spec-dock/scripts/spec-dock validate`（iss-00034 の create / validation boundary pre-guard に関する issue-specific supporting evidence。sync-generated artifact regeneration は scope 外のため `sync --github` は required evidence に含めない）
   - `git diff --stat`
 - reviewer approvals:
   - implementation review
@@ -363,6 +362,6 @@ ID: "iss-00034"
 - docs impact resolved:
   - boundary/canonical scope の最小 docs diff が反映され、full parity work は `iss-00038` へ残せている
 - scope boundary preserved:
-  - import / sync 本体変更や import 済みデータへの validation 波及を本 issue に持ち込んでいない
+  - import / sync main processing や sync-generated artifact regeneration を本 issue に持ち込まず、preflight validation boundary の最小調整に留めている
 - final diff approved:
   - S99 を通過し、reviewer が実装開始・継続可能と判断できる

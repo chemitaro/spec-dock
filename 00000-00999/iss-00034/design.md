@@ -99,7 +99,8 @@ ID: "iss-00034"
   - validation contract:
     - initiative / epic / issue に unscoped local-only node が存在する場合は validation error にする。
     - legacy mismatch は `new` では contract error、`validate` では validation error として non-zero を返す。
-    - `import ... --allow-foreign-url` 由来 node と sync-generated output はこの issue では対象外とし、validation hardening の直接適用範囲に含めない。
+    - `import ... --allow-foreign-url` 由来 node と sync-generated output の main processing / regeneration はこの issue では対象外とし、validation hardening の直接適用範囲に含めない。
+    - ただし create contract を fail-closed に保つため、import / sync preflight validation boundary の最小調整は許容し、malformed partial scope は strict validate / relaxed preflight の双方で current repo へ誤束縛させない。
 
 ### UML（推奨: module / dependency）
 ```plantuml
@@ -173,11 +174,13 @@ CreateNodeResult --> RepoScopeResolution
 - Read only:
   - `spec-dock/` checked-in dogfooding data（この issue では実装 source of truth にしない）
   - import / sync の主処理
+  - sync-generated artifact regeneration
 
 ## 要件 → 設計マッピング
 - AC-001 -> CLI default GitHub mode + `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence
 - AC-002 -> fail-closed `origin` resolver + first node binding + configured/cross-repo reject
 - AC-003 -> boundary docs diff + validation / migration tests の先行ガード
+  - ここでの boundary には import / sync main processing を変えない preflight validation boundary 調整を含む
 - EC-001 -> `origin` missing failure path
 - EC-002 -> fetch/push mismatch / non-GitHub origin reject
 - EC-003 -> cross-repo target reject
@@ -196,6 +199,7 @@ CreateNodeResult --> RepoScopeResolution
   - `origin` missing / non-GitHub / fetch-push mismatch / configured mismatch / cross-repo reject
 - E2E / manual:
   - dogfooding repo 上で `active issue` の create contract を再確認する必要はあるが、本 issue では CLI / application tests を主証拠にする。
+  - issue-level final evidence は `plan.md` S99 に従い `validate` と final diff review を使い、`sync --github` 実行証跡は要求しない。
 - migration / rollback / feature flag if needed:
   - feature flag は導入しない。
   - rollback は issue 単位で戻すが、GitHub mandatory contract を partially dual-mode にしない。
