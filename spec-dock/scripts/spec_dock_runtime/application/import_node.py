@@ -149,21 +149,21 @@ def _validate_url_repo_identity(
     repo = (req.target_repo_name or "").strip().lower()
     if not owner or not repo:
         return
-    if req.allow_foreign_url:
-        return
-
+    expected = f"{owner}/{repo}"
     if current_repo_slug is None:
         raise RuntimeError(
             "Cannot verify GitHub URL repository against current repo. "
-            "Configure git remote.origin.url or pass '--allow-foreign-url'."
+            "spec-dock import enforces single-repo GitHub-backed identity for "
+            f"GitHub issue URL imports (target repo={expected}), and "
+            "'--allow-foreign-url' no longer enables node import."
         )
-    expected = f"{owner}/{repo}"
     actual = current_repo_slug
     if actual != expected:
         raise RuntimeError(
-            "GitHub URL repository mismatch for import target: "
-            f"target={expected}, current={actual}. "
-            "Use '--allow-foreign-url' only when cross-repo import is intentional."
+            "foreign GitHub issue URL import is rejected: "
+            "spec-dock import enforces single-repo GitHub-backed identity for "
+            f"initiative/epic/issue nodes (target repo={expected}, current repo={actual}). "
+            "'--allow-foreign-url' no longer enables node import."
         )
 
 
@@ -300,6 +300,7 @@ def import_node_core(
             graph,
             repo_root=_resolve_repo_root(ports),
             current_repo_slug=current_repo_slug,
+            enforce_github_mandatory_linkage=False,
         )
         if report.errors:
             raise RuntimeError(report.errors[0])

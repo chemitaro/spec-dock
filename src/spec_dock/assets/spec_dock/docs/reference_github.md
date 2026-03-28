@@ -9,8 +9,9 @@
 
 ## 1. 前提（どのリポジトリが対象になるか）
 
-spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。  
-そのため、対象リポジトリは **`gh` の解釈**で決まります。
+spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略するわけではありません。  
+`import` / `active set` / deps check / sync の `gh issue view` 系では repo slug が分かっている場合に `--repo owner/repo` を付け、same-repo URL import でも current repo を明示して読み取ります。  
+一方で `gh issue create` / `gh issue list` は repo root を `cwd` にして実行し、対象リポジトリ解決は **`gh` の通常解釈**に委ねます。
 
 代表的な解決材料（`gh` 側）:
 - カレントディレクトリが Git リポジトリであること
@@ -22,11 +23,10 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 ### 更新する（GitHub Issue を作成する）
 
-- `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
-  - `new issue --create-github-issue` も同じ意味の explicit alias です
-  - GitHub を使わない場合は `new issue --no-github` を使ってください（`gh` を呼びません）
-- `new initiative --create-github-issue` / `new epic --create-github-issue` は GitHub Issue を作ります（opt-in）
-  - initiative/epic は **デフォルトでは GitHub Issue を作りません**（local-only）
+- `new initiative` / `new epic` / `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
+  - `--create-github-issue` は同じ意味の explicit alias です
+  - `initiative / epic / issue` では GitHub linkage が mandatory です
+  - `--no-github` は compatibility option として残っていますが、contract error で reject されます
 
 ### 読み取りだけ（非交渉）
 
@@ -39,7 +39,6 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 
 ### GitHub を呼ばない（ローカルのみ）
 
-- `new initiative` / `new epic`（デフォルト）は local-only です（`gh` を呼びません）
 - `new {initiative,epic,issue} --github-issue <n>` は「既存番号へリンク」するだけで、GitHub Issue は作りません（`gh` を呼びません）
 - 生成される `epics/rules.md` / `issues/rules.md` / `discussions/rules.md` は `spec-dock/docs/rules/**` への symlink です。`rules.md` は入口/ナビゲーション用で、ルールの正本は `spec-dock/docs/rules/**` にあります。runtime command はサポートされた実行経路です
 
@@ -50,10 +49,11 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 重要:
 - canonical URL は `https://github.com/<owner>/<repo>/issues/<n>` の形だけを受け付けます
 - `import` は URL 内の `owner/repo` を current repo（`git remote.origin.url`）と照合します
-- `owner/repo` mismatch は **default fail** です
-- cross-repo import は `--allow-foreign-url` を明示したときだけ許可されます
+- `owner/repo` mismatch は reject されます
+- `initiative / epic / issue` node import は single-repo / GitHub-backed identity contract のため、foreign issue URL を許可しません
+- `--allow-foreign-url` は compatibility flag として残っていますが、node identity import の成功経路にはなりません
 - canonical でない URL-like target（例: `git@github.com:owner/repo/issues/123`）は reject します
-- current repo を検証できない場合（origin 未設定 / GitHub 以外の remote）は、canonical URL import も `--allow-foreign-url` なしでは失敗します
+- current repo を検証できない場合（origin 未設定 / GitHub 以外の remote）は、canonical URL import を fail-closed で reject します
 
 ## 4. `active set` と checkout（安全装置）
 
@@ -89,11 +89,11 @@ spec-dock は `gh` 実行時に `--repo owner/repo` を指定しません。
 ## 6. よくある失敗
 
 - `gh` が未導入/未認証で `new issue`（デフォルト）が失敗する
-  - GitHub を使わないなら `new issue --no-github` を選ぶ（`gh` を呼びません）
-  - GitHub を使うなら `gh auth login` 等を先に行う
+  - `initiative / epic / issue` では GitHub linkage が mandatory なので、`gh auth login` 等を先に行ってください
 - Epic 配下で local-only issue を作りたい
-  - `issues/rules.md` を入口にしつつ、runtime command `./spec-dock/scripts/spec-dock new issue --no-github --epic <id> --title "..."` を使う
-  - GitHub Issue を作る場合は `./spec-dock/scripts/spec-dock new issue --epic <id> --title "..."` または `--create-github-issue`、既存番号へリンクするだけなら `--github-issue <n>` を使う
+  - 現行 contract では `initiative / epic / issue` の local-only create はサポートされません
+  - current repo の GitHub Issue を作るか、既存 current-repo issue に `--github-issue <n>` でリンクしてください
 - canonical URL import が失敗する → current repo（`origin`）を検証できないか、`owner/repo` mismatch の可能性があります
-  - cross-repo import を意図している場合だけ `--allow-foreign-url` を付けてください
+  - foreign GitHub issue URL は node identity import として reject されます
+  - `--allow-foreign-url` を付けても cross-repo node import の compatibility success path にはなりません
   - canonical でない URL-like target は受け付けません

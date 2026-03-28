@@ -69,7 +69,10 @@ def _add_import_initiative_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--allow-foreign-url",
         action="store_true",
-        help="Allow GitHub URL import even when URL owner/repo differs from current repo.",
+        help=(
+            "Retained for compatibility; foreign GitHub issue URLs are still rejected for "
+            "initiative/epic/issue node identity import."
+        ),
     )
     parser.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     parser.add_argument("--slug")
@@ -83,7 +86,10 @@ def _add_import_epic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--allow-foreign-url",
         action="store_true",
-        help="Allow GitHub URL import even when URL owner/repo differs from current repo.",
+        help=(
+            "Retained for compatibility; foreign GitHub issue URLs are still rejected for "
+            "initiative/epic/issue node identity import."
+        ),
     )
     parser.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     parser.add_argument("--slug")
@@ -101,7 +107,10 @@ def _add_import_issue_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--allow-foreign-url",
         action="store_true",
-        help="Allow GitHub URL import even when URL owner/repo differs from current repo.",
+        help=(
+            "Retained for compatibility; foreign GitHub issue URLs are still rejected for "
+            "initiative/epic/issue node identity import."
+        ),
     )
     parser.add_argument("--title", required=True, help="spec-dock title to store (GitHub title is not imported)")
     parser.add_argument("--slug")

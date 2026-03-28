@@ -968,16 +968,18 @@ with tempfile.TemporaryDirectory() as td:
     original_sync_after_import = app_import_node.sync_after_import
     app_import_node.sync_after_import = lambda _ports: object()
     try:
-        result = app_import_node.import_issue(request, ports)
+        try:
+            app_import_node.import_issue(request, ports)
+        except RuntimeError as exc:
+            message = str(exc)
+        else:
+            raise AssertionError("expected foreign import to be rejected")
     finally:
         app_import_node.sync_after_import = original_sync_after_import
 
-    assert result.node.id.startswith("iss-local-"), result.node.id
-    assert result.node.github_issue_number == 123
-    assert result.node.github_repo_owner == "other"
-    assert result.node.github_repo_name == "repo"
-    assert issue_gateway.calls, "issue_view_minimal was not called"
-    assert issue_gateway.calls[-1][2] == "other/repo", issue_gateway.calls[-1]
+    assert "single-repo" in message, message
+    assert "GitHub-backed identity" in message, message
+    assert issue_gateway.calls == [], issue_gateway.calls
 """
         result = subprocess.run(
             [sys.executable, "-c", check_code],
@@ -1488,30 +1490,33 @@ with tempfile.TemporaryDirectory() as td:
     original_sync_after_import = app_import_node.sync_after_import
     app_import_node.sync_after_import = lambda _ports: object()
     try:
-        result = app_import_node.import_issue(
-            app_contracts.ImportNodeRequest(
-                issue_number=123,
-                title="Imported foreign issue",
-                slug=None,
-                parent_id="epic-local-00001",
-                target_repo_owner="other",
-                target_repo_name="repo",
-                allow_foreign_url=True,
-            ),
-            ports,
-        )
+        try:
+            app_import_node.import_issue(
+                app_contracts.ImportNodeRequest(
+                    issue_number=123,
+                    title="Imported foreign issue",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    target_repo_owner="other",
+                    target_repo_name="repo",
+                    allow_foreign_url=True,
+                ),
+                ports,
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+        else:
+            raise AssertionError("expected foreign import to be rejected")
     finally:
         app_import_node.sync_after_import = original_sync_after_import
 
-    assert injected["done"], injected
-    assert result.node.id == "iss-local-00001", result.node.id
-    assert result.node.github_issue_number == 123
-    assert result.node.github_repo_owner == "other"
-    assert result.node.github_repo_name == "repo"
-    assert issue_gateway.calls == [(str(repo_root), 123, "other/repo")], issue_gateway.calls
-    assert events == ["copy_scaffolded_tree", "write_meta"], events
-    assert sum(1 for record in node_repo.records if record.id == "iss-00123") == 1, node_repo.records
-    assert sum(1 for record in node_repo.records if record.id == "iss-local-00001") == 1, node_repo.records
+    assert not injected["done"], injected
+    assert "single-repo" in message, message
+    assert "GitHub-backed identity" in message, message
+    assert issue_gateway.calls == [], issue_gateway.calls
+    assert events == [], events
+    assert sum(1 for record in node_repo.records if record.id == "iss-00123") == 0, node_repo.records
+    assert sum(1 for record in node_repo.records if record.id == "iss-local-00001") == 0, node_repo.records
 """
         result = subprocess.run(
             [sys.executable, "-c", check_code],
