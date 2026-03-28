@@ -445,6 +445,63 @@ OK
 
 ---
 
+### 2026-03-29 02:46 - 03:05
+
+#### 対象
+- Step: S90
+- AC/EC: docs impact resolution / parity verification
+
+#### 実施内容
+- provider-side naming / workflow docs を timestamp-based discussion naming contract に更新し、discussion doc family・`discussions/` original location・`<ts>-<kind>-<slug>.md` と same-second collision suffix `-<nn>-` を明文化した。
+- `reference_naming.md` に `doc_id` と filename stem の境界、legacy sequential docs の grandfathering、unrelated files ignore と malformed candidate fail-closed の validation 境界を追加した。
+- `workflow_adr.md` で ADR original が mirror / sync に関係なく `discussions/` に残ることを明記し、Issue / Epic / Initiative workflow と `rules/*/discussions.md` に timestamp-prefixed original の案内を揃えた。
+- dogfooding mirror 側の対象 docs を provider-side と同内容へ更新し、timestamp contract の parity を揃えた。
+
+#### 実行コマンド / 結果
+```bash
+git --no-pager diff -- src/spec_dock/assets/spec_dock/docs/reference_naming.md src/spec_dock/assets/spec_dock/docs/workflow_adr.md src/spec_dock/assets/spec_dock/docs/workflow_issue.md src/spec_dock/assets/spec_dock/docs/workflow_epic.md src/spec_dock/assets/spec_dock/docs/workflow_initiative.md src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md spec-dock/docs/reference_naming.md spec-dock/docs/workflow_adr.md spec-dock/docs/workflow_issue.md spec-dock/docs/workflow_epic.md spec-dock/docs/workflow_initiative.md spec-dock/docs/rules/issue/discussions.md spec-dock/docs/rules/epic/discussions.md spec-dock/docs/rules/initiative/discussions.md
+
+OK
+- targeted docs diff に timestamp naming contract への更新のみが出力された。
+
+git --no-pager grep -n "NNN-type-slug\.md\|3 桁固定\|001..999" -- src/spec_dock/assets/spec_dock/docs/reference_naming.md src/spec_dock/assets/spec_dock/docs/workflow_adr.md src/spec_dock/assets/spec_dock/docs/workflow_issue.md src/spec_dock/assets/spec_dock/docs/workflow_epic.md src/spec_dock/assets/spec_dock/docs/workflow_initiative.md src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md spec-dock/docs/reference_naming.md spec-dock/docs/workflow_adr.md spec-dock/docs/workflow_issue.md spec-dock/docs/workflow_epic.md spec-dock/docs/workflow_initiative.md spec-dock/docs/rules/issue/discussions.md spec-dock/docs/rules/epic/discussions.md spec-dock/docs/rules/initiative/discussions.md
+
+OK
+- obsolete sequential naming contract text は targeted docs から消えていることを確認した。
+
+cmp -s src/spec_dock/assets/spec_dock/docs/reference_naming.md spec-dock/docs/reference_naming.md && cmp -s src/spec_dock/assets/spec_dock/docs/workflow_adr.md spec-dock/docs/workflow_adr.md && cmp -s src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md && cmp -s src/spec_dock/assets/spec_dock/docs/workflow_epic.md spec-dock/docs/workflow_epic.md && cmp -s src/spec_dock/assets/spec_dock/docs/workflow_initiative.md spec-dock/docs/workflow_initiative.md && cmp -s src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md spec-dock/docs/rules/issue/discussions.md && cmp -s src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md spec-dock/docs/rules/epic/discussions.md && cmp -s src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md spec-dock/docs/rules/initiative/discussions.md
+
+OK
+- provider / dogfooding parity 対象 8 ファイルは byte-for-byte 一致した。
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_naming.md` - timestamp basename / collision suffix / `doc_id` / legacy-validation boundary を明文化
+- `src/spec_dock/assets/spec_dock/docs/workflow_adr.md` - ADR output naming と `discussions/` original location を timestamp contract に更新
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - issue discussions bullet を timestamp-prefixed original contract に更新
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` - epic discussions bullet を timestamp-prefixed original contract に更新
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md` - initiative discussions bullet を timestamp-prefixed original contract に更新
+- `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md` - issue discussion storage note を timestamp contract に更新
+- `src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md` - epic discussion storage note を timestamp contract に更新
+- `src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md` - initiative discussion storage note を timestamp contract に更新
+- `spec-dock/docs/reference_naming.md` - provider-side との parity 更新
+- `spec-dock/docs/workflow_adr.md` - provider-side との parity 更新
+- `spec-dock/docs/workflow_issue.md` - provider-side との parity 更新
+- `spec-dock/docs/workflow_epic.md` - provider-side との parity 更新
+- `spec-dock/docs/workflow_initiative.md` - provider-side との parity 更新
+- `spec-dock/docs/rules/issue/discussions.md` - provider-side との parity 更新
+- `spec-dock/docs/rules/epic/discussions.md` - provider-side との parity 更新
+- `spec-dock/docs/rules/initiative/discussions.md` - provider-side との parity 更新
+- `spec-dock/active/issue/report.md` - S90 docs impact evidence と parity verification を追記
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- docs-only 変更のため unit test は追加していない。targeted diff / grep / cmp で contract 更新と provider-dogfooding parity を確認した。
+
+---
+
 ### 2026-03-27 HH:MM - HH:MM
 
 #### 対象
