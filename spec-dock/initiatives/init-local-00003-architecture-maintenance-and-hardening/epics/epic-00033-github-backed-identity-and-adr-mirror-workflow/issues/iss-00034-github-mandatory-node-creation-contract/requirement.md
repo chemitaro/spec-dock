@@ -57,8 +57,8 @@ ID: "iss-00034"
   - cross-repo linkage を許可しない。
 - OUT OF SCOPE:
   - discussion / ADR の filename naming 変更
-  - `sync` による ADR mirror 再生成
-  - import contract の本体変更
+  - `sync` による ADR mirror / sync-generated artifact の再生成
+  - import / sync の main processing 本体変更
   - docs parity の全面クローズ
 
 ## 境界
@@ -66,7 +66,8 @@ ID: "iss-00034"
   - canonical repo scope の正本は `origin` remote が指す GitHub repository とする。
   - `origin` missing / non-GitHub remote / fetch-push mismatch / configured scope mismatch は fail-fast にする。
   - first node から same repo scope に束縛する。
-  - import / sync 由来データとその本体コマンドはこの issue の validation hardening 対象外とし、後続 issue まで exemption とする。
+  - import / sync の main processing と sync-generated artifact regeneration は read-only のままにし、本 issue で対象化しない。
+  - ただし AC-003 の範囲では、legacy/import behavior を壊さず validation blast radius を広げないための preflight validation boundary 調整と、malformed scope を fail-closed にする保護は対象内とする。
 - Ask:
   - GitHub issue body / labels / project metadata の扱いは後続 issue で必要なら拡張する。
 - Never:
@@ -117,7 +118,7 @@ ID: "iss-00034"
     - create / validate contract を確認する
   - Then:
     - in-place 自動移行は保証されず、legacy mismatch は `new` では contract error、`validate` では validation error として non-zero で fail-fast に扱われ、checked-in data の無断書き換えを目的としない境界が先行固定される
-    - この issue の `validate` pre-guard は `new` contract 由来の node linkage mismatch に限定し、`import ... --allow-foreign-url` 由来 node と sync-generated artifact は reject 対象に含めない
+    - この issue の `validate` / preflight pre-guard は `new` contract 由来の node linkage mismatch と malformed scope の fail-closed に限定し、`import ... --allow-foreign-url` 由来 node と sync-generated artifact regeneration は main processing の変更や新規 reject 対象に含めない
   - 観測点:
     - boundary docs diff
     - validate / migration contract tests
