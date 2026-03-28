@@ -324,7 +324,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("spec-dock: ok", p.stdout)
 
-    def test_validate_detects_duplicate_discussion_sequence(self) -> None:
+    def test_validate_grandfathers_legacy_discussion_names_and_ignores_unrelated_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -345,13 +345,210 @@ class TestCliValidate(CliRuntimeHarness):
             discussions_dir.mkdir(parents=True, exist_ok=True)
             (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-note-current.md").write_text("current\n", encoding="utf-8")
+            (discussions_dir / "20260329todo.md").write_text("ignore me\n", encoding="utf-8")
+            (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_rejects_malformed_discussion_doc_candidates(self) -> None:
+        cases = (
+            "20260329t123456z.md",
+            "20260329t123456z--adr-kickoff.md",
+            "20260329t123456z-1-adr-kickoff.md",
+            "20260329t123456z-0a-adr-kickoff.md",
+            "20260329t123456z-ADR-kickoff.md",
+            "20260329t123456z-01-NOTE-memo.md",
+            "20260329t123456z-bogus-kickoff.md",
+            "20260329T123456z-adr-upper-t.md",
+            "20260329t123456Z-adr-upper-z.md",
+            "20260329t123456z-00-adr-bad-suffix.md",
+            "20260329t123456z-100-adr-too-wide.md",
+            "20260329t123456z-adr.md",
+            "20260329t123456z_adr-kickoff.md",
+            "20260329t123456z01-adr-kickoff.md",
+            "20260329-adr-kickoff.md",
+            "20260329-99-adr-kickoff.md",
+            "20260329x123456z-adr-kickoff.md",
+            "20260329t123456zz-adr-kickoff.md",
+            "20260329t1234z-adr-kickoff.md",
+            "20260329t12345z-adr-kickoff.md",
+            "20260329123456z-adr-kickoff.md",
+            "20260329123456z-99-adr-kickoff.md",
+            "001-adr.md",
+            "001_adr-kickoff.md",
+            "001-bogus-kickoff.md",
+            "adr-kickoff.md",
+            "adr_kickoff.md",
+        )
+        for name in cases:
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._create_same_repo_linked_hierarchy(target)
+
+                    discussions_dir = (
+                        target
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001-auth-platform"
+                        / "epics"
+                        / "epic-00002-jwt-auth"
+                        / "issues"
+                        / "iss-00003-add-refresh-token"
+                        / "discussions"
+                    )
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    (discussions_dir / name).write_text("bad\n", encoding="utf-8")
+                    (discussions_dir / "rules.md").write_text("allowed\n", encoding="utf-8")
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Malformed discussion document filename", p.stderr)
+                    self.assertIn(name, p.stderr)
+                    self.assertNotIn("rules.md", p.stderr)
+
+    def test_validate_accepts_mixed_same_timestamp_unsuffixed_and_suffixed_slots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-adr-kickoff.md").write_text("kickoff\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-01-disc-options.md").write_text("options\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-99-research-spike.md").write_text("spike\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_accepts_high_end_discussion_timestamp_suffix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-99-adr-tail.md").write_text("tail\n", encoding="utf-8")
+            (discussions_dir / "20260329t123457z-note-next.md").write_text("next\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_accepts_research_discussion_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-research-spike.md").write_text("spike\n", encoding="utf-8")
+            (discussions_dir / "001-research-legacy-spike.md").write_text("legacy\n", encoding="utf-8")
+            (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_detects_duplicate_discussion_timestamp_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-disc-second.md").write_text("second\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate discussion sequence detected", p.stderr)
-            self.assertIn("seq=001", p.stderr)
-            self.assertIn("001-adr-first.md", p.stderr)
-            self.assertIn("001-disc-second.md", p.stderr)
+            self.assertIn("Duplicate discussion timestamp slot detected", p.stderr)
+            self.assertIn("slot=20260329t123456z", p.stderr)
+            self.assertIn("20260329t123456z-adr-first.md", p.stderr)
+            self.assertIn("20260329t123456z-disc-second.md", p.stderr)
+
+    def test_validate_detects_duplicate_discussion_timestamp_suffix_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-01-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-01-note-second.md").write_text("second\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Duplicate discussion timestamp suffix detected", p.stderr)
+            self.assertIn("slot=20260329t123456z-01", p.stderr)
+            self.assertIn("20260329t123456z-01-adr-first.md", p.stderr)
+            self.assertIn("20260329t123456z-01-note-second.md", p.stderr)
 
     def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
         artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
