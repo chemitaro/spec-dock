@@ -5,7 +5,7 @@ ID: "iss-00036"
 関連GitHub: ["#36"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-28"
 親: ["epic-00033", "init-local-00003"]
 ---
 
@@ -13,7 +13,7 @@ ID: "iss-00036"
 
 ## 目的
 - `discussions/` 配下の discussion docs（`adr / disc / research / note`）を timestamp-prefix naming へ切り替え、連番衝突を避けられる naming contract を固定する。
-- `new doc`、validation、ADR 集約の scan 前提のあいだで、同一 grammar を共有できる状態にする。
+- `new doc`、validation、ADR 集約の scan 前提のあいだで、同一 grammar と collision domain を共有できる状態にする。
 
 ## 背景・現状
 - 現状の挙動:
@@ -46,15 +46,16 @@ ID: "iss-00036"
   - `discussions/` 配下へ ADR / discussion / research / note を追加する maintainer
 - 代表シナリオ:
   - `new doc adr|disc|research|note` で conflict-resistant な filename を自動生成する。
-  - 同じ scope で同秒に複数 doc を作成しても deterministic に suffix が付く。
+  - 同じ scope で同秒に複数 doc を作成しても、create lock により create critical section 内で直列化されたうえで、type を問わず deterministic に suffix が付く。
   - 既存の pre-contract sequential docs はそのまま残し、新規生成だけを timestamp contract に切り替える。
 
 ## スコープ
 - MUST:
   - `discussions/` 配下で `new doc` が生成する 4 種 (`adr / disc / research / note`) の basename grammar を timestamp-prefix に統一する。
-  - basename grammar を `<ts>-<kind>-<slug>.md` に固定する。
-  - `ts = yyyymmddthhmmssz`（UTC、`t` / `z` lowercase 固定）、`kind in {adr, disc, research, note}`、同秒衝突時 `-<nn>-` suffix を acceptance に入れる。
-  - standard form と collision form の両方で doc identity を一意に扱えるよう、basename contract と template replacement contract の対応を曖昧にしない。
+  - basename grammar を standard form `<ts>-<kind>-<slug>.md`、collision form `<ts>-<nn>-<kind>-<slug>.md` に固定する。
+  - `ts = yyyymmddthhmmssz`（UTC、`t` / `z` lowercase 固定）、`kind in {adr, disc, research, note}`、`nn = 01..99` とする。
+  - same-second collision domain は「同一 scope / 同一 `ts` の discussion doc family 全体」とし、kind や slug が異なっても create lock により直列化された create critical section 内で 2 件目以降は最小未使用 `nn` を使うことを acceptance に入れる。
+  - basename、filename stem（basename から `.md` を除いた値）、`doc_id`（slug を含まない template/output 用 identity）の役割を分離し、standard form と collision form の両方で対応を曖昧にしない。
   - 原本は引き続き各 scope の `discussions/` に配置し、`adr` だけを後続 issue の集約対象にする前提を崩さない。
   - pre-contract sequential docs を grandfathered artifact として扱い、自動 rename / migrate 対象にしない境界を明記する。
   - `new doc`、validation、後続 issue の ADR 集約 scan が共有できる grammar 境界を requirement 上で固定する。
@@ -72,8 +73,11 @@ ID: "iss-00036"
   - naming grammar は lowercase path 制約に適合する。
   - 原本の配置先は `adr / disc / research / note` を含めて常に各 scope の `discussions/` である。
   - `adr` だけが後続 issue の top-level 集約対象になりうるが、原本配置ルールは変えない。
-  - same-second collision は 2 桁 suffix でのみ吸収する。
+  - same-second collision は「同一 scope / 同一 `ts` の discussion doc family 全体」を domain とし、最初の 1 件だけ suffix なし、2 件目以降は 2 桁 suffix でのみ吸収する。
+  - truly parallel な create invocation も同一 scope の create lock 取得後に suffix 選択へ進むため、parallel-safe の意味は「lock による直列化後に deterministic allocation される」である。
+  - filename stem は basename から `.md` を除いた値であり slug を保持する。`doc_id` は `<ts>-<kind>` または `<ts>-<nn>-<kind>` の slugless identity である。
   - pre-contract sequential docs は grandfathered artifact として保持し、新規 timestamp contract と混同しない。
+  - validation では filename を 4 つに分ける: valid timestamp name は新 contract として検査、legacy sequential name は grandfathered、timestamp/discussion-doc intent を持つ malformed name は explicit error、`rules.md` のような unrelated file は ignore。
 - Ask:
   - timestamp 精度を秒より細かくする判断は行わない。
 - Never:
@@ -102,6 +106,7 @@ ID: "iss-00036"
     - 新しい discussion doc を作成する
   - Then:
     - basename は `<ts>-<kind>-<slug>.md` grammar で生成される
+    - filename stem は `<ts>-<kind>-<slug>` であり、`doc_id` は `<ts>-<kind>` である
     - `kind` は `adr / disc / research / note` のいずれでも同一 contract を使う
     - 生成先は常に対象 scope の `discussions/` である
   - 観測点:
@@ -115,9 +120,10 @@ ID: "iss-00036"
   - When:
     - 同じ秒に複数 doc を作成する
   - Then:
-    - `yyyymmddthhmmssz-<nn>-<kind>-<slug>.md` の 2 桁 suffix が付与される
-    - collision 吸収は type を問わず同一 scope 内で deterministic に行われる
-    - collision form の doc identity は optional suffix を含めて一意に扱われ、standard form と衝突しない
+    - collision domain は同一 scope / 同一 `ts` の discussion doc family 全体である
+    - その秒の 1 件目だけ `yyyymmddthhmmssz-<kind>-<slug>.md` を使い、2 件目以降は `yyyymmddthhmmssz-<nn>-<kind>-<slug>.md` の 2 桁 suffix が付与される
+    - suffix 採番は kind ごとの basename 衝突判定ではなく、同一 scope の create lock で直列化された domain 全体から最小未使用 `nn` を選ぶ deterministic rule で行われる
+    - collision form の filename stem は `<ts>-<nn>-<kind>-<slug>`、`doc_id` は `<ts>-<nn>-<kind>` となり、standard form と衝突しない
   - 観測点:
     - collision tests
     - suffix evidence
@@ -131,6 +137,8 @@ ID: "iss-00036"
   - Then:
     - legacy docs は grandfathered として残り、自動 rename / migrate 対象にならない
     - 新規 timestamp contract と legacy grandfathered file を混同しない
+    - valid timestamp name は新 contract で validate され、timestamp/discussion-doc intent を持つ malformed filename は validation error になる
+    - `rules.md` のような unrelated nonconforming file は validation 対象外として ignore される
   - 観測点:
     - docs diff
     - validate contract tests
@@ -158,16 +166,16 @@ ID: "iss-00036"
     - filename normalization tests
 - EC-002:
   - 条件:
-    - timestamp grammar に合わない legacy file が存在する
+    - timestamp grammar に似た discussion-doc intent filename や legacy file が混在して存在する
   - 期待:
-    - legacy grandfathering と新規生成 contract を混同しない
+    - legacy sequential は grandfathered として扱い、timestamp/discussion-doc intent を持つ malformed filename は validation error、unrelated file は ignore として分類を混同しない
   - 観測点:
     - validate behavior tests
 - EC-003:
   - 条件:
     - 同じ scope / 同じ秒に複数 type の doc が並行生成される
   - 期待:
-    - suffix 付与で衝突を吸収し、type ごとの連番へフォールバックしない
+    - suffix 付与で衝突を吸収し、type ごとの独立採番や basename 単体比較へのフォールバックをしない
   - 観測点:
     - cross-type collision tests
 - EC-004:
@@ -206,6 +214,12 @@ ID: "iss-00036"
 - TERM-005:
   - collision form:
     - `<ts>-<nn>-<kind>-<slug>.md` の suffix 付き basename で表現される same-second collision 吸収形
+- TERM-006:
+  - filename stem:
+    - basename から `.md` を除いた値。slug を含み、`<ts>-<kind>-<slug>` または `<ts>-<nn>-<kind>-<slug>` を採る
+- TERM-007:
+  - doc_id:
+    - template / output へ埋め込む slugless identity。`<ts>-<kind>` または `<ts>-<nn>-<kind>` を採り、filename stem と同一視しない
 
 ## 未確定事項
 - なし:

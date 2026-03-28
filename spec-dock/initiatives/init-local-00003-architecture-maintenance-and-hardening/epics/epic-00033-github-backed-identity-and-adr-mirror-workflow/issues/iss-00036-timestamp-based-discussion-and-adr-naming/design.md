@@ -5,7 +5,7 @@ ID: "iss-00036"
 関連GitHub: ["#36"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-29"
+最終更新: "2026-03-28"
 依存: ["requirement.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -15,12 +15,12 @@ ID: "iss-00036"
 ## 目的・制約
 - 目的:
   - `discussions/` 配下の discussion doc family（`adr / disc / research / note`）を shared sequential naming から timestamp-prefix naming へ置き換える。
-  - `new doc` / validate / 後続 issue の ADR scan が同じ filename grammar を共有できるようにする。
+  - `new doc` / validate / 後続 issue の ADR scan が同じ filename grammar と collision domain を共有できるようにする。
   - pre-contract sequential docs を grandfathered artifact として保持しつつ、新規生成 contract を deterministic にする。
 - MUST / MUST NOT:
   - MUST:
     - 新規生成 basename を `<ts>-<kind>-<slug>.md` に統一する。
-    - `ts` は UTC `yyyymmddthhmmssz`、`kind` は `adr|disc|research|note`、同秒衝突時のみ `-<nn>-` を許可する。
+    - `ts` は UTC `yyyymmddthhmmssz`、`kind` は `adr|disc|research|note`、同一 scope / 同一秒では discussion doc family 全体で `-<nn>-` を管理する。
     - 生成先は全 type で各 scope の `discussions/` を維持する。
     - validate は timestamp grammar を基準に新規 contract の collision / malformed naming を検出する。
   - MUST NOT:
@@ -55,7 +55,7 @@ ID: "iss-00036"
   - active issue requirement と epic requirement は timestamp-prefix grammar を要求しており、現実装と契約がずれている。
 - 採用するパターン:
   - `new doc` / validate で同一の filename parser を共有する。
-  - shared sequence 採番を timestamp allocation helper へ置き換え、same-second collision だけ suffix allocator で吸収する。
+  - shared sequence 採番を timestamp allocation helper へ置き換え、same-second collision は same scope / same `ts` の family domain で suffix allocator が吸収し、その suffix 選択は既存 create lock による create critical section 内で行う。
   - grandfathered sequential docs は「既存 artifact としては許容するが、新規生成 source には使わない」fail-closed / no-migrate パターンを採る。
 - 採用しないもの:
   - `adr` だけ timestamp、他 type は連番、の split contract。
@@ -100,22 +100,31 @@ ID: "iss-00036"
       - `<ts>-<kind>-<slug>.md`
     - collision basename:
       - `<ts>-<nn>-<kind>-<slug>.md`
+    - filename stem:
+      - standard: `<ts>-<kind>-<slug>`
+      - collision: `<ts>-<nn>-<kind>-<slug>`
     - `ts = yyyymmddthhmmssz`
     - `nn = 01..99`
     - `kind in {adr, disc, research, note}`
   - allocation contract:
     - `ts` は `ports.clock.today()` ではなく現在 UTC datetime を source とする helper で生成する。
-    - 同一 scope / 同一秒で standard basename が衝突したときだけ、未使用の最小 `nn` を採用する。
+    - collision domain は「同一 scope / 同一 `ts` の discussion doc family 全体」とする。
+    - allocation は既存の同一 scope create lock / create critical section の内側で行い、truly parallel な invocation も suffix 選択前に直列化する。
+    - その domain の 1 件目だけ standard basename を採用し、2 件目以降は kind / slug に関係なく未使用の最小 `nn` を採用する。
     - `01..99` が使い切られた場合は explicit failure にする。
-    - logical doc identity は standard form では `<ts>-<kind>`、collision form では `<ts>-<nn>-<kind>` として扱い、suffix の有無を曖昧化しない。
+    - logical doc identity (`doc_id`) は standard form では `<ts>-<kind>`、collision form では `<ts>-<nn>-<kind>` として扱い、suffix の有無を曖昧化しない。
+    - filename stem は basename から `.md` を除いた値であり、slug を保持する。
     - basename identity は `standard form` なら `(ts, kind, slug)`、`collision form` なら `(ts, nn, kind, slug)` として扱う。
-    - `doc_id` は basename から `.md` を除いた値とし、standard form では `<ts>-<kind>`、collision form では `<ts>-<nn>-<kind>` を採る。
+    - `doc_id` は filename stem と別物の slugless identity とし、standard form では `<ts>-<kind>`、collision form では `<ts>-<nn>-<kind>` を採る。
     - template placeholder (`<ADR_ID>`, `<DISC_ID>`, `<RESEARCH_ID>`, `<NOTE_ID>`) へは新 `doc_id` をそのまま埋め込む。
   - validation contract:
     - timestamp grammar に一致する files は新 contract 対象として validate する。
     - grandfathered sequential files (`NNN-type-slug.md`) は legacy として存在を許容するが、新 contract の duplicate error source にしない。
-    - nonconforming files (`rules.md` 含む) は従来どおり scan 対象外とする。
-    - standard form と collision form を含めて、同一 basename identity を複数 file が占有する状態は duplicate として reject する。
+    - discussion doc filename candidate は `*.md` かつ basename 先頭が timestamp-like token、legacy sequential token、または `adr|disc|research|note` token を含むものとして判定し、その intent を持つ malformed filename は explicit error にする。
+    - 具体的には、timestamp shape/case 不正、malformed suffix、`<ts>-<kind>` / `<ts>-<nn>-<kind>` までは discussion contract を狙っているが slug/区切りが壊れている filename は malformed とみなす。
+    - unrelated nonconforming files (`rules.md` など、discussion doc candidate に当たらないもの) は従来どおり scan 対象外とする。
+    - 同一 scope / 同一 `ts` では suffix なし file は最大 1 件までとし、追加 file は unique な `nn` を持たなければならない。
+    - standard form と collision form を含めて、同一 basename identity または同一 `doc_id` slot を複数 file が占有する状態は duplicate として reject する。
   - scope/storage contract:
     - `adr / disc / research / note` の原本はすべて対象 node の `discussions/` に書き込む。
     - 後続 issue の top-level ADR mirror は `adr` files を `discussions/` から探索する前提に留め、本 issue で mirror 挙動は変更しない。
@@ -154,14 +163,14 @@ t3 --> validate
 - Class / Interface:
   - discussion filename allocator helper（新設）
 - responsibility:
-  - UTC timestamp basename の生成、same-second collision suffix の割当、overflow/failure message を担当する。
+  - UTC timestamp basename の生成、same scope / same `ts` domain に対する same-second collision suffix の割当、create lock 内での deterministic suffix 選択、overflow/failure message を担当する。
 - collaboration:
   - `plan_discussion_doc()` が使用し、`validation.py` の filename parser と grammar を共有する。
 
 - Class / Interface:
   - discussion filename parser/validator helper（新設または共通化）
 - responsibility:
-  - standard timestamp form / collision suffix form / legacy sequential form の判別を提供する。
+  - standard timestamp form / collision suffix form / legacy sequential form / malformed discussion candidate / unrelated file の判別と、filename stem / `doc_id` の分離を提供する。
 - collaboration:
   - `create_node.py` と `validation.py` が同一 parser を使うことで contract drift を防ぐ。
 
@@ -217,19 +226,19 @@ DiscussionTimestampAllocator --> CreateDiscussionDocResult
 ## テスト戦略
 - Unit:
   - timestamp formatter
-  - same-second suffix allocator
-  - filename parser（timestamp standard / timestamp collision / legacy sequential / nonconforming）
+  - same-second suffix allocator（cross-type shared domain / create lock 下の deterministic selection）
+  - filename parser（timestamp standard / timestamp collision / legacy sequential / malformed candidate / unrelated nonconforming）
   - suffix exhaustion failure
 - Integration:
   - `new doc adr|disc|research|note` が timestamp-prefix basename を生成する
-  - same-second collision で `-01-`, `-02-` が付く
+  - same scope / same `ts` の 2 件目以降で `-01-`, `-02-` が付き、parallel create は create lock により直列化されたうえで同じ rule に従う
   - suffix exhaustion で explicit failure になる
   - legacy sequential file があっても新規 timestamp allocation は連番へ引きずられない
   - `discussions/` 以外へ書かれない
-  - validate が timestamp duplicate / malformed timestamp を検出する
+  - validate が timestamp duplicate / malformed timestamp-intent filename を検出し、unrelated file は無視する
 - E2E / manual:
   - provider docs と dogfooding docs の naming reference parity
-  - `active issue` 上で generated filename を目視確認
+  - `active issue` 上で generated basename / filename stem / `doc_id` の対応を目視確認
 - migration / rollback / feature flag if needed:
   - feature flag は導入しない。
   - rollback は issue 単位で戻すが、`adr/disc` だけ timestamp のような split interim state は残さない。
@@ -250,6 +259,7 @@ DiscussionTimestampAllocator --> CreateDiscussionDocResult
   - docs / tests / validation が現状すべて連番前提なので、変更面が比較的広い。
   - grandfathered sequential files の扱いを曖昧にすると validate と sync scan の将来契約が再度ずれる。
   - same-second collision tests は clock seam が弱いと flaky になりうる。
+  - malformed candidate の判定規則が曖昧だと validate 実装差異が出やすい。
 - 移行:
   - pre-contract sequential docs は既存 artifact として残す。
   - 新規作成だけ timestamp-prefix contract へ切り替える。
