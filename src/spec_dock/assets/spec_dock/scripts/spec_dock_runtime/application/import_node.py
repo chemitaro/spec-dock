@@ -300,6 +300,7 @@ def import_node_core(
             graph,
             repo_root=_resolve_repo_root(ports),
             current_repo_slug=current_repo_slug,
+            enforce_github_mandatory_linkage=False,
         )
         if report.errors:
             raise RuntimeError(report.errors[0])
