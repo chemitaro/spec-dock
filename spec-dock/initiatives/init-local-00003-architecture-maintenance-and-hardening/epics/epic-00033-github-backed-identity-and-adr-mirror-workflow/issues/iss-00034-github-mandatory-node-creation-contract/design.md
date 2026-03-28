@@ -35,17 +35,22 @@ ID: "iss-00034"
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
   - `tests/cli_runtime/test_new.py`
   - `tests/cli_runtime/test_runtime_new_s08.py`
+  - `tests/cli_runtime/test_import.py`
+  - `tests/cli_runtime/test_runtime_import_s10.py`
 - 現状理解:
-  - `commands/new.py` は `new issue` だけを default GitHub create、`new initiative` / `new epic` は default `local_only` としている。
-  - `application/create_node.py::_resolve_github_mode()` は `kind == "issue"` のみ `create` default、他は `local_only` default である。
+  - 現在の `commands/new.py` は `new initiative` / `new epic` / `new issue` を GitHub mandatory として扱い、`--no-github` は contract error に寄せている。
+  - 現在の `application/create_node.py::_resolve_github_mode()` は `github_mode is None` の場合に `create` を返し、`local_only` は explicit reject する。
   - `repo_context.py` は `origin_github_repo_slug()` の単一戻り値だけを使って current repo scope を解決しており、fetch/push mismatch や non-GitHub origin の失敗理由を区別していない。
-  - `domain/validation.py` は github linkage uniqueness は持つが、initiative / epic / issue の GitHub mandatory 自体は検証していない。
+  - `domain/validation.py` は GitHub mandatory validation を持っているが、current issue の corrective scope では import boundary と docs/report の整流がまだ残っている。
+  - 一方で `import ... --allow-foreign-url` は URL repository identity check を bypass でき、current repo 未解決時の opt-in 成功経路が残っているため、single-repo contract と完全には整合していない。
   - 既存テストには `--no-github` 前提の create ケースが広く残っている一方、repo scope persistence や runtime create failure の下地となるテスト群も存在する。
 - 採用するパターン:
   - command layer は薄く保ち、実契約の切り替えは `application/create_node.py` と `repo_context.py` に寄せる。
@@ -55,6 +60,7 @@ ID: "iss-00034"
   - parser option の全面削除だけで契約変更を表現すること。
   - current repo scope を optional / best-effort のまま扱うこと。
   - cross-repo を暫定許容して後続 issue で締めること。
+  - `iss-local-*` を foreign issue fallback として再利用すること。
 - 影響範囲:
   - runtime create parser / orchestration
   - git remote scope resolution
@@ -80,6 +86,11 @@ ID: "iss-00034"
     - old workflow を成功させないという requirement を満たしつつ、利用者へ「何が禁止されたか」を明示できる。
     - create core の切り替えとテスト置換を段階的に進めやすい。
     - docs parity の全面更新は後続 issue に残しつつ、この issue 内で最小 boundary docs diff を出せる。
+  - 追加決定:
+    - foreign issue URL import については `iss-local-*` fallback を採らず strict reject を採用する。
+  - 追加理由:
+    - single GitHub repo / GitHub-backed canonical identity / no local fallback を同時に守るには、foreign issue を node identity に変換しないのが最も整合的である。
+    - multi-repo first-class support が必要なら、repo-scoped identity か external reference model を別 issue で設計すべきであり、本 issue の tactical fix で混ぜるべきではない。
 
 ## インターフェース契約
 - API / function / protocol / data boundary:
@@ -99,8 +110,9 @@ ID: "iss-00034"
   - validation contract:
     - initiative / epic / issue に unscoped local-only node が存在する場合は validation error にする。
     - legacy mismatch は `new` では contract error、`validate` では validation error として non-zero を返す。
-    - `import ... --allow-foreign-url` 由来 node と sync-generated output の main processing / regeneration はこの issue では対象外とし、validation hardening の直接適用範囲に含めない。
-    - ただし create contract を fail-closed に保つため、import / sync preflight validation boundary の最小調整は許容し、malformed partial scope は strict validate / relaxed preflight の双方で current repo へ誤束縛させない。
+    - `import ... --allow-foreign-url` は compatibility success path ではなく、single-repo contract に反する foreign issue URL を reject する。
+    - sync-generated output の main processing / regeneration はこの issue では対象外とし、validation hardening の直接適用範囲に含めない。
+    - malformed partial scope は strict validate / preflight の双方で current repo へ誤束縛させない。
 
 ### UML（推奨: module / dependency）
 ```plantuml
@@ -165,6 +177,7 @@ CreateNodeResult --> RepoScopeResolution
 - Modify:
   - `commands/new.py` の initiative / epic default GitHub behavior と error messaging。
   - `application/create_node.py` の mode resolution、precheck、repo scope binding、local_only rejection。
+  - `commands/import_cmd.py` / `application/import_node.py` の foreign issue URL reject contract。
   - `application/ports.py` / `infra/git_cli.py` の origin remote resolution 契約。
   - `domain/validation.py` の GitHub mandatory validation。
 - Delete:
@@ -173,17 +186,18 @@ CreateNodeResult --> RepoScopeResolution
   - なし。
 - Read only:
   - `spec-dock/` checked-in dogfooding data（この issue では実装 source of truth にしない）
-  - import / sync の主処理
+  - sync の主処理
   - sync-generated artifact regeneration
 
 ## 要件 → 設計マッピング
 - AC-001 -> CLI default GitHub mode + `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence
 - AC-002 -> fail-closed `origin` resolver + first node binding + configured/cross-repo reject
-- AC-003 -> boundary docs diff + validation / migration tests の先行ガード
-  - ここでの boundary には import / sync main processing を変えない preflight validation boundary 調整を含む
+- AC-003 -> boundary docs diff + `new` / `validate` における legacy mismatch fail-fast
+- AC-004 -> foreign issue URL import strict reject + no-write / no-fallback guarantee
 - EC-001 -> `origin` missing failure path
 - EC-002 -> fetch/push mismatch / non-GitHub origin reject
 - EC-003 -> cross-repo target reject
+- EC-004 -> `--allow-foreign-url` reject path
 - constraint -> `local_only` create path no longer succeeds for initiative / epic / issue
 
 ## テスト戦略
@@ -197,6 +211,7 @@ CreateNodeResult --> RepoScopeResolution
   - `new initiative|epic|issue --no-github` の explicit reject
   - `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence
   - `origin` missing / non-GitHub / fetch-push mismatch / configured mismatch / cross-repo reject
+  - `import ... --allow-foreign-url` の foreign issue URL reject と no-write 観測
 - E2E / manual:
   - dogfooding repo 上で `active issue` の create contract を再確認する必要はあるが、本 issue では CLI / application tests を主証拠にする。
   - issue-level final evidence は `plan.md` S99 に従い `validate` と final diff review を使い、`sync --github` 実行証跡は要求しない。
@@ -208,15 +223,18 @@ CreateNodeResult --> RepoScopeResolution
 - AC-001 -> `tests/cli_runtime/test_new.py` と `tests/cli_runtime/test_runtime_new_s08.py` の create success / meta persistence
 - AC-002 -> resolver reject tests（origin missing / non-GitHub / fetch-push mismatch / configured mismatch / cross-repo）
 - AC-003 -> boundary docs diff + `new` contract error / `validate` validation error tests
+- AC-004 -> `tests/cli_runtime/test_import.py` と `tests/cli_runtime/test_runtime_import_s10.py` の foreign issue URL reject / no-write
 - EC-001 -> origin missing test
 - EC-002 -> canonical resolver reject tests
 - EC-003 -> cross-repo reject tests
+- EC-004 -> `--allow-foreign-url` reject tests
 - constraint -> `--no-github` rejection tests for initiative / epic / issue
 
 ## リスク / 移行 / ロールバック（必要時）
 - 主リスク:
   - 既存 `--no-github` テストが広く存在するため、テストの置換と期待値更新が大きい。
   - `origin_github_repo_slug()` の現行 port では fetch/push mismatch を検出できず、port 変更が必要になる。
+  - foreign issue import を許していた docs / tests / review記録の期待値を同時に修正しないと、仕様逆行が再発しやすい。
 - 移行:
   - old workflow は success ではなく explicit failure に変える。
   - docs parity の全面更新は `iss-00038` に残し、本 issue では boundary/canonical scope の最小 docs diff に留める。

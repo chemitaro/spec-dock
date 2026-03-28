@@ -17,10 +17,12 @@ ID: "iss-00034"
   - AC-001
   - AC-002
   - AC-003
+  - AC-004
 - EC:
   - EC-001
   - EC-002
   - EC-003
+  - EC-004
 - 制約:
   - local-only success path を残さない
   - canonical repo scope は `origin` basis で fail-closed
@@ -37,6 +39,44 @@ ID: "iss-00034"
     - validation / docs boundary / final quality gate
   - exit:
     - GitHub mandatory create contract が tests と docs diff で観測できる
+- M3:
+  - 対象:
+    - foreign issue URL import の是正と review log の再整流
+  - exit:
+    - `iss-local-*` fallback を再導入しない strict reject contract が tests / docs / report で一貫する
+
+## 引き継ぎチェックリスト
+- 準備完了:
+  - [x] `requirement.md` を最新の corrective scope に更新した
+  - [x] `design.md` を latest repo context と strict reject 方針に更新した
+  - [x] `plan.md` に追加作業 `M3 / S04` を追記した
+  - [x] 分析シート [002-disc-foreign-issue-import-identity-conflict-analysis.md](/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/discussions/002-disc-foreign-issue-import-identity-conflict-analysis.md) を正本として残した
+  - [x] spec review を `pass` まで完了した
+  - [x] QA/test strategy review を `pass` まで完了した
+  - [x] repo-context consistency review を `pass` まで完了した
+- 実装担当者の未着手作業:
+  - [x] S01 canonical repo scope resolver
+  - [x] S02 GitHub mandatory node creation
+  - [x] S03 validation / migration boundary pre-guard
+  - [ ] S04 foreign issue URL strict reject correction
+  - [ ] S90 docs impact resolution
+  - [ ] S99 final diff review quality gate
+
+## 現在の repo 実装状態
+- 完了済み:
+  - S01:
+    - `repo_context.py` に current repo scope 解決があり、`create` 前に fail-closed で参照される
+  - S02:
+    - `new initiative` / `new epic` / `new issue` は GitHub mandatory で、`local_only` は reject される
+  - S03:
+    - `domain/validation.py` に GitHub mandatory linkage validation が入っている
+- 未完了:
+  - S04:
+    - foreign issue URL import の strict reject への是正
+  - S90:
+    - provider / dogfooding docs / report の最小差分更新
+  - S99:
+    - 最終 diff review と完了証跡の確定
 
 ## ステップ一覧
 - S01:
@@ -55,19 +95,28 @@ ID: "iss-00034"
     - create contract tests と `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence 確認
 - S03:
   - 観測可能な振る舞い:
-    - validation / migration boundary の先行ガードが create contract と整合し、import / sync main processing を変えずに preflight boundary だけを最小調整する
+    - validation / migration boundary の先行ガードが create contract と整合し、single-repo contract と矛盾する exemption を残さない
   - closes:
     - AC-003
   - review gate:
     - validate / boundary docs diff / migration tests の確認
+- S04:
+  - 観測可能な振る舞い:
+    - foreign issue URL import が strict reject に是正され、`iss-local-*` fallback を再導入しない
+  - closes:
+    - AC-004, EC-004
+  - review gate:
+    - import reject tests と docs / report の整合確認
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02
 - AC-002 -> S01 + S02
 - AC-003 -> S03
+- AC-004 -> S04
 - EC-001 -> S01
 - EC-002 -> S01
 - EC-003 -> S02
+- EC-004 -> S04
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -77,7 +126,7 @@ ID: "iss-00034"
     - create contract / resolver / validation の layering と fail-fast policy
 - QG1 QA review:
   - timing:
-    - S03 後
+    - S04 後
   - scope:
     - targeted unittest output と reject path coverage
 - SG1 spec review:
@@ -269,7 +318,7 @@ ID: "iss-00034"
 
 #### B1 — validation hardening
 - purpose:
-  - local-only node 禁止と repo scope ambiguity を validation で観測可能にしつつ、legacy/import behavior を壊さない preflight boundary へ限定する
+  - local-only node 禁止と repo scope ambiguity を validation で観測可能にしつつ、single-repo contract と矛盾する exemption を残さない
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
   - `tests/cli_runtime/test_runtime_new_s08.py`
@@ -282,14 +331,13 @@ ID: "iss-00034"
 ###### Red
 - failing test:
   - local-only node / ambiguous linkage / legacy mismatch の `new` contract error と `validate` validation error expectation tests を追加
-  - `import issue --allow-foreign-url` で成立済みの foreign-url import node と sync-generated artifact を、この issue の validation hardening で新規 reject しない非回帰観測を追加
 - expected failure:
   - 現行 validation は mandatory contract を表現しない
 
 ###### Green
 - minimum implementation:
   - validation に mandatory contract checks を追加し、legacy mismatch の error/warning 区分を explicit error に固定する
-  - import / sync は main processing を変えず、preflight validation boundary だけを最小調整して malformed partial scope を fail-closed にする
+  - malformed partial scope を fail-closed にし、S04 の import strict reject と矛盾する exemption を残さない
 - pass condition:
   - targeted validation tests が通る
 
@@ -298,20 +346,113 @@ ID: "iss-00034"
   - error wording と duplicate checks の整理
 - invariants to keep green:
   - existing github linkage uniqueness は維持
-  - foreign-url import node と sync-generated artifact の既存契約は壊さない
+  - sync-generated artifact の既存契約は壊さない
 
 #### step gate
 - review:
   - AC-003 の先行ガードが docs/tests/validate で揃っている
 - expected tests:
   - validation / migration contract tests が exit=0
-  - import / sync 本体コマンドと import 済み legacy data への適用範囲を広げていないことが diff / targeted regression で確認できる
+  - sync 本体コマンドと sync-generated artifact への適用範囲を広げていないことが diff / targeted regression で確認できる
 - verification command:
   - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
 - supporting checks:
   - `./spec-dock/scripts/spec-dock validate`
 - observes:
-  - AC-003 と validation 境界、foreign-url import exemption の非回帰
+  - AC-003 と validation 境界
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
+### S04 — foreign issue URL import is corrected to strict reject
+- target:
+  - `initiative / epic / issue` node に対する foreign issue URL import を strict reject へ是正し、`iss-local-*` fallback を再導入しない
+- design refs:
+  - `commands/import_cmd.py`
+  - `application/import_node.py`
+  - `application/create_node.py`
+  - `002-disc-foreign-issue-import-identity-conflict-analysis.md`
+- step boundary:
+  - foreign issue URL reject / no-write guarantee / docs and report 整流に限定し、external reference model や multi-repo support は扱わない
+
+#### B1 — import contract correction
+- purpose:
+  - `--allow-foreign-url` を compatibility success path ではなく explicit reject path に揃える
+- files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
+  - `tests/cli_runtime/test_import.py`
+  - `tests/cli_runtime/test_runtime_import_s10.py`
+  - `tests/test_init_update.py`
+
+##### I1 — foreign issue URL reject and no-write guarantee
+- slice goal:
+  - current repo と異なる GitHub issue URL を import しようとした場合、`iss-local-*` fallback を作らず non-zero で止める
+
+###### Red
+- failing test:
+  - foreign issue URL import success / `iss-local-*` fallback を期待しているテストを reject / no-write expectation に置き換える
+- expected failure:
+  - 現行は foreign import success と `iss-local-*` fallback を許してしまう
+
+###### Green
+- minimum implementation:
+  - foreign issue URL を node identity に変換しないよう import/create seam を整理し、single-repo policy の reject error を返す
+- pass condition:
+  - targeted import tests が通り、新規 node / meta / symlink が作られない
+
+###### Refactor
+- cleanup target:
+  - `--allow-foreign-url` error message と helper 呼び出しの整理
+- invariants to keep green:
+  - same-repo import / link_existing は壊さない
+  - `iss-local-*` fallback は存在しない
+
+#### B2 — docs and review log correction
+- purpose:
+  - 仕様逆行を前提にした記録を是正し、最新の accepted contract と一致させる
+- files:
+  - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+  - `spec-dock/docs/workflow_issue.md`
+  - `spec-dock/active/issue/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/discussions/002-disc-foreign-issue-import-identity-conflict-analysis.md`
+
+##### I1 — docs are realigned to strict reject
+- slice goal:
+  - user-facing docs と issue-level report/discussion が `iss-local-*` fallback を正当化しない
+
+###### Red
+- failing check:
+  - docs diff review で foreign import success を許す記述が残っている
+- expected failure:
+  - 現行 docs / review log は仕様逆行 fix を一時的に肯定している
+
+###### Green
+- minimum implementation:
+  - docs と issue report を strict reject / corrective review cycle へ読み替える
+- pass condition:
+  - docs diff review で accepted contract と矛盾する記述が解消される
+
+###### Refactor
+- cleanup target:
+  - 似た説明の重複を減らし、`002-disc` を分析の正本に寄せる
+- invariants to keep green:
+  - accepted ADR / epic / issue requirement と矛盾しない
+
+#### step gate
+- review:
+  - foreign issue URL import の是正が tests / docs / review記録で一貫している
+- expected tests:
+  - `tests/cli_runtime/test_import.py`
+  - `tests/cli_runtime/test_runtime_import_s10.py`
+  - `tests/test_init_update.py`
+  - relevant `new` / `validate` regressions
+- verification command:
+  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.test_init_update tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
+- supporting checks:
+  - `./spec-dock/scripts/spec-dock validate`
+- observes:
+  - AC-004、EC-004、および `iss-local-*` fallback 不在
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -323,27 +464,30 @@ ID: "iss-00034"
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
-  - docs / spec（asset mirror は対象外）
+  - issue docs と foreign issue strict reject に直接関係する最小 docs
 - 対応:
-  - create contract を参照する最小 docs 差分のみ更新する
-  - asset mirror / full parity refresh は `iss-00038` に渡し、この issue では未完了でも境界逸脱にしない
+  - create contract と foreign issue strict reject を参照する最小 docs 差分のみ更新する
+  - full parity refresh は `iss-00038` に渡し、この issue では未完了でも境界逸脱にしない
   - 更新候補:
     - `spec-dock/active/issue/{requirement,design,plan}.md`
-    - `src/spec_dock/assets/spec_dock/docs/*` は parity refresh 対象としては扱わない
+    - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+    - `spec-dock/docs/workflow_issue.md`
+    - `spec-dock/active/issue/report.md`
+    - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/discussions/002-disc-foreign-issue-import-identity-conflict-analysis.md`
 - verification command:
-  - `git diff -- spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
+  - `git diff -- spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md src/spec_dock/assets/spec_dock/docs/reference_github.md spec-dock/docs/workflow_issue.md spec-dock/active/issue/report.md`
 - observes:
-  - docs diff が boundary/canonical scope の最小更新に留まり、issue docs だけで reviewer blocker を解消できること
+  - docs diff が boundary/canonical scope と foreign strict reject の最小更新に留まり、accepted contract と矛盾しないこと
 
 ### S99 — final diff review quality gate
 - branch diff scope:
   - `iss-00034` ブランチ差分全体
 - required validation:
-  - targeted unittest output（create / resolver / validation）
+  - targeted unittest output（create / resolver / validation / import strict reject）
   - docs diff が boundary/canonical scope の最小更新に留まっていること
   - import / sync 関連ロジックへ不要な差分が入っていないこと
 - verification command:
-  - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
+  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.test_init_update tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
 - supporting checks:
   - `./spec-dock/scripts/spec-dock validate`（iss-00034 の create / validation boundary pre-guard に関する issue-specific supporting evidence。sync-generated artifact regeneration は scope 外のため `sync --github` は required evidence に含めない）
   - `git diff --stat`
@@ -358,10 +502,10 @@ ID: "iss-00034"
 
 ## final exit contract
 - AC/EC 達成:
-  - AC-001/002/003 と EC-001/002/003 に対応する tests / docs diff / validation evidence が揃う
+  - AC-001/002/003/004 と EC-001/002/003/004 に対応する tests / docs diff / validation evidence が揃う
 - docs impact resolved:
   - boundary/canonical scope の最小 docs diff が反映され、full parity work は `iss-00038` へ残せている
 - scope boundary preserved:
-  - import / sync main processing や sync-generated artifact regeneration を本 issue に持ち込まず、preflight validation boundary の最小調整に留めている
+  - foreign issue strict reject に必要な import 是正だけを扱い、multi-repo support / external reference model / sync-generated artifact regeneration は持ち込まない
 - final diff approved:
   - S99 を通過し、reviewer が実装開始・継続可能と判断できる
