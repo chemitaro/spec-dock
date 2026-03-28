@@ -5,7 +5,7 @@ ID: "iss-00036"
 関連GitHub: ["#36"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-29"
+最終更新: "2026-03-28"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -34,7 +34,7 @@ ID: "iss-00036"
   - 対象:
     - discussion filename allocator の timestamp 化
   - exit:
-    - `new doc` が 4 type すべてで timestamp-prefix basename を生成し、same-second collision を suffix で吸収できる
+    - `new doc` が 4 type すべてで timestamp-prefix basename を生成し、same scope / same `ts` collision を create lock 内の suffix 選択で吸収できる
 - M2:
   - 対象:
     - validation / docs boundary / parity
@@ -52,7 +52,7 @@ ID: "iss-00036"
     - 4 type 共通 grammar と path assertions が green
 - S02:
   - 観測可能な振る舞い:
-    - same-second collision が `-01-`, `-02-` suffix で deterministic に吸収される
+    - same-second collision が same scope / same `ts` の family domain で、create lock により直列化された suffix 選択として `-01-`, `-02-` で deterministic に吸収される
   - closes:
     - AC-002
     - EC-003
@@ -61,12 +61,12 @@ ID: "iss-00036"
     - collision-focused CLI/application regressions が green
 - S03:
   - 観測可能な振る舞い:
-    - validate が新 timestamp contract を検査し、legacy sequential docs は grandfathered として扱う
+    - validate が新 timestamp contract を検査し、legacy sequential docs は grandfathered、malformed discussion-doc candidate は error、unrelated file は ignore として扱う
   - closes:
     - AC-003
     - EC-002
   - review gate:
-    - validate / legacy boundary tests と docs diff が green
+    - validate / legacy boundary tests が green で、docs evidence は S90 に委譲されている
 - S90:
   - 観測可能な振る舞い:
     - naming docs / workflow docs / rules docs が 4 type timestamp contract に揃う
@@ -76,7 +76,7 @@ ID: "iss-00036"
     - provider + dogfooding docs parity 確認
 - S99:
   - 観測可能な振る舞い:
-    - final diff と review verdict が issue scope と一致している
+    - final diff と review verdict が issue scope と一致し、workflow-required final commands まで完了している
   - closes:
     - AC-001
     - AC-002
@@ -100,7 +100,7 @@ ID: "iss-00036"
   - timing:
     - S02 後、S03 後
   - scope:
-    - allocator / validation / docs boundary の layering と contract drift 有無
+    - allocator / validation boundary の layering と contract drift 有無
 - QG1 QA review:
   - timing:
     - S03 後
@@ -187,7 +187,7 @@ ID: "iss-00036"
 
 ### S02 — same-second collisions are absorbed with deterministic suffixes
 - target:
-  - 同秒並行作成の collision を `-01-`, `-02-` で吸収し、連番 fallback や race を残さない
+  - 同秒並行作成の collision を same scope / same `ts` domain で `-01-`, `-02-` により吸収し、suffix 選択は create lock / create critical section 内で直列化して race を残さない
 - design refs:
   - `design.md` の collision basename / allocation contract
 - step boundary:
@@ -195,7 +195,7 @@ ID: "iss-00036"
 
 #### B1 — same-second suffix allocation
 - purpose:
-  - standard basename 衝突時の suffix 採番と並行 create 安全性を固定する
+  - same scope / same `ts` domain の 2 件目以降に対する suffix 採番を、既存 create lock による直列化前提で固定する
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
   - `tests/cli_runtime/test_runtime_new_doc_s09.py`
@@ -203,18 +203,19 @@ ID: "iss-00036"
 
 ##### I1 — same-second suffix allocation
 - slice goal:
-  - 同秒 / 同scope / cross-type でも deterministic な suffix を割り当て、collision form の identity と exhaustion failure を固定する
+  - 同秒 / 同scope / cross-type でも、create lock 通過順に deterministic な suffix を割り当て、collision form の identity と exhaustion failure を固定する
 
 ###### Red
 - failing test:
   - same-second 固定 clock で `adr`, `disc`, `research`, `note` の collision suffix tests を追加
+  - allocation が create critical section 内で行われる前提を確認する regression を追加
   - `01..99` を使い切ったときの suffix exhaustion test を追加
 - expected failure:
   - 現行は同名 path 衝突か、timestamp helper 未実装で失敗する
 
 ###### Green
 - minimum implementation:
-  - basename 衝突時に `01..99` を探索する helper を導入し、使い切った場合は explicit failure にする
+  - same scope / same `ts` domain の追加 file に対して、create lock 内で `01..99` を探索する helper を導入し、使い切った場合は explicit failure にする
 - pass condition:
   - collision tests が green
 
@@ -228,7 +229,7 @@ ID: "iss-00036"
 
 #### step gate
 - review:
-  - same-second collision 吸収が deterministic で、cross-type collision も吸収できる
+  - same-second collision 吸収が create lock 前提で deterministic で、cross-type collision も吸収できる
 - expected tests:
   - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09`
 - verification command:
@@ -238,15 +239,15 @@ ID: "iss-00036"
 
 ### S03 — validate aligns with timestamp grammar and legacy grandfathering
 - target:
-  - validate が新 grammar を検査し、legacy sequential docs を grandfathered boundary に収める
+  - validate が新 grammar を検査し、legacy sequential docs / malformed discussion-doc candidate / unrelated file の境界を固定する
 - design refs:
   - `design.md` の validation contract / legacy boundary
 - step boundary:
-  - validate logic、legacy classification、関連 docs/tests に限定する
+  - validate logic、legacy classification、関連 tests に限定する。docs evidence は S90 へ分離する
 
 #### B1 — validation grammar update
 - purpose:
-  - sequential duplicate validation を timestamp contract へ置き換え、legacy sequential は fail-fast ではなく grandfathered に寄せる
+  - sequential duplicate validation を timestamp contract へ置き換え、legacy sequential は grandfathered、malformed discussion-doc candidate は explicit error、unrelated file は ignore に振り分ける
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
   - `tests/cli_runtime/test_validate.py`
@@ -255,17 +256,17 @@ ID: "iss-00036"
 
 ##### I1 — timestamp validation and grandfathering
 - slice goal:
-  - timestamp files は validate 対象、sequential legacy は grandfathered、nonconforming は ignore の境界を固定する
+  - timestamp files は validate 対象、sequential legacy は grandfathered、discussion-doc intent を持つ malformed filename は error、unrelated nonconforming は ignore の境界を固定する
 
 ###### Red
 - failing test:
-  - timestamp malformed / duplicate timestamp suffix / legacy sequential coexistence tests を追加
+  - timestamp malformed / malformed discussion-doc candidate / duplicate timestamp suffix / legacy sequential coexistence tests を追加
 - expected failure:
   - 現行 validate は duplicate sequence だけを見ており、新 contract に一致しない
 
 ###### Green
 - minimum implementation:
-  - validation parser を timestamp contract へ切り替え、legacy sequential 判定を追加する
+  - validation parser を timestamp contract へ切り替え、legacy sequential / malformed candidate / unrelated file の判定を追加する
 - pass condition:
   - validate-related tests が green
 
@@ -274,11 +275,12 @@ ID: "iss-00036"
   - filename parser 共通化、error message の安定化
 - invariants to keep green:
   - rules.md 等の nonconforming files は ignore
+  - timestamp-like / discussion-doc-like malformed filename は explicit error
   - grandfathered files を自動 rename しない
 
 #### step gate
 - review:
-  - validate が新規 contract と grandfathered boundary の両方に整合している
+  - validate が新規 contract、grandfathered boundary、malformed candidate error、unrelated file ignore に整合している
 - expected tests:
   - `python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09`
 - verification command:
@@ -296,10 +298,12 @@ ID: "iss-00036"
 - 対象:
   - docs / assets / workflow / rules
 - 対応:
-  - `reference_naming.md` を timestamp-prefix grammar へ更新する
+  - `reference_naming.md` を timestamp-prefix grammar と `doc_id`/filename stem boundary に合わせて更新する
   - `workflow_{initiative,epic,issue}.md` と `rules/*/discussions.md` の `new doc` 説明を timestamp contract に揃える
   - provider と dogfooding mirror の parity を確認する
   - `iss-00035` の ADR 集約 scan が参照する前提として、ADR 原本が `discussions/` にあることを docs 上でも明確化する
+- review gate:
+  - docs diff / parity evidence が green
 
 ### S99 — final diff review quality gate
 - branch diff scope:
@@ -311,6 +315,7 @@ ID: "iss-00036"
   - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
   - 必要なら `python -m unittest tests.test_init_update`
   - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync --github`
 - reviewer approvals:
   - spec review `pass`
   - implementation/code review `pass`
