@@ -470,7 +470,7 @@ class TestCliNew(CliRuntimeHarness):
             self.assertIn("2026-03-12", created.read_text(encoding="utf-8"))
             self.assertNotIn("2026-03-11", created.read_text(encoding="utf-8"))
 
-    def test_new_doc_ignores_nonconforming_files_for_timestamp_allocation(self) -> None:
+    def test_new_doc_ignores_unrelated_files_for_timestamp_allocation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -487,9 +487,7 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            (discussions_dir / "adr-00001-legacy.md").write_text("legacy\n", encoding="utf-8")
             (discussions_dir / "foo.md").write_text("nonconforming\n", encoding="utf-8")
-            (discussions_dir / "002-bogus-random.md").write_text("nonconforming type\n", encoding="utf-8")
             (discussions_dir / "009-disc-migrated.md").write_text("existing new format\n", encoding="utf-8")
             (discussions_dir / "1000-adr-legacy-overflow.md").write_text("4-digit should be ignored\n", encoding="utf-8")
 
@@ -497,6 +495,72 @@ class TestCliNew(CliRuntimeHarness):
 
             self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 1)
             self.assertEqual(list(discussions_dir.glob("001-adr-*.md")), [])
+
+    def test_new_doc_rejects_malformed_discussion_doc_candidates(self) -> None:
+        cases = (
+            "002-bogus-random.md",
+            "foo-adr-kickoff.md",
+            "bogus-01-adr-kickoff.md",
+        )
+        for malformed_name in cases:
+            with self.subTest(malformed_name=malformed_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    self._create_same_repo_linked_hierarchy(target)
+
+                    issue_dir = (
+                        target
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001-auth-platform"
+                        / "epics"
+                        / "epic-00002-jwt-auth"
+                        / "issues"
+                        / "iss-00003-add-refresh-token"
+                    )
+                    discussions_dir = issue_dir / "discussions"
+                    (discussions_dir / malformed_name).write_text("nonconforming type\n", encoding="utf-8")
+
+                    p = self._run_runtime_capture(
+                        target,
+                        ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
+                    )
+
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Malformed discussion document filename", p.stderr)
+                    self.assertIn(malformed_name, p.stderr)
+                    self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 0)
+
+    def test_new_doc_rejects_timestamp_shaped_malformed_discussion_doc_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            discussions_dir = issue_dir / "discussions"
+            malformed_name = "20260312t010203z-00-disc-malformed.md"
+            (discussions_dir / malformed_name).write_text("nonconforming type\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
+            )
+
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Malformed discussion document filename", p.stderr)
+            self.assertIn(malformed_name, p.stderr)
+            self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 0)
 
     def test_new_doc_preserves_legacy_files_without_reusing_sequence_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

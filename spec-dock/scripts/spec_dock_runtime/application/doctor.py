@@ -54,12 +54,25 @@ def _finding_from_error(error_message: str) -> DoctorFinding:
                 "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )
-    if "Duplicate discussion sequence detected" in error_message:
+    if (
+        "Duplicate discussion sequence detected" in error_message
+        or "Duplicate discussion timestamp slot detected" in error_message
+        or "Duplicate discussion timestamp suffix detected" in error_message
+    ):
         return DoctorFinding(
             code="duplicate_seq",
             message=error_message,
             guidance=[
-                "対象 scope の discussions 配下で重複 sequence の markdown を整理してください。",
+                "対象 scope の discussions 配下で重複している discussion markdown を整理してください。",
+                "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
+            ],
+        )
+    if "Malformed discussion document filename under " in error_message:
+        return DoctorFinding(
+            code="malformed_discussion_doc",
+            message=error_message,
+            guidance=[
+                "対象 scope の discussions 配下で命名規則に違反している discussion markdown を修正または整理してください。",
                 "修正後に `spec-dock/scripts/spec-dock validate` を再実行してください。",
             ],
         )
