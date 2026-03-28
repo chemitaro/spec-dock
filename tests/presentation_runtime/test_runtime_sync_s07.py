@@ -810,7 +810,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(status.source, "github")
             self.assertEqual(status.effective_status, "done")
 
-    def test_sync_skips_issue_view_target_for_malformed_partial_repo_scope_linkage(self) -> None:
+    def test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -821,73 +821,74 @@ class TestRuntimeSyncS07(unittest.TestCase):
             infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
-        partial_scopes = (("current", None), (None, "repo"))
+        partial_scopes = (("current", None), (None, "repo"), ("   ", "repo"), ("current", "   "))
 
-        for repo_owner, repo_name in partial_scopes:
-            with self.subTest(repo_owner=repo_owner, repo_name=repo_name):
-                with tempfile.TemporaryDirectory() as td:
-                    repo_root = Path(td)
-                    specdock_dir = repo_root / "spec-dock"
-                    specdock_dir.mkdir(parents=True, exist_ok=True)
-                    records = self._records(infra_contracts, repo_root)
-                    records[2] = _record(
-                        infra_contracts,
-                        kind="issue",
-                        node_id="iss-local-00001",
-                        title="API",
-                        path=Path(records[2].path),
-                        parent_id="epic-local-00001",
-                        initiative_id="init-local-00001",
-                        epic_id="epic-local-00001",
-                        github_issue_number=301,
-                        github_repo_owner=repo_owner,
-                        github_repo_name=repo_name,
-                    )
-                    records[3] = _record(
-                        infra_contracts,
-                        kind="issue",
-                        node_id="iss-local-00002",
-                        title="DB",
-                        path=Path(records[3].path),
-                        parent_id="epic-local-00001",
-                        initiative_id="init-local-00001",
-                        epic_id="epic-local-00001",
-                        github_issue_number=None,
-                    )
-                    issue_gateway = _StubIssueGateway(snapshots=[])
-                    ports = app_ports.Ports(
-                        node_reader=_StubNodeReader(records),
-                        repo_root=repo_root,
-                        specdock_dir=specdock_dir,
-                        deps_topology_reader=_StubDepsTopologyReader(
+        for force in (False, True):
+            for repo_owner, repo_name in partial_scopes:
+                with self.subTest(force=force, repo_owner=repo_owner, repo_name=repo_name):
+                    with tempfile.TemporaryDirectory() as td:
+                        repo_root = Path(td)
+                        specdock_dir = repo_root / "spec-dock"
+                        specdock_dir.mkdir(parents=True, exist_ok=True)
+                        records = self._records(infra_contracts, repo_root)
+                        records[2] = _record(
                             infra_contracts,
-                            {"iss-local-00001": [], "iss-local-00002": []},
-                        ),
-                        derived_state_reader=_StubDerivedStateReader(
-                            {"iss-local-00001": "open", "iss-local-00002": "open"}
-                        ),
-                        issue_gateway=issue_gateway,
-                        active_state_store=_StubActiveStateStore(infra_contracts, []),
-                        git_gateway=_StubGitGateway("main"),
-                        artifact_writer=infra_artifact_writer.FileArtifactWriter(),
-                        clock=_StubClock(),
-                    )
+                            kind="issue",
+                            node_id="iss-local-00001",
+                            title="API",
+                            path=Path(records[2].path),
+                            parent_id="epic-local-00001",
+                            initiative_id="init-local-00001",
+                            epic_id="epic-local-00001",
+                            github_issue_number=301,
+                            github_repo_owner=repo_owner,
+                            github_repo_name=repo_name,
+                        )
+                        records[3] = _record(
+                            infra_contracts,
+                            kind="issue",
+                            node_id="iss-local-00002",
+                            title="DB",
+                            path=Path(records[3].path),
+                            parent_id="epic-local-00001",
+                            initiative_id="init-local-00001",
+                            epic_id="epic-local-00001",
+                            github_issue_number=None,
+                        )
+                        issue_gateway = _StubIssueGateway(snapshots=[])
+                        ports = app_ports.Ports(
+                            node_reader=_StubNodeReader(records),
+                            repo_root=repo_root,
+                            specdock_dir=specdock_dir,
+                            deps_topology_reader=_StubDepsTopologyReader(
+                                infra_contracts,
+                                {"iss-local-00001": [], "iss-local-00002": []},
+                            ),
+                            derived_state_reader=_StubDerivedStateReader(
+                                {"iss-local-00001": "open", "iss-local-00002": "open"}
+                            ),
+                            issue_gateway=issue_gateway,
+                            active_state_store=_StubActiveStateStore(infra_contracts, []),
+                            git_gateway=_StubGitGateway("main"),
+                            artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                            clock=_StubClock(),
+                        )
 
-                    result = app_sync_state.sync(
-                        app_contracts.SyncRequest(
-                            force=False,
-                            github_enabled=True,
-                            issue_limit=10000,
-                            update_active_from_branch=False,
-                        ),
-                        ports,
-                    )
-                    self.assertIsNone(result.artifact_failure)
-                    self.assertEqual(issue_gateway.view_calls, [])
-                    self.assertNotIn("gh_fetch_failed", result.state.warnings)
-                    status = result.state.issue_statuses["iss-local-00001"]
-                    self.assertEqual(status.source, "unknown")
-                    self.assertTrue(status.stale)
+                        with self.assertRaisesRegex(
+                            RuntimeError,
+                            "preflight validate failed: issue has invalid github linkage",
+                        ):
+                            app_sync_state.sync(
+                                app_contracts.SyncRequest(
+                                    force=force,
+                                    github_enabled=True,
+                                    issue_limit=10000,
+                                    update_active_from_branch=False,
+                                ),
+                                ports,
+                            )
+                        self.assertEqual(issue_gateway.index_calls, [])
+                        self.assertEqual(issue_gateway.view_calls, [])
 
     def test_sync_falls_back_to_current_repo_view_for_unscoped_linked_epic_when_index_missing_key(self) -> None:
         (
@@ -2190,7 +2191,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertIn("iss-local-00001", state.graph.nodes_by_id)
             self.assertEqual(node_repo.backfill_calls, [])
 
-    def test_sync_github_keeps_fail_closed_for_partial_scope_backfill_candidates(self) -> None:
+    def test_collect_sync_state_force_hard_fails_for_partial_scope_backfill_candidates(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -2248,17 +2249,95 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 clock=_StubClock(),
             )
 
-            state = app_sync_state.collect_sync_state(
-                app_contracts.SyncRequest(
-                    force=True,
-                    github_enabled=True,
-                    issue_limit=10000,
-                    update_active_from_branch=False,
-                ),
-                ports,
-            )
-            self.assertIn("deps_preflight_failed", state.warnings)
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "preflight validate failed: issue has invalid github linkage",
+            ):
+                app_sync_state.collect_sync_state(
+                    app_contracts.SyncRequest(
+                        force=True,
+                        github_enabled=True,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    ),
+                    ports,
+                )
             self.assertEqual(node_repo.backfill_calls, [])
+
+    def test_collect_sync_state_force_hard_fails_for_partial_scope_when_another_validation_error_exists(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[2] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="API",
+                path=Path(records[2].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="current",
+                github_repo_name=None,
+            )
+            records[3] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-1",
+                title="DB",
+                path=Path(records[3].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=302,
+            )
+            node_repo = _StubNodeRepo()
+            issue_gateway = _StubIssueGateway([])
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=node_repo,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-1": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug="current/repo"),
+                clock=_StubClock(),
+            )
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "preflight validate failed: issue has invalid github linkage",
+            ):
+                app_sync_state.collect_sync_state(
+                    app_contracts.SyncRequest(
+                        force=True,
+                        github_enabled=True,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    ),
+                    ports,
+                )
+            self.assertEqual(node_repo.backfill_calls, [])
+            self.assertEqual(issue_gateway.index_calls, [])
+            self.assertEqual(issue_gateway.view_calls, [])
 
     def test_sync_github_skips_backfill_when_current_repo_slug_is_unknown(self) -> None:
         (

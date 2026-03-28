@@ -39,6 +39,64 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
 
 
 class CliRuntimeHarness(unittest.TestCase):
+    def _init_origin_repo(self, target: Path, *, owner: str = "example", repo: str = "repo") -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+        self._run_git(target, ["init"])
+        self._run_git(target, ["remote", "add", "origin", f"https://github.com/{owner}/{repo}.git"])
+
+    def _create_same_repo_linked_hierarchy(
+        self,
+        target: Path,
+        *,
+        owner: str = "example",
+        repo: str = "repo",
+        initiative_issue_number: int = 1,
+        epic_issue_number: int = 2,
+        issue_issue_number: int = 3,
+        initiative_title: str = "Auth platform",
+        epic_title: str = "JWT auth",
+        issue_title: str = "Add refresh token",
+    ) -> None:
+        self._init_origin_repo(target, owner=owner, repo=repo)
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "initiative",
+                "--title",
+                initiative_title,
+                "--github-issue",
+                str(initiative_issue_number),
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "epic",
+                "--initiative",
+                str(initiative_issue_number),
+                "--title",
+                epic_title,
+                "--github-issue",
+                str(epic_issue_number),
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "issue",
+                "--epic",
+                str(epic_issue_number),
+                "--title",
+                issue_title,
+                "--github-issue",
+                str(issue_issue_number),
+            ],
+        )
+
     def _can_create_symlink(self, target: Path) -> bool:
         if not hasattr(os, "symlink"):
             return False
@@ -314,4 +372,3 @@ class CliRuntimeHarness(unittest.TestCase):
         self.assertNotIn("new adr --", combined)
         self.assertNotIn("<type>-00001-<slug>.md", combined)
         self.assertNotIn("<type>-xxxxx-<slug>.md", combined)
-

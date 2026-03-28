@@ -70,6 +70,60 @@ def _github_linkage_key(
     return (repo_slug, int(node.github_issue_number))
 
 
+def _is_nonblank_github_repo_scope_value(value: str | None) -> bool:
+    return bool(str(value or "").strip())
+
+
+def _github_repo_scope_pairing_error(node: SpecNode, *, repo_root: Path | None = None) -> str | None:
+    if node.kind not in ("initiative", "epic", "issue"):
+        return None
+    owner_is_set = _is_nonblank_github_repo_scope_value(node.github_repo_owner)
+    name_is_set = _is_nonblank_github_repo_scope_value(node.github_repo_name)
+    if owner_is_set == name_is_set:
+        return None
+    meta_path = _meta_json_path_for_output(node, repo_root=repo_root)
+    return (
+        f"{node.kind} has invalid github linkage: github.repo_owner and github.repo_name "
+        f"must be provided together ({meta_path})"
+    )
+
+
+def find_github_repo_scope_pairing_error(
+    graph: SpecGraph,
+    *,
+    repo_root: Path | None = None,
+) -> str | None:
+    for node in graph.nodes_by_id.values():
+        error = _github_repo_scope_pairing_error(node, repo_root=repo_root)
+        if error is not None:
+            return error
+    return None
+
+
+def _validate_github_repo_scope_pairing(node: SpecNode, *, repo_root: Path | None = None) -> None:
+    error = _github_repo_scope_pairing_error(node, repo_root=repo_root)
+    if error is not None:
+        raise RuntimeError(error)
+
+
+def _validate_github_mandatory_linkage(node: SpecNode, *, repo_root: Path | None = None) -> None:
+    if node.kind not in ("initiative", "epic", "issue"):
+        return
+    meta_path = _meta_json_path_for_output(node, repo_root=repo_root)
+    if node.github_issue_number is None:
+        raise RuntimeError(
+            f"{node.kind} missing github.issue_number: {meta_path}. "
+            "initiative/epic/issue nodes must have explicit GitHub linkage under the create contract."
+        )
+
+    _validate_github_repo_scope_pairing(node, repo_root=repo_root)
+    if _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None:
+        raise RuntimeError(
+            f"{node.kind} has legacy unscoped github linkage: github.repo_owner and github.repo_name "
+            f"are required for initiative/epic/issue nodes ({meta_path})"
+        )
+
+
 def _validate_discussion_sequences(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
     scopes = sorted(
         (node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")),
@@ -159,6 +213,7 @@ def validate_graph(
     repo_root: Path | None = None,
     *,
     current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
 ) -> ValidationReport:
     """Validate structural integrity and return accumulated errors/warnings."""
     try:
@@ -166,6 +221,7 @@ def validate_graph(
             graph,
             repo_root=repo_root,
             current_repo_slug=current_repo_slug,
+            enforce_github_mandatory_linkage=enforce_github_mandatory_linkage,
         )
     except RuntimeError as e:
         return ValidationReport(errors=[str(e)], warnings=[])
@@ -178,12 +234,14 @@ def validate_graph_and_deps(
     repo_root: Path | None = None,
     *,
     current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
 ) -> ValidationReport:
     """Validate the graph and dependency-related preconditions."""
     report = validate_graph(
         graph,
         repo_root=repo_root,
         current_repo_slug=current_repo_slug,
+        enforce_github_mandatory_linkage=enforce_github_mandatory_linkage,
     )
     if report.errors:
         return report
@@ -201,6 +259,7 @@ def _validate_graph_or_raise(
     *,
     repo_root: Path | None = None,
     current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
 ) -> None:
     numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
     for node_id in graph.nodes_by_id.keys():
@@ -215,12 +274,15 @@ def _validate_graph_or_raise(
                 f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
             )
 
+    github_repo_scope_pairing_error = find_github_repo_scope_pairing_error(graph, repo_root=repo_root)
+    if github_repo_scope_pairing_error is not None:
+        raise RuntimeError(github_repo_scope_pairing_error)
+
     validate_github_issue_numbers_unique(
         graph,
         repo_root=repo_root,
         current_repo_slug=current_repo_slug,
     )
-    _validate_discussion_sequences(graph, repo_root=repo_root)
 
     for node_id, node in graph.nodes_by_id.items():
         validate_lowercase(node_id, field="id")
@@ -230,6 +292,8 @@ def _validate_graph_or_raise(
         if not node.slug:
             raise RuntimeError(f"Missing slug in .meta.json: {node.meta_path}")
         validate_slug(node.slug, field="slug")
+        if enforce_github_mandatory_linkage:
+            _validate_github_mandatory_linkage(node, repo_root=repo_root)
 
         if node.kind == "initiative":
             if node.parent_id is not None:
@@ -274,3 +338,5 @@ def _validate_graph_or_raise(
             continue
 
         raise RuntimeError(f"Unknown node type: {node.kind} ({node.meta_path})")
+
+    _validate_discussion_sequences(graph, repo_root=repo_root)
