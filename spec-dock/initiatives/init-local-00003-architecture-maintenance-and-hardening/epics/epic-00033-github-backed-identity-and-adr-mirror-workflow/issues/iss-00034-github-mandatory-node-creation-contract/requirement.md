@@ -5,7 +5,7 @@ ID: "iss-00034"
 関連GitHub: ["#34"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-28"
 親: ["epic-00033", "init-local-00003"]
 ---
 
@@ -50,7 +50,7 @@ ID: "iss-00034"
 - MUST:
   - `new initiative` / `new epic` / `new issue` を GitHub issue mandatory に揃える。
   - canonical repo scope を `origin` remote から一意に解決する contract を固定する。
-  - `.meta.json` に `github.issue_number` / `repo_owner` / `repo_name` を repo-scoped に保持する。
+  - `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` を lowercase canonical repo scope で保持する。
   - empty workspace / first node を含む create contract の acceptance を固定する。
 - MUST NOT:
   - local-only fallback を残さない。
@@ -92,7 +92,7 @@ ID: "iss-00034"
   - When:
     - `new initiative` / `new epic` / `new issue` を実行する
   - Then:
-    - create は GitHub issue linkage 必須で進み、`.meta.json` に `github.issue_number` / lowercase canonical `repo_owner` / `repo_name` が保存される
+    - create は GitHub issue linkage 必須で進み、`.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` が lowercase canonical repo scope で保存される
   - 観測点:
     - targeted create tests
     - created `.meta.json`

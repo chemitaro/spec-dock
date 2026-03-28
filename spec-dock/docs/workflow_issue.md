@@ -20,7 +20,6 @@ Issue は実装の最小単位です。
 ```bash
 ./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."
 ./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."
-./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title "..."
 
 ./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>] [--allow-foreign-url]
 
