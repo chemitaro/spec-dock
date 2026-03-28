@@ -55,6 +55,7 @@ class TestInitUpdate(CliRuntimeHarness):
     }
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
+        "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
@@ -80,6 +81,9 @@ class TestInitUpdate(CliRuntimeHarness):
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/doctor.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/application/repo_context.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py"

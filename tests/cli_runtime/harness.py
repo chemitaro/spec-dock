@@ -364,11 +364,63 @@ class CliRuntimeHarness(unittest.TestCase):
         self.assertIn("new doc disc", combined)
         self.assertIn("new doc research", combined)
         self.assertIn("new doc note", combined)
-        self.assertIn("NNN-type-slug.md", combined)
-        self.assertIn("nonconforming", combined)
-        self.assertIn("follow-up issue", combined)
+        self.assertIn("<ts>-<kind>-<slug>.md", combined)
+        self.assertIn("<ts>-<nn>-<kind>-<slug>.md", combined)
+        self.assertIn("yyyymmddthhmmssz", combined)
+        self.assertIn("01..99", combined)
+        self.assertIn("doc_id", combined)
+        self.assertIn("grandfathered", combined)
+        self.assertIn("unrelated files", combined)
+        self.assertIn("explicit failure", combined)
         self.assertIn("archive", combined)
 
         self.assertNotIn("new adr --", combined)
         self.assertNotIn("<type>-00001-<slug>.md", combined)
         self.assertNotIn("<type>-xxxxx-<slug>.md", combined)
+        for rel_path, text in text_map.items():
+            if rel_path.endswith("templates/README.md") or rel_path.endswith("scripts/README.md"):
+                self.assertIn(
+                    "<ts>-<kind>-<slug>.md",
+                    text,
+                    f"timestamp naming contract missing from {rel_path}",
+                )
+                self.assertIn(
+                    "yyyymmddthhmmssz",
+                    text,
+                    f"timestamp token guidance missing from {rel_path}",
+                )
+                self.assertNotIn(
+                    "NNN-type-slug.md",
+                    text,
+                    f"stale sequential naming guidance survived in {rel_path}",
+                )
+                self.assertIn(
+                    "unrelated files",
+                    text,
+                    f"unrelated-file guidance missing from {rel_path}",
+                )
+                self.assertIn(
+                    "grandfathered",
+                    text,
+                    f"legacy-grandfathering guidance missing from {rel_path}",
+                )
+                self.assertIn(
+                    "explicit failure",
+                    text,
+                    f"malformed-filename failure guidance missing from {rel_path}",
+                )
+                self.assertIn(
+                    "rules.md",
+                    text,
+                    f"rules.md ignore example missing from {rel_path}",
+                )
+                self.assertIn(
+                    "foo-adr-kickoff.md",
+                    text,
+                    f"malformed filename example missing from {rel_path}",
+                )
+                self.assertNotIn(
+                    "3-digit filename",
+                    text,
+                    f"stale sequential example survived in {rel_path}",
+                )

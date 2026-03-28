@@ -21,11 +21,11 @@ v2 では、日常運用（initiative/epic/issue/doc の作成、active 切り�
 ./spec-dock/scripts/spec-dock new issue --epic 1 --title "Add refresh token"           # id=iss-00123
 ./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token" # id=iss-local-00001
 
-# discussion docs（shared sequence, 3-digit filename）
-./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "Token rotation"   # 001-adr-...
-./spec-dock/scripts/spec-dock new doc disc --issue iss-00123 --title "API options"      # 002-disc-...
-./spec-dock/scripts/spec-dock new doc research --issue iss-00123 --title "Benchmarks"   # 003-research-...
-./spec-dock/scripts/spec-dock new doc note --issue iss-00123 --title "Kickoff memo"     # 004-note-...
+# discussion docs（timestamp-prefixed filename）
+./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "Token rotation"    # 20260329t123456z-adr-...
+./spec-dock/scripts/spec-dock new doc disc --issue iss-00123 --title "API options"      # 20260329t123457z-disc-...
+./spec-dock/scripts/spec-dock new doc research --issue iss-00123 --title "Benchmarks"   # 20260329t123458z-research-...
+./spec-dock/scripts/spec-dock new doc note --issue iss-00123 --title "Kickoff memo"     # 20260329t123459z-note-...
 
 # active（現在作業中）を設定
 ./spec-dock/scripts/spec-dock active set 123
@@ -41,9 +41,14 @@ v2 では、日常運用（initiative/epic/issue/doc の作成、active 切り�
 ```
 
 discussion docs 補足:
-- ファイル名は `NNN-type-slug.md`（`NNN` は 3 桁固定）。
-- 採番対象は recognized new-format files のみ（`rules.md` / legacy / nonconforming は無視）。
-- `999` を超える採番は失敗します。follow-up issue で archive または桁拡張を判断してください。
+- ファイル名 contract は `<ts>-<kind>-<slug>.md`、same-second collision 時は `<ts>-<nn>-<kind>-<slug>.md` です。
+- `ts = yyyymmddthhmmssz`（UTC, lowercase `t` / `z`）、`nn = 01..99` です。
+- `doc_id` は slugless identity（`<ts>-<kind>` / `<ts>-<nn>-<kind>`）で、filename stem は `<doc_id>-<slug>` です。
+- allocation 対象は valid timestamp-contract files のみです。
+- unrelated files は無視されます（例: `rules.md`, `README.md`）。
+- legacy sequential discussion docs（`<nnn>-<kind>-<slug>.md`）は grandfathered ですが、自動 rename や basename 再利用はしません。
+- ただし discussion-doc intent を持つ malformed basename は explicit failure です（例: `foo-adr-kickoff.md`, `bogus-01-adr-kickoff.md`, `20260329x-adr-kickoff.md`）。
+- same-second collision suffix が `99` まで埋まると失敗します。follow-up issue で archive または contract 拡張を判断してください。
 
 注:
 - `spec-dock/.agent/` と `spec-dock/active/` は生成物です（git 管理しません）。

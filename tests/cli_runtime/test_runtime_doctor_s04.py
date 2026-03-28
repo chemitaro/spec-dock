@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import sys
 import tempfile
 import time
@@ -26,6 +27,23 @@ def _runtime_modules():
     finally:
         sys.path.pop(0)
     return runtime_app, app_contracts, app_doctor, app_ports, infra_contracts
+
+
+def _runtime_fs_repo():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.infra import fs_repo as infra_fs_repo
+    finally:
+        sys.path.pop(0)
+    return infra_fs_repo
 
 
 def _record(
@@ -65,48 +83,79 @@ def _write_required_docs(node_dir: Path) -> None:
         (node_dir / name).write_text(f"{name}\n", encoding="utf-8")
 
 
+def _write_record_artifacts(record) -> None:
+    node_dir = Path(record.path)
+    node_dir.mkdir(parents=True, exist_ok=True)
+    meta_payload = {
+        "type": record.kind,
+        "id": record.id,
+        "title": record.title,
+        "slug": record.slug,
+    }
+    if record.parent_id is not None:
+        meta_payload["parent_id"] = record.parent_id
+    if record.initiative_id is not None:
+        meta_payload["initiative_id"] = record.initiative_id
+    if record.epic_id is not None:
+        meta_payload["epic_id"] = record.epic_id
+    if record.github_issue_number is not None:
+        meta_payload["github"] = {"issue_number": int(record.github_issue_number)}
+        if record.github_repo_owner is not None and record.github_repo_name is not None:
+            meta_payload["github"]["repo_owner"] = record.github_repo_owner
+            meta_payload["github"]["repo_name"] = record.github_repo_name
+    (node_dir / ".meta.json").write_text(json.dumps(meta_payload), encoding="utf-8")
+    for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (node_dir / name).write_text(f"{name}\n", encoding="utf-8")
+
+
 def _build_valid_records(infra_contracts, *, specdock_dir: Path):
     init_dir = specdock_dir / "initiatives" / "init-local-00001-auth-platform"
     epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
     issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
-    _write_required_docs(init_dir)
-    _write_required_docs(epic_dir)
-    _write_required_docs(issue_dir)
-    return (
-        [
-            _record(
-                infra_contracts,
-                kind="initiative",
-                node_id="init-local-00001",
-                title="Auth Platform",
-                path=init_dir,
-                parent_id=None,
-                initiative_id=None,
-                epic_id=None,
-            ),
-            _record(
-                infra_contracts,
-                kind="epic",
-                node_id="epic-local-00001",
-                title="JWT Auth",
-                path=epic_dir,
-                parent_id="init-local-00001",
-                initiative_id="init-local-00001",
-                epic_id=None,
-            ),
-            _record(
-                infra_contracts,
-                kind="issue",
-                node_id="iss-local-00001",
-                title="Add Refresh Token",
-                path=issue_dir,
-                parent_id="epic-local-00001",
-                initiative_id="init-local-00001",
-                epic_id="epic-local-00001",
-            ),
-        ],
-        issue_dir,
-    )
+    records = [
+        _record(
+            infra_contracts,
+            kind="initiative",
+            node_id="init-local-00001",
+            title="Auth Platform",
+            path=init_dir,
+            parent_id=None,
+            initiative_id=None,
+            epic_id=None,
+            github_issue_number=101,
+            github_repo_owner="example",
+            github_repo_name="repo",
+        ),
+        _record(
+            infra_contracts,
+            kind="epic",
+            node_id="epic-local-00001",
+            title="JWT Auth",
+            path=epic_dir,
+            parent_id="init-local-00001",
+            initiative_id="init-local-00001",
+            epic_id=None,
+            github_issue_number=102,
+            github_repo_owner="example",
+            github_repo_name="repo",
+        ),
+        _record(
+            infra_contracts,
+            kind="issue",
+            node_id="iss-local-00001",
+            title="Add Refresh Token",
+            path=issue_dir,
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=103,
+            github_repo_owner="example",
+            github_repo_name="repo",
+        ),
+    ]
+    for record in records:
+        _write_record_artifacts(record)
+    return (records, issue_dir)
 
 
 class _StubNodeReader:
@@ -165,29 +214,131 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             self.assertTrue(result.findings[0].guidance)
 
     def test_doctor_detects_duplicate_discussion_sequence(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
+        ports = app_ports.Ports(
+            node_reader=_FailingNodeReader(
+                "Duplicate discussion sequence detected under /repo/spec-dock/x/discussions: seq=001 files=[001-adr-first.md, 001-disc-second.md]"
+            ),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+        )
+        result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.findings[0].code, "duplicate_seq")
+        self.assertIn("Duplicate discussion sequence detected", result.findings[0].message)
+        self.assertTrue(result.findings[0].guidance)
+        self.assertTrue(any("重複している discussion markdown" in line for line in result.findings[0].guidance))
+        self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+
+    def test_doctor_detects_duplicate_discussion_timestamps(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            specdock_dir = repo_root / "spec-dock"
-            records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
-            discussions_dir = issue_dir / "discussions"
-            discussions_dir.mkdir(parents=True, exist_ok=True)
-            (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
-            (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+        cases = (
+            (
+                "slot",
+                (
+                    "20260312t010203z-adr-first.md",
+                    "20260312t010203z-disc-second.md",
+                ),
+                "Duplicate discussion timestamp slot detected",
+            ),
+            (
+                "suffix",
+                (
+                    "20260312t010203z-01-adr-first.md",
+                    "20260312t010203z-01-disc-second.md",
+                ),
+                "Duplicate discussion timestamp suffix detected",
+            ),
+        )
 
-            ports = app_ports.Ports(
-                node_reader=_StubNodeReader(records),
-                repo_root=repo_root,
-                specdock_dir=specdock_dir,
-            )
-            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+        for label, filenames, expected_message in cases:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    specdock_dir = repo_root / "spec-dock"
+                    records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+                    discussions_dir = issue_dir / "discussions"
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    for filename in filenames:
+                        (discussions_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.findings[0].code, "duplicate_seq")
-            self.assertIn("Duplicate discussion sequence detected", result.findings[0].message)
-            self.assertTrue(result.findings[0].guidance)
-            self.assertTrue(any("discussions" in line for line in result.findings[0].guidance))
-            self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+                    ports = app_ports.Ports(
+                        node_reader=_StubNodeReader(records),
+                        repo_root=repo_root,
+                        specdock_dir=specdock_dir,
+                    )
+                    result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+                    self.assertFalse(result.ok)
+                    self.assertEqual(result.findings[0].code, "duplicate_seq")
+                    self.assertIn(expected_message, result.findings[0].message)
+                    self.assertTrue(result.findings[0].guidance)
+                    self.assertTrue(any("重複している discussion markdown" in line for line in result.findings[0].guidance))
+                    self.assertFalse(any("重複 sequence" in line for line in result.findings[0].guidance))
+                    self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+
+    def test_doctor_detects_malformed_discussion_doc_filename(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
+        ports = app_ports.Ports(
+            node_reader=_FailingNodeReader(
+                "Malformed discussion document filename under /repo/spec-dock/x/discussions: "
+                "20260329x-adr-kickoff.md. Expected `<ts>-<kind>-<slug>.md`, "
+                "`<ts>-<nn>-<kind>-<slug>.md`, or grandfathered `<nnn>-<kind>-<slug>.md`."
+            ),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+        )
+        result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.findings[0].code, "malformed_discussion_doc")
+        self.assertIn("Malformed discussion document filename", result.findings[0].message)
+        self.assertTrue(result.findings[0].guidance)
+        self.assertTrue(any("discussions 配下" in line for line in result.findings[0].guidance))
+        self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
+
+    def test_doctor_detects_malformed_discussion_doc_filename_from_repo_backed_validation(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        infra_fs_repo = _runtime_fs_repo()
+
+        class _RepoBackedNodeReader:
+            def __init__(self, specdock_dir: Path):
+                self._specdock_dir = specdock_dir
+
+            def load_node_records(self):
+                return infra_fs_repo.load_node_records(self._specdock_dir)
+
+        cases = (
+            "20260329x-adr-kickoff.md",
+            "foo-adr-kickoff.md",
+            "bogus-01-adr-kickoff.md",
+        )
+        for malformed_name in cases:
+            with self.subTest(malformed_name=malformed_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    specdock_dir = repo_root / "spec-dock"
+                    _records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+                    discussions_dir = issue_dir / "discussions"
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    (discussions_dir / malformed_name).write_text("# malformed\n", encoding="utf-8")
+
+                    ports = app_ports.Ports(
+                        node_reader=_RepoBackedNodeReader(specdock_dir),
+                        repo_root=repo_root,
+                        specdock_dir=specdock_dir,
+                    )
+                    result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+                    self.assertFalse(result.ok)
+                    self.assertEqual(result.findings[0].code, "malformed_discussion_doc")
+                    self.assertIn("Malformed discussion document filename under", result.findings[0].message)
+                    self.assertIn(malformed_name, result.findings[0].message)
+                    self.assertIn("Expected `<ts>-<kind>-<slug>.md`", result.findings[0].message)
+                    self.assertTrue(result.findings[0].guidance)
+                    self.assertTrue(any("discussions 配下" in line for line in result.findings[0].guidance))
+                    self.assertTrue(any("spec-dock/scripts/spec-dock validate" in line for line in result.findings[0].guidance))
 
     def test_doctor_detects_duplicate_id(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
@@ -196,19 +347,21 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             specdock_dir = repo_root / "spec-dock"
             records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
             second_issue_dir = issue_dir.parent / "iss-local-1-add-refresh-token-alias"
-            _write_required_docs(second_issue_dir)
-            records.append(
-                _record(
-                    infra_contracts,
-                    kind="issue",
-                    node_id="iss-local-1",
-                    title="Add Refresh Token Alias",
-                    path=second_issue_dir,
-                    parent_id="epic-local-00001",
-                    initiative_id="init-local-00001",
-                    epic_id="epic-local-00001",
-                )
+            second_issue_record = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-1",
+                title="Add Refresh Token Alias",
+                path=second_issue_dir,
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=104,
+                github_repo_owner="example",
+                github_repo_name="repo",
             )
+            _write_record_artifacts(second_issue_record)
+            records.append(second_issue_record)
 
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
@@ -231,19 +384,21 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             specdock_dir = repo_root / "spec-dock"
             records, issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
             duplicate_issue_dir = issue_dir.parent / "iss-local-00001-add-refresh-token-duplicate"
-            _write_required_docs(duplicate_issue_dir)
-            records.append(
-                _record(
-                    infra_contracts,
-                    kind="issue",
-                    node_id="iss-local-00001",
-                    title="Add Refresh Token Duplicate",
-                    path=duplicate_issue_dir,
-                    parent_id="epic-local-00001",
-                    initiative_id="init-local-00001",
-                    epic_id="epic-local-00001",
-                )
+            duplicate_issue_record = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="Add Refresh Token Duplicate",
+                path=duplicate_issue_dir,
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=105,
+                github_repo_owner="example",
+                github_repo_name="repo",
             )
+            _write_record_artifacts(duplicate_issue_record)
+            records.append(duplicate_issue_record)
 
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
@@ -258,7 +413,7 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             self.assertNotIn("Duplicate numeric id detected", result.findings[0].message)
             self.assertTrue(result.findings[0].guidance)
 
-    def test_doctor_allows_mixed_scoped_and_unscoped_github_linkage_when_current_repo_is_resolved(self) -> None:
+    def test_doctor_detects_legacy_unscoped_github_linkage_when_current_repo_is_resolved(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -275,6 +430,7 @@ class TestRuntimeDoctorS04(unittest.TestCase):
                 epic_id=None,
                 github_issue_number=123,
             )
+            _write_record_artifacts(records[0])
             records[2] = _record(
                 infra_contracts,
                 kind="issue",
@@ -288,6 +444,7 @@ class TestRuntimeDoctorS04(unittest.TestCase):
                 github_repo_owner="other",
                 github_repo_name="repo",
             )
+            _write_record_artifacts(records[2])
 
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
@@ -297,8 +454,9 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             )
             result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.findings, [])
+            self.assertFalse(result.ok)
+            self.assertEqual(result.findings[0].code, "broken_meta")
+            self.assertIn("legacy unscoped github linkage", result.findings[0].message)
 
     def test_doctor_detects_broken_meta_when_reader_fails(self) -> None:
         _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
@@ -347,7 +505,11 @@ class TestRuntimeDoctorS04(unittest.TestCase):
                 parent_id=None,
                 initiative_id=None,
                 epic_id=None,
+                github_issue_number=101,
+                github_repo_owner="example",
+                github_repo_name="repo",
             )
+            _write_record_artifacts(records[0])
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,

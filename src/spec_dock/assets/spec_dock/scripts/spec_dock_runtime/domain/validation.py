@@ -26,6 +26,14 @@ def _is_discussion_doc_type_candidate(token: str) -> bool:
     return bool(token) and token.lower() in _DISCUSSION_DOC_TYPES
 
 
+def _find_discussion_doc_type_slot(parts: list[str]) -> int | None:
+    if len(parts) >= 2 and _is_discussion_doc_type_candidate(parts[1]):
+        return 1
+    if len(parts) >= 3 and _is_discussion_doc_type_candidate(parts[2]):
+        return 2
+    return None
+
+
 def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None) -> str:
     """Return a stable meta path for diagnostics (repo-relative when possible)."""
     meta_path = node.meta_path
@@ -144,7 +152,10 @@ def _is_malformed_discussion_doc_candidate(path: Path) -> bool:
     if not parts:
         return False
     first = parts[0]
+    doc_type_slot = _find_discussion_doc_type_slot(parts)
     if _is_discussion_doc_type_candidate(first):
+        return True
+    if doc_type_slot is not None and not first.isdigit():
         return True
     if re.fullmatch(r"[0-9]{3}", first) is not None:
         return True
@@ -166,6 +177,27 @@ def _format_discussion_filename_expectation() -> str:
     )
 
 
+def find_malformed_discussion_doc_filename_error(
+    discussions_dir: Path,
+    *,
+    repo_root: Path | None = None,
+) -> str | None:
+    if not discussions_dir.exists():
+        return None
+    for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+        if _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE.fullmatch(path.name) is not None:
+            continue
+        if _DISCUSSION_DOC_LEGACY_FILENAME_RE.fullmatch(path.name) is not None:
+            continue
+        if _is_malformed_discussion_doc_candidate(path):
+            return (
+                "Malformed discussion document filename under "
+                f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
+                f"{path.name}. {_format_discussion_filename_expectation()}"
+            )
+    return None
+
+
 def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
     scopes = sorted(
         (node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")),
@@ -178,6 +210,9 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
         by_standard_slot: dict[str, list[Path]] = {}
         by_suffix_slot: dict[tuple[str, int], list[Path]] = {}
         by_doc_id: dict[str, list[Path]] = {}
+        malformed_error = find_malformed_discussion_doc_filename_error(discussions_dir, repo_root=repo_root)
+        if malformed_error is not None:
+            raise RuntimeError(malformed_error)
         for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
             matched = _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE.fullmatch(path.name)
             if matched is not None:
@@ -195,12 +230,6 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
                 continue
             if _DISCUSSION_DOC_LEGACY_FILENAME_RE.fullmatch(path.name) is not None:
                 continue
-            if _is_malformed_discussion_doc_candidate(path):
-                raise RuntimeError(
-                    "Malformed discussion document filename under "
-                    f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
-                    f"{path.name}. {_format_discussion_filename_expectation()}"
-                )
         duplicate_standard_slots = sorted(slot for slot, paths in by_standard_slot.items() if len(paths) > 1)
         if duplicate_standard_slots:
             dup_slot = duplicate_standard_slots[0]

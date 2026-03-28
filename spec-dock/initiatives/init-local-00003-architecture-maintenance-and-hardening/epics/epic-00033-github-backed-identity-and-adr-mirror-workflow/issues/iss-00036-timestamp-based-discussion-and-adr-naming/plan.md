@@ -27,6 +27,7 @@ ID: "iss-00036"
   - `adr / disc / research / note` を同一 timestamp-prefix contract に統一する
   - 原本は常に `discussions/` に置く
   - pre-contract sequential docs は grandfathered として残し、自動 rename しない
+  - malformed / duplicate discussion filename は create / validate / `doctor` で同じ分類境界と remediation を共有する
   - `sync` の mirror 本体変更は行わない
 
 ## マイルストーン一覧
@@ -37,9 +38,9 @@ ID: "iss-00036"
     - `new doc` が 4 type すべてで timestamp-prefix basename を生成し、same scope / same `ts` collision を create lock 内の suffix 選択で吸収できる
 - M2:
   - 対象:
-    - validation / docs boundary / parity
+    - validation / doctor / docs boundary / parity
   - exit:
-    - validate と docs/test expectation が新 naming contract に揃う
+    - validate / `doctor` と docs/test expectation が新 naming contract に揃う
 
 ## ステップ一覧
 - S01:
@@ -61,12 +62,12 @@ ID: "iss-00036"
     - collision-focused CLI/application regressions が green
 - S03:
   - 観測可能な振る舞い:
-    - validate が新 timestamp contract を検査し、legacy sequential docs は grandfathered、malformed discussion-doc candidate は error、unrelated file は ignore として扱う
+    - validate / `doctor` が新 timestamp contract を同じ分類境界で扱い、legacy sequential docs は grandfathered、malformed / duplicate discussion-doc candidate は explicit error / remediation、unrelated file は ignore として扱う
   - closes:
     - AC-003
     - EC-002
   - review gate:
-    - validate / legacy boundary tests が green で、docs evidence は S90 に委譲されている
+    - validate / doctor / legacy boundary tests が green で、docs evidence は S90 に委譲されている
 - S90:
   - 観測可能な振る舞い:
     - naming docs / workflow docs / rules docs が 4 type timestamp contract に揃う
@@ -83,7 +84,7 @@ ID: "iss-00036"
     - AC-003
     - AC-004
   - review gate:
-    - spec review / implementation review / QA review pass
+    - exact snapshot evidence と reviewer truth が report に一致している
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S01
@@ -100,12 +101,12 @@ ID: "iss-00036"
   - timing:
     - S02 後、S03 後
   - scope:
-    - allocator / validation boundary の layering と contract drift 有無
+    - allocator / validation / doctor boundary の layering と contract drift 有無
 - QG1 QA review:
   - timing:
     - S03 後
   - scope:
-    - timestamp collision / legacy grandfathering / validate coverage
+    - timestamp collision / legacy grandfathering / validate-doctor coverage / corruption-path hardening
 - SG1 spec review:
   - timing:
     - design/plan 固定時と S99 前
@@ -239,52 +240,58 @@ ID: "iss-00036"
 
 ### S03 — validate aligns with timestamp grammar and legacy grandfathering
 - target:
-  - validate が新 grammar を検査し、legacy sequential docs / malformed discussion-doc candidate / unrelated file の境界を固定する
+  - validate / `doctor` が新 grammar を共有し、legacy sequential docs / malformed or duplicate discussion-doc candidate / unrelated file の境界と post-lock corruption 対応を固定する
 - design refs:
-  - `design.md` の validation contract / legacy boundary
+  - `design.md` の validation contract / doctor contract / post-lock corruption guard contract
 - step boundary:
-  - validate logic、legacy classification、関連 tests に限定する。docs evidence は S90 へ分離する
+  - validate logic、doctor guidance mapping、legacy classification、関連 tests に限定する。docs evidence は S90 へ分離する
 
 #### B1 — validation grammar update
 - purpose:
-  - sequential duplicate validation を timestamp contract へ置き換え、legacy sequential は grandfathered、malformed discussion-doc candidate は explicit error、unrelated file は ignore に振り分ける
+  - sequential duplicate validation を timestamp contract へ置き換え、legacy sequential は grandfathered、malformed / duplicate discussion-doc candidate は explicit error / remediation、unrelated file は ignore に振り分ける
 - files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py`
+  - `tests/cli_runtime/test_runtime_doctor_s04.py`
   - `tests/cli_runtime/test_validate.py`
   - `tests/cli_runtime/test_runtime_new_doc_s09.py`
   - `tests/cli_runtime/test_new.py`
 
 ##### I1 — timestamp validation and grandfathering
 - slice goal:
-  - timestamp files は validate 対象、sequential legacy は grandfathered、discussion-doc intent を持つ malformed filename は error、unrelated nonconforming は ignore の境界を固定する
+  - timestamp files は validate 対象、sequential legacy は grandfathered、discussion-doc intent を持つ malformed / duplicate filename は explicit error / remediation、unrelated nonconforming は ignore の境界を固定する
 
 ###### Red
 - failing test:
   - timestamp malformed / malformed discussion-doc candidate / duplicate timestamp suffix / legacy sequential coexistence tests を追加
+  - `doctor` が malformed / duplicate discussion filename に validate-aligned remediation を返す test を追加
+  - create lock 後 corruption path で malformed / duplicate discussion filename を silent に吸収しない regression を追加
 - expected failure:
-  - 現行 validate は duplicate sequence だけを見ており、新 contract に一致しない
+  - 現行 validate / `doctor` は duplicate sequence 前提のままで、新 contract や corruption-path hardening に一致しない
 
 ###### Green
 - minimum implementation:
-  - validation parser を timestamp contract へ切り替え、legacy sequential / malformed candidate / unrelated file の判定を追加する
+  - validation parser を timestamp contract へ切り替え、legacy sequential / malformed / duplicate candidate / unrelated file の判定を追加する
+  - `doctor` remediation を validation classifier に揃え、post-lock corruption path を explicit failure へ接続する
 - pass condition:
-  - validate-related tests が green
+  - validate / doctor related tests が green
 
 ###### Refactor
 - cleanup target:
-  - filename parser 共通化、error message の安定化
+  - filename parser 共通化、error/remediation message の安定化
 - invariants to keep green:
   - rules.md 等の nonconforming files は ignore
   - timestamp-like / discussion-doc-like malformed filename は explicit error
   - grandfathered files を自動 rename しない
+  - create lock 後 corruption path でも silent fallback しない
 
 #### step gate
 - review:
-  - validate が新規 contract、grandfathered boundary、malformed candidate error、unrelated file ignore に整合している
+  - validate / `doctor` が新規 contract、grandfathered boundary、malformed / duplicate candidate error-remediation、unrelated file ignore、post-lock corruption hardeningに整合している
 - expected tests:
-  - `python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09`
+  - `python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09`
 - verification command:
-  - `python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09`
+  - `python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09`
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -308,25 +315,29 @@ ID: "iss-00036"
 ### S99 — final diff review quality gate
 - branch diff scope:
   - `new doc` naming create path
-  - validate
+  - validate / `doctor` guidance alignment
+  - malformed / duplicate discussion corruption-path hardening（post-lock guard を含む）
   - naming/workflow docs
   - relevant tests / parity tests
+  - canonical active-issue evidence update（exact final diff/status snapshot と reviewer truth）
 - required validation:
+  - `python -m unittest tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_new`
   - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate`
-  - 必要なら `python -m unittest tests.test_init_update`
+  - `python -m unittest tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_validate`
+  - `python -m unittest tests.test_init_update`
   - `./spec-dock/scripts/spec-dock validate`
   - `./spec-dock/scripts/spec-dock sync --github`
 - reviewer approvals:
-  - spec review `pass`
-  - implementation/code review `pass`
-  - QA review `pass`
+  - `report.md` に `git --no-pager diff --stat` と `git --no-pager status --short` の exact snapshot evidence を残す
+  - reviewer outcome は exact snapshot に対する latest truth を記録し、rerun 前の stale pass を current-snapshot pass として書かない
+  - spec review / implementation review / QA review の最新 verdict と pending rerun の有無を明示する
 
 ## final exit contract
 - AC/EC 達成:
   - 4 type discussion doc family が timestamp-prefix naming に統一されている
   - same-second collisions が suffix で吸収される
   - suffix exhaustion は explicit failure として扱われる
-  - validate が新 contract と grandfathered boundary に整合する
+  - validate / `doctor` が新 contract と grandfathered boundary に整合し、post-lock corruption hardening が drift していない
 - docs impact resolved:
   - naming / workflow / rules docs が provider と dogfooding で一致している
 - final diff approved:

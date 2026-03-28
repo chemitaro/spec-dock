@@ -23,7 +23,7 @@ from ..domain.ids import (
 )
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
-from ..domain.validation import validate_graph_and_deps
+from ..domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
 from ..infra.contracts import StoredMetaRecord
 from .contracts import (
     CreateDiscussionDocRequest,
@@ -281,7 +281,10 @@ def _post_write_duplicate_guard(ports: Ports, *, node_id: str) -> None:
         raise RuntimeError(f"post-write duplicate guard failed: created id not found: {node_id}")
 
 
-def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
+def _scan_discussion_timestamp_duplicate_state(discussions_dir: Path) -> tuple[str | None, set[str]]:
+    malformed_error = find_malformed_discussion_doc_filename_error(discussions_dir)
+    if malformed_error is not None:
+        return malformed_error, set()
     refs = _scan_discussion_timestamp_sources(discussions_dir)
     by_standard_slot: dict[str, list[Path]] = {}
     by_suffix_slot: dict[tuple[str, int], list[Path]] = {}
@@ -298,23 +301,48 @@ def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str
     if duplicate_standard_slots:
         dup_slot = duplicate_standard_slots[0]
         files = ", ".join(path.name for path in sorted(by_standard_slot[dup_slot], key=lambda p: p.as_posix()))
-        raise RuntimeError(
-            "post-write duplicate guard failed: "
-            f"Duplicate discussion timestamp slot detected under {discussions_dir}: slot={dup_slot} files=[{files}]"
+        return (
+            f"Duplicate discussion timestamp slot detected under {discussions_dir}: "
+            f"slot={dup_slot} files=[{files}]",
+            doc_ids,
         )
+
     duplicate_suffix_slots = sorted(slot for slot, paths in by_suffix_slot.items() if len(paths) > 1)
     if duplicate_suffix_slots:
         dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
         files = ", ".join(
             path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
         )
-        raise RuntimeError(
-            "post-write duplicate guard failed: "
+        return (
             f"Duplicate discussion timestamp suffix detected under {discussions_dir}: "
-            f"slot={dup_timestamp}-{dup_suffix:02d} files=[{files}]"
+            f"slot={dup_timestamp}-{dup_suffix:02d} files=[{files}]",
+            doc_ids,
         )
+    return None, doc_ids
+
+
+def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
+    duplicate_error, doc_ids = _scan_discussion_timestamp_duplicate_state(discussions_dir)
+    if duplicate_error is not None:
+        raise RuntimeError(f"post-write duplicate guard failed: {duplicate_error}")
     if doc_id not in doc_ids:
         raise RuntimeError(f"post-write duplicate guard failed: created discussion id not found: {doc_id}")
+
+
+def _preflight_discussion_duplicate_guard(
+    req: CreateDiscussionDocRequest,
+    ports: Ports,
+    *,
+    specdock_dir: Path,
+) -> None:
+    lock_path = _resolve_create_lock_path(specdock_dir)
+    if lock_path.exists():
+        return
+    graph = load_graph(ports, validate=False)
+    discussions_dir = _resolve_scope_node(req, graph).path / "discussions"
+    duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(discussions_dir)
+    if duplicate_error is not None:
+        raise RuntimeError(duplicate_error)
 
 
 def _resolve_specdock_dir(ports: Ports) -> Path:
@@ -1152,6 +1180,7 @@ def plan_discussion_doc(
 def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult:
     template_scaffolder = _resolve_template_scaffolder(ports)
     specdock_dir = _resolve_specdock_dir(ports)
+    _preflight_discussion_duplicate_guard(req, ports, specdock_dir=specdock_dir)
     lock_path, lock_token = _acquire_create_lock(specdock_dir)
     result: CreateDiscussionDocResult | None = None
     body_error: Exception | None = None
@@ -1161,6 +1190,9 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
         today = _format_discussion_date(now_iso)
         timestamp = _format_discussion_timestamp(now_iso)
         template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today, timestamp=timestamp)
+        duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(dest_path.parent)
+        if duplicate_error is not None:
+            raise RuntimeError(duplicate_error)
 
         template_text = template_scaffolder.load_template_text(template_path)
         rendered_text = template_scaffolder.render_text(template_text, replacements)

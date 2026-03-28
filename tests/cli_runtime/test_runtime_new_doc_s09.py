@@ -124,6 +124,12 @@ class _StubIssueGateway:
         return 999
 
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
+
+
 class _StubClock:
     def now_iso(self):
         return "2026-03-12T01:02:03+00:00"
@@ -133,6 +139,9 @@ class _StubClock:
 
 
 class TestRuntimeNewDocS09(unittest.TestCase):
+    def _create_lock_path(self, specdock_dir: Path) -> Path:
+        return specdock_dir / "system" / ".runtime" / "create.lock"
+
     def _prepare_discussion_templates(self, specdock_dir: Path) -> None:
         templates_dir = specdock_dir / "templates" / "discussions"
         templates_dir.mkdir(parents=True, exist_ok=True)
@@ -166,6 +175,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             node_repo=_StubNodeRepo(records),
             template_scaffolder=_StubTemplateScaffolder(events=events),
             issue_gateway=_StubIssueGateway(),
+            git_gateway=_StubGitGateway(),
             clock=_StubClock(),
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
@@ -228,7 +238,6 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             (discussions_dir / "foo.md").write_text("nonconforming\n", encoding="utf-8")
             (discussions_dir / "002-bogus-random.md").write_text("nonconforming type\n", encoding="utf-8")
             (discussions_dir / "009-disc-migrated.md").write_text("existing\n", encoding="utf-8")
-            (discussions_dir / "20260312t010203z-00-disc-malformed.md").write_text("ignored malformed\n", encoding="utf-8")
             (discussions_dir / "1000-adr-legacy-overflow.md").write_text("ignored\n", encoding="utf-8")
 
             template_path, dest_path, replacements = app_create_node.plan_discussion_doc(
@@ -345,6 +354,277 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             self.assertEqual(events, [])
             self.assertEqual(list(discussions_dir.glob("20260312t010203z-*-note-*.md")), [])
 
+    def test_duplicate_timestamp_corruption_fail_fast_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            events: list[str] = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-disc-second.md").write_text("second\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp slot detected"):
+                app_create_node.create_discussion_doc(
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type="note",
+                        scope_node_id="iss-local-00001",
+                        title="Note one",
+                        slug=None,
+                    ),
+                    ports,
+                )
+
+            self.assertEqual(events, [])
+            lock_path = self._create_lock_path(specdock_dir)
+            self.assertFalse(lock_path.exists())
+            self.assertFalse(lock_path.parent.exists())
+            self.assertEqual(
+                sorted(path.name for path in discussions_dir.glob("*.md")),
+                [
+                    "20260312t010203z-adr-first.md",
+                    "20260312t010203z-disc-second.md",
+                ],
+            )
+
+    def test_duplicate_timestamp_suffix_corruption_fail_fast_no_lock_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            events: list[str] = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260312t010203z-01-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-01-disc-second.md").write_text("second\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp suffix detected"):
+                app_create_node.create_discussion_doc(
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type="note",
+                        scope_node_id="iss-local-00001",
+                        title="Note one",
+                        slug=None,
+                    ),
+                    ports,
+                )
+
+            self.assertEqual(events, [])
+            lock_path = self._create_lock_path(specdock_dir)
+            self.assertFalse(lock_path.exists())
+            self.assertFalse(lock_path.parent.exists())
+            self.assertEqual(
+                sorted(path.name for path in discussions_dir.glob("*.md")),
+                [
+                    "20260312t010203z-01-adr-first.md",
+                    "20260312t010203z-01-disc-second.md",
+                ],
+            )
+
+    def test_duplicate_timestamp_corruption_post_lock_rescan_fail_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            events: list[str] = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            first_name = "20260312t010203z-adr-first.md"
+            second_name = "20260312t010203z-disc-second.md"
+            lock_path = self._create_lock_path(specdock_dir)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_text(app_create_node._build_create_lock_metadata("holder"), encoding="utf-8")
+            self.assertTrue(lock_path.exists())
+
+            scan_snapshots: list[list[str]] = []
+            original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
+
+            def _wrapped_scan(target_dir):
+                scan_snapshots.append(sorted(path.name for path in target_dir.glob("*.md")))
+                return original_scan(target_dir)
+
+            def _release_and_corrupt() -> None:
+                time.sleep(0.1)
+                (discussions_dir / first_name).write_text("first\n", encoding="utf-8")
+                (discussions_dir / second_name).write_text("second\n", encoding="utf-8")
+                lock_path.unlink()
+
+            worker = threading.Thread(target=_release_and_corrupt)
+            worker.start()
+            try:
+                with patch.object(
+                    app_create_node,
+                    "_scan_discussion_timestamp_duplicate_state",
+                    side_effect=_wrapped_scan,
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp slot detected"):
+                        app_create_node.create_discussion_doc(
+                            app_contracts.CreateDiscussionDocRequest(
+                                doc_type="note",
+                                scope_node_id="iss-local-00001",
+                                title="Note one",
+                                slug=None,
+                            ),
+                            ports,
+                        )
+            finally:
+                worker.join(timeout=5.0)
+            self.assertFalse(worker.is_alive(), "lock release worker did not finish")
+
+            self.assertEqual(scan_snapshots, [[first_name, second_name]])
+            self.assertEqual(events, [])
+            self.assertFalse(lock_path.exists())
+            self.assertEqual(
+                sorted(path.name for path in discussions_dir.glob("*.md")),
+                [first_name, second_name],
+            )
+
+    def test_malformed_discussion_candidate_fail_fast_pre_lock_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        cases = (
+            "20260312t010203z-adr.md",
+            "foo-adr-kickoff.md",
+            "bogus-01-adr-kickoff.md",
+        )
+        for malformed_name in cases:
+            with self.subTest(malformed_name=malformed_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    specdock_dir = repo_root / "spec-dock"
+                    self._prepare_discussion_templates(specdock_dir)
+                    issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+                    events: list[str] = []
+                    ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+
+                    discussions_dir = Path(issue_record.path) / "discussions"
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
+
+                    with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
+                        app_create_node.create_discussion_doc(
+                            app_contracts.CreateDiscussionDocRequest(
+                                doc_type="note",
+                                scope_node_id="iss-local-00001",
+                                title="Note one",
+                                slug=None,
+                            ),
+                            ports,
+                        )
+
+                    self.assertEqual(events, [])
+                    lock_path = self._create_lock_path(specdock_dir)
+                    self.assertFalse(lock_path.exists())
+                    self.assertFalse(lock_path.parent.exists())
+                    self.assertEqual(sorted(path.name for path in discussions_dir.glob("*.md")), [malformed_name])
+
+    def test_malformed_timestamp_intent_variant_fail_fast_pre_lock_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            events: list[str] = []
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+
+            discussions_dir = Path(issue_record.path) / "discussions"
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            malformed_name = "20260329x-adr-kickoff.md"
+            (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
+                app_create_node.create_discussion_doc(
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type="note",
+                        scope_node_id="iss-local-00001",
+                        title="Note one",
+                        slug=None,
+                    ),
+                    ports,
+                )
+
+            self.assertEqual(events, [])
+            lock_path = self._create_lock_path(specdock_dir)
+            self.assertFalse(lock_path.exists())
+            self.assertFalse(lock_path.parent.exists())
+            self.assertEqual(sorted(path.name for path in discussions_dir.glob("*.md")), [malformed_name])
+
+    def test_malformed_discussion_candidate_post_lock_rescan_fail_no_write(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        cases = (
+            "20260329x-adr-kickoff.md",
+            "foo-adr-kickoff.md",
+            "bogus-01-adr-kickoff.md",
+        )
+        for malformed_name in cases:
+            with self.subTest(malformed_name=malformed_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    specdock_dir = repo_root / "spec-dock"
+                    self._prepare_discussion_templates(specdock_dir)
+                    issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+                    events: list[str] = []
+                    ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record], events=events)
+
+                    discussions_dir = Path(issue_record.path) / "discussions"
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    lock_path = self._create_lock_path(specdock_dir)
+                    lock_path.parent.mkdir(parents=True, exist_ok=True)
+                    lock_path.write_text(app_create_node._build_create_lock_metadata("holder"), encoding="utf-8")
+                    self.assertTrue(lock_path.exists())
+
+                    scan_snapshots: list[list[str]] = []
+                    original_scan = app_create_node._scan_discussion_timestamp_duplicate_state
+
+                    def _wrapped_scan(target_dir):
+                        scan_snapshots.append(sorted(path.name for path in target_dir.glob("*.md")))
+                        return original_scan(target_dir)
+
+                    def _release_and_corrupt() -> None:
+                        time.sleep(0.1)
+                        (discussions_dir / malformed_name).write_text("broken\n", encoding="utf-8")
+                        lock_path.unlink()
+
+                    worker = threading.Thread(target=_release_and_corrupt)
+                    worker.start()
+                    try:
+                        with patch.object(
+                            app_create_node,
+                            "_scan_discussion_timestamp_duplicate_state",
+                            side_effect=_wrapped_scan,
+                        ):
+                            with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
+                                app_create_node.create_discussion_doc(
+                                    app_contracts.CreateDiscussionDocRequest(
+                                        doc_type="note",
+                                        scope_node_id="iss-local-00001",
+                                        title="Note one",
+                                        slug=None,
+                                    ),
+                                    ports,
+                                )
+                    finally:
+                        worker.join(timeout=5.0)
+                    self.assertFalse(worker.is_alive(), "lock release worker did not finish")
+
+                    self.assertEqual(scan_snapshots, [[malformed_name]])
+                    self.assertEqual(events, [])
+                    self.assertFalse(lock_path.exists())
+                    self.assertEqual(sorted(path.name for path in discussions_dir.glob("*.md")), [malformed_name])
+
     def test_parallel_new_doc_allocates_unique_suffixes(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -460,7 +740,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     slug=None,
                     parent_id="epic-local-00001",
                     requested_node_id=None,
-                    github_mode="local_only",
+                    github_mode="create",
                     github_issue_number=None,
                 ),
                 ports,
