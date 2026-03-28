@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+_UNSET = object()
+
 
 def _runtime_modules():
     runtime_scripts_dir = (
@@ -405,9 +407,13 @@ class TestRuntimeImportS10(unittest.TestCase):
         artifact_writer,
         events=None,
         issue_gateway=None,
-        git_gateway=None,
+        git_gateway=_UNSET,
     ):
         self._materialize_required_artifacts(store.load())
+        if git_gateway is _UNSET:
+            resolved_git_gateway = _StubGitGateway("current/repo")
+        else:
+            resolved_git_gateway = git_gateway
         return app_ports.Ports(
             node_reader=_StubNodeReader(store),
             node_repo=_StubNodeRepo(store, events=events),
@@ -418,7 +424,7 @@ class TestRuntimeImportS10(unittest.TestCase):
             derived_state_reader=_StubDerivedStateReader(),
             artifact_writer=artifact_writer,
             clock=_DummyClock(),
-            git_gateway=git_gateway,
+            git_gateway=resolved_git_gateway,
             repo_root=specdock_dir.parent,
             specdock_dir=specdock_dir,
         )
@@ -955,6 +961,58 @@ class TestRuntimeImportS10(unittest.TestCase):
                     self.assertEqual(events, [])
                     self.assertEqual(git_gateway.origin_calls, [str(specdock_dir.parent)])
                     self.assertEqual(len(store.load()), 2)
+
+    def test_import_numeric_target_rejects_when_current_repo_unknown_without_writes(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_import_node,
+            app_ports,
+            domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            specdock_dir = Path(tmp) / "spec-dock"
+            self._prepare_templates(specdock_dir)
+            store = _NodeStore(self._base_records(infra_contracts, specdock_dir))
+            events: list[str] = []
+            issue_gateway = _StubIssueGateway(domain_models)
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                store=store,
+                domain_models=domain_models,
+                infra_contracts=infra_contracts,
+                active_manifest=self._active_manifest(infra_contracts),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                events=events,
+                issue_gateway=issue_gateway,
+                git_gateway=_StubGitGateway(None),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "Current GitHub repo scope could not be resolved from origin"):
+                app_import_node.import_issue(
+                    app_contracts.ImportNodeRequest(
+                        issue_number=123,
+                        title="Imported issue",
+                        slug=None,
+                        parent_id="epic-local-00001",
+                        target_repo_owner=None,
+                        target_repo_name=None,
+                        allow_foreign_url=False,
+                    ),
+                    ports,
+                )
+
+            self.assertEqual(events, [])
+            self.assertEqual(issue_gateway.view_calls, [])
+            self.assertEqual(
+                sum(1 for record in store.load() if record.id == "iss-00123"),
+                0,
+            )
+            self.assertEqual(sum(1 for record in store.load() if record.id == "iss-local-00001"), 0)
 
     def test_no_write_preflight_collision_regression(self) -> None:
         (

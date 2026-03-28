@@ -1036,6 +1036,48 @@ class TestCliImport(CliRuntimeHarness):
 
             self.assertEqual(sorted(issues_dir.glob("*-current-issue")), [])
 
+    def test_import_numeric_target_rejects_when_current_repo_unknown_without_writes(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
+            self._run_git(target, ["remote", "remove", "origin"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            issues_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+            )
+            p = self._run_runtime_capture(
+                target,
+                [
+                    "import",
+                    "issue",
+                    "123",
+                    "--title",
+                    "Imported issue",
+                    "--epic",
+                    "epic-00002",
+                ],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Current GitHub repo scope could not be resolved from origin", p.stderr)
+            self.assertEqual(sorted(issues_dir.glob("*-imported-issue")), [])
+
     def test_import_rejects_foreign_repo_when_current_repo_is_resolved(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
