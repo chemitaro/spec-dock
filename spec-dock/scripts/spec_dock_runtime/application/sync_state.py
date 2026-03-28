@@ -10,7 +10,7 @@ from ..domain.deps import build_deps_state, build_effective_deps_map, evaluate_r
 from ..domain.models import ActiveSelection, DepsEvaluation, DepsState, IssueSnapshot, NodeId, SpecNodeKind, SpecNodeSeed
 from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
 from ..domain.tree import build_graph, select_active_chain
-from ..domain.validation import validate_graph_and_deps
+from ..domain.validation import find_github_repo_scope_pairing_error, validate_graph_and_deps
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from ..presentation.contracts import ArtifactBundle
 from ..presentation.json_state import (
@@ -188,13 +188,18 @@ def collect_sync_state(
         issue_depends_on_map=None,
         repo_root=ports.repo_root,
         current_repo_slug=current_repo_slug,
+        enforce_github_mandatory_linkage=False,
     )
+    github_repo_scope_pairing_error = find_github_repo_scope_pairing_error(graph, repo_root=ports.repo_root)
     if validation.errors:
+        validation_error = validation.errors[0]
+        if github_repo_scope_pairing_error is not None:
+            raise RuntimeError(f"preflight validate failed: {github_repo_scope_pairing_error}")
         if req.force:
-            deps_preflight_error = f"preflight validate failed: {validation.errors[0]}"
+            deps_preflight_error = f"preflight validate failed: {validation_error}"
             _append_unique(warnings, "deps_preflight_failed")
         else:
-            raise RuntimeError(f"preflight validate failed: {validation.errors[0]}")
+            raise RuntimeError(f"preflight validate failed: {validation_error}")
     else:
         try:
             validate_required_artifacts_for_graph(graph, repo_root=ports.repo_root)
@@ -216,6 +221,7 @@ def collect_sync_state(
                     issue_depends_on_map=issue_depends_on_map,
                     repo_root=ports.repo_root,
                     current_repo_slug=current_repo_slug,
+                    enforce_github_mandatory_linkage=False,
                 )
                 effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
                 validate_deps_cycles(effective_deps_map)
