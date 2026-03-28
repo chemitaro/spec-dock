@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,17 @@ class TestCliNew(CliRuntimeHarness):
         self._run_runtime(
             target,
             ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--github-issue", "3"],
+        )
+
+    def _write_runtime_clock(self, target: Path, *, now_iso: str, today: str) -> None:
+        runtime_clock = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "clock.py"
+        runtime_clock.write_text(
+            (
+                "from __future__ import annotations\n\n"
+                f"def now_iso() -> str:\n    return {now_iso!r}\n\n"
+                f"def today() -> str:\n    return {today!r}\n"
+            ),
+            encoding="utf-8",
         )
 
     def test_new_rejects_duplicate_id_with_flag(self) -> None:
@@ -318,8 +330,16 @@ class TestCliNew(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target)
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision two"])
+            p_one = self._run_runtime_capture(
+                target,
+                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
+            )
+            p_two = self._run_runtime_capture(
+                target,
+                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision two"],
+            )
+            self.assertEqual(p_one.returncode, 0, p_one.stdout + p_one.stderr)
+            self.assertEqual(p_two.returncode, 0, p_two.stdout + p_two.stderr)
 
             issue_dir = (
                 target
@@ -332,8 +352,14 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            self.assertNotEqual(sorted(discussions_dir.glob("001-adr-*.md")), [])
-            self.assertNotEqual(sorted(discussions_dir.glob("002-adr-*.md")), [])
+            created_one = sorted(discussions_dir.glob("*-adr-decision-one.md"))
+            created_two = sorted(discussions_dir.glob("*-adr-decision-two.md"))
+            self.assertEqual(len(created_one), 1)
+            self.assertEqual(len(created_two), 1)
+            self.assertRegex(created_one[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
+            self.assertRegex(created_two[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-two\.md$")
+            self.assertRegex(p_one.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b")
+            self.assertRegex(p_two.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b")
             self.assertEqual(list(issue_dir.glob("adrs")), [])
 
     def test_new_doc_scope_shorthand_resolves_local_ids(self) -> None:
@@ -364,11 +390,11 @@ class TestCliNew(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
-            self.assertNotEqual(sorted((init_dir / "discussions").glob("001-note-*.md")), [])
-            self.assertNotEqual(sorted((epic_dir / "discussions").glob("001-note-*.md")), [])
-            self.assertNotEqual(sorted((issue_dir / "discussions").glob("001-note-*.md")), [])
+            self.assertEqual(len(sorted((init_dir / "discussions").glob("*-note-initiative-note.md"))), 1)
+            self.assertEqual(len(sorted((epic_dir / "discussions").glob("*-note-epic-note.md"))), 1)
+            self.assertEqual(len(sorted((issue_dir / "discussions").glob("*-note-issue-note.md"))), 1)
 
-    def test_new_doc_adr_uses_shared_sequence_across_discussion_types(self) -> None:
+    def test_new_doc_uses_timestamp_family_across_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -389,18 +415,45 @@ class TestCliNew(CliRuntimeHarness):
                 / "iss-00003-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
-            self.assertNotEqual(sorted(discussions_dir.glob("001-disc-*.md")), [])
-            self.assertNotEqual(sorted(discussions_dir.glob("002-adr-*.md")), [])
-            self.assertNotEqual(sorted(discussions_dir.glob("003-research-*.md")), [])
-            self.assertNotEqual(sorted(discussions_dir.glob("004-note-*.md")), [])
+            self.assertEqual(len(sorted(discussions_dir.glob("*-disc-discussion-one.md"))), 1)
+            self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 1)
+            self.assertEqual(len(sorted(discussions_dir.glob("*-research-research-one.md"))), 1)
+            self.assertEqual(len(sorted(discussions_dir.glob("*-note-note-one.md"))), 1)
 
-    def test_new_doc_disc_increments_after_adr(self) -> None:
+    def test_new_doc_stdout_uses_slugless_id_and_discussions_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target)
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"])
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+            self.assertRegex(
+                p.stdout,
+                (
+                    r"spec-dock: ok \(new doc\) type=disc "
+                    r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc "
+                    r"scope=iss-00003 "
+                    r"path=spec-dock/.*/discussions/[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-discussion-one\.md"
+                ),
+            )
+            self.assertNotIn("discussion-one", re.search(r"id=([^\s]+)", p.stdout).group(1))
+
+    def test_new_doc_renders_body_date_from_same_utc_instant_as_doc_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target)
+            self._write_runtime_clock(
+                target,
+                now_iso="2026-03-12T00:30:00+00:00",
+                today="2026-03-11",
+            )
+
+            self._run_runtime(target, ["new", "doc", "note", "--issue", "iss-00003", "--title", "UTC date check"])
 
             issue_dir = (
                 target
@@ -412,11 +465,12 @@ class TestCliNew(CliRuntimeHarness):
                 / "issues"
                 / "iss-00003-add-refresh-token"
             )
-            discussions_dir = issue_dir / "discussions"
-            self.assertNotEqual(sorted(discussions_dir.glob("001-adr-*.md")), [])
-            self.assertNotEqual(sorted(discussions_dir.glob("002-disc-*.md")), [])
+            created = issue_dir / "discussions" / "20260312t003000z-note-utc-date-check.md"
+            self.assertTrue(created.is_file())
+            self.assertIn("2026-03-12", created.read_text(encoding="utf-8"))
+            self.assertNotIn("2026-03-11", created.read_text(encoding="utf-8"))
 
-    def test_new_doc_ignores_nonconforming_files_for_sequence(self) -> None:
+    def test_new_doc_ignores_nonconforming_files_for_timestamp_allocation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -441,10 +495,10 @@ class TestCliNew(CliRuntimeHarness):
 
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
 
-            self.assertNotEqual(sorted(discussions_dir.glob("010-adr-*.md")), [])
+            self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 1)
             self.assertEqual(list(discussions_dir.glob("001-adr-*.md")), [])
 
-    def test_new_doc_fails_on_duplicate_sequence(self) -> None:
+    def test_new_doc_preserves_legacy_files_without_reusing_sequence_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -464,43 +518,10 @@ class TestCliNew(CliRuntimeHarness):
             (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
 
-            p = self._run_runtime_capture(
-                target,
-                ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"],
-            )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate discussion sequence", p.stderr)
-            self.assertEqual(list(discussions_dir.glob("002-note-*.md")), [])
-
-    def test_new_doc_fails_on_sequence_overflow(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            self.assertEqual(main(["init", str(target)]), 0)
-            self._create_same_repo_linked_hierarchy(target)
-
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            discussions_dir = issue_dir / "discussions"
-            (discussions_dir / "999-disc-capacity-limit.md").write_text("maxed\n", encoding="utf-8")
-
-            p = self._run_runtime_capture(
-                target,
-                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
-            )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Discussion sequence overflow", p.stderr)
-            self.assertIn("follow-up issue", p.stderr)
-            self.assertIn("archive", p.stderr)
-            self.assertIn("extend sequence width", p.stderr)
-            self.assertEqual(list(discussions_dir.glob("1000-adr-*.md")), [])
+            p = self._run_runtime_capture(target, ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertRegex(p.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-note\b")
+            self.assertEqual(len(sorted(discussions_dir.glob("*-note-note-one.md"))), 1)
 
     def test_new_doc_rejects_invalid_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
