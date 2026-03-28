@@ -42,7 +42,7 @@ Issue は実装の最小単位です。
 ## spec authoring
 
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
-- `discussions/`: `new doc {adr|disc|research|note} --issue <issue-id> --title "..."`
+- `discussions/`: `new doc {adr|disc|research|note} --issue <issue-id> --title "..."` で、この issue の `discussions/` 配下に timestamp-prefixed original を作成する。標準形は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - shared な書き方は `phase_*.md`、Issue plan の構造化は `phase_plan_issue.md`、Issue 固有の実行 policy はこの workflow を正本とする
 
 ## 実行 contract
