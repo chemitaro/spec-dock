@@ -445,12 +445,13 @@ ID: "iss-00034"
 - expected tests:
   - `tests/cli_runtime/test_import.py`
   - `tests/cli_runtime/test_runtime_import_s10.py`
-  - `tests/test_init_update.py`
-  - relevant `new` / `validate` regressions
+  - relevant `new` regressions
 - verification command:
-  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.test_init_update tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
+  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
 - supporting checks:
   - `./spec-dock/scripts/spec-dock validate`
+- evidence note:
+  - `tests.test_init_update` は `iss-00034` acceptance gate には含めない。S04 strict reject correction とは独立した pre-existing baseline failures が残っており、この issue では cleanup scope に含めない。
 - observes:
   - AC-004、EC-004、および `iss-local-*` fallback 不在
 - report update:
@@ -487,10 +488,12 @@ ID: "iss-00034"
   - docs diff が boundary/canonical scope の最小更新に留まっていること
   - import / sync 関連ロジックへ不要な差分が入っていないこと
 - verification command:
-  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.test_init_update tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
+  - `python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08`
 - supporting checks:
   - `./spec-dock/scripts/spec-dock validate`（iss-00034 の create / validation boundary pre-guard に関する issue-specific supporting evidence。sync-generated artifact regeneration は scope 外のため `sync --github` は required evidence に含めない）
   - `git diff --stat`
+- evidence note:
+  - `tests.test_init_update` は unrelated baseline failures が未解消のため informational check に留め、S99 acceptance evidence には採用しない。
 - reviewer approvals:
   - implementation review
   - spec review
