@@ -5,7 +5,7 @@ ID: "iss-00034"
 関連GitHub: ["#34"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-28"
 依存: ["requirement.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -19,7 +19,7 @@ ID: "iss-00034"
 - MUST / MUST NOT:
   - MUST:
     - `new initiative` / `new epic` / `new issue` の実効 create mode を GitHub create / link_existing に揃える。
-    - `origin` remote から current GitHub `owner/repo` を一意解決し、`.meta.json` へ lowercase canonical basis で保存する。
+    - `origin` remote から current GitHub `owner/repo` を一意解決し、`.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` を lowercase canonical basis で保存する。
     - `origin` missing / non-GitHub remote / fetch-push mismatch / configured scope mismatch / cross-repo target を fail-fast にする。
   - MUST NOT:
     - initiative / epic / issue の local-only node を新規作成しない。
@@ -95,7 +95,7 @@ ID: "iss-00034"
     - SSH / HTTPS は同一 `owner/repo` へ正規化して比較する。
     - configured repo scope がある場合は canonical scope と一致必須。
   - persistence contract:
-    - `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` は lowercase canonical basis で保持する。
+    - `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` は lowercase canonical basis で保持する。
   - validation contract:
     - initiative / epic / issue に unscoped local-only node が存在する場合は validation error にする。
     - legacy mismatch は `new` では contract error、`validate` では validation error として non-zero を返す。
@@ -175,7 +175,7 @@ CreateNodeResult --> RepoScopeResolution
   - import / sync の主処理
 
 ## 要件 → 設計マッピング
-- AC-001 -> CLI default GitHub mode + `.meta.json` canonical repo scope persistence
+- AC-001 -> CLI default GitHub mode + `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence
 - AC-002 -> fail-closed `origin` resolver + first node binding + configured/cross-repo reject
 - AC-003 -> boundary docs diff + validation / migration tests の先行ガード
 - EC-001 -> `origin` missing failure path
@@ -192,7 +192,7 @@ CreateNodeResult --> RepoScopeResolution
   - `new initiative` / `new epic` / `new issue` の create contract
   - `new issue --github-issue <same-repo issue>` の same-repo success
   - `new initiative|epic|issue --no-github` の explicit reject
-  - `.meta.json` への `repo_owner` / `repo_name` persistence
+  - `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` persistence
   - `origin` missing / non-GitHub / fetch-push mismatch / configured mismatch / cross-repo reject
 - E2E / manual:
   - dogfooding repo 上で `active issue` の create contract を再確認する必要はあるが、本 issue では CLI / application tests を主証拠にする。
