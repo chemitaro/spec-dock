@@ -3,7 +3,7 @@
 ID: "iss-00036"
 タイトル: "Timestamp Based Discussion and ADR Naming"
 関連GitHub: ["#36"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "Codex CLI"
 最終更新: "2026-03-29"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -502,56 +502,285 @@ OK
 
 ---
 
-### 2026-03-27 HH:MM - HH:MM
+### 2026-03-29 03:06 - 03:20
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004
 
 #### 実施内容
-- ...
+- S99 の implementation snapshot は、discussion filename hardening の本体として create / validate / `doctor` の整合、malformed / duplicate filename guidance、repo-backed doctor malformed-filename regression、guidance timestamp-contract parity 修正までを含む 15 ファイル差分である。
+- latest final-gate review では 3 件の concrete blocker が残っていた: canonical report の exact snapshot evidence stale、shipped guidance contract が旧 sequential naming のまま、repo-backed doctor malformed filename regression 不足。
+- この report entry は次回 rerun 前の latest truth に合わせ、exact snapshot evidence を更新しつつ、guidance/doc parity と doctor regression 補強を current snapshot の一部として記録する。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git --no-pager diff --stat
 
-<result>
+spec-dock/active/issue/design.md 48 +++++--
+spec-dock/active/issue/plan.md 61 ++++----
+spec-dock/active/issue/report.md 96 ++++++++-----
+spec-dock/active/issue/requirement.md 20 ++-
+create_node dogfooding 202 +++++++++++++++++++-------
+doctor dogfooding 17 ++-
+validation dogfooding 147 ++++++++++++++++---
+create_node provider 48 +++++--
+doctor provider 17 ++-
+validation provider 41 +++++-
+test_new 63 ++++++++-
+test_runtime_doctor_s04 273 +++++++++++++++++++++++++-----------
+test_runtime_new_doc_s09 272 ++++++++++++++++++++++++++++++++++-
+test_validate 3 +
+test_init_update 3 +
+15 files changed, 1060 insertions(+), 251 deletions(-)
+
+git --no-pager status --short
+
+M spec-dock/active/issue/design.md
+M spec-dock/active/issue/plan.md
+M spec-dock/active/issue/report.md
+M spec-dock/active/issue/requirement.md
+M spec-dock/scripts/spec_dock_runtime/application/create_node.py
+M spec-dock/scripts/spec_dock_runtime/application/doctor.py
+M spec-dock/scripts/spec_dock_runtime/domain/validation.py
+M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
+M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py
+M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py
+M tests/cli_runtime/test_new.py
+M tests/cli_runtime/test_runtime_doctor_s04.py
+M tests/cli_runtime/test_runtime_new_doc_s09.py
+M tests/cli_runtime/test_validate.py
+M tests/test_init_update.py
+```
+
+- reviewer status against the exact snapshot above:
+  - `code_reviewer` `iss00036-code-review-s99-r8` -> latest recorded verdict は `pass` だが、current snapshot では canonical docs repair 後の rerun 未実施
+  - `qa_reviewer` `iss00036-qa-review-s99-r8` -> latest recorded verdict は `pass` だが、current snapshot では canonical docs repair 後の rerun 未実施
+  - `spec_reviewer` `iss00036-spec-review-s99-r6` -> `fail`（P1: canonical issue contract に doctor guidance / post-lock corruption hardening が未追跡、P1: canonical report に exact current diff/status evidence が欠落）。本修正後の rerun は未実施
+
+#### 変更したファイル
+- `spec-dock/active/issue/design.md` - canonical design snapshot in scope
+- `spec-dock/active/issue/plan.md` - canonical plan snapshot in scope
+- `spec-dock/active/issue/report.md` - canonical report snapshot in scope
+- `spec-dock/active/issue/requirement.md` - canonical requirement snapshot in scope
+- `spec-dock/scripts/spec_dock_runtime/application/create_node.py` - dogfooding runtime create-path hardening in scope
+- `spec-dock/scripts/spec_dock_runtime/application/doctor.py` - dogfooding runtime doctor guidance in scope
+- `spec-dock/scripts/spec_dock_runtime/domain/validation.py` - dogfooding runtime validation hardening in scope
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - provider runtime create-path hardening in scope
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py` - provider runtime doctor guidance in scope
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - provider runtime validation hardening in scope
+- `tests/cli_runtime/test_new.py` - CLI new-doc regression evidence in scope
+- `tests/cli_runtime/test_runtime_doctor_s04.py` - doctor regression evidence in scope
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - runtime new-doc / post-lock corruption regression evidence in scope
+- `tests/cli_runtime/test_validate.py` - validate regression evidence in scope
+- `tests/test_init_update.py` - parity/update regression evidence in scope
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- exact snapshot evidence は上記 15 ファイル差分に固定した。
+- current truth は「spec fail / code+QA latest recorded pass but exact-snapshot rerun pending」であり、final approval state ではない。
+- 次の reviewer rerun では、この canonical doc repair を含む snapshot に対して verdict を取り直す必要がある。
+
+---
+
+### 2026-03-29 03:21 - 03:32
+
+#### 対象
+- Step: S99 final gate review follow-up
+- AC/EC: AC-001, AC-002, AC-003, AC-004
+
+#### 実施内容
+- provider-side discussion filename validation を補強し、discussion doc-type token を含む malformed basename（例: `foo-adr-kickoff.md`, `bogus-01-adr-kickoff.md`）が validate / doctor / create pre-lock / create post-lock rescan の全経路で explicit failure になるようにした。dogfooding runtime も同内容へ更新した。
+- shipped `scripts/README.md` の guidance を provider / dogfooding mirror で更新し、`rules.md` のような unrelated files は ignore、legacy sequential docs は grandfathered、しかし malformed discussion filename candidates は explicit failure という runtime contract に揃えた。
+- regression coverage を `test_validate` / `test_new` / `test_runtime_new_doc_s09` / `test_runtime_doctor_s04` / `test_init_update` に追加し、review 指摘だった malformed filename candidates と shipped scripts README parity を固定した。
+- reviewer status の current truth を更新した: r10 QA は improvement findings 付きで pass、r10 code review は P1 runtime bug（malformed candidate 判定が狭い）と P2 shipped guidance drift で fail。今回の patch はその指摘を解消するもので、review rerun はまだ pending。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_new tests.test_init_update
+
+OK (137 tests)
+
+python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate
+
+OK (48 tests)
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=8
+
+git --no-pager diff --stat
+
+.../issues/iss-00036-timestamp-based-discussion-and-adr-naming/design.md    |  48 ++++--
+.../issues/iss-00036-timestamp-based-discussion-and-adr-naming/plan.md      |  61 ++++---
+.../issues/iss-00036-timestamp-based-discussion-and-adr-naming/report.md    | 179 ++++++++++++++++---
+.../iss-00036-timestamp-based-discussion-and-adr-naming/requirement.md      |  20 ++-
+spec-dock/scripts/README.md                                                 |  21 ++-
+spec-dock/scripts/spec_dock_runtime/application/create_node.py              | 202 ++++++++++++++++------
+spec-dock/scripts/spec_dock_runtime/application/doctor.py                   |  17 +-
+spec-dock/scripts/spec_dock_runtime/domain/validation.py                    | 147 ++++++++++++++--
+spec-dock/templates/README.md                                               |  13 +-
+src/spec_dock/assets/spec_dock/scripts/README.md                            |  21 ++-
+.../assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py   |  48 +++++-
+.../assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py        |  17 +-
+.../assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py         |  41 ++++-
+src/spec_dock/assets/spec_dock/templates/README.md                          |  13 +-
+tests/cli_runtime/harness.py                                                |  30 +++-
+tests/cli_runtime/test_new.py                                               |  70 +++++++-
+tests/cli_runtime/test_runtime_doctor_s04.py                                | 332 +++++++++++++++++++++++++++---------
+tests/cli_runtime/test_runtime_new_doc_s09.py                               | 284 +++++++++++++++++++++++++++++-
+tests/cli_runtime/test_validate.py                                          |   5 +
+tests/test_init_update.py                                                   |   4 +
+20 files changed, 1303 insertions(+), 270 deletions(-)
+
+git --no-pager status --short
+
+M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/design.md
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/plan.md
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/report.md
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/requirement.md
+ M spec-dock/scripts/README.md
+ M spec-dock/scripts/spec_dock_runtime/application/create_node.py
+ M spec-dock/scripts/spec_dock_runtime/application/doctor.py
+ M spec-dock/scripts/spec_dock_runtime/domain/validation.py
+ M spec-dock/templates/README.md
+ M src/spec_dock/assets/spec_dock/scripts/README.md
+ M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
+ M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py
+ M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py
+ M src/spec_dock/assets/spec_dock/templates/README.md
+ M tests/cli_runtime/harness.py
+ M tests/cli_runtime/test_new.py
+ M tests/cli_runtime/test_runtime_doctor_s04.py
+ M tests/cli_runtime/test_runtime_new_doc_s09.py
+ M tests/cli_runtime/test_validate.py
+ M tests/test_init_update.py
 ```
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - provider malformed discussion filename candidate 判定を review 指摘ケースまで拡張
+- `spec-dock/scripts/spec_dock_runtime/domain/validation.py` - dogfooding runtime parity 更新
+- `src/spec_dock/assets/spec_dock/scripts/README.md` - provider shipped guidance を runtime contract に同期
+- `spec-dock/scripts/README.md` - dogfooding shipped guidance parity 更新
+- `tests/cli_runtime/test_validate.py` - malformed `foo-adr-*` / `bogus-01-adr-*` validate regressions を追加
+- `tests/cli_runtime/test_new.py` - CLI new-doc が同 malformed candidates を reject することを固定
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - create pre-lock / post-lock malformed candidate regressions を拡張
+- `tests/cli_runtime/test_runtime_doctor_s04.py` - repo-backed doctor regression に同 malformed candidates を追加
+- `tests/test_init_update.py` - shipped `scripts/README.md` の provider↔dogfooding parity を enforcement 対象へ追加
+- `spec-dock/active/issue/report.md` - latest S99 snapshot / review status / verification evidence を更新
 
 #### コミット
-- <hash> <message>
+- なし（do not commit 指示のため未実施）
 
 #### メモ
-- ...
+- verification は user 指定の 3 コマンドをそのまま実行し、すべて green だった。
+- exact snapshot evidence（`git diff --stat` / `git status --short`）はこの entry の更新後に合わせて refresh している。final approval は未取得で、r10 findings 対応後の reviewer rerun が必要。
 
 ---
 
-### 2026-03-27 HH:MM - HH:MM
+### 2026-03-29 04:25 - 04:35
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S99 final gate review follow-up (template README / canonical report refresh)
+- AC/EC: AC-001, AC-002, AC-003, AC-004
 
 #### 実施内容
-- ...
+- `src/spec_dock/assets/spec_dock/templates/README.md` を runtime contract に同期し、discussion docs について「unrelated files は ignore」「legacy sequential docs は grandfathered」「discussion-doc intent を持つ malformed basename は explicit failure」を明記した。
+- `spec-dock/templates/README.md` を同内容へ更新し、provider asset と dogfooding mirror の guidance parity を維持した。
+- `tests/cli_runtime/harness.py` の discussion guidance contract assertion を強化し、`templates/README.md` / `scripts/README.md` の両方で unrelated-file guidance・legacy grandfathering・malformed explicit failure・代表例が必須になるようにして docs drift を再発防止した。
+- canonical report の latest S99 evidence を current exact snapshot に更新し、reviewer truth を r11 QA pass / r11 code pass（non-blocking docs finding は本 patch で解消済み）/ r7 spec fail（この patch 前は exact-snapshot closure evidence と reviewer truth refresh が未充足）へ揃えた。fresh rerun はまだ pending なので final approval は主張しない。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_runtime_doctor_s04 tests.cli_runtime.test_new tests.test_init_update
+
+Ran 137 tests in 15.772s
+OK
+
+python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate
+
+Ran 48 tests in 25.017s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=8
+
+./spec-dock/scripts/spec-dock sync --github
+
+spec-dock: sync: active unchanged (matched id in branch: iss-00036)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+git --no-pager diff --stat
+
+.../issues/iss-00036-timestamp-based-discussion-and-adr-naming/design.md    |  48 ++++--
+.../issues/iss-00036-timestamp-based-discussion-and-adr-naming/plan.md      |  61 ++++---
+.../issues/iss-00036-timestamp-based-discussion-and-adr-naming/report.md    | 279 +++++++++++++++++++++++++++---
+.../iss-00036-timestamp-based-discussion-and-adr-naming/requirement.md      |  20 ++-
+spec-dock/scripts/README.md                                                 |  21 ++-
+spec-dock/scripts/spec_dock_runtime/application/create_node.py              | 202 ++++++++++++++++------
+spec-dock/scripts/spec_dock_runtime/application/doctor.py                   |  17 +-
+spec-dock/scripts/spec_dock_runtime/domain/validation.py                    | 147 ++++++++++++++--
+spec-dock/templates/README.md                                               |  14 +-
+src/spec_dock/assets/spec_dock/scripts/README.md                            |  21 ++-
+.../assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py   |  48 +++++-
+.../assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py        |  17 +-
+.../assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py         |  41 ++++-
+src/spec_dock/assets/spec_dock/templates/README.md                          |  14 +-
+tests/cli_runtime/harness.py                                                |  58 ++++++-
+tests/cli_runtime/test_new.py                                               |  70 +++++++-
+tests/cli_runtime/test_runtime_doctor_s04.py                                | 332 +++++++++++++++++++++++++++---------
+tests/cli_runtime/test_runtime_new_doc_s09.py                               | 284 +++++++++++++++++++++++++++++-
+tests/cli_runtime/test_validate.py                                          |   5 +
+tests/test_init_update.py                                                   |   4 +
+20 files changed, 1433 insertions(+), 270 deletions(-)
+
+git --no-pager status --short
+
+M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/design.md
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/plan.md
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/report.md
+ M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/requirement.md
+ M spec-dock/scripts/README.md
+ M spec-dock/scripts/spec_dock_runtime/application/create_node.py
+ M spec-dock/scripts/spec_dock_runtime/application/doctor.py
+ M spec-dock/scripts/spec_dock_runtime/domain/validation.py
+ M spec-dock/templates/README.md
+ M src/spec_dock/assets/spec_dock/scripts/README.md
+ M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
+ M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py
+ M src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py
+ M src/spec_dock/assets/spec_dock/templates/README.md
+ M tests/cli_runtime/harness.py
+ M tests/cli_runtime/test_new.py
+ M tests/cli_runtime/test_runtime_doctor_s04.py
+ M tests/cli_runtime/test_runtime_new_doc_s09.py
+ M tests/cli_runtime/test_validate.py
+ M tests/test_init_update.py
+```
+
+- reviewer status against the exact snapshot above:
+  - `qa_reviewer` r11 -> `pass`（findings なし）。ただしこの template README / report refresh patch を含む exact snapshot への fresh rerun は未実施
+  - `code_reviewer` r11 -> `pass`。残っていた non-blocking docs drift finding（template README wording mismatch）は本 patch で解消済み。fresh rerun は未実施
+  - `spec_reviewer` r7 -> `fail`。理由はこの patch 前の canonical report が exact current snapshot の final-gate evidence と reviewer truth closure をまだ十分に示していなかったため。本 patch 後の rerun は未実施
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/templates/README.md` - provider template README を runtime filename contract に同期
+- `spec-dock/templates/README.md` - dogfooding mirror parity を維持
+- `tests/cli_runtime/harness.py` - README guidance contract assertion を強化して docs drift を検知
+- `spec-dock/active/issue/report.md` - latest S99 snapshot / verification evidence / reviewer truth を current exact snapshot に refresh
+
+#### コミット
+- なし（do not commit 指示のため未実施）
+
+#### メモ
+- test 追加は行っていないため件数は前回 final-gate rerun と同じく 137 tests / 48 tests のまま。
+- exact snapshot evidence は上記 `git diff --stat` / `git status --short` を current report 更新後の状態に合わせて refresh 済みである。
+- reviewer reruns はこの patch 適用後に取り直す必要があるため、issue closure / final approval はまだ pending。
 
 ---
-
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
-
-## 学んだこと (任意)
-- ...
-- ...
-
-## 今後の推奨事項 (任意)
-- ...
-- ...
 
 ## 省略/例外メモ (必須)
 - 該当なし
