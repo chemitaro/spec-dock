@@ -409,7 +409,8 @@ class TestCliImport(CliRuntimeHarness):
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("repository mismatch", p.stderr)
+            self.assertIn("foreign GitHub issue URL", p.stderr)
+            self.assertIn("single-repo", p.stderr)
             self.assertIn("--allow-foreign-url", p.stderr)
 
             issue_dir = (
@@ -425,7 +426,7 @@ class TestCliImport(CliRuntimeHarness):
             self.assertFalse(issue_dir.exists())
             self.assertFalse(log_path.exists())
 
-    def test_import_allows_foreign_repo_url_with_opt_in(self) -> None:
+    def test_import_rejects_foreign_repo_url_even_with_opt_in(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
@@ -436,7 +437,6 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_linked_parents(target)
             self._make_standard_parents_unscoped(target)
-            self._run_git(target, ["remote", "remove", "origin"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -458,11 +458,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (import issue)", p.stdout)
-            self.assertIn("github=#123", p.stdout)
-            log = log_path.read_text(encoding="utf-8")
-            self.assertIn("issue view 123 --json number,url --repo other/repo", log)
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("foreign GitHub issue URL", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("--allow-foreign-url", p.stderr)
 
             issue_dir = (
                 target
@@ -474,10 +473,8 @@ class TestCliImport(CliRuntimeHarness):
                 / "issues"
                 / "iss-00123-imported-issue"
             )
-            meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(meta["github"]["issue_number"], 123)
-            self.assertEqual(meta["github"]["repo_owner"], "other")
-            self.assertEqual(meta["github"]["repo_name"], "repo")
+            self.assertFalse(issue_dir.exists())
+            self.assertFalse(log_path.exists())
 
     def test_import_rejects_non_canonical_url_like_target(self) -> None:
         if os.name == "nt":
@@ -960,9 +957,10 @@ class TestCliImport(CliRuntimeHarness):
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("fail-closed", p.stderr)
-            self.assertIn("github linkage scope is ambiguous", p.stderr)
-            self.assertIn("github.issue_number=123", p.stderr)
+            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertIn("--allow-foreign-url", p.stderr)
 
             foreign_issue_dir = (
                 target
@@ -976,7 +974,7 @@ class TestCliImport(CliRuntimeHarness):
             )
             self.assertFalse(foreign_issue_dir.exists())
 
-    def test_new_rejects_same_issue_number_between_foreign_and_unscoped_when_current_repo_unknown(self) -> None:
+    def test_import_rejects_foreign_repo_when_current_repo_unknown_without_writes(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -992,7 +990,16 @@ class TestCliImport(CliRuntimeHarness):
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            self._run_runtime(
+            issues_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+            )
+            p = self._run_runtime_capture(
                 target,
                 [
                     "import",
@@ -1006,24 +1013,10 @@ class TestCliImport(CliRuntimeHarness):
                 ],
                 env=test_env,
             )
-
-            issues_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-            )
-            imported_foreign_dirs = sorted(issues_dir.glob("*-foreign-issue"))
-            self.assertEqual(len(imported_foreign_dirs), 1, imported_foreign_dirs)
-            foreign_issue_dir = imported_foreign_dirs[0]
-            self.assertTrue(foreign_issue_dir.is_dir())
-            foreign_meta = json.loads((foreign_issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(foreign_meta["github"]["issue_number"], 123)
-            self.assertEqual(foreign_meta["github"]["repo_owner"], "other")
-            self.assertEqual(foreign_meta["github"]["repo_name"], "repo")
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertEqual(sorted(issues_dir.glob("*-foreign-issue")), [])
 
             p = self._run_runtime_capture(
                 target,
@@ -1043,7 +1036,7 @@ class TestCliImport(CliRuntimeHarness):
 
             self.assertEqual(sorted(issues_dir.glob("*-current-issue")), [])
 
-    def test_import_allows_same_issue_number_between_current_and_foreign_when_current_repo_resolved(self) -> None:
+    def test_import_rejects_foreign_repo_when_current_repo_is_resolved(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
@@ -1054,7 +1047,6 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
             self._make_standard_parents_unscoped(target)
-            self._run_git(target, ["remote", "remove", "origin"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1076,8 +1068,9 @@ class TestCliImport(CliRuntimeHarness):
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("cross-repo GitHub linkage is not supported", p.stderr)
-            self.assertIn("repo=example/repo", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertIn("foreign GitHub issue URL", p.stderr)
 
             current_issue_dir = (
                 target
@@ -1106,7 +1099,7 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(current_meta["id"], "iss-00123")
             self.assertEqual(current_meta["github"]["issue_number"], 123)
 
-    def test_import_rejects_duplicate_github_link_for_same_foreign_repo(self) -> None:
+    def test_import_rejects_foreign_repo_duplicate_attempts_without_writes(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1121,21 +1114,6 @@ class TestCliImport(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-            self._run_runtime(
-                target,
-                [
-                    "import",
-                    "issue",
-                    "https://github.com/other/repo/issues/123",
-                    "--allow-foreign-url",
-                    "--title",
-                    "Foreign issue",
-                    "--epic",
-                    "epic-00002",
-                ],
-                env=test_env,
-            )
 
             p = self._run_runtime_capture(
                 target,
@@ -1152,9 +1130,9 @@ class TestCliImport(CliRuntimeHarness):
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("already linked", p.stderr)
-            self.assertIn("repo=other/repo", p.stderr)
-            self.assertIn("github.issue_number=123", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertEqual(sorted((target / "spec-dock" / "initiatives").rglob("iss-local-00001-*")), [])
 
     def test_import_rejects_invalid_slug_and_invalid_title(self) -> None:
         if os.name == "nt":

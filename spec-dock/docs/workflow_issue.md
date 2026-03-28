@@ -21,7 +21,7 @@ Issue は実装の最小単位です。
 ./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."
 ./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."
 
-./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>] [--allow-foreign-url]
+./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>]
 
 ./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>
 ./spec-dock/scripts/spec-dock active set --id <issue-id>
@@ -31,7 +31,8 @@ Issue は実装の最小単位です。
 ```
 
 - `import issue` で `--epic` を省略した場合は current active から親 epic を解決する
-- `import issue` の canonical URL は current repo と照合され、cross-repo import は `--allow-foreign-url` を明示したときだけ許可される
+- `import issue` の canonical URL は current repo と照合され、current repo を検証できない場合も含めて foreign GitHub issue URL は fail-closed で reject される
+- `--allow-foreign-url` は compatibility flag として残るが、cross-repo node identity import の成功経路にはならない
 - canonical でない URL-like target は受け付けない
 - `active set` のデフォルトは no-checkout。ブランチ移動が必要な場合だけ `--checkout`
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える

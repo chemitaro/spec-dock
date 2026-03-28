@@ -164,6 +164,60 @@ spec-dock: ok (validate) nodes=8
 
 ---
 
+### 2026-03-28 — S04 foreign issue URL strict reject correction / S90 minimal docs refresh
+
+#### 対象
+- Step: S04, S90
+- AC/EC: AC-004, EC-004
+
+#### 実施内容
+- `import ... --allow-foreign-url` の foreign GitHub issue URL 成功経路を閉じ、single-repo / GitHub-backed identity contract に沿って strict reject へ固定した。
+- reject を `gh issue view` / create lock / local scaffold / `.meta.json` write 前に行い、rejected foreign import で GitHub read / node/meta/symlink の副作用が出ないことを tests で固定した。
+- same-repo URL import は維持しつつ、`--allow-foreign-url` は compatibility success path ではなく reject-only compatibility flag として扱うよう help/docs を整えた。
+- `reference_github.md` / `workflow_issue.md` を foreign strict reject と GitHub mandatory create contract に最小差分で揃え、`gh issue view` が repo slug 既知時に `--repo owner/repo` を付ける実装にも記述を合わせた。
+- foreign import correction path に残っていた `iss-local-*` fallback 前提を除去した。
+- checked-in runtime mirror `spec-dock/scripts/spec_dock_runtime/application/import_node.py` を provider asset と再同期し、`validate_graph_and_deps(..., enforce_github_mandatory_linkage=False)` を含む preflight validate call signature の差分を解消した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_runtime_import_s10.TestRuntimeImportS10.test_import_rejects_foreign_repo_before_github_read_lock_and_race_revalidation_writes
+
+Ran 1 test in 0.042s
+OK
+
+python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08
+
+Ran 131 tests in 14.569s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=8
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py` - foreign GitHub issue URL を strict reject に変更し、`--allow-foreign-url` compatibility success path を削除
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py` - `--allow-foreign-url` help を reject-only compatibility flag に更新
+- `spec-dock/scripts/spec_dock_runtime/application/import_node.py` - checked-in runtime mirror を provider asset と同内容へ同期
+- `spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py` - checked-in runtime mirror help を同期
+- `tests/cli_runtime/test_import.py` - foreign import success / fallback 期待を reject / no-write 期待へ更新
+- `tests/cli_runtime/test_runtime_import_s10.py` - application layer の foreign reject / same-repo import 回帰を更新し、initiative/epic coverage を追加
+- `src/spec_dock/assets/spec_dock/docs/reference_github.md` - foreign import strict reject と GitHub mandatory create contract を追記
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - import workflow の strict reject boundary を更新
+- `spec-dock/docs/reference_github.md` - checked-in docs mirror を同期
+- `spec-dock/docs/workflow_issue.md` - checked-in docs mirror を同期
+
+#### コミット
+- 未コミット
+
+#### メモ
+- foreign issue URL reject は `gh issue view` 実行前に止まるため、rejected import で GitHub read side effect も発生しない。
+- foreign issue URL reject は `_acquire_create_lock` 実行前にも止まることを targeted regression で固定した。
+- foreign import correction path から `iss-local-*` fallback を除去した。
+- `tests.test_init_update` は unrelated baseline failures が残るため、iss-00034 の S04/S99 acceptance evidence には採用しない。
+
+---
+
 ### 2026-03-28 — S99 final diff review quality gate
 
 #### 対象
@@ -174,13 +228,24 @@ spec-dock: ok (validate) nodes=8
 - branch 全体の diff stat と commit scope を確認し、docs impact が minimal boundary に留まることを review した。
 - implementation review / QA review / spec review の最終 verdict を揃えた。
 - `report.md` に commands / results / commits / reviewer verdict を記録した。
-- issue-level final evidence は `plan.md` S99 に従って `validate` と final diff review を採用し、`sync --github` は sync-generated artifact regeneration が scope 外のため required evidence に含めないことを確認した。
+- issue-level final evidence は `plan.md` S99 に従って、green の S04-targeted unittest suite + `validate` + final diff review を採用した。
+- `tests.test_init_update` を含む broader command は unrelated baseline failures の観測には使えるが、iss-00034 acceptance gate には採用しない。
+- `sync --github` は sync-generated artifact regeneration が scope 外のため required evidence に含めないことを確認した。
 
 #### 実行コマンド / 結果
 ```bash
-git diff --stat fba707409a061894871947300e30a64be6dd761f^..HEAD
+python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10 tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08
 
-19 files changed, 1974 insertions(+), 752 deletions(-)
+Ran 131 tests in 14.569s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=8
+
+git diff --stat
+
+13 files changed, 333 insertions(+), 183 deletions(-)
 ```
 
 #### 変更したファイル
