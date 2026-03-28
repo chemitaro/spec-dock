@@ -12,22 +12,27 @@ ID: "iss-00036"
 # iss-00036 Timestamp Based Discussion and ADR Naming — 要件定義（WHAT / WHY）
 
 ## 目的
-- discussion / ADR filename を timestamp-prefix naming へ切り替え、連番衝突を避けられる naming contract を固定する。
-- `new doc` と validation / sync scan 前提のあいだで、同一 grammar を共有できる状態にする。
+- `discussions/` 配下の discussion docs（`adr / disc / research / note`）を timestamp-prefix naming へ切り替え、連番衝突を避けられる naming contract を固定する。
+- `new doc`、validation、ADR 集約の scan 前提のあいだで、同一 grammar を共有できる状態にする。
 
 ## 背景・現状
 - 現状の挙動:
-  - discussion / ADR は sequential naming 前提の運用が残っている。
+  - `new doc` は `adr / disc / research / note` の 4 種を `discussions/` 配下へ生成するが、filename contract は `NNN-type-slug.md` の連番前提になっている。
+  - 現行 docs / tests / validate も同じ sequential naming を前提にしている。
 - 現状の課題:
-  - sequential naming は worktree / branch / merge を跨ぐと duplicate sequence を防げない。
-  - naming grammar が未固定だと `new doc`、validate、sync scan の契約がずれる。
+  - sequential naming は worktree / branch / merge を跨ぐと duplicate sequence を防げず、merge 後に衝突しうる。
+  - `adr / disc` だけ別 contract、`research / note` は旧 contract のまま、のような split を残すと `new doc` family の整合が崩れる。
+  - naming grammar が未固定だと `new doc`、validate、後続 issue の ADR 集約 scan の契約がずれる。
 - 再現手順:
-  1. 複数環境で discussion / ADR を連番採番すると番号が衝突しうる。
-  2. grammar 未固定のまま mirror 走査を実装すると対象判定がぶれる。
+  1. 複数環境で `discussions/` 配下の docs を連番採番すると、別 branch / worktree で同じ番号が並行に発生しうる。
+  2. その状態で merge すると、同一 scope の `NNN-*` が衝突しうる。
+  3. grammar 未固定のまま validation や後続 issue の ADR 集約 scan を実装すると対象判定がぶれる。
 - 観測点:
   - CLI:
     - `./spec-dock/scripts/spec-dock new doc adr`
     - `./spec-dock/scripts/spec-dock new doc disc`
+    - `./spec-dock/scripts/spec-dock new doc research`
+    - `./spec-dock/scripts/spec-dock new doc note`
   - Filesystem:
     - generated filename
   - Validation:
@@ -38,55 +43,67 @@ ID: "iss-00036"
 
 ## 対象ユーザー / 利用シナリオ（必要時）
 - 主な利用者:
-  - discussion / ADR を追加する maintainer
+  - `discussions/` 配下へ ADR / discussion / research / note を追加する maintainer
 - 代表シナリオ:
-  - `new doc adr` / `new doc disc` で conflict-resistant な filename を自動生成する。
-  - same-second collision でも deterministic に suffix が付く。
+  - `new doc adr|disc|research|note` で conflict-resistant な filename を自動生成する。
+  - 同じ scope で同秒に複数 doc を作成しても deterministic に suffix が付く。
+  - 既存の pre-contract sequential docs はそのまま残し、新規生成だけを timestamp contract に切り替える。
 
 ## スコープ
 - MUST:
+  - `discussions/` 配下で `new doc` が生成する 4 種 (`adr / disc / research / note`) の basename grammar を timestamp-prefix に統一する。
   - basename grammar を `<ts>-<kind>-<slug>.md` に固定する。
-  - `ts = yyyymmddthhmmssz`、`kind in {adr, disc}`、同秒衝突時 `-<nn>-` suffix を acceptance に入れる。
-  - legacy grandfathered docs を自動 rename しない境界を明記する。
+  - `ts = yyyymmddthhmmssz`（UTC、`t` / `z` lowercase 固定）、`kind in {adr, disc, research, note}`、同秒衝突時 `-<nn>-` suffix を acceptance に入れる。
+  - standard form と collision form の両方で doc identity を一意に扱えるよう、basename contract と template replacement contract の対応を曖昧にしない。
+  - 原本は引き続き各 scope の `discussions/` に配置し、`adr` だけを後続 issue の集約対象にする前提を崩さない。
+  - pre-contract sequential docs を grandfathered artifact として扱い、自動 rename / migrate 対象にしない境界を明記する。
+  - `new doc`、validation、後続 issue の ADR 集約 scan が共有できる grammar 境界を requirement 上で固定する。
 - MUST NOT:
   - sequential naming を新規生成しない。
+  - `adr / disc` と `research / note` で別の naming contract を採らない。
   - legacy docs の一括 rename / migration をこの issue の責務にしない。
 - OUT OF SCOPE:
-  - `sync` の mirror 再生成そのもの
+  - `sync` の top-level ADR mirror 再生成そのもの
   - GitHub mandatory node create contract
   - docs parity の全面クローズ
 
 ## 境界
 - Always:
   - naming grammar は lowercase path 制約に適合する。
+  - 原本の配置先は `adr / disc / research / note` を含めて常に各 scope の `discussions/` である。
+  - `adr` だけが後続 issue の top-level 集約対象になりうるが、原本配置ルールは変えない。
   - same-second collision は 2 桁 suffix でのみ吸収する。
-  - `001-adr...` / `002-adr...` は grandfathered planning artifacts として保持する。
+  - pre-contract sequential docs は grandfathered artifact として保持し、新規 timestamp contract と混同しない。
 - Ask:
   - timestamp 精度を秒より細かくする判断は行わない。
 - Never:
   - pre-contract legacy docs を自動 rename する。
-  - grammar 未固定のまま validate / sync 前提を増やす。
+  - grammar 未固定のまま validate / ADR 集約 scan 前提を増やす。
 
 ## 非交渉制約
 - UTC ベースの grammar を崩さない。
 - `t` / `z` は lowercase 固定とする。
-- naming contract は validate / sync scan と整合していなければならない。
+- naming contract は `new doc` / validate / ADR 集約 scan と整合していなければならない。
+- `discussions/` を原本の唯一の配置先とする運用を崩さない。
 
 ## 前提
 - `iss-00034` の create contract が先行している。
 - `new doc` の対象は issue / epic / initiative scope の `discussions/` である。
-- epic spec で grandfathered legacy docs の扱いが確定している。
+- `new doc` の現行 surface は `adr / disc / research / note` の 4 種であり、本 issue ではこの family を split しない。
+- epic spec で grandfathered legacy docs の扱いと ADR mirror only 方針が確定している。
 
 ## 受け入れ条件
 - AC-001:
   - Actor:
     - maintainer
   - Given:
-    - `new doc adr` または `new doc disc` を実行する
+    - `new doc adr|disc|research|note` を実行する
   - When:
-    - 新しい discussion / ADR を作成する
+    - 新しい discussion doc を作成する
   - Then:
     - basename は `<ts>-<kind>-<slug>.md` grammar で生成される
+    - `kind` は `adr / disc / research / note` のいずれでも同一 contract を使う
+    - 生成先は常に対象 scope の `discussions/` である
   - 観測点:
     - naming tests
     - generated file assertions
@@ -99,6 +116,8 @@ ID: "iss-00036"
     - 同じ秒に複数 doc を作成する
   - Then:
     - `yyyymmddthhmmssz-<nn>-<kind>-<slug>.md` の 2 桁 suffix が付与される
+    - collision 吸収は type を問わず同一 scope 内で deterministic に行われる
+    - collision form の doc identity は optional suffix を含めて一意に扱われ、standard form と衝突しない
   - 観測点:
     - collision tests
     - suffix evidence
@@ -106,14 +125,28 @@ ID: "iss-00036"
   - Actor:
     - maintainer
   - Given:
-    - pre-contract legacy docs（`001-adr...` / `002-adr...`）が存在する
+    - pre-contract sequential docs（例: `001-adr...` / `002-disc...` / `003-research...` / `004-note...`）が存在する
   - When:
     - new naming contract と validate 前提を確認する
   - Then:
     - legacy docs は grandfathered として残り、自動 rename / migrate 対象にならない
+    - 新規 timestamp contract と legacy grandfathered file を混同しない
   - 観測点:
     - docs diff
     - validate contract tests
+- AC-004:
+  - Actor:
+    - maintainer
+  - Given:
+    - `adr` docs を後続 issue で top-level 集約する前提がある
+  - When:
+    - naming contract を確認する
+  - Then:
+    - `adr` を含む全 doc type は同一 timestamp grammar を共有しつつ、原本配置は常に `discussions/` のままである
+    - ADR 集約のために `adr` だけ別の原本配置や別 naming grammar を持ち込まない
+  - 観測点:
+    - requirement/design boundary
+    - docs contract
 
 ## 例外・エッジケース
 - EC-001:
@@ -130,6 +163,20 @@ ID: "iss-00036"
     - legacy grandfathering と新規生成 contract を混同しない
   - 観測点:
     - validate behavior tests
+- EC-003:
+  - 条件:
+    - 同じ scope / 同じ秒に複数 type の doc が並行生成される
+  - 期待:
+    - suffix 付与で衝突を吸収し、type ごとの連番へフォールバックしない
+  - 観測点:
+    - cross-type collision tests
+- EC-004:
+  - 条件:
+    - 同じ scope / 同じ秒で collision suffix `01..99` を使い切る
+  - 期待:
+    - silent fallback や sequential fallback は行わず、explicit failure として停止する
+  - 観測点:
+    - suffix exhaustion tests
 
 ## 入力→出力例（必要時）
 - EX-001:
@@ -137,15 +184,29 @@ ID: "iss-00036"
     - `./spec-dock/scripts/spec-dock new doc adr --issue iss-00036 --title "Example Decision"`
   - Output:
     - `yyyymmddthhmmssz-adr-example-decision.md` または同秒時 `yyyymmddthhmmssz-01-adr-example-decision.md`
+- EX-002:
+  - Input:
+    - `./spec-dock/scripts/spec-dock new doc note --issue iss-00036 --title "Kickoff Memo"`
+  - Output:
+    - `yyyymmddthhmmssz-note-kickoff-memo.md` または同秒時 `yyyymmddthhmmssz-01-note-kickoff-memo.md`
 
 ## 用語（ドメイン語彙）
 - TERM-001:
   - timestamp-prefix naming:
-    - UTC timestamp を basename 先頭に持つ discussion / ADR filename contract
+    - UTC timestamp を basename 先頭に持つ discussion doc filename contract
 - TERM-002:
   - grandfathered planning artifact:
     - 新 contract 移行前に作られた legacy doc で、自動 rename 対象にしないもの
+- TERM-003:
+  - discussion doc family:
+    - `discussions/` 配下に置かれる `adr / disc / research / note` の原本群
+- TERM-004:
+  - ADR aggregation target:
+    - 原本は `discussions/` に置いたまま、後続 issue で top-level mirror 集約の対象として探索される `adr` docs
+- TERM-005:
+  - collision form:
+    - `<ts>-<nn>-<kind>-<slug>.md` の suffix 付き basename で表現される same-second collision 吸収形
 
 ## 未確定事項
 - なし:
-  - naming grammar は epic spec で固定済み
+  - discussion doc family 全体を timestamp-prefix naming に統一する方針は確定済み
