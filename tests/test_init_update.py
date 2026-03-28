@@ -1198,6 +1198,11 @@ class _StubIssueGateway:
             url=f"https://github.com/example/repo/issues/{{issue_number}}",
         )
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
+
 with tempfile.TemporaryDirectory() as td:
     repo_root = Path(td)
     specdock_dir = repo_root / "spec-dock"
@@ -1241,6 +1246,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
     )
@@ -1673,6 +1679,11 @@ class _StubIssueGateway:
             url=f"https://example.invalid/issues/{{issue_number}}",
         )
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
+
 class _StubActiveStateStore:
     def __init__(self, manifest):
         self._manifest = manifest
@@ -1915,6 +1926,11 @@ class _StubIssueGateway:
             url=f"https://example.invalid/issues/{{issue_number}}",
         )
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
+
 class _StubActiveStateStore:
     def __init__(self, manifest):
         self._manifest = manifest
@@ -1999,6 +2015,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo(records),
         template_scaffolder=_StubTemplateScaffolder(),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         active_state_store=active_state_store,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -5529,6 +5546,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -6115,6 +6134,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

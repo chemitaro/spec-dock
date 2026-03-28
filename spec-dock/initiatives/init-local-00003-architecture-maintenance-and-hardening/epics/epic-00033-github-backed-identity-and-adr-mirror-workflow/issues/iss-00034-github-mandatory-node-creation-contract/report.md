@@ -266,6 +266,51 @@ spec-dock: ok (validate) nodes=8
 - follow-up で broadened-suite evidence を green に更新し、`tests.test_init_update` の failure classification を iss-00034 scope に訂正した
 - checked-in initiative linkage は `init-local-00002 -> chemitaro/spec-dock#39`、`init-local-00003 -> chemitaro/spec-dock#31` が正しいため、その truth-preserving correction を issue boundary 内の最小例外として記録した
 
+---
+
+### 2026-03-28 — S04 follow-up numeric import no-origin fail-closed fix
+
+#### 対象
+- Step: S04 follow-up
+- AC/EC: AC-004, EC-004
+
+#### 実施内容
+- numeric import（`import issue 123`）で current repo origin が解決できない場合に fail-closed で reject する境界を固定した。
+- reject を `gh issue view` / create lock / local scaffold / `.meta.json` write より前に配置した。
+- precheck collision の no-write 優先は維持し、URL strict reject behavior も変更しないまま保持した。
+- provider asset と checked-in runtime mirror の `application/import_node.py` を同内容で同期した。
+- parity test 側は GitHub-mandatory 前提に合わせ、numeric import が成功する既存ケースには origin を明示して契約と整合させた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_import tests.cli_runtime.test_runtime_import_s10
+
+Ran 53 tests in 6.897s
+OK
+
+python -m unittest tests.test_init_update
+
+Ran 81 tests in 10.210s
+OK
+
+python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08 tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_validate_s02 tests.domain_runtime.test_runtime_domain_s03 tests.presentation_runtime.test_runtime_sync_s07
+
+Ran 160 tests in 22.921s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=8
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+- `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+- `tests/cli_runtime/test_import.py`
+- `tests/cli_runtime/test_runtime_import_s10.py`
+- `tests/test_init_update.py`
+- `spec-dock/active/issue/report.md`
+
 ## 遭遇した問題と解決
 - 問題: partial GitHub repo scope が import / sync の relaxed preflight で current repo へ誤束縛されうる状態が見つかった。
   - 解決: `validation.py` に structural pairing check を追加し、`sync --force` でも malformed scope を hard-stop するよう修正した。
@@ -279,6 +324,7 @@ spec-dock: ok (validate) nodes=8
 ## 今後の推奨事項
 - asset mirror 側 docs の parity refresh は `iss-00038` でまとめて実施する。
 - 同種の contract 変更では、CLI / domain / presentation の三層で reject path regressions を先に固定する。
+- numeric import のように target repo scope を持たない経路でも、current repo scope を必須にして fail-closed を揃える。
 
 ## 省略/例外メモ
 - `src/spec_dock/assets/spec_dock/docs/*` の全面 parity refresh は本 issue の scope 外とし、`iss-00038` へ defer した。

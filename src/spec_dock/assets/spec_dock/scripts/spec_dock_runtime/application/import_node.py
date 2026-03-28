@@ -175,6 +175,24 @@ def _target_repo_slug(req: ImportNodeRequest) -> str | None:
     return f"{owner}/{repo}"
 
 
+def _require_numeric_issue_import_repo_scope(
+    req: ImportNodeRequest,
+    *,
+    kind: Literal["initiative", "epic", "issue"],
+    current_repo_slug: str | None,
+) -> None:
+    if kind != "issue":
+        return
+    if _target_repo_slug(req) is not None:
+        return
+    if current_repo_slug is not None:
+        return
+    raise RuntimeError(
+        "Current GitHub repo scope could not be resolved from origin. "
+        "spec-dock import requires a current GitHub repo scope for numeric issue targets."
+    )
+
+
 def _import_target_ref(req: ImportNodeRequest) -> str:
     owner = (req.target_repo_owner or "").strip().lower()
     repo = (req.target_repo_name or "").strip().lower()
@@ -339,6 +357,11 @@ def import_node_core(
     precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
     if precheck_collisions:
         raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
+    _require_numeric_issue_import_repo_scope(
+        req,
+        kind=kind,
+        current_repo_slug=current_repo_slug,
+    )
 
     issue_gateway = _resolve_issue_gateway(ports)
     imported_issue = issue_gateway.issue_view_minimal(
