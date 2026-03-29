@@ -21,21 +21,17 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            # Create nodes without touching GitHub.
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            # Parent ids accept shorthand numeric forms (e.g. `1` -> `init-local-00001` / `epic-local-00001`).
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
             )
             self.assertTrue((issue_dir / "requirement.md").is_file())
             self.assertTrue((issue_dir / "design.md").is_file())
@@ -46,10 +42,10 @@ class TestCliSync(CliRuntimeHarness):
             requirement = (issue_dir / "requirement.md").read_text(encoding="utf-8")
             self.assertNotIn("<ISS_ID>", requirement)
             self.assertNotIn("<ISS_TITLE>", requirement)
-            self.assertIn("iss-local-00001", requirement)
+            self.assertIn("iss-00003", requirement)
 
             # Active pointers are set by a single target argument (node id or GitHub issue number).
-            self._run_runtime(target, ["active", "set", "iss-local-00001", "--force"])
+            self._run_runtime(target, ["active", "set", "iss-00003", "--force"])
             self.assertTrue((target / "spec-dock" / ".agent" / "active.json").is_file())
             self.assertTrue(
                 (target / "spec-dock" / "active" / "issue").exists()
@@ -75,21 +71,21 @@ class TestCliSync(CliRuntimeHarness):
             index_nodes = index["nodes"]
 
             init_item = tree["tree"][0]
-            self.assertEqual(init_item["id"], "init-local-00001")
+            self.assertEqual(init_item["id"], "init-00001")
             self.assertEqual(init_item["type"], "initiative")
             self.assertIn("epics", init_item)
 
             epic_item = init_item["epics"][0]
-            self.assertEqual(epic_item["id"], "epic-local-00001")
+            self.assertEqual(epic_item["id"], "epic-00002")
             self.assertEqual(epic_item["type"], "epic")
             self.assertIn("issues", epic_item)
 
             issue_item = epic_item["issues"][0]
-            self.assertEqual(issue_item["id"], "iss-local-00001")
+            self.assertEqual(issue_item["id"], "iss-00003")
             self.assertEqual(issue_item["type"], "issue")
 
             # `tree.json` nodes match the same node schema as `index.json` nodes.
-            self.assertEqual(issue_item, index_nodes["iss-local-00001"])
+            self.assertEqual(issue_item, index_nodes["iss-00003"])
             self._run_runtime(target, ["validate"])
 
     def test_sync_builds_flat_adr_mirror_and_clears_stale_entries_after_rename_and_delete(self) -> None:
@@ -151,9 +147,7 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             self._run_runtime(target, ["sync"])
 
@@ -247,6 +241,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
             self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
@@ -298,26 +293,27 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target issue"])
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Target issue"])
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Empty init"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "2", "--title", "Empty epic"])
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Empty init"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Empty epic"])
 
             target_issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-main-init"
+                / "init-00101-main-init"
                 / "epics"
-                / "epic-local-00001-main-epic"
+                / "epic-00201-main-epic"
                 / "issues"
-                / "iss-local-00001-target-issue"
+                / "iss-00301-target-issue"
             )
             (target_issue_dir / "deps.json").write_text(
                 json.dumps(
-                    {"schema_version": 1, "depends_on": ["epic-local-00002", "init-local-00002"]},
+                    {"schema_version": 1, "depends_on": ["epic-00202", "init-00102"]},
                     ensure_ascii=False,
                     indent=2,
                 )
@@ -337,29 +333,35 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target issue"])
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                initiative_title="Main init",
+                epic_title="Main epic",
+                issue_title="Target issue",
+            )
 
             target_issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-main-init"
+                / "init-00101-main-init"
                 / "epics"
-                / "epic-local-00001-main-epic"
+                / "epic-00201-main-epic"
                 / "issues"
-                / "iss-local-00001-target-issue"
+                / "iss-00301-target-issue"
             )
             (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-99999"]}, ensure_ascii=False, indent=2)
+                json.dumps({"schema_version": 1, "depends_on": ["iss-99999"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("iss-local-99999", p.stderr)
+            self.assertIn("iss-99999", p.stderr)
             self.assertIn("deps.json", p.stderr)
 
     def test_sync_fails_on_descendant_dependency(self) -> None:
@@ -367,14 +369,20 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Target issue"])
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                initiative_title="Main init",
+                epic_title="Main epic",
+                issue_title="Target issue",
+            )
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-main-init"
+            init_dir = target / "spec-dock" / "initiatives" / "init-00101-main-init"
             deps_path = init_dir / "deps.json"
             deps_path.write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
@@ -382,68 +390,69 @@ class TestCliSync(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn(str(deps_path), p.stderr)
-            self.assertIn("iss-local-00001", p.stderr)
+            self.assertIn("iss-00301", p.stderr)
 
     def test_sync_fails_on_self_or_cycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Main init"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Main epic"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue two"])
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Main init"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Main epic"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"])
 
             epic_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-main-init"
+                / "init-00101-main-init"
                 / "epics"
-                / "epic-local-00001-main-epic"
+                / "epic-00201-main-epic"
             )
-            issue_one_dir = epic_dir / "issues" / "iss-local-00001-issue-one"
-            issue_two_dir = epic_dir / "issues" / "iss-local-00002-issue-two"
+            issue_one_dir = epic_dir / "issues" / "iss-00301-issue-one"
+            issue_two_dir = epic_dir / "issues" / "iss-00302-issue-two"
             issue_one_deps_path = issue_one_dir / "deps.json"
 
             # Self dependency must fail.
             issue_one_deps_path.write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
             p_self = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p_self.returncode, 1, p_self.stdout + p_self.stderr)
-            self.assertIn("iss-local-00001", p_self.stderr)
+            self.assertIn("iss-00301", p_self.stderr)
             self.assertIn(str(issue_one_deps_path), p_self.stderr)
 
             # Shorthand self (issue depends on own epic) must also fail.
             issue_one_deps_path.write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-local-00001"]}, ensure_ascii=False, indent=2)
+                json.dumps({"schema_version": 1, "depends_on": ["epic-00201"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
             p_shorthand_self = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p_shorthand_self.returncode, 1, p_shorthand_self.stdout + p_shorthand_self.stderr)
-            self.assertIn("iss-local-00001", p_shorthand_self.stderr)
-            self.assertIn("epic-local-00001", p_shorthand_self.stderr)
+            self.assertIn("iss-00301", p_shorthand_self.stderr)
+            self.assertIn("epic-00201", p_shorthand_self.stderr)
             self.assertIn(str(issue_one_deps_path), p_shorthand_self.stderr)
 
             # Cycle dependency must fail.
             issue_one_deps_path.write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
             (issue_two_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
             p_cycle = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p_cycle.returncode, 1, p_cycle.stdout + p_cycle.stderr)
-            self.assertIn("iss-local-00001", p_cycle.stderr)
-            self.assertIn("iss-local-00002", p_cycle.stderr)
+            self.assertIn("iss-00301", p_cycle.stderr)
+            self.assertIn("iss-00302", p_cycle.stderr)
             self.assertIn("->", p_cycle.stderr)
 
     def test_sync_derives_deps_fields_ready_and_blockers(self) -> None:
@@ -453,6 +462,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -537,9 +547,14 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Unknown issue"])
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="Unknown issue",
+            )
+            self._materialize_local_compat_ids(target)
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -559,35 +574,36 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue one"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue two"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue three"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Issue target"])
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Issue one"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Issue two"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Issue three"])
+            self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "304", "--title", "Issue target"])
 
             issues_root = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00101-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00201-jwt-auth"
                 / "issues"
             )
-            (issues_root / "iss-local-00002-issue-two" / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00001"]}, ensure_ascii=False, indent=2)
+            (issues_root / "iss-00302-issue-two" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
-            (issues_root / "iss-local-00003-issue-three" / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-local-00002"]}, ensure_ascii=False, indent=2)
+            (issues_root / "iss-00303-issue-three" / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
                 + "\n",
                 encoding="utf-8",
             )
-            (issues_root / "iss-local-00004-issue-target" / "deps.json").write_text(
+            (issues_root / "iss-00304-issue-target" / "deps.json").write_text(
                 json.dumps(
-                    {"schema_version": 1, "depends_on": ["iss-local-00003", "iss-local-00001"]},
+                    {"schema_version": 1, "depends_on": ["iss-00303", "iss-00301"]},
                     ensure_ascii=False,
                     indent=2,
                 )
@@ -606,18 +622,18 @@ class TestCliSync(CliRuntimeHarness):
             self.assertEqual(
                 index1["deps"]["issue_edges"],
                 [
-                    {"from": "iss-local-00002", "to": "iss-local-00001", "kind": "depends_on"},
-                    {"from": "iss-local-00003", "to": "iss-local-00002", "kind": "depends_on"},
-                    {"from": "iss-local-00004", "to": "iss-local-00001", "kind": "depends_on"},
-                    {"from": "iss-local-00004", "to": "iss-local-00003", "kind": "depends_on"},
+                    {"from": "iss-00302", "to": "iss-00301", "kind": "depends_on"},
+                    {"from": "iss-00303", "to": "iss-00302", "kind": "depends_on"},
+                    {"from": "iss-00304", "to": "iss-00301", "kind": "depends_on"},
+                    {"from": "iss-00304", "to": "iss-00303", "kind": "depends_on"},
                 ],
             )
             self.assertEqual(index2["deps"]["issue_edges"], index1["deps"]["issue_edges"])
 
-            deps1 = index1["nodes"]["iss-local-00004"]["deps"]
-            deps2 = index2["nodes"]["iss-local-00004"]["deps"]
+            deps1 = index1["nodes"]["iss-00304"]["deps"]
+            deps2 = index2["nodes"]["iss-00304"]["deps"]
             self.assertEqual(deps1, deps2)
-            self.assertEqual(deps1["depends_on"], ["iss-local-00001", "iss-local-00002", "iss-local-00003"])
+            self.assertEqual(deps1["depends_on"], ["iss-00301", "iss-00302", "iss-00303"])
             self.assertEqual(deps1["blockers_top"], deps1["depends_on"][: len(deps1["blockers_top"])])
 
     def test_sync_emits_deps_issues_json_and_puml_todo_only(self) -> None:
@@ -627,6 +643,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -733,6 +750,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             # Branch A: mixed done/open issues.
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
@@ -855,6 +873,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -953,6 +972,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -1041,20 +1061,15 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            # Prepare a minimal git repository so `sync` can read the current branch name.
-            self._run_git(target, ["init"])
+            self._create_same_repo_linked_hierarchy(target)
+            self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
-                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
             )
 
-            # Create nodes (local-only).
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-
             # Branch name includes the node id. Without --force, `sync` would update active.
-            self._run_git(target, ["checkout", "-b", "feature/iss-local-0001-test"])
+            self._run_git(target, ["checkout", "-b", "feature/iss-00003-test"])
 
             self._run_runtime(target, ["active", "clear"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
@@ -1072,26 +1087,21 @@ class TestCliSync(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            # Prepare a minimal git repository so `sync` can read the current branch name.
-            self._run_git(target, ["init"])
+            self._create_same_repo_linked_hierarchy(target)
+            self._run_git(target, ["add", "-A"])
             self._run_git(
                 target,
-                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "spec tree"],
             )
 
-            # Create nodes (local-only).
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-
             # Branch name includes the node id.
-            self._run_git(target, ["checkout", "-b", "feature/iss-local-0001-test"])
+            self._run_git(target, ["checkout", "-b", "feature/iss-00003-test"])
 
             self._run_runtime(target, ["sync"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
-            self.assertEqual(active["initiative"]["id"], "init-local-00001")
-            self.assertEqual(active["epic"]["id"], "epic-local-00001")
-            self.assertEqual(active["issue"]["id"], "iss-local-00001")
+            self.assertEqual(active["initiative"]["id"], "init-00001")
+            self.assertEqual(active["epic"]["id"], "epic-00002")
+            self.assertEqual(active["issue"]["id"], "iss-00003")
 
     def test_sync_github_populates_issue_statuses(self) -> None:
         if os.name == "nt":
@@ -1100,6 +1110,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -1164,6 +1175,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -1279,6 +1291,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
 
@@ -1315,6 +1328,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
@@ -1340,12 +1354,15 @@ class TestCliSync(CliRuntimeHarness):
 
             p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("gh_index_incomplete", p.stderr)
+            self.assertIn("gh_fetch_failed", p.stderr)
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             nodes = index["nodes"]
             self.assertEqual(nodes["iss-00301"]["status"], "unknown")
-            self.assertEqual(nodes["iss-00301"]["github"], {"issue_number": 301})
+            self.assertEqual(
+                nodes["iss-00301"]["github"],
+                {"issue_number": 301, "repo_owner": "example", "repo_name": "repo"},
+            )
 
     def test_sync_github_fetch_failure_warns_and_continues(self) -> None:
         if os.name == "nt":
@@ -1354,6 +1371,7 @@ class TestCliSync(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
             self._run_runtime(
