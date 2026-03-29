@@ -15,6 +15,7 @@ ID: "iss-00040"
 ## 実装サマリー (任意)
 - `iss-00040` の requirement / design / plan と関連 discussions を、current stale-contract cluster と dogfooding parity drift を含む前提で更新した。
 - 全体回帰の再現結果と issue scope の判断材料を記録し、spec review に渡せる状態まで正本を整備した。
+- 各セッション節の `コミット: なし` は当該ログ記録時点の状態を示し、末尾の close/handoff 向けメモはその後に確定した最新の commit 状態をまとめる。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -294,6 +295,50 @@ python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfood
 
 ---
 
+### 2026-03-29 07:24 - 07:36
+
+#### 対象
+- Step: S05 final regression / final diff quality gate
+- AC/EC: AC-004, EC-001
+
+#### スコープ
+- `tests/cli_runtime/test_runtime_deps_s04.py`
+- `spec-dock/active/issue/report.md`
+
+#### 実施内容
+- final regression を実施し、`test_validate_tree_reconnects_topology_provider` に 1 件だけ残っていた stale expectation を特定した。
+- assertion を弱めるのではなく、test fixture を現行の scoped GitHub linkage requirement を満たす形へ更新し、意図していた dependency-cycle validation path へ到達するよう修正した。
+- 修正後、該当テストの focused rerun と full `python -m unittest discover -v` を再実行し、どちらも pass を確認した。
+- final diff quality gate として reviewer evidence を整理し、report に S05 / final evidence を追記した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_runtime_deps_s04.TestRuntimeDepsS04.test_validate_tree_reconnects_topology_provider -v
+python -m unittest discover -v
+
+- focused rerun は `Ran 1 test ... OK` で pass。
+- full suite は `Ran 525 tests ... OK` で pass。
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/test_runtime_deps_s04.py` - scoped GitHub linkage requirement を満たす fixture へ更新し、dependency-cycle validation path の期待値到達を回復
+- `spec-dock/active/issue/report.md` - この記録
+
+#### レビューサマリー
+- 最終 `code_reviewer` verdict は `pass`。
+- 最終 `qa_reviewer` verdict は `pass`。
+- 最終 `spec_reviewer` は、report refresh 後に final spec re-review を再依頼した結果 `pass`。
+- S05 report refresh 後の final spec re-review でも、追加の material findings はなかった。
+
+#### コミット
+- なし
+
+#### メモ
+- S05 の実装 / テスト / code review / QA review は完了済み。
+- final commit はこの report 更新と spec re-review の後に実施する。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - 初回 spec review で issue close criteria と epic ownership の曖昧さを指摘された。
@@ -311,8 +356,10 @@ python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfood
 - close 判定時は AC-004 に従い、remaining failures があれば scope 外判定と参照 issue を report に残す。
 
 ## 省略/例外メモ (必須)
-- SG1 docs scope はコミット済み。
-- S02 CLI fixture realignment scope はコミット済み。
-- S03 wrapper/domain expectation realignment scope はコミット済み。
-- S04 parity recovery の実装 / テスト / review は完了済みだが、commit はこの report 更新後に実施するため、この時点では未実施。
-- S05 final regression / report / close は未着手。
+- SG1 docs scope は、当該節の記録時点では `コミット: なし` だったが、その後の step commit でコミット済み。
+- S02 CLI fixture realignment scope は、当該節の記録時点では `コミット: なし` だったが、その後の step commit でコミット済み。
+- S03 wrapper/domain expectation realignment scope は、当該節の記録時点では `コミット: なし` だったが、その後の step commit でコミット済み。
+- S04 parity recovery scope は、当該節の記録時点では `コミット: なし` だったが、その後の step commit でコミット済み。
+- S05 implementation / test work は完了済みで、final code review / QA review も完了済み。
+- final spec re-review は完了済みで `pass`。
+- final S05 commit はこの時点では未実施。
