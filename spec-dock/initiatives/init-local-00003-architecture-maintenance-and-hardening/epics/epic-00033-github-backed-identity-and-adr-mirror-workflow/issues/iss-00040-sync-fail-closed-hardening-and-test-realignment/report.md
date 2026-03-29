@@ -258,6 +258,42 @@ python -m unittest tests.cli_runtime.test_wrappers tests.domain_runtime.test_run
 
 ---
 
+### 2026-03-29 07:18 - 07:24
+
+#### 対象
+- Step: S04 dogfooding parity recovery
+- AC/EC: AC-004, EC-001
+
+#### 実施内容
+- dogfooding parity recovery として `spec-dock/scripts/spec_dock_runtime/application/sync_state.py` を provider asset 正本へ再同期した。
+- provider-side の source of truth は `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` のままとし、checked-in dogfooding mirror を正本と完全一致する状態へ更新した。
+- parity drift を解消し、checked-in runtime mirror の整合性を issue scope 内で回復した。
+
+#### 実行コマンド / 結果
+```bash
+diff -q src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py spec-dock/scripts/spec_dock_runtime/application/sync_state.py
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+
+- `diff -q ...` は出力なし / exit 0 で、provider asset と checked-in dogfooding mirror の一致を確認した。
+- `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v` は `Ran 1 test ... OK` で pass。
+```
+
+#### 変更したファイル
+- `spec-dock/scripts/spec_dock_runtime/application/sync_state.py` - provider asset 正本に合わせて checked-in dogfooding mirror を更新
+- `spec-dock/active/issue/report.md` - この記録
+
+#### レビューサマリー
+- 最終 `code_reviewer` verdict は `pass`。
+- 最終 `qa_reviewer` verdict は `pass`。
+
+#### コミット
+- なし
+
+#### メモ
+- commit は未実施のため、このログ時点の commit 情報は pending / none 扱い。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - 初回 spec review で issue close criteria と epic ownership の曖昧さを指摘された。
@@ -276,6 +312,7 @@ python -m unittest tests.cli_runtime.test_wrappers tests.domain_runtime.test_run
 
 ## 省略/例外メモ (必須)
 - SG1 docs scope はコミット済み。
-- S02 の実装 / テスト修正は完了済みで、code review も pass 済み。
-- S02 / S03 の commit はこの report 更新後に実施する前提のため、この時点では未実施。
-- 以降の later steps は未着手。
+- S02 CLI fixture realignment scope はコミット済み。
+- S03 wrapper/domain expectation realignment scope はコミット済み。
+- S04 parity recovery の実装 / テスト / review は完了済みだが、commit はこの report 更新後に実施するため、この時点では未実施。
+- S05 final regression / report / close は未着手。
