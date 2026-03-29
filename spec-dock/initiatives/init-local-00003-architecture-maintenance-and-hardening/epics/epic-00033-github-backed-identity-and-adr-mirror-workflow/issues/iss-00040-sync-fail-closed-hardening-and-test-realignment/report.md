@@ -219,6 +219,45 @@ python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_deps tes
 
 ---
 
+### 2026-03-29 07:05 - 07:18
+
+#### 対象
+- Step: S03 wrapper/domain expectation realignment
+- AC/EC: AC-004, EC-001
+
+#### 実施内容
+- `tests/cli_runtime/test_wrappers.py` と `tests/domain_runtime/test_runtime_domain_s01.py` の stale test expectation を、現行 runtime / docs contract に合わせて再整列した。
+- production / runtime code は変更せず、wrapper / domain 側の期待値だけを current contract に追従させた。
+- wrapper tests に残っていた reject 済みの local-only `new ... --no-github` 前提を除去した。
+- `workflow_issue.md` の expectation で旧 `new issue --no-github ...` 例を必須視していた前提を解消した。
+- wrapper discussion filename expectation を旧 sequential numbering から、現行の timestamp-prefix 形式へ更新した。
+- domain validation expectation を、旧 structural mismatch error ではなく、現行 fail-closed の missing-github-linkage-first ordering に合わせて修正した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_wrappers tests.domain_runtime.test_runtime_domain_s01 -v
+
+- `python -m unittest tests.cli_runtime.test_wrappers tests.domain_runtime.test_runtime_domain_s01 -v` は `Ran 15 tests ... OK` で pass。
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/test_wrappers.py` - wrapper docs / local-only invocation / discussion filename expectation を current runtime contract へ更新
+- `tests/domain_runtime/test_runtime_domain_s01.py` - validation ordering expectation を fail-closed missing-github-linkage-first に更新
+- `spec-dock/active/issue/report.md` - この記録
+
+#### レビューループ
+- 初回 code review は `pass`。ただし non-blocking note として、`workflow_issue.md` に対する stale `new issue --no-github ...` 例の negative coverage を明示する `assertNotIn` 追加が提案された。
+- follow-up fix で当該 `assertNotIn` を追加し、wrapper docs expectation の stale example 不在を明示した。
+- 再レビュー後の最終 `code_reviewer` verdict は `pass`。
+
+#### コミット
+- なし
+
+#### メモ
+- S03 は wrapper / domain expectation の realignment のみで、runtime behavior 自体の変更は行っていない。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - 初回 spec review で issue close criteria と epic ownership の曖昧さを指摘された。
@@ -238,5 +277,5 @@ python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_deps tes
 ## 省略/例外メモ (必須)
 - SG1 docs scope はコミット済み。
 - S02 の実装 / テスト修正は完了済みで、code review も pass 済み。
-- S02 の commit はこの report 更新後に実施する前提のため、この時点では未実施。
+- S02 / S03 の commit はこの report 更新後に実施する前提のため、この時点では未実施。
 - 以降の later steps は未着手。

@@ -123,9 +123,13 @@ class TestRuntimeDomainS01(unittest.TestCase):
         report = domain_validation.validate_graph_and_deps(graph, repo_root=Path("/repo"))
 
         self.assertEqual(report.warnings, [])
-        self.assertIn(
-            "issue parent_id mismatch: iss-local-00001 parent_id=epic-local-99999 epic_id=epic-local-00001",
+        self.assertEqual(
             report.errors,
+            [
+                "initiative missing github.issue_number: "
+                "spec-dock/initiatives/init-local-00001-auth-platform/.meta.json. "
+                "initiative/epic/issue nodes must have explicit GitHub linkage under the create contract."
+            ],
         )
         self.assertFalse(any("Missing required artifact" in error for error in report.errors))
 
