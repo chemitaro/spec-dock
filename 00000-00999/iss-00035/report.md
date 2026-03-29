@@ -15,6 +15,7 @@ ID: "iss-00035"
 ## 実装サマリー (任意)
 - S01 として、ADR mirror の source preflight と basename collision fail-fast を追加した。
 - `sync` は initiative / epic / issue の `discussions/*.md` から有効な ADR 原本だけを候補化し、衝突時は active 更新や artifact write より前に `failed_before_write` で終了する。
+- S02 として、successful sync 時に `spec-dock/adrs/<basename>` の flat symlink mirror を clear-then-rebuild で再生成し、rename / delete 後の stale entry を残さないようにした。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -57,11 +58,54 @@ code_reviewer (S01 scope)
 - `tests/presentation_runtime/test_runtime_sync_s07.py` - S01 の source selection / collision preservation regression tests を追加
 
 #### コミット
-- pending: S01 commit after report update
+- `3112bbd23cb562eb6333d0b45e43ef2e92fabeb5` `feat(runtime): ADRミラー原本の事前検査を追加`
 
 #### メモ
 - full baseline (`python -m unittest discover -v`) は着手前から unrelated failures=106 のため、S01 では対象 suite に絞って検証した。
 - reviewer verdict は S99 final diff review quality gate でも再記録する。
+
+---
+
+### 2026-03-29 02:42 - 02:53
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, EC-003
+
+#### 実施内容
+- successful sync のみを対象に `spec-dock/adrs/` mirror rebuild helper を追加し、valid ADR source から flat な relative symlink 群を生成するようにした。
+- `spec-dock/adrs/` は success path で clear-then-rebuild されるため、rename / delete 後に stale symlink や手動残骸が残らないことを固定した。
+- S01 の collision fail-fast は維持しつつ、preflight 済み source 群を success path の mirror rebuild に引き渡す形へ整理した。
+- `code_reviewer` で S02 scope review を行い、review_status=pass を得た。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_builds_flat_adr_mirror_symlinks_on_success \
+  tests.cli_runtime.test_sync.TestCliSync.test_sync_builds_flat_adr_mirror_and_clears_stale_entries_after_rename_and_delete
+
+Ran 3 tests in 0.475s
+OK
+
+python -m unittest tests.presentation_runtime.test_runtime_sync_s07
+
+Ran 29 tests in 0.094s
+OK
+
+code_reviewer (S02 scope)
+- review_status=pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - flat mirror rebuild と stale cleanup success path を追加
+- `tests/presentation_runtime/test_runtime_sync_s07.py` - runtime-level success path mirror assertions を追加
+- `tests/cli_runtime/test_sync.py` - repeated sync で rename / delete stale cleanup を確認する CLI regression test を追加
+
+#### コミット
+- pending: S02 commit after report update
+
+#### メモ
+- S03 fallback は未着手のため、symlink unsupported / write failure は現時点では hard failure のまま。
 
 ---
 
