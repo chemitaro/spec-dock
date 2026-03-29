@@ -54,6 +54,7 @@ ID: "iss-00040"
   - `tests/cli_runtime/harness.py`
   - `tests/cli_runtime/test_active.py`
   - `tests/cli_runtime/test_deps.py`
+  - `tests/cli_runtime/test_runtime_deps_s04.py`
   - `tests/cli_runtime/test_sync.py`
   - `tests/cli_runtime/test_wrappers.py`
   - `tests/domain_runtime/test_runtime_domain_s01.py`
@@ -69,6 +70,7 @@ ID: "iss-00040"
 ## スコープ
 - MUST:
   - `tests/cli_runtime/test_active.py`、`tests/cli_runtime/test_deps.py`、`tests/cli_runtime/test_sync.py` の fixture と assertion を、GitHub mandatory / `origin` basis の repo scope / fail-closed contract に合わせて更新する。
+  - full regression で後段に顕在化した `tests/cli_runtime/test_runtime_deps_s04.py` の stale expectation も、現行 scoped GitHub linkage / fail-closed contract への未追随であり current stale-contract cluster に属する場合に限り、本 issue の realignment 対象に含める。
   - `tests/cli_runtime/test_wrappers.py` の docs expectation を current workflow/docs contract に合わせて更新する。
   - `tests/domain_runtime/test_runtime_domain_s01.py` の validation expectation を current fail-closed ordering に合わせて更新する。
   - provider asset と checked-in dogfooding runtime mirror の parity drift を解消し、parity check を回復する。

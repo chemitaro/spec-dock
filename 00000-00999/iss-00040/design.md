@@ -44,6 +44,7 @@ ID: "iss-00040"
   - `tests/cli_runtime/test_new.py`
   - `tests/cli_runtime/test_active.py`
   - `tests/cli_runtime/test_deps.py`
+  - `tests/cli_runtime/test_runtime_deps_s04.py`
   - `tests/cli_runtime/test_sync.py`
   - `tests/cli_runtime/test_wrappers.py`
   - `tests/domain_runtime/test_runtime_domain_s01.py`
@@ -72,6 +73,7 @@ ID: "iss-00040"
 - 影響範囲:
   - `tests/cli_runtime/test_active.py`
   - `tests/cli_runtime/test_deps.py`
+  - `tests/cli_runtime/test_runtime_deps_s04.py`（final regression で同一 stale-contract cluster と判明した fail-closed / scoped linkage 未追随のみ）
   - `tests/cli_runtime/test_sync.py`
   - `tests/cli_runtime/test_wrappers.py`
   - `tests/domain_runtime/test_runtime_domain_s01.py`
@@ -139,6 +141,7 @@ tests --> mirror
   - 必要なら stale-contract cluster 用の薄い helper
 - Modify:
   - stale fixture を持つ CLI runtime tests
+  - full regression で同 cluster と確認された `tests/cli_runtime/test_runtime_deps_s04.py` の stale expectation
   - wrapper docs expectation
   - domain validation expectation
   - checked-in dogfooding runtime mirror files
@@ -155,7 +158,7 @@ tests --> mirror
 - AC-002 -> current docs / current fail-closed ordering へ expectation を更新する
 - AC-003 -> provider asset を正本に checked-in mirror parity を回復する
 - AC-004 -> targeted rerun と full-suite rerun で cluster closure を確認する
-- EC-001 -> step ごとの rerun で secondary mismatch を露出し、scope 内だけ取り込む
+- EC-001 -> step ごとの rerun で secondary mismatch を露出し、full regression で見つかった `tests/cli_runtime/test_runtime_deps_s04.py` を含む same-cluster stale expectation だけを scope 内へ取り込む
 - EC-002 -> explicit legacy fixture で compat coverage を保持する
 - EC-003 -> parity recovery を product behavior change なしで完了する
 - constraint -> runtime contract は read-only unless true defect is proven
