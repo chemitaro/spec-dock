@@ -326,6 +326,240 @@ class TestRuntimeSyncS07(unittest.TestCase):
             update_active_from_branch=update_active,
         )
 
+    def _write_discussion_doc(
+        self,
+        scope_dir: Path,
+        filename: str,
+        *,
+        front_matter_lines: list[str] | None,
+    ) -> Path:
+        discussions_dir = scope_dir / "discussions"
+        discussions_dir.mkdir(parents=True, exist_ok=True)
+        path = discussions_dir / filename
+        parts: list[str] = []
+        if front_matter_lines is not None:
+            parts.extend(["---", *front_matter_lines, "---", ""])
+        parts.extend([f"# {filename}", ""])
+        path.write_text("\n".join(parts), encoding="utf-8")
+        return path
+
+    def _write_valid_adr_doc(
+        self,
+        scope_dir: Path,
+        filename: str,
+        *,
+        doc_id: str,
+        scope_id: str,
+    ) -> Path:
+        return self._write_discussion_doc(
+            scope_dir,
+            filename,
+            front_matter_lines=[
+                "種別: ADR（Architecture Decision Record）",
+                f'ID: "{doc_id}"',
+                'タイトル: "ADR"',
+                '状態: "draft"',
+                '作成者: "Tester"',
+                '最終更新: "2026-03-29"',
+                f'親: ["{scope_id}"]',
+            ],
+        )
+
+    def test_collect_adr_mirror_sources_filters_to_valid_multi_scope_adr_inputs(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            epic_dir = Path(records[1].path)
+            issue_api_dir = Path(records[2].path)
+            issue_db_dir = Path(records[3].path)
+            initiative_doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            epic_doc = self._write_valid_adr_doc(
+                epic_dir,
+                "20260312t010204z-adr-epic-decision.md",
+                doc_id="20260312t010204z-adr",
+                scope_id="epic-local-00001",
+            )
+            issue_doc = self._write_valid_adr_doc(
+                issue_api_dir,
+                "20260312t010205z-01-adr-issue-decision.md",
+                doc_id="20260312t010205z-01-adr",
+                scope_id="iss-local-00001",
+            )
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "001-adr-legacy-decision.md",
+                doc_id="001-adr",
+                scope_id="init-local-00001",
+            )
+            self._write_discussion_doc(
+                epic_dir,
+                "20260312t010206z-adr-malformed-frontmatter.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'タイトル: "Missing id and parent"',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_api_dir,
+                "notes.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010207z-adr"',
+                    '親: ["iss-local-00001"]',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_db_dir,
+                "20260312t010208z-adr-parent-mismatch.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010208z-adr"',
+                    'タイトル: "Mismatch"',
+                    '状態: "draft"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-03-29"',
+                    '親: ["epic-local-00001"]',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_db_dir,
+                "20260312t010209z-disc-not-an-adr.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010209z-disc"',
+                    '親: ["iss-local-00002"]',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_db_dir,
+                "20260312t010210z-adr-malformed-kind.md",
+                front_matter_lines=[
+                    "種別: ADRoops",
+                    'ID: "20260312t010210z-adr"',
+                    'タイトル: "Malformed kind"',
+                    '状態: "draft"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-03-29"',
+                    '親: ["iss-local-00002"]',
+                ],
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(self._request(app_contracts), ports)
+            sources = app_sync_state._collect_adr_mirror_sources(state.graph)
+
+            self.assertEqual(
+                {source.source_path for source in sources},
+                {initiative_doc, epic_doc, issue_doc},
+            )
+            self.assertEqual(
+                {source.basename for source in sources},
+                {
+                    "20260312t010203z-adr-init-decision.md",
+                    "20260312t010204z-adr-epic-decision.md",
+                    "20260312t010205z-01-adr-issue-decision.md",
+                },
+            )
+
+    def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            issue_api_dir = Path(records[2].path)
+            basename = "20260312t010203z-adr-shared-decision.md"
+            self._write_valid_adr_doc(
+                initiative_dir,
+                basename,
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            self._write_valid_adr_doc(
+                issue_api_dir,
+                basename,
+                doc_id="20260312t010203z-adr",
+                scope_id="iss-local-00001",
+            )
+            adrs_dir = specdock_dir / "adrs"
+            adrs_dir.mkdir(parents=True, exist_ok=True)
+            sentinel = adrs_dir / "keep.txt"
+            sentinel.write_text("keep-me\n", encoding="utf-8")
+            spy_writer = _SpyArtifactWriter()
+            events: list[str] = []
+            active_store = _StubActiveStateStore(infra_contracts, events)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=active_store,
+                git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts, update_active=True), ports)
+
+            self.assertFalse(spy_writer.called)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_before_write")
+            self.assertIn("ADR mirror basename collision", result.artifact_failure.reason)
+            self.assertIn(basename, result.artifact_failure.reason)
+            self.assertIsNone(result.active_update)
+            self.assertIsNone(result.state.active)
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep-me\n")
+            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), ["keep.txt"])
+            self.assertEqual(events, ["active.load.migrate"])
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+            self.assertIn("ADR mirror basename collision", rendered.stderr_lines[0])
+
     def test_sync_use_case_writes_artifacts_and_paths(self) -> None:
         (
             _runtime_app,

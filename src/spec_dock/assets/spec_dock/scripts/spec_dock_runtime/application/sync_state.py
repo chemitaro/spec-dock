@@ -1,16 +1,31 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
+from dataclasses import dataclass
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal, cast
 
 from ..domain.active import infer_active_node_from_branch
 from ..domain.deps import build_deps_state, build_effective_deps_map, evaluate_readiness, validate_deps_cycles
-from ..domain.models import ActiveSelection, DepsEvaluation, DepsState, IssueSnapshot, NodeId, SpecNodeKind, SpecNodeSeed
+from ..domain.models import (
+    ActiveSelection,
+    DepsEvaluation,
+    DepsState,
+    IssueSnapshot,
+    NodeId,
+    SpecGraph,
+    SpecNodeKind,
+    SpecNodeSeed,
+)
 from ..domain.status import build_progress_map, resolve_issue_snapshot_by_issue_id
 from ..domain.tree import build_graph, select_active_chain
-from ..domain.validation import find_github_repo_scope_pairing_error, validate_graph_and_deps
+from ..domain.validation import (
+    _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE,
+    find_github_repo_scope_pairing_error,
+    validate_graph_and_deps,
+)
 from ..infra.contracts import ActiveManifest, StoredMetaRecord
 from ..presentation.contracts import ArtifactBundle
 from ..presentation.json_state import (
@@ -47,6 +62,14 @@ class _ArtifactWriteExecutionError(RuntimeError):
         super().__init__(reason)
         self.status = status
         self.reason = reason
+
+
+@dataclass(frozen=True)
+class _AdrMirrorSource:
+    scope_id: str
+    source_path: Path
+    basename: str
+    doc_id: str
 
 
 def _append_unique(values: list[str], value: str) -> None:
@@ -136,6 +159,123 @@ def _require_sync_runner(ports: Ports):
     if runner is None:
         raise RuntimeError("sync_legacy_runner is required")
     return runner
+
+
+def _path_for_output(path: Path, *, repo_root: Path | None = None) -> str:
+    if repo_root is not None:
+        try:
+            return path.relative_to(repo_root).as_posix()
+        except ValueError:
+            pass
+    return path.as_posix()
+
+
+def _parse_required_adr_front_matter(path: Path) -> tuple[str, str] | None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    lines = text.splitlines()
+    if len(lines) < 3 or lines[0].strip() != "---":
+        return None
+    try:
+        closing_index = next(index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---")
+    except StopIteration:
+        return None
+    front_matter_lines = lines[1:closing_index]
+    entries: dict[str, str] = {}
+    for line in front_matter_lines:
+        key, separator, value = line.partition(":")
+        if not separator:
+            continue
+        entries[key.strip()] = value.strip()
+    doc_kind = entries.get("種別")
+    doc_id = entries.get("ID")
+    parents_raw = entries.get("親")
+    if doc_kind is None or doc_id is None or parents_raw is None:
+        return None
+    normalized_kind = doc_kind.strip().strip('"').strip("'")
+    if normalized_kind != "ADR":
+        kind_suffix = normalized_kind[3:].strip() if normalized_kind.startswith("ADR") else ""
+        if len(kind_suffix) <= 2 or (kind_suffix[0], kind_suffix[-1]) not in (("(", ")"), ("（", "）")):
+            return None
+    if not (doc_id.startswith('"') and doc_id.endswith('"')):
+        return None
+    try:
+        parents = json.loads(parents_raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parents, list) or not parents or not isinstance(parents[0], str):
+        return None
+    return (doc_id[1:-1], parents[0])
+
+
+def _adr_doc_id_from_basename(basename: str) -> str | None:
+    matched = _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE.fullmatch(basename)
+    if matched is None or matched.group("doc_type") != "adr":
+        return None
+    timestamp = str(matched.group("ts"))
+    suffix_raw = matched.group("nn")
+    if suffix_raw is None:
+        return f"{timestamp}-adr"
+    return f"{timestamp}-{int(suffix_raw):02d}-adr"
+
+
+def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
+    sources: list[_AdrMirrorSource] = []
+    scope_nodes = sorted(
+        (node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")),
+        key=lambda node: (node.kind, node.id, node.path.as_posix()),
+    )
+    for scope in scope_nodes:
+        discussions_dir = scope.path / "discussions"
+        if not discussions_dir.exists():
+            continue
+        for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+            basename = path.name
+            doc_id = _adr_doc_id_from_basename(basename)
+            if doc_id is None:
+                continue
+            front_matter = _parse_required_adr_front_matter(path)
+            if front_matter is None:
+                continue
+            front_matter_doc_id, parent_scope_id = front_matter
+            if front_matter_doc_id != doc_id:
+                continue
+            if parent_scope_id != scope.id:
+                continue
+            sources.append(
+                _AdrMirrorSource(
+                    scope_id=scope.id,
+                    source_path=path,
+                    basename=basename,
+                    doc_id=doc_id,
+                )
+            )
+    return sources
+
+
+def _preflight_adr_mirror_sources(result: SyncStateResult) -> list[_AdrMirrorSource]:
+    sources = _collect_adr_mirror_sources(result.graph)
+    sources_by_basename: dict[str, list[_AdrMirrorSource]] = {}
+    for source in sources:
+        sources_by_basename.setdefault(source.basename, []).append(source)
+    collisions = sorted(
+        (basename, entries)
+        for basename, entries in sources_by_basename.items()
+        if len(entries) > 1
+    )
+    if collisions:
+        basename, entries = collisions[0]
+        source_list = ", ".join(
+            _path_for_output(entry.source_path, repo_root=result.repo_root)
+            for entry in sorted(entries, key=lambda item: item.source_path.as_posix())
+        )
+        raise _ArtifactWriteExecutionError(
+            status="failed_before_write",
+            reason=f"ADR mirror basename collision: {basename} sources=[{source_list}]",
+        )
+    return sources
 
 
 def _can_collect_natively(ports: Ports) -> bool:
@@ -412,9 +552,13 @@ def maybe_auto_update_from_branch(
 def write_sync_artifacts(
     result: SyncStateResult,
     ports: Ports,
+    *,
+    preflight_adr_mirror_sources: bool = True,
 ) -> ArtifactWriteResult:
     if ports.artifact_writer is None:
         raise RuntimeError("artifact_writer is required")
+    if preflight_adr_mirror_sources:
+        _preflight_adr_mirror_sources(result)
     specdock_dir = _resolve_specdock_dir(ports)
     bundle = ArtifactBundle(
         index=render_index_artifact(result),
@@ -446,11 +590,24 @@ def _sync_impl(
     state = collect_sync_state(req, ports, active_manifest_mode=active_manifest_mode)
     active_update: ActiveUpdateOutcome | None = None
     final_state = state
+    try:
+        _preflight_adr_mirror_sources(state)
+    except _ArtifactWriteExecutionError as error:
+        return SyncCommandResult(
+            state=final_state,
+            write_result=None,
+            active_update=active_update,
+            artifact_failure=ArtifactWriteFailure(status=error.status, reason=error.reason),
+        )
     if req.update_active_from_branch and not req.force:
         final_state, active_update = maybe_auto_update_from_branch(state, ports)
 
     try:
-        write_result = write_sync_artifacts(final_state, ports)
+        write_result = write_sync_artifacts(
+            final_state,
+            ports,
+            preflight_adr_mirror_sources=False,
+        )
     except _ArtifactWriteExecutionError as error:
         return SyncCommandResult(
             state=final_state,
