@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -559,6 +560,66 @@ class TestRuntimeSyncS07(unittest.TestCase):
             rendered = presentation_cli_text.render_sync_text(result)
             self.assertIn("failed (sync)", rendered.stderr_lines[0])
             self.assertIn("ADR mirror basename collision", rendered.stderr_lines[0])
+
+    def test_sync_builds_flat_adr_mirror_symlinks_on_success(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            issue_api_dir = Path(records[2].path)
+            initiative_doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            issue_doc = self._write_valid_adr_doc(
+                issue_api_dir,
+                "20260312t010205z-01-adr-issue-decision.md",
+                doc_id="20260312t010205z-01-adr",
+                scope_id="iss-local-00001",
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts), ports)
+
+            self.assertIsNone(result.artifact_failure)
+            adrs_dir = specdock_dir / "adrs"
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertEqual(
+                sorted(path.name for path in adrs_dir.iterdir()),
+                [initiative_doc.name, issue_doc.name],
+            )
+            for source in (initiative_doc, issue_doc):
+                link_path = adrs_dir / source.name
+                self.assertTrue(link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}")
+                self.assertFalse(os.readlink(link_path).startswith("/"), os.readlink(link_path))
+                self.assertEqual(link_path.resolve(), source.resolve())
 
     def test_sync_use_case_writes_artifacts_and_paths(self) -> None:
         (

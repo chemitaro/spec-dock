@@ -92,6 +92,60 @@ class TestCliSync(CliRuntimeHarness):
             self.assertEqual(issue_item, index_nodes["iss-local-00001"])
             self._run_runtime(target, ["validate"])
 
+    def test_sync_builds_flat_adr_mirror_and_clears_stale_entries_after_rename_and_delete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlinks not supported in test environment")
+
+            self._create_same_repo_linked_hierarchy(target)
+            self._run_runtime(target, ["new", "doc", "adr", "--initiative", "init-00001", "--title", "Initiative decision"])
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Issue decision"])
+
+            specdock_dir = target / "spec-dock"
+            initiative_dir = specdock_dir / "initiatives" / "init-00001-auth-platform"
+            issue_dir = (
+                initiative_dir
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            initiative_doc = next((initiative_dir / "discussions").glob("*-adr-initiative-decision.md"))
+            issue_doc = next((issue_dir / "discussions").glob("*-adr-issue-decision.md"))
+
+            self._run_runtime(target, ["sync"])
+
+            adrs_dir = specdock_dir / "adrs"
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertEqual(
+                sorted(path.name for path in adrs_dir.iterdir()),
+                sorted([initiative_doc.name, issue_doc.name]),
+            )
+            for source in (initiative_doc, issue_doc):
+                link_path = adrs_dir / source.name
+                self.assertTrue(link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}")
+                self.assertFalse(os.readlink(link_path).startswith("/"), os.readlink(link_path))
+                self.assertEqual(link_path.resolve(), source.resolve())
+
+            renamed_issue_doc = issue_doc.with_name(issue_doc.name.replace("-issue-decision.md", "-issue-decision-renamed.md"))
+            issue_doc.rename(renamed_issue_doc)
+
+            self._run_runtime(target, ["sync"])
+
+            self.assertFalse((adrs_dir / issue_doc.name).exists())
+            renamed_link = adrs_dir / renamed_issue_doc.name
+            self.assertTrue(renamed_link.is_symlink(), f"missing renamed ADR mirror symlink: {renamed_link}")
+            self.assertEqual(renamed_link.resolve(), renamed_issue_doc.resolve())
+
+            renamed_issue_doc.unlink()
+
+            self._run_runtime(target, ["sync"])
+
+            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), [initiative_doc.name])
+            self.assertFalse(renamed_link.exists())
+
     def test_sync_emits_all_and_todo_json_views(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
