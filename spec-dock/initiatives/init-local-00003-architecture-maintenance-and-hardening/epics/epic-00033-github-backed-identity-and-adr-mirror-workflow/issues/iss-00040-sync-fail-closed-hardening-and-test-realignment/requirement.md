@@ -84,15 +84,16 @@ ID: "iss-00040"
 
 ## 境界
 - Always:
-  - current runtime/docs contract を source of truth とする。
-  - normal path tests と legacy-compat tests の fixture 戦略を分離する。
-  - checked-in dogfooding mirror は provider asset に一致させる。
-- Ask:
-  - implementation 中に test realignment では閉じない true product defect が見つかった場合、その時点で別 issue 化するか最小修正で同 issue に含めるか判断する。
-  - full-suite rerun 後に残る failure が current stale-contract cluster と無関係なら別 issue に切る。
+   - current runtime/docs contract を source of truth とする。
+   - normal path tests と legacy-compat tests の fixture 戦略を分離する。
+   - checked-in dogfooding mirror は provider asset に一致させる。
+- Stop / Escalate:
+  - implementation 中に test realignment / parity recovery では閉じない true product defect が見つかった場合、この issue の implementation を停止し、`report.md` に所見を記録した上で、人間の判断により別 issue 化または明示的な scope update が承認されるまで runtime behavior に触れない。
+  - full-suite rerun 後に残る failure が current stale-contract cluster と無関係なら、本 issue の close 判定では scope 外として `report.md` に記録し、人間判断で別 issue または既存 issue 参照先へエスカレーションする。
 - Never:
-  - `new --no-github` の normal path success を戻して tests を通すこと。
-  - `origin` 必須の repo scope resolver を無効化して tests を通すこと。
+   - `new --no-github` の normal path success を戻して tests を通すこと。
+   - `origin` 必須の repo scope resolver を無効化して tests を通すこと。
+   - true product defect を見つけたことを理由に、この issue 内で runtime rollback や無承認の scope expansion を行うこと。
 
 ## 非交渉制約
 - epic-00033 の GitHub-backed identity / repo-scope / fail-closed postureに反しないこと。

@@ -105,11 +105,83 @@ spec review: fail -> fix -> re-review -> pass
 
 ---
 
+### 2026-03-29 06:20 - 06:35
+
+#### 対象
+- Step: SG1 spec rework / pending re-review
+- AC/EC: AC-004, EC-001
+
+#### 実施内容
+- spec reviewer から reviewer timing、AC-004 の premature closure、true runtime defect 発見時の escalation ambiguity について fail 指摘を受けた。
+- `spec-dock/active/issue/plan.md` で AC-004 を S05 close に固定し、per-step approval loop と stop/escalation rule を明記した。
+- `spec-dock/active/issue/requirement.md` で Ask 境界を stop/escalation rule に置き換え、runtime rollback 禁止と human judgment 必須を固定した。
+- docs 修正後のため、spec re-review が必要な状態で記録した。
+
+#### 実行コマンド / 結果
+```bash
+spec review: fail
+
+- 指摘:
+  - step ごとの reviewer timing / approval loop が plan に明示されていない
+  - AC-004 が S01 baseline で close 扱いになっている
+  - true runtime defect 発見時の requirement/design/plan boundary が曖昧
+- 対応:
+  - requirement / plan を修正
+  - 再レビュー待ち
+```
+
+#### 変更したファイル
+- `spec-dock/active/issue/plan.md` - per-step approval loop、AC-004 close timing、stop/escalation rule を修正
+- `spec-dock/active/issue/requirement.md` - Ask 境界を stop/escalation rule へ修正
+- `spec-dock/active/issue/report.md` - この記録
+
+#### コミット
+- なし
+
+#### メモ
+- この時点では spec reviewer 再承認は未取得。
+
+---
+
+### 2026-03-29 06:35 - 06:41
+
+#### 対象
+- Step: SG1 spec re-review after docs fixes
+- AC/EC: AC-004, EC-001
+
+#### 実施内容
+- reviewer timing / AC-004 / escalation 修正後の docs で spec re-review を依頼した。
+- spec reviewer から pass を受領し、material な追加指摘がないことを確認した。
+- issue spec は implementation 開始可能となり、以降は S02 へ進行できる状態とした。
+
+#### 実行コマンド / 結果
+```bash
+spec review: re-review -> pass
+
+- docs fixes 後に再レビュー依頼
+- review_status=pass
+- material findings なし
+- implementation は S02 へ進行可能
+```
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - この記録
+
+#### コミット
+- なし
+
+#### メモ
+- docs 修正に対する spec re-review は完了済み。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - 初回 spec review で issue close criteria と epic ownership の曖昧さを指摘された。
+  - 追加で、reviewer timing / AC-004 close timing / escalation boundary の曖昧さを指摘された。
   - 解決:
-    - issue requirement / plan / epic plan をそれぞれ補強し、再レビューで `pass` を取得した。
+    - issue requirement / plan / epic plan を段階的に補強した。
+    - 最新の docs 修正に対する spec re-review で pass を取得し、implementation を S02 へ進められる状態にした。
 
 ## 学んだこと (任意)
 - stale-contract cluster は production bug と同じくらい full suite の signal を壊すため、issue docs で scope を明示しておく価値が高い。
