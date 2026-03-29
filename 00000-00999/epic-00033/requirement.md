@@ -5,7 +5,7 @@ ID: "epic-00033"
 関連GitHub: ["#33"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-29"
 親: ["init-local-00003"]
 ---
 
@@ -63,6 +63,7 @@ ID: "epic-00033"
     - `001-adr...` / `002-adr...` など pre-contract legacy ADR は grandfathered planning artifacts として保持し、自動 rename 対象ではないこと。
 - E-RQ-004:
   - `sync` は `spec-dock/adrs/` を毎回クリアしてから symlink mirror を全再生成し、rename / delete 後の stale symlink を残さないこと。index/manifest は導入しないこと。
+  - mirror 対象は、各 scope の `discussions/` 配下にあり、basename が timestamp-prefix ADR grammar に一致し、`new doc adr` template が出力する ADR front matter contract に一致する原本に限定すること。legacy ADR は grandfathered artifact として残っていてよいが、mirror 対象として読むことは求めない。
   - symlink 非対応環境では mirror を空の generated directory として残すか再作成し、warning を出しつつ成功扱いにできること（重要なのは stale link を残さないこと）。
 - E-RQ-005:
   - docs / tests / dogfooding parity が新 contract に揃うこと。
@@ -112,7 +113,8 @@ ID: "epic-00033"
   - When:
     - ADR 原本を走査する
   - Then:
-    - `spec-dock/adrs/` は毎回クリア後に symlink mirror が全再生成され、rename / delete 済み ADR を指す stale symlink が残らない
+    - `spec-dock/adrs/` は毎回クリア後に symlink mirror が全再生成され、各 scope の `discussions/` 配下で basename が timestamp ADR grammar に一致し `new doc adr` front matter contract を満たす原本だけを指す
+    - legacy ADR は mirror 対象として読まれず、rename / delete 済み ADR を指す stale symlink が残らない
     - symlink 非対応環境では `spec-dock/adrs/` は空の generated directory として残るか再作成され、warning を出しつつ成功扱いになる
   - 観測点:
     - sync tests、filesystem assertions
@@ -168,6 +170,7 @@ ID: "epic-00033"
   - `configured repo scope` のような追加設定値は `origin` と一致必須であり、不一致は fail-fast validation / create reject される
   - old workspace は rebuildable
   - `spec-dock/adrs/` は generated symlink mirror
+  - `spec-dock/adrs/` の mirror 対象は timestamp/new-doc-adr contract に一致する ADR 原本に限定され、legacy ADR は mirror 目的では無視してよい
 - Never:
   - old contract と new contract の dual-mode 長期共存
   - stale index / manifest を第二の source-of-truth として持つこと
