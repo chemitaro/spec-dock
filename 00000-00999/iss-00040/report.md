@@ -175,6 +175,50 @@ spec review: re-review -> pass
 
 ---
 
+### 2026-03-29 06:41 - 07:05
+
+#### 対象
+- Step: S02 CLI fixture realignment
+- AC/EC: AC-004, EC-001
+
+#### 実施内容
+- `tests/cli_runtime/harness.py`、`tests/cli_runtime/test_active.py`、`tests/cli_runtime/test_deps.py`、`tests/cli_runtime/test_sync.py` の CLI fixture realignment を実施した。
+- 現行 runtime contract は維持したまま、legacy local compat coverage を explicit fixture で復元した。
+- deps の local-only / fallback 系が imported id と削除済み GitHub metadata に依存しないように補正し、kind ごとに authentic な legacy local id を materialize する compat helper へ調整した。
+- ready-path の deps test で弱まっていた exit-code coverage を元の期待値まで戻した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_no_deps_is_ready -v
+python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_accepts_explicit_id_flag -v
+python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing -v
+python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_sync -v
+
+- deps の final review-fix loop targeted rerun は 3 件とも pass。
+- `python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_sync -v` は `Ran 109 tests ... OK` で pass。
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/harness.py` - legacy local compat fixture materialization を per-kind の authentic local id 生成へ修正
+- `tests/cli_runtime/test_active.py` - current runtime contract を維持したまま explicit legacy local compat coverage へ整列
+- `tests/cli_runtime/test_deps.py` - deps local-only / fallback coverage を true `*-local-*` fixture 基準へ修正し、ready-path exit-code assertion を復元
+- `tests/cli_runtime/test_sync.py` - CLI fixture realignment に追随して legacy local compat coverage を明示化
+- `spec-dock/active/issue/report.md` - この記録
+
+#### レビューループ
+- 初回 code review は fail。deps の local-only tests が、削除済み GitHub metadata を持たない imported id のままで、true `*-local-*` compat fixture を使えていない点を指摘された。
+- 追補後の code review も fail。local compat helper が GitHub number suffix を温存しており authentic な legacy local id を生成できていない点と、ready-path の deps test で exit-code coverage が弱まっていた点を指摘された。
+- 最新修正で、compat materialization を kind ごとの authentic local id 割り当てへ変更し、ready-path の exit-code assertion も復元した。
+- 最終 `code_reviewer` verdict は `pass`。
+
+#### コミット
+- なし
+
+#### メモ
+- commit は未実施のため、このログ時点の commit 情報は pending / none 扱い。
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - 初回 spec review で issue close criteria と epic ownership の曖昧さを指摘された。
@@ -192,4 +236,7 @@ spec review: re-review -> pass
 - close 判定時は AC-004 に従い、remaining failures があれば scope 外判定と参照 issue を report に残す。
 
 ## 省略/例外メモ (必須)
-- 実装・テスト修正・commit 自体はまだ未着手。
+- SG1 docs scope はコミット済み。
+- S02 の実装 / テスト修正は完了済みで、code review も pass 済み。
+- S02 の commit はこの report 更新後に実施する前提のため、この時点では未実施。
+- 以降の later steps は未着手。
