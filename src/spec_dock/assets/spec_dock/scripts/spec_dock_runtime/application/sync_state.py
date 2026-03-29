@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from datetime import datetime
 from dataclasses import dataclass
 from dataclasses import replace
@@ -278,6 +280,24 @@ def _preflight_adr_mirror_sources(result: SyncStateResult) -> list[_AdrMirrorSou
     return sources
 
 
+def _unlink_any(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+
+
+def _rebuild_adr_mirror(specdock_dir: Path, sources: list[_AdrMirrorSource]) -> None:
+    adrs_dir = specdock_dir / "adrs"
+    _unlink_any(adrs_dir)
+    adrs_dir.mkdir(parents=True, exist_ok=True)
+    for source in sorted(sources, key=lambda item: item.basename):
+        link_path = adrs_dir / source.basename
+        rel_target = os.path.relpath(source.source_path, start=adrs_dir)
+        os.symlink(rel_target, link_path)
+
+
 def _can_collect_natively(ports: Ports) -> bool:
     return ports.deps_topology_reader is not None
 
@@ -553,12 +573,17 @@ def write_sync_artifacts(
     result: SyncStateResult,
     ports: Ports,
     *,
+    adr_mirror_sources: list[_AdrMirrorSource] | None = None,
     preflight_adr_mirror_sources: bool = True,
 ) -> ArtifactWriteResult:
     if ports.artifact_writer is None:
         raise RuntimeError("artifact_writer is required")
-    if preflight_adr_mirror_sources:
-        _preflight_adr_mirror_sources(result)
+    if adr_mirror_sources is not None:
+        sources = list(adr_mirror_sources)
+    elif preflight_adr_mirror_sources:
+        sources = _preflight_adr_mirror_sources(result)
+    else:
+        raise RuntimeError("adr_mirror_sources is required when preflight_adr_mirror_sources is False")
     specdock_dir = _resolve_specdock_dir(ports)
     bundle = ArtifactBundle(
         index=render_index_artifact(result),
@@ -567,7 +592,9 @@ def write_sync_artifacts(
         dashboard=render_dashboard(result),
     )
     try:
-        return ports.artifact_writer.write(specdock_dir, bundle)
+        write_result = ports.artifact_writer.write(specdock_dir, bundle)
+        _rebuild_adr_mirror(specdock_dir, sources)
+        return write_result
     except Exception as error:
         # FileArtifactWriter writes sequentially and is non-atomic. Any writer exception
         # must preserve partial/stale possibility even when active_update was not applied.
@@ -591,7 +618,7 @@ def _sync_impl(
     active_update: ActiveUpdateOutcome | None = None
     final_state = state
     try:
-        _preflight_adr_mirror_sources(state)
+        adr_mirror_sources = _preflight_adr_mirror_sources(state)
     except _ArtifactWriteExecutionError as error:
         return SyncCommandResult(
             state=final_state,
@@ -606,6 +633,7 @@ def _sync_impl(
         write_result = write_sync_artifacts(
             final_state,
             ports,
+            adr_mirror_sources=adr_mirror_sources,
             preflight_adr_mirror_sources=False,
         )
     except _ArtifactWriteExecutionError as error:
