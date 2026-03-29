@@ -336,6 +336,10 @@ ID: "iss-00035"
   - `tests/presentation_runtime/test_runtime_sync_s07.py`
   - `tests/cli_runtime/test_sync.py`
   - issue に追加した targeted tests
+- evidence rule:
+  - 上記 file-level suites は実行して結果を `report.md` に記録する
+  - 既知の pre-existing / issue-scope 外 failure が file-level suite に含まれる場合、S99 gate の pass/fail 判定は issue が追加・変更した targeted tests と impacted runtime/presentation suite と `./spec-dock/scripts/spec-dock validate` を正本 evidence とする
+  - 例外を採用した場合は、file-level suite failure の内訳と issue-scope gate evidence への対応づけを `report.md` に明記する
 - reviewer approvals:
   - implementation review pass
   - QA review pass
