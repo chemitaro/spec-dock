@@ -5,7 +5,7 @@ ID: "epic-00033"
 関連GitHub: ["#33"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-29"
 依存: ["requirement.md", "design.md"]
 親: ["init-local-00003"]
 ---
@@ -39,6 +39,7 @@ ID: "epic-00033"
 - `issue-3-sync-adr-symlink-mirror` -> `iss-00035`（GitHub #35）
 - `issue-4-migration-guardrails-and-validation-hardening` -> `iss-00037`（GitHub #37）
 - `issue-5-docs-dogfooding-parity-and-final-regression-gate` -> `iss-00038`（GitHub #38）
+- `issue-6-sync-fail-closed-hardening-and-test-realignment` -> `iss-00040`（GitHub #40）
 
 ## Issue 一覧（順序 / tranche 付き）
 - iss-00034:
@@ -131,11 +132,45 @@ ID: "epic-00033"
     - iss-00034
     - iss-00036
     - iss-00035
+- iss-00040:
+  - actual issue id:
+    - `iss-00040`（GitHub #40）
+  - 関係:
+    - `iss-00038` の全面置換ではない
+    - `iss-00038` から wrappers / domain / dogfooding parity / final regression ownership を分割して引き取る split follow-up issue とする
+    - non-overlap rule:
+      - wrappers / domain / dogfooding parity / final regression の実行責務は `iss-00040` 専属とし、`iss-00038` 側では再実行しない
+  - 目的:
+    - current contract を正本として stale-contract cluster を realign し、wrappers / domain / dogfooding parity / final regression を閉じる
+  - deliverable:
+    - `active` / `deps` / `sync` fixture realignment evidence
+    - legacy-compat targeted evidence（issue plan の legacy-compat tests 参照）:
+      - `python -m unittest tests.cli_runtime.test_active.TestCliActive.test_active_set_local_only_node_does_not_rename_branch -v`
+      - `python -m unittest tests.cli_runtime.test_active.TestCliActive.test_active_set_without_github_local_issue_without_deps_is_ready -v`
+      - `python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing -v`
+      - `python -m unittest tests.cli_runtime.test_sync.TestCliSync.test_local_only_issue_is_open_and_ready_without_deps -v`
+    - wrappers docs expectation realignment evidence
+    - domain validation expectation realignment evidence
+    - provider asset と checked-in dogfooding runtime mirror の parity recovery evidence
+    - final regression evidence（stale-contract cluster 解消の識別を含む）
+  - tranche:
+    - tranche-3 / close-out
+  - closes:
+    - E-AC-005
+  - depends on:
+    - iss-00034
+    - iss-00036
+    - iss-00035
+    - iss-00037
 - iss-00038:
   - actual issue id:
     - `iss-00038`（GitHub #38）
+  - 関係:
+    - `iss-00040` に wrappers / domain / dogfooding parity / final regression ownership を分割した後の docs close-out owner とする
+    - non-overlap rule:
+      - 残責務は docs parity + final spec review record のみとし、wrappers/domain/dogfooding parity と final regression 実行は担当しない
   - 目的:
-    - provider docs / tests / dogfooding mirror を新 contract に揃え、最終回帰を閉じる
+    - provider docs / dogfooding docs を新 contract に揃え、final spec review record を閉じる
   - deliverable:
     - docs parity（provider + dogfooding）
     - 更新対象:
@@ -149,27 +184,29 @@ ID: "epic-00033"
     - old local-only / sequential / index assumption 除去を closure evidence として明示
     - `./spec-dock/scripts/spec-dock validate` 実行 evidence（exit=0）
     - `./spec-dock/scripts/spec-dock sync` 実行 evidence（exit=0）
-    - targeted unittest output（本 epic 変更対象 suite が exit=0）
-    - final spec review record（verdict=`pass`、iss-00034/iss-00036/iss-00035/iss-00037/iss-00038 の close evidence 参照付き）
+    - final spec review record（verdict=`pass`、iss-00034/iss-00036/iss-00035/iss-00037/iss-00040/iss-00038 の close evidence 参照付き）
   - tranche:
-    - tranche-3 / close-out
+    - tranche-3 / close-out final
   - closes:
-    - E-RQ-005, E-AC-005
+    - E-RQ-005
+  - contributes to:
+    - E-AC-005 docs/spec-review slice
   - depends on:
     - iss-00034
     - iss-00036
     - iss-00035
     - iss-00037
+    - iss-00040
 
 ## 統合チェックポイント
 - G1 decomposition review:
   - issue 分解が contract 単位で分かれていることを plan diff で確認できる（E-AC-004 は iss-00034/iss-00036 の先行ガード + iss-00037 final closure owner を明示）
 - G2 integration readiness:
-  - create / doc / sync / validate / docs parity の依存順が issue depends-on で確認できる
+  - create / doc / sync / validate / docs parity / wrappers-domain-parity / final spec review の依存順が issue depends-on で確認できる
 - G3 rollout/docs impact:
   - rebuildable workspace boundary が named docs diff + validate contract tests + migration boundary tests に現れている
 - G9 final epic spec review:
-  - iss-00034/iss-00036/iss-00035/iss-00037/iss-00038 の close evidence が全て参照可能であり、final spec review verdict=`pass` が記録される
+  - iss-00034/iss-00036/iss-00035/iss-00037/iss-00040/iss-00038 の close evidence が全て参照可能であり、final spec review verdict=`pass` が記録される
 
 ## 品質ゲート
 - test / observability / migration / docs:
@@ -201,16 +238,28 @@ ID: "epic-00033"
     - targeted unittest output（migration/validate 関連 suite、exit=0）
     - `./spec-dock/scripts/spec-dock validate` 実行 evidence（exit=0）
   - gate-5:
-    - iss-00038 完了時に以下 artifact が揃い、全て pass であること
+    - iss-00040（`iss-00038` から split された wrappers/domain/dogfooding parity/final regression owner）完了時に以下 artifact が揃い、全て pass であること
+    - targeted unittest output（`active` / `deps` / `sync` current-contract realignment、exit=0）
+    - targeted unittest output（`wrappers` / `domain` expectation realignment、exit=0）
+    - legacy-compat targeted evidence（issue plan の legacy-compat tests と同一）:
+      - `python -m unittest tests.cli_runtime.test_active.TestCliActive.test_active_set_local_only_node_does_not_rename_branch -v`
+      - `python -m unittest tests.cli_runtime.test_active.TestCliActive.test_active_set_without_github_local_issue_without_deps_is_ready -v`
+      - `python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing -v`
+      - `python -m unittest tests.cli_runtime.test_sync.TestCliSync.test_local_only_issue_is_open_and_ready_without_deps -v`
+    - dogfooding runtime parity recovery evidence
+    - parity test output（checked-in dogfooding runtime mirror match provider assets、exit=0）
+    - final regression evidence（stale-contract cluster 解消の識別を含む）
+  - gate-6:
+    - iss-00038（docs close-out / final spec review owner）完了時に以下 artifact が揃い、全て pass であること
     - targeted docs list diff（6ファイル）
     - `./spec-dock/scripts/spec-dock validate` 実行 evidence（exit=0）
     - `./spec-dock/scripts/spec-dock sync` 実行 evidence（exit=0）
-    - targeted unittest output（epic 対象回帰、exit=0）
-    - final spec review record（verdict=`pass`）
+    - final spec review record（verdict=`pass`、`iss-00040` final regression evidence 参照付き）
+    - non-overlap check（`iss-00038` では wrappers/domain/dogfooding parity と final regression を再実行しない）
 
 ## ロールアウト / docs impact
 - rollout order:
-  - create contract -> doc naming -> sync mirror -> migration guardrails -> docs/tests parity
+  - create contract -> doc naming -> sync mirror -> migration guardrails -> wrappers/domain/dogfooding parity/final regression -> docs parity -> final spec review
 - contract / docs refresh:
   - GitHub mandatory
   - no local-only
@@ -225,13 +274,14 @@ ID: "epic-00033"
 
 ## final exit contract
 - E-AC closure:
-  - 全 acceptance criteria に対して iss-00034/iss-00036/iss-00035/iss-00037/iss-00038 の close evidence が 1:1 で対応付けられている
+  - 全 acceptance criteria に対して iss-00034/iss-00036/iss-00035/iss-00037/iss-00040/iss-00038 の close evidence が対応付けられている
   - E-AC-004 は iss-00034/iss-00036 の先行ガードを前提に、iss-00037（final closure owner）で migration boundary 3条項（強制的 backward compatibility 非維持 / `spec-dock update` in-place 自動移行非保証 / 既存 checked-in data 無断破壊を目的にしない）が clause-by-clause で個別 evidence 化されている
+  - E-AC-005 は `iss-00038` の全面置換ではなく split follow-up として `iss-00040` が wrappers / domain / dogfooding parity / final regression ownership を引き取り、`iss-00038` は docs close-out と final spec review record を保持する
 - integration / rollout complete:
-  - create / doc / sync / validate / docs parity が新 contract に揃い、各 issue の観測可能 evidence（targeted unittest exit=0、validate exit=0、sync exit=0）で確認できる
+  - create / doc / sync / validate / docs parity / wrappers-domain parity / final regression が新 contract に揃い、各 issue の観測可能 evidence（targeted unittest exit=0、validate exit=0、sync exit=0、parity test exit=0）で確認できる
 - docs impact resolved:
   - `reference_github.md` / `reference_naming.md` / `reference_sync.md`（provider + dogfooding）で old local-only / sequential / index assumptions が除去され、targeted docs list diff で確認できる
-  - final spec review verdict は `pass` である
+  - final spec review verdict は `pass` であり、`iss-00040` の final regression evidence を参照している
 
 ## 依存 / ブロッカー
 - D-001:
