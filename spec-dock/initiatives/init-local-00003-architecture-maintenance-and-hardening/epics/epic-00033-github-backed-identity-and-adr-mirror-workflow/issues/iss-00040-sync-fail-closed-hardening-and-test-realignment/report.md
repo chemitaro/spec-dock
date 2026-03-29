@@ -339,6 +339,50 @@ python -m unittest discover -v
 
 ---
 
+---
+
+### 2026-03-30 00:00 - 00:20
+
+#### 対象
+- Step: acceptance / close readiness confirmation
+- AC/EC: AC-001, AC-002, AC-003, AC-004
+
+#### 実施内容
+- 現在の実装ブランチと Git 状態を確認し、worktree が clean であることを確認した。
+- spec-dock の正規ルートとして `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` を実行し、どちらも成功した。
+- issue の受入観点に対応する targeted suites と full regression を再実行し、issue close 判定に必要な evidence を再確認した。
+- `iss-00040` は epic `gate-5` の owner issue として要求された stale-contract cluster realignment / wrapper-domain expectation realignment / dogfooding parity / final regression evidence を満たしていると判断した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
+python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_sync -v
+python -m unittest tests.cli_runtime.test_wrappers tests.domain_runtime.test_runtime_domain_s01 -v
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+python -m unittest discover -v
+
+- `validate` は `spec-dock: ok (validate) nodes=9` で成功。
+- `sync --github` は active unchanged のまま成功。
+- targeted CLI runtime suites は `Ran 109 tests ... OK` で pass。
+- wrapper/domain suites は `Ran 15 tests ... OK` で pass。
+- parity test は `OK`。
+- full suite は `Ran 525 tests ... OK` で pass。
+```
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - この記録
+
+#### レビューサマリー
+- close readiness の観点で、既存の final `spec_reviewer` / `code_reviewer` / `qa_reviewer` pass と acceptance rerun evidence が矛盾なく揃っていることを確認した。
+
+#### コミット
+- pending
+
+#### メモ
+- この時点で `iss-00040` の issue close 条件は満たされている。
+- epic 全体としては `iss-00038` の docs close-out / final spec review record が残っているため、epic 自体は未完了。
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - 初回 spec review で issue close criteria と epic ownership の曖昧さを指摘された。
