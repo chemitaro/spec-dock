@@ -52,12 +52,11 @@ ID: "iss-00040"
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
-    - representative failures が current stale-contract cluster として再現し、issue scope と対応づけられている
+     - representative failures が current stale-contract cluster として再現し、issue scope と対応づけられている
   - closes:
-    - AC-004
-    - EC-001
+     - なし（baseline evidence / EC-001 support のみ）
   - review gate:
-    - failing signatures と scope boundary が report に残っている
+     - failing signatures と scope boundary が report に残っている
 - S02:
   - 観測可能な振る舞い:
     - `active` / `deps` / `sync` tests が repo-initialized GitHub-linked fixture で intended assertion まで到達して pass する
@@ -84,7 +83,7 @@ ID: "iss-00040"
     - targeted parity test が green
 - S05:
   - 観測可能な振る舞い:
-    - issue scope の stale-contract cluster が regression evidence 上で解消されている
+     - issue scope の stale-contract cluster が regression evidence 上で解消されている
   - closes:
     - AC-004
   - review gate:
@@ -94,27 +93,40 @@ ID: "iss-00040"
 - AC-001 -> S02
 - AC-002 -> S03
 - AC-003 -> S04
-- AC-004 -> S01, S05
-- EC-001 -> S01, S02
+- AC-004 -> S05
+- EC-001 -> S02
 - EC-002 -> S02
 - EC-003 -> S04
 
 ## レビュー / QA ゲート方針
-- RG1 implementation review:
+- SG1 spec review:
   - timing:
-    - S02, S03, S04, S05 完了後
+    - 実装着手前に pass を取得する
+    - S01 完了後、S02 着手前に step result approval を記録する
+  - scope:
+    - scope, guardrails, verification mapping, step decomposition
+    - baseline failure clustering と scope boundary の妥当性
+- RG1 code review:
+  - timing:
+    - S02 完了後、S03 着手前
+    - S03 完了後、S04 着手前
+    - S04 完了後、S05 着手前
+    - S05 完了後、close / commit 前の final review
   - scope:
     - fixture strategy, expectation meaning, parity correction, contract non-regression
 - QG1 QA review:
   - timing:
-    - S04, S05 完了後
+    - S04 完了後、S05 着手前
+    - S05 完了後、close / commit 前の final review
   - scope:
     - targeted suite outputs, parity evidence, full regression evidence
-- SG1 spec review:
-  - timing:
-    - 実装着手前
-  - scope:
-    - scope, guardrails, verification mapping, step decomposition
+- step approval loop:
+  - SG1/spec review pass を取得するまで implementation を開始しない
+  - S01 後は SG1/spec review approval を `report.md` に記録してから S02 を開始する
+  - S02 後は RG1/code review pass を `report.md` に記録してから S03 を開始する
+  - S03 後は RG1/code review pass を `report.md` に記録してから S04 を開始する
+  - S04 後は RG1/code review pass と QG1/QA review pass を `report.md` に記録してから S05 を開始する
+  - S05 後は final RG1/code review pass と final QG1/QA review pass を `report.md` に記録してから close / commit する
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -129,6 +141,7 @@ ID: "iss-00040"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
+- test realignment / parity recovery では閉じない true product/runtime defect を見つけた場合は、この issue の implementation を停止し、所見を `report.md` に記録し、人間の判断で別 issue 化または明示的な scope update が承認されるまで runtime behavior を変更しない。
 
 ## 実装ステップ
 
