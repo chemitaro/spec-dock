@@ -16,6 +16,7 @@ ID: "iss-00035"
 - S01 として、ADR mirror の source preflight と basename collision fail-fast を追加した。
 - `sync` は initiative / epic / issue の `discussions/*.md` から有効な ADR 原本だけを候補化し、衝突時は active 更新や artifact write より前に `failed_before_write` で終了する。
 - S02 として、successful sync 時に `spec-dock/adrs/<basename>` の flat symlink mirror を clear-then-rebuild で再生成し、rename / delete 後の stale entry を残さないようにした。
+- S03 として、symlink unsupported 環境だけを warning success に分類し、empty `spec-dock/adrs/` を残す fallback を追加した。非分類の symlink/write failure は hard failure のまま維持した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -102,10 +103,61 @@ code_reviewer (S02 scope)
 - `tests/cli_runtime/test_sync.py` - repeated sync で rename / delete stale cleanup を確認する CLI regression test を追加
 
 #### コミット
-- pending: S02 commit after report update
+- `8cafe55e7fcd8cda23f3711a10a1b7836204e5e1` `feat(runtime): sync成功時にADRミラーを再構築`
 
 #### メモ
 - S03 fallback は未着手のため、symlink unsupported / write failure は現時点では hard failure のまま。
+
+---
+
+### 2026-03-29 02:53 - 03:21
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, EC-006
+
+#### 実施内容
+- ADR mirror rebuild 前に symlink capability probe を追加し、`ENOSYS` / `EOPNOTSUPP` / `ENOTSUP` / `winerror == 1314` だけを unsupported classifier として扱うようにした。
+- unsupported classifier の場合は empty `spec-dock/adrs/` を残して warning code `adr_mirror_symlink_unsupported` を積み、`sync` 自体は success のままにした。
+- non-classified probe failure と actual mirror symlink write failure は hard failure のままであることを regression test で固定した。
+- no-ADR source の場合は不要な warning を出さないよう補正した。
+- `code_reviewer` は pass、`qa_reviewer` は 2 回の指摘（actual mirror write failure coverage / classified branch coverage）を経て final pass を得た。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_warns_and_succeeds_with_empty_adrs_when_symlinks_are_unsupported \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_leaves_empty_adrs_without_warning_when_no_adr_sources_exist \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_keeps_symlink_probe_failures_hard_when_not_classified_as_unsupported \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_keeps_actual_adr_mirror_symlink_failures_hard_after_probe_success \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_is_environment_symlink_unsupported_covers_remaining_classified_branches
+
+Ran 5 tests in 0.051s
+OK
+
+python -m unittest -v tests.presentation_runtime.test_runtime_sync_s07
+
+Ran 34 tests in 0.098s
+OK
+
+code_reviewer (S03 scope)
+- initial review_status=pass with non-blocking note
+- re-review review_status=pass
+
+qa_reviewer (S01-S03 cumulative scope)
+- initial review_status=fail
+- re-review review_status=pass with non-blocking note
+- final review_status=pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` - unsupported classifier / warning-success fallback / empty-source no-warning branchを追加
+- `tests/presentation_runtime/test_runtime_sync_s07.py` - S03 の fallback, hard-fail, classified-branch coverage tests を追加
+
+#### コミット
+- pending: S03 commit after report update
+
+#### メモ
+- QA 指摘はすべて DevCoder に戻して修正し、レビュー loop を完了した。
 
 ---
 
