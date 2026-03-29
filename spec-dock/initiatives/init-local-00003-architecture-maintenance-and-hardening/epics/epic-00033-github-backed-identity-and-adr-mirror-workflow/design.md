@@ -5,7 +5,7 @@ ID: "epic-00033"
 関連GitHub: ["#33"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-29"
 依存: ["requirement.md"]
 親: ["init-local-00003"]
 ---
@@ -75,6 +75,7 @@ sync --> parity
     - `kind in {adr, disc}`
   - sync:
     - `adrs/` を一度クリアして symlink mirror を再生成する
+    - mirror 対象は各 scope の `discussions/` 配下で basename が timestamp ADR grammar に一致し、`new doc adr` front matter contract を満たす ADR 原本に限定する
     - symlink 非対応環境では `adrs/` を空の generated directory として残すか再作成し、warning を出して成功扱いとする
   - validate:
     - new contract を前提に命名・mirror・migration boundary を検査する
@@ -88,6 +89,7 @@ sync --> parity
   - canonical repo scope と一致しない existing issue / target は reject される
   - discussion / ADR は sequential filename を新規生成しない
   - pre-contract legacy ADR（`001-adr...` / `002-adr...`）は grandfathered planning artifacts として保持し、自動 rename 対象にしない
+  - pre-contract legacy ADR は mirror source としては扱わない
   - `spec-dock/adrs/` は原本ではない
   - sync 後に stale symlink は残らない（非 symlink 環境では空 mirror directory のみが残る）
   - single GitHub repo scope invariant を満たさない cross-repo linkage は受理しない
@@ -109,11 +111,11 @@ sync --> parity
   3. scope `discussions/` に原本を書き込む
   4. `001-adr...` / `002-adr...` は legacy grandfathered artifact として保持し、自動 rename しない
 - Flow-C sync:
-  1. ADR 原本を timestamp grammar pattern 前提で走査する（legacy grandfathered file は読み取り対象だが rename 対象ではない）
+  1. ADR 原本を各 scope の `discussions/` 配下で走査し、timestamp ADR basename grammar と `new doc adr` front matter contract を満たすものだけを mirror source として採用する
   2. `spec-dock/adrs/` をクリアする
   3. symlink 対応環境では symlink mirror を再生成する
   4. symlink 非対応環境では `spec-dock/adrs/` を空の generated directory として残すか再作成し、warning を出して成功扱いにする
-  5. rename / delete 済み ADR を指す stale link を残さない
+  5. legacy ADR は mirror 用には無視し、rename / delete 済み ADR を指す stale link を残さない
 
 ### UML（任意: sequence / flow）
 ```plantuml
