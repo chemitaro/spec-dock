@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -72,6 +73,9 @@ class _AdrMirrorSource:
     source_path: Path
     basename: str
     doc_id: str
+
+
+_ADR_MIRROR_SYMLINK_UNSUPPORTED_WARNING = "adr_mirror_symlink_unsupported"
 
 
 def _append_unique(values: list[str], value: str) -> None:
@@ -288,14 +292,54 @@ def _unlink_any(path: Path) -> None:
         shutil.rmtree(path)
 
 
-def _rebuild_adr_mirror(specdock_dir: Path, sources: list[_AdrMirrorSource]) -> None:
+def _ensure_empty_dir(path: Path) -> None:
+    _unlink_any(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _is_environment_symlink_unsupported(error: BaseException) -> bool:
+    if not isinstance(error, OSError):
+        return False
+    unsupported_errnos = {
+        code
+        for code in (
+            getattr(errno, "ENOSYS", None),
+            getattr(errno, "EOPNOTSUPP", None),
+            getattr(errno, "ENOTSUP", None),
+        )
+        if code is not None
+    }
+    if error.errno in unsupported_errnos:
+        return True
+    return getattr(error, "winerror", None) == 1314
+
+
+def _preflight_adr_mirror_symlink_support(adrs_dir: Path) -> bool:
+    probe_path = adrs_dir / ".spec-dock-symlink-probe"
+    try:
+        os.symlink(".spec-dock-symlink-probe-target", probe_path)
+    except OSError as error:
+        if _is_environment_symlink_unsupported(error):
+            return False
+        raise
+    finally:
+        probe_path.unlink(missing_ok=True)
+    return True
+
+
+def _rebuild_adr_mirror(specdock_dir: Path, sources: list[_AdrMirrorSource]) -> bool:
     adrs_dir = specdock_dir / "adrs"
-    _unlink_any(adrs_dir)
-    adrs_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_empty_dir(adrs_dir)
+    if not sources:
+        return True
+    if not _preflight_adr_mirror_symlink_support(adrs_dir):
+        _ensure_empty_dir(adrs_dir)
+        return False
     for source in sorted(sources, key=lambda item: item.basename):
         link_path = adrs_dir / source.basename
         rel_target = os.path.relpath(source.source_path, start=adrs_dir)
         os.symlink(rel_target, link_path)
+    return True
 
 
 def _can_collect_natively(ports: Ports) -> bool:
@@ -575,6 +619,7 @@ def write_sync_artifacts(
     *,
     adr_mirror_sources: list[_AdrMirrorSource] | None = None,
     preflight_adr_mirror_sources: bool = True,
+    warning_codes: list[str] | None = None,
 ) -> ArtifactWriteResult:
     if ports.artifact_writer is None:
         raise RuntimeError("artifact_writer is required")
@@ -593,7 +638,9 @@ def write_sync_artifacts(
     )
     try:
         write_result = ports.artifact_writer.write(specdock_dir, bundle)
-        _rebuild_adr_mirror(specdock_dir, sources)
+        symlink_supported = _rebuild_adr_mirror(specdock_dir, sources)
+        if not symlink_supported and warning_codes is not None:
+            _append_unique(warning_codes, _ADR_MIRROR_SYMLINK_UNSUPPORTED_WARNING)
         return write_result
     except Exception as error:
         # FileArtifactWriter writes sequentially and is non-atomic. Any writer exception
@@ -629,13 +676,16 @@ def _sync_impl(
     if req.update_active_from_branch and not req.force:
         final_state, active_update = maybe_auto_update_from_branch(state, ports)
 
+    sync_warnings = list(final_state.warnings)
     try:
         write_result = write_sync_artifacts(
             final_state,
             ports,
             adr_mirror_sources=adr_mirror_sources,
             preflight_adr_mirror_sources=False,
+            warning_codes=sync_warnings,
         )
+        final_state = replace(final_state, warnings=sync_warnings)
     except _ArtifactWriteExecutionError as error:
         return SyncCommandResult(
             state=final_state,
