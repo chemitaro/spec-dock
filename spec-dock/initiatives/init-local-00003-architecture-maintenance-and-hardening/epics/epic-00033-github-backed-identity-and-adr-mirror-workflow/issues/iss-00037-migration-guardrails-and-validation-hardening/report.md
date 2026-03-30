@@ -16,6 +16,7 @@ ID: "iss-00037"
 - S01 として、migration boundary の clause-1/2/3 について current evidence・missing evidence・owner boundary を `iss-00037` の report に固定した。
 - `iss-00037` は migration-boundary evidence の final closure owner であり、S02 では clause-2 truthfulness に必要な最小 README correction（`README.md` と `spec-dock/docs/README.md`）も吸収する一方、full docs parity は `iss-00038`、stale-contract/test realignment は `iss-00040` に残す前提を明記した。
 - S02 として、clause-1/2 wording gap を最小 docs correction で閉じ、provider/dogfooding mirror を current runtime contract に整列させた。reject / fail-fast / no-auto-rename の根拠は既存テストを再利用して evidence として束ね、追加テストは行っていない。
+- S03 として、clause-3 non-destructive boundary を targeted regression で補強し、legacy `meta.json` を含む `sync` / `sync --force` が fail-fast のまま no-write / no-mutation / no-auto-repair を維持することを `tests/cli_runtime/test_validate.py` の最小差分で固定した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -146,6 +147,42 @@ python -m unittest tests.cli_runtime.test_validate -v
 - review rationale: wording matches the current runtime contract; touched provider/dogfooding mirror surfaces are aligned; no material defects found.
 - S02 は clause-1/2 wording gap を最小 docs correction で閉じた step であり、reject / fail-fast / no-auto-rename の追加実装や追加テストは不要と判断した。
 
+### 2026-03-30
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, EC-003
+- 備考: clause-3 non-destructive boundary hardening via targeted regression only
+
+#### 実施内容
+- `tests/cli_runtime/test_validate.py` の targeted regression のみを更新し、legacy `meta.json` を含む tree に対して `sync` と `sync --force` の両方が fail-fast のまま非 0 終了する境界を固定した。
+- 最終テスト名は `test_sync_clause3_legacy_meta_json_fail_fast_no_auto_repair_or_agent_write_even_with_force` とし、legacy state に対する no silent auto-repair 契約を reviewer-facing に読める形へ寄せた。
+- assertion は fail-fast に加えて、`.agent/*.json` write 不在、top-level sync 出力（`tree-all.puml` / `tree.puml` / `deps-issues.puml` / `dashboard.md`）不在、active-state mutation 不在（`active/context-pack.md`、symlink または `*.path` 表現の active pointer、`.agent/active.json`）をまとめて確認する形へ拡張した。
+- さらに `.meta.json` の再作成が起きないこと、および legacy `meta.json` 自体が rewrite されないことを明示的に検証し、clause-3 の no-write / no-mutation / no-auto-repair evidence を 1 本の targeted regression に束ねた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_validate -v
+# Ran 34 tests ... OK
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=9
+```
+
+- targeted regression を含む `tests.cli_runtime.test_validate` が 34 件すべて通過し、clause-3 boundary hardening 後も validate 系の既存挙動が維持されていることを確認した。
+- repo validate も `spec-dock: ok (validate) nodes=9` で通過し、issue docs 上の current tree が今回の回帰追加で壊れていないことを確認した。
+
+#### 変更したファイル
+- `tests/cli_runtime/test_validate.py` - clause-3 legacy `meta.json` fail-fast / no-write / no-mutation / no-auto-repair regression を追加強化
+- `spec-dock/active/issue/report.md` - S03 completion log / validation results / rereview outcomes を記録
+
+#### コミット
+- 未コミット
+
+#### メモ
+- RG1/code review（reviewer: `code_reviewer`、scope: `S03 targeted regression final diff`）は pass。final diff に material finding は残っていない。
+- QG1/qa review（reviewer: `qa_reviewer`、scope: `S03 targeted regression final diff`）も pass。`sync` / `sync --force` fail-fast と no-write / no-mutation coverage が clause-3 evidence として十分であり、material finding は残っていない。
+
 ---
 
 ## 遭遇した問題と解決 (任意)
@@ -157,7 +194,7 @@ python -m unittest tests.cli_runtime.test_validate -v
 - S01 では gap を増やさず、`iss-00038` / `iss-00040` との ownership boundary を先に固定することが重要。
 
 ## 今後の推奨事項 (任意)
-- S03 で clause-3 の fail-fast / warning / no-write mapping を targeted evidence と command results で補強する。
+- 現時点で追加なし
 
 ## 省略/例外メモ (必須)
 - 該当なし
