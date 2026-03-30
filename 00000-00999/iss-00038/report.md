@@ -15,6 +15,7 @@ ID: "iss-00038"
 ## 実装サマリー (任意)
 - S01 の baseline/spec lock と spec review の監査ログを追加し、`iss-00038` の残責務が docs parity と final spec review close-out に限定されることを report 上で追跡可能にした。
 - 初回 spec review fail の 3 指摘を requirement/design/plan/report template 側で是正し、re-review pass 後に S02 着手可能な状態まで整えた。
+- S04 では upstream issue 群（`iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040`）と本 issue（`iss-00038`）の close-out evidence を final spec review record として束ね、close-status source of truth と ownership boundary を reviewer 向けに固定した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -64,7 +65,7 @@ git --no-pager diff -- spec-dock/active/issue/requirement.md spec-dock/active/is
 - `spec-dock/active/issue/report.md` - S01 監査ログを残せる report template と本ログを更新
 
 #### コミット
-- 未コミット（この step の review pass 後にコミット予定）
+- `1649e4f` `docs(issue): iss-00038のS01監査性を補強`
 
 #### メモ
 - このセッションでの変更対象は active issue path 配下の `requirement.md` / `design.md` / `plan.md` / `report.md` のみ。
@@ -152,7 +153,7 @@ find . -path '*/reference_*.md' -o -path '*/active/issue/*' | sed 's#^./##' | so
 - `spec-dock/active/issue/report.md` - S02 の current-contract review 結果、family 別の確認事項、no-op parity close-out 判定を追記
 
 #### コミット
-- 未コミット（S02 review pass 後にコミット予定）
+- `766a853` `docs(issue): iss-00038のS02証跡を記録`
 
 #### メモ
 - targeted docs 自体は未変更。S02 では report への監査ログ追記のみ実施した。
@@ -207,17 +208,89 @@ find . -path '*/reference_*.md' -o -path '*/active/issue/*' | sed 's#^./##' | so
 - `spec-dock/active/issue/report.md` - S03 の validate/sync 実行結果、generated-state review、`--github` なし sync の解釈を追記
 
 #### コミット
-- 未コミット（S03 review pass 後にコミット予定）
+- `99e1a09` `docs(issue): iss-00038のS03証跡を記録`
 
 #### メモ
 - この step でも code/doc 本体の追加変更は行っていない。report への監査ログ追記のみ。
 - `source=cache` / `stale=true` は non-`--github` sync の expected snapshot semantics として扱い、drift の兆候とは解釈しない。
+
+### 2026-03-30 13:30 - 13:35
+
+#### 対象
+- Step: S04 final spec review record / close-out bundle
+- AC/EC: final spec review close-out、epic final evidence bundle、ownership non-overlap 再確認
+
+#### 実施内容
+- `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close-out evidence を final spec review record として束ね直し、reviewer が 1 つの session entry で最終判断できる形に整理した。
+- final spec review record の verdict は **pass**。close-status の source of truth は `spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` の 2 点であり、両方とも epic progress が `total=6 / done=5 / open=1 / unknown=0`、残 open issue が `iss-00038` のみで整合していることを確認した。
+- `iss-00038` の owner 責務は **docs parity + final spec review close-out only** であり、S02 で targeted docs parity/no-op と current-contract verification を閉じ、S03 で `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` の成功、および non-`--github` sync における `source=cache` / `stale=true` が expected snapshot behavior で drift ではないことまで記録済みである。
+- `iss-00040` は stale-contract / final regression / dogfooding parity realignment の owner のままであり、本 S04 では再実行していない。S04 は `iss-00040` を含む upstream close evidence を参照して final spec review close-out を束ねるだけで、runtime / targeted docs / upstream issue files の再変更は行っていない。
+- upstream evidence index を以下の exact file path で固定した。
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/report.md`
+    - close note: GitHub mandatory node creation contract と canonical repo scope fail-closed 境界を closure。
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00035-sync-adr-symlink-mirror/report.md`
+    - close note: ADR symlink mirror の preflight / clear-then-rebuild / stale symlink 除去境界を closure。
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/report.md`
+    - close note: timestamp-based discussion / ADR naming、slugless `doc_id`、same-second suffix allocation contract を closure。
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00037-migration-guardrails-and-validation-hardening/report.md`
+    - close note: migration boundary clause-1/2/3、fail-fast / no-auto-repair / non-destructive validation hardening を closure。
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+    - close note: stale-contract cluster、final regression、dogfooding parity realignment / test realignment を closure。owner は引き続き `iss-00040`。
+  - `spec-dock/active/issue/report.md`
+    - close note: `iss-00038` 自身の docs parity no-op、generated-state review、final spec review close-out record を closure 対象として整理。
+- close-status authority index:
+  - `spec-dock/.agent/index-all.json`
+    - `iss-00034/35/36/37/40=done`、`iss-00038=open`、epic progress=`total=6 / done=5 / open=1 / unknown=0`。
+  - `spec-dock/active/epic/report.md`
+    - 残 open issue は `iss-00038` のみ、`iss-00038` は docs parity と final spec review close-out の owner、`iss-00040` の stale-contract/test-realignment slice は再実行対象ではないことを明記。
+
+#### 実行コマンド / 結果
+```bash
+close-out evidence bundle review
+
+- S02 証跡を参照し、targeted docs parity/no-op と six-file current-contract verification が完了済みであることを再確認した。
+- S03 証跡を参照し、`./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` の成功、および non-`--github` sync の `source=cache` / `stale=true` が expected snapshot behavior であることを再確認した。
+- `spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を close-status authority として照合し、done=5 / open=1、残 open issue=`iss-00038` の整合を確認した。
+```
+
+#### 承認 / 観測エビデンス
+- final spec review record verdict:
+  - pass
+- close-status source of truth:
+  - `spec-dock/.agent/index-all.json`
+  - `spec-dock/active/epic/report.md`
+- close-out bundle evidence:
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00035-sync-adr-symlink-mirror/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00037-migration-guardrails-and-validation-hardening/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+  - `spec-dock/active/issue/report.md`
+- ownership note:
+  - `iss-00038` owns docs parity + final spec review close-out only
+  - `iss-00040` remains owner of stale-contract / final regression / dogfooding parity realignment and was not re-executed here
+- reviewer:
+  - final spec review record（close-out bundle）
+- 次ステップ着手可否:
+  - S04 close-out 可（commit は final review pass 後に実施）
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S04 final spec review record、close-status authority、upstream evidence index、ownership note を追記
+
+#### コミット
+- 未コミット（final review pass 後にコミット予定）
+
+#### メモ
+- S04 は close-out evidence の bundle 化のみであり、runtime code、targeted docs、upstream issue files は再変更していない。
+- close-status judgment は upstream report 単体ではなく、`spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を authority として固定する。
 
 ---
 
 ## 遭遇した問題と解決 (任意)
 - 問題: 初回 spec review で、parity-only evidence 依存、S01 の観測不足、stop/escalate rule 欠如が指摘され、そのままでは S02 へ進めなかった。
   - 解決: requirement/design/plan/report template を修正し、S01 監査ログと approval contract を明文化したうえで re-review pass を取得した。
+- 問題: S03 証跡の途中コミット `833445b` は commit message が壊れており、review evidence としては不適切だった。
+  - 解決: `e1c86c8` で revert したうえで `99e1a09` に同内容を正しい commit message で再記録し、`99e1a09` を authoritative な S03 evidence commit として扱う。
 
 ## 学んだこと (任意)
 - S01 は baseline/spec lock の narrative だけでなく、観測コマンドと承認ログがないと review 上の監査性が不足する。
