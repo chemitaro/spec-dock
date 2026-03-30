@@ -424,6 +424,58 @@ rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json sp
 - 本記録では S08/S09 の completion claim は追加していない。
 - `spec-dock/.agent/deps-issues.json` は active-only index 由来のため空配列だが、S07 の authority は `deps.json` と `spec-dock/.agent/index-all.json` の一致、および `sync --github` 後の generated state に置く。
 
+### 2026-03-30 16:50 - 16:50
+
+#### 対象
+- Step: S08 committed audit-trail normalization
+- AC/EC: EC-004
+
+#### 実施内容
+- S06 の original fail/pass chronology は append-only で保持し、S06 セクション自体の `コミット: なし（working tree 上の corrective report update）` は履歴として残した。
+- そのうえで branch-diff review の監査用 authoritative reference を S08 normalization record へ移し、`8796cf4` を actual committed corrective record として固定した。
+- 監査上は、先行する S06 の `working tree`/`なし` note は `8796cf4` による committed corrective record で superseded と扱う。最終 authoritative artifact は S06 の旧 note ではなく、この S08 record を参照する。
+- `8796cf4` は S07/S08 machine-readable/status-sync changes の authoritative committed corrective reference であり、`iss-00040` prerequisite 反映、S07 execution log 追記、計画側の status-sync 反映を commit-backed trail として追跡できる状態に正規化した。
+- 本 step は committed audit-trail normalization のみを扱い、S09 の epic status reconciliation / branch-diff rereview completion claim は追加していない。
+
+#### 実行コマンド / 結果
+```bash
+git --no-pager log --oneline -n 5
+- `8796cf4` が branch diff 上の最新 corrective commit であることを確認した。
+
+git --no-pager show -s --format='%ad%n%B' --date=format-local:'%Y-%m-%d %H:%M' 8796cf4
+- commit timestamp は `2026-03-30 16:50`。
+- commit message は `fix(issue): iss-00038のepic close correctiveを反映`。
+- commit body で `iss-00040` 依存、S07 log、計画チェック更新が corrective scope として記録されていることを確認した。
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `git --no-pager log --oneline -n 5`
+  - `git --no-pager show -s --format='%ad%n%B' --date=format-local:'%Y-%m-%d %H:%M' 8796cf4`
+  - `spec-dock/active/issue/report.md`
+- reviewer:
+  - RG1 docs/evidence review
+- verdict:
+  - pass
+- authoritative reference:
+  - `8796cf4` `fix(issue): iss-00038のepic close correctiveを反映`
+- audit normalization note:
+  - S06 の旧 `working tree`/`なし` note は履歴として保持する
+  - audit purpose では `8796cf4` の committed corrective record に superseded される
+  - S07/S08 machine-readable/status-sync corrective trail の authoritative artifact はこの S08 record
+- 次ステップ着手可否:
+  - S08 完了、S09 は未着手のまま
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S08 append-only normalization record を追記し、`8796cf4` を authoritative committed corrective reference として固定
+
+#### コミット
+- `8796cf4` `fix(issue): iss-00038のepic close correctiveを反映`
+
+#### メモ
+- S06 の本文や chronology は rewrite していない。監査時の authoritative reference のみを S08 で正規化した。
+- 真の no-op ではないため、最終 authoritative record では `なし` を使わない。
+
 ---
 
 ## 遭遇した問題と解決 (任意)

@@ -641,8 +641,8 @@ ID: "iss-00038"
   - S06 corrective close-out を committed branch diff review の監査証跡へ正規化する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] corrective commit hash の観測点を決めた
+- [x] `update_plan` に step の作業単位を登録した
+- [x] corrective commit hash の観測点を決めた
 
 #### B1 — replace working-tree-only evidence
 - purpose:
