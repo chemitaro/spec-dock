@@ -217,8 +217,8 @@ ID: "iss-00038"
   - issue の残責務を docs close-out と final spec review に限定し、split 前の stale scope を除去する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] `./spec-dock/active/issue/report.md` の追記位置を決めた
+- [x] `update_plan` に step の作業単位を登録した
+- [x] `./spec-dock/active/issue/report.md` の追記位置を決めた
 
 #### B1 — collect authoritative evidence
 - purpose:
@@ -274,8 +274,8 @@ ID: "iss-00038"
   - current contract に対する docs drift の有無を確定し、必要時のみ parity 修正する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] `./spec-dock/active/issue/report.md` の追記位置を決めた
+- [x] `update_plan` に step の作業単位を登録した
+- [x] `./spec-dock/active/issue/report.md` の追記位置を決めた
 
 #### B1 — review targeted docs list
 - purpose:
@@ -359,8 +359,8 @@ ID: "iss-00038"
   - close-out を current repo state と generated state の両面から確認する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] `./spec-dock/active/issue/report.md` の追記位置を決めた
+- [x] `update_plan` に step の作業単位を登録した
+- [x] `./spec-dock/active/issue/report.md` の追記位置を決めた
 
 #### B1 — command execution
 - purpose:
@@ -412,8 +412,8 @@ ID: "iss-00038"
   - final verdict と evidence 参照、non-overlap check を 1 つの record にまとめる
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] `./spec-dock/active/issue/report.md` の追記位置を決めた
+- [x] `update_plan` に step の作業単位を登録した
+- [x] `./spec-dock/active/issue/report.md` の追記位置を決めた
 
 #### B1 — assemble evidence index
 - purpose:
@@ -463,8 +463,8 @@ ID: "iss-00038"
   - acceptance review で見つかった report artifact の不整合だけを最小差分で正規化する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] `./spec-dock/active/issue/report.md` の修正位置を決めた
+- [x] `update_plan` に step の作業単位を登録した
+- [x] `./spec-dock/active/issue/report.md` の修正位置を決めた
 
 #### B1 — normalize final state markers
 - purpose:
@@ -538,8 +538,8 @@ ID: "iss-00038"
   - corrective findings を反映した issue docs 一式が再 review で整合していることを確認する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] 再 review 対象と観点を整理した
+- [x] `update_plan` に step の作業単位を登録した
+- [x] 再 review 対象と観点を整理した
 
 #### B1 — rerun spec review
 - purpose:
@@ -590,8 +590,8 @@ ID: "iss-00038"
   - `iss-00040` prerequisite を machine-readable deps と generated readiness に反映する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] narrative prerequisite と generated edge の観測点を整理した
+- [x] `update_plan` に step の作業単位を登録した
+- [x] narrative prerequisite と generated edge の観測点を整理した
 
 #### B1 — normalize deps contract
 - purpose:

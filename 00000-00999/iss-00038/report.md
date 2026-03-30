@@ -371,6 +371,59 @@ fresh spec reviewer review for corrective issue docs
 #### メモ
 - この S06 は requirement/design/plan の corrective contract 自体を変更せず、report artifact を plan に追従させるための記録追加である。
 
+### 2026-03-30 16:47 - 16:47
+
+#### 対象
+- Step: S07 dependency graph alignment
+- AC/EC: EC-006
+
+#### 実施内容
+- `iss-00038` の `deps.json` で `depends_on` に `iss-00040` が含まれていることを確認し、narrative prerequisite と machine-readable deps の前提を一致させた。
+- `./spec-dock/scripts/spec-dock sync --github` を実行し、generated artifacts の再生成が成功した。
+- `spec-dock/.agent/index-all.json` では `iss-00038` が `status=done` / `effective_status=done`、GitHub issue `#38` が `state=CLOSED`、epic progress が `total=6 / done=6 / open=0 / unknown=0` であることを確認した。
+- `spec-dock/dashboard.md` では `todo_total: 0`、`doing: 0`、`ready: 0`、`blocked: 0`、`unknown: 0` となり、残 open issue summary が解消されたことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n 'iss-00040' spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json spec-dock/.agent/index-all.json
+- `deps.json` に `iss-00040` が含まれ、generated authority 側でも `iss-00038 -> iss-00040` edge を確認した。
+
+./spec-dock/scripts/spec-dock sync --github
+- spec-dock: sync: active unchanged (matched id in branch: iss-00038)
+- spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json spec-dock/dashboard.md
+- `iss-00038` は `status=done` / `effective_status=done`、GitHub state は `CLOSED`。
+- epic progress は `done=6` / `open=0`。
+- `dashboard.md` は `todo_total: 0`。
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json`
+  - `./spec-dock/scripts/spec-dock sync --github`
+  - `spec-dock/.agent/index-all.json`
+  - `spec-dock/dashboard.md`
+- reviewer:
+  - DevCoder self-review
+- verdict:
+  - pass
+- 次ステップ着手可否:
+  - S07 完了、S08/S09 は未着手のまま
+
+#### 変更したファイル
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json` - `iss-00040` prerequisite が current state に含まれていることを確認
+- `spec-dock/.agent/index-all.json` - `iss-00038=done`、GitHub `#38=CLOSED`、epic progress `done=6/open=0` を確認
+- `spec-dock/dashboard.md` - `todo_total: 0` と残 open issue なしを確認
+- `spec-dock/active/issue/report.md` - S07 execution log を追記
+
+#### コミット
+- 未確認（この記録では current generated state と command result のみを観測）
+
+#### メモ
+- 本記録では S08/S09 の completion claim は追加していない。
+- `spec-dock/.agent/deps-issues.json` は active-only index 由来のため空配列だが、S07 の authority は `deps.json` と `spec-dock/.agent/index-all.json` の一致、および `sync --github` 後の generated state に置く。
+
 ---
 
 ## 遭遇した問題と解決 (任意)
