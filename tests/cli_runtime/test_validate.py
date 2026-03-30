@@ -1286,3 +1286,92 @@ class TestCliValidate(CliRuntimeHarness):
 
             self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
             self.assertTrue(legacy_meta_path.is_file())
+
+    def test_sync_clause3_legacy_meta_json_fail_fast_no_auto_repair_or_agent_write_even_with_force(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            dot_meta_path = issue_dir / ".meta.json"
+            legacy_meta_path = issue_dir / "meta.json"
+            before_text = dot_meta_path.read_text(encoding="utf-8")
+            dot_meta_path.rename(legacy_meta_path)
+
+            active_dir = target / "spec-dock" / "active"
+            context_pack_path = active_dir / "context-pack.md"
+            self.assertTrue(context_pack_path.is_file(), context_pack_path.as_posix())
+            self.assertFalse(context_pack_path.is_symlink(), context_pack_path.as_posix())
+            before_context_pack_text = context_pack_path.read_text(encoding="utf-8")
+
+            def _snapshot_active_pointer(name: str) -> tuple[str, str]:
+                active_link_path = active_dir / name
+                active_path_file = active_dir / f"{name}.path"
+                if active_link_path.is_symlink():
+                    self.assertFalse(active_path_file.exists(), active_path_file.as_posix())
+                    return ("symlink", os.readlink(active_link_path))
+                self.assertFalse(active_link_path.exists(), active_link_path.as_posix())
+                self.assertTrue(active_path_file.is_file(), active_path_file.as_posix())
+                return ("path", active_path_file.read_text(encoding="utf-8").strip())
+
+            before_active_pointers = {
+                name: _snapshot_active_pointer(name) for name in ("initiative", "epic", "issue")
+            }
+
+            agent_active_path = target / "spec-dock" / ".agent" / "active.json"
+            self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
+
+            generated_agent_paths = [
+                target / "spec-dock" / ".agent" / "index.json",
+                target / "spec-dock" / ".agent" / "tree.json",
+                target / "spec-dock" / ".agent" / "index-all.json",
+                target / "spec-dock" / ".agent" / "tree-all.json",
+                target / "spec-dock" / ".agent" / "deps-issues.json",
+            ]
+            generated_top_level_paths = [
+                target / "spec-dock" / "tree-all.puml",
+                target / "spec-dock" / "tree.puml",
+                target / "spec-dock" / "deps-issues.puml",
+                target / "spec-dock" / "dashboard.md",
+            ]
+            for generated_path in generated_agent_paths:
+                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+            for generated_path in generated_top_level_paths:
+                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+
+            for args in (["sync"], ["sync", "--force"]):
+                result = self._run_runtime_capture(target, args)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Unsupported legacy meta.json detected", result.stderr)
+                self.assertIn(str(legacy_meta_path), result.stderr)
+                self.assertFalse(dot_meta_path.exists())
+                self.assertTrue(legacy_meta_path.is_file())
+                self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+                self.assertTrue(context_pack_path.is_file(), context_pack_path.as_posix())
+                self.assertFalse(context_pack_path.is_symlink(), context_pack_path.as_posix())
+                self.assertEqual(
+                    context_pack_path.read_text(encoding="utf-8"),
+                    before_context_pack_text,
+                )
+                for name, before_active_pointer in before_active_pointers.items():
+                    self.assertEqual(_snapshot_active_pointer(name), before_active_pointer)
+                self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
+                for generated_path in generated_agent_paths:
+                    self.assertFalse(generated_path.exists(), generated_path.as_posix())
+                for generated_path in generated_top_level_paths:
+                    self.assertFalse(generated_path.exists(), generated_path.as_posix())
+
+            self.assertTrue(legacy_meta_path.is_file())
