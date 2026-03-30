@@ -23,10 +23,12 @@ ID: "iss-00038"
     - `iss-00040` の final regression evidence を参照し、`iss-00038` 自身では再実行 ownership を持たないことを明記する。
     - final spec review record を reviewer が traceable に辿れる形式で残す。
     - S01 の spec review pass は、観測コマンドまたは観測 artifact と reviewer verdict を `report.md` に残してから S02 へ進める execution contract とする。
+    - final close-out 後の `report.md` は、front matter 状態値とコミット記録が最終状態に正規化された監査可能な artifact とする。
   - MUST NOT:
     - runtime / test realignment を再度設計対象に戻さない。
     - docs parity が no-op の場合でも、6 ファイル個別の current-contract verification evidence を省略しない。
     - targeted docs list 外で見つかった stale old-contract assumption を、その場で S02 の修正対象へ拡張しない。
+    - report に「未コミット」や `draft | approved` のような暫定表記を最終状態のまま残さない。
 - 非交渉制約:
   - final verdict は `pass`。
   - `validate` / `sync` は exit=0。
@@ -62,6 +64,7 @@ ID: "iss-00038"
   - `iss-00040` が担当した regression/parity 系 suite は current snapshot でも pass しており、`iss-00038` が再実行 ownership を持たない前提を裏づけている。
   - 一部 upstream issue report には過去の reviewer コメントが残っていても、close status の正本は generated state と epic report にある。
   - したがって、この issue の主要設計論点は「どの evidence を最終 close-out 記録として束ねるか」であり、runtime behavior をどう変えるかではない。
+  - acceptance review の結果、close-out record 自体の整合性も verification 対象であると分かったため、report artifact の最終正規化を design scope に含める。
 - 採用するパターン:
   - docs verification first:
     - targeted docs list を current contract 観点で 6 ファイル個別にレビューし、parity 結果と old assumption 不在確認を evidence 化した上で、必要時のみ両側更新する。
@@ -71,6 +74,8 @@ ID: "iss-00038"
     - `validate` / `sync` を current state の close-out check として扱う。
   - final review record aggregation:
     - upstream issue reports と current issue evidence を report ベースで束ねる。
+  - final artifact normalization:
+    - final spec review pass 後に、`report.md` front matter と S04 コミット記録を確定状態へ揃える。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
@@ -127,6 +132,13 @@ ID: "iss-00038"
       - final spec review record（verdict / referenced evidence / non-overlap check）
     - source of truth:
       - close status は `spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を優先する
+  - report integrity boundary:
+    - input:
+      - `report.md` front matter
+      - S04 close-out 記録
+      - actual git history
+    - output:
+      - final artifact normalization evidence（状態値と commit 記録の整合）
   - escalation boundary:
     - trigger:
       - S02 で targeted docs list 外に stale old-contract assumption を発見する
@@ -186,11 +198,13 @@ upstream --> record
     - parity の有無に関わらず、6 ファイル個別の current-contract verification evidence を必須とする
 - AC-002 -> `validate` / `sync` 実行結果と generated state review で閉じる
 - AC-003 -> report を final spec review record の正本として evidence を集約する
+- AC-003 -> report を final spec review record の正本として evidence を集約し、最終状態へ正規化する
 - EC-001 -> docs no-op の場合も parity evidence を必須化する
   - 補足:
     - parity evidence 単独では閉じず、6 ファイル個別レビューを report に残す
 - EC-002 -> generated state drift を close blocker として扱う
 - EC-003 -> upstream evidence 欠落時は close-out を停止し reviewer judgment に渡す
+- EC-004 -> report artifact の暫定表記が残る場合は close blocker として扱う
 - constraint -> `iss-00040` 非重複を設計上で明文化する
 - constraint -> targeted docs list 外の stale assumption 発見時は stop/escalate する
 
@@ -206,6 +220,7 @@ upstream --> record
   - 6 ファイル個別の current-contract verification review
   - `spec-dock/dashboard.md` と `.agent/index*.json` の確認
   - final spec review record のレビュー
+  - `report.md` front matter と S04 コミット記録の最終整合確認
 - migration / rollback / feature flag if needed:
   - feature flag なし
   - rollback は docs/report 差分を issue 単位で戻す
@@ -215,10 +230,12 @@ upstream --> record
   - + 6 ファイル個別の current-contract verification evidence
 - AC-002 -> `validate` / `sync` 実行結果 + generated state check
 - AC-003 -> report 上の final spec review record
+- AC-003 -> report 上の final spec review record + front matter / commit record normalization
 - EC-001 -> docs no-op でも parity evidence を report に残す
   - + current-contract verification evidence を report に残す
 - EC-002 -> generated state mismatch がないことを確認する
 - EC-003 -> upstream evidence 欠落があれば review blocker として記録する
+- EC-004 -> report artifact の暫定表記が残っていないことを確認する
 - constraint -> non-overlap check を final review record に含める
 - constraint -> scope外 stale assumption は blocker + escalation record にする
 
