@@ -20,11 +20,14 @@ ID: "iss-00038"
   - AC-001
   - AC-002
   - AC-003
+  - AC-004
 - EC:
   - EC-001
   - EC-002
   - EC-003
   - EC-004
+  - EC-005
+  - EC-006
 - 制約:
   - `iss-00040` と ownership を重複させない
   - provider-side と dogfooding docs の両方を対象にする
@@ -56,6 +59,11 @@ ID: "iss-00038"
     - acceptance review 指摘への corrective close-out
   - exit:
     - `report.md` front matter と S04 コミット記録が最終状態に正規化され、再 review で受け入れ可能と判断できる
+- M6:
+  - 対象:
+    - epic-level branch diff review 指摘への corrective close-out
+  - exit:
+    - epic report / deps graph / corrective audit trail が branch diff review で矛盾なく辿れる
 
 ## ステップ一覧
 - S01:
@@ -107,15 +115,40 @@ ID: "iss-00038"
     - EC-004
   - review gate:
     - spec reviewer が corrective plan と issue docs の整合を `pass` と判定する
+- S07:
+  - 観測可能な振る舞い:
+    - `iss-00040` prerequisite が narrative spec と `deps.json` / generated deps graph の両方で一致する
+  - closes:
+    - EC-006
+  - review gate:
+    - `iss-00038/deps.json` と generated deps artifact が `iss-00040` edge を反映する
+- S08:
+  - 観測可能な振る舞い:
+    - branch diff review に使う corrective report/update が actual commit から追跡できる
+  - closes:
+    - EC-004
+  - review gate:
+    - `report.md` の S06 corrective log が committed audit trail と整合する
+- S09:
+  - 観測可能な振る舞い:
+    - epic report / issue report / generated state / GitHub status の authority reconciliation が完了し、epic close readiness を branch diff review で説明できる
+  - closes:
+    - AC-004
+    - EC-005
+  - review gate:
+    - epic-level spec review が committed branch diff を `pass` と判定する
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02
 - AC-002 -> S03
 - AC-003 -> S04
+- AC-004 -> S09
 - EC-001 -> S02
 - EC-002 -> S03
 - EC-003 -> S01, S04
-- EC-004 -> S05, S06
+- EC-004 -> S05, S06, S08
+- EC-005 -> S09
+- EC-006 -> S07
 
 ## レビュー / QA ゲート方針
 - SG1 spec review:
@@ -140,13 +173,14 @@ ID: "iss-00038"
   - scope:
     - close evidence の不足有無
     - epic close-out readiness
-- step approval loop:
+  - step approval loop:
   - SG1/spec review pass 前には execution に進まない
   - S02 着手前に S01 の baseline 固定について、観測コマンド結果または観測 artifact、reviewer、verdict、非重複確認先を report に記録する
   - S03 着手前に S02 の docs/evidence review を記録する
   - S04 着手前に S03 の close-out review を記録する
   - S04 完了後に final SG1/QG1 verdict を report に記録する
   - acceptance review で corrective findings が出た場合は、S05 で report artifact を正規化し、S06 で spec review pass を再取得してから受け入れ判定へ進む
+  - epic-level branch diff review で authority / deps / audit trail finding が出た場合は、S07-S09 を追加 corrective path として実行し、epic-level spec review pass を再取得してから epic completion を主張する
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -164,6 +198,9 @@ ID: "iss-00038"
 - `iss-00040` 完了済み scope を再度実行しない。もし upstream evidence 欠落が見つかった場合は、re-execute ではなく blocker として記録する。
 - S02 で targeted docs list 外の stale old-contract assumption を見つけた場合は、その場で修正範囲を広げず step を停止し、path / assumption / scope外理由 / escalation 先を `report.md` に記録して reviewer 判断を待つ。
 - acceptance review で report artifact の整合不備が見つかった場合は、runtime / docs contract へ波及させず、S05/S06 の corrective close-out として扱う。
+- epic-level review で deps graph mismatch が見つかった場合は、spec narrative を弱めるのではなく、原則として machine-readable deps と generated artifacts を spec に合わせる。
+- branch-diff review に使う corrective report/update は actual commit hash または真の no-op のどちらかで説明できなければ pass にしない。
+- S08 では既存 S06 chronology を上書きせず、append-only の normalization record を追加する。S06 の `working tree`/`なし` 表記は履歴として残してよいが、S08 で superseded であることと actual authoritative commit を明記し、最終 authoritative artifact は S08 record を参照する。
 
 ## 実装ステップ
 
@@ -540,6 +577,168 @@ ID: "iss-00038"
 - report update:
   - `./spec-dock/active/issue/report.md`
 
+### S07 — dependency graph alignment
+- target:
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json`
+  - `spec-dock/.agent/deps-issues.json`
+  - `spec-dock/.agent/index-all.json`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/epic/plan.md`
+  - `spec-dock/active/issue/discussions/20260330t090200z-disc-deps-graph-and-readiness-alignment-analysis.md`
+- step boundary:
+  - `iss-00040` prerequisite を machine-readable deps と generated readiness に反映する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録した
+- [ ] narrative prerequisite と generated edge の観測点を整理した
+
+#### B1 — normalize deps contract
+- purpose:
+  - human docs と deps graph の prerequisite semantics を一致させる
+- files:
+  - `iss-00038/deps.json`
+  - generated deps artifacts
+
+##### I1 — add missing edge
+- slice goal:
+  - `iss-00038 -> iss-00040` edge を authoritative graph に入れる
+
+###### Red
+- failing test:
+  - `iss-00038/deps.json` と `spec-dock/.agent/deps-issues.json` に `iss-00040` edge が無い
+- expected failure:
+  - readiness semantics が narrative spec と矛盾する
+
+###### Green
+- minimum implementation:
+  - `deps.json` を更新し、必要な generated artifacts を再生成する
+- pass condition:
+  - EC-006 の mismatch が解消する
+
+###### Refactor
+- cleanup target:
+  - dependency explanation の wording
+- invariants to keep green:
+  - `iss-00040` を ownership 再取得対象にはしない
+
+#### step gate
+- review:
+  - RG1 docs/evidence review
+- expected tests:
+  - `cat spec-dock/.../iss-00038/deps.json`
+  - `rg -n 'iss-00038|iss-00040' spec-dock/.agent/deps-issues.json spec-dock/.agent/index-all.json`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
+### S08 — committed audit-trail normalization
+- target:
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t090300z-disc-commit-backed-audit-trail-normalization-analysis.md`
+- step boundary:
+  - S06 corrective close-out を committed branch diff review の監査証跡へ正規化する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録した
+- [ ] corrective commit hash の観測点を決めた
+
+#### B1 — replace working-tree-only evidence
+- purpose:
+  - branch-diff review で使える actual commit-backed artifact にする
+- files:
+  - `spec-dock/active/issue/report.md`
+
+##### I1 — record actual corrective commit
+- slice goal:
+  - S06 chronology を保持したまま、S08 専用の normalization record で actual corrective commit を authoritative に追跡可能にする
+
+###### Red
+- failing test:
+  - S06 commit 欄が `working tree` や `なし` のまま
+- expected failure:
+  - committed branch diff review の監査証跡として使えない
+
+###### Green
+- minimum implementation:
+  - corrective report update を commit し、S06 を改変せずに S08 normalization record へその hash と `S06 working-tree note is superseded by this committed record` を記録する
+- pass condition:
+  - report corrective trail が actual commit から追え、監査時の authoritative reference が S08 record だと判定できる
+
+###### Refactor
+- cleanup target:
+  - corrective step のコミット記録 wording
+- invariants to keep green:
+  - S06 の original fail/pass chronology は append-only で保持する
+  - S06 の旧 `working tree`/`なし` wording は履歴としてのみ残し、最終 authoritative reference には使わない
+  - 真の no-op でない限り `なし` を使わない
+
+#### step gate
+- review:
+  - RG1 docs/evidence review
+- expected tests:
+  - `git log --oneline -n 5`
+  - `rg -n 'working tree|なし（working tree|未コミット' spec-dock/active/issue/report.md`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
+### S09 — epic status reconciliation and branch-diff rereview
+- target:
+  - `spec-dock/active/epic/report.md`
+  - `spec-dock/.agent/index.json`
+  - `spec-dock/.agent/index-all.json`
+  - `spec-dock/dashboard.md`
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t090100z-disc-epic-close-status-reconciliation-analysis.md`
+- step boundary:
+  - epic close を主張できる authority reconciliation を完成させ、committed branch diff を再 review する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録した
+- [ ] status authority の優先順位と blocker 条件を確認した
+
+#### B1 — reconcile status authorities
+- purpose:
+  - GitHub issue state / generated state / epic report / issue report を authority order に従って同じ結論へ収束させる
+- files:
+  - epic report
+  - generated state artifacts
+  - issue report
+
+##### I1 — finalize epic close readiness
+- slice goal:
+  - `E-AC-005` と remaining-open summary を final authority に合わせる
+
+###### Red
+- failing test:
+  - epic report が `Partial/open` のまま、または authority が相互に矛盾する
+- expected failure:
+  - branch diff review が epic completion を受け入れられない
+
+###### Green
+- minimum implementation:
+  - GitHub issue state を先頭 authority とし、`sync --github` / generated state / epic report / issue report を順に一致させる
+- pass condition:
+  - AC-004 / EC-005 を満たす authority reconciliation が揃う
+
+###### Refactor
+- cleanup target:
+  - `approved` と `closed` の記述分離
+- invariants to keep green:
+  - authority が open の間は epic close を宣言しない
+
+#### step gate
+- review:
+  - epic-level spec review pass
+- expected tests:
+  - `./spec-dock/scripts/spec-dock sync --github`
+  - `rg -n 'E-AC-005|iss-00038|open|Partial|Pass' spec-dock/active/epic/report.md spec-dock/.agent/index.json spec-dock/.agent/index-all.json spec-dock/dashboard.md spec-dock/active/issue/report.md`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
 ### S90 — docs impact resolution / docs refresh
 - 対象:
   - docs
@@ -549,18 +748,21 @@ ID: "iss-00038"
 
 ### S99 — final diff review quality gate
 - branch diff scope:
-  - `iss-00038` で更新した issue docs、report、必要時のみ targeted docs list、corrective close-out 差分
+  - `iss-00038` で更新した issue docs、report、deps graph corrective、epic status reconciliation 差分、必要時のみ targeted docs list
 - required validation:
   - AC-001/002/003 の evidence が diff と report から追える
+  - AC-004 の authority reconciliation が diff と generated artifacts から追える
   - `iss-00040` 非重複が最終 diff 上でも保たれている
   - acceptance review で指摘された report artifact 整合不備が解消している
+  - epic-level review で指摘された deps / audit trail / status authority 不整合が解消している
 - reviewer approvals:
   - final SG1 spec review pass
   - final QG1 close-out review pass
+  - epic-level spec review pass
 
 ## 未確定事項
 - なし:
-  - close-out の execution path は S01-S04 + S05/S06 corrective path + S90 + S99 で固定する
+  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S90 + S99 で固定する
 
 ## final exit contract
 - AC/EC 達成:
@@ -568,6 +770,9 @@ ID: "iss-00038"
   - `validate` / `sync` の成功結果がある
   - final spec review record が verdict=`pass` で残っている
   - `report.md` front matter と S04 コミット記録が final 状態に正規化されている
+  - `iss-00038/deps.json` と generated deps graph が `iss-00040` prerequisite を反映している
+  - epic report / issue report / generated state / GitHub status の authority reconciliation が branch diff 上で説明できる
+  - corrective report/update が committed audit trail から追える
 - docs impact resolved:
   - targeted docs list の差分または no-op evidence が report にある
   - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
