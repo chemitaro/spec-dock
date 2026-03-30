@@ -16,6 +16,7 @@ ID: "iss-00038"
 - `iss-00040` が完了させた wrappers / domain / dogfooding parity / final regression evidence を参照可能な形で束ね、`E-AC-005` の docs/spec-review slice を客観的に閉じる。
 - この issue は epic の `E-RQ-005` を close し、`E-AC-005` の docs/spec-review slice を完了させる owner である。
 - 追加 corrective scope として、epic-level branch diff review で露出した status authority、dependency graph、commit-backed audit trail の不整合を解消し、epic close readiness を監査可能にする。
+- latest fresh review で残った `S09` fresh final rereview record 欠落、`epic-00033/report.md` の GitHub issue `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence 表記を narrow corrective scope として解消し、final close judgement を committed rereview まで閉じる。
 
 ## 背景・現状
 - 現状の挙動:
@@ -28,6 +29,7 @@ ID: "iss-00038"
   - docs parity が現時点で no-op に見えても、close evidence と final spec review record が整理されない限り epic close-out を客観的に判定できない。
   - acceptance review の結果、`report.md` の final close-out record に「未コミット」表記と曖昧な `状態` 値が残っており、実際の git history / approved state と整合しないことが判明した。
   - epic-level branch diff review の結果、`epic-00033/report.md` の `E-AC-005` がなお Partial/open のまま、`iss-00038/deps.json` に `iss-00040` が無く、S06 corrective 記録も committed audit trail になっていないことが判明した。
+  - latest fresh review の結果、S09 は execution evidence の記録までで fresh final rereview record が未記録、`epic-00033/report.md` は本文の completion claims と例外メモの `#33 OPEN` が衝突し、`iss-00040/report.md` も `draft | approved` などの provisional marker を含むため、upstream evidence を final review 用に正規化する必要がある。
 - 再現手順:
   1. `spec-dock/active/epic/plan.md` と `spec-dock/active/epic/report.md` を確認する。
   2. `iss-00038` の現 spec が split 前の責務を含んでいることを確認する。
@@ -60,6 +62,9 @@ ID: "iss-00038"
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t090100z-disc-epic-close-status-reconciliation-analysis.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t090200z-disc-deps-graph-and-readiness-alignment-analysis.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t090300z-disc-commit-backed-audit-trail-normalization-analysis.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t174500z-disc-s09-final-rereview-record-closure-analysis.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t174600z-disc-epic-report-33-open-closed-authority-mismatch-analysis.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t174700z-disc-upstream-evidence-normalization-for-iss-00040-report-analysis.md`
 
 ## 対象ユーザー / 利用シナリオ（必要時）
 - 主な利用者:
@@ -80,6 +85,10 @@ ID: "iss-00038"
   - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、`todo_total: 0` 時の active-only projection 空状態を drift と誤判定しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
   - branch-diff review に使う corrective report/update は committed history から再現できることを保証し、working-tree-only evidence を最終 artifact に残さない。
+  - S09 の execution evidence だけでは close claim を完了扱いにせず、S10 upstream evidence normalization と S11 fresh final rereview closure を close-out 必須経路として実行し、normalized artifact set を参照する committed artifact が揃うまで close claim を保留する。
+  - `epic-00033/report.md` の `#33` state は本文・例外メモ・generated state・`iss-00038/report.md` で同じ authority conclusion に揃える。
+  - `iss-00040/report.md` を触る場合は report-artifact normalization のみとし、runtime/test/implementation の re-execution を要求しない。
+  - S10 で `iss-00040/report.md` を正規化する場合、authoritative citation layer / front matter / final summary note だけを対象にし、historical session-log の `コミット: なし` entry が時点事実を表す限り書き換えない。
 - MUST NOT:
   - `iss-00040` が owner である wrappers / domain / dogfooding parity / final regression を再実行前提で抱え込まない。
   - runtime contract や test expectation の realignment を、この issue の close-out のために再度変更しない。
@@ -89,6 +98,7 @@ ID: "iss-00038"
   - generated state や GitHub status が open のままなのに、epic report だけを先行して `Pass` / closed 相当に更新しない。
   - narrative spec にだけ dependency を残し、`deps.json` / generated deps graph と不一致のままにしない。
   - committed branch diff review を前提にした gate で、working-tree-only corrective evidence を使わない。
+  - `iss-00040/report.md` の normalization を理由に `iss-00040` の implementation / regression ownership を reopen しない。
 - OUT OF SCOPE:
   - create / naming / sync / migration contract の中核実装変更
   - stale-contract cluster の再調査や full regression の再所有
@@ -105,6 +115,9 @@ ID: "iss-00038"
   - S01 の step approval は `report.md` 上で reviewer / verdict / 観測コマンドまたは観測 artifact / 非重複確認先を追跡できる形で残す。
   - upstream issue report の記述と generated state / epic report が衝突する場合は、`spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を close status の優先正本とする。
   - `spec-dock/dashboard.md` が `todo_total: 0` を返した後は、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` の空状態は active-only projection の仕様内であり、S07/S09 の否定 evidence には使わない。
+  - S09 は status reconciliation execution evidence step であり、fresh final rereview closure は後続 corrective step で committed record 化する。
+  - S10 が `epic-00033/report.md` または `iss-00040/report.md` の rereview input を更新した後は、`epic-00033/report.md` / normalized `iss-00040/report.md` / `iss-00038/report.md` / generated state / deps graph から成る normalized artifact set に対して、epic-level committed rereview を再度 `pass` させてから close judgement へ進む。
+  - `iss-00040/report.md` と `epic-00033/report.md` の更新が必要な場合でも、扱うのは report-artifact normalization だけであり、implementation 完了判定そのものは再実行しない。
 - Ask:
   - targeted docs list 以外に old contract assumption が見つかった場合は、その場で scope を広げず、`report.md` に blocker として記録して reviewer 判断へ escalate する。
 - Never:
@@ -164,6 +177,7 @@ ID: "iss-00038"
     - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence 参照が追える
     - `iss-00038` と `iss-00040` の non-overlap が明記されている
     - `report.md` の front matter 状態値と S04 のコミット記録が、最終的な approved 状態と実 commit に整合している
+    - fresh final rereview の reviewer / verdict / 参照した normalized upstream evidence が committed record として追える
   - 観測点:
     - final spec review record
 - AC-004:
@@ -176,10 +190,14 @@ ID: "iss-00038"
   - Then:
     - `epic-00033/report.md` の `E-AC-005` / remaining-open summary、`iss-00038/deps.json`、generated state、`iss-00038/report.md` の corrective commit trail が矛盾しない
     - epic close を主張するなら、その authority reconciliation が branch diff 上で追える
+    - `epic-00033/report.md` の `#33` state 記述が本文・例外メモ・generated state と矛盾しない
+    - S10 で更新した `epic-00033/report.md` と normalized `iss-00040/report.md` を含む normalized artifact set に対して、epic-level committed rereview が `pass` である
   - 観測点:
     - GitHub issue state または `sync --github` 実行ログ
     - `epic-00033/report.md`
+    - normalized `iss-00040/report.md`
     - `iss-00038/deps.json`
+    - deps graph evidence（`spec-dock/.agent/deps-issues.json` など）
     - `spec-dock/.agent/index-all.json`
     - active-only projection（`spec-dock/.agent/index.json` など）は補助観測点として扱う
     - `spec-dock/dashboard.md`
@@ -205,9 +223,9 @@ ID: "iss-00038"
     - generated state review
 - EC-003:
   - 条件:
-    - upstream issue evidence の参照先が不足している、または final spec review で ownership conflict が再発する
+    - upstream issue evidence の参照先が不足している、upstream report に provisional marker が残っている、または final spec review で ownership conflict が再発する
   - 期待:
-    - `iss-00038` 単独で強行 close せず、欠落 evidence または ownership 競合を docs に明記して reviewer 判断を待つ
+    - `iss-00038` 単独で強行 close せず、欠落 evidence / provisional marker / ownership 競合を docs に明記して reviewer 判断を待つ
   - 観測点:
     - review feedback
     - evidence index
@@ -238,6 +256,22 @@ ID: "iss-00038"
     - `spec-dock/.agent/index-all.json`
     - `spec-dock/.agent/deps-issues.json`（`todo_total: 0` で空の場合は参考値）
     - `epic-00033/plan.md`
+- EC-007:
+  - 条件:
+    - S09 execution evidence は記録済みだが、fresh final rereview の reviewer / verdict / commit-backed closure record が未記録
+  - 期待:
+    - S09 を close 完了扱いにせず、upstream evidence normalization 後に final committed rereview closure step を実施する
+  - 観測点:
+    - `iss-00038/report.md`
+    - latest rereview record
+- EC-008:
+  - 条件:
+    - `epic-00033/report.md` または `iss-00040/report.md` に provisional / conflicting status marker が残る
+  - 期待:
+    - report-artifact normalization だけを行い、implementation/test rerun に広げない
+  - 観測点:
+    - `epic-00033/report.md`
+    - `iss-00040/report.md`
 
 ## 入力→出力例（必要時）
 - EX-001:
