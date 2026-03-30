@@ -36,7 +36,7 @@ ID: "iss-00037"
   - 対象:
     - clause-1 / clause-2 の docs + validate boundary hardening
   - exit:
-    - forced backward compatibility 非維持と in-place 自動移行非保証が reviewer に追える
+    - forced backward compatibility 非維持と in-place 自動移行非保証が reviewer に追え、README contradiction の最小 correction owner も固定される
 - M3:
   - 対象:
     - clause-3 の non-destructive evidence hardening
@@ -58,13 +58,13 @@ ID: "iss-00037"
     - inventory と ownership boundary が spec review 可能な形で残っている
 - S02:
   - 観測可能な振る舞い:
-    - clause-1 と clause-2 の docs / validate boundary が reviewer にとって自明になる
+    - clause-1 と clause-2 の docs / validate boundary が reviewer にとって自明になり、README contradiction の最小 boundary correction も本 issue scope で扱われる
   - closes:
     - AC-001
     - AC-002
     - EC-002
   - review gate:
-    - minimal docs diff と targeted validate evidence が揃う
+    - `README.md` / `spec-dock/docs/README.md` / reference docs の minimal docs diff と targeted create / import / validate evidence が揃う
 - S03:
   - 観測可能な振る舞い:
     - clause-3 の fail-fast / warning / no-auto-repair 境界が tests と command results で観測できる
@@ -196,14 +196,18 @@ ID: "iss-00037"
 ### S02 — clause-1 and clause-2 docs plus validate hardening
 - target:
   - minimal boundary docs
+  - README boundary correction
   - validate regressions
 - design refs:
   - `spec-dock/active/issue/design.md`
+  - `README.md`
+  - `spec-dock/docs/README.md`
   - `spec-dock/docs/reference_github.md`
   - `spec-dock/docs/reference_naming.md`
   - `tests/cli_runtime/test_validate.py`
 - step boundary:
   - forced backward compatibility 非維持と in-place 自動移行非保証を、docs / validate / tests の正本へ揃える
+  - clause-2 acceptance は named docs diff（`README.md` / `spec-dock/docs/README.md` / reference docs）と current create / import / validate reject evidence で discharge し、新しい update-migration runtime path は作らない
 
 #### update_plan（着手時に登録）
 - [ ] `update_plan` に step の作業単位を登録した
@@ -241,8 +245,10 @@ ID: "iss-00037"
 
 #### B2 — clause-2 update non-guarantee
 - purpose:
-  - `spec-dock update` による in-place 自動移行非保証を docs / tests で観測可能にする
+  - `spec-dock update` による in-place 自動移行非保証を docs / tests で観測可能にし、README contradiction の最小 correction owner を `iss-00037` に固定する
 - files:
+  - `README.md`
+  - `spec-dock/docs/README.md`
   - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
   - `spec-dock/docs/reference_github.md`
   - `tests/cli_runtime/test_new.py`
@@ -251,7 +257,7 @@ ID: "iss-00037"
 
 ##### I1 — close clause-2 wording gaps
 - slice goal:
-  - current repo mismatch や legacy linkage mismatch が auto-migrate ではなく reject / fail-fast であることを固定する
+  - current repo mismatch や legacy linkage mismatch が auto-migrate ではなく reject / fail-fast であることと、README surface でも `update` 非保証が truthfully 読めることを固定する
 
 ###### Red
 - failing test:
@@ -261,15 +267,16 @@ ID: "iss-00037"
 
 ###### Green
 - minimum implementation:
-  - docs wording と targeted validate coverage を補完する
+  - `README.md` / `spec-dock/docs/README.md` / reference docs の最小 wording correction と targeted validate coverage を補完する
 - pass condition:
-  - clause-2 の docs + tests evidence が揃う
+  - clause-2 の parent epic acceptance が、named docs diff + current create / import / validate reject evidence だけで判定できる
 
 ###### Refactor
 - cleanup target:
   - wording の重複と曖昧な migration 表現の解消
 - invariants to keep green:
   - `update` を migration ツールとして誤解させない
+  - full docs parity refresh は `iss-00038` に残す
 
 #### step gate
 - review:
@@ -395,6 +402,7 @@ ID: "iss-00037"
   - docs / assets / workflow
 - 対応:
   - `iss-00037` では migration boundary に直接関係する minimal docs diff のみを扱う
+  - repo entrypoint `README.md` と `spec-dock/docs/README.md` の contradictory wording correction は S02 の boundary scope に含める
   - provider-side docs と checked-in dogfooding docs は必要箇所だけ同期する
   - full docs parity refresh は `iss-00038` の scope として維持する
 
@@ -422,5 +430,6 @@ ID: "iss-00037"
   - `iss-00038` / `iss-00040` との ownership boundary が崩れていない
 - docs impact resolved:
   - minimal boundary docs diff が provider / dogfooding で整合している
+  - README contradiction correction は S02 の narrow boundary scope として完了している
 - final diff approved:
   - S99 required validation と reviewer approvals が揃っている

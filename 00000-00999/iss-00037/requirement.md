@@ -25,6 +25,7 @@ ID: "iss-00037"
 - 現状の課題:
   - old workspace 非サポートの方針は epic docs にはあるが、reviewer が clause-1 / clause-2 / clause-3 を個別に再確認できる evidence bundle が `iss-00037` に固定されていない。
   - `spec-dock update` の in-place 自動移行非保証、legacy mismatch の fail-fast / warning、checked-in data 非破壊の境界が、docs / validate / tests に分散している。
+  - repo entrypoint `README.md` と shipped docs entry surface `spec-dock/docs/README.md` にある旧 contract の残存 wording は、migration boundary truthfulness に関わるが、どの issue が最小修正 owner なのかが曖昧なままである。
   - `iss-00038` / `iss-00040` と責務を混ぜると、close readiness の ownership が曖昧になる。
 - 再現手順:
   1. epic-00033 の現行 docs / reports / tests を横断して読む。
@@ -61,6 +62,7 @@ ID: "iss-00037"
   - E-AC-004 の 3 条項を clause-by-clause で閉じる。
   - clause ごとに docs / validate / tests / command evidence を対応づける。
   - `iss-00034` / `iss-00036` / `iss-00035` / `iss-00040` の実装成果を migration boundary の観点で統合し、final closure owner としての根拠を固定する。
+  - S02 では `README.md` と、obsolete contract を直接再掲している shipped docs entry README surface（現時点では `spec-dock/docs/README.md`）の最小 boundary correction を本 issue に吸収する。
 - MUST NOT:
   - old workspace 自動移行 tooling を追加しない。
   - backward compatibility を強制維持する方向へ戻さない。
@@ -90,6 +92,7 @@ ID: "iss-00037"
 - clause ごとに objective evidence を持つ。
 - final closure owner は本 issue とする。
 - minimal boundary docs diff までを本 issue の docs scope とし、full parity refresh は後続 issue に残す。
+- clause-2 の close evidence は、`README.md` / `spec-dock/docs/README.md` / `reference_github.md` などの named docs diff と、current create / import / validate reject evidence で判定できるようにする。
 
 ## 前提
 - `iss-00034` / `iss-00036` / `iss-00035` / `iss-00040` の先行 contract が存在する。
@@ -111,16 +114,16 @@ ID: "iss-00037"
     - `tests/cli_runtime/test_validate.py`
 - AC-002:
   - Actor:
-    - maintainer / reviewer
+     - maintainer / reviewer
   - Given:
-    - create / validate / update 周辺の migration boundary を確認する
+     - create / import / validate / update 周辺の migration boundary を確認する
   - When:
-    - clause-2 を評価する
+     - clause-2 を評価する
   - Then:
-    - in-place 自動移行非保証が docs diff と create / validate reject evidence で確認できる
+     - `README.md`、`spec-dock/docs/README.md`、`reference_github.md` 系の named docs diff と current create / import / validate reject evidence により、`spec-dock update` は old workspace の in-place migration guarantee ではないと確認でき、親 epic の clause-2 acceptance を新しい update-migration runtime path なしで判定できる
   - 観測点:
-    - docs diff
-    - targeted create / validate evidence
+     - `README.md` / `spec-dock/docs/README.md` / `reference_github.md` の docs diff
+     - targeted create / import / validate evidence
 - AC-003:
   - Actor:
     - maintainer / reviewer
@@ -157,12 +160,12 @@ ID: "iss-00037"
     - issue-level evidence mapping
 - EC-002:
   - 条件:
-    - maintainer が `update` による自動移行を期待している
+     - maintainer が `update` による自動移行を期待している
   - 期待:
-    - docs と contract tests で非保証であることが明確に観測できる
+     - named docs diff と create / import / validate reject evidence により、非保証であることが明確に観測できる
   - 観測点:
-    - docs diff
-    - create / validate evidence
+     - `README.md` / `spec-dock/docs/README.md` / `reference_github.md` の docs diff
+     - create / import / validate evidence
 
 ## 入力→出力例（必要時）
 - EX-001:

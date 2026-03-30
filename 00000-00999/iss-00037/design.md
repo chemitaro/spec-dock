@@ -28,6 +28,7 @@ ID: "iss-00037"
 - 非交渉制約:
   - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` にある。
   - minimal boundary docs diff までを `iss-00037` の docs impact とし、full parity refresh は `iss-00038` に残す。
+  - repo entrypoint `README.md` と shipped docs entry `spec-dock/docs/README.md` に obsolete migration contract が残る場合、その最小 boundary correction は `iss-00037` の S02 で吸収する。
   - validation / warning / fail-fast の境界を曖昧にしない。
 - 前提:
   - `iss-00034` は GitHub mandatory create / validate preflight 境界を実装済み。
@@ -57,7 +58,7 @@ ID: "iss-00037"
     - ただし reviewer が「migration boundary の clause-1 evidence」として追う導線はまだ `iss-00037` 側に束ねられていない。
   - clause-2:
     - `iss-00034` で old workspace 自動移行非保証と fail-fast create / validate 境界が入っている。
-    - 一方で `spec-dock update` を含む user-facing wording と validate evidence を migration boundary の観点で横断整理した owner は未確立である。
+    - 一方で `spec-dock update` を含む user-facing wording と validate evidence を migration boundary の観点で横断整理し、`README.md` / `spec-dock/docs/README.md` まで含めて最小 correction owner を確定する必要がある。
   - clause-3:
     - validate は local-only / legacy unscoped / malformed discussion filename を non-zero で reject し、sync も malformed partial scope を preflight で止める。
     - ただし reviewer が「無断破壊を目的にしない」を warning / fail-fast / no-write の観測点として再確認しやすい mapping が不足している。
@@ -100,6 +101,7 @@ ID: "iss-00037"
     - clause-2:
       - `spec-dock update` による in-place 自動移行を保証しないこと
       - old workspace は rebuildable であり、current contract 不一致は fail-fast / reject しうること
+      - user-facing boundary surface は `README.md`、`spec-dock/docs/README.md`、`reference_github.md` 系とし、named docs diff で obsolete contract を除去できること
     - clause-3:
       - checked-in data の無断書き換えを目的とせず、legacy mismatch は warning / error / reject で観測させること
   - validation contract:
@@ -107,10 +109,11 @@ ID: "iss-00037"
     - `sync` preflight は malformed partial scope 等を force でも hard-stop し、曖昧な repair path を取らない。
   - evidence contract:
     - clause-1 は naming / create / validation docs + validate regressions
-    - clause-2 は GitHub mandatory docs + create/validate reject regressions + `update` 非保証の docs wording
+    - clause-2 は `README.md` / `spec-dock/docs/README.md` / reference docs の named docs diff + current create/import/validate reject evidence により、`update` 非保証を示す
     - clause-3 は validate / sync preflight / no-write or no-auto-repair regressions
   - ownership contract:
-    - `iss-00037` は final closure owner であり、full docs parity finalization は `iss-00038`、stale-contract cluster realignment は `iss-00040` が持つ。
+    - `iss-00037` は final closure owner であり、clause-2 の migration-boundary truthfulness に必要な最小 README correction（`README.md` と `spec-dock/docs/README.md`）も持つ。
+    - full docs parity finalization は `iss-00038`、stale-contract cluster realignment は `iss-00040` が持つ。
 
 ### UML（推奨: module / dependency）
 ```plantuml
@@ -176,6 +179,8 @@ docs --> validation
   - `spec-dock/active/issue/requirement.md`
   - `spec-dock/active/issue/design.md`
   - `spec-dock/active/issue/plan.md`
+  - `README.md`
+  - `spec-dock/docs/README.md`
   - minimal boundary docs diff が必要な場合の reference docs
   - `tests/cli_runtime/test_validate.py`
   - 必要に応じて `tests/cli_runtime/test_sync.py` / related validate-preflight regressions
@@ -189,7 +194,7 @@ docs --> validation
 
 ## 要件 → 設計マッピング
 - AC-001 -> clause-1 を naming / validate / boundary docs に結びつける verification matrix
-- AC-002 -> clause-2 を GitHub mandatory docs / create+validate reject evidence / update 非保証 wording に結びつける
+- AC-002 -> clause-2 を named docs diff（README + reference）/ create+import+validate reject evidence / update 非保証 wording に結びつけ、parent epic acceptance を新 runtime path なしで判定可能にする
 - AC-003 -> clause-3 を validate / sync preflight / no-auto-repair evidence に結びつける
 - AC-004 -> issue close 時に clause-1/2/3 の owner と evidence set を reportable にする
 - EC-001 -> docs / tests / validate の scope outside ambiguity を残さない
@@ -212,11 +217,11 @@ docs --> validation
 
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> legacy sequential grandfathering / malformed discussion candidate reject / docs wording
-- AC-002 -> local-only reject / legacy unscoped linkage reject / `origin` fail-closed wording / `update` 非保証の docs wording
+- AC-002 -> `README.md` / `spec-dock/docs/README.md` / reference docs wording と current create/import/validate reject evidence の組み合わせで、`update` 非保証を parent epic clause-2 close evidence にする
 - AC-003 -> sync preflight hard-stop / no-write-no-auto-repair expectations / validate non-zero evidence
 - AC-004 -> issue report と final review で clause ownership と evidence set を参照可能にする
 - EC-001 -> minimal docs diff と review notes で `iss-00038` / `iss-00040` との責務分離を明記
-- EC-002 -> reference docs と validate command evidence
+- EC-002 -> named docs diff と create/import/validate command or test evidence
 - constraint -> stop / escalate rule を plan に固定
 
 ## リスク / 移行 / ロールバック（必要時）
@@ -224,8 +229,9 @@ docs --> validation
   - evidence mapping だけで閉じるつもりが、実際には未実装 gap を見落とす可能性がある。
   - `iss-00038` / `iss-00040` との ownership boundary が曖昧だと、close evidence が重複する。
   - `update` wording が散在すると clause-2 の非保証が reviewer に伝わりにくい。
+  - README correction owner を曖昧に戻すと、`iss-00038` への不明確な defer と見なされる。
 - migration:
-  - old workspace を mutate して救済するのではなく、non-support boundary を docs / validate / tests で観測可能にする。
+  - old workspace を mutate して救済するのではなく、named docs diff と create/import/validate reject evidence で non-support boundary を観測可能にする。
 - rollback:
   - docs/tests の issue diff を戻す。
   - partial rollback で self-healing path を混入させない。
