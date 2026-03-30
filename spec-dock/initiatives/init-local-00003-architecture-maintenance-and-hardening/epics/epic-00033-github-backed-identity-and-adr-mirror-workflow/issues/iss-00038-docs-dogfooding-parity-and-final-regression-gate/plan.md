@@ -78,6 +78,20 @@ ID: "iss-00038"
   - exit:
     - `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs に残る stale `--no-github` guidance が GitHub-mandatory create contract に揃い、S02 original six-file verdict と区別して report から追える
 
+## ステップ進捗サマリー
+- [x] S01 close-out baseline and ownership lock
+- [x] S02 targeted docs current-contract review / parity close-out
+- [x] S03 generated-state review / final sync snapshot確認
+- [x] S04 final spec review record / close-out bundle
+- [x] S05 acceptance corrective close-out / report normalization
+- [x] S06 corrective acceptance alignment / spec re-review
+- [x] S07 dependency graph alignment
+- [x] S08 committed audit-trail normalization
+- [x] S09 epic status reconciliation and branch-diff rereview
+- [x] S10 upstream evidence normalization
+- [x] S11 final committed rereview closure
+- [x] S12 narrow rules/docs-authority alignment
+
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
