@@ -17,6 +17,7 @@ ID: "iss-00038"
   - `iss-00038` を「docs parity + final spec review record」の close-out issue として再固定する。
   - current repo state 上で、docs drift の有無、`validate` / `sync` の成立、upstream evidence の参照可能性をまとめて確認できる execution contract を作る。
   - epic `E-RQ-005` / `E-AC-005 docs/spec-review slice` と 1:1 に対応する close-out path を固定する。
+  - epic-level branch diff review で要求される status reconciliation、dependency graph alignment、commit-backed audit trail を追加 corrective scope として取り込む。
 - MUST / MUST NOT:
   - MUST:
     - provider-side と dogfooding 側の targeted docs list を同時に扱う。
@@ -24,11 +25,13 @@ ID: "iss-00038"
     - final spec review record を reviewer が traceable に辿れる形式で残す。
     - S01 の spec review pass は、観測コマンドまたは観測 artifact と reviewer verdict を `report.md` に残してから S02 へ進める execution contract とする。
     - final close-out 後の `report.md` は、front matter 状態値とコミット記録が最終状態に正規化された監査可能な artifact とする。
+    - epic close を宣言する場合は、issue report / epic report / generated state / deps graph の authority reconciliation を伴うことを execution contract に含める。
   - MUST NOT:
     - runtime / test realignment を再度設計対象に戻さない。
     - docs parity が no-op の場合でも、6 ファイル個別の current-contract verification evidence を省略しない。
     - targeted docs list 外で見つかった stale old-contract assumption を、その場で S02 の修正対象へ拡張しない。
     - report に「未コミット」や `draft | approved` のような暫定表記を最終状態のまま残さない。
+    - branch diff review を committed delta 前提で行うのに、working-tree-only evidence を最終 corrective artifact に残さない。
 - 非交渉制約:
   - final verdict は `pass`。
   - `validate` / `sync` は exit=0。
@@ -65,6 +68,7 @@ ID: "iss-00038"
   - 一部 upstream issue report には過去の reviewer コメントが残っていても、close status の正本は generated state と epic report にある。
   - したがって、この issue の主要設計論点は「どの evidence を最終 close-out 記録として束ねるか」であり、runtime behavior をどう変えるかではない。
   - acceptance review の結果、close-out record 自体の整合性も verification 対象であると分かったため、report artifact の最終正規化を design scope に含める。
+  - epic-level review の結果、status authority と deps graph も close-out artifact の一部であり、issue report だけ整っていても epic completion は主張できないことが分かった。
 - 採用するパターン:
   - docs verification first:
     - targeted docs list を current contract 観点で 6 ファイル個別にレビューし、parity 結果と old assumption 不在確認を evidence 化した上で、必要時のみ両側更新する。
@@ -76,10 +80,17 @@ ID: "iss-00038"
     - upstream issue reports と current issue evidence を report ベースで束ねる。
   - final artifact normalization:
     - final spec review pass 後に、`report.md` front matter と S04 コミット記録を確定状態へ揃える。
+  - dependency graph alignment:
+    - `iss-00040` を evidence prerequisite として `iss-00038/deps.json` と generated deps graph に追加し、ownership 再取得ではないことを保つ。
+  - status reconciliation:
+    - `approved` と lifecycle `closed` を区別し、GitHub issue state -> generated state -> epic report -> issue report の authority order が揃ってから epic completion を宣言する。
+  - commit-backed audit trail:
+    - branch-diff review に使う corrective doc update は actual commit から追跡できる状態にし、既存 S06 chronology は append-only で保持する。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
   - provider docs だけを直して dogfooding 側を同期しないこと。
+  - generated state / GitHub が open のまま、epic report だけを先に close 相当に書き換えること。
 - 影響範囲:
   - `spec-dock/active/issue/requirement.md`
   - `spec-dock/active/issue/design.md`
@@ -132,6 +143,13 @@ ID: "iss-00038"
       - final spec review record（verdict / referenced evidence / non-overlap check）
     - source of truth:
       - close status は `spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を優先する
+  - dependency boundary:
+    - input:
+      - `iss-00038/deps.json`
+      - `spec-dock/active/epic/plan.md`
+      - `spec-dock/.agent/deps-issues.json`
+    - output:
+      - narrative spec と generated deps graph が一致した prerequisite definition
   - report integrity boundary:
     - input:
       - `report.md` front matter
@@ -139,6 +157,16 @@ ID: "iss-00038"
       - actual git history
     - output:
       - final artifact normalization evidence（状態値と commit 記録の整合）
+  - status reconciliation boundary:
+    - input:
+      - GitHub issue state
+      - `iss-00038/report.md`
+      - `epic-00033/report.md`
+      - `spec-dock/.agent/index*.json`
+      - `spec-dock/dashboard.md`
+      - `sync --github` 後の issue status
+    - output:
+      - epic completion を主張できる単一の close-status conclusion
   - escalation boundary:
     - trigger:
       - S02 で targeted docs list 外に stale old-contract assumption を発見する
@@ -182,6 +210,8 @@ upstream --> record
   - `spec-dock/active/issue/design.md`
   - `spec-dock/active/issue/plan.md`
   - 実行時は `spec-dock/active/issue/report.md`
+  - `spec-dock/initiatives/.../iss-00038/deps.json`
+  - `spec-dock/active/epic/report.md`
   - 必要時のみ targeted docs list 6 ファイル
 - Delete:
   - なし
@@ -199,12 +229,15 @@ upstream --> record
 - AC-002 -> `validate` / `sync` 実行結果と generated state review で閉じる
 - AC-003 -> report を final spec review record の正本として evidence を集約する
 - AC-003 -> report を final spec review record の正本として evidence を集約し、最終状態へ正規化する
+- AC-004 -> branch diff review 上で epic report / deps graph / issue report / generated state の authority reconciliation を確認する
 - EC-001 -> docs no-op の場合も parity evidence を必須化する
   - 補足:
     - parity evidence 単独では閉じず、6 ファイル個別レビューを report に残す
 - EC-002 -> generated state drift を close blocker として扱う
 - EC-003 -> upstream evidence 欠落時は close-out を停止し reviewer judgment に渡す
 - EC-004 -> report artifact の暫定表記が残る場合は close blocker として扱う
+- EC-005 -> issue/epic/generated state の close-status mismatch を close blocker として扱う
+- EC-006 -> deps graph と narrative prerequisite の mismatch を close blocker として扱う
 - constraint -> `iss-00040` 非重複を設計上で明文化する
 - constraint -> targeted docs list 外の stale assumption 発見時は stop/escalate する
 
@@ -221,6 +254,8 @@ upstream --> record
   - `spec-dock/dashboard.md` と `.agent/index*.json` の確認
   - final spec review record のレビュー
   - `report.md` front matter と S04 コミット記録の最終整合確認
+  - `iss-00038/deps.json` と generated deps graph の一致確認
+  - GitHub issue state / `sync --github` / generated state / `epic-00033/report.md` の close-status reconciliation 確認
 - migration / rollback / feature flag if needed:
   - feature flag なし
   - rollback は docs/report 差分を issue 単位で戻す
@@ -231,11 +266,14 @@ upstream --> record
 - AC-002 -> `validate` / `sync` 実行結果 + generated state check
 - AC-003 -> report 上の final spec review record
 - AC-003 -> report 上の final spec review record + front matter / commit record normalization
+- AC-004 -> epic report / generated state / deps graph / issue report の branch diff reconciliation
 - EC-001 -> docs no-op でも parity evidence を report に残す
   - + current-contract verification evidence を report に残す
 - EC-002 -> generated state mismatch がないことを確認する
 - EC-003 -> upstream evidence 欠落があれば review blocker として記録する
 - EC-004 -> report artifact の暫定表記が残っていないことを確認する
+- EC-005 -> authority mismatch があれば epic close blocker として記録する
+- EC-006 -> dependency mismatch があれば deps alignment を要求する
 - constraint -> non-overlap check を final review record に含める
 - constraint -> scope外 stale assumption は blocker + escalation record にする
 
@@ -245,6 +283,8 @@ upstream --> record
   - `iss-00040` の evidence 参照を誤ると ownership 競合が再発する。
   - `validate` / `sync` は成功しても generated state review を省くと close-out の客観性が弱まる。
   - targeted docs list 外の stale assumption を見つけた際に ad hoc 修正へ流れると、`iss-00040` との境界や issue scope が再び曖昧になる。
+  - issue report が `approved/pass` でも epic report / generated state / GitHub が open のままだと、epic close readiness を誤判定しやすい。
+  - corrective doc update が commit-backed でないと、branch diff review の監査性が失われる。
 - migration:
   - scope の再定義が主であり、user-visible runtime migration はない。
 - rollback:

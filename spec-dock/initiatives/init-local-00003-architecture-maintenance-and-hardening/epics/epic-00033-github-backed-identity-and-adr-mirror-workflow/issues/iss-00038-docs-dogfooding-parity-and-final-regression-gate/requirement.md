@@ -15,6 +15,7 @@ ID: "iss-00038"
 - epic `epic-00033` の最後の open slice として、provider docs / dogfooding docs の close-out と final spec review record を完成させる。
 - `iss-00040` が完了させた wrappers / domain / dogfooding parity / final regression evidence を参照可能な形で束ね、`E-AC-005` の docs/spec-review slice を客観的に閉じる。
 - この issue は epic の `E-RQ-005` を close し、`E-AC-005` の docs/spec-review slice を完了させる owner である。
+- 追加 corrective scope として、epic-level branch diff review で露出した status authority、dependency graph、commit-backed audit trail の不整合を解消し、epic close readiness を監査可能にする。
 
 ## 背景・現状
 - 現状の挙動:
@@ -26,6 +27,7 @@ ID: "iss-00038"
   - `iss-00038` 自身の issue spec は split 前の責務を引きずっており、`iss-00040` へ移管済みの final regression ownership が requirement/design/plan に残っている。
   - docs parity が現時点で no-op に見えても、close evidence と final spec review record が整理されない限り epic close-out を客観的に判定できない。
   - acceptance review の結果、`report.md` の final close-out record に「未コミット」表記と曖昧な `状態` 値が残っており、実際の git history / approved state と整合しないことが判明した。
+  - epic-level branch diff review の結果、`epic-00033/report.md` の `E-AC-005` がなお Partial/open のまま、`iss-00038/deps.json` に `iss-00040` が無く、S06 corrective 記録も committed audit trail になっていないことが判明した。
 - 再現手順:
   1. `spec-dock/active/epic/plan.md` と `spec-dock/active/epic/report.md` を確認する。
   2. `iss-00038` の現 spec が split 前の責務を含んでいることを確認する。
@@ -55,6 +57,9 @@ ID: "iss-00038"
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/design.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/plan.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t090100z-disc-epic-close-status-reconciliation-analysis.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t090200z-disc-deps-graph-and-readiness-alignment-analysis.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t090300z-disc-commit-backed-audit-trail-normalization-analysis.md`
 
 ## 対象ユーザー / 利用シナリオ（必要時）
 - 主な利用者:
@@ -71,12 +76,18 @@ ID: "iss-00038"
   - S01 の spec review pass と `iss-00040` 非重複確認について、観測コマンドまたは観測 artifact を伴う承認記録を `report.md` に残し、その承認後にのみ S02 へ進む。
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
   - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
+  - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
+  - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
+  - branch-diff review に使う corrective report/update は committed history から再現できることを保証し、working-tree-only evidence を最終 artifact に残さない。
 - MUST NOT:
   - `iss-00040` が owner である wrappers / domain / dogfooding parity / final regression を再実行前提で抱え込まない。
   - runtime contract や test expectation の realignment を、この issue の close-out のために再度変更しない。
   - docs parity を provider-side だけで閉じない。
   - targeted docs list の parity/no-op だけで AC-001 を満たした扱いにしない。
   - final close-out record に、実際の commit 済み状態や approved 状態と矛盾する暫定表記を残さない。
+  - generated state や GitHub status が open のままなのに、epic report だけを先行して `Pass` / closed 相当に更新しない。
+  - narrative spec にだけ dependency を残し、`deps.json` / generated deps graph と不一致のままにしない。
+  - committed branch diff review を前提にした gate で、working-tree-only corrective evidence を使わない。
 - OUT OF SCOPE:
   - create / naming / sync / migration contract の中核実装変更
   - stale-contract cluster の再調査や full regression の再所有
@@ -86,6 +97,8 @@ ID: "iss-00038"
 ## 境界
 - Always:
   - `iss-00038` は docs close-out owner であり、`iss-00040` の final regression evidence を参照して閉じる。
+  - lifecycle close authority order は、1) GitHub issue state、2) `sync --github` 後の generated state、3) `epic-00033/report.md`、4) `iss-00038/report.md` の順とし、後段は前段を mirror する。
+  - `approved` は artifact quality verdict を表し、epic lifecycle close とは別に status reconciliation を要する。
   - targeted docs list の評価は provider-side source of truth と checked-in dogfooding docs の両方で行う。
   - close evidence は docs review結果、`validate` / `sync` の実行結果、final spec review record の 3 本柱で残す。
   - S01 の step approval は `report.md` 上で reviewer / verdict / 観測コマンドまたは観測 artifact / 非重複確認先を追跡できる形で残す。
@@ -102,6 +115,7 @@ ID: "iss-00038"
 - final spec review record には `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence 参照を含める。
 - `validate` / `sync` は current repo state に対して exit=0 を示す。
 - 新たに uppercase path を増やさない。
+- epic close readiness を宣言するには、epic report / issue report / generated state / dependency graph が branch diff review 上で矛盾しないことを要求する。
 
 ## 前提
 - `iss-00040` は完了済みで、stale-contract / final regression / dogfooding parity evidence はその report に集約されている。
@@ -149,6 +163,23 @@ ID: "iss-00038"
     - `report.md` の front matter 状態値と S04 のコミット記録が、最終的な approved 状態と実 commit に整合している
   - 観測点:
     - final spec review record
+- AC-004:
+  - Actor:
+    - epic maintainer / spec reviewer
+  - Given:
+    - `iss-00038` の close-out evidence と corrective findings が揃っている
+  - When:
+    - `git diff main...HEAD` を epic completion review として確認する
+  - Then:
+    - `epic-00033/report.md` の `E-AC-005` / remaining-open summary、`iss-00038/deps.json`、generated state、`iss-00038/report.md` の corrective commit trail が矛盾しない
+    - epic close を主張するなら、その authority reconciliation が branch diff 上で追える
+  - 観測点:
+    - GitHub issue state または `sync --github` 実行ログ
+    - `epic-00033/report.md`
+    - `iss-00038/deps.json`
+    - `spec-dock/.agent/index*.json`
+    - `spec-dock/dashboard.md`
+    - `iss-00038/report.md`
 
 ## 例外・エッジケース
 - EC-001:
@@ -183,6 +214,24 @@ ID: "iss-00038"
   - 観測点:
     - `report.md` front matter
     - S04 close-out 記録
+- EC-005:
+  - 条件:
+    - issue docs は `approved/pass` だが、epic report や generated state がなお `open/partial` を返している
+  - 期待:
+    - authority mismatch を残したまま epic close を宣言せず、status reconciliation step を実行してから最終判定へ進む
+  - 観測点:
+    - `epic-00033/report.md`
+    - `spec-dock/.agent/index*.json`
+    - `spec-dock/dashboard.md`
+- EC-006:
+  - 条件:
+    - narrative spec では `iss-00040` prerequisite を要求しているが、`deps.json` や generated deps graph に edge が無い
+  - 期待:
+    - dependency graph を spec に合わせて正規化するか、spec 側の prerequisite 表現を修正するまで epic review を pass にしない
+  - 観測点:
+    - `iss-00038/deps.json`
+    - `spec-dock/.agent/deps-issues.json`
+    - `epic-00033/plan.md`
 
 ## 入力→出力例（必要時）
 - EX-001:
