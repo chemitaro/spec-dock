@@ -132,9 +132,9 @@ class TestInitUpdate(CliRuntimeHarness):
                 "Epic workflow: `spec-dock/docs/workflow_epic.md`",
                 "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new epic --initiative <id> --title",
-                "--no-github",
             ),
             "absent": (
+                "--no-github",
                 "new issue --epic",
                 "new doc adr",
             ),
