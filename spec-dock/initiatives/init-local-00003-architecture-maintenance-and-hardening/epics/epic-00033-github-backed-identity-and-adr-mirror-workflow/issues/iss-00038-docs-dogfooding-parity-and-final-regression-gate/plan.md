@@ -50,7 +50,7 @@ ID: "iss-00038"
 - [x] S11 final committed rereview closure
 - [x] S12 narrow rules/docs-authority alignment
 - [x] S90 docs impact resolution / docs refresh
-- [ ] S99 final diff review quality gate
+- [x] S99 final diff review quality gate
 - note:
   - 最新の committed branch diff を対象にした fresh final review cycle は、この S99 で閉じる
 
