@@ -813,10 +813,10 @@ rg -n 'historical anchor|corrective anchor|S99|RG1|QG1|573fe3f' spec-dock/active
 - `spec-dock/active/issue/report.md` - S99 final gate record を追記
 
 #### コミット
-- pending（この S99 pass record を commit して terminal close claim を固定する）
+- gate record anchor: `a6d2014` `docs(issue): iss-00038のS99品質ゲートを確定`
 
 #### メモ
-- S99 は terminal close claim を閉じる quality gate であり、この entry 自体を commit して初めて committed audit trail が完成する。
+- S99 は terminal close claim を閉じる quality gate であり、gate record 自体は `a6d2014` で committed artifact 化済みである。
 - S13 の implementation self-review は execution-local evidence のまま保持し、reviewer-recorded gate evidence は S99 に集約した。
 
 ---
