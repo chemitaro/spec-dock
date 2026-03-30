@@ -13,6 +13,11 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 `import` / `active set` / deps check / sync の `gh issue view` 系では repo slug が分かっている場合に `--repo owner/repo` を付け、same-repo URL import でも current repo を明示して読み取ります。  
 一方で `gh issue create` / `gh issue list` は repo root を `cwd` にして実行し、対象リポジトリ解決は **`gh` の通常解釈**に委ねます。
 
+補足:
+- `spec-dock update` は managed files/docs/templates/scripts/skills を refresh しますが、old workspace の in-place migration は保証しません
+- legacy `meta.json`、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で吸収されず current create / import / validate / sync が reject / fail-fast しうります
+- その場合は auto-migrate を期待せず、手動で normalize するか workspace を rebuild してください
+
 代表的な解決材料（`gh` 側）:
 - カレントディレクトリが Git リポジトリであること
 - `git remote` の URL
@@ -36,6 +41,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
   - ローカルにはノードを生成し、`sync --no-update-active` 相当まで実行します（active は変更しません）
   - `import` は実行前に preflight validate（`validate` 相当）を行い、既存ツリーが不整合な場合は **副作用（テンプレートコピー/`.meta.json`生成）なし**で失敗します
   - `meta.json`（レガシー名）が混在しているツリーは非対応です（`.meta.json` へ手動移行後に実行してください）
+  - linkage mismatch / current-repo mismatch は手動 normalize 前提で reject され、auto-repair / auto-migrate は行いません
 
 ### GitHub を呼ばない（ローカルのみ）
 

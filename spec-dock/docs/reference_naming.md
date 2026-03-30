@@ -135,11 +135,13 @@ collision 形の `doc_id`:
 
 ### 4.4 legacy files と validation 境界
 
-legacy sequential docs は grandfathered です。
+legacy sequential docs は grandfathered only です。
 
 - 例: `001-adr-token-rotation.md`, `002-disc-api-options.md`
+- 強制的 backward compatibility を維持するために legacy naming へ戻したり、新規 doc で legacy sequence basename を優先したりはしません
 - 既存 legacy file は自動 rename しません
 - 新 contract で新規作成するときに legacy sequential basename を再利用しません
+- malformed / mismatch basename を validation が自動 repair することもありません
 
 validation / allocation の扱い:
 - unrelated files は無視します
@@ -153,6 +155,7 @@ validation / allocation の扱い:
 原則:
 - unrelated file は ignore します
 - malformed discussion filename candidate は fail-closed で reject します
+- grandfathered なのは既存 legacy sequential docs だけであり、legacy contract 全体の forced compatibility を意味しません
 
 ---
 

@@ -15,6 +15,7 @@ ID: "iss-00037"
 ## 実装サマリー (任意)
 - S01 として、migration boundary の clause-1/2/3 について current evidence・missing evidence・owner boundary を `iss-00037` の report に固定した。
 - `iss-00037` は migration-boundary evidence の final closure owner であり、S02 では clause-2 truthfulness に必要な最小 README correction（`README.md` と `spec-dock/docs/README.md`）も吸収する一方、full docs parity は `iss-00038`、stale-contract/test realignment は `iss-00040` に残す前提を明記した。
+- S02 として、clause-1/2 wording gap を最小 docs correction で閉じ、provider/dogfooding mirror を current runtime contract に整列させた。reject / fail-fast / no-auto-rename の根拠は既存テストを再利用して evidence として束ね、追加テストは行っていない。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -101,6 +102,50 @@ cd /srv/mount/spec-dock && git --no-pager grep -n "meta.json\|preflight\|unsuppo
 - README contradiction の最小 correction は S02 で `iss-00037` が吸収する。
 - full docs parity は `iss-00038`、stale-contract realignment は `iss-00040` の ownership のまま維持する。
 
+### 2026-03-30
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, EC-002
+- 備考: clause-1/2 wording gap を最小 docs correction で閉じ、既存 reject / fail-fast / no-auto-rename tests を evidence として再利用
+
+#### 実施内容
+- `README.md`、provider asset docs、dogfooding mirror docs の wording を current runtime contract に合わせて見直し、clause-1/2 の reviewer-facing gap のみを最小差分で修正した。
+- clause-1 について、legacy sequential naming は grandfathered だが新 contract へ自動 rename しないことを明確化し、no forced backward compatibility / no auto-rename の境界を docs で揃えた。
+- clause-2 について、legacy / malformed state は update/import/validate 系で in-place auto-migration せず reject/fail-fast する契約に wording を寄せ、README と reference docs の説明差を解消した。
+- provider surface（`src/spec_dock/assets/spec_dock/docs/...`）と dogfooding mirror（`spec-dock/docs/...`）を同内容で更新し、clause-1/2 wording gap を閉じた。
+- 追加テストは行わず、既存の `tests.cli_runtime.test_new` / `tests.cli_runtime.test_runtime_new_s08` / `tests.cli_runtime.test_validate` を current evidence として再利用した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08 -v
+# Ran 82 tests ... OK
+
+python -m unittest tests.cli_runtime.test_validate -v
+# Ran 33 tests ... OK
+```
+
+- 既存テスト群で reject / fail-fast / no-auto-rename evidence が維持されていることを確認した。
+- S02 は docs-only diff として完了し、README・reference docs の wording が current runtime contract と整合した。
+
+#### 変更したファイル
+- `README.md` - clause-1/2 wording gap を閉じる最小 README correction
+- `src/spec_dock/assets/spec_dock/docs/README.md` - provider asset README mirror を current contract に同期
+- `spec-dock/docs/README.md` - dogfooding README mirror を current contract に同期
+- `src/spec_dock/assets/spec_dock/docs/reference_github.md` - reject / fail-fast / no in-place auto-migration wording を調整
+- `spec-dock/docs/reference_github.md` - dogfooding GitHub reference mirror を同期
+- `src/spec_dock/assets/spec_dock/docs/reference_naming.md` - legacy sequential grandfathering / no auto-rename wording を調整
+- `spec-dock/docs/reference_naming.md` - dogfooding naming reference mirror を同期
+- `spec-dock/active/issue/report.md` - S02 completion log / test evidence / review結果を記録
+
+#### コミット
+- 未コミット
+
+#### メモ
+- RG1/code review（reviewer: `code_reviewer`、scope: `S02 docs-only diff`）は pass。README / provider docs / dogfooding mirror の wording が current runtime contract と一致し、material defect は確認されなかった。
+- review rationale: wording matches the current runtime contract; touched provider/dogfooding mirror surfaces are aligned; no material defects found.
+- S02 は clause-1/2 wording gap を最小 docs correction で閉じた step であり、reject / fail-fast / no-auto-rename の追加実装や追加テストは不要と判断した。
+
 ---
 
 ## 遭遇した問題と解決 (任意)
@@ -112,7 +157,6 @@ cd /srv/mount/spec-dock && git --no-pager grep -n "meta.json\|preflight\|unsuppo
 - S01 では gap を増やさず、`iss-00038` / `iss-00040` との ownership boundary を先に固定することが重要。
 
 ## 今後の推奨事項 (任意)
-- S02 で clause-1 / clause-2 の reviewer-facing wording gap を、`README.md` / `spec-dock/docs/README.md` / reference docs を含む最小 docs diff で閉じる。
 - S03 で clause-3 の fail-fast / warning / no-write mapping を targeted evidence と command results で補強する。
 
 ## 省略/例外メモ (必須)
