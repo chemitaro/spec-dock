@@ -70,6 +70,94 @@ git --no-pager diff -- spec-dock/active/issue/requirement.md spec-dock/active/is
 - このセッションでの変更対象は active issue path 配下の `requirement.md` / `design.md` / `plan.md` / `report.md` のみ。
 - runtime code、targeted docs list、他 issue docs は未変更。
 
+### 2026-03-30 13:17 - 13:22
+
+#### 対象
+- Step: S02 targeted docs current-contract review / parity close-out
+- AC/EC: targeted docs current-contract evidence、no-op parity close-out、stale assumption 無しの確認
+
+#### 実施内容
+- targeted docs 6件（provider / dogfooding pair）を parity 前提だけでなく、各 path ごとの current-contract evidence として個別確認した。
+- `reference_github.md` family では、現行 contract が以下を明示していることを確認した:
+  - `initiative / epic / issue` に local-only create path は無く、Epic 配下 issue でも current repo の GitHub linkage が必須である
+  - URL import は canonical GitHub issue URL のみ許可される
+  - current repo を検証できない場合や `owner/repo` mismatch は fail-closed で reject される
+  - `update` / import / validate / sync に auto-migrate expectation は無く、old contract 不整合は手動 normalize 前提である
+- `reference_naming.md` family では、現行 contract が以下を明示していることを確認した:
+  - legacy sequential discussion docs は grandfathered only である
+  - 既存 legacy basename の auto-rename は行わない
+  - legacy naming 全体の forced backward compatibility は維持しない
+  - malformed / mismatch basename candidate は fail-closed で reject される
+- `reference_sync.md` family では、現行 contract が以下を明示していることを確認した:
+  - generated-state / sync contract は `.meta.json` ベースの v2 出力、`index-all.json` 優先 fallback、legacy v1 stale artifact 削除として記述されており、stale local-only / stale index 前提は含まれていない
+  - `sync --github` は `gh issue list` による issue status enrichment として一貫して記述され、`sync` 単体時の snapshot fallback と矛盾していない
+- six-file individual review checklist は以下の通り。各 item で path・provider/dogfooding parity result・その exact file の current-contract verification outcome を記録し、targeted-docs-external stale assumption が無いことを file 単位で確認した。
+  - `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+    - provider/dogfooding parity: `spec-dock/docs/reference_github.md` と diff/cmp same、sha256 same (`1f2218e686f1ebd106d6b40d3e5537c2d5a4737eb4a7593a73aecf4703f52246`)
+    - current-contract verification: asset 側の exact file で local-only create path 不在、canonical GitHub issue URL only、repo mismatch fail-closed、auto-migrate expectation 無しを個別確認。stale assumption なし。
+  - `spec-dock/docs/reference_github.md`
+    - provider/dogfooding parity: `src/spec_dock/assets/spec_dock/docs/reference_github.md` と diff/cmp same、sha256 same (`1f2218e686f1ebd106d6b40d3e5537c2d5a4737eb4a7593a73aecf4703f52246`)
+    - current-contract verification: dogfooding 側の exact file で local-only create path 不在、canonical GitHub issue URL only、repo mismatch fail-closed、auto-migrate expectation 無しを個別確認。stale assumption なし。
+  - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+    - provider/dogfooding parity: `spec-dock/docs/reference_naming.md` と diff/cmp same、sha256 same (`83dcdb411e5380848fa5789112e28f68646c0993e38972e7d6dc757f263b0d6f`)
+    - current-contract verification: asset 側の exact file で legacy sequential discussion docs は grandfathered only、auto-rename 不実施、forced backward compatibility 非維持、malformed/mismatch basename fail-closed を個別確認。stale assumption なし。
+  - `spec-dock/docs/reference_naming.md`
+    - provider/dogfooding parity: `src/spec_dock/assets/spec_dock/docs/reference_naming.md` と diff/cmp same、sha256 same (`83dcdb411e5380848fa5789112e28f68646c0993e38972e7d6dc757f263b0d6f`)
+    - current-contract verification: dogfooding 側の exact file で legacy sequential discussion docs は grandfathered only、auto-rename 不実施、forced backward compatibility 非維持、malformed/mismatch basename fail-closed を個別確認。stale assumption なし。
+  - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+    - provider/dogfooding parity: `spec-dock/docs/reference_sync.md` と diff/cmp same、sha256 same (`13ce48a3e080505a770550d9a5878b1f89e4281ed42faf4a9c854c5234127e47`)
+    - current-contract verification: asset 側の exact file で `.meta.json` ベース v2 出力、`index-all.json` 優先 fallback、legacy v1 stale artifact 削除、`sync --github` の issue status enrichment 記述を個別確認。stale local-only / stale index assumption なし。
+  - `spec-dock/docs/reference_sync.md`
+    - provider/dogfooding parity: `src/spec_dock/assets/spec_dock/docs/reference_sync.md` と diff/cmp same、sha256 same (`13ce48a3e080505a770550d9a5878b1f89e4281ed42faf4a9c854c5234127e47`)
+    - current-contract verification: dogfooding 側の exact file で `.meta.json` ベース v2 出力、`index-all.json` 優先 fallback、legacy v1 stale artifact 削除、`sync --github` の issue status enrichment 記述を個別確認。stale local-only / stale index assumption なし。
+- 既に機械確認済みの provider / dogfooding parity（`reference_github.md` / `reference_naming.md` / `reference_sync.md` の diff/cmp/sha256 一致）に加え、内容面でも six-file 全件で targeted-docs-external stale assumption は見つからなかった。
+- 以上より S02 は no-op parity close-out と判断し、targeted docs の追加修正は不要と結論づけた。blocker / escalation も不要だった。
+
+#### 実行コマンド / 結果
+```bash
+find . -path '*/reference_*.md' -o -path '*/active/issue/*' | sed 's#^./##' | sort
+
+- targeted docs の所在を再確認した。
+- provider / dogfooding pair の current-contract review 対象を `spec-dock/docs/*.md` と `src/spec_dock/assets/spec_dock/docs/*.md` で確認した。
+- 機械確認済み parity（session 既知）に加え、各 family の現行 contract 記述に stale assumption が無いことを目視確認した。
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `spec-dock/docs/reference_github.md` / `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+  - `spec-dock/docs/reference_naming.md` / `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+  - `spec-dock/docs/reference_sync.md` / `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+  - session 既知の parity evidence:
+    - `reference_github.md`: provider/dogfooding diff same, cmp same, sha256 `1f2218e686f1ebd106d6b40d3e5537c2d5a4737eb4a7593a73aecf4703f52246`
+    - `reference_naming.md`: provider/dogfooding diff same, cmp same, sha256 `83dcdb411e5380848fa5789112e28f68646c0993e38972e7d6dc757f263b0d6f`
+    - `reference_sync.md`: provider/dogfooding diff same, cmp same, sha256 `13ce48a3e080505a770550d9a5878b1f89e4281ed42faf4a9c854c5234127e47`
+  - six-file current-contract review:
+    - `src/spec_dock/assets/spec_dock/docs/reference_github.md`: exact file reviewed, current GitHub linkage/import/validation contract confirmed, stale assumption none
+    - `spec-dock/docs/reference_github.md`: exact file reviewed, current GitHub linkage/import/validation contract confirmed, stale assumption none
+    - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`: exact file reviewed, current naming/legacy/fail-closed contract confirmed, stale assumption none
+    - `spec-dock/docs/reference_naming.md`: exact file reviewed, current naming/legacy/fail-closed contract confirmed, stale assumption none
+    - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`: exact file reviewed, current sync/generated-state/status-enrichment contract confirmed, stale assumption none
+    - `spec-dock/docs/reference_sync.md`: exact file reviewed, current sync/generated-state/status-enrichment contract confirmed, stale assumption none
+- reviewer:
+  - DevCoder self-review（S02 review pass 用 evidence 整理）
+- verdict:
+  - pass（no-op parity close-out、targeted docs edit 不要）
+- stop / escalate 判定:
+  - targeted-docs-external stale assumption は未検出
+  - blocker / escalation 不要
+- 次ステップ着手可否:
+  - S02 close-out 可
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S02 の current-contract review 結果、family 別の確認事項、no-op parity close-out 判定を追記
+
+#### コミット
+- 未コミット（S02 review pass 後にコミット予定）
+
+#### メモ
+- targeted docs 自体は未変更。S02 では report への監査ログ追記のみ実施した。
+- no targeted-docs-external stale assumption was found; therefore no blocker/escalation was needed.
+
 ---
 
 ## 遭遇した問題と解決 (任意)
