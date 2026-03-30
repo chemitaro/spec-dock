@@ -25,6 +25,7 @@ ID: "iss-00038"
 - 現状の課題:
   - `iss-00038` 自身の issue spec は split 前の責務を引きずっており、`iss-00040` へ移管済みの final regression ownership が requirement/design/plan に残っている。
   - docs parity が現時点で no-op に見えても、close evidence と final spec review record が整理されない限り epic close-out を客観的に判定できない。
+  - acceptance review の結果、`report.md` の final close-out record に「未コミット」表記と曖昧な `状態` 値が残っており、実際の git history / approved state と整合しないことが判明した。
 - 再現手順:
   1. `spec-dock/active/epic/plan.md` と `spec-dock/active/epic/report.md` を確認する。
   2. `iss-00038` の現 spec が split 前の責務を含んでいることを確認する。
@@ -69,11 +70,13 @@ ID: "iss-00038"
   - `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` の close-out evidence を取得する。
   - S01 の spec review pass と `iss-00040` 非重複確認について、観測コマンドまたは観測 artifact を伴う承認記録を `report.md` に残し、その承認後にのみ S02 へ進む。
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
+  - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
 - MUST NOT:
   - `iss-00040` が owner である wrappers / domain / dogfooding parity / final regression を再実行前提で抱え込まない。
   - runtime contract や test expectation の realignment を、この issue の close-out のために再度変更しない。
   - docs parity を provider-side だけで閉じない。
   - targeted docs list の parity/no-op だけで AC-001 を満たした扱いにしない。
+  - final close-out record に、実際の commit 済み状態や approved 状態と矛盾する暫定表記を残さない。
 - OUT OF SCOPE:
   - create / naming / sync / migration contract の中核実装変更
   - stale-contract cluster の再調査や full regression の再所有
@@ -143,6 +146,7 @@ ID: "iss-00038"
     - verdict が `pass` である
     - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence 参照が追える
     - `iss-00038` と `iss-00040` の non-overlap が明記されている
+    - `report.md` の front matter 状態値と S04 のコミット記録が、最終的な approved 状態と実 commit に整合している
   - 観測点:
     - final spec review record
 
@@ -171,6 +175,14 @@ ID: "iss-00038"
   - 観測点:
     - review feedback
     - evidence index
+- EC-004:
+  - 条件:
+    - final spec review record 自体は揃っているが、`report.md` に暫定表記や状態不整合が残っている
+  - 期待:
+    - close-out は未完了とし、front matter とコミット記録を最終状態へ正規化してから受け入れ判定へ進む
+  - 観測点:
+    - `report.md` front matter
+    - S04 close-out 記録
 
 ## 入力→出力例（必要時）
 - EX-001:
