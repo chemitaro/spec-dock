@@ -589,8 +589,8 @@ upstream evidence normalization
 - AC/EC: AC-003, AC-004, EC-004, EC-007
 
 #### 実施内容
-- S09 の execution evidence（`fdccc87`）と S10 の normalized upstream evidence（`aba6db7` で反映された `epic-00033/report.md` / `iss-00040/report.md` / 本 issue docs alignment）を合わせた normalized artifact set に対して、fresh final spec rereview を実施した。
-- 上記の fresh final spec rereview では、normalized artifact set に対する committed branch diff `main...HEAD` の epic-level rereview gate も `pass` と判定されたものとして closure record に束ねた。
+- S09 の execution evidence（`fdccc87`）と S10 の normalized upstream evidence（`aba6db7` で反映された `epic-00033/report.md`、`iss-00038/deps.json`、`spec-dock/.agent/index-all.json`、`spec-dock/dashboard.md`、`iss-00038/report.md`、正規化済み `iss-00040/report.md`）を合わせた full normalized artifact set に対して、fresh final spec rereview を実施した。
+- 上記の fresh final spec rereview では、committed branch diff `main...HEAD` の epic-level rereview gate が、上記 6 source を含む full normalized artifact set に対して `pass` したことを closure record に明示した。
 - reviewer `Mill`（agent `019d3dff-88a2-7b72-88a3-677670b94ad5`）の completed spec-review result を最終判定として採用し、issue-doc contract level の closure verdict を `pass` で固定した。
 - この S11 により、`iss-00038` の issue-doc contract 上の AC-003（final spec review record）と AC-004（authority reconciliation を伴う final close claim）がともに閉じたことを明示した。
 - prior code/QA rereview で残っていた指摘は、fresh final rereview record 欠落や upstream artifact ambiguity といった pre-closure artifact gap に限られており、S10 normalization と今回の report alignment で解消済みであることを確認した。code/QA slice 自体に対する追加の pass verdict はここでは主張していない。
@@ -613,6 +613,10 @@ rg -n 'Mill|019d3dff|verdict|aba6db7|c2c6233' spec-dock/initiatives/init-local-0
 
 #### 承認 / 観測エビデンス
 - 観測コマンドまたは観測 artifact:
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json`
+  - `spec-dock/.agent/index-all.json`
+  - `spec-dock/dashboard.md`
   - `spec-dock/active/issue/requirement.md`
   - `spec-dock/active/issue/design.md`
   - `spec-dock/active/issue/plan.md`
@@ -681,7 +685,7 @@ rg -n -- '--no-github|Create command' src/spec_dock/assets/spec_dock/docs/rules/
 - `spec-dock/active/issue/report.md` - S12 corrective scope と original six-file slice との切り分けを追記
 
 #### コミット
-- なし（working tree 上の narrow rules-authority corrective update）
+- `ba732ec` `docs(rules): epic作成のgithub必須契約を整合`
 
 #### メモ
 - この S12 は `docs/rules/initiative/epics.md` pair の rules-authority corrective に限定し、runtime/test/implementation scope は reopen していない。
