@@ -792,8 +792,8 @@ ID: "iss-00038"
   - fresh final rereview の入力となる upstream reports の ambiguity を最小差分で正規化する。`iss-00040/report.md` に触る場合も report-artifact normalization のみで、authoritative citation layer / front matter / final summary note だけを整え、historical session-log chronology は保持したまま S11 の normalized artifact set を用意する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録する
-- [ ] upstream report ごとの ambiguity と normalization boundary を整理する
+- [x] `update_plan` に step の作業単位を登録する
+- [x] upstream report ごとの ambiguity と normalization boundary を整理する
 
 #### B1 — normalize upstream review inputs
 - purpose:

@@ -15,6 +15,7 @@ ID: "epic-00033"
 - 現在地（何が完了し、何が未完か）:
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00038` / `iss-00040` は完了済み。
   - `./spec-dock/scripts/spec-dock sync --github` 実行後の `spec-dock/.agent/index-all.json` では、GitHub issue `#38` が `CLOSED`、`iss-00038` は `status=done` / `effective_status=done` として反映されている。
+  - 同じ generated state で epic GitHub issue `#33` も `state=CLOSED` として反映されている。
   - 同じ generated state で epic progress は `total=6` / `done=6` / `open=0` / `unknown=0` である。
   - `spec-dock/dashboard.md` は `todo_total: 0`、`doing: 0`、`ready: 0`、`blocked: 0`、`unknown: 0` となっており、残る open issue summary は解消済みである。
 - 次のマイルストーン:
@@ -54,4 +55,4 @@ ID: "epic-00033"
 
 ## 省略/例外メモ (必須)
 - child issue の authoritative state は `sync --github` 後に `done=6` / `open=0` / `todo_total: 0` まで揃っている。
-- 一方で `spec-dock/.agent/index-all.json` 上の epic GitHub issue `#33` 自体の state は `OPEN` のままであり、この report の `状態: approved` は child issue completion と acceptance evidence の完了を表す。
+- `spec-dock/.agent/index-all.json` 上の epic GitHub issue `#33` も `CLOSED` であり、この report の `状態: approved` は child issue completion と GitHub/generated state の closure evidence に整合する。
