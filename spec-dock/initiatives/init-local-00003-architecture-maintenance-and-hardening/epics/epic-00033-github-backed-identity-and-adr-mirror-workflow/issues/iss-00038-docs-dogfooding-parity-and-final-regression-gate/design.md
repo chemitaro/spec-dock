@@ -65,6 +65,7 @@ ID: "iss-00038"
   - targeted docs list は current contract を反映済みで、少なくとも現時点の provider/dogfooding 間には内容差分がない。
   - ただし docs parity no-op だけでは close-out 不十分であり、6 ファイル個別に old local-only / sequential / index assumption 不在を示す current-contract verification evidence が必要である。
   - `iss-00040` が担当した regression/parity 系 suite は current snapshot でも pass しており、`iss-00038` が再実行 ownership を持たない前提を裏づけている。
+  - S07 の generated deps/status verification では `spec-dock/.agent/index-all.json` が authority であり、`spec-dock/dashboard.md` が `todo_total: 0` を返す局面では active-only projection の `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` が空でも contract violation ではない。
   - 一部 upstream issue report には過去の reviewer コメントが残っていても、close status の正本は generated state と epic report にある。
   - したがって、この issue の主要設計論点は「どの evidence を最終 close-out 記録として束ねるか」であり、runtime behavior をどう変えるかではない。
   - acceptance review の結果、close-out record 自体の整合性も verification 対象であると分かったため、report artifact の最終正規化を design scope に含める。
@@ -135,7 +136,7 @@ ID: "iss-00038"
       - current repo state
     - output:
       - `validate` / `sync` の exit=0 evidence
-      - generated state review (`dashboard.md`, `.agent/index*.json`)
+      - generated state review (`dashboard.md`, `spec-dock/.agent/index-all.json`, active-only projection は存在時のみ補助利用)
   - review boundary:
     - input:
       - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の issue-level evidence
@@ -147,9 +148,10 @@ ID: "iss-00038"
     - input:
       - `iss-00038/deps.json`
       - `spec-dock/active/epic/plan.md`
-      - `spec-dock/.agent/deps-issues.json`
+      - `spec-dock/.agent/index-all.json`
+      - `spec-dock/.agent/deps-issues.json`（`todo_total: 0` なら空でもよい）
     - output:
-      - narrative spec と generated deps graph が一致した prerequisite definition
+      - narrative spec と authoritative generated deps/status view が一致した prerequisite definition
   - report integrity boundary:
     - input:
       - `report.md` front matter
@@ -162,7 +164,8 @@ ID: "iss-00038"
       - GitHub issue state
       - `iss-00038/report.md`
       - `epic-00033/report.md`
-      - `spec-dock/.agent/index*.json`
+      - `spec-dock/.agent/index-all.json`
+      - active-only projection（存在する場合）
       - `spec-dock/dashboard.md`
       - `sync --github` 後の issue status
     - output:
@@ -226,18 +229,18 @@ upstream --> record
 - AC-001 -> targeted docs list review + parity evidence + 6 ファイル個別 verification evidence で閉じる
   - 補足:
     - parity の有無に関わらず、6 ファイル個別の current-contract verification evidence を必須とする
-- AC-002 -> `validate` / `sync` 実行結果と generated state review で閉じる
+- AC-002 -> `validate` / `sync` 実行結果と `index-all.json` 正本の generated state review で閉じる
 - AC-003 -> report を final spec review record の正本として evidence を集約する
 - AC-003 -> report を final spec review record の正本として evidence を集約し、最終状態へ正規化する
 - AC-004 -> branch diff review 上で epic report / deps graph / issue report / generated state の authority reconciliation を確認する
 - EC-001 -> docs no-op の場合も parity evidence を必須化する
   - 補足:
     - parity evidence 単独では閉じず、6 ファイル個別レビューを report に残す
-- EC-002 -> generated state drift を close blocker として扱う
+- EC-002 -> generated state drift を close blocker として扱い、`todo_total: 0` 時の active-only projection 空状態は drift から除外する
 - EC-003 -> upstream evidence 欠落時は close-out を停止し reviewer judgment に渡す
 - EC-004 -> report artifact の暫定表記が残る場合は close blocker として扱う
 - EC-005 -> issue/epic/generated state の close-status mismatch を close blocker として扱う
-- EC-006 -> deps graph と narrative prerequisite の mismatch を close blocker として扱う
+- EC-006 -> deps graph と narrative prerequisite の mismatch を close blocker として扱い、authoritative generated deps evidence は `index-all.json` を優先する
 - constraint -> `iss-00040` 非重複を設計上で明文化する
 - constraint -> targeted docs list 外の stale assumption 発見時は stop/escalate する
 
@@ -251,10 +254,11 @@ upstream --> record
   - S01 承認観測（issue docs diff と report 上の approval log）
   - targeted docs list の diff / parity review
   - 6 ファイル個別の current-contract verification review
-  - `spec-dock/dashboard.md` と `.agent/index*.json` の確認
+  - `spec-dock/.agent/index-all.json` を正本とした generated state 確認
+  - `spec-dock/dashboard.md` と active-only projection の確認（`todo_total: 0` 時の空状態を許容）
   - final spec review record のレビュー
   - `report.md` front matter と S04 コミット記録の最終整合確認
-  - `iss-00038/deps.json` と generated deps graph の一致確認
+  - `iss-00038/deps.json` と authoritative generated deps/status view の一致確認
   - GitHub issue state / `sync --github` / generated state / `epic-00033/report.md` の close-status reconciliation 確認
 - migration / rollback / feature flag if needed:
   - feature flag なし
@@ -263,17 +267,17 @@ upstream --> record
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> targeted docs diff または no-op parity evidence
   - + 6 ファイル個別の current-contract verification evidence
-- AC-002 -> `validate` / `sync` 実行結果 + generated state check
+- AC-002 -> `validate` / `sync` 実行結果 + `index-all.json` 正本の generated state check
 - AC-003 -> report 上の final spec review record
 - AC-003 -> report 上の final spec review record + front matter / commit record normalization
 - AC-004 -> epic report / generated state / deps graph / issue report の branch diff reconciliation
 - EC-001 -> docs no-op でも parity evidence を report に残す
   - + current-contract verification evidence を report に残す
-- EC-002 -> generated state mismatch がないことを確認する
+- EC-002 -> generated state mismatch がないことを確認し、`todo_total: 0` 時の active-only projection 空状態を mismatch と誤判定しない
 - EC-003 -> upstream evidence 欠落があれば review blocker として記録する
 - EC-004 -> report artifact の暫定表記が残っていないことを確認する
 - EC-005 -> authority mismatch があれば epic close blocker として記録する
-- EC-006 -> dependency mismatch があれば deps alignment を要求する
+- EC-006 -> dependency mismatch があれば deps alignment を要求し、authoritative generated deps evidence は `index-all.json` を参照する
 - constraint -> non-overlap check を final review record に含める
 - constraint -> scope外 stale assumption は blocker + escalation record にする
 
