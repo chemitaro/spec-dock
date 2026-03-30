@@ -16,7 +16,7 @@ ID: "iss-00038"
 - S01 の baseline/spec lock と spec review の監査ログを追加し、`iss-00038` の残責務が docs parity と final spec review close-out に限定されることを report 上で追跡可能にした。
 - 初回 spec review fail の 3 指摘を requirement/design/plan/report template 側で是正し、re-review pass 後に S02 着手可能な状態まで整えた。
 - S04 では upstream issue 群（`iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040`）と本 issue（`iss-00038`）の close-out evidence を final spec review record として束ね、close-status source of truth と ownership boundary を reviewer 向けに固定した。
-- S09 では epic / issue GitHub status の execution evidence を commit-backed に固定し、S10 では upstream report の authority marker だけを chronology-preserving に正規化した。fresh final rereview は S11 まで保留している。
+- S09 では epic / issue GitHub status の execution evidence を commit-backed に固定し、S10 では upstream report の authority marker だけを chronology-preserving に正規化した。S11 では normalized artifact set に対する fresh final spec rereview pass を記録し、AC-003/AC-004 の issue-doc contract close-out を確定した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -476,7 +476,7 @@ git --no-pager show -s --format='%ad%n%B' --date=format-local:'%Y-%m-%d %H:%M' 8
 - S06 の本文や chronology は rewrite していない。監査時の authoritative reference のみを S08 で正規化した。
 - 真の no-op ではないため、最終 authoritative record では `なし` を使わない。
 
-### 2026-03-30 08:14 - 08:14
+### 2026-03-30 17:20 - 17:20
 
 #### 対象
 - Step: S09 epic status reconciliation and branch-diff rereview
@@ -524,7 +524,7 @@ status reconciliation execution evidence
 - S09 は execution evidence の記録までであり、epic-level spec review pass はまだ取得していない。
 - final reviewer pass は fresh final re-review 完了まで保留する。
 
-### 2026-03-30 09:04 - 09:04
+### 2026-03-30 18:06 - 18:06
 
 #### 対象
 - Step: S10 upstream evidence normalization
@@ -564,11 +564,63 @@ upstream evidence normalization
 - `spec-dock/active/issue/report.md` - S10 normalization log を追記
 
 #### コミット
-- なし（S10 normalization の working tree update）
+- 保留（S11 fresh final rereview に直結する normalization record として保持。時系列アンカーは `aba6db7`、必要なら直後 follow-up を即時起票できる状態）
 
 #### メモ
 - S10 は upstream evidence normalization のみであり、S09 execution evidence を final reviewer pass に昇格させていない。
 - `iss-00040/report.md` の historical session chronology は rewrite していない。
+
+### 2026-03-30 18:07 - 18:07
+
+#### 対象
+- Step: S11 final committed rereview closure
+- AC/EC: AC-003, AC-004, EC-004, EC-007
+
+#### 実施内容
+- S09 の execution evidence（`fdccc87`）と S10 の normalized upstream evidence（`aba6db7` で反映された `epic-00033/report.md` / `iss-00040/report.md` / 本 issue docs alignment）を合わせた normalized artifact set に対して、fresh final spec rereview を実施した。
+- reviewer `Mill`（agent `019d3dff-88a2-7b72-88a3-677670b94ad5`）の completed spec-review result を最終判定として採用し、issue-doc contract level の closure verdict を `pass` で固定した。
+- この S11 により、`iss-00038` の issue-doc contract 上の AC-003（final spec review record）と AC-004（authority reconciliation を伴う final close claim）がともに閉じたことを明示した。
+- prior code/QA rereview で残っていた指摘は、fresh final rereview record 欠落や upstream artifact ambiguity といった pre-closure artifact gap に限られており、S10 normalization と今回の report alignment で解消済みであることを確認した。code/QA slice 自体に対する追加の pass verdict はここでは主張していない。
+
+#### 実行コマンド / 結果
+```text
+fresh final spec rereview on normalized artifact set
+
+- reviewer: Mill (agent `019d3dff-88a2-7b72-88a3-677670b94ad5`)
+- evidence commits: `fdccc87` (S09 execution evidence), `aba6db7` (S10 normalized upstream evidence)
+- scope: issue-doc contract closure on normalized artifact set
+- verdict: pass
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+  - `spec-dock/active/epic/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+  - `fdccc87` `docs(issue): iss-00038のS09整合条件を明確化`
+  - `aba6db7` `docs(report): epic closeのupstream evidenceを正規化`
+- reviewer:
+  - `Mill`（agent `019d3dff-88a2-7b72-88a3-677670b94ad5`）
+- verdict:
+  - pass
+- contract close note:
+  - AC-003 / AC-004 は issue-doc contract level で close
+  - S11 は normalized artifact set に対する fresh final spec rereview closure record
+- 次ステップ着手可否:
+  - S11 close-out 完了
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S11 fresh final spec rereview closure、reviewer/verdict/evidence、issue-doc contract close note を追記
+
+#### コミット
+- 保留（この append-only closure record は必要なら直後 follow-up commit に切り出せる。rereview input の actual commit hash は `fdccc87` / `aba6db7`）
+
+#### メモ
+- S11 は S09/S10 を引用する closure record であり、既存 execution evidence や upstream normalization entry 自体は rewrite していない。
+- fresh final rereview の `pass` は issue-doc contract close-out に限定して扱い、prior code/QA rereview に遡って pass verdict を付与しない。
 
 ---
 

@@ -847,8 +847,8 @@ ID: "iss-00038"
   - S09 execution evidence と S10 normalized upstream evidence を参照し、normalized artifact set に対する epic-level committed rereview を fresh final rereview の一部として実施し、committed closure record として確定する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録する
-- [ ] rereview で引用する evidence set と commit 観測点を整理する
+- [x] `update_plan` に step の作業単位を登録する
+- [x] rereview で引用する evidence set と commit 観測点を整理する
 
 #### B1 — capture fresh final rereview
 - purpose:
