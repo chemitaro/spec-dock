@@ -3,7 +3,7 @@
 ID: "iss-00037"
 タイトル: "Migration Guardrails and Validation Hardening"
 関連GitHub: ["#37"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-30"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -280,6 +280,52 @@ python -m unittest tests.cli_runtime.test_validate -v
 - 本追記の目的は、final RG1/QG1 review で `iss-00037` 単体から clause-1 / clause-2 / clause-3 close readiness を判定可能にすることに限定される。
 - final RG1/code review (`code_reviewer`) は、修正済み S04 report-only diff に対して no remaining material findings で pass。
 - final QG1/QA review (`qa_reviewer`) は、修正済み S04 report-only diff に対して no remaining material findings で pass。
+
+### 2026-03-30
+
+#### 対象
+- Step: acceptance / close
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002
+- 備考: 実装担当者の commit 済み差分に対する受け入れ判定と issue close 決定
+
+#### 実施内容
+- 実装担当者が完了した branch head を受け入れ観点で確認し、`iss-00037` の scope が requirement / design / plan / final closure packet と矛盾なく閉じているかを再点検した。
+- docs / tests / report 差分、spec reviewer pass、code review pass、QA review pass、targeted / full regression、`sync --github` の結果を突き合わせ、migration boundary clause-1 / clause-2 / clause-3 の close evidence が揃っていることを確認した。
+- non-blocking review note として、README wording clarity 1 件と report traceability/evidence wording 2 件は残ったが、いずれも current acceptance を阻害しないため close blocker とは扱わず、docs close-out owner である `iss-00038` で吸収可能と判断した。
+- 以上をもって `iss-00037` は accepted / close ready と判断し、ユーザーの close 指示に従って本 report を approved へ更新した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_s08 -v
+# Ran 82 tests ... OK
+
+python -m unittest tests.cli_runtime.test_validate -v
+# Ran 34 tests ... OK
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=9
+
+./spec-dock/scripts/spec-dock sync --github
+# ok
+
+python -m unittest discover -v
+# Ran 526 tests ... OK
+```
+
+- targeted regression、issue-level validate、GitHub-enriched sync、full regression のすべてが成功し、受け入れ時点で issue close を妨げる失敗は確認されなかった。
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - acceptance / close judgment と非ブロッキング残件の扱いを追記し、状態を `approved` に更新
+
+#### コミット
+- 未コミット
+
+#### メモ
+- close judgment は「`iss-00037` の acceptance を満たすか」で判定し、epic close-out docs parity まで本 issue に吸収しない。
+- 非ブロッキング残件:
+  - README の `--no-github` wording clarity
+  - report 上の trace label / import evidence wording の明確化
+- 上記は `iss-00038` の docs/final close-out scope に送れるため、本 issue の close blocker にはしない。
 
 ---
 
