@@ -16,6 +16,7 @@ ID: "iss-00038"
 - S01 の baseline/spec lock と spec review の監査ログを追加し、`iss-00038` の残責務が docs parity と final spec review close-out に限定されることを report 上で追跡可能にした。
 - 初回 spec review fail の 3 指摘を requirement/design/plan/report template 側で是正し、re-review pass 後に S02 着手可能な状態まで整えた。
 - S04 では upstream issue 群（`iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040`）と本 issue（`iss-00038`）の close-out evidence を final spec review record として束ね、close-status source of truth と ownership boundary を reviewer 向けに固定した。
+- S09 では epic / issue GitHub status の execution evidence を commit-backed に固定し、S10 では upstream report の authority marker だけを chronology-preserving に正規化した。fresh final rereview は S11 まで保留している。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -517,11 +518,57 @@ status reconciliation execution evidence
 - `spec-dock/active/issue/report.md` - S09 execution evidence と remaining gate を追記
 
 #### コミット
-- なし（fresh final re-review 前の execution evidence 記録）
+- `fdccc87` `docs(issue): iss-00038のS09整合条件を明確化`
 
 #### メモ
 - S09 は execution evidence の記録までであり、epic-level spec review pass はまだ取得していない。
 - final reviewer pass は fresh final re-review 完了まで保留する。
+
+### 2026-03-30 09:04 - 09:04
+
+#### 対象
+- Step: S10 upstream evidence normalization
+- AC/EC: EC-003, EC-005, EC-008
+
+#### 実施内容
+- `epic-00033/report.md` の stale `#33 OPEN` authority note を、`spec-dock/.agent/index-all.json` で確認できる epic GitHub issue `#33 state=CLOSED` と整合する表現へ正規化した。
+- `iss-00040/report.md` は authoritative layer のみを対象にし、front matter を最終単一状態へ揃えた。
+- `iss-00040/report.md` の末尾 note で、authoritative close-readiness reference を `6a1e0f7`（S05 final regression evidence）と `190d541`（acceptance / close readiness report record）として参照できるようにした。
+- historical session-log の `コミット: なし` / `pending` は時点事実として保持し、code/test/runtime/dogfooding surface の rerun や rewrite は行っていない。
+
+#### 実行コマンド / 結果
+```text
+upstream evidence normalization
+
+- `epic-00033/report.md`: `#33` authority note normalized to `CLOSED`
+- `iss-00040/report.md`: front matter normalized to a single final state
+- `iss-00040/report.md`: authoritative close-readiness references anchored to `6a1e0f7` and `190d541`
+- no implementation/test/runtime/dogfooding rerun; chronology preserved
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `spec-dock/.agent/index-all.json`
+  - `spec-dock/active/epic/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+- reviewer:
+  - 未実施（S11 fresh final rereview 待ち）
+- verdict:
+  - pending（normalized artifact set prepared only）
+- 次ステップ着手可否:
+  - S11 fresh final rereview のみ未了
+
+#### 変更したファイル
+- `spec-dock/active/epic/report.md` - `#33` authority note を `CLOSED` 基準へ正規化
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md` - front matter と authoritative close-readiness note を最小差分で正規化
+- `spec-dock/active/issue/report.md` - S10 normalization log を追記
+
+#### コミット
+- なし（S10 normalization の working tree update）
+
+#### メモ
+- S10 は upstream evidence normalization のみであり、S09 execution evidence を final reviewer pass に昇格させていない。
+- `iss-00040/report.md` の historical session chronology は rewrite していない。
 
 ---
 

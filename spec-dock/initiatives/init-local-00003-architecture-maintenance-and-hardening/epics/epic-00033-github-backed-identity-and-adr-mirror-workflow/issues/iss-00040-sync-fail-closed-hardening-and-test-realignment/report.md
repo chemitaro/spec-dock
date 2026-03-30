@@ -3,9 +3,9 @@
 ID: "iss-00040"
 タイトル: "Sync Fail Closed Hardening And Test Realignment"
 関連GitHub: ["#40"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-29"
+最終更新: "2026-03-30"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -15,7 +15,7 @@ ID: "iss-00040"
 ## 実装サマリー (任意)
 - `iss-00040` の requirement / design / plan と関連 discussions を、current stale-contract cluster と dogfooding parity drift を含む前提で更新した。
 - 全体回帰の再現結果と issue scope の判断材料を記録し、spec review に渡せる状態まで正本を整備した。
-- 各セッション節の `コミット: なし` は当該ログ記録時点の状態を示し、末尾の close/handoff 向けメモはその後に確定した最新の commit 状態をまとめる。
+- 各セッション節の `コミット: なし` / `pending` は当該ログ記録時点の状態を示し、authoritative close-readiness reference は S05 final regression evidence を確定した `6a1e0f7` と、その acceptance / close readiness handoff を report に固定した `190d541` を参照する。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -406,4 +406,4 @@ python -m unittest discover -v
 - S04 parity recovery scope は、当該節の記録時点では `コミット: なし` だったが、その後の step commit でコミット済み。
 - S05 implementation / test work は完了済みで、final code review / QA review も完了済み。
 - final spec re-review は完了済みで `pass`。
-- final S05 commit はこの時点では未実施。
+- authoritative close-readiness execution reference は `6a1e0f7`、acceptance / close readiness report reference は `190d541`。S05 / acceptance 節の `コミット: なし` / `pending` は当該記録時点の事実として保持する。
