@@ -381,7 +381,8 @@ fresh spec reviewer review for corrective issue docs
 #### 実施内容
 - `iss-00038` の `deps.json` で `depends_on` に `iss-00040` が含まれていることを確認し、narrative prerequisite と machine-readable deps の前提を一致させた。
 - `./spec-dock/scripts/spec-dock sync --github` を実行し、generated artifacts の再生成が成功した。
-- `spec-dock/.agent/index-all.json` を authoritative generated deps/status evidence として観測し、`iss-00038` が `status=done` / `effective_status=done`、GitHub issue `#38` が `state=CLOSED`、epic progress が `total=6 / done=6 / open=0 / unknown=0` であることを確認した。
+- `spec-dock/.agent/index-all.json` を authoritative generated deps/status evidence として観測し、top-level `deps.issue_edges` に `iss-00038 -> iss-00040` を含む prerequisite edge list が残っていることを確認した。一方で per-node `nodes.iss-00038.deps` は `ready=true` / `depends_on=[]` の readiness projection であり、closed issue prerequisite edge の保存先ではないことも確認した。
+- 同じ `spec-dock/.agent/index-all.json` で `iss-00038` が `status=done` / `effective_status=done`、GitHub issue `#38` が `state=CLOSED`、epic progress が `total=6 / done=6 / open=0 / unknown=0` であることを確認した。
 - `spec-dock/dashboard.md` では `todo_total: 0`、`doing: 0`、`ready: 0`、`blocked: 0`、`unknown: 0` となり、残 open issue summary が解消されたことを確認した。active-only projection である `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` はこの局面で空でも許容される。
 
 #### 実行コマンド / 結果
@@ -397,6 +398,16 @@ rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json sp
 - `iss-00038` は `status=done` / `effective_status=done`、GitHub state は `CLOSED`。
 - epic progress は `done=6` / `open=0`。
 - `dashboard.md` は `todo_total: 0`。
+
+python - <<'PY'
+import json
+from pathlib import Path
+data = json.loads(Path('spec-dock/.agent/index-all.json').read_text())
+print([edge for edge in data['deps']['issue_edges'] if edge['from'] == 'iss-00038'])
+print(data['nodes']['iss-00038']['deps'])
+PY
+- top-level `deps.issue_edges` には `iss-00038 -> iss-00034/35/36/37/40` が残る。
+- `nodes.iss-00038.deps` は `{'ready': True, 'depends_on': [], 'blockers_top': []}` であり、readiness projection と prerequisite edge list が別レイヤであることを確認した。
 ```
 
 #### 承認 / 観測エビデンス
@@ -421,7 +432,7 @@ rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json sp
 
 #### メモ
 - 本記録では S08/S09 の completion claim は追加していない。
-- `spec-dock/.agent/index-all.json` が S07 の authoritative generated deps/status evidence であり、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` は active-only projection として `todo_total: 0` では空でもよい。
+- `spec-dock/.agent/index-all.json` では top-level `deps.issue_edges` を prerequisite edge authority、per-node `nodes.<id>.deps` を readiness projection として読み分ける。`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` は active-only projection として `todo_total: 0` では空でもよい。
 - `spec-dock/.agent/index-all.json` / `spec-dock/dashboard.md` はこの step で再生成・観測した generated artifacts であり、committed file change としては扱わない。
 
 ### 2026-03-30 16:50 - 16:50
@@ -564,7 +575,7 @@ upstream evidence normalization
 - `spec-dock/active/issue/report.md` - S10 normalization log を追記
 
 #### コミット
-- 保留（S11 fresh final rereview に直結する normalization record として保持。時系列アンカーは `aba6db7`、必要なら直後 follow-up を即時起票できる状態）
+- `aba6db7` `docs(report): epic closeのupstream evidenceを正規化`
 
 #### メモ
 - S10 は upstream evidence normalization のみであり、S09 execution evidence を final reviewer pass に昇格させていない。
@@ -590,6 +601,12 @@ fresh final spec rereview on normalized artifact set
 - evidence commits: `fdccc87` (S09 execution evidence), `aba6db7` (S10 normalized upstream evidence)
 - scope: issue-doc contract closure on normalized artifact set
 - verdict: pass
+
+git log --oneline -n 5
+- `c2c6233` が最新の S11 closure record、`aba6db7` が直前の S10 normalization record として並ぶことを確認した。
+
+rg -n 'Mill|019d3dff|verdict|aba6db7|c2c6233' spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/report.md
+- S11 closure entry に reviewer `Mill`、agent `019d3dff-88a2-7b72-88a3-677670b94ad5`、`verdict: pass`、evidence commit `aba6db7` / closure commit `c2c6233` が揃っていることを確認した。
 ```
 
 #### 承認 / 観測エビデンス
@@ -602,6 +619,7 @@ fresh final spec rereview on normalized artifact set
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
   - `fdccc87` `docs(issue): iss-00038のS09整合条件を明確化`
   - `aba6db7` `docs(report): epic closeのupstream evidenceを正規化`
+  - `c2c6233` `docs(issue): iss-00038のS11 close recordを追加`
 - reviewer:
   - `Mill`（agent `019d3dff-88a2-7b72-88a3-677670b94ad5`）
 - verdict:
@@ -616,7 +634,7 @@ fresh final spec rereview on normalized artifact set
 - `spec-dock/active/issue/report.md` - S11 fresh final spec rereview closure、reviewer/verdict/evidence、issue-doc contract close note を追記
 
 #### コミット
-- 保留（この append-only closure record は必要なら直後 follow-up commit に切り出せる。rereview input の actual commit hash は `fdccc87` / `aba6db7`）
+- `c2c6233` `docs(issue): iss-00038のS11 close recordを追加`
 
 #### メモ
 - S11 は S09/S10 を引用する closure record であり、既存 execution evidence や upstream normalization entry 自体は rewrite していない。

@@ -72,7 +72,7 @@ ID: "iss-00038"
   - targeted docs list は current contract を反映済みで、少なくとも現時点の provider/dogfooding 間には内容差分がない。
   - ただし docs parity no-op だけでは close-out 不十分であり、6 ファイル個別に old local-only / sequential / index assumption 不在を示す current-contract verification evidence が必要である。
   - `iss-00040` が担当した regression/parity 系 suite は current snapshot でも pass しており、`iss-00038` が再実行 ownership を持たない前提を裏づけている。
-  - S07 の generated deps/status verification では `spec-dock/.agent/index-all.json` が authority であり、`spec-dock/dashboard.md` が `todo_total: 0` を返す局面では active-only projection の `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` が空でも contract violation ではない。
+  - S07 の generated deps/status verification では `spec-dock/.agent/index-all.json` が authority であり、prerequisite edge の証拠は top-level `deps.issue_edges` で読む。per-node `nodes.<id>.deps` は readiness projection なので closed issue の prerequisite edge を保持しない場合があり、`spec-dock/dashboard.md` が `todo_total: 0` を返す局面で active-only projection の `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` が空でも contract violation ではない。
   - 一部 upstream issue report には過去の reviewer コメントが残っていても、close status の正本は generated state と epic report にある。
   - したがって、この issue の主要設計論点は「どの evidence を最終 close-out 記録として束ねるか」であり、runtime behavior をどう変えるかではない。
   - acceptance review の結果、close-out record 自体の整合性も verification 対象であると分かったため、report artifact の最終正規化を design scope に含める。
@@ -261,7 +261,7 @@ upstream --> record
 - EC-003 -> upstream evidence 欠落時は close-out を停止し reviewer judgment に渡す
 - EC-004 -> report artifact の暫定表記が残る場合は close blocker として扱う
 - EC-005 -> issue/epic/generated state の close-status mismatch を close blocker として扱う
-- EC-006 -> deps graph と narrative prerequisite の mismatch を close blocker として扱い、authoritative generated deps evidence は `index-all.json` を優先する
+- EC-006 -> deps graph と narrative prerequisite の mismatch を close blocker として扱い、authoritative generated deps evidence は `index-all.json` の top-level `deps.issue_edges` を優先し、per-node `nodes.<id>.deps` は readiness projection として扱う
 - EC-007 -> S09 execution evidence だけで close claim を完了扱いにせず、fresh final rereview record を必須にする
 - EC-008 -> upstream report の provisional / conflicting status marker は artifact normalization で閉じ、implementation/test rerun へ拡張しない
 - constraint -> `iss-00040` 非重複を設計上で明文化する
