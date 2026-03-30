@@ -24,6 +24,7 @@ ID: "iss-00038"
   - EC-001
   - EC-002
   - EC-003
+  - EC-004
 - 制約:
   - `iss-00040` と ownership を重複させない
   - provider-side と dogfooding docs の両方を対象にする
@@ -50,6 +51,11 @@ ID: "iss-00038"
     - final spec review record の完成
   - exit:
     - verdict=`pass` の review record が report に残る
+- M5:
+  - 対象:
+    - acceptance review 指摘への corrective close-out
+  - exit:
+    - `report.md` front matter と S04 コミット記録が最終状態に正規化され、再 review で受け入れ可能と判断できる
 
 ## ステップ一覧
 - S01:
@@ -85,6 +91,22 @@ ID: "iss-00038"
     - EC-003
   - review gate:
     - reviewer verdict=`pass`
+- S05:
+  - 観測可能な振る舞い:
+    - acceptance review 指摘を受けて、`report.md` の final artifact が実 commit / approved 状態と整合する
+  - closes:
+    - EC-004
+  - review gate:
+    - `report.md` front matter の状態値が単一の確定値である
+    - S04 のコミット記録が actual git history と矛盾しない
+- S06:
+  - 観測可能な振る舞い:
+    - corrective close-out を反映した issue docs が再度 spec review で整合 pass する
+  - closes:
+    - AC-003
+    - EC-004
+  - review gate:
+    - spec reviewer が corrective plan と issue docs の整合を `pass` と判定する
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02
@@ -93,6 +115,7 @@ ID: "iss-00038"
 - EC-001 -> S02
 - EC-002 -> S03
 - EC-003 -> S01, S04
+- EC-004 -> S05, S06
 
 ## レビュー / QA ゲート方針
 - SG1 spec review:
@@ -123,6 +146,7 @@ ID: "iss-00038"
   - S03 着手前に S02 の docs/evidence review を記録する
   - S04 着手前に S03 の close-out review を記録する
   - S04 完了後に final SG1/QG1 verdict を report に記録する
+  - acceptance review で corrective findings が出た場合は、S05 で report artifact を正規化し、S06 で spec review pass を再取得してから受け入れ判定へ進む
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -139,6 +163,7 @@ ID: "iss-00038"
 - reviewer verdict は `report.md` に残す。
 - `iss-00040` 完了済み scope を再度実行しない。もし upstream evidence 欠落が見つかった場合は、re-execute ではなく blocker として記録する。
 - S02 で targeted docs list 外の stale old-contract assumption を見つけた場合は、その場で修正範囲を広げず step を停止し、path / assumption / scope外理由 / escalation 先を `report.md` に記録して reviewer 判断を待つ。
+- acceptance review で report artifact の整合不備が見つかった場合は、runtime / docs contract へ波及させず、S05/S06 の corrective close-out として扱う。
 
 ## 実装ステップ
 
@@ -391,6 +416,130 @@ ID: "iss-00038"
 - report update:
   - `./spec-dock/active/issue/report.md`
 
+### S05 — report artifact normalization
+- target:
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t053149z-disc-acceptance-review-findings-analysis.md`
+- step boundary:
+  - acceptance review で見つかった report artifact の不整合だけを最小差分で正規化する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録した
+- [ ] `./spec-dock/active/issue/report.md` の修正位置を決めた
+
+#### B1 — normalize final state markers
+- purpose:
+  - final close-out record を actual git history / approved state に揃える
+- files:
+  - `spec-dock/active/issue/report.md`
+
+##### I1 — front matter normalization
+- slice goal:
+  - `状態` を単一の確定値へ正規化する
+
+###### Red
+- failing test:
+  - `report.md` front matter が `draft | approved` のような曖昧値のまま
+- expected failure:
+  - final artifact の状態が確定しない
+
+###### Green
+- minimum implementation:
+  - `状態` を final 状態に更新する
+- pass condition:
+  - front matter が単一の確定値になる
+
+###### Refactor
+- cleanup target:
+  - front matter の表記揺れ
+- invariants to keep green:
+  - requirement/design/plan の `approved` と矛盾しない
+
+##### I2 — commit record normalization
+- slice goal:
+  - S04 記録のコミット状態を actual git history と揃える
+
+###### Red
+- failing test:
+  - `report.md` に「未コミット」などの暫定表記が残っている
+- expected failure:
+  - git history と report artifact が矛盾する
+
+###### Green
+- minimum implementation:
+  - actual commit hash または finalized state に更新する
+- pass condition:
+  - S04 記録が git history と整合する
+
+###### Refactor
+- cleanup target:
+  - finalized wording の表記揺れ
+- invariants to keep green:
+  - commit message フォーマット自体は今回の corrective scope 外
+
+#### step gate
+- review:
+  - RG1 docs/evidence review
+- expected tests:
+  - `git log --oneline -n 3`
+  - `rg -n '状態:|未コミット|commit は final review pass 後に実施予定' spec-dock/active/issue/report.md`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
+### S06 — corrective acceptance alignment
+- target:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t053149z-disc-acceptance-review-findings-analysis.md`
+- step boundary:
+  - corrective findings を反映した issue docs 一式が再 review で整合していることを確認する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録した
+- [ ] 再 review 対象と観点を整理した
+
+#### B1 — rerun spec review
+- purpose:
+  - corrective close-out が requirement/design/plan/report と整合していることを再確認する
+- files:
+  - issue docs 一式
+
+##### I1 — acceptance-focused rereview
+- slice goal:
+  - corrective findings が解消されたことを reviewer が判定できる状態にする
+
+###### Red
+- failing test:
+  - spec review
+- expected failure:
+  - corrective step が docs と整合しない
+
+###### Green
+- minimum implementation:
+  - 必要なら issue docs を微修正し、review pass を取得する
+- pass condition:
+  - corrective close-out に対する spec review が `pass`
+
+###### Refactor
+- cleanup target:
+  - corrective step と final exit contract の表現揺れ
+- invariants to keep green:
+  - 既存 S01-S04 の完了記録は上書きせず、追加 corrective step として扱う
+
+#### step gate
+- review:
+  - final SG1 spec review
+- expected tests:
+  - spec review record
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
 ### S90 — docs impact resolution / docs refresh
 - 対象:
   - docs
@@ -400,23 +549,25 @@ ID: "iss-00038"
 
 ### S99 — final diff review quality gate
 - branch diff scope:
-  - `iss-00038` で更新した issue docs、report、必要時のみ targeted docs list
+  - `iss-00038` で更新した issue docs、report、必要時のみ targeted docs list、corrective close-out 差分
 - required validation:
   - AC-001/002/003 の evidence が diff と report から追える
   - `iss-00040` 非重複が最終 diff 上でも保たれている
+  - acceptance review で指摘された report artifact 整合不備が解消している
 - reviewer approvals:
   - final SG1 spec review pass
   - final QG1 close-out review pass
 
 ## 未確定事項
 - なし:
-  - close-out の execution path は S01-S04 + S90 + S99 で固定する
+  - close-out の execution path は S01-S04 + S05/S06 corrective path + S90 + S99 で固定する
 
 ## final exit contract
 - AC/EC 達成:
   - targeted docs parity が確認済みであり、6 ファイル個別の current-contract verification evidence がある
   - `validate` / `sync` の成功結果がある
   - final spec review record が verdict=`pass` で残っている
+  - `report.md` front matter と S04 コミット記録が final 状態に正規化されている
 - docs impact resolved:
   - targeted docs list の差分または no-op evidence が report にある
   - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
