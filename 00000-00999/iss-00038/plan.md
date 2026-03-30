@@ -36,6 +36,24 @@ ID: "iss-00038"
   - final spec review verdict を `pass` まで上げる
   - `iss-00040/report.md` に触る場合でも report-artifact normalization のみとし、implementation/test rerun を行わない
 
+## 実施状況チェック
+- [x] S01 close-out baseline and ownership lock
+- [x] S02 targeted docs current-contract review / parity close-out
+- [x] S03 generated-state review / final sync snapshot確認
+- [x] S04 final spec review record / close-out bundle
+- [x] S05 acceptance corrective close-out / report normalization
+- [x] S06 corrective acceptance alignment / spec re-review
+- [x] S07 dependency graph alignment
+- [x] S08 committed audit-trail normalization
+- [x] S09 epic status reconciliation and branch-diff rereview
+- [x] S10 upstream evidence normalization
+- [x] S11 final committed rereview closure
+- [x] S12 narrow rules/docs-authority alignment
+- [x] S90 docs impact resolution / docs refresh
+- [ ] S99 final diff review quality gate
+- note:
+  - 最新の committed branch diff を対象にした fresh final review cycle は、この S99 で閉じる
+
 ## マイルストーン一覧
 - M1:
   - 対象:
@@ -993,6 +1011,7 @@ ID: "iss-00038"
   - `rg -n 'original six-file|rules/docs-authority corrective|S12' spec-dock/active/issue/report.md`
 - report update:
   - `./spec-dock/active/issue/report.md`
+  - S12 の commit-backed traceability として `ba732ec` と `d018c86` の両方を記録する
 
 ### S13 — canonical guidance test expectation realignment
 - target:
@@ -1047,6 +1066,7 @@ ID: "iss-00038"
   - `python -m unittest discover -v`
 - report update:
   - `./spec-dock/active/issue/report.md`
+  - implementation self-review だけで完了扱いにせず、reviewer-recorded な RG1/QG1 verdict を残した後に S99 へ進む
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -1066,10 +1086,14 @@ ID: "iss-00038"
   - acceptance review で指摘された report artifact 整合不備が解消している
   - epic-level review で指摘された deps / audit trail / status authority 不整合が解消している
   - latest fresh review で指摘された S09 final rereview record 欠落、`#33` authority mismatch、`iss-00040/report.md` ambiguity が解消している
+  - S12 の docs-authority corrective が `ba732ec` と `d018c86` の両 anchor から trace できる
+  - S13 の RG1/QG1 reviewer evidence が `report.md` に残っている
 - reviewer approvals:
   - final SG1 spec review pass
   - final QG1 close-out review pass
   - epic-level spec review pass
+- report update:
+  - `./spec-dock/active/issue/report.md` に committed S99 gate record を追記する
 
 ## 未確定事項
 - なし:

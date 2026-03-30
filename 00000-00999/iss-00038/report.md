@@ -699,9 +699,11 @@ rg -n -- '--no-github|current-repo Issue|Create command' src/spec_dock/assets/sp
 
 #### コミット
 - historical anchor: `ba732ec` `docs(rules): epic作成のgithub必須契約を整合`
+- corrective anchor: `d018c86` `docs(sync): github必須契約の案内を最終整合`
 
 #### メモ
-- `ba732ec` は original rules pair corrective の historical anchor であり、今回の broadened docs-authority wording update はこの report/doc refresh diff で補っている。
+- `ba732ec` は original rules pair corrective の historical anchor である。
+- `d018c86` は `docs/github.md` / `docs/workflow-tree.md` の provider/dogfooding corrective anchor であり、S12 の docs-authority corrective はこの 2 commit を合わせて trace する。
 - この S12 は `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の narrow rules/docs-authority corrective に限定し、runtime/test/implementation scope は reopen していない。
 
 ### 追補 — S13 canonical guidance test expectation realignment
@@ -742,6 +744,7 @@ python -m unittest discover -v
   - docs contract rollback はしていない
   - runtime code は未変更
   - stale expectation realignment は canonical guidance tests に限定した
+  - final reviewer-recorded RG1/QG1 evidence は S99 で committed gate record として残す
 
 #### 変更したファイル
 - `tests/cli_runtime/test_wrappers.py` - initiative 配下 epic create guidance の expected command を current wording に整列
@@ -758,6 +761,40 @@ python -m unittest discover -v
 #### メモ
 - S13 は S12 で正規化した docs/rules contract を前提に、stale test oracle だけを閉じる follow-up corrective である。
 - full suite green により、S12/S13 を含む current branch snapshot 上で docs guidance と regression suite の整合が回復した。
+
+### 追補 — S99 final diff review quality gate
+
+#### 対象
+- Step: S99 final diff review quality gate
+- AC/EC: terminal close-claim audit trail
+
+#### 実施内容
+- pending:
+  - 最新の committed branch diff を対象にした fresh final review cycle の reviewer / verdict / referenced evidence を、このセクションへ append-only で追記する。
+  - S13 の reviewer-recorded RG1 docs/evidence review と QG1 close-out review、ならびに final SG1 / epic-level spec review pass は、この S99 gate record で committed artifact 化する。
+
+#### 実行コマンド / 結果
+```text
+pending
+
+- S99 は fresh final reviews 完了後に、committed branch diff `main...HEAD` を対象とした gate record をここへ追記する。
+```
+
+#### 承認 / 観測エビデンス
+- pending:
+  - final SG1 spec review
+  - final QG1 close-out review
+  - epic-level spec review
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S99 gate record の追記位置を確保
+
+#### コミット
+- pending
+
+#### メモ
+- S99 は terminal close claim を閉じる committed quality gate であり、pass verdict を先書きしない。
+- S13 の implementation self-review は execution-local evidence であり、final reviewer-recorded gate evidence の代用にしない。
 
 ---
 

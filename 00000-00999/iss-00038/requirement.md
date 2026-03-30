@@ -86,11 +86,13 @@ ID: "iss-00038"
   - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
   - final close-out rereview で見つかった provider/dogfooding 両側の `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` stale `--no-github` guidance を、`reference_github.md` の GitHub-mandatory create contract に揃える。これは original six-file targeted docs slice の結論を broader docs no-finding claim に拡張しない narrow corrective として扱う。
   - S12 で正規化した current guidance を読む canonical guidance tests について、旧 `--no-github` 期待値が残っている場合は、docs contract を戻さず test expectation を current shipped guidance に揃える narrow follow-up corrective を許可する。
+  - S12 の docs-authority corrective は、`ba732ec` を rules pair の historical anchor、`d018c86` を `docs/github.md` / `docs/workflow-tree.md` corrective anchor として、両方を `report.md` から追える commit-backed traceability を要求する。
   - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
   - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、generated prerequisite evidence は top-level `deps.issue_edges` edge list を正本として扱う。per-node `nodes.<id>.deps` は readiness projection であり、closed issue の prerequisite edge を保持しない場合があるため、`todo_total: 0` 時の active-only projection 空状態と同様に edge authority とは混同しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
   - branch-diff review に使う corrective report/update は committed history から再現できることを保証し、working-tree-only evidence を最終 artifact に残さない。
   - S09 の execution evidence だけでは close claim を完了扱いにせず、S10 upstream evidence normalization と S11 fresh final rereview closure を close-out 必須経路として実行し、normalized artifact set を参照する committed artifact が揃うまで close claim を保留する。
+  - S13 実施後は、`report.md` に reviewer-recorded な RG1 docs/evidence review と QG1 close-out review を残し、その後に committed S99 final diff review quality gate record で terminal close claim を閉じる。
   - `epic-00033/report.md` の `#33` state は本文・例外メモ・generated state・`iss-00038/report.md` で同じ authority conclusion に揃える。
   - `iss-00040/report.md` を触る場合は report-artifact normalization のみとし、runtime/test/implementation の re-execution を要求しない。
   - S10 で `iss-00040/report.md` を正規化する場合、authoritative citation layer / front matter / final summary note だけを対象にし、historical session-log の `コミット: なし` entry が時点事実を表す限り書き換えない。
@@ -123,6 +125,7 @@ ID: "iss-00038"
   - `spec-dock/dashboard.md` が `todo_total: 0` を返した後は、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` の空状態は active-only projection の仕様内であり、S07/S09 の否定 evidence には使わない。`spec-dock/.agent/index-all.json` では top-level `deps.issue_edges` を prerequisite edge の正本、per-node `nodes.<id>.deps` を readiness projection として読み分ける。
   - S09 は status reconciliation execution evidence step であり、fresh final rereview closure は後続 corrective step で committed record 化する。
   - S10 が `epic-00033/report.md` または `iss-00040/report.md` の rereview input を更新した後は、`epic-00033/report.md` / normalized `iss-00040/report.md` / `iss-00038/report.md` / generated state / deps graph から成る normalized artifact set に対して、epic-level committed rereview を再度 `pass` させてから close judgement へ進む。
+  - final exit を主張する committed branch diff では、S99 final diff review quality gate の reviewer / verdict / referenced evidence を `report.md` から追えなければならない。
   - `iss-00040/report.md` と `epic-00033/report.md` の更新が必要な場合でも、扱うのは report-artifact normalization だけであり、implementation 完了判定そのものは再実行しない。
 - Ask:
   - targeted docs list 以外に old contract assumption が見つかった場合は、その場で scope を広げず、`report.md` に blocker として記録して reviewer 判断へ escalate する。

@@ -34,6 +34,8 @@ ID: "iss-00038"
     - `epic-00033/report.md` と `iss-00040/report.md` を触る場合は report-artifact normalization のみとし、implementation/test rerun は scope 外に固定する。
     - `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note だけを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら rewrite しない。
     - S12 corrective 後に canonical guidance tests が stale expectation で fail した場合は、current shipped docs を正本として tests だけを最小更新する。
+    - S12 の commit-backed traceability は、`ba732ec` を rules pair の historical anchor、`d018c86` を `docs/github.md` / `docs/workflow-tree.md` corrective anchor として report に並記する。
+    - S13 は implementation self-review だけで閉じず、reviewer-recorded な RG1 docs/evidence review と QG1 close-out review を `report.md` に残したうえで、S99 final diff review quality gate の committed record へ接続する。
   - MUST NOT:
     - runtime / test realignment を再度設計対象に戻さない。
     - docs-facing canonical guidance tests の stale expectation 修正を理由に、runtime/docs contract 自体を再び変更しない。
@@ -110,6 +112,9 @@ ID: "iss-00038"
     - final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、その provider/dogfooding docs だけを修正し、S02 original six-file verdict は append-only で維持する。
   - canonical guidance test realignment:
     - S12 corrective 後に `tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` が旧 `--no-github` command example を期待して fail した場合は、docs を戻さず current shipped guidance に test oracle を合わせる。
+  - final diff review quality gate:
+    - terminal close claim は S99 の committed record で閉じる。
+    - S99 record には final SG1 / final QG1 / epic-level spec review の reviewer・verdict・referenced evidence を `report.md` に明記する。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
