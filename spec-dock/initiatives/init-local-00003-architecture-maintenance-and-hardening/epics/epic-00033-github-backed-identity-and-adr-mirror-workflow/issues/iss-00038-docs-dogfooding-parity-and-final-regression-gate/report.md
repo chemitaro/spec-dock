@@ -17,6 +17,7 @@ ID: "iss-00038"
 - 初回 spec review fail の 3 指摘を requirement/design/plan/report template 側で是正し、re-review pass 後に S02 着手可能な状態まで整えた。
 - S04 では upstream issue 群（`iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040`）と本 issue（`iss-00038`）の close-out evidence を final spec review record として束ね、close-status source of truth と ownership boundary を reviewer 向けに固定した。
 - S09 では epic / issue GitHub status の execution evidence を commit-backed に固定し、S10 では upstream report の authority marker だけを chronology-preserving に正規化した。S11 では normalized artifact set に対する fresh final spec rereview pass を記録し、AC-003/AC-004 の issue-doc contract close-out を確定した。
+- final close-out rereview では、original six-file targeted docs slice の外側にあった `docs/rules/initiative/epics.md` pair の stale `--no-github` command を narrow rules-authority corrective として整合させ、S02 の no-op conclusion を broader docs no-finding claim に拡張しないことを明記した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -112,7 +113,7 @@ git --no-pager diff -- spec-dock/active/issue/requirement.md spec-dock/active/is
   - `spec-dock/docs/reference_sync.md`
     - provider/dogfooding parity: `src/spec_dock/assets/spec_dock/docs/reference_sync.md` と diff/cmp same、sha256 same (`13ce48a3e080505a770550d9a5878b1f89e4281ed42faf4a9c854c5234127e47`)
     - current-contract verification: dogfooding 側の exact file で `.meta.json` ベース v2 出力、`index-all.json` 優先 fallback、legacy v1 stale artifact 削除、`sync --github` の issue status enrichment 記述を個別確認。stale local-only / stale index assumption なし。
-- 既に機械確認済みの provider / dogfooding parity（`reference_github.md` / `reference_naming.md` / `reference_sync.md` の diff/cmp/sha256 一致）に加え、内容面でも six-file 全件で targeted-docs-external stale assumption は見つからなかった。
+- 既に機械確認済みの provider / dogfooding parity（`reference_github.md` / `reference_naming.md` / `reference_sync.md` の diff/cmp/sha256 一致）に加え、内容面でも original six-file targeted docs slice 全件では stale assumption は見つからなかった。
 - 以上より S02 は no-op parity close-out と判断し、targeted docs の追加修正は不要と結論づけた。blocker / escalation も不要だった。
 
 #### 実行コマンド / 結果
@@ -145,7 +146,7 @@ find . -path '*/reference_*.md' -o -path '*/active/issue/*' | sed 's#^./##' | so
 - verdict:
   - pass（no-op parity close-out、targeted docs edit 不要）
 - stop / escalate 判定:
-  - targeted-docs-external stale assumption は未検出
+  - original six-file targeted docs slice 外への escalation はこの時点では不要
   - blocker / escalation 不要
 - 次ステップ着手可否:
   - S02 close-out 可
@@ -158,7 +159,7 @@ find . -path '*/reference_*.md' -o -path '*/active/issue/*' | sed 's#^./##' | so
 
 #### メモ
 - targeted docs 自体は未変更。S02 では report への監査ログ追記のみ実施した。
-- no targeted-docs-external stale assumption was found; therefore no blocker/escalation was needed.
+- original six-file targeted docs slice では stale assumption は見つからず、S02 時点の blocker/escalation は不要だった。
 
 ### 2026-03-30 13:23 - 13:28
 
@@ -589,6 +590,7 @@ upstream evidence normalization
 
 #### 実施内容
 - S09 の execution evidence（`fdccc87`）と S10 の normalized upstream evidence（`aba6db7` で反映された `epic-00033/report.md` / `iss-00040/report.md` / 本 issue docs alignment）を合わせた normalized artifact set に対して、fresh final spec rereview を実施した。
+- 上記の fresh final spec rereview では、normalized artifact set に対する committed branch diff `main...HEAD` の epic-level rereview gate も `pass` と判定されたものとして closure record に束ねた。
 - reviewer `Mill`（agent `019d3dff-88a2-7b72-88a3-677670b94ad5`）の completed spec-review result を最終判定として採用し、issue-doc contract level の closure verdict を `pass` で固定した。
 - この S11 により、`iss-00038` の issue-doc contract 上の AC-003（final spec review record）と AC-004（authority reconciliation を伴う final close claim）がともに閉じたことを明示した。
 - prior code/QA rereview で残っていた指摘は、fresh final rereview record 欠落や upstream artifact ambiguity といった pre-closure artifact gap に限られており、S10 normalization と今回の report alignment で解消済みであることを確認した。code/QA slice 自体に対する追加の pass verdict はここでは主張していない。
@@ -599,7 +601,7 @@ fresh final spec rereview on normalized artifact set
 
 - reviewer: Mill (agent `019d3dff-88a2-7b72-88a3-677670b94ad5`)
 - evidence commits: `fdccc87` (S09 execution evidence), `aba6db7` (S10 normalized upstream evidence)
-- scope: issue-doc contract closure on normalized artifact set
+- scope: issue-doc contract closure and committed branch diff `main...HEAD` epic-level rereview gate on normalized artifact set
 - verdict: pass
 
 git log --oneline -n 5
@@ -639,6 +641,50 @@ rg -n 'Mill|019d3dff|verdict|aba6db7|c2c6233' spec-dock/initiatives/init-local-0
 #### メモ
 - S11 は S09/S10 を引用する closure record であり、既存 execution evidence や upstream normalization entry 自体は rewrite していない。
 - fresh final rereview の `pass` は issue-doc contract close-out に限定して扱い、prior code/QA rereview に遡って pass verdict を付与しない。
+
+### 追補 — S12 narrow rules-authority alignment
+
+#### 対象
+- Step: S12 narrow rules-authority alignment
+- AC/EC: AC-001
+
+#### 実施内容
+- final close-out rereview で、original six-file targeted docs slice の外側にある `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` と `spec-dock/docs/rules/initiative/epics.md` に stale `--no-github` create command が残っていることを確認した。
+- 上記 2 ファイルのみを、`spec-dock/docs/workflow_epic.md` と `spec-dock/docs/reference_github.md` が示す GitHub-mandatory epic create contract に合わせ、`./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"` へ是正した。
+- この corrective は rules-authority mismatch の局所是正であり、S02 の original six-file targeted docs slice に対する no-op conclusion を broader docs no-finding claim へ広げ直すものではない。
+
+#### 実行コマンド / 結果
+```bash
+rg -n -- '--no-github|Create command' src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/rules/initiative/epics.md spec-dock/docs/workflow_epic.md spec-dock/docs/reference_github.md
+
+- `docs/rules/initiative/epics.md` pair に stale `--no-github` example が残っていたことを観測した。
+- `workflow_epic.md` / `reference_github.md` 側の GitHub-mandatory epic create contract と揃う command example へ更新した。
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md`
+  - `spec-dock/docs/rules/initiative/epics.md`
+  - `spec-dock/docs/workflow_epic.md`
+  - `spec-dock/docs/reference_github.md`
+- reviewer:
+  - doc maintenance self-review
+- verdict:
+  - pass
+- corrective scope note:
+  - original six-file targeted docs slice の S02 conclusion は履歴として維持する
+  - 今回の finding/fix は final close-out rereview で見つかった narrow rules-authority mismatch のみ
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` - stale `--no-github` epic create command を GitHub-mandatory contract に整合
+- `spec-dock/docs/rules/initiative/epics.md` - stale `--no-github` epic create command を GitHub-mandatory contract に整合
+- `spec-dock/active/issue/report.md` - S12 corrective scope と original six-file slice との切り分けを追記
+
+#### コミット
+- なし（working tree 上の narrow rules-authority corrective update）
+
+#### メモ
+- この S12 は `docs/rules/initiative/epics.md` pair の rules-authority corrective に限定し、runtime/test/implementation scope は reopen していない。
 
 ---
 

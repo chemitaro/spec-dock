@@ -17,6 +17,7 @@ ID: "iss-00038"
 - この issue は epic の `E-RQ-005` を close し、`E-AC-005` の docs/spec-review slice を完了させる owner である。
 - 追加 corrective scope として、epic-level branch diff review で露出した status authority、dependency graph、commit-backed audit trail の不整合を解消し、epic close readiness を監査可能にする。
 - latest fresh review で残った `S09` fresh final rereview record 欠落、`epic-00033/report.md` の GitHub issue `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence 表記を narrow corrective scope として解消し、final close judgement を committed rereview まで閉じる。
+- final close-out rereview で、`src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` と `spec-dock/docs/rules/initiative/epics.md` の stale `--no-github` create command が epic create の GitHub-mandatory contract と不整合だと判明したため、これは original six-file targeted docs slice を reopen しない narrow rules-authority corrective として扱う。
 
 ## 背景・現状
 - 現状の挙動:
@@ -30,6 +31,7 @@ ID: "iss-00038"
   - acceptance review の結果、`report.md` の final close-out record に「未コミット」表記と曖昧な `状態` 値が残っており、実際の git history / approved state と整合しないことが判明した。
   - epic-level branch diff review の結果、`epic-00033/report.md` の `E-AC-005` がなお Partial/open のまま、`iss-00038/deps.json` に `iss-00040` が無く、S06 corrective 記録も committed audit trail になっていないことが判明した。
   - latest fresh review の結果、S09 は execution evidence の記録までで fresh final rereview record が未記録、`epic-00033/report.md` は本文の completion claims と例外メモの `#33 OPEN` が衝突し、`iss-00040/report.md` も `draft | approved` などの provisional marker を含むため、upstream evidence を final review 用に正規化する必要がある。
+  - final close-out rereview の結果、original six-file targeted docs slice の外側にある `docs/rules/initiative/epics.md` provider/dogfooding pair が、なお stale `--no-github` epic create command を保持しており、rules-authority と `workflow_epic.md` / `reference_github.md` の GitHub-mandatory contract が不整合だと判明した。
 - 再現手順:
   1. `spec-dock/active/epic/plan.md` と `spec-dock/active/epic/report.md` を確認する。
   2. `iss-00038` の現 spec が split 前の責務を含んでいることを確認する。
@@ -81,6 +83,7 @@ ID: "iss-00038"
   - S01 の spec review pass と `iss-00040` 非重複確認について、観測コマンドまたは観測 artifact を伴う承認記録を `report.md` に残し、その承認後にのみ S02 へ進む。
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
   - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
+  - final close-out rereview で見つかった provider/dogfooding 両側の `docs/rules/initiative/epics.md` stale `--no-github` command を、`workflow_epic.md` と `reference_github.md` の GitHub-mandatory epic create contract に揃える。これは original six-file targeted docs slice の結論を broader docs no-finding claim に拡張しない narrow corrective として扱う。
   - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
   - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、generated prerequisite evidence は top-level `deps.issue_edges` edge list を正本として扱う。per-node `nodes.<id>.deps` は readiness projection であり、closed issue の prerequisite edge を保持しない場合があるため、`todo_total: 0` 時の active-only projection 空状態と同様に edge authority とは混同しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
@@ -149,6 +152,7 @@ ID: "iss-00038"
     - old local-only / sequential / index assumption が残っていないことを、6 ファイル個別の current contract verification evidence で示せる
     - 差分が必要なら provider-side と dogfooding 側の両方で更新される
     - 差分が不要なら no-op であることに加えて、parity だけではなく current contract review 済みであることが close evidence として説明される
+    - original six-file targeted docs slice の no-op conclusion と、later final-rereview で見つかった `docs/rules/initiative/epics.md` rules-authority corrective が区別して記録される
   - 観測点:
     - targeted docs diff または no-op parity evidence
     - 6 ファイル個別の current contract verification evidence（path / parity 結果 / old assumption 不在確認を含む）
