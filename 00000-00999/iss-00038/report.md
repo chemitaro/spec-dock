@@ -3,7 +3,7 @@
 ID: "iss-00038"
 タイトル: "Docs Dogfooding Parity and Final Regression Gate"
 関連GitHub: ["#38"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-03-30"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -272,17 +272,57 @@ close-out evidence bundle review
 - reviewer:
   - final spec review record（close-out bundle）
 - 次ステップ着手可否:
-  - S04 close-out 可（commit は final review pass 後に実施）
+  - S04 close-out 完了（actual close-out commit: `32719cf`）
 
 #### 変更したファイル
 - `spec-dock/active/issue/report.md` - S04 final spec review record、close-status authority、upstream evidence index、ownership note を追記
 
 #### コミット
-- 未コミット（final review pass 後にコミット予定）
+- `32719cf` `docs(issue): iss-00038 の final close-out 記録`
 
 #### メモ
 - S04 は close-out evidence の bundle 化のみであり、runtime code、targeted docs、upstream issue files は再変更していない。
 - close-status judgment は upstream report 単体ではなく、`spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を authority として固定する。
+
+### 2026-03-30 13:36 - 13:38
+
+#### 対象
+- Step: S05 acceptance corrective close-out / report normalization
+- AC/EC: acceptance finding 反映、front matter 正規化、S04 close-out record の git history 整合
+
+#### 実施内容
+- acceptance handoff の finding に従い、front matter `状態` の許容値表記 `draft | approved` を最終単一値 `approved` へ正規化した。
+- S04 close-out record の commit 欄と next-step 表記を、実際の final close-out commit `32719cf` を参照する形へ補正した。
+- S01-S04 の本文は履歴として維持し、acceptance corrective として必要最小限の追記・補正のみを行った。
+
+#### 実行コマンド / 結果
+```bash
+git --no-pager log --oneline -n 3
+
+- `32719cf` が S04 close-out diff を記録した actual final close-out commit であることを確認した。
+- `153b558` は後続の acceptance review/handoff commit であり、S04 close-out commit 自体の参照先は `32719cf` のままとした。
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `git --no-pager log --oneline -n 3`
+  - `spec-dock/active/issue/report.md`
+- reviewer:
+  - acceptance handoff
+- verdict:
+  - pass（report corrective normalization only）
+- 次ステップ着手可否:
+  - corrective close-out 完了
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - front matter `状態` 正規化、S04 commit record 補正、S05 corrective log を追記
+
+#### コミット
+- 未コミット（本 corrective は report 更新のみ）
+
+#### メモ
+- acceptance analysis にある commit-message formatting issue は out of scope のため、この corrective では hash 整合のみを記録した。
+- runtime code、targeted docs、requirement/design/plan、commit history 自体は変更していない。
 
 ---
 
