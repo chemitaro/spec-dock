@@ -82,7 +82,7 @@ ID: "iss-00038"
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
   - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
   - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
-  - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、`todo_total: 0` 時の active-only projection 空状態を drift と誤判定しない。
+  - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、generated prerequisite evidence は top-level `deps.issue_edges` edge list を正本として扱う。per-node `nodes.<id>.deps` は readiness projection であり、closed issue の prerequisite edge を保持しない場合があるため、`todo_total: 0` 時の active-only projection 空状態と同様に edge authority とは混同しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
   - branch-diff review に使う corrective report/update は committed history から再現できることを保証し、working-tree-only evidence を最終 artifact に残さない。
   - S09 の execution evidence だけでは close claim を完了扱いにせず、S10 upstream evidence normalization と S11 fresh final rereview closure を close-out 必須経路として実行し、normalized artifact set を参照する committed artifact が揃うまで close claim を保留する。
@@ -114,7 +114,7 @@ ID: "iss-00038"
   - close evidence は docs review結果、`validate` / `sync` の実行結果、final spec review record の 3 本柱で残す。
   - S01 の step approval は `report.md` 上で reviewer / verdict / 観測コマンドまたは観測 artifact / 非重複確認先を追跡できる形で残す。
   - upstream issue report の記述と generated state / epic report が衝突する場合は、`spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を close status の優先正本とする。
-  - `spec-dock/dashboard.md` が `todo_total: 0` を返した後は、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` の空状態は active-only projection の仕様内であり、S07/S09 の否定 evidence には使わない。
+  - `spec-dock/dashboard.md` が `todo_total: 0` を返した後は、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` の空状態は active-only projection の仕様内であり、S07/S09 の否定 evidence には使わない。`spec-dock/.agent/index-all.json` では top-level `deps.issue_edges` を prerequisite edge の正本、per-node `nodes.<id>.deps` を readiness projection として読み分ける。
   - S09 は status reconciliation execution evidence step であり、fresh final rereview closure は後続 corrective step で committed record 化する。
   - S10 が `epic-00033/report.md` または `iss-00040/report.md` の rereview input を更新した後は、`epic-00033/report.md` / normalized `iss-00040/report.md` / `iss-00038/report.md` / generated state / deps graph から成る normalized artifact set に対して、epic-level committed rereview を再度 `pass` させてから close judgement へ進む。
   - `iss-00040/report.md` と `epic-00033/report.md` の更新が必要な場合でも、扱うのは report-artifact normalization だけであり、implementation 完了判定そのものは再実行しない。
@@ -197,7 +197,7 @@ ID: "iss-00038"
     - `epic-00033/report.md`
     - normalized `iss-00040/report.md`
     - `iss-00038/deps.json`
-    - deps graph evidence（`spec-dock/.agent/deps-issues.json` など）
+    - deps graph evidence（`spec-dock/.agent/index-all.json` の top-level `deps.issue_edges` を正本とし、`spec-dock/.agent/deps-issues.json` などは補助観測点）
     - `spec-dock/.agent/index-all.json`
     - active-only projection（`spec-dock/.agent/index.json` など）は補助観測点として扱う
     - `spec-dock/dashboard.md`
@@ -250,7 +250,7 @@ ID: "iss-00038"
   - 条件:
     - narrative spec では `iss-00040` prerequisite を要求しているが、`deps.json` や generated deps graph に edge が無い
   - 期待:
-    - dependency graph を spec に合わせて正規化するか、spec 側の prerequisite 表現を修正するまで epic review を pass にしない
+    - dependency graph を spec に合わせて正規化するか、spec 側の prerequisite 表現を修正するまで epic review を pass にしない。generated edge の有無は `spec-dock/.agent/index-all.json` の top-level `deps.issue_edges` で判定し、per-node `nodes.<id>.deps` は readiness projection として補助的に扱う
   - 観測点:
     - `iss-00038/deps.json`
     - `spec-dock/.agent/index-all.json`
