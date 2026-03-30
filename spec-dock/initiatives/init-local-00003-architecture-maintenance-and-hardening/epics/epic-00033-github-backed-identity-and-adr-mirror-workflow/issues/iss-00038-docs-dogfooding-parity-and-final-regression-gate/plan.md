@@ -91,6 +91,7 @@ ID: "iss-00038"
 - [x] S10 upstream evidence normalization
 - [x] S11 final committed rereview closure
 - [x] S12 narrow rules/docs-authority alignment
+- [ ] S13 canonical guidance test expectation realignment
 
 ## ステップ一覧
 - S01:
@@ -196,9 +197,18 @@ ID: "iss-00038"
   - review gate:
     - provider-side / dogfooding 両側の `docs/rules/initiative/epics.md` が `workflow_epic.md` と矛盾しない
     - `report.md` に、これは original six-file targeted docs slice の broader scope reopening ではなく narrow rules/docs-authority corrective だと追記される
+- S13:
+  - 観測可能な振る舞い:
+    - S12 corrective 後に stale `--no-github` guidance を期待していた canonical guidance tests が、current shipped docs contract を正本として pass する
+  - closes:
+    - AC-001
+    - EC-009
+  - review gate:
+    - `tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` の failing expectations が current docs wording に揃っている
+    - docs contract rollback なしで targeted failing tests が pass する
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S02, S12
+- AC-001 -> S02, S12, S13
 - AC-002 -> S03
 - AC-003 -> S04, S11
 - AC-004 -> S11
@@ -210,6 +220,7 @@ ID: "iss-00038"
 - EC-006 -> S07
 - EC-007 -> S11
 - EC-008 -> S10
+- EC-009 -> S13
 
 ## レビュー / QA ゲート方針
 - SG1 spec review:
@@ -243,7 +254,8 @@ ID: "iss-00038"
   - acceptance review で corrective findings が出た場合は、S05 で report artifact を正規化し、S06 で spec review pass を再取得してから受け入れ判定へ進む
   - epic-level branch diff review で authority / deps / audit trail finding が出た場合は、S07-S09 を追加 corrective path として実行し、S10 で upstream evidence normalization、S11 で fresh final rereview closure を完了してから epic completion を主張する
   - S11 後の final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、S02 original six-file verdict を broader claim に書き換えず、S12 で narrow rules/docs-authority corrective として append-only に閉じる
-  - close-out は S10 で upstream evidence normalization、S11 で normalized artifact set に対する fresh final rereview closure、必要時のみ S12 で narrow rules/docs-authority corrective を完了して初めて exit できる
+  - S12 corrective 後に canonical guidance tests が旧 `--no-github` wording を期待して fail した場合は、docs rollback ではなく S13 で test expectation realignment を行う
+  - close-out は S10 で upstream evidence normalization、S11 で normalized artifact set に対する fresh final rereview closure、必要時のみ S12 で narrow rules/docs-authority corrective、さらに必要時のみ S13 で canonical guidance test expectation realignment を完了して初めて exit できる
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -255,7 +267,7 @@ ID: "iss-00038"
 - failing test は iteration ごとに 1 本ずつ進める。
 - `Green` は最小実装、`Refactor` は green 維持を前提とする。
 - shared minimum gate と scope-specific readiness contract / final exit contract を満たす。
-- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S99 / final exit へ進まない。S12 は final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の rules/docs-authority mismatch が見つかった場合のみ追加で実行する。
+- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S99 / final exit へ進まない。S12 は final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の rules/docs-authority mismatch が見つかった場合のみ追加で実行する。S13 は S12 corrective 後に canonical guidance tests が stale expectation で fail した場合のみ追加で実行する。
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
@@ -271,6 +283,7 @@ ID: "iss-00038"
 - S10 で `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note のみを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら保持する。
 - S10 完了後は、S11 で normalized artifact set に対する epic-level committed rereview を再度 `pass` させなければ close-out を完了できない。
 - S11 後に `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、S02 の six-file no-op conclusion を rewrite せず、S12 で provider/dogfooding 両側の current create wording だけを GitHub-mandatory contract へ揃える。
+- S13 では docs contract を再変更せず、`tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` の canonical guidance assertions だけを current shipped wording に揃える。
 
 ## 実装ステップ
 
@@ -981,6 +994,60 @@ ID: "iss-00038"
 - report update:
   - `./spec-dock/active/issue/report.md`
 
+### S13 — canonical guidance test expectation realignment
+- target:
+  - `tests/cli_runtime/test_wrappers.py`
+  - `tests/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t122947z-disc-s13-guidance-test-expectation-realignment-analysis.md`
+- step boundary:
+  - S12 で是正済みの current docs contract を正本とし、canonical guidance tests に残った旧 `--no-github` 期待値だけを最小 realignment する。docs/runtime contract 自体は再変更しない
+
+#### B1 — update stale test oracle only
+- purpose:
+  - docs corrective を regression と誤判定している stale test oracle を閉じる
+- files:
+  - `tests/cli_runtime/test_wrappers.py`
+  - `tests/test_init_update.py`
+  - `spec-dock/active/issue/report.md`
+
+##### I1 — replace legacy epic create expectation
+- slice goal:
+  - initiative 配下 epic create guidance に対する旧 `--no-github` 期待値を current wording に揃える
+
+###### Red
+- failing test:
+  - `python -m unittest tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs tests.test_init_update.TestInitUpdate.test_current_guidance_documents_match_discussion_numbering_contract tests.test_init_update.TestInitUpdate.test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set -v`
+- expected failure:
+  - canonical guidance tests が `docs/rules/initiative/epics.md` に旧 `--no-github` wording を期待して fail する
+
+###### Green
+- minimum implementation:
+  - `tests/cli_runtime/test_wrappers.py` の expected command を current shipped wording に更新する
+  - `tests/test_init_update.py` の canonical rules expectation を current shipped wording に更新し、`--no-github` は absent side で扱う
+  - `report.md` に S13 corrective を追記する
+- pass condition:
+  - targeted failing tests が pass し、docs contract rollback を伴わない
+
+###### Refactor
+- cleanup target:
+  - test oracle wording を canonical rules contract と一致させる
+- invariants to keep green:
+  - runtime/docs contract を再変更しない
+  - S12 corrective の scope を broader docs reopening に広げない
+
+#### step gate
+- review:
+  - RG1 docs/evidence review
+  - QG1 close-out review
+- expected tests:
+  - `python -m unittest tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs tests.test_init_update.TestInitUpdate.test_current_guidance_documents_match_discussion_numbering_contract tests.test_init_update.TestInitUpdate.test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set -v`
+  - `python -m unittest discover -v`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
 ### S90 — docs impact resolution / docs refresh
 - 対象:
   - docs
@@ -1006,7 +1073,7 @@ ID: "iss-00038"
 
 ## 未確定事項
 - なし:
-  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + 必要時のみ S12 rules/docs-authority corrective + S90 + S99 で固定する
+  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + 必要時のみ S12 rules/docs-authority corrective + 必要時のみ S13 canonical guidance test expectation realignment + S90 + S99 で固定する
 
 ## final exit contract
 - AC/EC 達成:
@@ -1024,4 +1091,4 @@ ID: "iss-00038"
   - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
 - final diff approved:
   - `iss-00040` 非重複を保ったまま reviewer pass を取得している
-  - S10/S11 と、必要時のみ S12 を含む close-out 必須経路が完了している
+  - S10/S11 と、必要時のみ S12/S13 を含む close-out 必須経路が完了している

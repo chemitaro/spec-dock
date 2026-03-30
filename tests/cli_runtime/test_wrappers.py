@@ -127,7 +127,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             for text, expected_command in (
                 (
                     initiative_epics_rules,
-                    "`./spec-dock/scripts/spec-dock new epic --initiative <id> --title \"<title>\" --no-github`",
+                    "`./spec-dock/scripts/spec-dock new epic --initiative <id> --title \"<title>\"`",
                 ),
                 (
                     initiative_discussions_rules,
@@ -149,6 +149,7 @@ class TestCliRulesContract(CliRuntimeHarness):
                 self.assertIn("spec-dock/docs/", text)
                 self.assertIn(expected_command, text)
                 self.assertNotIn("./spec ", text)
+            self.assertNotIn("--no-github", initiative_epics_rules)
 
     def test_new_doc_numbering_and_validate_ignore_initiative_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
