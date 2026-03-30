@@ -18,6 +18,7 @@ ID: "iss-00038"
 - 追加 corrective scope として、epic-level branch diff review で露出した status authority、dependency graph、commit-backed audit trail の不整合を解消し、epic close readiness を監査可能にする。
 - latest fresh review で残った `S09` fresh final rereview record 欠落、`epic-00033/report.md` の GitHub issue `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence 表記を narrow corrective scope として解消し、final close judgement を committed rereview まで閉じる。
 - final close-out rereview で、`docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding 側に stale `--no-github` create guidance が残っていると判明したため、これは original six-file targeted docs slice を reopen しない narrow rules/docs-authority corrective として扱う。
+- S12 corrective 後の fresh review で、canonical guidance tests がなお initiative 配下 epic create guidance に `--no-github` を期待していると判明したため、current docs contract を正本とした test expectation realignment を narrow follow-up corrective として扱う。
 
 ## 背景・現状
 - 現状の挙動:
@@ -84,6 +85,7 @@ ID: "iss-00038"
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
   - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
   - final close-out rereview で見つかった provider/dogfooding 両側の `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` stale `--no-github` guidance を、`reference_github.md` の GitHub-mandatory create contract に揃える。これは original six-file targeted docs slice の結論を broader docs no-finding claim に拡張しない narrow corrective として扱う。
+  - S12 で正規化した current guidance を読む canonical guidance tests について、旧 `--no-github` 期待値が残っている場合は、docs contract を戻さず test expectation を current shipped guidance に揃える narrow follow-up corrective を許可する。
   - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
   - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、generated prerequisite evidence は top-level `deps.issue_edges` edge list を正本として扱う。per-node `nodes.<id>.deps` は readiness projection であり、closed issue の prerequisite edge を保持しない場合があるため、`todo_total: 0` 時の active-only projection 空状態と同様に edge authority とは混同しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
@@ -94,7 +96,8 @@ ID: "iss-00038"
   - S10 で `iss-00040/report.md` を正規化する場合、authoritative citation layer / front matter / final summary note だけを対象にし、historical session-log の `コミット: なし` entry が時点事実を表す限り書き換えない。
 - MUST NOT:
   - `iss-00040` が owner である wrappers / domain / dogfooding parity / final regression を再実行前提で抱え込まない。
-  - runtime contract や test expectation の realignment を、この issue の close-out のために再度変更しない。
+  - runtime contract の realignment を、この issue の close-out のために再度変更しない。
+  - test expectation realignment を広く再開しない。許可するのは S12 で是正した `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` に対する canonical guidance tests の stale expectation 修正だけとする。
   - docs parity を provider-side だけで閉じない。
   - targeted docs list の parity/no-op だけで AC-001 を満たした扱いにしない。
   - final close-out record に、実際の commit 済み状態や approved 状態と矛盾する暫定表記を残さない。
@@ -153,6 +156,7 @@ ID: "iss-00038"
     - 差分が必要なら provider-side と dogfooding 側の両方で更新される
     - 差分が不要なら no-op であることに加えて、parity だけではなく current contract review 済みであることが close evidence として説明される
     - original six-file targeted docs slice の no-op conclusion と、later final-rereview で見つかった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の rules/docs-authority corrective が区別して記録される
+    - S12 corrective 後に canonical guidance tests の期待値が stale だった場合は、docs contract rollback ではなく test expectation realignment で閉じたことが追える
   - 観測点:
     - targeted docs diff または no-op parity evidence
     - 6 ファイル個別の current contract verification evidence（path / parity 結果 / old assumption 不在確認を含む）
@@ -277,6 +281,14 @@ ID: "iss-00038"
   - 観測点:
     - `epic-00033/report.md`
     - `iss-00040/report.md`
+- EC-009:
+  - 条件:
+    - S12 で current docs contract を是正した後、canonical guidance tests が旧 `--no-github` wording を期待して fail する
+  - 期待:
+    - docs を旧 contract へ戻さず、current shipped guidance を正本として tests だけを最小 realignment する
+  - 観測点:
+    - `tests/cli_runtime/test_wrappers.py`
+    - `tests/test_init_update.py`
 
 ## 入力→出力例（必要時）
 - EX-001:

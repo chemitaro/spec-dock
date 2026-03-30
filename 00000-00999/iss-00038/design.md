@@ -20,6 +20,7 @@ ID: "iss-00038"
   - epic-level branch diff review で要求される status reconciliation、dependency graph alignment、commit-backed audit trail を追加 corrective scope として取り込む。
   - latest fresh review で露出した S09 fresh final rereview record 欠落、`epic-00033/report.md` の `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence ambiguity を narrow corrective scope として扱う。
   - final close-out rereview で見つかった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs に残る stale `--no-github` guidance を、post-S11 の narrow rules/docs-authority corrective として記録し、original six-file targeted docs slice の結論とは切り分ける。
+  - S12 corrective 後に露出した canonical guidance tests の stale `--no-github` expectation を、docs contract rollback ではなく test oracle realignment として閉じる。
 - MUST / MUST NOT:
   - MUST:
     - provider-side と dogfooding 側の targeted docs list を同時に扱う。
@@ -32,8 +33,10 @@ ID: "iss-00038"
     - final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale create guidance が見つかった場合は、provider/dogfooding docs のみを `reference_github.md` authority に揃える narrow corrective として扱い、S02 original six-file verdict を broader no-finding claim へ書き換えない。
     - `epic-00033/report.md` と `iss-00040/report.md` を触る場合は report-artifact normalization のみとし、implementation/test rerun は scope 外に固定する。
     - `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note だけを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら rewrite しない。
+    - S12 corrective 後に canonical guidance tests が stale expectation で fail した場合は、current shipped docs を正本として tests だけを最小更新する。
   - MUST NOT:
     - runtime / test realignment を再度設計対象に戻さない。
+    - docs-facing canonical guidance tests の stale expectation 修正を理由に、runtime/docs contract 自体を再び変更しない。
     - docs parity が no-op の場合でも、6 ファイル個別の current-contract verification evidence を省略しない。
     - targeted docs list 外で見つかった stale old-contract assumption を、その場で S02 の修正対象へ拡張しない。
     - report に「未コミット」や `draft | approved` のような暫定表記を最終状態のまま残さない。
@@ -105,6 +108,8 @@ ID: "iss-00038"
     - S09 execution evidence の後に、normalized upstream evidence を参照する fresh final rereview record を committed history に残し、normalized artifact set に対する epic-level rereview を再度 `pass` させて close judgement を確定する。
   - post-S11 narrow rules/docs-authority corrective:
     - final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、その provider/dogfooding docs だけを修正し、S02 original six-file verdict は append-only で維持する。
+  - canonical guidance test realignment:
+    - S12 corrective 後に `tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` が旧 `--no-github` command example を期待して fail した場合は、docs を戻さず current shipped guidance に test oracle を合わせる。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
@@ -275,6 +280,7 @@ upstream --> record
 - EC-006 -> deps graph と narrative prerequisite の mismatch を close blocker として扱い、authoritative generated deps evidence は `index-all.json` の top-level `deps.issue_edges` を優先し、per-node `nodes.<id>.deps` は readiness projection として扱う
 - EC-007 -> S09 execution evidence だけで close claim を完了扱いにせず、fresh final rereview record を必須にする
 - EC-008 -> upstream report の provisional / conflicting status marker は artifact normalization で閉じ、implementation/test rerun へ拡張しない
+- EC-009 -> S12 corrective 後の docs-facing test oracle drift は docs rollback ではなく stale expectation realignment で閉じる
 - constraint -> `iss-00040` 非重複を設計上で明文化する
 - constraint -> targeted docs list 外の stale assumption 発見時は stop/escalate する
 
@@ -319,6 +325,7 @@ upstream --> record
 - EC-006 -> dependency mismatch があれば deps alignment を要求し、authoritative generated deps evidence は `index-all.json` を参照する
 - EC-007 -> S09 execution evidence only のままなら final rereview blocker として記録する
 - EC-008 -> upstream report ambiguity が残るなら artifact normalization 後に再 review する
+- EC-009 -> canonical guidance tests が旧 `--no-github` wording を期待して fail した場合、current shipped guidance に揃えた test expectation へ更新する
 - constraint -> non-overlap check を final review record に含める
 - constraint -> scope外 stale assumption は blocker + escalation record にする
 
