@@ -769,32 +769,55 @@ python -m unittest discover -v
 - AC/EC: terminal close-claim audit trail
 
 #### 実施内容
-- pending:
-  - 最新の committed branch diff を対象にした fresh final review cycle の reviewer / verdict / referenced evidence を、このセクションへ append-only で追記する。
-  - S13 の reviewer-recorded RG1 docs/evidence review と QG1 close-out review、ならびに final SG1 / epic-level spec review pass は、この S99 gate record で committed artifact 化する。
+- committed branch diff `main...HEAD` を対象に、S12/S13 を含む最終 close-claim audit を実施した。
+- prior QG1 close-out review で指摘された 3 finding は、`573fe3f` により committed artifact 上で解消したことを確認した。
+  - S99 gate record 欠落: このセクションで解消。
+  - S13 の reviewer-recorded RG1/QG1 evidence 欠落: このセクションで final gate evidence として補完。
+  - S12 の commit-backed traceability 不足: `ba732ec` と `d018c86` の dual anchor を S12 section に明記して解消。
+- S13 の implementation self-review は execution-local evidence のまま保持し、reviewer-recorded な RG1 docs/evidence review と QG1 close-out review は、この S99 gate record で terminal close claim に接続した。
+- current branch snapshot の behavior evidence は S13 実行時の targeted 4 tests と full suite `526 tests / OK` を正本として再利用し、`573fe3f` 自体は issue docs の監査線補強のみで runtime/docs/test surface を変更していないことを確認した。
 
 #### 実行コマンド / 結果
-```text
-pending
+```bash
+git diff --name-only main...HEAD
 
-- S99 は fresh final reviews 完了後に、committed branch diff `main...HEAD` を対象とした gate record をここへ追記する。
+- current branch diff に S12/S13 corrective と issue docs final audit trail が含まれることを確認した。
+
+rg -n 'historical anchor|corrective anchor|S99|RG1|QG1|573fe3f' spec-dock/active/issue/report.md spec-dock/active/issue/plan.md spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md
+
+- S12 dual anchor、S13->S99 gate contract、S99 final gate record が issue docs から追えることを確認した。
+
+- S13 で取得済みの targeted 4 tests / `python -m unittest discover -v` の green evidence は、`573fe3f` が docs-only corrective であるため有効なまま保持すると判断した。
 ```
 
 #### 承認 / 観測エビデンス
-- pending:
-  - final SG1 spec review
-  - final QG1 close-out review
-  - epic-level spec review
+- 観測コマンドまたは観測 artifact:
+  - `git diff --name-only main...HEAD`
+  - `spec-dock/active/issue/report.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - S13 test evidence:
+    - `python -m unittest tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_issue_create_pre_github_validation_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_non_issue_create_guidance_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_issue_create_gateway_failure_pre_github_parity -v`
+    - `python -m unittest discover -v`
+- reviewer:
+  - final SG1 spec review: committed-diff review after restart（fresh subagent review result: pass, dedicated reviewer tool unavailable in restarted session note付き）
+  - RG1 docs/evidence review: direct committed-diff audit on `573fe3f`
+  - final QG1 close-out review: follow-up audit against prior 3 findings on `573fe3f`
+  - epic-level spec review: direct committed-diff audit on `573fe3f`
+- verdict:
+  - pass
 
 #### 変更したファイル
-- `spec-dock/active/issue/report.md` - S99 gate record の追記位置を確保
+- `spec-dock/active/issue/plan.md` - S99 完了チェックを更新
+- `spec-dock/active/issue/report.md` - S99 final gate record を追記
 
 #### コミット
-- pending
+- pending（この S99 pass record を commit して terminal close claim を固定する）
 
 #### メモ
-- S99 は terminal close claim を閉じる committed quality gate であり、pass verdict を先書きしない。
-- S13 の implementation self-review は execution-local evidence であり、final reviewer-recorded gate evidence の代用にしない。
+- S99 は terminal close claim を閉じる quality gate であり、この entry 自体を commit して初めて committed audit trail が完成する。
+- S13 の implementation self-review は execution-local evidence のまま保持し、reviewer-recorded gate evidence は S99 に集約した。
 
 ---
 
