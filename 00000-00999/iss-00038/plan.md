@@ -28,10 +28,13 @@ ID: "iss-00038"
   - EC-004
   - EC-005
   - EC-006
+  - EC-007
+  - EC-008
 - 制約:
   - `iss-00040` と ownership を重複させない
   - provider-side と dogfooding docs の両方を対象にする
   - final spec review verdict を `pass` まで上げる
+  - `iss-00040/report.md` に触る場合でも report-artifact normalization のみとし、implementation/test rerun を行わない
 
 ## マイルストーン一覧
 - M1:
@@ -64,6 +67,11 @@ ID: "iss-00038"
     - epic-level branch diff review 指摘への corrective close-out
   - exit:
     - epic report / deps graph / corrective audit trail が branch diff review で矛盾なく辿れる
+- M7:
+  - 対象:
+    - upstream evidence normalization と final committed rereview closure
+  - exit:
+    - `iss-00040/report.md` / `epic-00033/report.md` の rereview input ambiguity が解消し、normalized artifact set に対する epic-level committed rereview を含む fresh final rereview record が committed artifact として残る
 
 ## ステップ一覧
 - S01:
@@ -132,24 +140,47 @@ ID: "iss-00038"
     - `report.md` の S06 corrective log が committed audit trail と整合する
 - S09:
   - 観測可能な振る舞い:
-    - epic report / issue report / generated state / GitHub status の authority reconciliation が完了し、epic close readiness を branch diff review で説明できる
+    - epic report / issue report / generated state / GitHub status の authority reconciliation execution evidence が揃い、epic close readiness rereview の前提を branch diff review で説明できる
   - closes:
-    - AC-004
     - EC-005
   - review gate:
     - epic-level spec review が committed branch diff を `pass` と判定する
+- S10:
+  - 観測可能な振る舞い:
+    - final rereview が参照する upstream reports の provisional / conflicting evidence marker が、session chronology を保持したまま最小差分で正規化される
+  - closes:
+    - EC-003
+    - EC-005
+    - EC-008
+  - review gate:
+    - `epic-00033/report.md` の `#33` authority note が本文・例外メモ・generated state と単一結論で読める
+    - `iss-00040/report.md` の normalization が report-artifact only であり、implementation/test rerun を伴っていない
+    - `iss-00040/report.md` の normalization は authoritative citation layer / front matter / final summary note に限定され、historical session-log の time-scoped `コミット: なし` entry を rewrite していない
+- S11:
+  - 観測可能な振る舞い:
+    - S09 execution evidence と S10 normalized upstream evidence を参照する fresh final rereview record が committed closure として残る
+  - closes:
+    - AC-003
+    - AC-004
+    - EC-004
+    - EC-007
+  - review gate:
+    - final spec reviewer が fresh final rereview を `pass` と判定する
+    - `iss-00038/report.md` に reviewer / verdict / referenced evidence / actual commit hash を含む committed closure record が残る
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02
 - AC-002 -> S03
-- AC-003 -> S04
-- AC-004 -> S09
+- AC-003 -> S04, S11
+- AC-004 -> S11
 - EC-001 -> S02
 - EC-002 -> S03
-- EC-003 -> S01, S04
-- EC-004 -> S05, S06, S08
-- EC-005 -> S09
+- EC-003 -> S01, S04, S10
+- EC-004 -> S05, S06, S08, S11
+- EC-005 -> S09, S10
 - EC-006 -> S07
+- EC-007 -> S11
+- EC-008 -> S10
 
 ## レビュー / QA ゲート方針
 - SG1 spec review:
@@ -181,7 +212,8 @@ ID: "iss-00038"
   - S04 着手前に S03 の close-out review を記録する
   - S04 完了後に final SG1/QG1 verdict を report に記録する
   - acceptance review で corrective findings が出た場合は、S05 で report artifact を正規化し、S06 で spec review pass を再取得してから受け入れ判定へ進む
-  - epic-level branch diff review で authority / deps / audit trail finding が出た場合は、S07-S09 を追加 corrective path として実行し、epic-level spec review pass を再取得してから epic completion を主張する
+  - epic-level branch diff review で authority / deps / audit trail finding が出た場合は、S07-S09 を追加 corrective path として実行し、S10 で upstream evidence normalization、S11 で fresh final rereview closure を完了してから epic completion を主張する
+  - close-out は S10 で upstream evidence normalization、S11 で normalized artifact set に対する fresh final rereview closure を完了して初めて exit できる
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -193,6 +225,7 @@ ID: "iss-00038"
 - failing test は iteration ごとに 1 本ずつ進める。
 - `Green` は最小実装、`Refactor` は green 維持を前提とする。
 - shared minimum gate と scope-specific readiness contract / final exit contract を満たす。
+- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S99 / final exit へ進まない。
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
@@ -202,6 +235,11 @@ ID: "iss-00038"
 - epic-level review で deps graph mismatch が見つかった場合は、spec narrative を弱めるのではなく、原則として machine-readable deps と generated artifacts を spec に合わせる。
 - branch-diff review に使う corrective report/update は actual commit hash または真の no-op のどちらかで説明できなければ pass にしない。
 - S08 では既存 S06 chronology を上書きせず、append-only の normalization record を追加する。S06 の `working tree`/`なし` 表記は履歴として残してよいが、S08 で superseded であることと actual authoritative commit を明記し、最終 authoritative artifact は S08 record を参照する。
+- S09 は execution evidence 記録 step であり、fresh final rereview pass の代用にしない。close claim は S11 の committed closure record まで保留する。
+- S10 で `iss-00040/report.md` を触る場合は report-artifact normalization only とし、code/test/runtime/dogfooding surface を変更しない。
+- S10 では `epic-00033/report.md` の `#33` authority ambiguity を解消してから S11 へ進む。
+- S10 で `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note のみを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら保持する。
+- S10 完了後は、S11 で normalized artifact set に対する epic-level committed rereview を再度 `pass` させなければ close-out を完了できない。
 
 ## 実装ステップ
 
@@ -741,6 +779,116 @@ ID: "iss-00038"
 - report update:
   - `./spec-dock/active/issue/report.md`
 
+### S10 — upstream evidence normalization
+- target:
+  - `spec-dock/active/epic/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t174600z-disc-epic-report-33-open-closed-authority-mismatch-analysis.md`
+  - `spec-dock/active/issue/discussions/20260330t174700z-disc-upstream-evidence-normalization-for-iss-00040-report-analysis.md`
+- step boundary:
+  - fresh final rereview の入力となる upstream reports の ambiguity を最小差分で正規化する。`iss-00040/report.md` に触る場合も report-artifact normalization のみで、authoritative citation layer / front matter / final summary note だけを整え、historical session-log chronology は保持したまま S11 の normalized artifact set を用意する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録する
+- [ ] upstream report ごとの ambiguity と normalization boundary を整理する
+
+#### B1 — normalize upstream review inputs
+- purpose:
+  - final rereview が読む upstream evidence を単一解釈にする
+- files:
+  - epic report
+  - `iss-00040/report.md`
+
+##### I1 — normalize authority and status markers
+- slice goal:
+  - `#33` authority note と `iss-00040` provisional marker を rereview 用の artifact として読める形に揃える
+
+###### Red
+- failing test:
+  - `rg -n '#33|OPEN|CLOSED' spec-dock/active/epic/report.md`
+  - `rg -n '状態:|draft \\| approved|コミット: なし' spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+- expected failure:
+  - upstream evidence が final rereview input として曖昧
+
+###### Green
+- minimum implementation:
+  - epic report と `iss-00040/report.md` を report-artifact normalization の範囲で整え、final rereview が引用すべき authoritative note を明確化する
+- pass condition:
+  - EC-003 / EC-005 / EC-008 の blocker が解消し、chronology-preserving な normalized artifact set が揃って S11 の epic-level rereview を開始できる
+
+###### Refactor
+- cleanup target:
+  - upstream report 内の status wording と citation anchor
+- invariants to keep green:
+  - `iss-00040` の implementation / test / regression ownership は reopen しない
+  - `iss-00040/report.md` の historical session-log chronology は保持し、time-scoped `コミット: なし` fact を rewrite しない
+
+#### step gate
+- review:
+  - RG1 docs/evidence review
+- expected tests:
+  - `rg -n '#33|OPEN|CLOSED' spec-dock/active/epic/report.md`
+  - `rg -n '状態:|draft \\| approved|コミット: なし|最終|summary' spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
+### S11 — final committed rereview closure
+- target:
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/discussions/20260330t174500z-disc-s09-final-rereview-record-closure-analysis.md`
+  - `spec-dock/active/issue/discussions/20260330t174600z-disc-epic-report-33-open-closed-authority-mismatch-analysis.md`
+  - `spec-dock/active/issue/discussions/20260330t174700z-disc-upstream-evidence-normalization-for-iss-00040-report-analysis.md`
+- step boundary:
+  - S09 execution evidence と S10 normalized upstream evidence を参照し、normalized artifact set に対する epic-level committed rereview を fresh final rereview の一部として実施し、committed closure record として確定する
+
+#### update_plan（着手時に登録）
+- [ ] `update_plan` に step の作業単位を登録する
+- [ ] rereview で引用する evidence set と commit 観測点を整理する
+
+#### B1 — capture fresh final rereview
+- purpose:
+  - latest blocker である final rereview record 欠落を、report 正本上の committed closure で解消する
+- files:
+  - `spec-dock/active/issue/report.md`
+
+##### I1 — record final closure verdict
+- slice goal:
+  - reviewer / verdict / referenced normalized evidence / actual commit hash を含む rereview record を残す
+
+###### Red
+- failing test:
+  - `rg -n 'fresh final re-review|S11|reviewer:|verdict:' spec-dock/active/issue/report.md`
+- expected failure:
+  - S09 execution evidence はあるが final closure record がない
+
+###### Green
+- minimum implementation:
+  - fresh final rereview entry を追加し、S09 + S10 を引用した最終 verdict と commit-backed closure を記録する
+- pass condition:
+  - AC-003 / AC-004 / EC-004 / EC-007 を満たす committed closure record が完成し、normalized artifact set に対する epic-level rereview `pass` が追える
+
+###### Refactor
+- cleanup target:
+  - rereview record の evidence ordering と wording
+- invariants to keep green:
+  - 既存 S09 execution evidence は rewrite せず、後段 closure record として追加する
+
+#### step gate
+- review:
+  - final SG1 spec review
+  - final QG1 close-out review
+  - normalized artifact set に対する epic-level spec review pass
+- expected tests:
+  - `git log --oneline -n 5`
+  - `rg -n 'fresh final re-review|S11|reviewer:|verdict:' spec-dock/active/issue/report.md`
+- report update:
+  - `./spec-dock/active/issue/report.md`
+
 ### S90 — docs impact resolution / docs refresh
 - 対象:
   - docs
@@ -750,7 +898,7 @@ ID: "iss-00038"
 
 ### S99 — final diff review quality gate
 - branch diff scope:
-  - `iss-00038` で更新した issue docs、report、deps graph corrective、epic status reconciliation 差分、必要時のみ targeted docs list
+  - `iss-00038` で更新した issue docs、report、deps graph corrective、epic status reconciliation 差分、upstream report normalization 差分、必要時のみ targeted docs list
 - required validation:
   - AC-001/002/003 の evidence が diff と report から追える
   - AC-004 の authority reconciliation が diff と generated artifacts から追える
@@ -758,6 +906,7 @@ ID: "iss-00038"
   - `iss-00040` 非重複が最終 diff 上でも保たれている
   - acceptance review で指摘された report artifact 整合不備が解消している
   - epic-level review で指摘された deps / audit trail / status authority 不整合が解消している
+  - latest fresh review で指摘された S09 final rereview record 欠落、`#33` authority mismatch、`iss-00040/report.md` ambiguity が解消している
 - reviewer approvals:
   - final SG1 spec review pass
   - final QG1 close-out review pass
@@ -765,7 +914,7 @@ ID: "iss-00038"
 
 ## 未確定事項
 - なし:
-  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S90 + S99 で固定する
+  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + S90 + S99 で固定する
 
 ## final exit contract
 - AC/EC 達成:
@@ -776,8 +925,10 @@ ID: "iss-00038"
   - `iss-00038/deps.json` と generated deps graph が `iss-00040` prerequisite を反映している
   - epic report / issue report / generated state / GitHub status の authority reconciliation が branch diff 上で説明できる
   - corrective report/update が committed audit trail から追える
+  - S10 で正規化した `epic-00033/report.md` / `iss-00040/report.md` を含む normalized artifact set に対する epic-level committed rereview が `pass` であり、S11 の committed closure record から追える
 - docs impact resolved:
   - targeted docs list の差分または no-op evidence が report にある
   - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
 - final diff approved:
   - `iss-00040` 非重複を保ったまま reviewer pass を取得している
+  - S10/S11 を含む close-out 必須経路が完了している
