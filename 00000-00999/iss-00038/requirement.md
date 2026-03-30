@@ -65,29 +65,34 @@ ID: "iss-00038"
 ## スコープ
 - MUST:
   - `iss-00038` の scope を `docs parity + final spec review record` に再固定し、`iss-00040` へ移管済みの責務を除外する。
-  - targeted docs list 6 ファイルについて、old local-only / sequential / index assumption が残っていないことを確認し、必要なら provider-side と dogfooding 側の両方を更新する。
+  - targeted docs list 6 ファイルについて、old local-only / sequential / index assumption が残っていないことを current contract review で 1 ファイルずつ確認し、その確認結果を close evidence として残す。parity が no-op でも、この current contract verification evidence を省略しない。
   - `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` の close-out evidence を取得する。
+  - S01 の spec review pass と `iss-00040` 非重複確認について、観測コマンドまたは観測 artifact を伴う承認記録を `report.md` に残し、その承認後にのみ S02 へ進む。
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
 - MUST NOT:
   - `iss-00040` が owner である wrappers / domain / dogfooding parity / final regression を再実行前提で抱え込まない。
   - runtime contract や test expectation の realignment を、この issue の close-out のために再度変更しない。
   - docs parity を provider-side だけで閉じない。
+  - targeted docs list の parity/no-op だけで AC-001 を満たした扱いにしない。
 - OUT OF SCOPE:
   - create / naming / sync / migration contract の中核実装変更
   - stale-contract cluster の再調査や full regression の再所有
   - `iss-00040` 完了済み evidence の差し替え
+  - targeted docs list 外で見つかった stale old-contract assumption の ad hoc 修正
 
 ## 境界
 - Always:
   - `iss-00038` は docs close-out owner であり、`iss-00040` の final regression evidence を参照して閉じる。
   - targeted docs list の評価は provider-side source of truth と checked-in dogfooding docs の両方で行う。
   - close evidence は docs review結果、`validate` / `sync` の実行結果、final spec review record の 3 本柱で残す。
+  - S01 の step approval は `report.md` 上で reviewer / verdict / 観測コマンドまたは観測 artifact / 非重複確認先を追跡できる形で残す。
   - upstream issue report の記述と generated state / epic report が衝突する場合は、`spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を close status の優先正本とする。
 - Ask:
-  - targeted docs list 以外に old contract assumption が見つかった場合、それが `iss-00038` の docs close-out に含めるべき drift か、別 issue に分けるべき drift かを design/plan で判断する。
+  - targeted docs list 以外に old contract assumption が見つかった場合は、その場で scope を広げず、`report.md` に blocker として記録して reviewer 判断へ escalate する。
 - Never:
   - `iss-00040` が閉じた scope を再び `iss-00038` に混ぜて完了条件を曖昧にする。
   - upstream evidence が欠けたまま narrative だけで epic close を宣言する。
+  - targeted docs list 外で見つけた stale assumption を S02 の途中で ad hoc に修正対象へ追加する。
 
 ## 非交渉制約
 - final spec review verdict は `pass` を要求する。
@@ -107,13 +112,14 @@ ID: "iss-00038"
   - Given:
     - targeted docs list を確認する
   - When:
-    - provider-side と dogfooding 側の 6 ファイルを current contract 観点でレビューする
+    - provider-side と dogfooding 側の 6 ファイルを current contract 観点でレビューし、6 ファイル個別の確認結果を evidence 化する
   - Then:
-    - old local-only / sequential / index assumption が残っていないことを示せる
+    - old local-only / sequential / index assumption が残っていないことを、6 ファイル個別の current contract verification evidence で示せる
     - 差分が必要なら provider-side と dogfooding 側の両方で更新される
-    - 差分が不要なら no-op であることが close evidence として説明される
+    - 差分が不要なら no-op であることに加えて、parity だけではなく current contract review 済みであることが close evidence として説明される
   - 観測点:
     - targeted docs diff または no-op parity evidence
+    - 6 ファイル個別の current contract verification evidence（path / parity 結果 / old assumption 不在確認を含む）
 - AC-002:
   - Actor:
     - maintainer / reviewer
@@ -145,9 +151,10 @@ ID: "iss-00038"
   - 条件:
     - targeted docs list がすでに完全一致で、内容変更が不要
   - 期待:
-    - docs close-out は no-op でよいが、parity evidence と current contract review 結果を記録しなければ close にしない
+    - docs close-out は no-op でよいが、parity evidence だけでは足りず、6 ファイル個別の current contract review 結果を記録しなければ close にしない
   - 観測点:
     - `diff -q` 相当の parity evidence
+    - 6 ファイル個別の current contract verification evidence
 - EC-002:
   - 条件:
     - `validate` / `sync` は成功するが、dashboard や index snapshot の open/ready 認識が epic report と整合しない

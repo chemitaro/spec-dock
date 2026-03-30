@@ -58,15 +58,17 @@ ID: "iss-00038"
   - closes:
     - なし（baseline / EC-003 support）
   - review gate:
-    - spec review が requirement/design/plan を pass し、`iss-00040` との非重複が確認できる
+    - `git --no-pager diff -- spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md` で baseline diff を観測できる
+    - spec review が requirement/design/plan を pass し、`iss-00040` との非重複確認先を含む S01 承認記録が `report.md` に残る
 - S02:
   - 観測可能な振る舞い:
-    - targeted docs list が current contract 観点で close-out 可能だと示せる
+    - targeted docs list が current contract 観点で close-out 可能だと、6 ファイル個別 evidence 付きで示せる
   - closes:
     - AC-001
     - EC-001
   - review gate:
-    - docs diff または no-op parity evidence が report に残る
+    - docs diff または no-op parity evidence に加え、6 ファイル個別の current contract verification evidence が report に残る
+    - targeted docs list 外の stale assumption を見つけた場合は blocker と escalation が report に残る
 - S03:
   - 観測可能な振る舞い:
     - `validate` / `sync` と generated state review が close-out evidence として成立する
@@ -117,7 +119,7 @@ ID: "iss-00038"
     - epic close-out readiness
 - step approval loop:
   - SG1/spec review pass 前には execution に進まない
-  - S02 着手前に S01 の baseline 固定を report に記録する
+  - S02 着手前に S01 の baseline 固定について、観測コマンド結果または観測 artifact、reviewer、verdict、非重複確認先を report に記録する
   - S03 着手前に S02 の docs/evidence review を記録する
   - S04 着手前に S03 の close-out review を記録する
   - S04 完了後に final SG1/QG1 verdict を report に記録する
@@ -136,6 +138,7 @@ ID: "iss-00038"
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
 - `iss-00040` 完了済み scope を再度実行しない。もし upstream evidence 欠落が見つかった場合は、re-execute ではなく blocker として記録する。
+- S02 で targeted docs list 外の stale old-contract assumption を見つけた場合は、その場で修正範囲を広げず step を停止し、path / assumption / scope外理由 / escalation 先を `report.md` に記録して reviewer 判断を待つ。
 
 ## 実装ステップ
 
@@ -188,8 +191,9 @@ ID: "iss-00038"
 #### step gate
 - review:
   - spec review pass
+  - S01 承認記録（観測コマンドまたは観測 artifact / reviewer / verdict / 非重複確認先）が `report.md` にある
 - expected tests:
-  - なし
+  - `git --no-pager diff -- spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -213,7 +217,7 @@ ID: "iss-00038"
 
 #### B1 — review targeted docs list
 - purpose:
-  - old local-only / sequential / index assumption の残存有無を確認する
+  - old local-only / sequential / index assumption の残存有無を 6 ファイル個別に確認する
 - files:
   - targeted docs list 6 ファイル
 
@@ -239,13 +243,45 @@ ID: "iss-00038"
 - invariants to keep green:
   - provider-side と dogfooding 側の整合
 
+##### I2 — current-contract verification
+- slice goal:
+  - parity の有無に関係なく、6 ファイルそれぞれで old assumption 不在を示す
+
+###### Red
+- failing test:
+  - 6 ファイル個別レビュー表が欠けている状態
+- expected failure:
+  - parity no-op でも current-contract verification evidence がなく、AC-001 を閉じられない
+
+###### Green
+- minimum implementation:
+  - `report.md` に 6 ファイル個別レビュー表（path / parity 結果 / local-only 不在 / sequential 不在 / index assumption 不在 / note）を残す
+- pass condition:
+  - parity だけではなく current-contract verification evidence まで揃う
+
+###### Refactor
+- cleanup target:
+  - 6 ファイル個別レビュー表の表記揺れ
+- invariants to keep green:
+  - parity no-op の場合でも 6 ファイル個別 evidence を省略しない
+
 #### step gate
 - review:
   - RG1 docs/evidence review
 - expected tests:
   - targeted docs diff / parity check
+  - 6 ファイル個別の current-contract verification review
 - report update:
   - `./spec-dock/active/issue/report.md`
+
+#### blocker rule
+- trigger:
+  - targeted docs list 外で stale old-contract assumption を見つけた場合
+- action:
+  - その場で修正対象を追加せず S02 を停止する
+  - `report.md` に path / assumption / scope外理由 / reviewer への escalation を記録する
+- exit:
+  - reviewer が follow-up issue または別 scope judgment を返すまで S02 を pass にしない
 
 ### S03 — validate sync close-out evidence
 - target:
@@ -360,7 +396,7 @@ ID: "iss-00038"
   - docs
 - 対応:
   - S02 で扱った targeted docs list を最終見直しし、provider-side と dogfooding 側の parity を再確認する
-  - no-op だった場合も、その旨を report に残す
+  - no-op だった場合も、その旨と 6 ファイル個別 current-contract verification 済みであることを report に残す
 
 ### S99 — final diff review quality gate
 - branch diff scope:
@@ -378,10 +414,11 @@ ID: "iss-00038"
 
 ## final exit contract
 - AC/EC 達成:
-  - targeted docs parity が確認済みである
+  - targeted docs parity が確認済みであり、6 ファイル個別の current-contract verification evidence がある
   - `validate` / `sync` の成功結果がある
   - final spec review record が verdict=`pass` で残っている
 - docs impact resolved:
   - targeted docs list の差分または no-op evidence が report にある
+  - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
 - final diff approved:
   - `iss-00040` 非重複を保ったまま reviewer pass を取得している

@@ -22,9 +22,11 @@ ID: "iss-00038"
     - provider-side と dogfooding 側の targeted docs list を同時に扱う。
     - `iss-00040` の final regression evidence を参照し、`iss-00038` 自身では再実行 ownership を持たないことを明記する。
     - final spec review record を reviewer が traceable に辿れる形式で残す。
+    - S01 の spec review pass は、観測コマンドまたは観測 artifact と reviewer verdict を `report.md` に残してから S02 へ進める execution contract とする。
   - MUST NOT:
     - runtime / test realignment を再度設計対象に戻さない。
-    - docs parity が no-op の場合でも、evidence 記録を省略しない。
+    - docs parity が no-op の場合でも、6 ファイル個別の current-contract verification evidence を省略しない。
+    - targeted docs list 外で見つかった stale old-contract assumption を、その場で S02 の修正対象へ拡張しない。
 - 非交渉制約:
   - final verdict は `pass`。
   - `validate` / `sync` は exit=0。
@@ -56,12 +58,15 @@ ID: "iss-00038"
   - epic report と generated state の両方で、残件は `iss-00038` のみと観測できる。
   - epic plan はすでに `iss-00038` の残責務を docs close-out と final spec review record のみに狭めている。
   - targeted docs list は current contract を反映済みで、少なくとも現時点の provider/dogfooding 間には内容差分がない。
+  - ただし docs parity no-op だけでは close-out 不十分であり、6 ファイル個別に old local-only / sequential / index assumption 不在を示す current-contract verification evidence が必要である。
   - `iss-00040` が担当した regression/parity 系 suite は current snapshot でも pass しており、`iss-00038` が再実行 ownership を持たない前提を裏づけている。
   - 一部 upstream issue report には過去の reviewer コメントが残っていても、close status の正本は generated state と epic report にある。
   - したがって、この issue の主要設計論点は「どの evidence を最終 close-out 記録として束ねるか」であり、runtime behavior をどう変えるかではない。
 - 採用するパターン:
   - docs verification first:
-    - targeted docs list を current contract 観点でレビューし、必要時のみ両側更新する。
+    - targeted docs list を current contract 観点で 6 ファイル個別にレビューし、parity 結果と old assumption 不在確認を evidence 化した上で、必要時のみ両側更新する。
+  - baseline approval first:
+    - S01 では issue docs diff と non-overlap 根拠を観測し、その承認記録が `report.md` に残るまで S02 へ進まない。
   - command evidence:
     - `validate` / `sync` を current state の close-out check として扱う。
   - final review record aggregation:
@@ -90,40 +95,59 @@ ID: "iss-00038"
   - Option B を採る。
   - 理由:
     - issue workflow 上、close-out evidence と reviewer verdict を report に残す流れと整合する。
-    - docs parity が no-op だった場合でも、追加 artifact を増やさずに execution evidence を集約できる。
+    - docs parity が no-op だった場合でも、report に 6 ファイル個別の current-contract verification evidence と step approval 記録を集約できる。
     - `iss-00040` を含む upstream report 参照関係を 1 か所にまとめやすい。
 
 ## インターフェース契約
 - API / function / protocol / data boundary:
+  - baseline approval boundary:
+    - input:
+      - `spec-dock/active/issue/requirement.md`
+      - `spec-dock/active/issue/design.md`
+      - `spec-dock/active/issue/plan.md`
+      - `iss-00040` report / epic report の non-overlap 根拠
+    - output:
+      - S01 承認記録（観測コマンドまたは観測 artifact、reviewer、verdict、参照根拠）
   - docs boundary:
     - input:
       - targeted docs list 6 ファイル
     - output:
       - docs diff または no-op parity evidence
+      - 6 ファイル個別の current-contract verification evidence
   - command boundary:
     - input:
       - current repo state
     - output:
       - `validate` / `sync` の exit=0 evidence
       - generated state review (`dashboard.md`, `.agent/index*.json`)
-- review boundary:
+  - review boundary:
     - input:
       - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の issue-level evidence
     - output:
       - final spec review record（verdict / referenced evidence / non-overlap check）
     - source of truth:
       - close status は `spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を優先する
+  - escalation boundary:
+    - trigger:
+      - S02 で targeted docs list 外に stale old-contract assumption を発見する
+    - behavior:
+      - その場で修正対象を拡張せず、S02 を blocker として停止する
+      - `report.md` に発見 path / assumption / scope外である理由 / reviewer への escalation を記録する
+    - owner:
+      - reviewer judgment または follow-up issue
 
 ### UML（推奨: module / dependency）
 ```plantuml
 @startuml
 skinparam monochrome true
 
+rectangle "S01 approval evidence" as s01
 rectangle "targeted docs list" as docs
 rectangle "validate / sync evidence" as commands
 rectangle "upstream issue reports" as upstream
 rectangle "iss-00038 report\n(final spec review record)" as record
 
+s01 --> record
 docs --> record
 commands --> record
 upstream --> record
@@ -157,13 +181,18 @@ upstream --> record
   - `.agent` generated state
 
 ## 要件 → 設計マッピング
-- AC-001 -> targeted docs list review と parity evidence で閉じる
+- AC-001 -> targeted docs list review + parity evidence + 6 ファイル個別 verification evidence で閉じる
+  - 補足:
+    - parity の有無に関わらず、6 ファイル個別の current-contract verification evidence を必須とする
 - AC-002 -> `validate` / `sync` 実行結果と generated state review で閉じる
 - AC-003 -> report を final spec review record の正本として evidence を集約する
 - EC-001 -> docs no-op の場合も parity evidence を必須化する
+  - 補足:
+    - parity evidence 単独では閉じず、6 ファイル個別レビューを report に残す
 - EC-002 -> generated state drift を close blocker として扱う
 - EC-003 -> upstream evidence 欠落時は close-out を停止し reviewer judgment に渡す
 - constraint -> `iss-00040` 非重複を設計上で明文化する
+- constraint -> targeted docs list 外の stale assumption 発見時は stop/escalate する
 
 ## テスト戦略
 - Unit:
@@ -172,7 +201,9 @@ upstream --> record
   - `./spec-dock/scripts/spec-dock validate`
   - `./spec-dock/scripts/spec-dock sync`
 - E2E / manual:
+  - S01 承認観測（issue docs diff と report 上の approval log）
   - targeted docs list の diff / parity review
+  - 6 ファイル個別の current-contract verification review
   - `spec-dock/dashboard.md` と `.agent/index*.json` の確認
   - final spec review record のレビュー
 - migration / rollback / feature flag if needed:
@@ -181,18 +212,22 @@ upstream --> record
 
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> targeted docs diff または no-op parity evidence
+  - + 6 ファイル個別の current-contract verification evidence
 - AC-002 -> `validate` / `sync` 実行結果 + generated state check
 - AC-003 -> report 上の final spec review record
 - EC-001 -> docs no-op でも parity evidence を report に残す
+  - + current-contract verification evidence を report に残す
 - EC-002 -> generated state mismatch がないことを確認する
 - EC-003 -> upstream evidence 欠落があれば review blocker として記録する
 - constraint -> non-overlap check を final review record に含める
+- constraint -> scope外 stale assumption は blocker + escalation record にする
 
 ## リスク / 移行 / ロールバック（必要時）
 - risk:
   - docs parity が no-op だと、issue の完了条件が曖昧に見えやすい。
   - `iss-00040` の evidence 参照を誤ると ownership 競合が再発する。
   - `validate` / `sync` は成功しても generated state review を省くと close-out の客観性が弱まる。
+  - targeted docs list 外の stale assumption を見つけた際に ad hoc 修正へ流れると、`iss-00040` との境界や issue scope が再び曖昧になる。
 - migration:
   - scope の再定義が主であり、user-visible runtime migration はない。
 - rollback:
