@@ -312,17 +312,64 @@ git --no-pager log --oneline -n 3
 - verdict:
   - pass（report corrective normalization only）
 - 次ステップ着手可否:
-  - corrective close-out 完了
+  - S06 着手可
 
 #### 変更したファイル
 - `spec-dock/active/issue/report.md` - front matter `状態` 正規化、S04 commit record 補正、S05 corrective log を追記
 
 #### コミット
-- 未コミット（本 corrective は report 更新のみ）
+- `b6bde02` `docs(issue): iss-00038のacceptance correctiveを記録`
 
 #### メモ
 - acceptance analysis にある commit-message formatting issue は out of scope のため、この corrective では hash 整合のみを記録した。
 - runtime code、targeted docs、requirement/design/plan、commit history 自体は変更していない。
+
+### 2026-03-30 15:15 - 15:24
+
+#### 対象
+- Step: S06 corrective acceptance alignment / spec re-review
+- AC/EC: AC-003, EC-004
+
+#### 実施内容
+- corrective plan に追加した S06 に従い、`requirement.md` / `design.md` / `plan.md` / `report.md` を対象に fresh な spec review を実施した。
+- 初回の rereview では、「S06 rereview gate 自体が `report.md` に未記録であり、corrective slice を pass 扱いできない」という finding を受けた。
+- その finding に従って本 S06 記録を追加し、corrective workflow を artifacts 上で完結させたうえで follow-up re-review を再実施した。
+- follow-up re-review では、S05 actual commit alignment と S06 corrective gate の存在、および requirement/design/plan/report 間の整合が取れていることを確認し、最終 verdict を `pass` で固定した。
+
+#### 実行コマンド / 結果
+```text
+fresh spec reviewer review for corrective issue docs
+
+- initial rereview result: fail
+- finding: `report.md` に S06 rereview gate の完了記録がなく、corrective plan と report が未整合
+- action: 本 S06 エントリを追加し、corrective acceptance alignment の記録を report に反映
+- follow-up rereview result: pass
+- confirmation: S05 commit alignment / S06 existence / cross-document consistency が解消
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+- reviewer:
+  - spec reviewer（initial corrective rereview）
+  - spec reviewer（follow-up corrective rereview）
+- verdict:
+  - initial: fail（S06 record missing）
+  - follow-up: pass
+- 次ステップ着手可否:
+  - corrective acceptance slice 完了
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S06 corrective acceptance alignment の初回 fail、記録追加、follow-up pass を記録
+
+#### コミット
+- なし（working tree 上の corrective report update）
+
+#### メモ
+- この S06 は requirement/design/plan の corrective contract 自体を変更せず、report artifact を plan に追従させるための記録追加である。
 
 ---
 
