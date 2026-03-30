@@ -704,6 +704,61 @@ rg -n -- '--no-github|current-repo Issue|Create command' src/spec_dock/assets/sp
 - `ba732ec` は original rules pair corrective の historical anchor であり、今回の broadened docs-authority wording update はこの report/doc refresh diff で補っている。
 - この S12 は `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の narrow rules/docs-authority corrective に限定し、runtime/test/implementation scope は reopen していない。
 
+### 追補 — S13 canonical guidance test expectation realignment
+
+#### 対象
+- Step: S13 canonical guidance test expectation realignment
+- AC/EC: AC-001, EC-009
+
+#### 実施内容
+- S12 corrective 後の fresh review で、canonical guidance tests がなお `docs/rules/initiative/epics.md` に旧 `--no-github` wording を期待していることを確認した。
+- docs contract はすでに current shipped guidance として正規化済みだったため、S13 では docs/runtime を戻さず、`tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` の test oracle だけを current wording に整列した。
+- 併せて `iss-00038` requirement/design/plan に S13 を narrow follow-up corrective として追加し、これは S12 docs corrective の rollback ではなく stale expectation realignment だけを許可する scope だと固定した。
+- targeted failing 4 tests はすべて pass し、その後の `python -m unittest discover -v` も 526 tests / all green を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs tests.test_init_update.TestInitUpdate.test_current_guidance_documents_match_discussion_numbering_contract tests.test_init_update.TestInitUpdate.test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set -v
+
+- targeted failing 4 tests はすべて pass。
+
+python -m unittest discover -v
+
+- 526 tests / OK。
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `tests/cli_runtime/test_wrappers.py`
+  - `tests/test_init_update.py`
+  - `spec-dock/active/issue/discussions/20260330t122947z-disc-s13-guidance-test-expectation-realignment-analysis.md`
+  - `python -m unittest tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs tests.test_init_update.TestInitUpdate.test_current_guidance_documents_match_discussion_numbering_contract tests.test_init_update.TestInitUpdate.test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set -v`
+  - `python -m unittest discover -v`
+- reviewer:
+  - code/QA self-review
+- verdict:
+  - pass
+- corrective scope note:
+  - docs contract rollback はしていない
+  - runtime code は未変更
+  - stale expectation realignment は canonical guidance tests に限定した
+
+#### 変更したファイル
+- `tests/cli_runtime/test_wrappers.py` - initiative 配下 epic create guidance の expected command を current wording に整列
+- `tests/test_init_update.py` - canonical rules expectations から旧 `--no-github` 成功経路前提を除去
+- `spec-dock/active/issue/requirement.md` - S13 narrow follow-up corrective と EC-009 を追記
+- `spec-dock/active/issue/design.md` - S13 test oracle realignment 境界を追記
+- `spec-dock/active/issue/plan.md` - S13 step と完了チェックを追記
+- `spec-dock/active/issue/discussions/20260330t122947z-disc-s13-guidance-test-expectation-realignment-analysis.md` - 分析と推奨案を記録
+- `spec-dock/active/issue/report.md` - S13 corrective log を追記
+
+#### コミット
+- implementation anchor: `3bd0c60` `test(issue): iss-00038のguidance期待値を現行契約へ整列`
+
+#### メモ
+- S13 は S12 で正規化した docs/rules contract を前提に、stale test oracle だけを閉じる follow-up corrective である。
+- full suite green により、S12/S13 を含む current branch snapshot 上で docs guidance と regression suite の整合が回復した。
+
 ---
 
 ## 遭遇した問題と解決 (任意)

@@ -91,7 +91,7 @@ ID: "iss-00038"
 - [x] S10 upstream evidence normalization
 - [x] S11 final committed rereview closure
 - [x] S12 narrow rules/docs-authority alignment
-- [ ] S13 canonical guidance test expectation realignment
+- [x] S13 canonical guidance test expectation realignment
 
 ## ステップ一覧
 - S01:
