@@ -19,7 +19,7 @@ ID: "iss-00038"
   - epic `E-RQ-005` / `E-AC-005 docs/spec-review slice` と 1:1 に対応する close-out path を固定する。
   - epic-level branch diff review で要求される status reconciliation、dependency graph alignment、commit-backed audit trail を追加 corrective scope として取り込む。
   - latest fresh review で露出した S09 fresh final rereview record 欠落、`epic-00033/report.md` の `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence ambiguity を narrow corrective scope として扱う。
-  - final close-out rereview で見つかった `docs/rules/initiative/epics.md` provider/dogfooding pair の stale `--no-github` command を、post-S11 の narrow rules-authority corrective として記録し、original six-file targeted docs slice の結論とは切り分ける。
+  - final close-out rereview で見つかった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs に残る stale `--no-github` guidance を、post-S11 の narrow rules/docs-authority corrective として記録し、original six-file targeted docs slice の結論とは切り分ける。
 - MUST / MUST NOT:
   - MUST:
     - provider-side と dogfooding 側の targeted docs list を同時に扱う。
@@ -29,7 +29,7 @@ ID: "iss-00038"
     - final close-out 後の `report.md` は、front matter 状態値とコミット記録が最終状態に正規化された監査可能な artifact とする。
     - epic close を宣言する場合は、issue report / epic report / generated state / deps graph の authority reconciliation を伴うことを execution contract に含める。
     - S09 execution evidence と fresh final rereview closure を別 artifact として扱い、S10 upstream evidence normalization と S11 fresh final rereview closure を close-out 必須経路として固定し、後者は normalized upstream evidence を参照した committed record にする。
-    - final close-out rereview で `docs/rules/initiative/epics.md` の stale command example が見つかった場合は、provider/dogfooding pair のみを `workflow_epic.md` / `reference_github.md` authority に揃える narrow corrective として扱い、S02 original six-file verdict を broader no-finding claim へ書き換えない。
+    - final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale create guidance が見つかった場合は、provider/dogfooding docs のみを `reference_github.md` authority に揃える narrow corrective として扱い、S02 original six-file verdict を broader no-finding claim へ書き換えない。
     - `epic-00033/report.md` と `iss-00040/report.md` を触る場合は report-artifact normalization のみとし、implementation/test rerun は scope 外に固定する。
     - `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note だけを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら rewrite しない。
   - MUST NOT:
@@ -80,7 +80,7 @@ ID: "iss-00038"
   - acceptance review の結果、close-out record 自体の整合性も verification 対象であると分かったため、report artifact の最終正規化を design scope に含める。
   - epic-level review の結果、status authority と deps graph も close-out artifact の一部であり、issue report だけ整っていても epic completion は主張できないことが分かった。
   - latest fresh review の結果、S09 execution evidence はあるが reviewer / verdict / commit-backed final rereview record が欠けており、epic report の `#33` state と `iss-00040/report.md` の provisional marker が rereview input を曖昧にしている。
-  - final close-out rereview の結果、original six-file targeted docs slice 外の `docs/rules/initiative/epics.md` pair にだけ stale `--no-github` example が残っており、rules-authority mismatch はこの 2 ファイルへ局所化できると分かった。
+  - final close-out rereview の結果、original six-file targeted docs slice 外の `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` に stale `--no-github` guidance が残っており、rules/docs-authority mismatch はこの narrow docs set へ局所化できると分かった。
 - 採用するパターン:
   - docs verification first:
     - targeted docs list を current contract 観点で 6 ファイル個別にレビューし、parity 結果と old assumption 不在確認を evidence 化した上で、必要時のみ両側更新する。
@@ -103,8 +103,8 @@ ID: "iss-00038"
     - `iss-00040/report.md` では authoritative citation layer / front matter / final summary note だけを整え、historical session-log chronology と time-scoped `コミット: なし` facts は保持する。
   - final committed rereview closure:
     - S09 execution evidence の後に、normalized upstream evidence を参照する fresh final rereview record を committed history に残し、normalized artifact set に対する epic-level rereview を再度 `pass` させて close judgement を確定する。
-  - post-S11 narrow rules-authority corrective:
-    - final close-out rereview で `docs/rules/initiative/epics.md` pair の stale `--no-github` example が見つかった場合は、その provider/dogfooding pair だけを修正し、S02 original six-file verdict は append-only で維持する。
+  - post-S11 narrow rules/docs-authority corrective:
+    - final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、その provider/dogfooding docs だけを修正し、S02 original six-file verdict は append-only で維持する。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
@@ -114,7 +114,11 @@ ID: "iss-00038"
   - `spec-dock/active/issue/requirement.md`
   - `spec-dock/active/issue/design.md`
   - `spec-dock/active/issue/plan.md`
+  - `src/spec_dock/assets/spec_dock/docs/github.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md`
+  - `spec-dock/docs/github.md`
+  - `spec-dock/docs/workflow-tree.md`
   - `spec-dock/docs/rules/initiative/epics.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t174500z-disc-s09-final-rereview-record-closure-analysis.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260330t174600z-disc-epic-report-33-open-closed-authority-mismatch-analysis.md`

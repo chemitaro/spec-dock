@@ -17,7 +17,7 @@ ID: "iss-00038"
 - 初回 spec review fail の 3 指摘を requirement/design/plan/report template 側で是正し、re-review pass 後に S02 着手可能な状態まで整えた。
 - S04 では upstream issue 群（`iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040`）と本 issue（`iss-00038`）の close-out evidence を final spec review record として束ね、close-status source of truth と ownership boundary を reviewer 向けに固定した。
 - S09 では epic / issue GitHub status の execution evidence を commit-backed に固定し、S10 では upstream report の authority marker だけを chronology-preserving に正規化した。S11 では normalized artifact set に対する fresh final spec rereview pass を記録し、AC-003/AC-004 の issue-doc contract close-out を確定した。
-- final close-out rereview では、original six-file targeted docs slice の外側にあった `docs/rules/initiative/epics.md` pair の stale `--no-github` command を narrow rules-authority corrective として整合させ、S02 の no-op conclusion を broader docs no-finding claim に拡張しないことを明記した。
+- final close-out rereview では、original six-file targeted docs slice の外側にあった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance を narrow rules/docs-authority corrective として整合させ、S02 の no-op conclusion を broader docs no-finding claim に拡張しないことを明記した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -604,11 +604,17 @@ fresh final spec rereview on normalized artifact set
 - scope: issue-doc contract closure and committed branch diff `main...HEAD` epic-level rereview gate on normalized artifact set
 - verdict: pass
 
-git log --oneline -n 5
-- `c2c6233` が最新の S11 closure record、`aba6db7` が直前の S10 normalization record として並ぶことを確認した。
+git show --stat --oneline --no-patch aba6db7 -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/report.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/report.md
+- `aba6db7` が S10 upstream evidence normalization commit であり、epic report と `iss-00040/report.md` の正規化に紐づくことを確認した。
 
-rg -n 'Mill|019d3dff|verdict|aba6db7|c2c6233' spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/report.md
-- S11 closure entry に reviewer `Mill`、agent `019d3dff-88a2-7b72-88a3-677670b94ad5`、`verdict: pass`、evidence commit `aba6db7` / closure commit `c2c6233` が揃っていることを確認した。
+git show --stat --oneline --no-patch c2c6233 -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/report.md
+- `c2c6233` が S11 closure record commit であり、`iss-00038/report.md` に対する committed closure であることを確認した。
+
+jq '{epic:{issue_number:.nodes["epic-00033"].github.issue_number,state:.nodes["epic-00033"].github.state,progress:.nodes["epic-00033"].progress}, issue:{issue_number:.nodes["iss-00038"].github.issue_number,state:.nodes["iss-00038"].github.state,status:.nodes["iss-00038"].status,effective_status:.nodes["iss-00038"].effective_status}}' spec-dock/.agent/index-all.json
+- `index-all.json` で epic `#33` が `state=CLOSED` / progress=`done=6,open=0`、`iss-00038` が `#38` / `state=CLOSED` / `status=done` / `effective_status=done` であることを確認した。
+
+sed -n '1,12p' spec-dock/dashboard.md
+- `dashboard.md` で `todo_total: 0` を確認した。
 ```
 
 #### 承認 / 観測エビデンス
@@ -646,30 +652,33 @@ rg -n 'Mill|019d3dff|verdict|aba6db7|c2c6233' spec-dock/initiatives/init-local-0
 - S11 は S09/S10 を引用する closure record であり、既存 execution evidence や upstream normalization entry 自体は rewrite していない。
 - fresh final rereview の `pass` は issue-doc contract close-out に限定して扱い、prior code/QA rereview に遡って pass verdict を付与しない。
 
-### 追補 — S12 narrow rules-authority alignment
+### 追補 — S12 narrow rules/docs-authority alignment
 
 #### 対象
-- Step: S12 narrow rules-authority alignment
+- Step: S12 narrow rules/docs-authority alignment
 - AC/EC: AC-001
 
 #### 実施内容
-- final close-out rereview で、original six-file targeted docs slice の外側にある `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` と `spec-dock/docs/rules/initiative/epics.md` に stale `--no-github` create command が残っていることを確認した。
-- 上記 2 ファイルのみを、`spec-dock/docs/workflow_epic.md` と `spec-dock/docs/reference_github.md` が示す GitHub-mandatory epic create contract に合わせ、`./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"` へ是正した。
-- この corrective は rules-authority mismatch の局所是正であり、S02 の original six-file targeted docs slice に対する no-op conclusion を broader docs no-finding claim へ広げ直すものではない。
+- final close-out rereview で、original six-file targeted docs slice の外側にある `src/spec_dock/assets/spec_dock/docs/github.md` / `src/spec_dock/assets/spec_dock/docs/workflow-tree.md` / `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` と dogfooding 側 mirror に stale `--no-github` create guidance が残っていることを確認した。
+- 上記 docs/rules set を、`reference_github.md` が示す GitHub-mandatory create contract に合わせて更新し、`--no-github` の actionable guidance を除去した。`rules/initiative/epics.md` は epic create command を `./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"` に揃え、`github.md` / `workflow-tree.md` は current-repo Issue linkage と reject wording へ更新した。
+- この corrective は rules/docs-authority mismatch の局所是正であり、S02 の original six-file targeted docs slice に対する no-op conclusion を broader docs no-finding claim へ広げ直すものではない。
 
 #### 実行コマンド / 結果
 ```bash
-rg -n -- '--no-github|Create command' src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/rules/initiative/epics.md spec-dock/docs/workflow_epic.md spec-dock/docs/reference_github.md
+rg -n -- '--no-github|current-repo Issue|Create command' src/spec_dock/assets/spec_dock/docs/github.md src/spec_dock/assets/spec_dock/docs/workflow-tree.md src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/github.md spec-dock/docs/workflow-tree.md spec-dock/docs/rules/initiative/epics.md
 
-- `docs/rules/initiative/epics.md` pair に stale `--no-github` example が残っていたことを観測した。
-- `workflow_epic.md` / `reference_github.md` 側の GitHub-mandatory epic create contract と揃う command example へ更新した。
+- stale `--no-github` guidance が docs/rules set に残っていたことを観測した。
+- provider/dogfooding 両側で current-repo Issue linkage / GitHub-mandatory create contract に揃う wording へ更新した。
 ```
 
 #### 承認 / 観測エビデンス
 - 観測コマンドまたは観測 artifact:
+  - `src/spec_dock/assets/spec_dock/docs/github.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md`
+  - `spec-dock/docs/github.md`
+  - `spec-dock/docs/workflow-tree.md`
   - `spec-dock/docs/rules/initiative/epics.md`
-  - `spec-dock/docs/workflow_epic.md`
   - `spec-dock/docs/reference_github.md`
 - reviewer:
   - doc maintenance self-review
@@ -677,18 +686,23 @@ rg -n -- '--no-github|Create command' src/spec_dock/assets/spec_dock/docs/rules/
   - pass
 - corrective scope note:
   - original six-file targeted docs slice の S02 conclusion は履歴として維持する
-  - 今回の finding/fix は final close-out rereview で見つかった narrow rules-authority mismatch のみ
+  - 今回の finding/fix は final close-out rereview で見つかった narrow rules/docs-authority mismatch のみ
 
 #### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/github.md` - stale `--no-github` create guidance を current create contract に整合
+- `src/spec_dock/assets/spec_dock/docs/workflow-tree.md` - stale `--no-github` tree-create guidance を current create contract に整合
 - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md` - stale `--no-github` epic create command を GitHub-mandatory contract に整合
+- `spec-dock/docs/github.md` - stale `--no-github` create guidance を current create contract に整合
+- `spec-dock/docs/workflow-tree.md` - stale `--no-github` tree-create guidance を current create contract に整合
 - `spec-dock/docs/rules/initiative/epics.md` - stale `--no-github` epic create command を GitHub-mandatory contract に整合
 - `spec-dock/active/issue/report.md` - S12 corrective scope と original six-file slice との切り分けを追記
 
 #### コミット
-- `ba732ec` `docs(rules): epic作成のgithub必須契約を整合`
+- historical anchor: `ba732ec` `docs(rules): epic作成のgithub必須契約を整合`
 
 #### メモ
-- この S12 は `docs/rules/initiative/epics.md` pair の rules-authority corrective に限定し、runtime/test/implementation scope は reopen していない。
+- `ba732ec` は original rules pair corrective の historical anchor であり、今回の broadened docs-authority wording update はこの report/doc refresh diff で補っている。
+- この S12 は `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の narrow rules/docs-authority corrective に限定し、runtime/test/implementation scope は reopen していない。
 
 ---
 

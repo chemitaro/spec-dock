@@ -74,9 +74,9 @@ ID: "iss-00038"
     - `iss-00040/report.md` / `epic-00033/report.md` の rereview input ambiguity が解消し、normalized artifact set に対する epic-level committed rereview を含む fresh final rereview record が committed artifact として残る
 - M8:
   - 対象:
-    - post-S11 narrow rules-authority alignment
+    - post-S11 narrow rules/docs-authority alignment
   - exit:
-    - `docs/rules/initiative/epics.md` provider/dogfooding pair の stale `--no-github` command が GitHub-mandatory epic create contract に揃い、S02 original six-file verdict と区別して report から追える
+    - `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs に残る stale `--no-github` guidance が GitHub-mandatory create contract に揃い、S02 original six-file verdict と区別して report から追える
 
 ## ステップ一覧
 - S01:
@@ -176,12 +176,12 @@ ID: "iss-00038"
     - normalized artifact set に対する committed branch diff `main...HEAD` の epic-level rereview gate `pass` が report から追える
 - S12:
   - 観測可能な振る舞い:
-    - final close-out rereview で見つかった `docs/rules/initiative/epics.md` pair の stale `--no-github` command が、GitHub-mandatory epic create contract に整合した command example へ是正される
+    - final close-out rereview で見つかった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が、GitHub-mandatory create contract に整合した wording へ是正される
   - closes:
     - AC-001
   - review gate:
     - provider-side / dogfooding 両側の `docs/rules/initiative/epics.md` が `workflow_epic.md` と矛盾しない
-    - `report.md` に、これは original six-file targeted docs slice の broader scope reopening ではなく narrow rules-authority corrective だと追記される
+    - `report.md` に、これは original six-file targeted docs slice の broader scope reopening ではなく narrow rules/docs-authority corrective だと追記される
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02, S12
@@ -228,8 +228,8 @@ ID: "iss-00038"
   - S04 完了後に final SG1/QG1 verdict を report に記録する
   - acceptance review で corrective findings が出た場合は、S05 で report artifact を正規化し、S06 で spec review pass を再取得してから受け入れ判定へ進む
   - epic-level branch diff review で authority / deps / audit trail finding が出た場合は、S07-S09 を追加 corrective path として実行し、S10 で upstream evidence normalization、S11 で fresh final rereview closure を完了してから epic completion を主張する
-  - S11 後の final close-out rereview で `docs/rules/initiative/epics.md` pair の stale `--no-github` example が見つかった場合は、S02 original six-file verdict を broader claim に書き換えず、S12 で narrow rules-authority corrective として append-only に閉じる
-  - close-out は S10 で upstream evidence normalization、S11 で normalized artifact set に対する fresh final rereview closure、必要時のみ S12 で narrow rules-authority corrective を完了して初めて exit できる
+  - S11 後の final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、S02 original six-file verdict を broader claim に書き換えず、S12 で narrow rules/docs-authority corrective として append-only に閉じる
+  - close-out は S10 で upstream evidence normalization、S11 で normalized artifact set に対する fresh final rereview closure、必要時のみ S12 で narrow rules/docs-authority corrective を完了して初めて exit できる
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -241,7 +241,7 @@ ID: "iss-00038"
 - failing test は iteration ごとに 1 本ずつ進める。
 - `Green` は最小実装、`Refactor` は green 維持を前提とする。
 - shared minimum gate と scope-specific readiness contract / final exit contract を満たす。
-- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S99 / final exit へ進まない。S12 は final close-out rereview で `docs/rules/initiative/epics.md` pair の rules-authority mismatch が見つかった場合のみ追加で実行する。
+- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S99 / final exit へ進まない。S12 は final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の rules/docs-authority mismatch が見つかった場合のみ追加で実行する。
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
@@ -256,7 +256,7 @@ ID: "iss-00038"
 - S10 では `epic-00033/report.md` の `#33` authority ambiguity を解消してから S11 へ進む。
 - S10 で `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note のみを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら保持する。
 - S10 完了後は、S11 で normalized artifact set に対する epic-level committed rereview を再度 `pass` させなければ close-out を完了できない。
-- S11 後に `docs/rules/initiative/epics.md` pair の stale `--no-github` example が見つかった場合は、S02 の six-file no-op conclusion を rewrite せず、S12 で provider/dogfooding 両側の command example だけを GitHub-mandatory contract へ揃える。
+- S11 後に `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、S02 の six-file no-op conclusion を rewrite せず、S12 で provider/dogfooding 両側の current create wording だけを GitHub-mandatory contract へ揃える。
 
 ## 実装ステップ
 
@@ -906,46 +906,53 @@ ID: "iss-00038"
 - report update:
   - `./spec-dock/active/issue/report.md`
 
-### S12 — narrow rules-authority alignment
+### S12 — narrow rules/docs-authority alignment
 - target:
+  - `src/spec_dock/assets/spec_dock/docs/github.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md`
+  - `spec-dock/docs/github.md`
+  - `spec-dock/docs/workflow-tree.md`
   - `spec-dock/docs/rules/initiative/epics.md`
   - `spec-dock/active/issue/report.md`
 - design refs:
   - `spec-dock/active/issue/design.md`
-  - `spec-dock/docs/workflow_epic.md`
   - `spec-dock/docs/reference_github.md`
 - step boundary:
-  - final close-out rereview で見つかった `docs/rules/initiative/epics.md` pair の stale `--no-github` command を、GitHub-mandatory epic create contract に整合させる。S02 original six-file verdict は履歴として保持し、broader docs reopening には広げない
+  - final close-out rereview で見つかった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance を、GitHub-mandatory create contract に整合させる。S02 original six-file verdict は履歴として保持し、broader docs reopening には広げない
 
-#### B1 — align rule entrypoint wording
+#### B1 — align docs/rules entrypoint wording
 - purpose:
-  - rules-authority mismatch を provider/dogfooding pair だけで閉じる
+  - rules/docs-authority mismatch を provider/dogfooding docs だけで閉じる
 - files:
+  - `src/spec_dock/assets/spec_dock/docs/github.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md`
+  - `spec-dock/docs/github.md`
+  - `spec-dock/docs/workflow-tree.md`
   - `spec-dock/docs/rules/initiative/epics.md`
   - `spec-dock/active/issue/report.md`
 
 ##### I1 — replace stale create command
 - slice goal:
-  - `workflow_epic.md` / `reference_github.md` と矛盾する `--no-github` example を除去する
+  - `reference_github.md` と矛盾する `--no-github` guidance を除去する
 
 ###### Red
 - failing test:
-  - `rg -n -- '--no-github' src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/rules/initiative/epics.md`
+  - `rg -n -- '--no-github' src/spec_dock/assets/spec_dock/docs/github.md src/spec_dock/assets/spec_dock/docs/workflow-tree.md src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/github.md spec-dock/docs/workflow-tree.md spec-dock/docs/rules/initiative/epics.md`
 - expected failure:
-  - 両 rules file に stale `--no-github` example が残っている
+  - provider/dogfooding docs に stale `--no-github` guidance が残っている
 
 ###### Green
 - minimum implementation:
-  - provider/dogfooding 両側の rules file を `./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"` に揃える
-  - `report.md` に、これは original six-file targeted docs slice の broader scope reopening ではなく narrow rules-authority corrective だと記録する
+  - provider/dogfooding 両側の `github.md` / `workflow-tree.md` / `rules/initiative/epics.md` を current create contract に揃える
+  - `report.md` に、これは original six-file targeted docs slice の broader scope reopening ではなく narrow rules/docs-authority corrective だと記録する
 - pass condition:
-  - rules file pair が GitHub-mandatory epic create contract と整合し、S02 original six-file conclusion と later corrective が区別して追える
+  - docs/rules set が GitHub-mandatory create contract と整合し、S02 original six-file conclusion と later corrective が区別して追える
 
 ###### Refactor
 - cleanup target:
-  - rules-authority と issue close-out wording の整列
+  - rules/docs-authority と issue close-out wording の整列
 - invariants to keep green:
   - targeted docs list 6 ファイルの original verdict は rewrite しない
   - code/test/runtime scope へ広げない
@@ -955,8 +962,8 @@ ID: "iss-00038"
   - RG1 docs/evidence review
   - final QG1 close-out review
 - expected tests:
-  - `rg -n 'Create command' src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/rules/initiative/epics.md`
-  - `rg -n 'original six-file|rules-authority corrective|S12' spec-dock/active/issue/report.md`
+  - `rg -n -- '--no-github|current-repo Issue|Create command' src/spec_dock/assets/spec_dock/docs/github.md src/spec_dock/assets/spec_dock/docs/workflow-tree.md src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md spec-dock/docs/github.md spec-dock/docs/workflow-tree.md spec-dock/docs/rules/initiative/epics.md`
+  - `rg -n 'original six-file|rules/docs-authority corrective|S12' spec-dock/active/issue/report.md`
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -985,7 +992,7 @@ ID: "iss-00038"
 
 ## 未確定事項
 - なし:
-  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + 必要時のみ S12 rules-authority corrective + S90 + S99 で固定する
+  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + 必要時のみ S12 rules/docs-authority corrective + S90 + S99 で固定する
 
 ## final exit contract
 - AC/EC 達成:
@@ -997,7 +1004,7 @@ ID: "iss-00038"
   - epic report / issue report / generated state / GitHub status の authority reconciliation が branch diff 上で説明できる
   - corrective report/update が committed audit trail から追える
   - S10 で正規化した `epic-00033/report.md` / `iss-00040/report.md` を含む normalized artifact set に対する epic-level committed rereview が `pass` であり、S11 の committed closure record から追える
-  - final close-out rereview で rules-authority mismatch が見つかった場合は、`docs/rules/initiative/epics.md` pair の narrow corrective が report から追える
+  - final close-out rereview で rules/docs-authority mismatch が見つかった場合は、`docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の narrow corrective が report から追える
 - docs impact resolved:
   - targeted docs list の差分または no-op evidence が report にある
   - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
