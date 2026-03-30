@@ -14,6 +14,7 @@ ID: "epic-00033"
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00038` / `iss-00040` は完了済み。
+  - primary close evidence は `iss-00038/report.md` の S11 fresh final rereview closure record であり、`c2c6233` が closure record、`aba6db7` がその直前の upstream evidence normalization を記録している。
   - `./spec-dock/scripts/spec-dock sync --github` 実行後の `spec-dock/.agent/index-all.json` では、GitHub issue `#38` が `CLOSED`、`iss-00038` は `status=done` / `effective_status=done` として反映されている。
   - 同じ generated state で epic GitHub issue `#33` も `state=CLOSED` として反映されている。
   - 同じ generated state で epic progress は `total=6` / `done=6` / `open=0` / `unknown=0` である。
@@ -40,7 +41,7 @@ ID: "epic-00033"
 - `E-AC-002`: Pass（証拠: `iss-00036` で timestamp-based discussion / ADR naming contract を固定）
 - `E-AC-003`: Pass（証拠: `iss-00035` で ADR symlink mirror の clear-then-rebuild と stale link 除去を固定）
 - `E-AC-004`: Pass（証拠: `iss-00034` / `iss-00036` の先行ガードに加え、`iss-00037` で migration boundary clause-1/2/3 の closure evidence を確定）
-- `E-AC-005`: Pass（証拠: `iss-00040` の stale-contract / test-realignment slice と `iss-00038` の docs parity / final spec review close-out が完了し、`sync --github` 後の generated state が `done=6/open=0` と `todo_total: 0` を示している）
+- `E-AC-005`: Pass（主要証拠: `iss-00038/report.md` の S11 fresh final rereview closure と、その入力を正規化した `aba6db7` / closure record を追加した `c2c6233`。補強証拠: `iss-00040` の stale-contract / test-realignment slice 完了と、`sync --github` 後 generated state の `done=6/open=0` / `todo_total: 0`）
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:

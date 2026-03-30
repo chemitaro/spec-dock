@@ -125,11 +125,12 @@ ID: "iss-00038"
     - spec reviewer が corrective plan と issue docs の整合を `pass` と判定する
 - S07:
   - 観測可能な振る舞い:
-    - `iss-00040` prerequisite が narrative spec と `deps.json` / authoritative generated deps evidence の両方で一致する
+    - `iss-00040` prerequisite が narrative spec と `deps.json` / `spec-dock/.agent/index-all.json` の top-level `deps.issue_edges` の両方で一致する
   - closes:
     - EC-006
   - review gate:
-    - `iss-00038/deps.json` と `spec-dock/.agent/index-all.json` が `iss-00040` prerequisite を反映する
+    - `iss-00038/deps.json` と `spec-dock/.agent/index-all.json` の top-level `deps.issue_edges` が `iss-00040` prerequisite を反映する
+    - per-node `nodes.iss-00038.deps` は readiness projection として扱い、closed issue prerequisite edge の不保持だけで mismatch 判定しない
     - `spec-dock/dashboard.md` が `todo_total: 0` の場合、active-only projection の空状態は許容される
 - S08:
   - 観測可能な振る舞い:
@@ -626,7 +627,7 @@ ID: "iss-00038"
   - `spec-dock/active/epic/plan.md`
   - `spec-dock/active/issue/discussions/20260330t090200z-disc-deps-graph-and-readiness-alignment-analysis.md`
 - step boundary:
-  - `iss-00040` prerequisite を machine-readable deps と authoritative generated deps/status view に反映する
+  - `iss-00040` prerequisite を machine-readable deps と authoritative generated deps/status view に反映する。generated edge authority は `spec-dock/.agent/index-all.json` の top-level `deps.issue_edges` とする
 
 #### update_plan（着手時に登録）
 - [x] `update_plan` に step の作業単位を登録した
@@ -641,17 +642,17 @@ ID: "iss-00038"
 
 ##### I1 — add missing edge
 - slice goal:
-  - `iss-00038 -> iss-00040` prerequisite を `deps.json` と `index-all.json` の authoritative view で追えるようにする
+  - `iss-00038 -> iss-00040` prerequisite を `deps.json` と `index-all.json` の top-level `deps.issue_edges` authoritative view で追えるようにする
 
 ###### Red
 - failing test:
-  - `iss-00038/deps.json` と `spec-dock/.agent/index-all.json` の prerequisite evidence が食い違う
+  - `iss-00038/deps.json` と `spec-dock/.agent/index-all.json` の top-level `deps.issue_edges` prerequisite evidence が食い違う
 - expected failure:
   - readiness semantics が narrative spec と矛盾する
 
 ###### Green
 - minimum implementation:
-  - `deps.json` を authoritative generated state と整合させ、必要な generated artifacts を再生成する
+  - `deps.json` を authoritative generated state と整合させ、必要な generated artifacts を再生成する。per-node `nodes.<id>.deps` は readiness projection として補助確認に留める
 - pass condition:
   - EC-006 の mismatch が解消し、`todo_total: 0` 時の active-only projection 空状態を例外扱いできる
 
@@ -666,7 +667,7 @@ ID: "iss-00038"
   - RG1 docs/evidence review
 - expected tests:
   - `cat spec-dock/.../iss-00038/deps.json`
-  - `rg -n 'iss-00038|iss-00040' spec-dock/.agent/index-all.json`
+  - `rg -n 'issue_edges|iss-00038|iss-00040' spec-dock/.agent/index-all.json`
   - `rg -n 'todo_total' spec-dock/dashboard.md`
 - report update:
   - `./spec-dock/active/issue/report.md`
