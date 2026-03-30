@@ -380,8 +380,8 @@ fresh spec reviewer review for corrective issue docs
 #### 実施内容
 - `iss-00038` の `deps.json` で `depends_on` に `iss-00040` が含まれていることを確認し、narrative prerequisite と machine-readable deps の前提を一致させた。
 - `./spec-dock/scripts/spec-dock sync --github` を実行し、generated artifacts の再生成が成功した。
-- `spec-dock/.agent/index-all.json` では `iss-00038` が `status=done` / `effective_status=done`、GitHub issue `#38` が `state=CLOSED`、epic progress が `total=6 / done=6 / open=0 / unknown=0` であることを確認した。
-- `spec-dock/dashboard.md` では `todo_total: 0`、`doing: 0`、`ready: 0`、`blocked: 0`、`unknown: 0` となり、残 open issue summary が解消されたことを確認した。
+- `spec-dock/.agent/index-all.json` を authoritative generated deps/status evidence として観測し、`iss-00038` が `status=done` / `effective_status=done`、GitHub issue `#38` が `state=CLOSED`、epic progress が `total=6 / done=6 / open=0 / unknown=0` であることを確認した。
+- `spec-dock/dashboard.md` では `todo_total: 0`、`doing: 0`、`ready: 0`、`blocked: 0`、`unknown: 0` となり、残 open issue summary が解消されたことを確認した。active-only projection である `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` はこの局面で空でも許容される。
 
 #### 実行コマンド / 結果
 ```bash
@@ -404,6 +404,7 @@ rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json sp
   - `./spec-dock/scripts/spec-dock sync --github`
   - `spec-dock/.agent/index-all.json`
   - `spec-dock/dashboard.md`
+  - `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json`（`todo_total: 0` では空でも許容）
 - reviewer:
   - DevCoder self-review
 - verdict:
@@ -412,9 +413,6 @@ rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json sp
   - S07 完了、S08/S09 は未着手のまま
 
 #### 変更したファイル
-- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json` - `iss-00040` prerequisite が current state に含まれていることを確認
-- `spec-dock/.agent/index-all.json` - `iss-00038=done`、GitHub `#38=CLOSED`、epic progress `done=6/open=0` を確認
-- `spec-dock/dashboard.md` - `todo_total: 0` と残 open issue なしを確認
 - `spec-dock/active/issue/report.md` - S07 execution log を追記
 
 #### コミット
@@ -422,7 +420,8 @@ rg -n 'iss-00038|todo_total|CLOSED|done|open' spec-dock/.agent/index-all.json sp
 
 #### メモ
 - 本記録では S08/S09 の completion claim は追加していない。
-- `spec-dock/.agent/deps-issues.json` は active-only index 由来のため空配列だが、S07 の authority は `deps.json` と `spec-dock/.agent/index-all.json` の一致、および `sync --github` 後の generated state に置く。
+- `spec-dock/.agent/index-all.json` が S07 の authoritative generated deps/status evidence であり、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` は active-only projection として `todo_total: 0` では空でもよい。
+- `spec-dock/.agent/index-all.json` / `spec-dock/dashboard.md` はこの step で再生成・観測した generated artifacts であり、committed file change としては扱わない。
 
 ### 2026-03-30 16:50 - 16:50
 
@@ -475,6 +474,54 @@ git --no-pager show -s --format='%ad%n%B' --date=format-local:'%Y-%m-%d %H:%M' 8
 #### メモ
 - S06 の本文や chronology は rewrite していない。監査時の authoritative reference のみを S08 で正規化した。
 - 真の no-op ではないため、最終 authoritative record では `なし` を使わない。
+
+### 2026-03-30 08:14 - 08:14
+
+#### 対象
+- Step: S09 epic status reconciliation and branch-diff rereview
+- AC/EC: AC-004, EC-005
+
+#### 実施内容
+- GitHub issue `#33` が `CLOSED` になったことを execution evidence として記録した。
+- GitHub issue `#38` が `CLOSED` であることを再確認した。
+- GitHub issue `#33` を閉じた後に `./spec-dock/scripts/spec-dock sync --github` が成功したことを記録した。
+- generated state と epic report が、child issue completion と epic GitHub issue `#33=CLOSED` に収束したことを execution evidence として記録した。
+- fresh final re-review が remaining gate であり、この entry 自体では final reviewer pass を主張しない。
+
+#### 実行コマンド / 結果
+```text
+status reconciliation execution evidence
+
+- GitHub issue `#33`: CLOSED
+- GitHub issue `#38`: CLOSED
+- `./spec-dock/scripts/spec-dock sync --github`: succeeded after closing `#33`
+- generated state and epic report: converged on all child issues done and epic GitHub issue `#33=CLOSED`
+- remaining gate: fresh final re-review
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - GitHub issue `#33` status evidence
+  - GitHub issue `#38` status evidence
+  - `./spec-dock/scripts/spec-dock sync --github`
+  - generated state
+  - `spec-dock/active/epic/report.md`
+- reviewer:
+  - 未実施（fresh final re-review 待ち）
+- verdict:
+  - pending（execution evidence recorded only）
+- 次ステップ着手可否:
+  - fresh final re-review のみ未了
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S09 execution evidence と remaining gate を追記
+
+#### コミット
+- なし（fresh final re-review 前の execution evidence 記録）
+
+#### メモ
+- S09 は execution evidence の記録までであり、epic-level spec review pass はまだ取得していない。
+- final reviewer pass は fresh final re-review 完了まで保留する。
 
 ---
 

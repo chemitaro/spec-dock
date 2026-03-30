@@ -117,11 +117,12 @@ ID: "iss-00038"
     - spec reviewer が corrective plan と issue docs の整合を `pass` と判定する
 - S07:
   - 観測可能な振る舞い:
-    - `iss-00040` prerequisite が narrative spec と `deps.json` / generated deps graph の両方で一致する
+    - `iss-00040` prerequisite が narrative spec と `deps.json` / authoritative generated deps evidence の両方で一致する
   - closes:
     - EC-006
   - review gate:
-    - `iss-00038/deps.json` と generated deps artifact が `iss-00040` edge を反映する
+    - `iss-00038/deps.json` と `spec-dock/.agent/index-all.json` が `iss-00040` prerequisite を反映する
+    - `spec-dock/dashboard.md` が `todo_total: 0` の場合、active-only projection の空状態は許容される
 - S08:
   - 観測可能な振る舞い:
     - branch diff review に使う corrective report/update が actual commit から追跡できる
@@ -580,14 +581,14 @@ ID: "iss-00038"
 ### S07 — dependency graph alignment
 - target:
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/deps.json`
-  - `spec-dock/.agent/deps-issues.json`
   - `spec-dock/.agent/index-all.json`
+  - `spec-dock/.agent/deps-issues.json`（`todo_total: 0` なら空でもよい）
 - design refs:
   - `spec-dock/active/issue/design.md`
   - `spec-dock/active/epic/plan.md`
   - `spec-dock/active/issue/discussions/20260330t090200z-disc-deps-graph-and-readiness-alignment-analysis.md`
 - step boundary:
-  - `iss-00040` prerequisite を machine-readable deps と generated readiness に反映する
+  - `iss-00040` prerequisite を machine-readable deps と authoritative generated deps/status view に反映する
 
 #### update_plan（着手時に登録）
 - [x] `update_plan` に step の作業単位を登録した
@@ -602,19 +603,19 @@ ID: "iss-00038"
 
 ##### I1 — add missing edge
 - slice goal:
-  - `iss-00038 -> iss-00040` edge を authoritative graph に入れる
+  - `iss-00038 -> iss-00040` prerequisite を `deps.json` と `index-all.json` の authoritative view で追えるようにする
 
 ###### Red
 - failing test:
-  - `iss-00038/deps.json` と `spec-dock/.agent/deps-issues.json` に `iss-00040` edge が無い
+  - `iss-00038/deps.json` と `spec-dock/.agent/index-all.json` の prerequisite evidence が食い違う
 - expected failure:
   - readiness semantics が narrative spec と矛盾する
 
 ###### Green
 - minimum implementation:
-  - `deps.json` を更新し、必要な generated artifacts を再生成する
+  - `deps.json` を authoritative generated state と整合させ、必要な generated artifacts を再生成する
 - pass condition:
-  - EC-006 の mismatch が解消する
+  - EC-006 の mismatch が解消し、`todo_total: 0` 時の active-only projection 空状態を例外扱いできる
 
 ###### Refactor
 - cleanup target:
@@ -627,7 +628,8 @@ ID: "iss-00038"
   - RG1 docs/evidence review
 - expected tests:
   - `cat spec-dock/.../iss-00038/deps.json`
-  - `rg -n 'iss-00038|iss-00040' spec-dock/.agent/deps-issues.json spec-dock/.agent/index-all.json`
+  - `rg -n 'iss-00038|iss-00040' spec-dock/.agent/index-all.json`
+  - `rg -n 'todo_total' spec-dock/dashboard.md`
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -697,8 +699,8 @@ ID: "iss-00038"
   - epic close を主張できる authority reconciliation を完成させ、committed branch diff を再 review する
 
 #### update_plan（着手時に登録）
-- [ ] `update_plan` に step の作業単位を登録した
-- [ ] status authority の優先順位と blocker 条件を確認した
+- [x] `update_plan` に step の作業単位を登録した
+- [x] status authority の優先順位と blocker 条件を確認した
 
 #### B1 — reconcile status authorities
 - purpose:
@@ -722,7 +724,7 @@ ID: "iss-00038"
 - minimum implementation:
   - GitHub issue state を先頭 authority とし、`sync --github` / generated state / epic report / issue report を順に一致させる
 - pass condition:
-  - AC-004 / EC-005 を満たす authority reconciliation が揃う
+  - AC-004 / EC-005 を満たす authority reconciliation evidence が揃い、fresh final re-review に引き渡せる
 
 ###### Refactor
 - cleanup target:
@@ -752,6 +754,7 @@ ID: "iss-00038"
 - required validation:
   - AC-001/002/003 の evidence が diff と report から追える
   - AC-004 の authority reconciliation が diff と generated artifacts から追える
+  - `todo_total: 0` 時の active-only projection 空状態が `index-all.json` authority を覆していない
   - `iss-00040` 非重複が最終 diff 上でも保たれている
   - acceptance review で指摘された report artifact 整合不備が解消している
   - epic-level review で指摘された deps / audit trail / status authority 不整合が解消している

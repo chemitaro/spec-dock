@@ -19,7 +19,7 @@ ID: "iss-00038"
 
 ## 背景・現状
 - 現状の挙動:
-  - `spec-dock/dashboard.md` と `spec-dock/.agent/index*.json` では、todo は `iss-00038` のみで `deps.ready=true` になっている。
+  - generated status / deps の正本は `spec-dock/.agent/index-all.json` であり、active-only projection である `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` は `spec-dock/dashboard.md` の `todo_total: 0` 到達後に空でもよい。
   - `epic-00033/report.md` では `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` が完了済み、残件は `iss-00038` の docs close-out と final spec review record のみと整理されている。
   - targeted docs list である `reference_github.md` / `reference_naming.md` / `reference_sync.md` は provider-side と dogfooding 側で現時点ですでに一致している。
   - `iss-00040` が owner だった regression/parity 系 evidence は現スナップショットでも pass しており、full suite / parity / `validate` / `sync` は current contract に整合している。
@@ -77,6 +77,7 @@ ID: "iss-00038"
   - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence を参照する final spec review record を作成し、verdict を `pass` に到達させる。
   - `report.md` の front matter と S04 close-out 記録は、最終的な git history / reviewer verdict と矛盾しない確定状態に正規化する。
   - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
+  - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、`todo_total: 0` 時の active-only projection 空状態を drift と誤判定しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
   - branch-diff review に使う corrective report/update は committed history から再現できることを保証し、working-tree-only evidence を最終 artifact に残さない。
 - MUST NOT:
@@ -103,6 +104,7 @@ ID: "iss-00038"
   - close evidence は docs review結果、`validate` / `sync` の実行結果、final spec review record の 3 本柱で残す。
   - S01 の step approval は `report.md` 上で reviewer / verdict / 観測コマンドまたは観測 artifact / 非重複確認先を追跡できる形で残す。
   - upstream issue report の記述と generated state / epic report が衝突する場合は、`spec-dock/.agent/index-all.json` と `spec-dock/active/epic/report.md` を close status の優先正本とする。
+  - `spec-dock/dashboard.md` が `todo_total: 0` を返した後は、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` の空状態は active-only projection の仕様内であり、S07/S09 の否定 evidence には使わない。
 - Ask:
   - targeted docs list 以外に old contract assumption が見つかった場合は、その場で scope を広げず、`report.md` に blocker として記録して reviewer 判断へ escalate する。
 - Never:
@@ -148,7 +150,8 @@ ID: "iss-00038"
     - 両コマンドが exit=0 で成功し、current repo state と generated state が close-out 可能であることを示せる
   - 観測点:
     - command outputs
-    - `spec-dock/dashboard.md` / `.agent/index*.json` の整合
+    - `spec-dock/.agent/index-all.json` を正本とした generated state review
+    - `spec-dock/dashboard.md` と active-only projection（存在する場合）の整合
 - AC-003:
   - Actor:
     - spec reviewer
@@ -177,7 +180,8 @@ ID: "iss-00038"
     - GitHub issue state または `sync --github` 実行ログ
     - `epic-00033/report.md`
     - `iss-00038/deps.json`
-    - `spec-dock/.agent/index*.json`
+    - `spec-dock/.agent/index-all.json`
+    - active-only projection（`spec-dock/.agent/index.json` など）は補助観測点として扱う
     - `spec-dock/dashboard.md`
     - `iss-00038/report.md`
 
@@ -194,7 +198,8 @@ ID: "iss-00038"
   - 条件:
     - `validate` / `sync` は成功するが、dashboard や index snapshot の open/ready 認識が epic report と整合しない
   - 期待:
-    - close-out を停止し、generated state drift として原因を切り分ける
+    - `spec-dock/.agent/index-all.json` を正本として close-out を停止するかを判定し、generated state drift を切り分ける
+    - `spec-dock/dashboard.md` が `todo_total: 0` のとき、active-only projection の空状態だけでは drift 扱いにしない
   - 観測点:
     - command outputs
     - generated state review
@@ -230,7 +235,8 @@ ID: "iss-00038"
     - dependency graph を spec に合わせて正規化するか、spec 側の prerequisite 表現を修正するまで epic review を pass にしない
   - 観測点:
     - `iss-00038/deps.json`
-    - `spec-dock/.agent/deps-issues.json`
+    - `spec-dock/.agent/index-all.json`
+    - `spec-dock/.agent/deps-issues.json`（`todo_total: 0` で空の場合は参考値）
     - `epic-00033/plan.md`
 
 ## 入力→出力例（必要時）
