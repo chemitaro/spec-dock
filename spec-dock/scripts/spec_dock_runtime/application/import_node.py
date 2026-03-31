@@ -175,21 +175,26 @@ def _target_repo_slug(req: ImportNodeRequest) -> str | None:
     return f"{owner}/{repo}"
 
 
-def _require_numeric_issue_import_repo_scope(
+def _resolve_import_issue_view_repo_slug(
     req: ImportNodeRequest,
     *,
-    kind: Literal["initiative", "epic", "issue"],
+    current_repo_slug: str | None,
+) -> str | None:
+    return _target_repo_slug(req) or current_repo_slug
+
+
+def _require_numeric_import_repo_scope(
+    req: ImportNodeRequest,
+    *,
     current_repo_slug: str | None,
 ) -> None:
-    if kind != "issue":
-        return
     if _target_repo_slug(req) is not None:
         return
     if current_repo_slug is not None:
         return
     raise RuntimeError(
         "Current GitHub repo scope could not be resolved from origin. "
-        "spec-dock import requires a current GitHub repo scope for numeric issue targets."
+        "spec-dock import requires a current GitHub repo scope for numeric initiative/epic/issue targets."
     )
 
 
@@ -331,6 +336,10 @@ def import_node_core(
 
     issue_number = int(req.issue_number)
     _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+    _require_numeric_import_repo_scope(
+        req,
+        current_repo_slug=current_repo_slug,
+    )
     specdock_dir = _resolve_specdock_dir(ports)
     today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
     guard_github_issue_uniqueness(
@@ -357,17 +366,12 @@ def import_node_core(
     precheck_collisions = [path for path in precheck_plan.planned_paths if path.exists()]
     if precheck_collisions:
         raise RuntimeError(f"Destination already exists: {precheck_collisions[0]}")
-    _require_numeric_issue_import_repo_scope(
-        req,
-        kind=kind,
-        current_repo_slug=current_repo_slug,
-    )
 
     issue_gateway = _resolve_issue_gateway(ports)
     imported_issue = issue_gateway.issue_view_minimal(
         _resolve_repo_root(ports),
         issue_number,
-        repo_slug=_target_repo_slug(req),
+        repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
     )
     lock_path, lock_token = _acquire_create_lock(specdock_dir)
     result_node: SpecNode | None = None

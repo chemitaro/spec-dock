@@ -762,6 +762,81 @@ python -m unittest discover -v
 - S13 は S12 で正規化した docs/rules contract を前提に、stale test oracle だけを閉じる follow-up corrective である。
 - full suite green により、S12/S13 を含む current branch snapshot 上で docs guidance と regression suite の整合が回復した。
 
+### 追補 — S14 PR review corrective implementation and spec re-review
+
+#### 対象
+- Step: S14 PR review corrective implementation and spec re-review
+- AC/EC: AC-005
+
+#### 実施内容
+- PR #41 review で指摘された 2 系統の corrective を narrow scope で実施した。
+  - README walkthrough の parent reference を exact node id に統一し、逐次 example の internal consistency を回復した。
+  - numeric `initiative` / `epic` / `issue` import の repo-scope guard を fail-closed に一般化し、guard を pre-planning 境界へ前倒しした。
+  - numeric import の GitHub read は、explicit repo scope がない場合でも resolved current repo slug に pin されるよう補強した。
+- 影響を受ける回帰テストを current contract に合わせて更新した。
+  - numeric import の no-write / no-fetch fail-fast
+  - resolved current repo slug への GitHub read pinning
+  - repo-pinning 後の parent fallback / import race 系 runtime regressions
+  - current repo scope を必要とする CLI import fixture
+- README import guidance に、numeric import が resolved current repo または explicit owner/repo を読むこと、どちらも無い場合は local write 前に fail-fast することを追記した。
+- fresh reviewer cycle を実施し、final scoped verdict として spec/code/QA の `pass` を取得した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.cli_runtime.test_runtime_import_s10
+
+- 20 tests / OK
+
+python -m unittest -v \
+  tests.cli_runtime.test_import.TestCliImport.test_import_accepts_number_hash_and_url_equivalently \
+  tests.cli_runtime.test_import.TestCliImport.test_import_numeric_target_rejects_when_current_repo_unknown_without_writes \
+  tests.cli_runtime.test_import.TestCliImport.test_import_initiative_creates_node_and_runs_sync_without_updating_active \
+  tests.cli_runtime.test_import.TestCliImport.test_import_epic_and_initiative_create_nodes \
+  tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_when_current_repo_unknown_without_writes \
+  tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_when_current_repo_is_resolved \
+  tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_duplicate_attempts_without_writes
+
+- 7 tests / OK
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `README.md`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/test_import.py`
+  - `tests/cli_runtime/test_runtime_import_s10.py`
+  - `spec-dock/active/issue/discussions/20260331t001500z-disc-pr41-copilot-review-readme-example-consistency-analysis.md`
+  - `spec-dock/active/issue/discussions/20260331t001600z-disc-pr41-codex-review-import-repo-scope-analysis.md`
+  - `python -m unittest -v tests.cli_runtime.test_runtime_import_s10`
+  - `python -m unittest -v tests.cli_runtime.test_import.TestCliImport.test_import_accepts_number_hash_and_url_equivalently tests.cli_runtime.test_import.TestCliImport.test_import_numeric_target_rejects_when_current_repo_unknown_without_writes tests.cli_runtime.test_import.TestCliImport.test_import_initiative_creates_node_and_runs_sync_without_updating_active tests.cli_runtime.test_import.TestCliImport.test_import_epic_and_initiative_create_nodes tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_when_current_repo_unknown_without_writes tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_when_current_repo_is_resolved tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_duplicate_attempts_without_writes`
+- reviewer:
+  - SG1 spec review: fresh final corrective review `pass`
+  - code review: fresh final code review `pass`
+  - QA review: fresh final QA review `pass`
+- verdict:
+  - pass
+
+#### 変更したファイル
+- `README.md` - walkthrough parent reference を exact id に統一し、numeric import repo-scope guidance を追記
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py` - numeric import repo-scope fail-closed と repo-pinned GitHub read を実装
+- `spec-dock/scripts/spec_dock_runtime/application/import_node.py` - dogfooding mirror parity
+- `tests/cli_runtime/test_import.py` - numeric import no-write / repo pinning / current repo scope fixture を current contract に整列
+- `tests/cli_runtime/test_runtime_import_s10.py` - pre-planning guard、repo pinning、parent fallback / race regressions を current contract に整列
+- `spec-dock/active/issue/requirement.md` - S14/S100 corrective contract を追補
+- `spec-dock/active/issue/design.md` - S14/S100 corrective design を追補
+- `spec-dock/active/issue/plan.md` - S14/S100 step と gating を追補し、S14 完了へ更新
+- `spec-dock/active/issue/discussions/20260331t001500z-disc-pr41-copilot-review-readme-example-consistency-analysis.md` - README corrective analysis
+- `spec-dock/active/issue/discussions/20260331t001600z-disc-pr41-codex-review-import-repo-scope-analysis.md` - import corrective analysis
+
+#### コミット
+- 未コミット（S100 committed gate 後に authoritative commit hash を追記する）
+
+#### メモ
+- S14 は PR #41 review corrective を narrow scope で閉じる step であり、historical S01-S13/S99 record を reopen しない。
+- terminal close claim は S100 で committed `main...HEAD` final gate を再取得してから確定する。
+
 ### 追補 — S99 final diff review quality gate
 
 #### 対象
