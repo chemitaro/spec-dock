@@ -889,8 +889,10 @@ python -m unittest -v \
   - `spec-dock/active/issue/report.md`
 - reviewer:
   - final SG1 spec review: fresh committed-diff review `pass`
-  - final code review: fresh committed-diff review `pass`
-  - final QA review: fresh committed-diff review `pass`
+  - final QG1 close-out review: fresh committed-diff review `pass`
+  - epic-level spec review: fresh committed-diff review `pass`
+  - supporting code review: fresh committed-diff review `pass`
+  - supporting QA review: fresh committed-diff review `pass`
 - verdict:
   - pass
 
@@ -900,11 +902,14 @@ python -m unittest -v \
 
 #### コミット
 - gate baseline anchor: `623e590` `fix(import): 数値importのrepo scopeをfail-closedに補強`
-- gate record commit: `481cdca` `docs(issue): iss-00038のS100品質ゲートを確定`
+- reviewed scope anchor: `623e590` `fix(import): 数値importのrepo scopeをfail-closedに補強`
+- record sync commits:
+  - `481cdca` `docs(issue): iss-00038のS100品質ゲートを確定`
+  - `f17a2f7` `docs(issue): iss-00038のS100記録を同期`
 
 #### メモ
 - S99 は historical final gate として保持し、current authoritative terminal gate はこの S100 record とする。
-- `481cdca` により、この S100 record 自体も committed artifact 化された。
+- `481cdca` と `f17a2f7` は S100 record の report-only sync commits であり、reviewed runtime/docs/tests scope 自体は `623e590` から増えていない。
 
 ### 追補 — S99 final diff review quality gate
 
