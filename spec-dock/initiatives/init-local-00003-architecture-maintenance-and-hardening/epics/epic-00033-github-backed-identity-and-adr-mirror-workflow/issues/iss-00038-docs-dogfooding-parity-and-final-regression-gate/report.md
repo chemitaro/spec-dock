@@ -831,11 +831,80 @@ python -m unittest -v \
 - `spec-dock/active/issue/discussions/20260331t001600z-disc-pr41-codex-review-import-repo-scope-analysis.md` - import corrective analysis
 
 #### コミット
-- 未コミット（S100 committed gate 後に authoritative commit hash を追記する）
+- implementation anchor: `623e590` `fix(import): 数値importのrepo scopeをfail-closedに補強`
 
 #### メモ
 - S14 は PR #41 review corrective を narrow scope で閉じる step であり、historical S01-S13/S99 record を reopen しない。
 - terminal close claim は S100 で committed `main...HEAD` final gate を再取得してから確定する。
+
+### 追補 — S100 post-S14 final diff review quality gate
+
+#### 対象
+- Step: S100 post-S14 final diff review quality gate
+- AC/EC: AC-005 terminal close-claim refresh
+
+#### 実施内容
+- committed branch diff `main...HEAD` を対象に、S14 corrective を含む最新 branch state の final gate review を実施した。
+- S14 implementation anchor `623e590` を review baseline とし、README guidance、provider/dogfooding import implementation、CLI/runtime regression tests、issue requirement/design/plan/report の整合を committed state で確認した。
+- fresh final spec reviewer は `pass` を返し、S14 contract が end-to-end で整合していることを確認した。
+  - README walkthrough は exact node id と numeric import repo-scope guidance を含む。
+  - numeric `initiative` / `epic` / `issue` import は repo scope 未解決時に local write 前で fail-closed する。
+  - implicit numeric GitHub read は resolved current repo slug に pin される。
+  - provider と dogfooding mirror は同一 semantics で一致する。
+- code review / QA review でも `pass` を取得し、runtime behavior と regression coverage の両面で blocker が無いことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+git diff --name-only main...HEAD
+
+- S14 corrective と S100 gate record 対象の committed branch diff を確認した。
+
+python -m unittest -v tests.cli_runtime.test_runtime_import_s10
+
+- 20 tests / OK
+
+python -m unittest -v \
+  tests.cli_runtime.test_import.TestCliImport.test_import_accepts_number_hash_and_url_equivalently \
+  tests.cli_runtime.test_import.TestCliImport.test_import_numeric_target_rejects_when_current_repo_unknown_without_writes \
+  tests.cli_runtime.test_import.TestCliImport.test_import_initiative_creates_node_and_runs_sync_without_updating_active \
+  tests.cli_runtime.test_import.TestCliImport.test_import_epic_and_initiative_create_nodes \
+  tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_when_current_repo_unknown_without_writes \
+  tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_when_current_repo_is_resolved \
+  tests.cli_runtime.test_import.TestCliImport.test_import_rejects_foreign_repo_duplicate_attempts_without_writes
+
+- 7 tests / OK
+```
+
+#### 承認 / 観測エビデンス
+- 観測コマンドまたは観測 artifact:
+  - `git diff --name-only main...HEAD`
+  - `README.md`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/test_import.py`
+  - `tests/cli_runtime/test_runtime_import_s10.py`
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+- reviewer:
+  - final SG1 spec review: fresh committed-diff review `pass`
+  - final code review: fresh committed-diff review `pass`
+  - final QA review: fresh committed-diff review `pass`
+- verdict:
+  - pass
+
+#### 変更したファイル
+- `spec-dock/active/issue/plan.md` - S100 完了チェックを更新
+- `spec-dock/active/issue/report.md` - S14 implementation anchor を確定し、S100 final gate record を追記
+
+#### コミット
+- gate baseline anchor: `623e590` `fix(import): 数値importのrepo scopeをfail-closedに補強`
+- gate record commit: pending in working tree（この S100 record を commit して authoritative artifact 化する）
+
+#### メモ
+- S99 は historical final gate として保持し、current authoritative terminal gate はこの S100 record とする。
+- この section を commit した後の fresh committed-diff review で再確認し、push-ready state を確定する。
 
 ### 追補 — S99 final diff review quality gate
 
