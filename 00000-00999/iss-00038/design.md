@@ -5,7 +5,7 @@ ID: "iss-00038"
 関連GitHub: ["#38"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-30"
+最終更新: "2026-03-31"
 依存: ["requirement.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -21,6 +21,7 @@ ID: "iss-00038"
   - latest fresh review で露出した S09 fresh final rereview record 欠落、`epic-00033/report.md` の `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence ambiguity を narrow corrective scope として扱う。
   - final close-out rereview で見つかった `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs に残る stale `--no-github` guidance を、post-S11 の narrow rules/docs-authority corrective として記録し、original six-file targeted docs slice の結論とは切り分ける。
   - S12 corrective 後に露出した canonical guidance tests の stale `--no-github` expectation を、docs contract rollback ではなく test oracle realignment として閉じる。
+  - PR #41 external review で露出した `README.md` walkthrough inconsistency と numeric import repo-scope guard 漏れを、merge 前 narrow corrective として閉じる。
 - MUST / MUST NOT:
   - MUST:
     - provider-side と dogfooding 側の targeted docs list を同時に扱う。
@@ -35,7 +36,10 @@ ID: "iss-00038"
     - `iss-00040/report.md` を触る場合は authoritative citation layer / front matter / final summary note だけを正規化対象とし、historical session-log の `コミット: なし` entry が時点事実なら rewrite しない。
     - S12 corrective 後に canonical guidance tests が stale expectation で fail した場合は、current shipped docs を正本として tests だけを最小更新する。
     - S12 の commit-backed traceability は、`ba732ec` を rules pair の historical anchor、`d018c86` を `docs/github.md` / `docs/workflow-tree.md` corrective anchor として report に並記する。
-    - S13 は implementation self-review だけで閉じず、reviewer-recorded な RG1 docs/evidence review と QG1 close-out review を `report.md` に残したうえで、S99 final diff review quality gate の committed record へ接続する。
+    - S13 は implementation self-review だけで閉じず、reviewer-recorded な RG1 docs/evidence review と QG1 close-out review を `report.md` に残したうえで、S100 post-S14 final diff review quality gate の committed record へ接続する。
+    - README corrective では walkthrough 本文の parent reference を exact node id に統一し、numeric shorthand は補足説明に閉じ込める。
+    - numeric import corrective では `issue` 専用 guard を generalize し、repo scope 必須条件を `initiative` / `epic` / `issue` の numeric import すべてで fail-closed にする。
+    - provider source、dogfooding mirror、tests は同一 corrective セットとして扱い、片側だけの修正を認めない。
   - MUST NOT:
     - runtime / test realignment を再度設計対象に戻さない。
     - docs-facing canonical guidance tests の stale expectation 修正を理由に、runtime/docs contract 自体を再び変更しない。
@@ -82,6 +86,7 @@ ID: "iss-00038"
   - S07 の generated deps/status verification では `spec-dock/.agent/index-all.json` が authority であり、prerequisite edge の証拠は top-level `deps.issue_edges` で読む。per-node `nodes.<id>.deps` は readiness projection なので closed issue の prerequisite edge を保持しない場合があり、`spec-dock/dashboard.md` が `todo_total: 0` を返す局面で active-only projection の `spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` が空でも contract violation ではない。
   - 一部 upstream issue report には過去の reviewer コメントが残っていても、close status の正本は generated state と epic report にある。
   - したがって、この issue の主要設計論点は「どの evidence を最終 close-out 記録として束ねるか」であり、runtime behavior をどう変えるかではない。
+  - ただし PR #41 review で露出した numeric import guard 漏れは fail-closed contract そのものの欠損なので、merge 前 corrective として runtime/application 層の最小修正を許可する。
   - acceptance review の結果、close-out record 自体の整合性も verification 対象であると分かったため、report artifact の最終正規化を design scope に含める。
   - epic-level review の結果、status authority と deps graph も close-out artifact の一部であり、issue report だけ整っていても epic completion は主張できないことが分かった。
   - latest fresh review の結果、S09 execution evidence はあるが reviewer / verdict / commit-backed final rereview record が欠けており、epic report の `#33` state と `iss-00040/report.md` の provisional marker が rereview input を曖昧にしている。
@@ -112,9 +117,17 @@ ID: "iss-00038"
     - final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、その provider/dogfooding docs だけを修正し、S02 original six-file verdict は append-only で維持する。
   - canonical guidance test realignment:
     - S12 corrective 後に `tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` が旧 `--no-github` command example を期待して fail した場合は、docs を戻さず current shipped guidance に test oracle を合わせる。
+  - README walkthrough normalization:
+    - PR review corrective では `README.md` の逐次 example を parent exact id で統一し、例の内部整合性を優先する。numeric shorthand を残す場合は explanatory note として別置きし、step-by-step command sequence と混在させない。
+  - import repo-scope guard generalization:
+    - `build_linked_create_request` より前段で、numeric import かつ `github_issue_number` を使う `initiative` / `epic` / `issue` すべてに repo scope 必須 guard を適用する。
+    - current repo slug を解決できず、かつ explicit `target_repo_owner` / `target_repo_name` がない場合は fail-fast し、node metadata への write や remote fetch に進まない。
+    - provider source と dogfooding mirror の `import_node.py` は同一 semantics を保つ。
+  - targeted regression reinforcement:
+    - 既存 issue-only tests を broaden し、initiative/epic でも no-write fail-fast を確認する targeted tests を追加または拡張する。
   - final diff review quality gate:
-    - terminal close claim は S99 の committed record で閉じる。
-    - S99 record には final SG1 / final QG1 / epic-level spec review の reviewer・verdict・referenced evidence を `report.md` に明記する。
+    - terminal close claim は S100 の committed record で閉じる。
+    - S100 record には final SG1 / final QG1 / epic-level spec review の reviewer・verdict・referenced evidence を `report.md` に明記する。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
@@ -124,6 +137,11 @@ ID: "iss-00038"
   - `spec-dock/active/issue/requirement.md`
   - `spec-dock/active/issue/design.md`
   - `spec-dock/active/issue/plan.md`
+  - `README.md`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/test_import.py`
+  - 必要時 `tests/cli_runtime/test_runtime_import_s10.py`
   - `src/spec_dock/assets/spec_dock/docs/github.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md`
