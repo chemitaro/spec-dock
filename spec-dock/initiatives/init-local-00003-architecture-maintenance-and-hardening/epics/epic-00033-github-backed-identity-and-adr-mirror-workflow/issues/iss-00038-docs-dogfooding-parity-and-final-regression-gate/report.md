@@ -900,11 +900,11 @@ python -m unittest -v \
 
 #### コミット
 - gate baseline anchor: `623e590` `fix(import): 数値importのrepo scopeをfail-closedに補強`
-- gate record commit: pending in working tree（この S100 record を commit して authoritative artifact 化する）
+- gate record commit: `481cdca` `docs(issue): iss-00038のS100品質ゲートを確定`
 
 #### メモ
 - S99 は historical final gate として保持し、current authoritative terminal gate はこの S100 record とする。
-- この section を commit した後の fresh committed-diff review で再確認し、push-ready state を確定する。
+- `481cdca` により、この S100 record 自体も committed artifact 化された。
 
 ### 追補 — S99 final diff review quality gate
 
