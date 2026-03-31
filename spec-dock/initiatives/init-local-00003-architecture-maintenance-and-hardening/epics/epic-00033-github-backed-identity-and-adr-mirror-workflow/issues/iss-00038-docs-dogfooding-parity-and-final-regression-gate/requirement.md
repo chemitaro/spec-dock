@@ -5,7 +5,7 @@ ID: "iss-00038"
 関連GitHub: ["#38"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-30"
+最終更新: "2026-03-31"
 親: ["epic-00033", "init-local-00003"]
 ---
 
@@ -19,6 +19,7 @@ ID: "iss-00038"
 - latest fresh review で残った `S09` fresh final rereview record 欠落、`epic-00033/report.md` の GitHub issue `#33` OPEN/CLOSED authority ambiguity、`iss-00040/report.md` の provisional upstream evidence 表記を narrow corrective scope として解消し、final close judgement を committed rereview まで閉じる。
 - final close-out rereview で、`docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding 側に stale `--no-github` create guidance が残っていると判明したため、これは original six-file targeted docs slice を reopen しない narrow rules/docs-authority corrective として扱う。
 - S12 corrective 後の fresh review で、canonical guidance tests がなお initiative 配下 epic create guidance に `--no-github` を期待していると判明したため、current docs contract を正本とした test expectation realignment を narrow follow-up corrective として扱う。
+- PR #41 の fresh external review で、README walkthrough example の parent reference が sequential shorthand と exact id を混在させており利用者を誤誘導しうる点、ならびに numeric GitHub import が `initiative` / `epic` では unresolved repo scope のまま unscoped linkage を作りうる点が指摘されたため、merge 前 corrective scope として扱う。
 
 ## 背景・現状
 - 現状の挙動:
@@ -33,6 +34,7 @@ ID: "iss-00038"
   - epic-level branch diff review の結果、`epic-00033/report.md` の `E-AC-005` がなお Partial/open のまま、`iss-00038/deps.json` に `iss-00040` が無く、S06 corrective 記録も committed audit trail になっていないことが判明した。
   - latest fresh review の結果、S09 は execution evidence の記録までで fresh final rereview record が未記録、`epic-00033/report.md` は本文の completion claims と例外メモの `#33 OPEN` が衝突し、`iss-00040/report.md` も `draft | approved` などの provisional marker を含むため、upstream evidence を final review 用に正規化する必要がある。
   - final close-out rereview の結果、original six-file targeted docs slice の外側にある `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs が、なお stale `--no-github` create guidance を保持しており、docs/rules authority と `reference_github.md` の GitHub-mandatory contract が不整合だと判明した。
+  - PR #41 の外部 review の結果、`README.md` walkthrough example が parent node 指定で exact id と shorthand を混在させており current GitHub-mandatory create contract の読み手に誤解を与えうること、また `import_node.py` の numeric import guard が `issue` にしか適用されず `initiative` / `epic` では current repo scope 未解決時でも unscoped GitHub linkage metadata を作りうることが判明した。
 - 再現手順:
   1. `spec-dock/active/epic/plan.md` と `spec-dock/active/epic/report.md` を確認する。
   2. `iss-00038` の現 spec が split 前の責務を含んでいることを確認する。
@@ -87,18 +89,22 @@ ID: "iss-00038"
   - final close-out rereview で見つかった provider/dogfooding 両側の `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` stale `--no-github` guidance を、`reference_github.md` の GitHub-mandatory create contract に揃える。これは original six-file targeted docs slice の結論を broader docs no-finding claim に拡張しない narrow corrective として扱う。
   - S12 で正規化した current guidance を読む canonical guidance tests について、旧 `--no-github` 期待値が残っている場合は、docs contract を戻さず test expectation を current shipped guidance に揃える narrow follow-up corrective を許可する。
   - S12 の docs-authority corrective は、`ba732ec` を rules pair の historical anchor、`d018c86` を `docs/github.md` / `docs/workflow-tree.md` corrective anchor として、両方を `report.md` から追える commit-backed traceability を要求する。
+  - `README.md` walkthrough corrective では、numeric shorthand の便宜説明を残してもよいが、逐次実行 example 本文は parent reference を exact node id で統一し、initiative -> epic -> issue の一本道 walkthrough として監査可能にする。
+  - numeric GitHub import corrective では、repo scope 必須 guard を `issue` 専用の暫定実装のまま残さず、`initiative` / `epic` / `issue` の numeric import すべてに fail-closed で適用する。
+  - unresolved repo scope 下の numeric import corrective は provider implementation、dogfooding mirror、回帰 tests を同時に更新し、partial fix を残さない。
   - `iss-00040` は evidence prerequisite として `iss-00038/deps.json` と generated deps graph にも反映し、ownership 再取得ではないことを明記する。
   - S07 の generated deps/status verification は `spec-dock/.agent/index-all.json` を authority とし、generated prerequisite evidence は top-level `deps.issue_edges` edge list を正本として扱う。per-node `nodes.<id>.deps` は readiness projection であり、closed issue の prerequisite edge を保持しない場合があるため、`todo_total: 0` 時の active-only projection 空状態と同様に edge authority とは混同しない。
   - epic close を主張する前に、GitHub issue state、`sync --github` 後の generated state、`epic-00033/report.md`、`iss-00038/report.md` が定義済み authority order に従って同じ結論へ収束する reconciliation path を定義する。
   - branch-diff review に使う corrective report/update は committed history から再現できることを保証し、working-tree-only evidence を最終 artifact に残さない。
   - S09 の execution evidence だけでは close claim を完了扱いにせず、S10 upstream evidence normalization と S11 fresh final rereview closure を close-out 必須経路として実行し、normalized artifact set を参照する committed artifact が揃うまで close claim を保留する。
-  - S13 実施後は、`report.md` に reviewer-recorded な RG1 docs/evidence review と QG1 close-out review を残し、その後に committed S99 final diff review quality gate record で terminal close claim を閉じる。
+  - S13 実施後は、`report.md` に reviewer-recorded な RG1 docs/evidence review と QG1 close-out review を残し、その後に committed S100 post-S14 final diff review quality gate record で terminal close claim を閉じる。
   - `epic-00033/report.md` の `#33` state は本文・例外メモ・generated state・`iss-00038/report.md` で同じ authority conclusion に揃える。
   - `iss-00040/report.md` を触る場合は report-artifact normalization のみとし、runtime/test/implementation の re-execution を要求しない。
   - S10 で `iss-00040/report.md` を正規化する場合、authoritative citation layer / front matter / final summary note だけを対象にし、historical session-log の `コミット: なし` entry が時点事実を表す限り書き換えない。
 - MUST NOT:
   - `iss-00040` が owner である wrappers / domain / dogfooding parity / final regression を再実行前提で抱え込まない。
   - runtime contract の realignment を、この issue の close-out のために再度変更しない。
+  - `initiative` / `epic` numeric import の fail-closed guard だけを超えて import contract 全体を再設計しない。
   - test expectation realignment を広く再開しない。許可するのは S12 で是正した `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` に対する canonical guidance tests の stale expectation 修正だけとする。
   - docs parity を provider-side だけで閉じない。
   - targeted docs list の parity/no-op だけで AC-001 を満たした扱いにしない。
@@ -125,7 +131,7 @@ ID: "iss-00038"
   - `spec-dock/dashboard.md` が `todo_total: 0` を返した後は、`spec-dock/.agent/index.json` / `spec-dock/.agent/deps-issues.json` の空状態は active-only projection の仕様内であり、S07/S09 の否定 evidence には使わない。`spec-dock/.agent/index-all.json` では top-level `deps.issue_edges` を prerequisite edge の正本、per-node `nodes.<id>.deps` を readiness projection として読み分ける。
   - S09 は status reconciliation execution evidence step であり、fresh final rereview closure は後続 corrective step で committed record 化する。
   - S10 が `epic-00033/report.md` または `iss-00040/report.md` の rereview input を更新した後は、`epic-00033/report.md` / normalized `iss-00040/report.md` / `iss-00038/report.md` / generated state / deps graph から成る normalized artifact set に対して、epic-level committed rereview を再度 `pass` させてから close judgement へ進む。
-  - final exit を主張する committed branch diff では、S99 final diff review quality gate の reviewer / verdict / referenced evidence を `report.md` から追えなければならない。
+  - final exit を主張する committed branch diff では、S100 post-S14 final diff review quality gate の reviewer / verdict / referenced evidence を `report.md` から追えなければならない。
   - `iss-00040/report.md` と `epic-00033/report.md` の更新が必要な場合でも、扱うのは report-artifact normalization だけであり、implementation 完了判定そのものは再実行しない。
 - Ask:
   - targeted docs list 以外に old contract assumption が見つかった場合は、その場で scope を広げず、`report.md` に blocker として記録して reviewer 判断へ escalate する。
@@ -136,10 +142,11 @@ ID: "iss-00038"
 
 ## 非交渉制約
 - final spec review verdict は `pass` を要求する。
-- final spec review record には `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence 参照を含める。
-- `validate` / `sync` は current repo state に対して exit=0 を示す。
-- 新たに uppercase path を増やさない。
-- epic close readiness を宣言するには、epic report / issue report / generated state / dependency graph が branch diff review 上で矛盾しないことを要求する。
+  - final spec review record には `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00040` / `iss-00038` の close evidence 参照を含める。
+  - `validate` / `sync` は current repo state に対して exit=0 を示す。
+  - 新たに uppercase path を増やさない。
+  - epic close readiness を宣言するには、epic report / issue report / generated state / dependency graph が branch diff review 上で矛盾しないことを要求する。
+  - PR review corrective 完了には、README walkthrough wording と numeric import fail-closed contract の両方が fresh spec review で `pass` になることを要求する。
 
 ## 前提
 - `iss-00040` は完了済みで、stale-contract / final regression / dogfooding parity evidence はその report に集約されている。
@@ -214,6 +221,25 @@ ID: "iss-00038"
     - active-only projection（`spec-dock/.agent/index.json` など）は補助観測点として扱う
     - `spec-dock/dashboard.md`
     - `iss-00038/report.md`
+- AC-005:
+  - Actor:
+    - maintainer / spec reviewer
+  - Given:
+    - PR #41 の external review で README walkthrough guidance と numeric import repo-scope guard の corrective scope が定義されている
+  - When:
+    - corrective docs/code/tests を反映し、fresh spec review で merge 前の妥当性を確認する
+  - Then:
+    - `README.md` の逐次 walkthrough example が parent reference を exact node id で一貫して示し、current create contract の誤読を招かない
+    - numeric GitHub import は `initiative` / `epic` / `issue` のいずれでも、explicit repo scope なしで current repo scope を解決できない場合は fail-fast し、unscoped linkage metadata を書き込まない
+    - provider implementation / dogfooding mirror / regression tests / issue report が corrective outcome と一致している
+    - fresh spec reviewer の verdict が `pass` である
+  - 観測点:
+    - `README.md`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+    - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+    - `tests/cli_runtime/test_import.py`
+    - 必要なら `tests/cli_runtime/test_runtime_import_s10.py`
+    - corrective review record
 
 ## 例外・エッジケース
 - EC-001:

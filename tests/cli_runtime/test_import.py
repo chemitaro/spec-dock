@@ -182,7 +182,7 @@ class TestCliImport(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_git(target, ["init"])
+            self._init_origin_repo(target)
             self._run_git(
                 target,
                 ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
@@ -223,6 +223,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -375,6 +376,7 @@ class TestCliImport(CliRuntimeHarness):
                     self.assertTrue(issue_dir.is_dir())
                     log = log_path.read_text(encoding="utf-8")
                     self.assertIn("issue view 123", log)
+                    self.assertIn("--repo example/repo", log)
                     self.assertNotIn("--repo other/repo", log)
 
     def test_import_rejects_foreign_repo_url_without_opt_in(self) -> None:
@@ -1052,31 +1054,30 @@ class TestCliImport(CliRuntimeHarness):
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            issues_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-            )
-            p = self._run_runtime_capture(
-                target,
-                [
-                    "import",
+            initiatives_dir = target / "spec-dock" / "initiatives"
+            cases = (
+                (
+                    "initiative",
+                    ["import", "initiative", "123", "--title", "Imported initiative"],
+                    "init-00123-",
+                ),
+                (
+                    "epic",
+                    ["import", "epic", "124", "--title", "Imported epic", "--initiative", "init-00001"],
+                    "epic-00124-",
+                ),
+                (
                     "issue",
-                    "123",
-                    "--title",
-                    "Imported issue",
-                    "--epic",
-                    "epic-00002",
-                ],
-                env=test_env,
+                    ["import", "issue", "125", "--title", "Imported issue", "--epic", "epic-00002"],
+                    "iss-00125-",
+                ),
             )
-            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Current GitHub repo scope could not be resolved from origin", p.stderr)
-            self.assertEqual(sorted(issues_dir.glob("*-imported-issue")), [])
+            for kind, args, id_prefix in cases:
+                with self.subTest(kind=kind):
+                    p = self._run_runtime_capture(target, args, env=test_env)
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Current GitHub repo scope could not be resolved from origin", p.stderr)
+                    self.assertEqual(sorted(initiatives_dir.rglob(f"{id_prefix}*")), [])
 
     def test_import_rejects_foreign_repo_when_current_repo_is_resolved(self) -> None:
         if os.name == "nt":

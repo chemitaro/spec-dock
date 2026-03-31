@@ -5,7 +5,7 @@ ID: "iss-00038"
 関連GitHub: ["#38"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-30"
+最終更新: "2026-03-31"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00033", "init-local-00003"]
 ---
@@ -21,6 +21,7 @@ ID: "iss-00038"
   - AC-002
   - AC-003
   - AC-004
+  - AC-005
 - EC:
   - EC-001
   - EC-002
@@ -49,10 +50,14 @@ ID: "iss-00038"
 - [x] S10 upstream evidence normalization
 - [x] S11 final committed rereview closure
 - [x] S12 narrow rules/docs-authority alignment
+- [x] S13 canonical guidance test expectation realignment
+- [x] S14 PR review corrective implementation and spec re-review
 - [x] S90 docs impact resolution / docs refresh
 - [x] S99 final diff review quality gate
+- [ ] S100 post-S14 final diff review quality gate
 - note:
-  - 最新の committed branch diff を対象にした fresh final review cycle は、この S99 で閉じる
+  - S99 は S13 までの historical final gate として保持する
+  - PR #41 corrective を追加したため、最新の authoritative final gate は S14 完了後に再実行する S100 とする
 
 ## マイルストーン一覧
 - M1:
@@ -95,6 +100,16 @@ ID: "iss-00038"
     - post-S11 narrow rules/docs-authority alignment
   - exit:
     - `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の provider/dogfooding docs に残る stale `--no-github` guidance が GitHub-mandatory create contract に揃い、S02 original six-file verdict と区別して report から追える
+- M9:
+  - 対象:
+    - PR #41 external review corrective close-out
+  - exit:
+    - `README.md` walkthrough consistency と numeric import fail-closed guard の corrective が fresh spec review `pass` まで閉じる
+- M10:
+  - 対象:
+    - post-S14 final quality gate refresh
+  - exit:
+    - `main...HEAD` の committed branch diff に対する最新 authoritative final review record が report から追える
 
 ## ステップ進捗サマリー
 - [x] S01 close-out baseline and ownership lock
@@ -110,6 +125,8 @@ ID: "iss-00038"
 - [x] S11 final committed rereview closure
 - [x] S12 narrow rules/docs-authority alignment
 - [x] S13 canonical guidance test expectation realignment
+- [x] S14 PR review corrective implementation and spec re-review
+- [ ] S100 post-S14 final diff review quality gate
 
 ## ステップ一覧
 - S01:
@@ -224,12 +241,33 @@ ID: "iss-00038"
   - review gate:
     - `tests/cli_runtime/test_wrappers.py` と `tests/test_init_update.py` の failing expectations が current docs wording に揃っている
     - docs contract rollback なしで targeted failing tests が pass する
+- S14:
+  - 観測可能な振る舞い:
+    - PR #41 external review で指摘された README walkthrough inconsistency と numeric import repo-scope guard 漏れが、provider/dogfooding/test/report を含む corrective セットとして閉じる
+  - closes:
+    - AC-005
+  - review gate:
+    - `README.md` walkthrough example の parent reference が exact node id で一貫している
+    - numeric import は `initiative` / `epic` / `issue` のいずれでも unresolved repo scope 下で fail-fast し、unscoped linkage metadata を書かない
+    - provider source / dogfooding mirror / targeted regression tests が整合する
+    - fresh spec reviewer が corrective scope を `pass` と判定する
+- S100:
+  - 観測可能な振る舞い:
+    - S14 corrective を含む最新の committed branch diff に対する authoritative final review record が更新され、merge 前 quality gate が単一の terminal state に再固定される
+  - closes:
+    - AC-005
+  - review gate:
+    - `report.md` で S99 が historical gate、S100 が current authoritative gate だと区別して追える
+    - fresh final review が `main...HEAD` の committed diff を対象に `pass` と判定する
+    - push 前の branch state に対する最終 verdict が report と git history で矛盾しない
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02, S12, S13
 - AC-002 -> S03
 - AC-003 -> S04, S11
 - AC-004 -> S11
+- AC-005 -> S14
+- AC-005 -> S100
 - EC-001 -> S02
 - EC-002 -> S03
 - EC-003 -> S01, S04, S10
@@ -273,6 +311,8 @@ ID: "iss-00038"
   - epic-level branch diff review で authority / deps / audit trail finding が出た場合は、S07-S09 を追加 corrective path として実行し、S10 で upstream evidence normalization、S11 で fresh final rereview closure を完了してから epic completion を主張する
   - S11 後の final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の stale `--no-github` guidance が見つかった場合は、S02 original six-file verdict を broader claim に書き換えず、S12 で narrow rules/docs-authority corrective として append-only に閉じる
   - S12 corrective 後に canonical guidance tests が旧 `--no-github` wording を期待して fail した場合は、docs rollback ではなく S13 で test expectation realignment を行う
+  - PR #41 external review で merge blocker 相当の corrective が出た場合は、README walkthrough guidance は doc_writer、runtime/test corrective は dev_coder に委任し、fresh spec reviewer が `pass` になるまで S14 を反復し、その後 fresh final reviewer による S100 を再取得する
+  - S100 が fail した場合は、failure origin が今回の README walkthrough corrective または numeric import fail-closed corrective に閉じる限り S14 に戻って修正し、earlier historical paths は reopen しない。S14 を超える新規 scope が必要なら blocker として escalate する
   - close-out は S10 で upstream evidence normalization、S11 で normalized artifact set に対する fresh final rereview closure、必要時のみ S12 で narrow rules/docs-authority corrective、さらに必要時のみ S13 で canonical guidance test expectation realignment を完了して初めて exit できる
 
 ## 実行ルール（全ステップ共通）
@@ -285,9 +325,11 @@ ID: "iss-00038"
 - failing test は iteration ごとに 1 本ずつ進める。
 - `Green` は最小実装、`Refactor` は green 維持を前提とする。
 - shared minimum gate と scope-specific readiness contract / final exit contract を満たす。
-- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S99 / final exit へ進まない。S12 は final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の rules/docs-authority mismatch が見つかった場合のみ追加で実行する。S13 は S12 corrective 後に canonical guidance tests が stale expectation で fail した場合のみ追加で実行する。
+- `iss-00038` の close-out flow は S01-S11 を必須経路とし、S10/S11 を省略して S90 / S100 / final exit へ進まない。S12 は final close-out rereview で `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の rules/docs-authority mismatch が見つかった場合のみ追加で実行する。S13 は S12 corrective 後に canonical guidance tests が stale expectation で fail した場合のみ追加で実行する。
+- PR #41 external review corrective がある場合は S14 を追加必須経路として扱い、fresh spec review `pass` 前に push しない。
+- PR #41 external review corrective がある場合は S14 完了後に S100 を追加必須経路として扱い、historical S99 を final gate と再利用しない。
 - docs impact が `none` でなければ `S90` を実行する。
-- 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
+- 最後に `git diff main...HEAD` を対象に `S100 post-S14 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
 - `iss-00040` 完了済み scope を再度実行しない。もし upstream evidence 欠落が見つかった場合は、re-execute ではなく blocker として記録する。
 - S02 で targeted docs list 外の stale old-contract assumption を見つけた場合は、その場で修正範囲を広げず step を停止し、path / assumption / scope外理由 / escalation 先を `report.md` に記録して reviewer 判断を待つ。
@@ -318,47 +360,51 @@ ID: "iss-00038"
   - issue の残責務を docs close-out と final spec review に限定し、split 前の stale scope を除去する
 
 #### update_plan（着手時に登録）
-- [x] `update_plan` に step の作業単位を登録した
-- [x] `./spec-dock/active/issue/report.md` の追記位置を決めた
 
-#### B1 — collect authoritative evidence
-- purpose:
-  - epic と upstream issue の正本から close-out baseline を固定する
-- files:
-  - `spec-dock/active/epic/plan.md`
-  - `spec-dock/active/epic/report.md`
-  - `iss-00040` report
+### S14 — PR review corrective implementation and spec re-review
+- target:
+  - `README.md`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `spec-dock/scripts/spec_dock_runtime/application/import_node.py`
+  - `tests/cli_runtime/test_import.py`
+  - 必要時 `tests/cli_runtime/test_runtime_import_s10.py`
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260331t001500z-disc-pr41-copilot-review-readme-example-consistency-analysis.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/discussions/20260331t001600z-disc-pr41-codex-review-import-repo-scope-analysis.md`
+- step boundary:
+  - README walkthrough example の internal consistency と numeric import fail-closed contract だけを最小差分で是正し、既存 S01-S13/S90/S99 の historical record を上書きしない
+- execution:
+  - `doc_writer` が `README.md` の逐次 walkthrough example を parent exact id で統一し、必要なら shorthand を explanatory note に分離する
+  - `dev_coder` が numeric import repo-scope guard を `initiative` / `epic` / `issue` に一般化し、provider source と dogfooding mirror を同一 semantics で更新する
+  - `dev_coder` が targeted regression tests を追加または拡張し、unresolved repo scope 下の no-write fail-fast を initiative/epic/issue で確認する
+  - 実装結果は `report.md` に S14 corrective record として追記し、README corrective / runtime corrective / test evidence / spec review evidence をひも付ける
+- expected verification:
+  - `python -m unittest tests.cli_runtime.test_import`
+  - 必要時 `python -m unittest tests.cli_runtime.test_runtime_import_s10`
+  - 必要時 README walkthrough snippet の目視確認
+  - fresh `spec_reviewer` による issue docs + corrective outcome の `pass`
 
-##### I1 — lock scope
-- slice goal:
-  - `iss-00040` との non-overlap を requirement/design/plan に反映する
-
-###### Red
-- failing test:
-  - 該当なし
-- expected failure:
-  - split 前の stale scope が issue docs に残っている
-
-###### Green
-- minimum implementation:
-  - issue spec docs を close-out owner 向けに更新する
-- pass condition:
-  - spec review へ出せる draft が揃う
-
-###### Refactor
-- cleanup target:
-  - requirement/design/plan の用語統一
-- invariants to keep green:
-  - regression ownership を再導入しない
-
-#### step gate
-- review:
-  - spec review pass
-  - S01 承認記録（観測コマンドまたは観測 artifact / reviewer / verdict / 非重複確認先）が `report.md` にある
-- expected tests:
-  - `git --no-pager diff -- spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
+### S100 — post-S14 final diff review quality gate
+- target:
+  - `spec-dock/active/issue/report.md`
+- design refs:
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+- step boundary:
+  - S14 を含む committed branch diff 全体に対して、historical S99 を supersede する authoritative terminal gate を記録する
+- execution:
+  - S14 corrective を commit 済み状態にしたうえで、fresh reviewer に `main...HEAD` をレビューさせる
+  - `report.md` に S100 reviewer / verdict / reviewed scope / referenced evidence を追記し、S99 は historical gate で S100 が最新 authoritative gate だと明記する
+- expected verification:
+  - `git --no-pager diff main...HEAD`
+  - fresh final reviewer による committed branch diff review
+  - `report.md` 上の S100 record と最新 commit history の照合
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - `./spec-dock/active/issue/report.md` に S100 reviewer / verdict / reviewed scope / referenced evidence / actual commit hash を追記する
 
 ### S02 — targeted docs parity review and refresh
 - target:
@@ -1066,7 +1112,7 @@ ID: "iss-00038"
   - `python -m unittest discover -v`
 - report update:
   - `./spec-dock/active/issue/report.md`
-  - implementation self-review だけで完了扱いにせず、reviewer-recorded な RG1/QG1 verdict を残した後に S99 へ進む
+  - implementation self-review だけで完了扱いにせず、reviewer-recorded な RG1/QG1 verdict を残した後に S100 へ進む
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -1093,11 +1139,11 @@ ID: "iss-00038"
   - final QG1 close-out review pass
   - epic-level spec review pass
 - report update:
-  - `./spec-dock/active/issue/report.md` に committed S99 gate record を追記する
+  - `./spec-dock/active/issue/report.md` に committed S99 historical gate record を保持する
 
 ## 未確定事項
 - なし:
-  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + 必要時のみ S12 rules/docs-authority corrective + 必要時のみ S13 canonical guidance test expectation realignment + S90 + S99 で固定する
+  - close-out の execution path は S01-S04 + S05/S06 corrective path + S07-S09 epic corrective path + S10/S11 final normalization/rereview path + 必要時のみ S12 rules/docs-authority corrective + 必要時のみ S13 canonical guidance test expectation realignment + S14 PR review corrective implementation/spec re-review + S90 + S100 で固定する
 
 ## final exit contract
 - AC/EC 達成:
@@ -1115,4 +1161,4 @@ ID: "iss-00038"
   - S01 承認記録と S02 の 6 ファイル個別レビュー表が report から追える
 - final diff approved:
   - `iss-00040` 非重複を保ったまま reviewer pass を取得している
-  - S10/S11 と、必要時のみ S12/S13 を含む close-out 必須経路が完了している
+  - S10/S11 と、必要時のみ S12/S13、および今回の S14/S100 を含む close-out 必須経路が完了している
