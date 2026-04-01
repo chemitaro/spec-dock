@@ -133,6 +133,7 @@ ID: "iss-00038"
   - S10 が `epic-00033/report.md` または `iss-00040/report.md` の rereview input を更新した後は、`epic-00033/report.md` / normalized `iss-00040/report.md` / `iss-00038/report.md` / generated state / deps graph から成る normalized artifact set に対して、epic-level committed rereview を再度 `pass` させてから close judgement へ進む。
   - final exit を主張する committed branch diff では、S100 post-S14 final diff review quality gate の reviewer / verdict / referenced evidence を `report.md` から追えなければならない。
   - S100 の report sync が gate record 自体を committed artifact 化するだけで、reviewed runtime/docs/tests scope を増やさない場合は、`report.md` に `reviewed_scope_anchor` と `record_sync_commit` を分けて記録してよい。後続の report-only sync commit は、その diff が `report.md` の S100 bookkeeping に限定される限り、`reviewed_scope_anchor` を更新しなくてよい。
+  - 最新 authoritative S100 record が当該 commit 自身に載る場合は、`current_authoritative_record: self` を使ってよい。この `self` は「この S100 entry を含む current HEAD commit」を意味し、明示列挙が必要なのは prior `record_sync_commit` のみとする。
   - `iss-00040/report.md` と `epic-00033/report.md` の更新が必要な場合でも、扱うのは report-artifact normalization だけであり、implementation 完了判定そのものは再実行しない。
 - Ask:
   - targeted docs list 以外に old contract assumption が見つかった場合は、その場で scope を広げず、`report.md` に blocker として記録して reviewer 判断へ escalate する。

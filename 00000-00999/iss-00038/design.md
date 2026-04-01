@@ -129,6 +129,7 @@ ID: "iss-00038"
     - terminal close claim は S100 の committed record で閉じる。
     - S100 record には final SG1 / final QG1 / epic-level spec review の reviewer・verdict・referenced evidence を `report.md` に明記する。
     - S100 record sync commit が report-only bookkeeping で reviewed runtime/docs/tests scope を変えない場合は、`reviewed_scope_anchor` と `record_sync_commit` を併記し、後続の report-only sync commit は `reviewed_scope_anchor` を更新せずに bookkeeping chain として扱ってよい。
+    - current authoritative gate がその commit 自身に埋め込まれる場合は、`current_authoritative_record: self` を使い、prior bookkeeping chain と区別して表現してよい。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。

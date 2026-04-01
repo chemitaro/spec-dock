@@ -907,11 +907,14 @@ python -m unittest -v \
   - `481cdca` `docs(issue): iss-00038のS100品質ゲートを確定`
   - `f17a2f7` `docs(issue): iss-00038のS100記録を同期`
   - `f4ed038` `docs(issue): iss-00038のS100監査線を正規化`
+  - `0ec1e7d` `docs(issue): iss-00038のS100同期ルールを明確化`
+- current authoritative record:
+  - `self`（この S100 entry を含む current HEAD commit）
 
 #### メモ
 - S99 は historical final gate として保持し、current authoritative terminal gate はこの S100 record とする。
-- `481cdca` / `f17a2f7` / `f4ed038` は S100 record の report-only sync commits であり、reviewed runtime/docs/tests scope 自体は `623e590` から増えていない。
-- 現在の HEAD に含まれる、これ以後の `report.md` S100 bookkeeping-only sync commit も同じ reviewed scope anchor `623e590` に従属する chain として扱う。
+- `481cdca` / `f17a2f7` / `f4ed038` / `0ec1e7d` は S100 record の prior report-only sync commits であり、reviewed runtime/docs/tests scope 自体は `623e590` から増えていない。
+- `current_authoritative_record: self` は、この S100 entry を含む current HEAD commit を指し、reviewed scope anchor `623e590` に従属する最新 bookkeeping-only sync record である。
 
 ### 追補 — S99 final diff review quality gate
 
