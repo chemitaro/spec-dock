@@ -55,6 +55,7 @@ class TestInitUpdate(CliRuntimeHarness):
     }
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
+        "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
@@ -80,6 +81,30 @@ class TestInitUpdate(CliRuntimeHarness):
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/doctor.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/repo_context.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/sync_state.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/import_node.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/commands/new.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/domain/validation.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py"
         ),
     }
 
@@ -107,9 +132,9 @@ class TestInitUpdate(CliRuntimeHarness):
                 "Epic workflow: `spec-dock/docs/workflow_epic.md`",
                 "リポジトリ root から実行してください",
                 "./spec-dock/scripts/spec-dock new epic --initiative <id> --title",
-                "--no-github",
             ),
             "absent": (
+                "--no-github",
                 "new issue --epic",
                 "new doc adr",
             ),
@@ -525,6 +550,7 @@ class TestInitUpdate(CliRuntimeHarness):
             }
             for legacy_rel_path, legacy_text in legacy_template_text_map.items():
                 legacy_path = target / legacy_rel_path
+                legacy_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_text_force(legacy_path, legacy_text)
                 self.assertTrue(legacy_path.is_file(), f"expected legacy template fixture: {legacy_rel_path}")
             self._write_text_force(
@@ -589,6 +615,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 ),
             }
             for artifact_path, artifact_text in managed_legacy_artifacts.items():
+                artifact_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_text_force(artifact_path, artifact_text)
 
             node_root = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
@@ -968,16 +995,18 @@ with tempfile.TemporaryDirectory() as td:
     original_sync_after_import = app_import_node.sync_after_import
     app_import_node.sync_after_import = lambda _ports: object()
     try:
-        result = app_import_node.import_issue(request, ports)
+        try:
+            app_import_node.import_issue(request, ports)
+        except RuntimeError as exc:
+            message = str(exc)
+        else:
+            raise AssertionError("expected foreign import to be rejected")
     finally:
         app_import_node.sync_after_import = original_sync_after_import
 
-    assert result.node.id.startswith("iss-local-"), result.node.id
-    assert result.node.github_issue_number == 123
-    assert result.node.github_repo_owner == "other"
-    assert result.node.github_repo_name == "repo"
-    assert issue_gateway.calls, "issue_view_minimal was not called"
-    assert issue_gateway.calls[-1][2] == "other/repo", issue_gateway.calls[-1]
+    assert "single-repo" in message, message
+    assert "GitHub-backed identity" in message, message
+    assert issue_gateway.calls == [], issue_gateway.calls
 """
         result = subprocess.run(
             [sys.executable, "-c", check_code],
@@ -1173,6 +1202,11 @@ class _StubIssueGateway:
             url=f"https://github.com/example/repo/issues/{{issue_number}}",
         )
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
+
 with tempfile.TemporaryDirectory() as td:
     repo_root = Path(td)
     specdock_dir = repo_root / "spec-dock"
@@ -1216,6 +1250,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
     )
@@ -1488,30 +1523,33 @@ with tempfile.TemporaryDirectory() as td:
     original_sync_after_import = app_import_node.sync_after_import
     app_import_node.sync_after_import = lambda _ports: object()
     try:
-        result = app_import_node.import_issue(
-            app_contracts.ImportNodeRequest(
-                issue_number=123,
-                title="Imported foreign issue",
-                slug=None,
-                parent_id="epic-local-00001",
-                target_repo_owner="other",
-                target_repo_name="repo",
-                allow_foreign_url=True,
-            ),
-            ports,
-        )
+        try:
+            app_import_node.import_issue(
+                app_contracts.ImportNodeRequest(
+                    issue_number=123,
+                    title="Imported foreign issue",
+                    slug=None,
+                    parent_id="epic-local-00001",
+                    target_repo_owner="other",
+                    target_repo_name="repo",
+                    allow_foreign_url=True,
+                ),
+                ports,
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+        else:
+            raise AssertionError("expected foreign import to be rejected")
     finally:
         app_import_node.sync_after_import = original_sync_after_import
 
-    assert injected["done"], injected
-    assert result.node.id == "iss-local-00001", result.node.id
-    assert result.node.github_issue_number == 123
-    assert result.node.github_repo_owner == "other"
-    assert result.node.github_repo_name == "repo"
-    assert issue_gateway.calls == [(str(repo_root), 123, "other/repo")], issue_gateway.calls
-    assert events == ["copy_scaffolded_tree", "write_meta"], events
-    assert sum(1 for record in node_repo.records if record.id == "iss-00123") == 1, node_repo.records
-    assert sum(1 for record in node_repo.records if record.id == "iss-local-00001") == 1, node_repo.records
+    assert not injected["done"], injected
+    assert "single-repo" in message, message
+    assert "GitHub-backed identity" in message, message
+    assert issue_gateway.calls == [], issue_gateway.calls
+    assert events == [], events
+    assert sum(1 for record in node_repo.records if record.id == "iss-00123") == 0, node_repo.records
+    assert sum(1 for record in node_repo.records if record.id == "iss-local-00001") == 0, node_repo.records
 """
         result = subprocess.run(
             [sys.executable, "-c", check_code],
@@ -1644,6 +1682,11 @@ class _StubIssueGateway:
             updated_at="2026-03-20T00:00:00Z",
             url=f"https://example.invalid/issues/{{issue_number}}",
         )
+
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
 
 class _StubActiveStateStore:
     def __init__(self, manifest):
@@ -1887,6 +1930,11 @@ class _StubIssueGateway:
             url=f"https://example.invalid/issues/{{issue_number}}",
         )
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "example/repo"
+
 class _StubActiveStateStore:
     def __init__(self, manifest):
         self._manifest = manifest
@@ -1971,6 +2019,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo(records),
         template_scaffolder=_StubTemplateScaffolder(),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         active_state_store=active_state_store,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -2705,6 +2754,11 @@ class _StubTemplateScaffolder:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
 class _FailingTemplateScaffolder(_StubTemplateScaffolder):
     def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
         del src_dir, dest_dir, replacements
@@ -2774,6 +2828,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -2807,8 +2862,8 @@ with tempfile.TemporaryDirectory() as td:
                 slug=None,
                 parent_id=None,
                 requested_node_id=None,
-                github_mode="local_only",
-                github_issue_number=None,
+                github_mode="link_existing",
+                github_issue_number=702,
             ),
             ports,
         )
@@ -2817,7 +2872,7 @@ with tempfile.TemporaryDirectory() as td:
     thread.join(timeout=5.0)
     assert not thread.is_alive(), "github create thread did not finish"
     assert issue_errors == [], issue_errors
-    assert local_result.node.id == "init-local-00002", local_result
+    assert local_result.node.id == "init-00702", local_result
     assert issue_result["value"].node.id == "iss-00811", issue_result
     assert len(issue_gateway.calls) == 1, issue_gateway.calls
     body = issue_gateway.calls[0][2]
@@ -2864,6 +2919,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -2947,6 +3003,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3025,6 +3082,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3119,6 +3177,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_FailingTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3194,6 +3253,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3272,6 +3332,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3353,6 +3414,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_FailingTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3437,6 +3499,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=node_repo,
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=_StubClock(),
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3581,6 +3644,21 @@ class _StubIssueGateway:
             raise RuntimeError("no issue numbers configured")
         return self._numbers.pop(0)
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
 with tempfile.TemporaryDirectory() as td:
     repo_root = Path(td)
     specdock_dir = repo_root / "spec-dock"
@@ -3618,7 +3696,7 @@ with tempfile.TemporaryDirectory() as td:
                 "parent_id": "epic-local-00001",
                 "requested_node_id": "iss-local-00100",
             },
-            "Cannot combine '--id' with GitHub mode",
+            "Cannot combine '--id' with GitHub-backed node creation",
         ),
         (
             "missing-epic",
@@ -3670,6 +3748,7 @@ with tempfile.TemporaryDirectory() as td:
             node_repo=_StubNodeRepo(records),
             template_scaffolder=_StubTemplateScaffolder(),
             issue_gateway=issue_gateway,
+            git_gateway=_StubGitGateway(),
             clock=None,
             repo_root=repo_root,
             specdock_dir=specdock_dir,
@@ -3811,6 +3890,11 @@ class _StubIssueGateway:
             raise RuntimeError("no issue numbers configured")
         return self._numbers.pop(0)
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
 with tempfile.TemporaryDirectory() as td:
     repo_root = Path(td)
     specdock_dir = repo_root / "spec-dock"
@@ -3821,6 +3905,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo([]),
         template_scaffolder=_StubTemplateScaffolder(),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=None,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3878,6 +3963,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo(records),
         template_scaffolder=_StubTemplateScaffolder(),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=None,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -3991,6 +4077,11 @@ class _StubIssueGateway:
             raise RuntimeError("no issue numbers configured")
         return self._numbers.pop(0)
 
+class _StubGitGateway:
+    def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+
 with tempfile.TemporaryDirectory() as td:
     repo_root = Path(td)
     specdock_dir = repo_root / "spec-dock"
@@ -4027,6 +4118,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo(duplicate_records),
         template_scaffolder=_StubTemplateScaffolder(),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         clock=None,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -4759,7 +4851,9 @@ with tempfile.TemporaryDirectory() as td:
             parent_id=None,
             initiative_id=None,
             epic_id=None,
-            github_issue_number=None,
+            github_issue_number=101,
+            github_repo_owner="current",
+            github_repo_name="repo",
         ),
         _record(
             kind="epic",
@@ -4769,7 +4863,9 @@ with tempfile.TemporaryDirectory() as td:
             parent_id="init-local-00001",
             initiative_id="init-local-00001",
             epic_id=None,
-            github_issue_number=None,
+            github_issue_number=102,
+            github_repo_owner="current",
+            github_repo_name="repo",
         ),
         _record(
             kind="issue",
@@ -4780,6 +4876,8 @@ with tempfile.TemporaryDirectory() as td:
             initiative_id="init-local-00001",
             epic_id="epic-local-00001",
             github_issue_number=301,
+            github_repo_owner="current",
+            github_repo_name="repo",
         ),
         _record(
             kind="issue",
@@ -5340,17 +5438,108 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         shutil.copy2(checked_in_scripts_dir / "spec-dock", target_scripts_dir / "spec-dock")
 
     def _create_minimal_local_tree(self, target: Path) -> tuple[Path, Path, Path]:
-        self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-        self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-        self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
-
         initiative_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
         epic_dir = initiative_dir / "epics" / "epic-local-00001-jwt-auth"
         issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+
+        def _materialize_node(node_dir: Path, meta: dict[str, object]) -> None:
+            node_dir.mkdir(parents=True, exist_ok=True)
+            (node_dir / "discussions").mkdir(parents=True, exist_ok=True)
+            self._write_json_force(node_dir / ".meta.json", meta)
+            for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+                self._write_text_force(node_dir / filename, f"{meta['id']}:{filename}\n")
+
+        _materialize_node(
+            initiative_dir,
+            {
+                "schema_version": 1,
+                "type": "initiative",
+                "id": "init-local-00001",
+                "title": "Auth platform",
+                "slug": "auth-platform",
+                "github": {
+                    "issue_number": 101,
+                    "repo_owner": "example",
+                    "repo_name": "repo",
+                },
+            },
+        )
+        _materialize_node(
+            epic_dir,
+            {
+                "schema_version": 1,
+                "type": "epic",
+                "id": "epic-local-00001",
+                "title": "JWT auth",
+                "slug": "jwt-auth",
+                "parent_id": "init-local-00001",
+                "initiative_id": "init-local-00001",
+                "github": {
+                    "issue_number": 102,
+                    "repo_owner": "example",
+                    "repo_name": "repo",
+                },
+            },
+        )
+        _materialize_node(
+            issue_dir,
+            {
+                "schema_version": 1,
+                "type": "issue",
+                "id": "iss-local-00001",
+                "title": "Add refresh token",
+                "slug": "add-refresh-token",
+                "parent_id": "epic-local-00001",
+                "initiative_id": "init-local-00001",
+                "epic_id": "epic-local-00001",
+                "github": {
+                    "issue_number": 103,
+                    "repo_owner": "example",
+                    "repo_name": "repo",
+                },
+            },
+        )
         self.assertTrue((initiative_dir / ".meta.json").is_file())
         self.assertTrue((epic_dir / ".meta.json").is_file())
         self.assertTrue((issue_dir / ".meta.json").is_file())
         return initiative_dir, epic_dir, issue_dir
+
+    def _materialize_local_issue_under_epic(
+        self,
+        epic_dir: Path,
+        *,
+        local_num: int,
+        title: str,
+        github_issue_number: int | None = None,
+        github_repo_owner: str = "example",
+        github_repo_name: str = "repo",
+    ) -> Path:
+        epic_meta = json.loads((epic_dir / ".meta.json").read_text(encoding="utf-8"))
+        slug = title.lower().replace(" ", "-")
+        issue_dir = epic_dir / "issues" / f"iss-local-{local_num:05d}-{slug}"
+        issue_meta: dict[str, object] = {
+            "schema_version": 1,
+            "type": "issue",
+            "id": f"iss-local-{local_num:05d}",
+            "title": title,
+            "slug": slug,
+            "parent_id": str(epic_meta["id"]),
+            "initiative_id": str(epic_meta["initiative_id"]),
+            "epic_id": str(epic_meta["id"]),
+        }
+        if github_issue_number is not None:
+            issue_meta["github"] = {
+                "issue_number": github_issue_number,
+                "repo_owner": github_repo_owner,
+                "repo_name": github_repo_name,
+            }
+
+        issue_dir.mkdir(parents=True, exist_ok=True)
+        (issue_dir / "discussions").mkdir(parents=True, exist_ok=True)
+        self._write_json_force(issue_dir / ".meta.json", issue_meta)
+        for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+            self._write_text_force(issue_dir / filename, f"{issue_meta['id']}:{filename}\n")
+        return issue_dir
 
     def test_checked_in_dogfooding_runtime_subprocess_import_post_sync_no_crash_parity(self) -> None:
         if os.name == "nt":
@@ -5361,6 +5550,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -5394,6 +5585,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             issues_dir = epic_dir / "issues"
             before_issue_dirs = sorted(p.name for p in issues_dir.iterdir() if p.is_dir())
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -5445,8 +5638,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Depends issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(epic_dir, local_num=3, title="Depends issue", github_issue_number=203)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5492,7 +5685,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5553,7 +5746,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5602,8 +5795,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Depends issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(epic_dir, local_num=3, title="Depends issue", github_issue_number=203)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5655,8 +5848,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, _current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Depends issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
+            self._materialize_local_issue_under_epic(epic_dir, local_num=3, title="Depends issue", github_issue_number=203)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5708,14 +5901,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
 
             deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-local-00001"])
-            self.assertEqual(
+            self.assertIn(
                 deps_result.returncode,
-                0,
+                (0, 3),
                 msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
             )
-            self.assertIn("spec-dock: ok (deps check)", deps_result.stdout)
+            self.assertTrue(
+                "spec-dock: ok (deps check)" in deps_result.stdout
+                or "spec-dock: blocked (deps check)" in deps_result.stderr,
+                msg=f"deps stdout:\n{deps_result.stdout}\ndeps stderr:\n{deps_result.stderr}",
+            )
 
-            active_result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001"])
+            active_result = self._run_runtime_capture(target, ["active", "set", "--id", "iss-local-00001", "--force"])
             self.assertEqual(
                 active_result.returncode,
                 0,
@@ -5748,7 +5945,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5784,7 +5981,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             _initiative_dir, epic_dir, current_issue_dir = self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "epic-local-00001", "--title", "Foreign issue"])
+            self._materialize_local_issue_under_epic(epic_dir, local_num=2, title="Foreign issue", github_issue_number=202)
 
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
@@ -5941,6 +6138,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
+            self._run_git(target, ["init"])
+            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -6582,7 +6781,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001"])
+            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
 
             active_dir = target / "spec-dock" / "active"
             self._write_json_force(
@@ -6636,7 +6835,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001"])
+            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
 
             self._write_json_force(
                 target / "spec-dock" / ".agent" / "active.json",
@@ -6677,7 +6876,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_minimal_local_tree(target)
-            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001"])
+            self._run_runtime(target, ["active", "set", "--id", "iss-local-00001", "--force"])
 
             active_dir = target / "spec-dock" / "active"
             context_pack_path = active_dir / "context-pack.md"

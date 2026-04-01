@@ -105,25 +105,54 @@ _SSH_GH_REMOTE_RE = re.compile(
 )
 
 
-def origin_github_repo_slug(repo_root: Path) -> str | None:
+def _remote_get_url(repo_root: Path, *, push: bool) -> str:
     _ensure_git_available()
+    cmd = ["git", "remote", "get-url"]
+    if push:
+        cmd.append("--push")
+    cmd.append("origin")
     p = subprocess.run(
-        ["git", "config", "--get", "remote.origin.url"],
+        cmd,
         cwd=str(repo_root),
         capture_output=True,
         text=True,
         check=False,
     )
     if p.returncode != 0:
-        return None
+        stderr = (p.stderr or "").strip()
+        if "No such remote" in stderr and "origin" in stderr:
+            raise RuntimeError("origin remote is missing; cannot resolve canonical GitHub repo scope.")
+        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{stderr}")
     raw = (p.stdout or "").strip()
     if not raw:
-        return None
-    match = _HTTPS_GH_REMOTE_RE.fullmatch(raw) or _SSH_GH_REMOTE_RE.fullmatch(raw)
+        raise RuntimeError("origin remote is missing; cannot resolve canonical GitHub repo scope.")
+    return raw
+
+
+def _parse_github_repo_slug(remote_url: str) -> str | None:
+    match = _HTTPS_GH_REMOTE_RE.fullmatch(remote_url) or _SSH_GH_REMOTE_RE.fullmatch(remote_url)
     if match is None:
         return None
-    owner = match.group("owner").strip()
-    repo = match.group("repo").strip()
+    owner = match.group("owner").strip().lower()
+    repo = match.group("repo").strip().lower()
     if not owner or not repo:
         return None
     return f"{owner}/{repo}"
+
+
+def origin_github_repo_slug(repo_root: Path) -> str | None:
+    fetch_url = _remote_get_url(repo_root, push=False)
+    push_url = _remote_get_url(repo_root, push=True)
+    fetch_slug = _parse_github_repo_slug(fetch_url)
+    push_slug = _parse_github_repo_slug(push_url)
+    if fetch_slug is None or push_slug is None:
+        raise RuntimeError(
+            "origin remote is not a GitHub repository; cannot resolve canonical repo scope: "
+            f"fetch={fetch_url} push={push_url}"
+        )
+    if fetch_slug != push_slug:
+        raise RuntimeError(
+            "origin remote fetch/push mismatch; cannot resolve canonical repo scope: "
+            f"fetch={fetch_slug} push={push_slug}"
+        )
+    return fetch_slug

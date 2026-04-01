@@ -41,7 +41,7 @@ Epic は設計の背骨です。
 - `requirement.md`: 期待する価値、受け入れ条件、非機能、スコープ
 - `design.md`: 契約、移行、観測性、リスク
 - `plan.md`: Issue 分割、依存順、品質ゲート。shared axiom は `phase_plan.md`、Epic 固有の書き方は `phase_plan_epic.md`
-- `discussions/`: `new doc {adr|disc|research|note} --epic <epic-id> --title "..."`
+- `discussions/`: `new doc {adr|disc|research|note} --epic <epic-id> --title "..."` で、この epic の `discussions/` 配下に timestamp-prefixed original を作成する。標準形は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - shared な書き方は `phase_*.md`、lifecycle / governance と Epic 固有の分割判断はこの workflow を正本とする
 
 ## 品質ゲート

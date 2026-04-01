@@ -1,4 +1,5 @@
 import contextlib
+from dataclasses import replace
 import io
 import json
 import sys
@@ -967,7 +968,14 @@ class TestRuntimeDepsS04(unittest.TestCase):
         ) = _runtime_modules()
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
-            records = _sample_records(infra_contracts, repo_root=repo_root)
+            records = [
+                replace(
+                    record,
+                    github_repo_owner="current",
+                    github_repo_name="repo",
+                )
+                for record in _sample_records(infra_contracts, repo_root=repo_root)
+            ]
             _materialize_required_artifacts(records)
             deps_reader = _StubDepsTopologyReader(
                 {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": ["iss-local-00001"]}

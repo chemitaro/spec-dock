@@ -7,9 +7,31 @@ from .deps import validate_deps_cycles
 from .ids import parse_id, validate_lowercase, validate_slug
 from .models import SpecGraph, SpecNode, ValidationReport
 
-_DISCUSSION_DOC_FILENAME_RE = re.compile(
+_DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
+_DISCUSSION_DOC_TIMESTAMP_FILENAME_RE = re.compile(
+    r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?-(?P<doc_type>adr|disc|research|note)-"
+    r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+)
+_DISCUSSION_DOC_LEGACY_FILENAME_RE = re.compile(
     r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
+_DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE = re.compile(
+    r"^(?:[0-9]{8}|[0-9]{14}[a-zA-Z]?|[0-9]{8}[a-zA-Z][0-9]{5,7}[a-zA-Z]?|[0-9]{8}[tT][0-9]+[a-zA-Z]*)$"
+)
+_DISCUSSION_DOC_TIMESTAMP_INTENT_PREFIX_RE = re.compile(r"^[0-9]{8}[tT][0-9].*$")
+_DISCUSSION_DOC_LEGACY_SEQUENCE_INTENT_PREFIX_RE = re.compile(r"^[0-9]{3}_.*$")
+
+
+def _is_discussion_doc_type_candidate(token: str) -> bool:
+    return bool(token) and token.lower() in _DISCUSSION_DOC_TYPES
+
+
+def _find_discussion_doc_type_slot(parts: list[str]) -> int | None:
+    if len(parts) >= 2 and _is_discussion_doc_type_candidate(parts[1]):
+        return 1
+    if len(parts) >= 3 and _is_discussion_doc_type_candidate(parts[2]):
+        return 2
+    return None
 
 
 def _meta_json_path_for_output(node: SpecNode, *, repo_root: Path | None = None) -> str:
@@ -70,7 +92,113 @@ def _github_linkage_key(
     return (repo_slug, int(node.github_issue_number))
 
 
-def _validate_discussion_sequences(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
+def _is_nonblank_github_repo_scope_value(value: str | None) -> bool:
+    return bool(str(value or "").strip())
+
+
+def _github_repo_scope_pairing_error(node: SpecNode, *, repo_root: Path | None = None) -> str | None:
+    if node.kind not in ("initiative", "epic", "issue"):
+        return None
+    owner_is_set = _is_nonblank_github_repo_scope_value(node.github_repo_owner)
+    name_is_set = _is_nonblank_github_repo_scope_value(node.github_repo_name)
+    if owner_is_set == name_is_set:
+        return None
+    meta_path = _meta_json_path_for_output(node, repo_root=repo_root)
+    return (
+        f"{node.kind} has invalid github linkage: github.repo_owner and github.repo_name "
+        f"must be provided together ({meta_path})"
+    )
+
+
+def find_github_repo_scope_pairing_error(
+    graph: SpecGraph,
+    *,
+    repo_root: Path | None = None,
+) -> str | None:
+    for node in graph.nodes_by_id.values():
+        error = _github_repo_scope_pairing_error(node, repo_root=repo_root)
+        if error is not None:
+            return error
+    return None
+
+
+def _validate_github_repo_scope_pairing(node: SpecNode, *, repo_root: Path | None = None) -> None:
+    error = _github_repo_scope_pairing_error(node, repo_root=repo_root)
+    if error is not None:
+        raise RuntimeError(error)
+
+
+def _validate_github_mandatory_linkage(node: SpecNode, *, repo_root: Path | None = None) -> None:
+    if node.kind not in ("initiative", "epic", "issue"):
+        return
+    meta_path = _meta_json_path_for_output(node, repo_root=repo_root)
+    if node.github_issue_number is None:
+        raise RuntimeError(
+            f"{node.kind} missing github.issue_number: {meta_path}. "
+            "initiative/epic/issue nodes must have explicit GitHub linkage under the create contract."
+        )
+
+    _validate_github_repo_scope_pairing(node, repo_root=repo_root)
+    if _normalize_repo_slug(node.github_repo_owner, node.github_repo_name) is None:
+        raise RuntimeError(
+            f"{node.kind} has legacy unscoped github linkage: github.repo_owner and github.repo_name "
+            f"are required for initiative/epic/issue nodes ({meta_path})"
+        )
+
+
+def _is_malformed_discussion_doc_candidate(path: Path) -> bool:
+    stem = path.stem
+    parts = stem.split("-")
+    if not parts:
+        return False
+    first = parts[0]
+    doc_type_slot = _find_discussion_doc_type_slot(parts)
+    if _is_discussion_doc_type_candidate(first):
+        return True
+    if doc_type_slot is not None and not first.isdigit():
+        return True
+    if re.fullmatch(r"[0-9]{3}", first) is not None:
+        return True
+    if _DISCUSSION_DOC_LEGACY_SEQUENCE_INTENT_PREFIX_RE.fullmatch(stem) is not None:
+        return True
+    if any(stem.lower().startswith(f"{doc_type}_") for doc_type in _DISCUSSION_DOC_TYPES):
+        return True
+    if _DISCUSSION_DOC_TIMESTAMP_INTENT_TOKEN_RE.fullmatch(first) is not None:
+        return True
+    if _DISCUSSION_DOC_TIMESTAMP_INTENT_PREFIX_RE.fullmatch(stem) is not None:
+        return True
+    return False
+
+
+def _format_discussion_filename_expectation() -> str:
+    return (
+        "Expected `<ts>-<kind>-<slug>.md`, `<ts>-<nn>-<kind>-<slug>.md`, "
+        "or grandfathered `<nnn>-<kind>-<slug>.md`."
+    )
+
+
+def find_malformed_discussion_doc_filename_error(
+    discussions_dir: Path,
+    *,
+    repo_root: Path | None = None,
+) -> str | None:
+    if not discussions_dir.exists():
+        return None
+    for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+        if _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE.fullmatch(path.name) is not None:
+            continue
+        if _DISCUSSION_DOC_LEGACY_FILENAME_RE.fullmatch(path.name) is not None:
+            continue
+        if _is_malformed_discussion_doc_candidate(path):
+            return (
+                "Malformed discussion document filename under "
+                f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
+                f"{path.name}. {_format_discussion_filename_expectation()}"
+            )
+    return None
+
+
+def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
     scopes = sorted(
         (node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")),
         key=lambda node: (node.kind, node.id, node.path.as_posix()),
@@ -79,23 +207,60 @@ def _validate_discussion_sequences(graph: SpecGraph, *, repo_root: Path | None =
         discussions_dir = scope.path / "discussions"
         if not discussions_dir.exists():
             continue
-        by_seq: dict[int, list[Path]] = {}
+        by_standard_slot: dict[str, list[Path]] = {}
+        by_suffix_slot: dict[tuple[str, int], list[Path]] = {}
+        by_doc_id: dict[str, list[Path]] = {}
+        malformed_error = find_malformed_discussion_doc_filename_error(discussions_dir, repo_root=repo_root)
+        if malformed_error is not None:
+            raise RuntimeError(malformed_error)
         for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
-            matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
-            if matched is None:
+            matched = _DISCUSSION_DOC_TIMESTAMP_FILENAME_RE.fullmatch(path.name)
+            if matched is not None:
+                timestamp = str(matched.group("ts"))
+                suffix_raw = matched.group("nn")
+                doc_type = str(matched.group("doc_type"))
+                if suffix_raw is None:
+                    by_standard_slot.setdefault(timestamp, []).append(path)
+                    doc_id = f"{timestamp}-{doc_type}"
+                else:
+                    suffix = int(suffix_raw)
+                    by_suffix_slot.setdefault((timestamp, suffix), []).append(path)
+                    doc_id = f"{timestamp}-{suffix:02d}-{doc_type}"
+                by_doc_id.setdefault(doc_id, []).append(path)
                 continue
-            seq = int(matched.group("seq"))
-            by_seq.setdefault(seq, []).append(path)
-        duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
-        if not duplicate_seqs:
-            continue
-        dup_seq = duplicate_seqs[0]
-        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
-        raise RuntimeError(
-            "Duplicate discussion sequence detected under "
-            f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
-            f"seq={dup_seq:03d} files=[{files}]"
-        )
+            if _DISCUSSION_DOC_LEGACY_FILENAME_RE.fullmatch(path.name) is not None:
+                continue
+        duplicate_standard_slots = sorted(slot for slot, paths in by_standard_slot.items() if len(paths) > 1)
+        if duplicate_standard_slots:
+            dup_slot = duplicate_standard_slots[0]
+            files = ", ".join(path.name for path in sorted(by_standard_slot[dup_slot], key=lambda p: p.as_posix()))
+            raise RuntimeError(
+                "Duplicate discussion timestamp slot detected under "
+                f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
+                f"slot={dup_slot} files=[{files}]"
+            )
+        duplicate_suffix_slots = sorted(slot for slot, paths in by_suffix_slot.items() if len(paths) > 1)
+        if duplicate_suffix_slots:
+            dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
+            files = ", ".join(
+                path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+            )
+            raise RuntimeError(
+                "Duplicate discussion timestamp suffix detected under "
+                f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
+                f"slot={dup_timestamp}-{dup_suffix:02d} files=[{files}]"
+            )
+        duplicate_doc_ids = sorted(doc_id for doc_id, paths in by_doc_id.items() if len(paths) > 1)
+        if duplicate_doc_ids:
+            duplicate_doc_id = duplicate_doc_ids[0]
+            files = ", ".join(
+                path.name for path in sorted(by_doc_id[duplicate_doc_id], key=lambda p: p.as_posix())
+            )
+            raise RuntimeError(
+                "Duplicate discussion doc_id detected under "
+                f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
+                f"doc_id={duplicate_doc_id} files=[{files}]"
+            )
 
 
 def validate_github_issue_numbers_unique(
@@ -159,6 +324,7 @@ def validate_graph(
     repo_root: Path | None = None,
     *,
     current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
 ) -> ValidationReport:
     """Validate structural integrity and return accumulated errors/warnings."""
     try:
@@ -166,6 +332,7 @@ def validate_graph(
             graph,
             repo_root=repo_root,
             current_repo_slug=current_repo_slug,
+            enforce_github_mandatory_linkage=enforce_github_mandatory_linkage,
         )
     except RuntimeError as e:
         return ValidationReport(errors=[str(e)], warnings=[])
@@ -178,12 +345,14 @@ def validate_graph_and_deps(
     repo_root: Path | None = None,
     *,
     current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
 ) -> ValidationReport:
     """Validate the graph and dependency-related preconditions."""
     report = validate_graph(
         graph,
         repo_root=repo_root,
         current_repo_slug=current_repo_slug,
+        enforce_github_mandatory_linkage=enforce_github_mandatory_linkage,
     )
     if report.errors:
         return report
@@ -201,6 +370,7 @@ def _validate_graph_or_raise(
     *,
     repo_root: Path | None = None,
     current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
 ) -> None:
     numeric_ids: dict[tuple[str, bool, int], list[str]] = {}
     for node_id in graph.nodes_by_id.keys():
@@ -215,12 +385,15 @@ def _validate_graph_or_raise(
                 f"Duplicate numeric id detected: {prefix}{marker}-{num} matches multiple ids: {', '.join(uniq)}"
             )
 
+    github_repo_scope_pairing_error = find_github_repo_scope_pairing_error(graph, repo_root=repo_root)
+    if github_repo_scope_pairing_error is not None:
+        raise RuntimeError(github_repo_scope_pairing_error)
+
     validate_github_issue_numbers_unique(
         graph,
         repo_root=repo_root,
         current_repo_slug=current_repo_slug,
     )
-    _validate_discussion_sequences(graph, repo_root=repo_root)
 
     for node_id, node in graph.nodes_by_id.items():
         validate_lowercase(node_id, field="id")
@@ -230,6 +403,8 @@ def _validate_graph_or_raise(
         if not node.slug:
             raise RuntimeError(f"Missing slug in .meta.json: {node.meta_path}")
         validate_slug(node.slug, field="slug")
+        if enforce_github_mandatory_linkage:
+            _validate_github_mandatory_linkage(node, repo_root=repo_root)
 
         if node.kind == "initiative":
             if node.parent_id is not None:
@@ -274,3 +449,5 @@ def _validate_graph_or_raise(
             continue
 
         raise RuntimeError(f"Unknown node type: {node.kind} ({node.meta_path})")
+
+    _validate_discussion_filenames(graph, repo_root=repo_root)

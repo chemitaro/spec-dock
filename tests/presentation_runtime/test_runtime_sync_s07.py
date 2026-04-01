@@ -1,6 +1,8 @@
 import contextlib
+import errno
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -232,6 +234,17 @@ class _FailingArtifactWriter:
         raise RuntimeError(self.reason)
 
 
+class _CapturingFailingArtifactWriter:
+    def __init__(self, reason):
+        self.reason = reason
+        self.bundle = None
+
+    def write(self, specdock_dir, bundle):
+        del specdock_dir
+        self.bundle = bundle
+        raise RuntimeError(self.reason)
+
+
 class _SpyArtifactWriter:
     def __init__(self):
         self.called = False
@@ -325,6 +338,1147 @@ class TestRuntimeSyncS07(unittest.TestCase):
             issue_limit=10000,
             update_active_from_branch=update_active,
         )
+
+    def _write_discussion_doc(
+        self,
+        scope_dir: Path,
+        filename: str,
+        *,
+        front_matter_lines: list[str] | None,
+    ) -> Path:
+        discussions_dir = scope_dir / "discussions"
+        discussions_dir.mkdir(parents=True, exist_ok=True)
+        path = discussions_dir / filename
+        parts: list[str] = []
+        if front_matter_lines is not None:
+            parts.extend(["---", *front_matter_lines, "---", ""])
+        parts.extend([f"# {filename}", ""])
+        path.write_text("\n".join(parts), encoding="utf-8")
+        return path
+
+    def _write_valid_adr_doc(
+        self,
+        scope_dir: Path,
+        filename: str,
+        *,
+        doc_id: str,
+        scope_id: str,
+    ) -> Path:
+        return self._write_discussion_doc(
+            scope_dir,
+            filename,
+            front_matter_lines=[
+                "種別: ADR（Architecture Decision Record）",
+                f'ID: "{doc_id}"',
+                'タイトル: "ADR"',
+                '状態: "draft"',
+                '作成者: "Tester"',
+                '最終更新: "2026-03-29"',
+                f'親: ["{scope_id}"]',
+            ],
+        )
+
+    def _expected_sync_artifact_relpaths(self) -> set[str]:
+        return {
+            ".agent/index-all.json",
+            ".agent/index.json",
+            ".agent/tree-all.json",
+            ".agent/tree.json",
+            "tree-all.puml",
+            "tree.puml",
+            ".agent/deps-issues.json",
+            "deps-issues.puml",
+            "dashboard.md",
+        }
+
+    def test_collect_adr_mirror_sources_filters_to_valid_multi_scope_adr_inputs(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            epic_dir = Path(records[1].path)
+            issue_api_dir = Path(records[2].path)
+            issue_db_dir = Path(records[3].path)
+            initiative_doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            epic_doc = self._write_valid_adr_doc(
+                epic_dir,
+                "20260312t010204z-adr-epic-decision.md",
+                doc_id="20260312t010204z-adr",
+                scope_id="epic-local-00001",
+            )
+            issue_doc = self._write_valid_adr_doc(
+                issue_api_dir,
+                "20260312t010205z-01-adr-issue-decision.md",
+                doc_id="20260312t010205z-01-adr",
+                scope_id="iss-local-00001",
+            )
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "001-adr-legacy-decision.md",
+                doc_id="001-adr",
+                scope_id="init-local-00001",
+            )
+            self._write_discussion_doc(
+                epic_dir,
+                "20260312t010206z-adr-malformed-frontmatter.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'タイトル: "Missing id and parent"',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_api_dir,
+                "notes.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010207z-adr"',
+                    '親: ["iss-local-00001"]',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_db_dir,
+                "20260312t010208z-adr-parent-mismatch.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010208z-adr"',
+                    'タイトル: "Mismatch"',
+                    '状態: "draft"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-03-29"',
+                    '親: ["epic-local-00001"]',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_db_dir,
+                "20260312t010209z-disc-not-an-adr.md",
+                front_matter_lines=[
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010209z-disc"',
+                    '親: ["iss-local-00002"]',
+                ],
+            )
+            self._write_discussion_doc(
+                issue_db_dir,
+                "20260312t010210z-adr-malformed-kind.md",
+                front_matter_lines=[
+                    "種別: ADRoops",
+                    'ID: "20260312t010210z-adr"',
+                    'タイトル: "Malformed kind"',
+                    '状態: "draft"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-03-29"',
+                    '親: ["iss-local-00002"]',
+                ],
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(self._request(app_contracts), ports)
+            sources = app_sync_state._collect_adr_mirror_sources(state.graph)
+
+            self.assertEqual(
+                {source.source_path for source in sources},
+                {initiative_doc, epic_doc, issue_doc},
+            )
+            self.assertEqual(
+                {source.basename for source in sources},
+                {
+                    "20260312t010203z-adr-init-decision.md",
+                    "20260312t010204z-adr-epic-decision.md",
+                    "20260312t010205z-01-adr-issue-decision.md",
+                },
+            )
+
+    def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            issue_api_dir = Path(records[2].path)
+            basename = "20260312t010203z-adr-shared-decision.md"
+            self._write_valid_adr_doc(
+                initiative_dir,
+                basename,
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            self._write_valid_adr_doc(
+                issue_api_dir,
+                basename,
+                doc_id="20260312t010203z-adr",
+                scope_id="iss-local-00001",
+            )
+            adrs_dir = specdock_dir / "adrs"
+            adrs_dir.mkdir(parents=True, exist_ok=True)
+            sentinel = adrs_dir / "keep.txt"
+            sentinel.write_text("keep-me\n", encoding="utf-8")
+            spy_writer = _SpyArtifactWriter()
+            events: list[str] = []
+            active_store = _StubActiveStateStore(infra_contracts, events)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=active_store,
+                git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts, update_active=True), ports)
+
+            self.assertFalse(spy_writer.called)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_before_write")
+            self.assertIn("ADR mirror basename collision", result.artifact_failure.reason)
+            self.assertIn(basename, result.artifact_failure.reason)
+            self.assertIsNone(result.active_update)
+            self.assertIsNone(result.state.active)
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep-me\n")
+            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), ["keep.txt"])
+            self.assertEqual(events, ["active.load.migrate"])
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+            self.assertIn("ADR mirror basename collision", rendered.stderr_lines[0])
+
+    def test_sync_builds_flat_adr_mirror_symlinks_on_success(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            issue_api_dir = Path(records[2].path)
+            initiative_doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            issue_doc = self._write_valid_adr_doc(
+                issue_api_dir,
+                "20260312t010205z-01-adr-issue-decision.md",
+                doc_id="20260312t010205z-01-adr",
+                scope_id="iss-local-00001",
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts), ports)
+
+            self.assertIsNone(result.artifact_failure)
+            adrs_dir = specdock_dir / "adrs"
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertEqual(
+                sorted(path.name for path in adrs_dir.iterdir()),
+                [initiative_doc.name, issue_doc.name],
+            )
+            for source in (initiative_doc, issue_doc):
+                link_path = adrs_dir / source.name
+                self.assertTrue(link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}")
+                self.assertFalse(os.readlink(link_path).startswith("/"), os.readlink(link_path))
+                self.assertEqual(link_path.resolve(), source.resolve())
+
+    def test_sync_warns_and_succeeds_with_empty_adrs_when_symlinks_are_unsupported(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            adrs_dir = specdock_dir / "adrs"
+            adrs_dir.mkdir(parents=True, exist_ok=True)
+            (adrs_dir / "stale.txt").write_text("stale\n", encoding="utf-8")
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+            original_symlink = app_sync_state.os.symlink
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                OSError(errno.ENOSYS, "symlink unsupported")
+            )
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+
+            self.assertIsNone(result.artifact_failure)
+            self.assertIsNotNone(result.write_result)
+            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            index_todo = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
+            index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertIn("adr_mirror_symlink_unsupported", index_todo["warnings"])
+            self.assertIn("adr_mirror_symlink_unsupported", index_all["warnings"])
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertEqual(list(adrs_dir.iterdir()), [])
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertIn("adr_mirror_symlink_unsupported", rendered.warnings)
+
+    def test_sync_failure_keeps_symlink_unsupported_warning_in_result_state(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            writer = infra_artifact_writer.FileArtifactWriter()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=writer,
+                clock=_StubClock(),
+            )
+            write_calls: list[Path] = []
+            original_write_text = infra_artifact_writer._write_text
+            fail_after_successes = 3
+
+            def _partial_write_then_fail(path: Path, text: str) -> None:
+                if len(write_calls) >= fail_after_successes:
+                    raise RuntimeError("read-only fs")
+                original_write_text(path, text)
+                write_calls.append(path)
+
+            infra_artifact_writer._write_text = _partial_write_then_fail
+            original_symlink = app_sync_state.os.symlink
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                OSError(errno.ENOSYS, "symlink unsupported")
+            )
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                infra_artifact_writer._write_text = original_write_text
+                app_sync_state.os.symlink = original_symlink
+
+            self.assertIsNone(result.write_result)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
+            self.assertEqual(result.artifact_failure.reason, "read-only fs")
+            persisted_paths = {path.relative_to(specdock_dir).as_posix() for path in write_calls}
+            expected_paths = self._expected_sync_artifact_relpaths()
+            self.assertTrue(persisted_paths)
+            self.assertTrue(persisted_paths.issubset(expected_paths))
+            self.assertNotEqual(persisted_paths, expected_paths)
+            self.assertTrue(expected_paths - persisted_paths)
+            persisted_index_paths = [
+                path for path in write_calls if path.relative_to(specdock_dir).as_posix() in
+                {".agent/index-all.json", ".agent/index.json"}
+            ]
+            for persisted_index_path in persisted_index_paths:
+                payload = json.loads(persisted_index_path.read_text(encoding="utf-8"))
+                self.assertIn("adr_mirror_symlink_unsupported", payload["warnings"])
+            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertEqual(rendered.warnings, result.state.warnings)
+
+    def test_sync_active_update_render_failure_preserves_symlink_warning_and_reports_non_atomic(
+        self,
+    ) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            events: list[str] = []
+            spy_writer = _SpyArtifactWriter()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, events),
+                git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            original_symlink = app_sync_state.os.symlink
+            original_render_dashboard = app_sync_state.render_dashboard
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                OSError(errno.ENOSYS, "symlink unsupported")
+            )
+            app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("render failed")
+            )
+            try:
+                result = app_sync_state.sync(
+                    self._request(app_contracts, force=False, update_active=True),
+                    ports,
+                )
+            finally:
+                app_sync_state.os.symlink = original_symlink
+                app_sync_state.render_dashboard = original_render_dashboard
+
+            self.assertFalse(spy_writer.called)
+            self.assertIsNone(result.write_result)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
+            self.assertEqual(result.artifact_failure.reason, "render failed")
+            self.assertIsNotNone(result.active_update)
+            self.assertTrue(result.active_update.applied)
+            self.assertEqual(result.state.active.issue_id, "iss-local-00001")
+            self.assertIn("active.write", events)
+            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertEqual(rendered.warnings, result.state.warnings)
+            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+            self.assertIn("status=failed_partial_or_stale", rendered.stderr_lines[0])
+            self.assertIn("adr_mirror_symlink_unsupported", rendered.warnings)
+
+    def test_sync_symlink_probe_preserves_existing_repo_files_with_legacy_probe_name(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            legacy_probe_path = specdock_dir / ".spec-dock-symlink-probe"
+            legacy_probe_path.write_text("user data\n", encoding="utf-8")
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts), ports)
+
+            self.assertIsNone(result.artifact_failure)
+            self.assertEqual(legacy_probe_path.read_text(encoding="utf-8"), "user data\n")
+            mirror_path = specdock_dir / "adrs" / doc.name
+            self.assertTrue(mirror_path.is_symlink())
+            self.assertEqual(mirror_path.resolve(), doc.resolve())
+
+    def test_sync_recovers_dangling_adrs_symlink_before_probe_and_rebuilds_mirror(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            adrs_dir = specdock_dir / "adrs"
+            try:
+                os.symlink("missing-generated-adrs-dir", adrs_dir)
+            except OSError as error:
+                if app_sync_state._is_environment_symlink_unsupported(error):
+                    self.skipTest("symlinks not supported in test environment")
+                raise
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts), ports)
+
+            self.assertIsNone(result.artifact_failure)
+            self.assertIsNotNone(result.write_result)
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertFalse(adrs_dir.is_symlink())
+            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), [doc.name])
+            mirror_path = adrs_dir / doc.name
+            self.assertTrue(mirror_path.is_symlink())
+            self.assertEqual(mirror_path.resolve(), doc.resolve())
+
+    def test_sync_treats_live_adrs_symlink_as_unsafe_for_probe_and_replaces_it(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            managed_target_dir = repo_root / "managed-adrs-target"
+            managed_target_dir.mkdir(parents=True, exist_ok=True)
+            preserved = managed_target_dir / "preserve.txt"
+            preserved.write_text("keep-me\n", encoding="utf-8")
+            adrs_dir = specdock_dir / "adrs"
+            try:
+                os.symlink(managed_target_dir, adrs_dir)
+            except OSError as error:
+                if app_sync_state._is_environment_symlink_unsupported(error):
+                    self.skipTest("symlinks not supported in test environment")
+                raise
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+            symlink_calls: list[tuple[str, Path]] = []
+            original_symlink = app_sync_state.os.symlink
+
+            def _recording_symlink(src, dst):
+                dst_path = Path(dst)
+                symlink_calls.append((str(src), dst_path))
+                return original_symlink(src, dst)
+
+            app_sync_state.os.symlink = _recording_symlink
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+
+            self.assertIsNone(result.artifact_failure)
+            self.assertIsNotNone(result.write_result)
+            self.assertGreaterEqual(len(symlink_calls), 2)
+            probe_path = symlink_calls[0][1]
+            mirror_path = adrs_dir / doc.name
+            self.assertEqual(probe_path.parent, specdock_dir)
+            self.assertTrue(probe_path.name.startswith(".spec-dock-adr-mirror-probe-"))
+            self.assertFalse(probe_path.exists())
+            self.assertEqual(symlink_calls[1][1], mirror_path)
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertFalse(adrs_dir.is_symlink())
+            self.assertTrue(mirror_path.is_symlink())
+            self.assertEqual(mirror_path.resolve(), doc.resolve())
+            self.assertTrue(managed_target_dir.is_dir())
+            self.assertEqual(sorted(path.name for path in managed_target_dir.iterdir()), ["preserve.txt"])
+            self.assertEqual(preserved.read_text(encoding="utf-8"), "keep-me\n")
+            self.assertFalse((managed_target_dir / doc.name).exists())
+
+    def test_resolve_adr_mirror_probe_location_falls_back_when_adrs_is_not_a_directory(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            specdock_dir = Path(td) / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            adrs_path = specdock_dir / "adrs"
+            adrs_path.write_text("not a directory\n", encoding="utf-8")
+
+            location = app_sync_state._resolve_adr_mirror_probe_location(specdock_dir)
+
+            self.assertEqual(location.probe_dir, specdock_dir)
+            self.assertFalse(location.remove_probe_dir_after)
+
+    def test_sync_uses_specdock_dir_for_probe_when_existing_adrs_dir_is_not_probe_writable(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            adrs_dir = specdock_dir / "adrs"
+            adrs_dir.mkdir(parents=True, exist_ok=True)
+            os.chmod(adrs_dir, 0o555)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+            symlink_calls: list[tuple[str, Path]] = []
+            original_symlink = app_sync_state.os.symlink
+
+            def _read_only_generated_adrs_probe(src, dst):
+                dst_path = Path(dst)
+                symlink_calls.append((str(src), dst_path))
+                if (
+                    dst_path.parent == adrs_dir
+                    and dst_path.name.startswith(".spec-dock-adr-mirror-probe-")
+                ):
+                    raise PermissionError(errno.EPERM, "operation not permitted")
+                return original_symlink(src, dst)
+
+            app_sync_state.os.symlink = _read_only_generated_adrs_probe
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+                if adrs_dir.exists() and not adrs_dir.is_symlink():
+                    os.chmod(adrs_dir, 0o755)
+
+            self.assertIsNone(result.artifact_failure)
+            self.assertIsNotNone(result.write_result)
+            self.assertGreaterEqual(len(symlink_calls), 2)
+            probe_path = symlink_calls[0][1]
+            mirror_path = adrs_dir / doc.name
+            self.assertEqual(probe_path.parent, specdock_dir)
+            self.assertTrue(probe_path.name.startswith(".spec-dock-adr-mirror-probe-"))
+            self.assertFalse(probe_path.exists())
+            self.assertEqual(symlink_calls[1][1], mirror_path)
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertTrue(mirror_path.is_symlink())
+            self.assertEqual(mirror_path.resolve(), doc.resolve())
+
+    def test_sync_ignores_non_utf8_timestamp_adr_candidates(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            valid_doc = self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            invalid_doc = initiative_dir / "discussions" / "20260312t010204z-adr-invalid-encoding.md"
+            invalid_doc.write_bytes(b"\xff\xfe\x00bad utf-8")
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+
+            result = app_sync_state.sync(self._request(app_contracts), ports)
+
+            self.assertIsNone(result.artifact_failure)
+            adrs_dir = specdock_dir / "adrs"
+            self.assertEqual(sorted(path.name for path in adrs_dir.iterdir()), [valid_doc.name])
+            self.assertFalse((adrs_dir / invalid_doc.name).exists())
+
+    def test_sync_leaves_empty_adrs_without_warning_when_no_adr_sources_exist(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            adrs_dir = specdock_dir / "adrs"
+            adrs_dir.mkdir(parents=True, exist_ok=True)
+            (adrs_dir / "stale.txt").write_text("stale\n", encoding="utf-8")
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+            original_symlink = app_sync_state.os.symlink
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                OSError(errno.ENOSYS, "symlink unsupported")
+            )
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+
+            self.assertIsNone(result.artifact_failure)
+            self.assertIsNotNone(result.write_result)
+            self.assertTrue(adrs_dir.is_dir())
+            self.assertEqual(list(adrs_dir.iterdir()), [])
+            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertNotIn("adr_mirror_symlink_unsupported", rendered.warnings)
+
+    def test_sync_keeps_symlink_probe_failures_hard_when_not_classified_as_unsupported(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+            original_symlink = app_sync_state.os.symlink
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                PermissionError(errno.EPERM, "operation not permitted")
+            )
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_before_write")
+            self.assertIn("operation not permitted", result.artifact_failure.reason)
+            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+
+    def test_sync_active_update_probe_failure_is_non_atomic(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            events: list[str] = []
+            active_store = _StubActiveStateStore(infra_contracts, events)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=active_store,
+                git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
+                artifact_writer=_SpyArtifactWriter(),
+                clock=_StubClock(),
+            )
+            original_symlink = app_sync_state.os.symlink
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                PermissionError(errno.EPERM, "operation not permitted")
+            )
+            try:
+                result = app_sync_state.sync(
+                    self._request(app_contracts, force=False, update_active=True),
+                    ports,
+                )
+            finally:
+                app_sync_state.os.symlink = original_symlink
+
+            self.assertIsNone(result.write_result)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
+            self.assertIn("operation not permitted", result.artifact_failure.reason)
+            self.assertIsNotNone(result.active_update)
+            self.assertTrue(result.active_update.applied)
+            self.assertIn("active.write", events)
+            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+            self.assertNotIn("adr_mirror_symlink_unsupported", rendered.warnings)
+
+    def test_sync_keeps_actual_adr_mirror_symlink_failures_hard_after_probe_success(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            basename = "20260312t010203z-adr-init-decision.md"
+            self._write_valid_adr_doc(
+                initiative_dir,
+                basename,
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            adrs_dir = specdock_dir / "adrs"
+            mirror_path = adrs_dir / basename
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                clock=_StubClock(),
+            )
+            symlink_calls: list[tuple[str, Path]] = []
+            original_symlink = app_sync_state.os.symlink
+
+            def _fail_only_actual_mirror_link(src, dst):
+                dst_path = Path(dst)
+                symlink_calls.append((str(src), dst_path))
+                if len(symlink_calls) == 1:
+                    return original_symlink(src, dst)
+                raise PermissionError(errno.EPERM, "operation not permitted")
+
+            app_sync_state.os.symlink = _fail_only_actual_mirror_link
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+
+            probe_path = symlink_calls[0][1]
+            self.assertEqual(
+                [path.name for _, path in symlink_calls],
+                [probe_path.name, mirror_path.name],
+            )
+            self.assertEqual(probe_path.parent, adrs_dir)
+            self.assertTrue(probe_path.name.startswith(".spec-dock-adr-mirror-probe-"))
+            self.assertFalse(probe_path.exists())
+            self.assertFalse(mirror_path.exists())
+            self.assertIsNone(result.write_result)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_partial_or_stale")
+            self.assertIn("operation not permitted", result.artifact_failure.reason)
+            self.assertNotIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertNotIn("adr_mirror_symlink_unsupported", rendered.warnings)
+            self.assertIn("failed (sync)", rendered.stderr_lines[0])
+
+    def test_is_environment_symlink_unsupported_covers_remaining_classified_branches(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        sentinel = object()
+        original_codes = {
+            name: getattr(app_sync_state.errno, name, sentinel)
+            for name in ("EOPNOTSUPP", "ENOTSUP")
+        }
+        app_sync_state.errno.EOPNOTSUPP = 9001
+        app_sync_state.errno.ENOTSUP = 9002
+        try:
+            with self.subTest("EOPNOTSUPP"):
+                self.assertTrue(
+                    app_sync_state._is_environment_symlink_unsupported(
+                        OSError(app_sync_state.errno.EOPNOTSUPP, "symlink unsupported")
+                    )
+                )
+            with self.subTest("ENOTSUP"):
+                self.assertTrue(
+                    app_sync_state._is_environment_symlink_unsupported(
+                        OSError(app_sync_state.errno.ENOTSUP, "symlink unsupported")
+                    )
+                )
+        finally:
+            for name, value in original_codes.items():
+                if value is sentinel:
+                    delattr(app_sync_state.errno, name)
+                else:
+                    setattr(app_sync_state.errno, name, value)
+
+        class _WindowsPrivilegeError(OSError):
+            @property
+            def winerror(self):
+                return 1314
+
+        with self.subTest("winerror_1314"):
+            self.assertTrue(
+                app_sync_state._is_environment_symlink_unsupported(
+                    _WindowsPrivilegeError(errno.EPERM, "privilege not held")
+                )
+            )
 
     def test_sync_use_case_writes_artifacts_and_paths(self) -> None:
         (
@@ -810,7 +1964,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(status.source, "github")
             self.assertEqual(status.effective_status, "done")
 
-    def test_sync_skips_issue_view_target_for_malformed_partial_repo_scope_linkage(self) -> None:
+    def test_sync_fails_preflight_for_malformed_partial_repo_scope_linkage(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -821,73 +1975,74 @@ class TestRuntimeSyncS07(unittest.TestCase):
             infra_contracts,
             _presentation_cli_text,
         ) = _runtime_modules()
-        partial_scopes = (("current", None), (None, "repo"))
+        partial_scopes = (("current", None), (None, "repo"), ("   ", "repo"), ("current", "   "))
 
-        for repo_owner, repo_name in partial_scopes:
-            with self.subTest(repo_owner=repo_owner, repo_name=repo_name):
-                with tempfile.TemporaryDirectory() as td:
-                    repo_root = Path(td)
-                    specdock_dir = repo_root / "spec-dock"
-                    specdock_dir.mkdir(parents=True, exist_ok=True)
-                    records = self._records(infra_contracts, repo_root)
-                    records[2] = _record(
-                        infra_contracts,
-                        kind="issue",
-                        node_id="iss-local-00001",
-                        title="API",
-                        path=Path(records[2].path),
-                        parent_id="epic-local-00001",
-                        initiative_id="init-local-00001",
-                        epic_id="epic-local-00001",
-                        github_issue_number=301,
-                        github_repo_owner=repo_owner,
-                        github_repo_name=repo_name,
-                    )
-                    records[3] = _record(
-                        infra_contracts,
-                        kind="issue",
-                        node_id="iss-local-00002",
-                        title="DB",
-                        path=Path(records[3].path),
-                        parent_id="epic-local-00001",
-                        initiative_id="init-local-00001",
-                        epic_id="epic-local-00001",
-                        github_issue_number=None,
-                    )
-                    issue_gateway = _StubIssueGateway(snapshots=[])
-                    ports = app_ports.Ports(
-                        node_reader=_StubNodeReader(records),
-                        repo_root=repo_root,
-                        specdock_dir=specdock_dir,
-                        deps_topology_reader=_StubDepsTopologyReader(
+        for force in (False, True):
+            for repo_owner, repo_name in partial_scopes:
+                with self.subTest(force=force, repo_owner=repo_owner, repo_name=repo_name):
+                    with tempfile.TemporaryDirectory() as td:
+                        repo_root = Path(td)
+                        specdock_dir = repo_root / "spec-dock"
+                        specdock_dir.mkdir(parents=True, exist_ok=True)
+                        records = self._records(infra_contracts, repo_root)
+                        records[2] = _record(
                             infra_contracts,
-                            {"iss-local-00001": [], "iss-local-00002": []},
-                        ),
-                        derived_state_reader=_StubDerivedStateReader(
-                            {"iss-local-00001": "open", "iss-local-00002": "open"}
-                        ),
-                        issue_gateway=issue_gateway,
-                        active_state_store=_StubActiveStateStore(infra_contracts, []),
-                        git_gateway=_StubGitGateway("main"),
-                        artifact_writer=infra_artifact_writer.FileArtifactWriter(),
-                        clock=_StubClock(),
-                    )
+                            kind="issue",
+                            node_id="iss-local-00001",
+                            title="API",
+                            path=Path(records[2].path),
+                            parent_id="epic-local-00001",
+                            initiative_id="init-local-00001",
+                            epic_id="epic-local-00001",
+                            github_issue_number=301,
+                            github_repo_owner=repo_owner,
+                            github_repo_name=repo_name,
+                        )
+                        records[3] = _record(
+                            infra_contracts,
+                            kind="issue",
+                            node_id="iss-local-00002",
+                            title="DB",
+                            path=Path(records[3].path),
+                            parent_id="epic-local-00001",
+                            initiative_id="init-local-00001",
+                            epic_id="epic-local-00001",
+                            github_issue_number=None,
+                        )
+                        issue_gateway = _StubIssueGateway(snapshots=[])
+                        ports = app_ports.Ports(
+                            node_reader=_StubNodeReader(records),
+                            repo_root=repo_root,
+                            specdock_dir=specdock_dir,
+                            deps_topology_reader=_StubDepsTopologyReader(
+                                infra_contracts,
+                                {"iss-local-00001": [], "iss-local-00002": []},
+                            ),
+                            derived_state_reader=_StubDerivedStateReader(
+                                {"iss-local-00001": "open", "iss-local-00002": "open"}
+                            ),
+                            issue_gateway=issue_gateway,
+                            active_state_store=_StubActiveStateStore(infra_contracts, []),
+                            git_gateway=_StubGitGateway("main"),
+                            artifact_writer=infra_artifact_writer.FileArtifactWriter(),
+                            clock=_StubClock(),
+                        )
 
-                    result = app_sync_state.sync(
-                        app_contracts.SyncRequest(
-                            force=False,
-                            github_enabled=True,
-                            issue_limit=10000,
-                            update_active_from_branch=False,
-                        ),
-                        ports,
-                    )
-                    self.assertIsNone(result.artifact_failure)
-                    self.assertEqual(issue_gateway.view_calls, [])
-                    self.assertNotIn("gh_fetch_failed", result.state.warnings)
-                    status = result.state.issue_statuses["iss-local-00001"]
-                    self.assertEqual(status.source, "unknown")
-                    self.assertTrue(status.stale)
+                        with self.assertRaisesRegex(
+                            RuntimeError,
+                            "preflight validate failed: issue has invalid github linkage",
+                        ):
+                            app_sync_state.sync(
+                                app_contracts.SyncRequest(
+                                    force=force,
+                                    github_enabled=True,
+                                    issue_limit=10000,
+                                    update_active_from_branch=False,
+                                ),
+                                ports,
+                            )
+                        self.assertEqual(issue_gateway.index_calls, [])
+                        self.assertEqual(issue_gateway.view_calls, [])
 
     def test_sync_falls_back_to_current_repo_view_for_unscoped_linked_epic_when_index_missing_key(self) -> None:
         (
@@ -1813,6 +2968,71 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(result.artifact_failure.status, "failed_before_write")
             self.assertEqual(result.artifact_failure.reason, "render failed")
 
+    def test_sync_prewrite_render_failure_keeps_symlink_warning_in_failed_before_write_result(
+        self,
+    ) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            initiative_dir = Path(records[0].path)
+            self._write_valid_adr_doc(
+                initiative_dir,
+                "20260312t010203z-adr-init-decision.md",
+                doc_id="20260312t010203z-adr",
+                scope_id="init-local-00001",
+            )
+            spy_writer = _SpyArtifactWriter()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": ["iss-local-00002"], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "done"}
+                ),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("feature/iss-local-00001-implement"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            original_symlink = app_sync_state.os.symlink
+            original_render_dashboard = app_sync_state.render_dashboard
+            app_sync_state.os.symlink = lambda src, dst: (_ for _ in ()).throw(
+                OSError(errno.ENOSYS, "symlink unsupported")
+            )
+            app_sync_state.render_dashboard = lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("render failed")
+            )
+            try:
+                result = app_sync_state.sync(self._request(app_contracts), ports)
+            finally:
+                app_sync_state.os.symlink = original_symlink
+                app_sync_state.render_dashboard = original_render_dashboard
+
+            self.assertFalse(spy_writer.called)
+            self.assertIsNotNone(result.artifact_failure)
+            self.assertEqual(result.artifact_failure.status, "failed_before_write")
+            self.assertEqual(result.artifact_failure.reason, "render failed")
+            self.assertIn("adr_mirror_symlink_unsupported", result.state.warnings)
+            rendered = presentation_cli_text.render_sync_text(result)
+            self.assertIn("adr_mirror_symlink_unsupported", rendered.warnings)
+
     def test_render_sync_text_regression(self) -> None:
         (
             _runtime_app,
@@ -1936,6 +3156,33 @@ class TestRuntimeSyncS07(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 exit_code_ok = runtime_app.main(["sync"])
             self.assertEqual(exit_code_ok, 0)
+
+            runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
+                use_cases=_build_use_cases(
+                    lambda _req: app_contracts.SyncCommandResult(
+                        state=app_contracts.SyncStateResult(
+                            graph=delegated_state.graph,
+                            active=delegated_state.active,
+                            issue_statuses=delegated_state.issue_statuses,
+                            progress=delegated_state.progress,
+                            deps_state=delegated_state.deps_state,
+                            deps_eval_by_id=delegated_state.deps_eval_by_id,
+                            generated_at=delegated_state.generated_at,
+                            warnings=["adr_mirror_symlink_unsupported"],
+                            deps_preflight_error=delegated_state.deps_preflight_error,
+                        ),
+                        write_result=None,
+                        active_update=None,
+                        artifact_failure=None,
+                    )
+                )
+            )
+            out = io.StringIO()
+            err = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                exit_code_warn = runtime_app.main(["sync"])
+            self.assertEqual(exit_code_warn, 0)
+            self.assertIn("adr_mirror_symlink_unsupported", err.getvalue())
 
             runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
                 use_cases=_build_use_cases(lambda _req: (_ for _ in ()).throw(RuntimeError("sync failed")))
@@ -2190,7 +3437,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertIn("iss-local-00001", state.graph.nodes_by_id)
             self.assertEqual(node_repo.backfill_calls, [])
 
-    def test_sync_github_keeps_fail_closed_for_partial_scope_backfill_candidates(self) -> None:
+    def test_collect_sync_state_force_hard_fails_for_partial_scope_backfill_candidates(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -2248,17 +3495,95 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 clock=_StubClock(),
             )
 
-            state = app_sync_state.collect_sync_state(
-                app_contracts.SyncRequest(
-                    force=True,
-                    github_enabled=True,
-                    issue_limit=10000,
-                    update_active_from_branch=False,
-                ),
-                ports,
-            )
-            self.assertIn("deps_preflight_failed", state.warnings)
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "preflight validate failed: issue has invalid github linkage",
+            ):
+                app_sync_state.collect_sync_state(
+                    app_contracts.SyncRequest(
+                        force=True,
+                        github_enabled=True,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    ),
+                    ports,
+                )
             self.assertEqual(node_repo.backfill_calls, [])
+
+    def test_collect_sync_state_force_hard_fails_for_partial_scope_when_another_validation_error_exists(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            records[2] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="API",
+                path=Path(records[2].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="current",
+                github_repo_name=None,
+            )
+            records[3] = _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-1",
+                title="DB",
+                path=Path(records[3].path),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=302,
+            )
+            node_repo = _StubNodeRepo()
+            issue_gateway = _StubIssueGateway([])
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                node_repo=node_repo,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-1": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                issue_gateway=issue_gateway,
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main", repo_slug="current/repo"),
+                clock=_StubClock(),
+            )
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "preflight validate failed: issue has invalid github linkage",
+            ):
+                app_sync_state.collect_sync_state(
+                    app_contracts.SyncRequest(
+                        force=True,
+                        github_enabled=True,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    ),
+                    ports,
+                )
+            self.assertEqual(node_repo.backfill_calls, [])
+            self.assertEqual(issue_gateway.index_calls, [])
+            self.assertEqual(issue_gateway.view_calls, [])
 
     def test_sync_github_skips_backfill_when_current_repo_slug_is_unknown(self) -> None:
         (
