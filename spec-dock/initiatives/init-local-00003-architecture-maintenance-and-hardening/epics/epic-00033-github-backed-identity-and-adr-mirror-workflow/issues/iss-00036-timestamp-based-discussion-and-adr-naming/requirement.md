@@ -42,7 +42,7 @@ ID: "iss-00036"
     - naming / scan contract
 - 情報源:
   - `epic-00033` requirement / design / plan
-  - `epic-00033/discussions/001-adr-adr-symlink-mirror-without-index.md`
+  - `epic-00033/discussions/20260327t091500z-adr-adr-symlink-mirror-without-index.md`
 
 ## 対象ユーザー / 利用シナリオ（必要時）
 - 主な利用者:

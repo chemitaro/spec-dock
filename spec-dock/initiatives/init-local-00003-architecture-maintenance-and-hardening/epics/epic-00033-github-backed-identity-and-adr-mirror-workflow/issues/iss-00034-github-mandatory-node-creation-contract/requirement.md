@@ -37,7 +37,7 @@ ID: "iss-00034"
     - `./spec-dock/scripts/spec-dock validate`
 - 情報源:
   - `epic-00033` requirement / design / plan
-  - `epic-00033/discussions/002-adr-github-mandatory-node-linkage.md`
+  - `epic-00033/discussions/20260327t093000z-adr-github-mandatory-node-linkage.md`
 
 ## 対象ユーザー / 利用シナリオ（必要時）
 - 主な利用者:

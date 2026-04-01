@@ -1,6 +1,6 @@
 ---
 種別: ADR（Architecture Decision Record）
-ID: "001-adr"
+ID: "20260327t091500z-adr"
 タイトル: "Adr Symlink Mirror Without Index"
 状態: "accepted"
 作成者: "Codex CLI"
@@ -8,7 +8,7 @@ ID: "001-adr"
 親: ["epic-00033"]
 ---
 
-# 001-adr Adr Symlink Mirror Without Index
+# 20260327t091500z-adr Adr Symlink Mirror Without Index
 
 ## 結論（Decision）
 - ADR の唯一の source of truth は、各 initiative / epic / issue 配下の ADR 実体ファイルとする。

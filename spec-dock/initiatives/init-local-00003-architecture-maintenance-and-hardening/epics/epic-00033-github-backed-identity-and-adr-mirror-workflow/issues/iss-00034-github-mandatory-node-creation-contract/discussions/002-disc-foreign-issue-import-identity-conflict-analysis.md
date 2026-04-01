@@ -24,7 +24,7 @@ ID: "002-disc"
 
 ## 事実確認
 - accepted ADR は `local-only` / local fallback 廃止を明言している。
-  - [002-adr-github-mandatory-node-linkage.md](/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/discussions/002-adr-github-mandatory-node-linkage.md)
+  - [20260327t093000z-adr-github-mandatory-node-linkage.md](/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/discussions/20260327t093000z-adr-github-mandatory-node-linkage.md)
 - active epic requirement は `local-only fallback を残さない`、`cross-repo linkage を扱わない`、`single GitHub repo 前提` を固定している。
   - [requirement.md](/srv/mount/spec-dock/spec-dock/active/epic/requirement.md)
 - active issue requirement でも `local-only fallback` を残さず、`cross-repo linkage` を許可しないと書かれている。
