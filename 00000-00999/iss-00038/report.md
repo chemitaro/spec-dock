@@ -910,6 +910,7 @@ python -m unittest -v \
 #### メモ
 - S99 は historical final gate として保持し、current authoritative terminal gate はこの S100 record とする。
 - `481cdca` と `f17a2f7` は S100 record の report-only sync commits であり、reviewed runtime/docs/tests scope 自体は `623e590` から増えていない。
+- `f4ed038` は S100 audit-line normalization の report-only sync commit であり、reviewed runtime/docs/tests scope 自体は引き続き `623e590` から増えていない。
 
 ### 追補 — S99 final diff review quality gate
 

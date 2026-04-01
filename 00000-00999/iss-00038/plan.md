@@ -405,7 +405,8 @@ ID: "iss-00038"
   - `report.md` 上の S100 record と最新 commit history の照合
 - report update:
   - `./spec-dock/active/issue/report.md` に S100 reviewer / verdict / reviewed scope / referenced evidence / reviewed scope anchor を追記する
-  - S100 gate record を committed artifact 化するための report-only sync commit が後続する場合は、その commit hash を `record_sync_commit` として追記し、fresh `main...HEAD` review がそれを含むことを明記する
+  - S100 gate record を committed artifact 化するための report-only sync commit が後続する場合は、その commit hash を `record_sync_commit` として追記する
+  - その後さらに `report.md` の S100 bookkeeping だけを更新する report-only sync commit が続いても、reviewed runtime/docs/tests scope が不変なら `reviewed_scope_anchor` を更新しない
 
 ### S02 — targeted docs parity review and refresh
 - target:

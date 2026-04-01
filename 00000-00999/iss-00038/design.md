@@ -128,7 +128,7 @@ ID: "iss-00038"
   - final diff review quality gate:
     - terminal close claim は S100 の committed record で閉じる。
     - S100 record には final SG1 / final QG1 / epic-level spec review の reviewer・verdict・referenced evidence を `report.md` に明記する。
-    - S100 record sync commit が report-only bookkeeping で reviewed runtime/docs/tests scope を変えない場合は、`reviewed_scope_anchor` と `record_sync_commit` を併記し、fresh committed-diff review がその sync commit を含むことを明示する。
+    - S100 record sync commit が report-only bookkeeping で reviewed runtime/docs/tests scope を変えない場合は、`reviewed_scope_anchor` と `record_sync_commit` を併記し、後続の report-only sync commit は `reviewed_scope_anchor` を更新せずに bookkeeping chain として扱ってよい。
 - 採用しないもの:
   - `iss-00040` の regression evidence を `iss-00038` で再取得すること。
   - full suite rerun を `iss-00038` の close 条件として再導入すること。
