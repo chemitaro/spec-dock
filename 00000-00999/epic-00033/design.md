@@ -201,9 +201,9 @@ CLI -> MIRROR: rebuild symlink mirror
   - E-AC-005 -> docs parity + final spec review
 
 ## 関連 ADR
-- `discussions/002-adr-github-mandatory-node-linkage.md`
-- `discussions/001-adr-adr-symlink-mirror-without-index.md`
-- 上記 `001-adr...` / `002-adr...` は pre-contract legacy ADR として grandfathered 扱い（自動 rename 対象外）
+- `discussions/20260327t093000z-adr-github-mandatory-node-linkage.md`
+- `discussions/20260327t091500z-adr-adr-symlink-mirror-without-index.md`
+- 上記 2 件は current timestamp ADR basename に整えた accepted ADR 原本。
 
 ## 未確定事項
 - なし:

@@ -1,6 +1,6 @@
 ---
 種別: ADR（Architecture Decision Record）
-ID: "002-adr"
+ID: "20260327t093000z-adr"
 タイトル: "GitHub Mandatory Node Linkage"
 状態: "accepted"
 作成者: "Codex CLI"
@@ -8,7 +8,7 @@ ID: "002-adr"
 親: ["epic-00033"]
 ---
 
-# 002-adr GitHub Mandatory Node Linkage
+# 20260327t093000z-adr GitHub Mandatory Node Linkage
 
 ## 結論（Decision）
 - `initiative` / `epic` / `issue` はすべて GitHub issue との連携を必須にする。
