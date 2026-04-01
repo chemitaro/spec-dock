@@ -101,8 +101,8 @@ contracts --> dogfood
   - non-goal が曖昧で feature backlog を取り込んでしまう。
 
 ## 関連 ADR
-- `epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/discussions/002-adr-github-mandatory-node-linkage.md`
-- `epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/discussions/001-adr-adr-symlink-mirror-without-index.md`
+- `epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/discussions/20260327t093000z-adr-github-mandatory-node-linkage.md`
+- `epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/discussions/20260327t091500z-adr-adr-symlink-mirror-without-index.md`
 
 ## 未確定事項
 - Q-001:

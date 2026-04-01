@@ -44,6 +44,7 @@ Initiative
 
 - SSOT: `spec-dock/initiatives/**/.meta.json`
 - 主な生成物: `spec-dock/active/**`, `spec-dock/.agent/{active,index,tree}*.json`, `spec-dock/{tree,deps-issues}*.puml`, `spec-dock/dashboard.md`
+- `spec-dock/adrs/` は generated ADR mirror です（`sync` で rebuild / gitignore 対象）
 - GitHub は入口として連携できるが、仕様ツリーの正はローカル metadata
 
 代表構造:

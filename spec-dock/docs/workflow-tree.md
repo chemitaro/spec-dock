@@ -4,11 +4,11 @@
 目的は「巨大Issue化」「Why/What/How/Do の混線」「承認前に実装が走る」を防ぎ、Codex CLI（コーディングエージェント）と人間が同じ前提で運用できる状態を作ることです。
 
 関連:
-- 共通原則/チェックリスト: `spec-dock-guide.md`
+- 総合導線: `guide.md`
 - GitHub連携の挙動: `reference_github.md`
-- 状態集計（tree/index）: `sync.md`
-- Issue実装ワークフロー: `workflow-issue.md`
-- ADR運用: `workflow-adr.md`
+- 状態集計（tree/index）: `reference_sync.md`
+- Issue実装ワークフロー: `workflow_issue.md`
+- ADR運用: `workflow_adr.md`
 
 ---
 
@@ -58,7 +58,7 @@
 運用:
 - `状態: draft` の間は **議論・詰め・TBD解消の期間**。推測で埋めない。
 - Initiativeの `状態: approved` は、ユーザー/レビュアーの **明示的承認** でのみ付ける。
-- 詳細チェックは `spec-dock-guide.md` のチェックリストを使う。
+- 詳細確認は `guide.md` を入口に対象 workflow / phase を参照する。
 
 ---
 
@@ -84,9 +84,9 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 
 推奨:
 - 重複を避け、背景/KPIの再掲はせず **親へリンク**する。
-- 親の前提や制約を破る必要が出たら、先に ADR を起こす（`workflow-adr.md`）。
+- 親の前提や制約を破る必要が出たら、先に ADR を起こす（`workflow_adr.md`）。
 
-詳細: `workflow-issue.md`
+詳細: `workflow_issue.md`
 
 ---
 
@@ -101,8 +101,9 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 
 - `spec-dock/.agent/tree.json`（人間向けのネスト表示）
 - `spec-dock/.agent/index.json`（エージェント向けのフラット索引）
+- `spec-dock/adrs/`（generated ADR mirror。`sync` で rebuild / gitignore 対象）
 
-詳細: `sync.md`
+詳細: `reference_sync.md`
 
 ### 5.2 いま作業する対象の固定（active）
 
@@ -134,4 +135,4 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 - GitHub を使えない環境で `new` が失敗 → `gh` と current repo の GitHub linkage を整えるか、既存 current-repo Issue に `--github-issue <n>` でリンクする（`reference_github.md`）
 - `approved` を“進捗”として使ってしまう → **承認用途のみ**（進捗は report/sync）
 - 上位（Initiative/Epic）と下位（Issue）の矛盾が放置される → 差分が出たら上位へフィードバック + ADR
-- “とりあえず実装”が始まる → requirement/design/plan の承認ゲートを必ず通す（`spec-dock-guide.md`）
+- “とりあえず実装”が始まる → requirement/design/plan の承認ゲートを必ず通す（`guide.md` を入口に確認）
