@@ -61,10 +61,12 @@ plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の 
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
 - plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
-- `new issue` はデフォルトで GitHub Issue を作る。local-only は `--no-github`
+- `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作る。node create/import で local-only create へ自動フォールバックしない
 - `new issue --create-github-issue` は default create の explicit alias
-- `new initiative` / `new epic` はデフォルトで local-only。GitHub 連携は opt-in
-- `import` は読み取り確認のみで、GitHub を更新しない。canonical URL は current repo と照合し、cross-repo は `--allow-foreign-url` が必要
+- `--no-github` / `--allow-foreign-url` は compatibility flag として残るが、current contract mismatch を auto-migrate せず reject/fail-fast しうる
+- `import` は読み取り確認のみで、GitHub を更新しない。canonical URL は current repo と照合し、cross-repo node import は reject される
 - `active set` / `deps check` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
+- legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
+- `spec-dock update` は managed files/docs/templates/scripts/skills の更新であり、old workspace の in-place migration ツールではない。legacy `meta.json` や linkage mismatch は手動 normalize / rebuild が必要な場合がある
 - Issue plan は TDD ベースの execution contract を持つが、cadence policy の正本は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

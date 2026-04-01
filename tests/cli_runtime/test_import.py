@@ -16,6 +16,96 @@ from tests.cli_runtime.harness import (
 
 
 class TestCliImport(CliRuntimeHarness):
+    _STANDARD_INITIATIVE_ID = "init-00001"
+    _STANDARD_INITIATIVE_DIRNAME = "init-00001-auth-platform"
+    _STANDARD_EPIC_ID = "epic-00002"
+    _STANDARD_EPIC_DIRNAME = "epic-00002-jwt-auth"
+
+    def _create_linked_parents(
+        self,
+        target: Path,
+        *,
+        owner: str = "example",
+        repo: str = "repo",
+        initiative_issue_number: int = 1,
+        epic_issue_number: int = 2,
+        initiative_title: str = "Auth platform",
+        epic_title: str = "JWT auth",
+    ) -> None:
+        self._init_origin_repo(target, owner=owner, repo=repo)
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "initiative",
+                "--title",
+                initiative_title,
+                "--github-issue",
+                str(initiative_issue_number),
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "epic",
+                "--initiative",
+                str(initiative_issue_number),
+                "--title",
+                epic_title,
+                "--github-issue",
+                str(epic_issue_number),
+            ],
+        )
+
+    def _create_standard_linked_hierarchy(
+        self,
+        target: Path,
+        *,
+        owner: str = "example",
+        repo: str = "repo",
+        issue_issue_number: int = 3,
+        issue_title: str = "Add refresh token",
+    ) -> None:
+        self._create_same_repo_linked_hierarchy(
+            target,
+            owner=owner,
+            repo=repo,
+            initiative_issue_number=1,
+            epic_issue_number=2,
+            issue_issue_number=issue_issue_number,
+            initiative_title="Auth platform",
+            epic_title="JWT auth",
+            issue_title=issue_title,
+        )
+
+    def _standard_initiative_meta_path(self, target: Path) -> Path:
+        return target / "spec-dock" / "initiatives" / self._STANDARD_INITIATIVE_DIRNAME / ".meta.json"
+
+    def _standard_epic_meta_path(self, target: Path) -> Path:
+        return (
+            target
+            / "spec-dock"
+            / "initiatives"
+            / self._STANDARD_INITIATIVE_DIRNAME
+            / "epics"
+            / self._STANDARD_EPIC_DIRNAME
+            / ".meta.json"
+        )
+
+    def _strip_repo_scope(self, meta_path: Path) -> None:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        github = meta.get("github")
+        self.assertIsInstance(github, dict)
+        github_dict = github
+        github_dict.pop("repo_owner", None)
+        github_dict.pop("repo_name", None)
+        self._write_json_force(meta_path, meta)
+
+    def _make_standard_parents_unscoped(self, target: Path) -> None:
+        self._strip_repo_scope(self._standard_initiative_meta_path(target))
+        self._strip_repo_scope(self._standard_epic_meta_path(target))
+
     def test_import_aborts_without_local_changes_when_gh_issue_view_fails(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -24,8 +114,7 @@ class TestCliImport(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -34,7 +123,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -53,12 +142,11 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
 
             # Import target lineage (canonical .meta.json)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
             # Unrelated legacy file to trigger preflight failure.
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Legacy holder"])
+            self._run_runtime(target, ["new", "initiative", "--title", "Legacy holder", "--github-issue", "99"])
 
-            legacy_init_dir = target / "spec-dock" / "initiatives" / "init-local-00002-legacy-holder"
+            legacy_init_dir = target / "spec-dock" / "initiatives" / "init-00099-legacy-holder"
             dot_meta_path = legacy_init_dir / ".meta.json"
             legacy_meta_path = legacy_init_dir / "meta.json"
             dot_meta_path.rename(legacy_meta_path)
@@ -72,7 +160,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                ["import", "issue", "99999", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -94,7 +182,7 @@ class TestCliImport(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_git(target, ["init"])
+            self._init_origin_repo(target)
             self._run_git(
                 target,
                 ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
@@ -135,6 +223,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -200,9 +289,8 @@ class TestCliImport(CliRuntimeHarness):
             )
             self._run_git(target, ["checkout", "-b", "feature/iss-00123-check"])
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["active", "set", "epic-local-00001"])
+            self._create_linked_parents(target)
+            self._run_runtime(target, ["active", "set", "epic-00002"])
 
             active_path = target / "spec-dock" / ".agent" / "active.json"
             before = active_path.read_text(encoding="utf-8")
@@ -214,14 +302,14 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("spec-dock: ok (import issue)", p.stdout)
             self.assertIn("id=iss-00123", p.stdout)
-            self.assertIn("epic=epic-local-00001", p.stdout)
-            self.assertIn("initiative=init-local-00001", p.stdout)
+            self.assertIn("epic=epic-00002", p.stdout)
+            self.assertIn("initiative=init-00001", p.stdout)
             self.assertIn("path=", p.stdout)
             self.assertIn("github=#123", p.stdout)
 
@@ -229,9 +317,9 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
@@ -261,13 +349,7 @@ class TestCliImport(CliRuntimeHarness):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
                     self.assertEqual(main(["init", str(target)]), 0)
-                    if issue_target.startswith("https://"):
-                        if shutil.which("git") is None:
-                            self.skipTest("git not available")
-                        self._run_git(target, ["init"])
-                        self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+                    self._create_linked_parents(target)
 
                     bin_dir = target / ".bin"
                     bin_dir.mkdir(parents=True, exist_ok=True)
@@ -277,7 +359,7 @@ class TestCliImport(CliRuntimeHarness):
 
                     self._run_runtime(
                         target,
-                        ["import", "issue", issue_target, "--title", "Imported issue", "--epic", "epic-local-00001"],
+                        ["import", "issue", issue_target, "--title", "Imported issue", "--epic", "epic-00002"],
                         env=test_env,
                     )
 
@@ -285,15 +367,16 @@ class TestCliImport(CliRuntimeHarness):
                         target
                         / "spec-dock"
                         / "initiatives"
-                        / "init-local-00001-auth-platform"
+                        / "init-00001-auth-platform"
                         / "epics"
-                        / "epic-local-00001-jwt-auth"
+                        / "epic-00002-jwt-auth"
                         / "issues"
                         / "iss-00123-imported-issue"
                     )
                     self.assertTrue(issue_dir.is_dir())
                     log = log_path.read_text(encoding="utf-8")
                     self.assertIn("issue view 123", log)
+                    self.assertIn("--repo example/repo", log)
                     self.assertNotIn("--repo other/repo", log)
 
     def test_import_rejects_foreign_repo_url_without_opt_in(self) -> None:
@@ -305,10 +388,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -325,28 +406,29 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("repository mismatch", p.stderr)
+            self.assertIn("foreign GitHub issue URL", p.stderr)
+            self.assertIn("single-repo", p.stderr)
             self.assertIn("--allow-foreign-url", p.stderr)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-imported-issue"
             )
             self.assertFalse(issue_dir.exists())
             self.assertFalse(log_path.exists())
 
-    def test_import_allows_foreign_repo_url_with_opt_in(self) -> None:
+    def test_import_rejects_foreign_repo_url_even_with_opt_in(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
@@ -355,10 +437,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -376,30 +456,27 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (import issue)", p.stdout)
-            self.assertIn("github=#123", p.stdout)
-            log = log_path.read_text(encoding="utf-8")
-            self.assertIn("issue view 123 --json number,url --repo other/repo", log)
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("foreign GitHub issue URL", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("--allow-foreign-url", p.stderr)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-imported-issue"
             )
-            meta = json.loads((issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(meta["github"]["issue_number"], 123)
-            self.assertEqual(meta["github"]["repo_owner"], "other")
-            self.assertEqual(meta["github"]["repo_name"], "repo")
+            self.assertFalse(issue_dir.exists())
+            self.assertFalse(log_path.exists())
 
     def test_import_rejects_non_canonical_url_like_target(self) -> None:
         if os.name == "nt":
@@ -408,8 +485,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -425,7 +502,7 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
@@ -441,9 +518,9 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
+            self._run_git(target, ["remote", "remove", "origin"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -459,7 +536,7 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
@@ -475,10 +552,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://example.com/owner/repo.git"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._run_git(target, ["remote", "set-url", "origin", "https://example.com/owner/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -494,7 +569,7 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
@@ -510,10 +585,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "git@github.com:example/repo.git"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._run_git(target, ["remote", "set-url", "origin", "git@github.com:example/repo.git"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -529,7 +602,7 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
@@ -545,13 +618,11 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
+            self._create_linked_parents(target)
             self._run_git(
                 target,
-                ["remote", "add", "origin", "https://token@github.com/example/repo.git"],
+                ["remote", "set-url", "origin", "https://token@github.com/example/repo.git"],
             )
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -567,7 +638,7 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Imported issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
@@ -581,9 +652,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["active", "set", "epic-local-00001"])
+            self._create_linked_parents(target)
+            self._run_runtime(target, ["active", "set", "epic-00002"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -595,9 +665,9 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )
@@ -610,8 +680,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["active", "set", "init-local-00001"])
+            self._create_linked_parents(target)
+            self._run_runtime(target, ["active", "set", "init-00001"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -623,7 +693,7 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
                 / "epic-00124-jwt-auth"
             )
@@ -636,8 +706,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -655,8 +724,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             broken_active = {
                 "schema_version": 2,
@@ -686,8 +754,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -696,7 +763,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p1 = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "init-local-00001"],
+                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "init-00001"],
                 env=test_env,
             )
             self.assertNotEqual(p1.returncode, 0, p1.stdout + p1.stderr)
@@ -710,7 +777,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p3 = self._run_runtime_capture(
                 target,
-                ["import", "epic", "125", "--title", "JWT auth", "--initiative", "epic-local-00001"],
+                ["import", "epic", "125", "--title", "JWT auth", "--initiative", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p3.returncode, 0, p3.stdout + p3.stderr)
@@ -722,9 +789,9 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
             self._run_runtime(target, ["new", "initiative", "--title", "Linked initiative", "--github-issue", "123"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -733,7 +800,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -750,20 +817,16 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
+            self._make_standard_parents_unscoped(target)
 
             current_issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-current-issue"
                 / ".meta.json"
@@ -793,7 +856,7 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Duplicate current issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
@@ -806,9 +869,9 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-duplicate-current-issue"
             )
@@ -823,11 +886,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -836,7 +895,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Current issue", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "Current issue", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -845,9 +904,9 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-current-issue"
                 / ".meta.json"
@@ -864,9 +923,21 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
+            self._make_standard_parents_unscoped(target)
+            current_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+            self._strip_repo_scope(current_issue_meta)
+            self._run_git(target, ["remote", "remove", "origin"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -883,43 +954,54 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Foreign issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("fail-closed", p.stderr)
-            self.assertIn("github linkage scope is ambiguous", p.stderr)
-            self.assertIn("github.issue_number=123", p.stderr)
+            self.assertIn("Cannot verify GitHub URL repository", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertIn("--allow-foreign-url", p.stderr)
 
             foreign_issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-local-00001-foreign-issue"
             )
             self.assertFalse(foreign_issue_dir.exists())
 
-    def test_new_rejects_same_issue_number_between_foreign_and_unscoped_when_current_repo_unknown(self) -> None:
+    def test_import_rejects_foreign_repo_when_current_repo_unknown_without_writes(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
+            self._run_git(target, ["remote", "remove", "origin"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            self._run_runtime(
+            issues_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+            )
+            p = self._run_runtime_capture(
                 target,
                 [
                     "import",
@@ -929,28 +1011,14 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Foreign issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
-
-            issues_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-local-00001-auth-platform"
-                / "epics"
-                / "epic-local-00001-jwt-auth"
-                / "issues"
-            )
-            imported_foreign_dirs = sorted(issues_dir.glob("*-foreign-issue"))
-            self.assertEqual(len(imported_foreign_dirs), 1, imported_foreign_dirs)
-            foreign_issue_dir = imported_foreign_dirs[0]
-            self.assertTrue(foreign_issue_dir.is_dir())
-            foreign_meta = json.loads((foreign_issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            self.assertEqual(foreign_meta["github"]["issue_number"], 123)
-            self.assertEqual(foreign_meta["github"]["repo_owner"], "other")
-            self.assertEqual(foreign_meta["github"]["repo_name"], "repo")
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertEqual(sorted(issues_dir.glob("*-foreign-issue")), [])
 
             p = self._run_runtime_capture(
                 target,
@@ -958,7 +1026,7 @@ class TestCliImport(CliRuntimeHarness):
                     "new",
                     "issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                     "--title",
                     "Current issue",
                     "--github-issue",
@@ -966,13 +1034,52 @@ class TestCliImport(CliRuntimeHarness):
                 ],
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("fail-closed", p.stderr)
-            self.assertIn("github linkage scope is ambiguous", p.stderr)
-            self.assertIn("repo=(current-or-unknown) github.issue_number=123", p.stderr)
+            self.assertIn("origin remote is missing", p.stderr)
 
             self.assertEqual(sorted(issues_dir.glob("*-current-issue")), [])
 
-    def test_import_allows_same_issue_number_between_current_and_foreign_when_current_repo_resolved(self) -> None:
+    def test_import_numeric_target_rejects_when_current_repo_unknown_without_writes(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
+            self._run_git(target, ["remote", "remove", "origin"])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_view_stub(bin_dir)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            initiatives_dir = target / "spec-dock" / "initiatives"
+            cases = (
+                (
+                    "initiative",
+                    ["import", "initiative", "123", "--title", "Imported initiative"],
+                    "init-00123-",
+                ),
+                (
+                    "epic",
+                    ["import", "epic", "124", "--title", "Imported epic", "--initiative", "init-00001"],
+                    "epic-00124-",
+                ),
+                (
+                    "issue",
+                    ["import", "issue", "125", "--title", "Imported issue", "--epic", "epic-00002"],
+                    "iss-00125-",
+                ),
+            )
+            for kind, args, id_prefix in cases:
+                with self.subTest(kind=kind):
+                    p = self._run_runtime_capture(target, args, env=test_env)
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Current GitHub repo scope could not be resolved from origin", p.stderr)
+                    self.assertEqual(sorted(initiatives_dir.rglob(f"{id_prefix}*")), [])
+
+    def test_import_rejects_foreign_repo_when_current_repo_is_resolved(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
         if shutil.which("git") is None:
@@ -981,11 +1088,8 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
+            self._make_standard_parents_unscoped(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1002,19 +1106,22 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Foreign issue",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertIn("foreign GitHub issue URL", p.stderr)
 
             current_issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-current-issue"
             )
@@ -1022,53 +1129,34 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-local-00001-foreign-issue"
             )
             self.assertTrue(current_issue_dir.is_dir())
-            self.assertTrue(foreign_issue_dir.is_dir())
+            self.assertFalse(foreign_issue_dir.exists())
 
             current_meta = json.loads((current_issue_dir / ".meta.json").read_text(encoding="utf-8"))
-            foreign_meta = json.loads((foreign_issue_dir / ".meta.json").read_text(encoding="utf-8"))
             self.assertEqual(current_meta["id"], "iss-00123")
             self.assertEqual(current_meta["github"]["issue_number"], 123)
-            self.assertEqual(foreign_meta["id"], "iss-local-00001")
-            self.assertEqual(foreign_meta["github"]["issue_number"], 123)
-            self.assertEqual(foreign_meta["github"]["repo_owner"], "other")
-            self.assertEqual(foreign_meta["github"]["repo_name"], "repo")
 
-    def test_import_rejects_duplicate_github_link_for_same_foreign_repo(self) -> None:
+    def test_import_rejects_foreign_repo_duplicate_attempts_without_writes(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
+            self._make_standard_parents_unscoped(target)
+            self._run_git(target, ["remote", "remove", "origin"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_view_stub(bin_dir)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
-
-            self._run_runtime(
-                target,
-                [
-                    "import",
-                    "issue",
-                    "https://github.com/other/repo/issues/123",
-                    "--allow-foreign-url",
-                    "--title",
-                    "Foreign issue",
-                    "--epic",
-                    "epic-local-00001",
-                ],
-                env=test_env,
-            )
 
             p = self._run_runtime_capture(
                 target,
@@ -1080,14 +1168,14 @@ class TestCliImport(CliRuntimeHarness):
                     "--title",
                     "Foreign issue duplicate",
                     "--epic",
-                    "epic-local-00001",
+                    "epic-00002",
                 ],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("already linked", p.stderr)
-            self.assertIn("repo=other/repo", p.stderr)
-            self.assertIn("github.issue_number=123", p.stderr)
+            self.assertIn("single-repo", p.stderr)
+            self.assertIn("GitHub-backed identity", p.stderr)
+            self.assertEqual(sorted((target / "spec-dock" / "initiatives").rglob("iss-local-00001-*")), [])
 
     def test_import_rejects_invalid_slug_and_invalid_title(self) -> None:
         if os.name == "nt":
@@ -1096,8 +1184,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1107,7 +1194,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p1 = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-local-00001", "--slug", "Bad!Slug"],
+                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002", "--slug", "Bad!Slug"],
                 env=test_env,
             )
             self.assertNotEqual(p1.returncode, 0, p1.stdout + p1.stderr)
@@ -1116,7 +1203,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p2 = self._run_runtime_capture(
                 target,
-                ["import", "issue", "124", "--title", "!!!", "--epic", "epic-local-00001"],
+                ["import", "issue", "124", "--title", "!!!", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p2.returncode, 0, p2.stdout + p2.stderr)
@@ -1135,8 +1222,7 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1146,7 +1232,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "日本語", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "日本語", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1165,14 +1251,13 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
             init_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / ".meta.json"
             )
             data = json.loads(init_meta.read_text(encoding="utf-8"))
@@ -1187,7 +1272,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "Add refresh token", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1199,6 +1284,61 @@ class TestCliImport(CliRuntimeHarness):
             imported = list((target / "spec-dock" / "initiatives").rglob("iss-00123-*"))
             self.assertEqual(imported, [])
 
+    def test_import_fails_preflight_on_partial_scope_linkage_before_duplicate_or_gh_view(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_standard_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
+
+            current_issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00123-current-issue"
+                / ".meta.json"
+            )
+            current_meta = json.loads(current_issue_meta.read_text(encoding="utf-8"))
+            current_meta["github"] = {"issue_number": 123, "repo_owner": "example"}
+            self._write_json_force(current_issue_meta, current_meta)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            log_path = target / ".gh.log"
+            self._make_gh_issue_view_stub(bin_dir, log_path=log_path)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(
+                target,
+                ["import", "issue", "123", "--title", "Duplicate current issue", "--epic", "epic-00002"],
+                env=test_env,
+            )
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("Invalid github.repo_owner/repo_name", p.stderr)
+            self.assertIn("both fields are required", p.stderr)
+            self.assertNotIn("already linked", p.stderr)
+            if log_path.exists():
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "")
+
+            duplicate_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00123-duplicate-current-issue"
+            )
+            self.assertFalse(duplicate_issue_dir.exists())
+
     def test_import_fails_preflight_when_required_artifact_is_missing_without_creating_node(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
@@ -1206,19 +1346,17 @@ class TestCliImport(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Existing issue"])
+            self._create_standard_linked_hierarchy(target, issue_title="Existing issue")
 
             missing_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-existing-issue"
+                / "iss-00003-existing-issue"
                 / "report.md"
             )
             missing_path.unlink(missing_ok=False)
@@ -1231,7 +1369,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1253,8 +1391,18 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
 
             # Create both GitHub and local variants with the same numeric suffix.
+            self._init_origin_repo(target)
             self._run_runtime(target, ["new", "initiative", "--github-issue", "10", "--title", "GitHub initiative"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--id", "10", "--title", "Local initiative"])
+            github_dir = target / "spec-dock" / "initiatives" / "init-00010-github-initiative"
+            local_dir = target / "spec-dock" / "initiatives" / "init-local-00010-local-initiative"
+            shutil.copytree(github_dir, local_dir)
+            local_meta_path = local_dir / ".meta.json"
+            local_meta = json.loads(local_meta_path.read_text(encoding="utf-8"))
+            local_meta["id"] = "init-local-00010"
+            local_meta["slug"] = "local-initiative"
+            local_meta["title"] = "Local initiative"
+            local_meta.pop("github", None)
+            self._write_json_force(local_meta_path, local_meta)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1280,8 +1428,7 @@ class TestCliImport(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Parent initiative"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "Parent epic"])
+            self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1302,7 +1449,7 @@ class TestCliImport(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-local-00001"],
+                ["import", "issue", "123", "--title", "Imported issue", "--epic", "epic-00002"],
                 env=test_env,
             )
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -1320,11 +1467,10 @@ class TestCliImport(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._create_linked_parents(target)
 
-            init_path = "spec-dock/initiatives/init-local-00001-auth-platform"
-            epic_path = f"{init_path}/epics/epic-local-00001-jwt-auth"
+            init_path = "spec-dock/initiatives/init-00001-auth-platform"
+            epic_path = f"{init_path}/epics/epic-00002-jwt-auth"
 
             legacy_dir = target / "spec-dock" / ".work"
             legacy_dir.mkdir(parents=True, exist_ok=True)
@@ -1334,8 +1480,8 @@ class TestCliImport(CliRuntimeHarness):
                     {
                         "schema_version": 2,
                         "updated_at": "2026-01-01T00:00:00+00:00",
-                        "initiative": {"id": "init-local-00001", "path": init_path},
-                        "epic": {"id": "epic-local-00001", "path": epic_path},
+                        "initiative": {"id": "init-00001", "path": init_path},
+                        "epic": {"id": "epic-00002", "path": epic_path},
                         "issue": None,
                     },
                     ensure_ascii=False,
@@ -1356,9 +1502,9 @@ class TestCliImport(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-add-refresh-token"
             )

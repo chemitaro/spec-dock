@@ -2,9 +2,9 @@
 種別: レポート（Epic）
 ID: "epic-00033"
 タイトル: "GitHub backed identity and ADR mirror workflow"
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
-最終更新: "2026-03-27"
+状態: "approved"
+作成者: "Codex CLI"
+最終更新: "2026-03-30"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
 ---
@@ -13,35 +13,47 @@ ID: "epic-00033"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
-  - ...
+  - `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00038` / `iss-00040` は完了済み。
+  - primary close evidence は `iss-00038/report.md` の S11 fresh final rereview closure record であり、`c2c6233` が closure record、`aba6db7` がその直前の upstream evidence normalization を記録している。post-close doc corrective としては同 report の S12 が `docs/github.md` / `docs/workflow-tree.md` / `docs/rules/initiative/epics.md` の narrow rules/docs-authority mismatch を補正している。
+  - `./spec-dock/scripts/spec-dock sync --github` 実行後の `spec-dock/.agent/index-all.json` では、GitHub issue `#38` が `CLOSED`、`iss-00038` は `status=done` / `effective_status=done` として反映されている。
+  - 同じ generated state で epic GitHub issue `#33` も `state=CLOSED` として反映されている。
+  - 同じ generated state で epic progress は `total=6` / `done=6` / `open=0` / `unknown=0` である。
+  - `spec-dock/dashboard.md` は `todo_total: 0`、`doing: 0`、`ready: 0`、`blocked: 0`、`unknown: 0` となっており、残る open issue summary は解消済みである。
 - 次のマイルストーン:
-  - ...
+  - issue-level completion evidence は揃っており、追加の open child issue はない。
 - ブロッカー:
-  - ...
+  - 実装ブロッカーはなし。
 
 ## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- epic 専用の新規 ADR はなし。
+- 本 epic の authoritative close 判断は `iss-00034` / `iss-00035` / `iss-00036` / `iss-00037` / `iss-00038` / `iss-00040` の issue-level evidence に集約する。特に最終 close gate と post-close doc corrective は `iss-00038/report.md` を正本とし、epic では close 順序と達成状況だけを管理する。
 
 ## 完了した Issue / PR / Release (必須)
-- iss-xxxx-...: Done（PR: ...）
-- ...
+- `iss-00034` / GitHub `#34`: Done
+- `iss-00035` / GitHub `#35`: Done
+- `iss-00036` / GitHub `#36`: Done
+- `iss-00037` / GitHub `#37`: Done（GitHub state: `CLOSED`）
+- `iss-00038` / GitHub `#38`: Done（GitHub state: `CLOSED`）
+- `iss-00040` / GitHub `#40`: Done（GitHub state: `CLOSED`）
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: Pass / Fail（証拠: ...）
-- E-AC-002: ...
+- `E-AC-001`: Pass（証拠: `iss-00034` で GitHub mandatory node creation contract と canonical repo scope fail-closed 境界を固定）
+- `E-AC-002`: Pass（証拠: `iss-00036` で timestamp-based discussion / ADR naming contract を固定）
+- `E-AC-003`: Pass（証拠: `iss-00035` で ADR symlink mirror の clear-then-rebuild と stale link 除去を固定）
+- `E-AC-004`: Pass（証拠: `iss-00034` / `iss-00036` の先行ガードに加え、`iss-00037` で migration boundary clause-1/2/3 の closure evidence を確定）
+- `E-AC-005`: Pass（主要証拠: `iss-00038/report.md` の S11 fresh final rereview closure と、その入力を正規化した `aba6db7` / closure record を追加した `c2c6233`、および post-close narrow rules/docs-authority corrective を記録した S12。補強証拠: `iss-00040` の stale-contract / test-realignment slice 完了と、`sync --github` 後 generated state の `done=6/open=0` / `todo_total: 0`）
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
-  - ...
+  - 該当なし。repo 内 contract / docs / validation close-out として進行中。
 - 監視値（エラー率/レイテンシなど）:
-  - ...
+  - 該当なし。
 - 障害/アラート:
-  - ...
+  - 該当なし。
 
 ## フォローアップ（別Issue化） (必須)
-- iss-xxxx-...:
-  - ...
+- 現時点で追加の follow-up issue はなし。
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- child issue の authoritative state は `sync --github` 後に `done=6` / `open=0` / `todo_total: 0` まで揃っている。
+- `spec-dock/.agent/index-all.json` 上の epic GitHub issue `#33` も `CLOSED` であり、この report の `状態: approved` は child issue completion と GitHub/generated state の closure evidence に整合する。

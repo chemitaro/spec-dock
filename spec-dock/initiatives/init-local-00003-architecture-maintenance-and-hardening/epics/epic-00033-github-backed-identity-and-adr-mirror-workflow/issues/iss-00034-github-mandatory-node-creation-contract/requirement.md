@@ -5,7 +5,7 @@ ID: "iss-00034"
 関連GitHub: ["#34"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-03-28"
 親: ["epic-00033", "init-local-00003"]
 ---
 
@@ -17,14 +17,15 @@ ID: "iss-00034"
 
 ## 背景・現状
 - 現状の挙動:
-  - runtime には local-only 前提が残っており、scope によって GitHub linkage の必須性が揃っていない。
-  - create 時の repo scope 解決と `.meta.json` persistence の contract が十分に固定されていない。
+  - create contract 自体は GitHub mandatory へ寄ってきているが、repo scope 解決と import boundary の strictness がまだ揺れている。
+  - create 時の repo scope 解決と `.meta.json` persistence の contract は固定が進んでいる一方、foreign issue URL import の reject 境界が十分に閉じ切れていない。
+  - review fix の過程で `import ... --allow-foreign-url` から `iss-local-*` fallback が一時的に復元され、accepted policy と実装が不整合になった。
 - 現状の課題:
   - 分散環境では local-only create path が sequential id collision の原因になる。
   - canonical repo scope が曖昧だと、same repo / cross-repo reject の境界が実装依存になる。
 - 再現手順:
   1. local-only 前提の create flow を許すと、別 worktree / 別 clone で node id が衝突しうる。
-  2. repo scope 解決が曖昧なままだと、create / validate / import の reject 条件が揺れる。
+  2. repo scope 解決が曖昧なままだと、create / validate の reject 条件が揺れる。
 - 観測点:
   - CLI:
     - `./spec-dock/scripts/spec-dock new initiative`
@@ -50,14 +51,16 @@ ID: "iss-00034"
 - MUST:
   - `new initiative` / `new epic` / `new issue` を GitHub issue mandatory に揃える。
   - canonical repo scope を `origin` remote から一意に解決する contract を固定する。
-  - `.meta.json` に `github.issue_number` / `repo_owner` / `repo_name` を repo-scoped に保持する。
+  - `.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` を lowercase canonical repo scope で保持する。
   - empty workspace / first node を含む create contract の acceptance を固定する。
+  - `initiative / epic / issue` node に対する foreign issue URL import を strict reject に揃え、`iss-local-*` fallback を再導入しない。
 - MUST NOT:
   - local-only fallback を残さない。
   - cross-repo linkage を許可しない。
 - OUT OF SCOPE:
   - discussion / ADR の filename naming 変更
-  - `sync` による ADR mirror 再生成
+  - `sync` による ADR mirror / sync-generated artifact の再生成
+  - foreign issue import reject 以外の import main processing 本体変更
   - docs parity の全面クローズ
 
 ## 境界
@@ -65,6 +68,9 @@ ID: "iss-00034"
   - canonical repo scope の正本は `origin` remote が指す GitHub repository とする。
   - `origin` missing / non-GitHub remote / fetch-push mismatch / configured scope mismatch は fail-fast にする。
   - first node から same repo scope に束縛する。
+  - sync の main processing と sync-generated artifact regeneration は read-only のままにし、本 issue で対象化しない。
+  - import については foreign issue URL を node identity に変換しない strict reject への是正だけを対象内とし、external reference model や multi-repo identity は扱わない。
+  - validation/preflight は malformed scope を fail-closed にし、single-repo contract と矛盾する exemption を残さない。
 - Ask:
   - GitHub issue body / labels / project metadata の扱いは後続 issue で必要なら拡張する。
 - Never:
@@ -90,7 +96,7 @@ ID: "iss-00034"
   - When:
     - `new initiative` / `new epic` / `new issue` を実行する
   - Then:
-    - create は GitHub issue linkage 必須で進み、`.meta.json` に `github.issue_number` / lowercase canonical `repo_owner` / `repo_name` が保存される
+    - create は GitHub issue linkage 必須で進み、`.meta.json.github.issue_number` / `.meta.json.github.repo_owner` / `.meta.json.github.repo_name` が lowercase canonical repo scope で保存される
   - 観測点:
     - targeted create tests
     - created `.meta.json`
@@ -114,10 +120,25 @@ ID: "iss-00034"
   - When:
     - create / validate contract を確認する
   - Then:
-    - in-place 自動移行は保証されず、legacy mismatch は fail-fast / warning で扱われ、checked-in data の無断書き換えを目的としない境界が先行固定される
+    - in-place 自動移行は保証されず、legacy mismatch は `new` では contract error、`validate` では validation error として non-zero で fail-fast に扱われ、checked-in data の無断書き換えを目的としない境界が先行固定される
+    - この issue の `validate` / preflight pre-guard は `new` contract 由来の node linkage mismatch と malformed scope の fail-closed に整合し、sync-generated artifact regeneration や external reference model の新設は対象外とする
   - 観測点:
     - boundary docs diff
     - validate / migration contract tests
+
+- AC-004:
+  - Actor:
+    - maintainer
+  - Given:
+    - current repo と異なる GitHub issue URL を `initiative / epic / issue` node として import しようとしている
+  - When:
+    - `import ... --allow-foreign-url` を含む import flow を実行する
+  - Then:
+    - foreign issue URL は node identity として reject され、`iss-local-*` fallback や cross-repo node 作成は行われない
+    - エラーメッセージは single-repo / GitHub-backed identity に基づく reject 理由を示す
+  - 観測点:
+    - import reject tests
+    - no-write / no-side-effect verification
 
 ## 例外・エッジケース
 - EC-001:
@@ -140,7 +161,14 @@ ID: "iss-00034"
   - 期待:
     - cross-repo linkage として reject される
   - 観測点:
-    - create / import reject tests
+    - create reject tests
+- EC-004:
+  - 条件:
+    - foreign issue URL import に `--allow-foreign-url` が付与されている
+  - 期待:
+    - compatibility escape hatch ではなく explicit reject として扱われ、local fallback を作らない
+  - 観測点:
+    - import reject tests
 
 ## 入力→出力例（必要時）
 - EX-001:

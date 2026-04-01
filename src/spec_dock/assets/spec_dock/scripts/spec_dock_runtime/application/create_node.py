@@ -6,7 +6,7 @@ import shlex
 import time
 import uuid
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
 from typing import cast
@@ -23,7 +23,7 @@ from ..domain.ids import (
 )
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
-from ..domain.validation import validate_graph_and_deps
+from ..domain.validation import find_malformed_discussion_doc_filename_error, validate_graph_and_deps
 from ..infra.contracts import StoredMetaRecord
 from .contracts import (
     CreateDiscussionDocRequest,
@@ -33,12 +33,13 @@ from .contracts import (
     CreatePlan,
 )
 from .ports import Ports
-from .repo_context import resolve_current_repo_slug, split_repo_slug
+from .repo_context import require_current_repo_slug, resolve_current_repo_slug, split_repo_slug
 
 _META_FILENAME = ".meta.json"
 _DISCUSSION_DOC_TYPES = ("adr", "disc", "research", "note")
 _DISCUSSION_DOC_FILENAME_RE = re.compile(
-    r"^(?P<seq>[0-9]{3})-(?P<doc_type>adr|disc|research|note)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+    r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?-(?P<doc_type>adr|disc|research|note)-"
+    r"(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
 _CREATE_LOCK_DIRNAME = ".runtime"
 _CREATE_LOCK_FILENAME = "create.lock"
@@ -280,24 +281,68 @@ def _post_write_duplicate_guard(ports: Ports, *, node_id: str) -> None:
         raise RuntimeError(f"post-write duplicate guard failed: created id not found: {node_id}")
 
 
-def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
-    refs = _scan_discussion_sequence_sources(discussions_dir)
-    by_seq: dict[int, list[Path]] = {}
+def _scan_discussion_timestamp_duplicate_state(discussions_dir: Path) -> tuple[str | None, set[str]]:
+    malformed_error = find_malformed_discussion_doc_filename_error(discussions_dir)
+    if malformed_error is not None:
+        return malformed_error, set()
+    refs = _scan_discussion_timestamp_sources(discussions_dir)
+    by_standard_slot: dict[str, list[Path]] = {}
+    by_suffix_slot: dict[tuple[str, int], list[Path]] = {}
     doc_ids: set[str] = set()
-    for seq, doc_type, path in refs:
-        by_seq.setdefault(seq, []).append(path)
-        doc_ids.add(f"{seq:03d}-{doc_type}")
+    for timestamp, suffix, doc_type, path in refs:
+        if suffix is None:
+            by_standard_slot.setdefault(timestamp, []).append(path)
+            doc_ids.add(f"{timestamp}-{doc_type}")
+            continue
+        by_suffix_slot.setdefault((timestamp, suffix), []).append(path)
+        doc_ids.add(f"{timestamp}-{suffix:02d}-{doc_type}")
 
-    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
-    if duplicate_seqs:
-        dup_seq = duplicate_seqs[0]
-        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
-        raise RuntimeError(
-            "post-write duplicate guard failed: "
-            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+    duplicate_standard_slots = sorted(slot for slot, paths in by_standard_slot.items() if len(paths) > 1)
+    if duplicate_standard_slots:
+        dup_slot = duplicate_standard_slots[0]
+        files = ", ".join(path.name for path in sorted(by_standard_slot[dup_slot], key=lambda p: p.as_posix()))
+        return (
+            f"Duplicate discussion timestamp slot detected under {discussions_dir}: "
+            f"slot={dup_slot} files=[{files}]",
+            doc_ids,
         )
+
+    duplicate_suffix_slots = sorted(slot for slot, paths in by_suffix_slot.items() if len(paths) > 1)
+    if duplicate_suffix_slots:
+        dup_timestamp, dup_suffix = duplicate_suffix_slots[0]
+        files = ", ".join(
+            path.name for path in sorted(by_suffix_slot[(dup_timestamp, dup_suffix)], key=lambda p: p.as_posix())
+        )
+        return (
+            f"Duplicate discussion timestamp suffix detected under {discussions_dir}: "
+            f"slot={dup_timestamp}-{dup_suffix:02d} files=[{files}]",
+            doc_ids,
+        )
+    return None, doc_ids
+
+
+def _post_write_discussion_duplicate_guard(discussions_dir: Path, *, doc_id: str) -> None:
+    duplicate_error, doc_ids = _scan_discussion_timestamp_duplicate_state(discussions_dir)
+    if duplicate_error is not None:
+        raise RuntimeError(f"post-write duplicate guard failed: {duplicate_error}")
     if doc_id not in doc_ids:
         raise RuntimeError(f"post-write duplicate guard failed: created discussion id not found: {doc_id}")
+
+
+def _preflight_discussion_duplicate_guard(
+    req: CreateDiscussionDocRequest,
+    ports: Ports,
+    *,
+    specdock_dir: Path,
+) -> None:
+    lock_path = _resolve_create_lock_path(specdock_dir)
+    if lock_path.exists():
+        return
+    graph = load_graph(ports, validate=False)
+    discussions_dir = _resolve_scope_node(req, graph).path / "discussions"
+    duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(discussions_dir)
+    if duplicate_error is not None:
+        raise RuntimeError(duplicate_error)
 
 
 def _resolve_specdock_dir(ports: Ports) -> Path:
@@ -418,9 +463,11 @@ def _resolve_github_mode(
     req: CreateNodeRequest, kind: Literal["initiative", "epic", "issue"]
 ) -> Literal["create", "link_existing", "local_only"]:
     if req.github_mode is None:
-        return "create" if kind == "issue" else "local_only"
+        return "create"
     if req.github_mode not in ("create", "link_existing", "local_only"):
         raise RuntimeError(f"Unsupported github mode: {req.github_mode}")
+    if req.github_mode == "local_only":
+        raise RuntimeError(f"GitHub linkage is mandatory for {kind}; local_only is not supported.")
     return req.github_mode
 
 
@@ -481,6 +528,22 @@ def _node_github_linkage_key(
 
 def _node_github_repo_slug(node: SpecNode) -> str | None:
     return _normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+
+
+def _resolve_requested_repo_slug(req: CreateNodeRequest, *, current_repo_slug: str | None) -> str | None:
+    owner = (req.github_repo_owner or "").strip().lower()
+    repo = (req.github_repo_name or "").strip().lower()
+    if owner or repo:
+        if not owner or not repo:
+            raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
+        requested_repo_slug = _normalize_repo_slug(owner, repo)
+        if current_repo_slug is not None and requested_repo_slug != current_repo_slug:
+            raise RuntimeError(
+                "cross-repo GitHub linkage is not supported: "
+                f"requested repo={requested_repo_slug} current repo={current_repo_slug}"
+            )
+        return requested_repo_slug
+    return current_repo_slug
 
 
 def guard_github_issue_uniqueness(
@@ -788,12 +851,11 @@ def plan_node_creation(
     title, slug = resolve_input_title_and_slug(req.title, req.slug)
     mode = _resolve_github_mode(req, kind)
     prefix = _prefix_for_kind(kind)
+    requested_repo_slug = _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
     if mode in ("create", "link_existing"):
         if req.requested_node_id is not None:
-            raise RuntimeError(
-                "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
-            )
+            raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
         if req.github_issue_number is None:
             raise RuntimeError("github_issue_number is required for github mode")
         node_id = format_id(prefix, int(req.github_issue_number), local=False)
@@ -817,13 +879,14 @@ def plan_node_creation(
     if existing_id and mode in ("create", "link_existing") and req.github_issue_number is not None:
         existing = graph.nodes_by_id[existing_id]
         existing_repo_slug = _normalize_repo_slug(existing.github_repo_owner, existing.github_repo_name) or current_repo_slug
-        requested_repo_slug = _normalize_repo_slug(req.github_repo_owner, req.github_repo_name) or current_repo_slug
-        # Cross-repo overlap is allowed; keep deterministic github-number IDs when possible,
-        # but fall back to a local ID when the same numeric github ID is already occupied.
         if existing_repo_slug != requested_repo_slug:
-            node_id = _next_id(graph, prefix, local=True)
-            parsed_prefix, is_local, num = parse_id(node_id)
-            existing_id = find_existing_id_by_num(graph.nodes_by_id, prefix=parsed_prefix, num=num, local=is_local)
+            existing_repo_label = existing_repo_slug if existing_repo_slug is not None else "(current-or-unknown)"
+            requested_repo_label = requested_repo_slug if requested_repo_slug is not None else "(current-or-unknown)"
+            raise RuntimeError(
+                "cross-repo GitHub linkage is not supported: "
+                f"requested repo={requested_repo_label} github.issue_number={int(req.github_issue_number)} "
+                f"conflicts with existing repo={existing_repo_label}: {existing_id} ({existing.meta_path})"
+            )
     if existing_id:
         existing = graph.nodes_by_id[existing_id]
         raise RuntimeError(f"id already exists: {existing_id} ({existing.meta_path})")
@@ -849,17 +912,9 @@ def plan_node_creation(
     github_repo_owner: str | None = None
     github_repo_name: str | None = None
     if req.github_issue_number is not None:
-        owner = (req.github_repo_owner or "").strip().lower()
-        repo = (req.github_repo_name or "").strip().lower()
-        if owner or repo:
-            if not owner or not repo:
-                raise RuntimeError("github_repo_owner and github_repo_name must be provided together")
-            github_repo_owner = owner
-            github_repo_name = repo
-        else:
-            current_scope = split_repo_slug(current_repo_slug)
-            if current_scope is not None:
-                github_repo_owner, github_repo_name = current_scope
+        current_scope = split_repo_slug(requested_repo_slug)
+        if current_scope is not None:
+            github_repo_owner, github_repo_name = current_scope
     template_dir = specdock_dir / "templates" / kind
     planned_paths = _scaffold_file_paths(template_dir, dest_dir)
     planned_paths.extend(link_path for link_path, _target_path in _rules_scaffold_specs(kind=kind, dest_dir=dest_dir, specdock_dir=specdock_dir))
@@ -981,44 +1036,89 @@ def _normalize_discussion_doc_inputs(req: CreateDiscussionDocRequest) -> tuple[s
     return doc_type, title, slug
 
 
-def _scan_discussion_sequence_sources(discussions_dir: Path) -> list[tuple[int, str, Path]]:
-    refs: list[tuple[int, str, Path]] = []
+def _resolve_discussion_instant_utc(now_iso: str | None = None) -> datetime:
+    if now_iso is None:
+        return datetime.now(timezone.utc)
+    normalized = now_iso.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    dt = datetime.fromisoformat(normalized)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _format_discussion_timestamp(now_iso: str | None = None) -> str:
+    return _resolve_discussion_instant_utc(now_iso).strftime("%Y%m%dt%H%M%S") + "z"
+
+
+def _format_discussion_date(now_iso: str | None = None) -> str:
+    return _resolve_discussion_instant_utc(now_iso).date().isoformat()
+
+
+def _scan_discussion_timestamp_sources(
+    discussions_dir: Path,
+) -> list[tuple[str, int | None, str, Path]]:
+    refs: list[tuple[str, int | None, str, Path]] = []
     if not discussions_dir.exists():
         return refs
     for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
         matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
         if not matched:
             continue
-        refs.append((int(matched.group("seq")), str(matched.group("doc_type")), path))
+        suffix_raw = matched.group("nn")
+        refs.append(
+            (
+                str(matched.group("ts")),
+                int(suffix_raw) if suffix_raw is not None else None,
+                str(matched.group("doc_type")),
+                path,
+            )
+        )
     return refs
 
 
-def _next_discussion_doc_seq(discussions_dir: Path) -> int:
-    refs = _scan_discussion_sequence_sources(discussions_dir)
-    if not refs:
-        return 1
+def _format_discussion_doc_identity(
+    *, timestamp: str, doc_type: str, slug: str, suffix: int | None
+) -> tuple[str, str]:
+    stem_prefix = f"{timestamp}-{doc_type}" if suffix is None else f"{timestamp}-{suffix:02d}-{doc_type}"
+    return f"{stem_prefix}-{slug}", stem_prefix
 
-    max_seq = 0
-    by_seq: dict[int, list[Path]] = {}
-    for seq, _doc_type, path in refs:
-        max_seq = max(max_seq, seq)
-        by_seq.setdefault(seq, []).append(path)
 
-    duplicate_seqs = sorted(seq for seq, paths in by_seq.items() if len(paths) > 1)
-    if duplicate_seqs:
-        dup_seq = duplicate_seqs[0]
-        files = ", ".join(path.name for path in sorted(by_seq[dup_seq], key=lambda p: p.as_posix()))
-        raise RuntimeError(
-            f"Duplicate discussion sequence detected under {discussions_dir}: seq={dup_seq:03d} files=[{files}]"
+def _allocate_discussion_doc_filename(
+    discussions_dir: Path,
+    *,
+    timestamp: str,
+    doc_type: str,
+    slug: str,
+) -> tuple[Path, str]:
+    refs = _scan_discussion_timestamp_sources(discussions_dir)
+    matching = [(suffix, path) for ts, suffix, _existing_doc_type, path in refs if ts == timestamp]
+    if not matching:
+        stem, doc_id = _format_discussion_doc_identity(
+            timestamp=timestamp,
+            doc_type=doc_type,
+            slug=slug,
+            suffix=None,
         )
+        return discussions_dir / f"{stem}.md", doc_id
 
-    next_seq = max_seq + 1
-    if next_seq > 999:
-        raise RuntimeError(
-            "Discussion sequence overflow: next sequence would exceed 999. "
-            "Create a follow-up issue to decide whether to archive old discussion docs or extend sequence width."
+    used_suffixes = {suffix for suffix, _path in matching if suffix is not None}
+    for suffix in range(1, 100):
+        if suffix in used_suffixes:
+            continue
+        stem, doc_id = _format_discussion_doc_identity(
+            timestamp=timestamp,
+            doc_type=doc_type,
+            slug=slug,
+            suffix=suffix,
         )
-    return next_seq
+        return discussions_dir / f"{stem}.md", doc_id
+    raise RuntimeError(
+        "Discussion timestamp suffix exhaustion: "
+        f"timestamp={timestamp} under {discussions_dir}. "
+        "Suffix allocation is limited to 01..99 within a single-second discussion-doc family."
+    )
 
 
 def _resolve_specdock_root(path: Path) -> Path:
@@ -1032,7 +1132,10 @@ def _doc_id_from_path(path: Path) -> str:
     matched = _DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name)
     if matched is None:
         raise RuntimeError(f"Invalid discussion document filename: {path.name}")
-    return f"{matched.group('seq')}-{matched.group('doc_type')}"
+    suffix_raw = matched.group("nn")
+    if suffix_raw is None:
+        return f"{matched.group('ts')}-{matched.group('doc_type')}"
+    return f"{matched.group('ts')}-{suffix_raw}-{matched.group('doc_type')}"
 
 
 def plan_discussion_doc(
@@ -1040,6 +1143,7 @@ def plan_discussion_doc(
     graph: SpecGraph,
     *,
     today: str | None = None,
+    timestamp: str | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
     scope = _resolve_scope_node(req, graph)
     doc_type, title, slug = _normalize_discussion_doc_inputs(req)
@@ -1047,10 +1151,13 @@ def plan_discussion_doc(
     specdock_dir = _resolve_specdock_root(scope.path)
     template_path = specdock_dir / "templates" / "discussions" / f"{doc_type}.md"
     discussions_dir = scope.path / "discussions"
-    seq = _next_discussion_doc_seq(discussions_dir)
-    seq_text = f"{seq:03d}"
-    doc_id = f"{seq_text}-{doc_type}"
-    dest_path = discussions_dir / f"{seq_text}-{doc_type}-{slug}.md"
+    effective_timestamp = timestamp if timestamp is not None else _format_discussion_timestamp()
+    dest_path, doc_id = _allocate_discussion_doc_filename(
+        discussions_dir,
+        timestamp=effective_timestamp,
+        doc_type=doc_type,
+        slug=slug,
+    )
     if dest_path.exists():
         raise RuntimeError(f"Discussion doc already exists: {dest_path}")
 
@@ -1073,22 +1180,29 @@ def plan_discussion_doc(
 def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult:
     template_scaffolder = _resolve_template_scaffolder(ports)
     specdock_dir = _resolve_specdock_dir(ports)
+    _preflight_discussion_duplicate_guard(req, ports, specdock_dir=specdock_dir)
     lock_path, lock_token = _acquire_create_lock(specdock_dir)
     result: CreateDiscussionDocResult | None = None
     body_error: Exception | None = None
     try:
         graph = load_graph(ports, validate=False)
-        today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
-        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today)
+        now_iso = ports.clock.now_iso() if ports.clock is not None else None
+        today = _format_discussion_date(now_iso)
+        timestamp = _format_discussion_timestamp(now_iso)
+        template_path, dest_path, replacements = plan_discussion_doc(req, graph, today=today, timestamp=timestamp)
+        duplicate_error, _doc_ids = _scan_discussion_timestamp_duplicate_state(dest_path.parent)
+        if duplicate_error is not None:
+            raise RuntimeError(duplicate_error)
 
         template_text = template_scaffolder.load_template_text(template_path)
         rendered_text = template_scaffolder.render_text(template_text, replacements)
         template_scaffolder.write_text(dest_path, rendered_text)
         doc_id = _doc_id_from_path(dest_path)
         _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
+        doc_type, _title, _slug = _normalize_discussion_doc_inputs(req)
         result = CreateDiscussionDocResult(
             doc_id=doc_id,
-            doc_type=doc_id.split("-", 1)[1],
+            doc_type=doc_type,
             scope_node_id=replacements["<SCOPE_ID>"],
             path=dest_path,
             warnings=[],
@@ -1149,9 +1263,7 @@ def _validate_pre_github_create_inputs(
         return
 
     if req.requested_node_id is not None:
-        raise RuntimeError(
-            "Cannot combine '--id' with GitHub mode. Omit GitHub flags (or use '--no-github') to create local ids."
-        )
+        raise RuntimeError("Cannot combine '--id' with GitHub-backed node creation.")
 
     if kind == "epic" and req.parent_id is None:
         raise RuntimeError("--initiative is required")
@@ -1337,11 +1449,15 @@ def create_node_core(
     title, _slug = resolve_input_title_and_slug(req.title, req.slug)
     github_issue_number = req.github_issue_number
     created_github_issue_number: int | None = None
+    current_repo_slug: str | None = None
     specdock_dir: Path | None = None
 
     try:
         _validate_pre_github_create_inputs(req, kind=kind, mode=mode)
         specdock_dir = _resolve_specdock_dir(ports)
+        if mode in ("create", "link_existing"):
+            current_repo_slug = require_current_repo_slug(ports)
+            _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
         if mode == "link_existing" and github_issue_number is None:
             raise RuntimeError("github_issue_number is required for link_existing mode")
@@ -1391,7 +1507,8 @@ def create_node_core(
     local_node_id: str | None = None
     try:
         graph = load_graph(ports, validate=False)
-        current_repo_slug = resolve_current_repo_slug(ports)
+        if current_repo_slug is None:
+            current_repo_slug = resolve_current_repo_slug(ports)
 
         today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
         plan = plan_node_creation(

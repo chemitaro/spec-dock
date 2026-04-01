@@ -17,7 +17,7 @@
 - `new doc <type>`（`type = adr|disc|research|note`）
 
 補足:
-- `new doc <type>` は explicit sequence override（`--id` / `--seq`）を提供しません。
+- `new doc <type>` は explicit basename / `doc_id` override（`--id` / `--seq` など）を提供しません。
 
 ### 1.2 ブランチ命名（checkout 後の正規化）
 
@@ -80,38 +80,82 @@
 
 ---
 
-## 4. discussion docs の命名と採番（`new doc <type>`）
+## 4. discussion docs の命名と識別子（`new doc <type>`）
 
-### 4.1 ファイル名
+### 4.1 doc family と保存先
 
-- 形式: `NNN-type-slug.md`
-- `NNN`: 3 桁固定（`001`..`999`）
-- `type`: `adr|disc|research|note`
+- discussion doc family は `adr|disc|research|note` です。
+- original/source file は、対象 Initiative / Epic / Issue ノード配下の `discussions/` に作成されます。
+- ADR も original は常に `discussions/` 配下です。mirror / sync があっても original location は変わりません。
+
+### 4.2 basename contract
+
+標準形:
+- `<ts>-<kind>-<slug>.md`
+
+same-second collision 形:
+- `<ts>-<nn>-<kind>-<slug>.md`
+
+各要素:
+- `ts = yyyymmddthhmmssz`
+  - UTC 固定
+  - `t` / `z` は lowercase 固定
+- `nn = 01..99`
+  - 同一 `discussions/` directory 内で同じ秒を共有した discussion doc family collision を解消する suffix です
+  - suffix が必要ないときは付けません
+- `kind = adr|disc|research|note`
+- `slug` は kebab-case です
 
 例:
-- `001-adr-token-rotation.md`
-- `002-disc-api-options.md`
-- `003-research-benchmark-summary.md`
-- `004-note-kickoff-memo.md`
+- `20260329t123456z-adr-token-rotation.md`
+- `20260329t123456z-disc-api-options.md`
+- `20260329t123456z-01-research-benchmark-summary.md`
+- `20260329t123456z-02-note-kickoff-memo.md`
 
-### 4.2 採番対象
+### 4.3 `doc_id` と filename stem の境界
 
-`discussions/` 配下で採番対象になるのは、recognized format（`NNN-type-slug.md`）に一致するファイルのみです。
+`doc_id` は slugless identity です。
 
-- `rules.md` は採番対象外
-- legacy/nonconforming files（例: `adr-00001-...`, `foo.md`, `1000-adr-...`）は採番対象外
-- 既存ファイルの rename は行いません（そのまま残し、採番時に無視）
+標準形の `doc_id`:
+- `<ts>-<kind>`
 
-### 4.3 失敗条件（明示的に停止）
+collision 形の `doc_id`:
+- `<ts>-<nn>-<kind>`
 
-- unknown type
-- invalid slug
-- duplicate sequence（recognized files 内で同じ `NNN` が複数）
-- sequence overflow（次番号が `999` を超える）
+関係:
+- filename stem = `<doc_id>-<slug>`
+- つまり slug は filename の一部ですが、identity そのものではありません
+- CLI / runtime が discussion doc の識別子を表示するときは、この slugless `doc_id` を使います
 
-overflow 時の guidance:
-- `1000-...` へ進まず失敗します。
-- follow-up issue を作成し、archive または桁拡張を判断してください。
+例:
+- filename: `20260329t123456z-adr-token-rotation.md`
+  - `doc_id`: `20260329t123456z-adr`
+- filename: `20260329t123456z-01-disc-api-options.md`
+  - `doc_id`: `20260329t123456z-01-disc`
+
+### 4.4 legacy files と validation 境界
+
+legacy sequential docs は grandfathered only です。
+
+- 例: `001-adr-token-rotation.md`, `002-disc-api-options.md`
+- 強制的 backward compatibility を維持するために legacy naming へ戻したり、新規 doc で legacy sequence basename を優先したりはしません
+- 既存 legacy file は自動 rename しません
+- 新 contract で新規作成するときに legacy sequential basename を再利用しません
+- malformed / mismatch basename を validation が自動 repair することもありません
+
+validation / allocation の扱い:
+- unrelated files は無視します
+  - 例: `rules.md`, `README.md`, `notes.txt`
+- ただし、timestamp intent / discussion-doc intent があるのに contract を満たさない basename は explicit error です
+  - 例: `20260329T123456Z-adr-token-rotation.md`（`T` / `Z` が uppercase）
+  - 例: `20260329t123456-adr-token-rotation.md`（末尾 `z` 欠落）
+  - 例: `20260329t123456z_adr-token-rotation.md`（separator 不正）
+  - 例: `001_adr-token-rotation.md`, `adr_token_rotation.md`（discussion-doc intent の malformed legacy-like basename）
+
+原則:
+- unrelated file は ignore します
+- malformed discussion filename candidate は fail-closed で reject します
+- grandfathered なのは既存 legacy sequential docs だけであり、legacy contract 全体の forced compatibility を意味しません
 
 ---
 

@@ -22,23 +22,21 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
-            meta["parent_id"] = "epic-local-99999"
+            meta["parent_id"] = "epic-99999"
             self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["validate"])
@@ -48,46 +46,145 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Payments platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
+            self._run_runtime(target, ["new", "initiative", "--title", "Payments platform", "--github-issue", "4"])
 
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
-            meta["initiative_id"] = "init-local-00002"
+            meta["initiative_id"] = "init-00004"
             self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["validate"])
+
+    def test_validate_rejects_local_only_initiative_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            init_meta = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / ".meta.json"
+            meta = json.loads(init_meta.read_text(encoding="utf-8"))
+            meta.pop("github", None)
+            self._write_json_force(init_meta, meta)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("initiative missing github.issue_number", p.stderr)
+
+    def test_validate_rejects_legacy_unscoped_issue_linkage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / ".meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["github"] = {"issue_number": 3}
+            self._write_json_force(issue_meta, meta)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("legacy unscoped github linkage", p.stderr)
+
+    def test_sync_fails_preflight_on_partially_scoped_issue_linkage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / ".meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["github"] = {"issue_number": 3, "repo_owner": "example"}
+            self._write_json_force(issue_meta, meta)
+
+            for args in (
+                ["sync", "--no-update-active"],
+                ["sync", "--no-update-active", "--force"],
+            ):
+                with self.subTest(args=args):
+                    p = self._run_runtime_capture(target, args)
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Invalid github.repo_owner/repo_name", p.stderr)
+                    self.assertIn("both fields are required", p.stderr)
+                    self.assertNotIn("deps_preflight_failed", p.stderr)
+
+    def test_validate_rejects_blank_string_repo_scope_in_meta_loader(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / ".meta.json"
+            )
+            meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+            meta["github"] = {"issue_number": 3, "repo_owner": "   ", "repo_name": "repo"}
+            self._write_json_force(issue_meta, meta)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Invalid github.repo_owner/repo_name", p.stderr)
+            self.assertIn("empty value is not allowed", p.stderr)
+            self.assertNotIn("legacy unscoped github linkage", p.stderr)
 
     def test_validate_reports_invalid_meta_json_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             self._write_text_force(issue_meta, "[]\n")
@@ -102,26 +199,24 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             init_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / ".meta.json"
             )
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
 
@@ -132,17 +227,18 @@ class TestCliValidate(CliRuntimeHarness):
             issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
             issue_data["github"] = {"issue_number": 1}
             self._write_json_force(issue_meta, issue_data)
+            shutil.rmtree(target / ".git", ignore_errors=True)
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("Duplicate github.linkage detected", p.stderr)
             self.assertIn("github.issue_number=1", p.stderr)
             self.assertIn("repo=(current-or-unknown)", p.stderr)
-            self.assertIn("initiative:init-local-00001", p.stderr)
-            self.assertIn("issue:iss-local-00001", p.stderr)
-            self.assertIn("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json", p.stderr)
+            self.assertIn("initiative:init-00001", p.stderr)
+            self.assertIn("issue:iss-00003", p.stderr)
+            self.assertIn("spec-dock/initiatives/init-00001-auth-platform/.meta.json", p.stderr)
             self.assertIn(
-                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json",
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json",
                 p.stderr,
             )
             self.assertIn("Fix github linkage", p.stderr)
@@ -152,26 +248,24 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             init_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / ".meta.json"
             )
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
 
@@ -182,6 +276,7 @@ class TestCliValidate(CliRuntimeHarness):
             issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
             issue_data["github"] = {"issue_number": 1, "repo_owner": "other", "repo_name": "repo"}
             self._write_json_force(issue_meta, issue_data)
+            shutil.rmtree(target / ".git", ignore_errors=True)
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -196,34 +291,29 @@ class TestCliValidate(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
-            self._run_git(target, ["init"])
-            self._run_git(target, ["remote", "add", "origin", "https://github.com/example/repo.git"])
-
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             init_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / ".meta.json"
             )
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
 
             init_data = json.loads(init_meta.read_text(encoding="utf-8"))
-            init_data["github"] = {"issue_number": 1}
+            init_data["github"] = {"issue_number": 1, "repo_owner": "example", "repo_name": "repo"}
             self._write_json_force(init_meta, init_data)
 
             issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
@@ -234,53 +324,253 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("spec-dock: ok", p.stdout)
 
-    def test_validate_detects_duplicate_discussion_sequence(self) -> None:
+    def test_validate_grandfathers_legacy_discussion_names_and_ignores_unrelated_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             discussions_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / "discussions"
             )
             discussions_dir.mkdir(parents=True, exist_ok=True)
             (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-note-current.md").write_text("current\n", encoding="utf-8")
+            (discussions_dir / "20260329todo.md").write_text("ignore me\n", encoding="utf-8")
+            (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_rejects_malformed_discussion_doc_candidates(self) -> None:
+        cases = (
+            "20260329t123456z.md",
+            "20260329t123456z--adr-kickoff.md",
+            "20260329t123456z-1-adr-kickoff.md",
+            "20260329t123456z-0a-adr-kickoff.md",
+            "20260329t123456z-ADR-kickoff.md",
+            "20260329t123456z-01-NOTE-memo.md",
+            "20260329t123456z-bogus-kickoff.md",
+            "20260329T123456z-adr-upper-t.md",
+            "20260329t123456Z-adr-upper-z.md",
+            "20260329t123456z-00-adr-bad-suffix.md",
+            "20260329t123456z-100-adr-too-wide.md",
+            "20260329t123456z-adr.md",
+            "20260329t123456z_adr-kickoff.md",
+            "20260329t123456z01-adr-kickoff.md",
+            "20260329-adr-kickoff.md",
+            "20260329-99-adr-kickoff.md",
+            "20260329t-adr-kickoff.md",
+            "20260329tt123456z-adr-kickoff.md",
+            "20260329x123456z-adr-kickoff.md",
+            "20260329x-adr-kickoff.md",
+            "20260329t123456zz-adr-kickoff.md",
+            "20260329t1234z-adr-kickoff.md",
+            "20260329t12345z-adr-kickoff.md",
+            "20260329123456z-adr-kickoff.md",
+            "20260329123456z-99-adr-kickoff.md",
+            "001-adr.md",
+            "001_adr-kickoff.md",
+            "001-bogus-kickoff.md",
+            "foo-adr-kickoff.md",
+            "bogus-01-adr-kickoff.md",
+            "adr-kickoff.md",
+            "adr_kickoff.md",
+        )
+        for name in cases:
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._create_same_repo_linked_hierarchy(target)
+
+                    discussions_dir = (
+                        target
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001-auth-platform"
+                        / "epics"
+                        / "epic-00002-jwt-auth"
+                        / "issues"
+                        / "iss-00003-add-refresh-token"
+                        / "discussions"
+                    )
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    (discussions_dir / name).write_text("bad\n", encoding="utf-8")
+                    (discussions_dir / "rules.md").write_text("allowed\n", encoding="utf-8")
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Malformed discussion document filename", p.stderr)
+                    self.assertIn(name, p.stderr)
+                    self.assertNotIn("rules.md", p.stderr)
+
+    def test_validate_accepts_mixed_same_timestamp_unsuffixed_and_suffixed_slots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-adr-kickoff.md").write_text("kickoff\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-01-disc-options.md").write_text("options\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-99-research-spike.md").write_text("spike\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_accepts_high_end_discussion_timestamp_suffix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-99-adr-tail.md").write_text("tail\n", encoding="utf-8")
+            (discussions_dir / "20260329t123457z-note-next.md").write_text("next\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_accepts_research_discussion_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-research-spike.md").write_text("spike\n", encoding="utf-8")
+            (discussions_dir / "001-research-legacy-spike.md").write_text("legacy\n", encoding="utf-8")
+            (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_detects_duplicate_discussion_timestamp_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-disc-second.md").write_text("second\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("Duplicate discussion sequence detected", p.stderr)
-            self.assertIn("seq=001", p.stderr)
-            self.assertIn("001-adr-first.md", p.stderr)
-            self.assertIn("001-disc-second.md", p.stderr)
+            self.assertIn("Duplicate discussion timestamp slot detected", p.stderr)
+            self.assertIn("slot=20260329t123456z", p.stderr)
+            self.assertIn("20260329t123456z-adr-first.md", p.stderr)
+            self.assertIn("20260329t123456z-disc-second.md", p.stderr)
+
+    def test_validate_detects_duplicate_discussion_timestamp_suffix_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "20260329t123456z-01-adr-first.md").write_text("first\n", encoding="utf-8")
+            (discussions_dir / "20260329t123456z-01-note-second.md").write_text("second\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Duplicate discussion timestamp suffix detected", p.stderr)
+            self.assertIn("slot=20260329t123456z-01", p.stderr)
+            self.assertIn("20260329t123456z-01-adr-first.md", p.stderr)
+            self.assertIn("20260329t123456z-01-note-second.md", p.stderr)
 
     def test_validate_detects_missing_required_artifact_docs_for_each_node_kind(self) -> None:
         artifact_names = ("requirement.md", "design.md", "plan.md", "report.md")
         node_roots = {
             "initiative": (
-                Path("spec-dock/initiatives/init-local-00001-auth-platform"),
-                "kind=initiative id=init-local-00001",
+                Path("spec-dock/initiatives/init-00001-auth-platform"),
+                "kind=initiative id=init-00001",
             ),
             "epic": (
-                Path("spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth"),
-                "kind=epic id=epic-local-00001",
+                Path("spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth"),
+                "kind=epic id=epic-00002",
             ),
             "issue": (
                 Path(
-                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token"
+                    "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token"
                 ),
-                "kind=issue id=iss-local-00001",
+                "kind=issue id=iss-00003",
             ),
         }
         cases = [
@@ -294,9 +584,7 @@ class TestCliValidate(CliRuntimeHarness):
                     target = Path(tmp)
                     self.assertEqual(main(["init", str(target)]), 0)
 
-                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-                    self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+                    self._create_same_repo_linked_hierarchy(target)
 
                     artifact_path = target / artifact_rel_path
                     artifact_path.unlink(missing_ok=False)
@@ -311,22 +599,22 @@ class TestCliValidate(CliRuntimeHarness):
         cases = [
             (
                 "initiative",
-                Path("spec-dock/initiatives/init-local-00001-auth-platform/.meta.json"),
-                "kind=initiative id=init-local-00001",
+                Path("spec-dock/initiatives/init-00001-auth-platform/.meta.json"),
+                "kind=initiative id=init-00001",
             ),
             (
                 "epic",
                 Path(
-                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/.meta.json"
+                    "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/.meta.json"
                 ),
-                "kind=epic id=epic-local-00001",
+                "kind=epic id=epic-00002",
             ),
             (
                 "issue",
                 Path(
-                    "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json"
+                    "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json"
                 ),
-                "kind=issue id=iss-local-00001",
+                "kind=issue id=iss-00003",
             ),
         ]
         for kind, meta_rel_path, expected in cases:
@@ -335,9 +623,7 @@ class TestCliValidate(CliRuntimeHarness):
                     target = Path(tmp)
                     self.assertEqual(main(["init", str(target)]), 0)
 
-                    self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-                    self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-                    self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+                    self._create_same_repo_linked_hierarchy(target)
 
                     meta_path = target / meta_rel_path
                     meta_path.unlink(missing_ok=False)
@@ -353,12 +639,10 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             meta_rel_path = Path(
-                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/.meta.json"
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.meta.json"
             )
             (target / meta_rel_path).unlink(missing_ok=False)
 
@@ -373,19 +657,17 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
             )
             (issue_dir / ".meta.json").unlink(missing_ok=False)
 
@@ -427,19 +709,17 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
             )
             (issue_dir / ".meta.json").unlink(missing_ok=False)
 
@@ -481,12 +761,10 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             missing_rel_path = Path(
-                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/plan.md"
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/plan.md"
             )
             (target / missing_rel_path).unlink(missing_ok=False)
 
@@ -511,14 +789,12 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
             self._run_runtime(target, ["sync", "--no-update-active"])
 
             agent_dir = target / "spec-dock" / ".agent"
             missing_rel_path = Path(
-                "spec-dock/initiatives/init-local-00001-auth-platform/epics/epic-local-00001-jwt-auth/issues/iss-local-00001-add-refresh-token/plan.md"
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/plan.md"
             )
             (target / missing_rel_path).unlink(missing_ok=False)
 
@@ -542,23 +818,21 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
-            meta["parent_id"] = "epic-local-99999"
+            meta["parent_id"] = "epic-99999"
             self._write_json_force(issue_meta, meta)
 
             self._run_runtime_expect_fail(target, ["sync", "--no-update-active"])
@@ -568,9 +842,7 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             self._run_runtime(target, ["sync", "--no-update-active"])
             agent_dir = target / "spec-dock" / ".agent"
@@ -583,15 +855,15 @@ class TestCliValidate(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
-            meta["parent_id"] = "epic-local-99999"
+            meta["parent_id"] = "epic-99999"
             self._write_json_force(issue_meta, meta)
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
@@ -606,7 +878,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertEqual(index["deps"]["issue_edges"], [])
             self.assertIn("preflight validate failed", str(index["deps"]["error"]))
             self.assertIn("deps_preflight_failed", index["warnings"])
-            self.assertIsNone(index["nodes"]["iss-local-00001"]["deps"])
+            self.assertIsNone(index["nodes"]["iss-00003"]["deps"])
 
             tree = json.loads((agent_dir / "tree.json").read_text(encoding="utf-8"))
             self.assertFalse(tree["deps"]["valid"])
@@ -637,19 +909,17 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_meta = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             meta = json.loads(issue_meta.read_text(encoding="utf-8"))
@@ -681,35 +951,33 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             init_meta_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / ".meta.json"
             )
             epic_meta_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / ".meta.json"
             )
             issue_meta_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
                 / ".meta.json"
             )
             meta_paths = [init_meta_path, epic_meta_path, issue_meta_path]
@@ -755,18 +1023,18 @@ class TestCliValidate(CliRuntimeHarness):
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Foreign issue"])
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
+            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Foreign issue", "--github-issue", "124"])
 
             current_issue_meta_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-current-issue"
                 / ".meta.json"
@@ -775,11 +1043,11 @@ class TestCliValidate(CliRuntimeHarness):
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-foreign-issue"
+                / "iss-00124-foreign-issue"
                 / ".meta.json"
             )
 
@@ -850,17 +1118,17 @@ class TestCliValidate(CliRuntimeHarness):
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
+            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
 
             current_issue_meta_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-current-issue"
                 / ".meta.json"
@@ -890,17 +1158,17 @@ class TestCliValidate(CliRuntimeHarness):
             self._run_git(target, ["init"])
             self._run_git(target, ["remote", "add", "origin", "https://github.com/current/repo.git"])
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--epic", "1", "--title", "Current issue", "--github-issue", "123"])
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
+            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Current issue", "--github-issue", "123"])
 
             current_issue_meta_path = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00123-current-issue"
                 / ".meta.json"
@@ -937,19 +1205,17 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
             )
             dot_meta_path = issue_dir / ".meta.json"
             legacy_meta_path = issue_dir / "meta.json"
@@ -987,19 +1253,17 @@ class TestCliValidate(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
             )
             dot_meta_path = issue_dir / ".meta.json"
             legacy_meta_path = issue_dir / "meta.json"
@@ -1021,4 +1285,93 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn(str(legacy_meta_path), p_sync.stderr)
 
             self.assertEqual(dot_meta_path.read_text(encoding="utf-8"), before_text)
+            self.assertTrue(legacy_meta_path.is_file())
+
+    def test_sync_clause3_legacy_meta_json_fail_fast_no_auto_repair_or_agent_write_even_with_force(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            dot_meta_path = issue_dir / ".meta.json"
+            legacy_meta_path = issue_dir / "meta.json"
+            before_text = dot_meta_path.read_text(encoding="utf-8")
+            dot_meta_path.rename(legacy_meta_path)
+
+            active_dir = target / "spec-dock" / "active"
+            context_pack_path = active_dir / "context-pack.md"
+            self.assertTrue(context_pack_path.is_file(), context_pack_path.as_posix())
+            self.assertFalse(context_pack_path.is_symlink(), context_pack_path.as_posix())
+            before_context_pack_text = context_pack_path.read_text(encoding="utf-8")
+
+            def _snapshot_active_pointer(name: str) -> tuple[str, str]:
+                active_link_path = active_dir / name
+                active_path_file = active_dir / f"{name}.path"
+                if active_link_path.is_symlink():
+                    self.assertFalse(active_path_file.exists(), active_path_file.as_posix())
+                    return ("symlink", os.readlink(active_link_path))
+                self.assertFalse(active_link_path.exists(), active_link_path.as_posix())
+                self.assertTrue(active_path_file.is_file(), active_path_file.as_posix())
+                return ("path", active_path_file.read_text(encoding="utf-8").strip())
+
+            before_active_pointers = {
+                name: _snapshot_active_pointer(name) for name in ("initiative", "epic", "issue")
+            }
+
+            agent_active_path = target / "spec-dock" / ".agent" / "active.json"
+            self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
+
+            generated_agent_paths = [
+                target / "spec-dock" / ".agent" / "index.json",
+                target / "spec-dock" / ".agent" / "tree.json",
+                target / "spec-dock" / ".agent" / "index-all.json",
+                target / "spec-dock" / ".agent" / "tree-all.json",
+                target / "spec-dock" / ".agent" / "deps-issues.json",
+            ]
+            generated_top_level_paths = [
+                target / "spec-dock" / "tree-all.puml",
+                target / "spec-dock" / "tree.puml",
+                target / "spec-dock" / "deps-issues.puml",
+                target / "spec-dock" / "dashboard.md",
+            ]
+            for generated_path in generated_agent_paths:
+                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+            for generated_path in generated_top_level_paths:
+                self.assertFalse(generated_path.exists(), generated_path.as_posix())
+
+            for args in (["sync"], ["sync", "--force"]):
+                result = self._run_runtime_capture(target, args)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Unsupported legacy meta.json detected", result.stderr)
+                self.assertIn(str(legacy_meta_path), result.stderr)
+                self.assertFalse(dot_meta_path.exists())
+                self.assertTrue(legacy_meta_path.is_file())
+                self.assertEqual(legacy_meta_path.read_text(encoding="utf-8"), before_text)
+                self.assertTrue(context_pack_path.is_file(), context_pack_path.as_posix())
+                self.assertFalse(context_pack_path.is_symlink(), context_pack_path.as_posix())
+                self.assertEqual(
+                    context_pack_path.read_text(encoding="utf-8"),
+                    before_context_pack_text,
+                )
+                for name, before_active_pointer in before_active_pointers.items():
+                    self.assertEqual(_snapshot_active_pointer(name), before_active_pointer)
+                self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
+                for generated_path in generated_agent_paths:
+                    self.assertFalse(generated_path.exists(), generated_path.as_posix())
+                for generated_path in generated_top_level_paths:
+                    self.assertFalse(generated_path.exists(), generated_path.as_posix())
+
             self.assertTrue(legacy_meta_path.is_file())

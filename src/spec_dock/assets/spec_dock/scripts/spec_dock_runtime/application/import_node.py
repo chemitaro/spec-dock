@@ -149,21 +149,21 @@ def _validate_url_repo_identity(
     repo = (req.target_repo_name or "").strip().lower()
     if not owner or not repo:
         return
-    if req.allow_foreign_url:
-        return
-
+    expected = f"{owner}/{repo}"
     if current_repo_slug is None:
         raise RuntimeError(
             "Cannot verify GitHub URL repository against current repo. "
-            "Configure git remote.origin.url or pass '--allow-foreign-url'."
+            "spec-dock import enforces single-repo GitHub-backed identity for "
+            f"GitHub issue URL imports (target repo={expected}), and "
+            "'--allow-foreign-url' no longer enables node import."
         )
-    expected = f"{owner}/{repo}"
     actual = current_repo_slug
     if actual != expected:
         raise RuntimeError(
-            "GitHub URL repository mismatch for import target: "
-            f"target={expected}, current={actual}. "
-            "Use '--allow-foreign-url' only when cross-repo import is intentional."
+            "foreign GitHub issue URL import is rejected: "
+            "spec-dock import enforces single-repo GitHub-backed identity for "
+            f"initiative/epic/issue nodes (target repo={expected}, current repo={actual}). "
+            "'--allow-foreign-url' no longer enables node import."
         )
 
 
@@ -173,6 +173,29 @@ def _target_repo_slug(req: ImportNodeRequest) -> str | None:
     if not owner or not repo:
         return None
     return f"{owner}/{repo}"
+
+
+def _resolve_import_issue_view_repo_slug(
+    req: ImportNodeRequest,
+    *,
+    current_repo_slug: str | None,
+) -> str | None:
+    return _target_repo_slug(req) or current_repo_slug
+
+
+def _require_numeric_import_repo_scope(
+    req: ImportNodeRequest,
+    *,
+    current_repo_slug: str | None,
+) -> None:
+    if _target_repo_slug(req) is not None:
+        return
+    if current_repo_slug is not None:
+        return
+    raise RuntimeError(
+        "Current GitHub repo scope could not be resolved from origin. "
+        "spec-dock import requires a current GitHub repo scope for numeric initiative/epic/issue targets."
+    )
 
 
 def _import_target_ref(req: ImportNodeRequest) -> str:
@@ -300,6 +323,7 @@ def import_node_core(
             graph,
             repo_root=_resolve_repo_root(ports),
             current_repo_slug=current_repo_slug,
+            enforce_github_mandatory_linkage=False,
         )
         if report.errors:
             raise RuntimeError(report.errors[0])
@@ -312,6 +336,10 @@ def import_node_core(
 
     issue_number = int(req.issue_number)
     _validate_url_repo_identity(req, current_repo_slug=current_repo_slug)
+    _require_numeric_import_repo_scope(
+        req,
+        current_repo_slug=current_repo_slug,
+    )
     specdock_dir = _resolve_specdock_dir(ports)
     today = ports.clock.today() if ports.clock is not None else date.today().isoformat()
     guard_github_issue_uniqueness(
@@ -343,7 +371,7 @@ def import_node_core(
     imported_issue = issue_gateway.issue_view_minimal(
         _resolve_repo_root(ports),
         issue_number,
-        repo_slug=_target_repo_slug(req),
+        repo_slug=_resolve_import_issue_view_repo_slug(req, current_repo_slug=current_repo_slug),
     )
     lock_path, lock_token = _acquire_create_lock(specdock_dir)
     result_node: SpecNode | None = None

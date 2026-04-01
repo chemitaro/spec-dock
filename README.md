@@ -18,7 +18,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/pr
 # Overwrite managed files if 'spec-dock' already exists
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
 
-# Update managed files (docs/templates/scripts/skills)
+# Update managed files (docs/templates/scripts/skills only; not an in-place migration tool)
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
 ```
 
@@ -45,6 +45,11 @@ uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
 uvx --from ~/src/spec-dock spec-dock update
 ```
 
+`spec-dock update` refreshes managed files/docs/templates/scripts/skills, but it does **not**
+guarantee in-place migration of older workspaces. If an older tree still has legacy `meta.json`,
+partial linkage, or current-repo mismatches, current runtime commands may reject/fail-fast; normalize
+manually or rebuild the workspace instead of expecting auto-migration.
+
 Troubleshooting:
 - If `.spec-dock/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
   v2 generates `spec-dock/initiatives/`, `spec-dock/active/`, and `spec-dock/.agent/`.
@@ -63,23 +68,22 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 ```bash
 # Create nodes:
-# - initiative/epic default: local-only (no GitHub); ids use `*-local-*`.
-./spec-dock/scripts/spec-dock new initiative --title "Auth platform"     # id=init-local-00001
-./spec-dock/scripts/spec-dock new epic --initiative 1 --title "JWT auth" # id=epic-local-00001
+# - initiative/epic/issue default: create and link a GitHub issue.
+#   Requires: GitHub CLI `gh` and a GitHub repository.
+./spec-dock/scripts/spec-dock new initiative --title "Auth platform"                # creates GH issue, id=init-00123
+./spec-dock/scripts/spec-dock new epic --initiative init-00123 --title "JWT auth"  # creates GH issue, id=epic-00124
 
 # - issue default: create and link a GitHub issue; ids follow GitHub issue numbers.
-#   Requires: GitHub CLI `gh` and a GitHub repository.
-./spec-dock/scripts/spec-dock new issue --epic 1 --title "Add refresh token"  # creates GH issue, id=iss-00123
+./spec-dock/scripts/spec-dock new issue --epic epic-00124 --title "Add refresh token"  # creates GH issue, id=iss-00123
 
-# Optional: create and link GitHub issues for initiative/epic.
-./spec-dock/scripts/spec-dock new initiative --create-github-issue --title "Auth platform"       # id=init-00123
-./spec-dock/scripts/spec-dock new epic --create-github-issue --initiative 123 --title "JWT auth" # id=epic-00124
-
-# Local-only issue creation (no GitHub)
-./spec-dock/scripts/spec-dock new issue --no-github --epic 1 --title "Add refresh token"  # id=iss-local-00001
+# `--create-github-issue` is an explicit alias for the default create path.
+./spec-dock/scripts/spec-dock new initiative --create-github-issue --title "Auth platform"                # id=init-00123
+./spec-dock/scripts/spec-dock new epic --create-github-issue --initiative init-00123 --title "JWT auth"  # id=epic-00124
 
 # Or: link to an existing GitHub issue number (without creating a new one)
-./spec-dock/scripts/spec-dock new issue --epic 1 --title "Add refresh token" --github-issue 123  # id=iss-00123
+./spec-dock/scripts/spec-dock new issue --epic epic-00124 --title "Add refresh token" --github-issue 123  # id=iss-00123
+
+# Note: `--no-github` remains only as a compatibility flag and is rejected for node create/import paths.
 
 # Scope-local wrappers created in generated nodes (single title arg)
 <initiative-dir>/epics/new-epic "JWT auth"
@@ -93,7 +97,8 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ./spec-dock/scripts/spec-dock import epic 11 --title "JWT auth" --initiative init-00010    # id=epic-00011
 ./spec-dock/scripts/spec-dock import issue 123 --title "Add refresh token" --epic epic-00011  # id=iss-00123
 #
-# Note: URL targets are parsed for the issue number only; owner/repo in the URL is ignored.
+# Note: canonical GitHub issue URLs are checked against the current repo; owner/repo mismatch is rejected.
+# Note: numeric initiative/epic/issue imports read from the resolved current repo (or explicit owner/repo when provided); if neither explicit repo scope nor a resolvable current repo scope from `origin` is available, import fails before local writes.
 
 # Set active issue pointers (symlinks) and generate context-pack
 ./spec-dock/scripts/spec-dock active set 123             # default: active only (no checkout)
@@ -110,6 +115,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 Notes:
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
+- Legacy sequential discussion docs are grandfathered only. New docs do not reuse legacy sequence names, and spec-dock does not auto-rename or auto-repair them to preserve forced backward compatibility.
 - `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
 - With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.

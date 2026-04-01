@@ -11,13 +11,11 @@ class TestCliRulesContract(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
-            epic_dir = init_dir / "epics" / "epic-local-00001-jwt-auth"
-            issue_dir = epic_dir / "issues" / "iss-local-00001-add-refresh-token"
+            init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
+            issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
             expected_rules_links = {
                 init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
                 init_dir / "discussions" / "rules.md": (
@@ -104,17 +102,20 @@ class TestCliRulesContract(CliRuntimeHarness):
                     "./spec-dock/scripts/spec-dock new issue --create-github-issue --epic "
                     "<epic-id> --title \"...\""
                 ),
-                "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"",
                 "./spec-dock/scripts/spec-dock validate",
                 "./spec-dock/scripts/spec-dock sync --github",
             ):
                 self.assertIn(command, workflow_issue)
             self.assertNotIn("./spec ", workflow_issue)
             self.assertNotIn("issues/new-issue", workflow_issue)
+            self.assertNotIn(
+                "./spec-dock/scripts/spec-dock new issue --no-github --epic <epic-id> --title \"...\"",
+                workflow_issue,
+            )
 
             self.assertIn("`spec-dock/docs/rules/**`", reference_github)
             self.assertIn(
-                "`./spec-dock/scripts/spec-dock new issue --no-github --epic <id> --title \"...\"`",
+                "`--no-github` は compatibility option として残っていますが、contract error で reject されます",
                 reference_github,
             )
             self.assertIn("`--create-github-issue`", reference_github)
@@ -126,7 +127,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             for text, expected_command in (
                 (
                     initiative_epics_rules,
-                    "`./spec-dock/scripts/spec-dock new epic --initiative <id> --title \"<title>\" --no-github`",
+                    "`./spec-dock/scripts/spec-dock new epic --initiative <id> --title \"<title>\"`",
                 ),
                 (
                     initiative_discussions_rules,
@@ -148,15 +149,17 @@ class TestCliRulesContract(CliRuntimeHarness):
                 self.assertIn("spec-dock/docs/", text)
                 self.assertIn(expected_command, text)
                 self.assertNotIn("./spec ", text)
+            self.assertNotIn("--no-github", initiative_epics_rules)
 
     def test_new_doc_numbering_and_validate_ignore_initiative_discussion_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
 
-            initiative_dir = target / "spec-dock" / "initiatives" / "init-local-00001-auth-platform"
+            initiative_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             discussions_dir = initiative_dir / "discussions"
             rules_target = target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
 
@@ -167,11 +170,15 @@ class TestCliRulesContract(CliRuntimeHarness):
             self._run_runtime(target, ["new", "doc", "adr", "--initiative", "1", "--title", "Decision one"])
             self._run_runtime(target, ["new", "doc", "disc", "--initiative", "1", "--title", "Why now"])
 
-            self.assertTrue((discussions_dir / "001-adr-decision-one.md").is_file())
-            self.assertTrue((discussions_dir / "002-disc-why-now.md").is_file())
+            adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
+            disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
+            self.assertEqual(len(adr_files), 1)
+            self.assertEqual(len(disc_files), 1)
+            self.assertRegex(adr_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
+            self.assertRegex(disc_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$")
             self.assertEqual(
                 sorted(path.name for path in discussions_dir.iterdir()),
-                ["001-adr-decision-one.md", "002-disc-why-now.md", "rules.md"],
+                sorted([adr_files[0].name, disc_files[0].name, "rules.md"]),
             )
 
             validate_result = self._run_runtime_capture(target, ["validate"])
@@ -187,16 +194,17 @@ class TestCliRulesContract(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
+            self._init_origin_repo(target)
+            self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
+            self._run_runtime(target, ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"])
 
             epic_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
             )
             discussions_dir = epic_dir / "discussions"
             rules_target = target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
@@ -204,14 +212,18 @@ class TestCliRulesContract(CliRuntimeHarness):
             self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
             self.assertEqual(rules_link.resolve(), rules_target.resolve())
 
-            self._run_runtime(target, ["new", "doc", "adr", "--epic", "1", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "disc", "--epic", "1", "--title", "Why now"])
+            self._run_runtime(target, ["new", "doc", "adr", "--epic", "2", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--epic", "2", "--title", "Why now"])
 
-            self.assertTrue((discussions_dir / "001-adr-decision-one.md").is_file())
-            self.assertTrue((discussions_dir / "002-disc-why-now.md").is_file())
+            adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
+            disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
+            self.assertEqual(len(adr_files), 1)
+            self.assertEqual(len(disc_files), 1)
+            self.assertRegex(adr_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
+            self.assertRegex(disc_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$")
             self.assertEqual(
                 sorted(path.name for path in discussions_dir.iterdir()),
-                ["001-adr-decision-one.md", "002-disc-why-now.md", "rules.md"],
+                sorted([adr_files[0].name, disc_files[0].name, "rules.md"]),
             )
 
             validate_result = self._run_runtime_capture(target, ["validate"])
@@ -227,19 +239,17 @@ class TestCliRulesContract(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            self._run_runtime(target, ["new", "initiative", "--no-github", "--title", "Auth platform"])
-            self._run_runtime(target, ["new", "epic", "--no-github", "--initiative", "1", "--title", "JWT auth"])
-            self._run_runtime(target, ["new", "issue", "--no-github", "--epic", "1", "--title", "Add refresh token"])
+            self._create_same_repo_linked_hierarchy(target)
 
             issue_dir = (
                 target
                 / "spec-dock"
                 / "initiatives"
-                / "init-local-00001-auth-platform"
+                / "init-00001-auth-platform"
                 / "epics"
-                / "epic-local-00001-jwt-auth"
+                / "epic-00002-jwt-auth"
                 / "issues"
-                / "iss-local-00001-add-refresh-token"
+                / "iss-00003-add-refresh-token"
             )
             discussions_dir = issue_dir / "discussions"
             rules_target = target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
@@ -247,14 +257,18 @@ class TestCliRulesContract(CliRuntimeHarness):
             self.assertTrue(rules_link.is_symlink(), f"missing rules symlink: {rules_link}")
             self.assertEqual(rules_link.resolve(), rules_target.resolve())
 
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "1", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "disc", "--issue", "1", "--title", "Why now"])
+            self._run_runtime(target, ["new", "doc", "adr", "--issue", "3", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "doc", "disc", "--issue", "3", "--title", "Why now"])
 
-            self.assertTrue((discussions_dir / "001-adr-decision-one.md").is_file())
-            self.assertTrue((discussions_dir / "002-disc-why-now.md").is_file())
+            adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
+            disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
+            self.assertEqual(len(adr_files), 1)
+            self.assertEqual(len(disc_files), 1)
+            self.assertRegex(adr_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$")
+            self.assertRegex(disc_files[0].name, r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$")
             self.assertEqual(
                 sorted(path.name for path in discussions_dir.iterdir()),
-                ["001-adr-decision-one.md", "002-disc-why-now.md", "rules.md"],
+                sorted([adr_files[0].name, disc_files[0].name, "rules.md"]),
             )
 
             validate_result = self._run_runtime_capture(target, ["validate"])
