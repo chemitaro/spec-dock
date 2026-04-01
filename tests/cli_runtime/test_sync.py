@@ -1052,6 +1052,81 @@ class TestCliSync(CliRuntimeHarness):
             self.assertIn("tree.puml", gitignore)
             self.assertIn("deps-issues.puml", gitignore)
             self.assertIn("dashboard.md", gitignore)
+            self.assertIn("/adrs/", gitignore)
+
+    def test_spec_dock_gitignore_behavior_matches_git_check_ignore(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._run_git(target, ["init"])
+
+            (target / "spec-dock" / "dashboard.md").write_text("dashboard\n", encoding="utf-8")
+            adrs_doc = target / "spec-dock" / "adrs" / "example.md"
+            adrs_doc.parent.mkdir(parents=True, exist_ok=True)
+            adrs_doc.write_text("adr\n", encoding="utf-8")
+            nested_adrs_doc = target / "spec-dock" / "docs" / "adrs" / "example.md"
+            nested_adrs_doc.parent.mkdir(parents=True, exist_ok=True)
+            nested_adrs_doc.write_text("nested adr\n", encoding="utf-8")
+            self.assertTrue((target / "spec-dock" / "docs" / "README.md").is_file())
+
+            isolated_home = target / ".git-home"
+            isolated_xdg = target / ".git-xdg"
+            isolated_home.mkdir(parents=True, exist_ok=True)
+            isolated_xdg.mkdir(parents=True, exist_ok=True)
+            check_ignore_env = os.environ.copy()
+            check_ignore_env.update(
+                {
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_CONFIG_GLOBAL": os.devnull,
+                    "HOME": str(isolated_home),
+                    "XDG_CONFIG_HOME": str(isolated_xdg),
+                }
+            )
+
+            def _run_check_ignore(path: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [
+                        "git",
+                        "-c",
+                        f"core.excludesfile={os.devnull}",
+                        "check-ignore",
+                        "--no-index",
+                        path,
+                    ],
+                    cwd=str(target),
+                    env=check_ignore_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+            ignored_dashboard = _run_check_ignore("spec-dock/dashboard.md")
+            self.assertEqual(
+                ignored_dashboard.returncode,
+                0,
+                ignored_dashboard.stdout + ignored_dashboard.stderr,
+            )
+            self.assertIn("spec-dock/dashboard.md", ignored_dashboard.stdout)
+
+            ignored_adr = _run_check_ignore("spec-dock/adrs/example.md")
+            self.assertEqual(ignored_adr.returncode, 0, ignored_adr.stdout + ignored_adr.stderr)
+            self.assertIn("spec-dock/adrs/example.md", ignored_adr.stdout)
+
+            not_ignored_doc = _run_check_ignore("spec-dock/docs/README.md")
+            self.assertEqual(
+                not_ignored_doc.returncode,
+                1,
+                not_ignored_doc.stdout + not_ignored_doc.stderr,
+            )
+            not_ignored_nested_adrs = _run_check_ignore("spec-dock/docs/adrs/example.md")
+            self.assertEqual(
+                not_ignored_nested_adrs.returncode,
+                1,
+                not_ignored_nested_adrs.stdout + not_ignored_nested_adrs.stderr,
+            )
 
     def test_sync_force_does_not_update_active_from_branch(self) -> None:
         if shutil.which("git") is None:

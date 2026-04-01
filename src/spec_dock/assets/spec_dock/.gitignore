@@ -4,6 +4,7 @@
 # legacy v2 name (kept ignored for safe upgrades)
 .work/
 active/
+/adrs/
 tree-all.puml
 tree.puml
 deps-issues.puml

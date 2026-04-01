@@ -54,13 +54,16 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
+        "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
         "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
         "spec-dock/docs/workflow_issue.md": "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
+        "spec-dock/docs/workflow-tree.md": "src/spec_dock/assets/spec_dock/docs/workflow-tree.md",
         "spec-dock/docs/reference_github.md": (
             "src/spec_dock/assets/spec_dock/docs/reference_github.md"
         ),
@@ -186,6 +189,29 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
         },
     }
+    _WORKFLOW_TREE_REQUIRED_FRAGMENTS = (
+        "`guide.md`",
+        "`reference_sync.md`",
+        "`workflow_issue.md`",
+        "`workflow_adr.md`",
+        "`spec-dock/adrs/`",
+        "generated ADR mirror",
+    )
+    _GUIDE_REQUIRED_FRAGMENTS = (
+        "`spec-dock/adrs/`",
+        "generated ADR mirror",
+        "`sync` で rebuild / gitignore 対象",
+    )
+    _GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS = (
+        "[workflow_initiative.md](workflow_initiative.md)",
+        "[workflow_epic.md](workflow_epic.md)",
+        "[workflow_issue.md](workflow_issue.md)",
+        "[workflow_adr.md](workflow_adr.md)",
+        "[reference_github.md](reference_github.md)",
+        "[reference_naming.md](reference_naming.md)",
+        "[reference_deps.md](reference_deps.md)",
+        "[reference_sync.md](reference_sync.md)",
+    )
 
     def _assert_canonical_rules_files_contract(self, text_map: dict[str, str]) -> None:
         for rel_suffix, expected in self._CANONICAL_RULES_EXPECTATIONS.items():
@@ -226,6 +252,54 @@ class TestInitUpdate(CliRuntimeHarness):
                 installed_path.read_text(encoding="utf-8"),
                 asset_path.read_text(encoding="utf-8"),
                 f"canonical rules file diverged from provider asset: {installed_rel_path}",
+            )
+
+    def _assert_workflow_tree_docs_contract(self, workflow_tree_text: str) -> None:
+        for fragment in self._WORKFLOW_TREE_REQUIRED_FRAGMENTS:
+            self.assertIn(
+                fragment,
+                workflow_tree_text,
+                f"workflow-tree contract fragment missing: {fragment}",
+            )
+        for legacy_token in (
+            "spec-dock-guide.md",
+            "sync.md",
+            "workflow-issue.md",
+            "workflow-adr.md",
+        ):
+            self.assertNotIn(
+                f"`{legacy_token}`",
+                workflow_tree_text,
+                f"workflow-tree contains legacy link token: {legacy_token}",
+            )
+
+    def _assert_guide_docs_contract(self, guide_text: str) -> None:
+        for fragment in self._GUIDE_REQUIRED_FRAGMENTS:
+            self.assertIn(
+                fragment,
+                guide_text,
+                f"guide contract fragment missing: {fragment}",
+            )
+        for fragment in self._GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS:
+            self.assertIn(
+                fragment,
+                guide_text,
+                f"guide reference-name contract fragment missing: {fragment}",
+            )
+        for legacy_token in (
+            "workflow-initiative.md",
+            "workflow-epic.md",
+            "workflow-issue.md",
+            "workflow-adr.md",
+            "reference-github.md",
+            "reference-naming.md",
+            "reference-deps.md",
+            "reference-sync.md",
+        ):
+            self.assertNotIn(
+                legacy_token,
+                guide_text,
+                f"guide contains legacy link token: {legacy_token}",
             )
 
     def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
@@ -314,6 +388,7 @@ class TestInitUpdate(CliRuntimeHarness):
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
             self.assertIn(".agent/", gitignore)
             self.assertIn("active/", gitignore)
+            self.assertIn("/adrs/", gitignore)
 
             docs_dir = target / "spec-dock" / "docs"
             self.assertTrue((docs_dir / "README.md").is_file())
@@ -322,6 +397,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((docs_dir / "workflow_epic.md").is_file())
             self.assertTrue((docs_dir / "workflow_issue.md").is_file())
             self.assertTrue((docs_dir / "workflow_adr.md").is_file())
+            self.assertTrue((docs_dir / "workflow-tree.md").is_file())
             self.assertTrue((docs_dir / "phase_requirement.md").is_file())
             self.assertTrue((docs_dir / "phase_design.md").is_file())
             self.assertTrue((docs_dir / "phase_plan.md").is_file())
@@ -345,6 +421,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("[phase_requirement.md](phase_requirement.md)", guide_text)
             self.assertIn("[phase_design.md](phase_design.md)", guide_text)
             self.assertIn("[phase_plan.md](phase_plan.md)", guide_text)
+            self._assert_guide_docs_contract(guide_text)
+            workflow_tree = (docs_dir / "workflow-tree.md").read_text(encoding="utf-8")
+            self._assert_workflow_tree_docs_contract(workflow_tree)
 
             workflow_initiative = (docs_dir / "workflow_initiative.md").read_text(encoding="utf-8")
             workflow_epic = (docs_dir / "workflow_epic.md").read_text(encoding="utf-8")
@@ -561,10 +640,33 @@ class TestInitUpdate(CliRuntimeHarness):
                 target / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md",
                 "legacy skill example: new adr --issue ...\n",
             )
+            legacy_gitignore_path = target / "spec-dock" / ".gitignore"
+            self._write_text_force(
+                legacy_gitignore_path,
+                ".agent/\n"
+                "active/\n"
+                "tree-all.puml\n"
+                "tree.puml\n"
+                "deps-issues.puml\n"
+                "dashboard.md\n",
+            )
+            self.assertNotIn(
+                "/adrs/",
+                legacy_gitignore_path.read_text(encoding="utf-8"),
+                "legacy fixture must omit /adrs/ before update",
+            )
 
             self.assertEqual(main(["update", str(target)]), 0)
+            gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn("/adrs/", gitignore)
             self._assert_canonical_rules_files_match_provider_assets(target)
             self._assert_installed_templates_match_provider_assets(target)
+            self._assert_workflow_tree_docs_contract(
+                (target / "spec-dock" / "docs" / "workflow-tree.md").read_text(encoding="utf-8")
+            )
+            self._assert_guide_docs_contract(
+                (target / "spec-dock" / "docs" / "guide.md").read_text(encoding="utf-8")
+            )
             for installed_rel_path, corrupted_rules_text in corrupted_rules_text_map.items():
                 self.assertNotEqual(
                     (target / installed_rel_path).read_text(encoding="utf-8"),
