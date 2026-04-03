@@ -172,10 +172,12 @@ ID: "iss-00049"
   - `index.json` / `index-all.json` の shape が期待どおり
 
 ###### Refactor
-- cleanup target:
-  - metadata naming の重複整理
-- invariants to keep green:
-  - 既存 consumer が壊れない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### B2 — deps view
 - purpose:
@@ -200,10 +202,12 @@ ID: "iss-00049"
   - `deps-issues.json` verification が green
 
 ###### Refactor
-- cleanup target:
-  - duplicated constants / wording
-- invariants to keep green:
-  - fail-closed placeholder behavior を維持する
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
@@ -251,10 +255,12 @@ ID: "iss-00049"
   - snapshot verification が green
 
 ###### Refactor
-- cleanup target:
-  - duplicated context rendering logic
-- invariants to keep green:
-  - active-none fallback を壊さない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### B2 — provider/dogfooding docs parity
 - purpose:
@@ -280,10 +286,12 @@ ID: "iss-00049"
   - parity evidence が揃う
 
 ###### Refactor
-- cleanup target:
-  - repetitive wording の整理
-- invariants to keep green:
-  - `sync --force` / placeholder 説明を落とさない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
