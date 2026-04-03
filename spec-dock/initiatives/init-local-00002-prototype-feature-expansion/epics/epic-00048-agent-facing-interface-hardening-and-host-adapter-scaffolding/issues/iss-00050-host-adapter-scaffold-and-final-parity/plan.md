@@ -94,17 +94,23 @@ ID: "iss-00050"
     - S04 final close 前
   - scope:
     - thin adapter contract、issue boundary、final epic consistency
+  - commit gate:
+    - 初回 SG1 pass 後は docs-only commit を原則作成し、final SG1 でも追加差分があれば commit する
 - RG1 implementation review:
   - timing:
     - S02 完了後
     - S03 完了後
   - scope:
     - installer changes、asset layout、adapter thinness
+  - commit gate:
+    - 各 RG1 pass 後に、その stage で確定した差分を 1 commit にまとめる
 - QG1 QA review:
   - timing:
     - S03 完了後
   - scope:
     - init/update behavior、parity evidence、validate
+  - commit gate:
+    - QG1 pass 後に QA 反映済みの最終差分を commit し、S04 へ渡す
 - step approval loop:
   - SG1 pass 後に S02 へ進む
   - S02 後は RG1 pass を取ってから S03 へ進む
@@ -119,6 +125,7 @@ ID: "iss-00050"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
+- 各 stage gate（SG/RG/QG）通過後は、その gate で確定した差分を原則 commit し、no-op の場合のみ `report.md` に理由を残す。
 
 ## 実装ステップ
 
@@ -137,6 +144,8 @@ ID: "iss-00050"
   - SG1/spec review pass
 - expected tests:
   - なし（docs review only）
+- commit:
+  - thin adapter contract と metadata fixed point を commit し、後続の実装差分と分離する
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -213,6 +222,8 @@ ID: "iss-00050"
   - RG1 implementation review
 - expected tests:
   - relevant installer tests
+- commit:
+  - installer managed asset sync 差分を 1 commit として確定する
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -292,6 +303,8 @@ ID: "iss-00050"
 - expected tests:
   - relevant installer tests
   - `./spec-dock/scripts/spec-dock validate`
+- commit:
+  - adapter thinness / parity / QA反映込みの差分を 1 commit として確定する
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -310,6 +323,8 @@ ID: "iss-00050"
   - SG1/spec review pass
 - expected tests:
   - evidence review only
+- commit:
+  - final spec review で追加入力があれば closing commit を作成し、無ければ直前 gate の commit を最終成果として扱う
 - report update:
   - `./spec-dock/active/issue/report.md`
 
@@ -330,6 +345,8 @@ ID: "iss-00050"
   - spec review pass
   - implementation review pass
   - QA review pass
+- commit expectation:
+  - final diff review 後に追加修正があれば最終 commit を作成し、追加修正が無ければ直前 gate の commit を最終成果として扱う
 
 ## 未確定事項
 - なし:
