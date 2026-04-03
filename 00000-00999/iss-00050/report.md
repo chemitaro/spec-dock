@@ -141,3 +141,62 @@
   - S01 で non-blocking note だった `meta.json.targets` subshape は、この step で exact JSON assertion を追加して閉じた
 - refactor:
   - なし
+
+## 2026-04-03 S03 triage note
+- `tests/test_init_update.py` の差分は次の 2 群に分けて扱う:
+  - A:
+    - host adapter asset / metadata / checked-in parity に直接必要な差分
+  - B:
+    - checked-in dogfooding runtime import parity test の期待値調整
+- B 差分の判定:
+  - keep
+- keep 理由:
+  - provider-side asset runtime と checked-in dogfooding runtime の `application/import_node.py` は、どちらも `current_repo_slug` 解決、`git_gateway` 使用、`issue_view_minimal(..., repo_slug=...)` 呼び出しを既に共有している
+  - したがって `issue_gateway.calls == (..., "example/repo")` と `git_gateway=_StubGitGateway()` の追加は host adapter 独自の新規仕様ではなく、既存 runtime 契約への parity test 追随である
+  - S02 で切り分けた broader `tests.test_init_update` の 3 failure はこの parity gap に対応しており、issue-00050 S03 の dogfooding parity closure として扱うのが妥当
+
+## 2026-04-03 S03 adapter thinness, dogfooding parity, docs parity
+- 実行コマンド:
+  - `PYTHONPATH=src python -m spec_dock.cli update .`
+  - `python -m unittest tests.test_init_update`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git --no-pager diff --cached --check`
+- test 結果:
+  - `python -m unittest tests.test_init_update`
+    - pass
+  - `./spec-dock/scripts/spec-dock validate`
+    - pass
+  - `git --no-pager diff --cached --check`
+    - pass
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - host adapter scaffold、checked-in parity、`json_state.py` の projection 追随、stale docs cleanup は accepted scope に収まっており、issue-00049 の protocol semantics を変えていない
+  - QA / `qa_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - adapter asset / metadata parity、custom skill preservation、projection field 追加、checked-in runtime parity test 追随に対する regression protection が十分であり、priority 0/1 の test gap はない
+- 修正内容:
+  - `.agents/host-adapters/meta.json`
+    - checked-in dogfooding metadata mirror を追加した
+  - `.agents/skills/spec-dock-codex-adapter/SKILL.md`
+    - Codex 向け thin host adapter entrypoint を checked-in dogfooding mirror に追加した
+  - `.agents/skills/spec-dock-copilot-adapter/SKILL.md`
+    - Copilot 向け thin host adapter entrypoint を checked-in dogfooding mirror に追加した
+  - `spec-dock/scripts/spec_dock_runtime/presentation/json_state.py`
+    - checked-in dogfooding runtime parity として `index.json` / `index-all.json` / `deps-issues.json` に `projection` を持たせた
+  - `tests/test_init_update.py`
+    - host adapter skill / metadata parity map を追加した
+    - checked-in dogfooding import parity test を current runtime contract に追随させた
+  - `spec-dock/docs/spec-dock-guide-old.md`
+  - `spec-dock/docs/spec-dock-guide.md`
+  - `spec-dock/docs/sync.md`
+  - `spec-dock/docs/workflow-adr.md`
+  - `spec-dock/docs/workflow-issue.md`
+    - provider-side asset 不在に伴う stale mirror cleanup として削除した
+- 想定外と対処:
+  - `read_agent` が使えない環境だったため reviewer verdict の回収経路が弱く、session events から reviewer output を抽出して gate evidence を確定した
+  - `tests/test_init_update.py` の B 差分は scope creep 疑いがあったが、triage の通り existing runtime contract への parity test 追随として整理し、review gate でも blocker にならなかった
+- refactor:
+  - なし
