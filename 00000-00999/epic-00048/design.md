@@ -77,10 +77,14 @@ copilot --> core : read-only reference
 
 ### Data boundary
 - SoR:
-  - runtime state 正本は `.agent` JSON 群。
-  - `context-pack.md` は人間向け summary であり、唯一正本ではない。
+  - `active.json` は entry / current target を示す最小文脈。
+  - `index.json` は default working set / current-future projection。
+  - `deps-issues.json` は open/todo issue 向けの default dependency view。
+  - `index-all.json` は full-history / audit / search / escalation only。
+  - `context-pack.md` は human summary only であり、唯一正本ではない。
 - consistency model:
-  - `active.json` を入口、`index-all.json` を全体索引、`index.json` を todo projection として扱う。
+  - 通常実行は `active.json` -> `index.json` / `deps-issues.json` の順で current/future を解決する。
+  - `index-all.json` は full-history が必要な場合にのみ追加参照する。
   - host adapter は上記 state を読み取るのみで、再計算しない。
 
 ## データモデル
@@ -88,10 +92,11 @@ copilot --> core : read-only reference
   - 新規 host adapter metadata（案: `.agents/host-adapters/meta.json`）を導入。
   - runtime state schema は後方互換を維持しつつ、docs で責務を明示。
 - invariants:
-  - `active.json` は現在対象の最小文脈。
-  - `index-all.json` は全ノード索引。
-  - `index.json` は todo projection。
-  - `context-pack.md` は summary only。
+  - `active.json` は entry / current target の最小文脈。
+  - `index.json` は default working set / current-future projection。
+  - `deps-issues.json` は open/todo issue 向け dependency view。
+  - `index-all.json` は full-history / audit / search / escalation only。
+  - `context-pack.md` は human summary only。
   - host adapter は runtime state を複製しない。
 
 ### JSON shape（例）
@@ -103,27 +108,34 @@ copilot --> core : read-only reference
     "issue": null,
     "updated_at": "2026-04-02T00:00:00Z"
   },
-  "index-all.json": {
+  "index.json": {
     "schema_version": 2,
-    "source": {"index": "spec-dock/.agent/index-all.json", "schema_version": 2},
+    "projection": "current-future",
     "nodes": {
       "epic-00048": {
         "type": "epic",
         "id": "epic-00048",
         "title": "Agent facing interface hardening and host adapter scaffolding",
         "status": "open",
+        "path": "spec-dock/initiatives/.../epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding",
         "deps": {"ready": true, "depends_on": [], "blockers_top": []}
       }
-    },
+    }
+  },
+  "deps-issues.json": {
+    "schema_version": 2,
+    "projection": "open-issues-dependency-view",
+    "issues": {},
     "deps": {
       "issue_edges": [
         {"from": "iss-xxxxx", "to": "iss-yyyyy"}
       ]
     }
   },
-  "index.json": {
+  "index-all.json": {
     "schema_version": 2,
-    "projection": "todo",
+    "projection": "full-history",
+    "source": {"index": "spec-dock/.agent/index-all.json", "schema_version": 2},
     "nodes": {}
   },
   "host_adapter_meta": {
@@ -150,16 +162,23 @@ class ActiveJson {
   updated_at
 }
 
-class IndexAllJson {
+class IndexJson {
   schema_version
-  source
+  projection=current-future
   nodes
+}
+
+class DepsIssuesJson {
+  schema_version
+  projection=open-issues-dependency-view
+  issues
   deps.issue_edges
 }
 
-class IndexJson {
+class IndexAllJson {
   schema_version
-  projection=todo
+  projection=full-history
+  source
   nodes
 }
 
@@ -176,19 +195,23 @@ class HostAdapterMeta {
   updated_at
 }
 
-ActiveJson --> IndexAllJson : entry-to-global
-IndexAllJson --> IndexJson : todo projection
+ActiveJson --> IndexJson : entry-to-working-set
+IndexJson --> DepsIssuesJson : default dependency view
+IndexJson ..> IndexAllJson : escalate if needed
 ContextPackMd ..> ActiveJson : human summary
 HostAdapterMeta ..> ActiveJson : read contract
-HostAdapterMeta ..> IndexAllJson : read contract
+HostAdapterMeta ..> IndexJson : default contract
+HostAdapterMeta ..> DepsIssuesJson : default contract
+HostAdapterMeta ..> IndexAllJson : escalation contract
 @enduml
 ```
 
 ## 主要フロー
 - Flow-A protocol-driven execution:
   1. adapter が `active.json` を読む。
-  2. 必要に応じて `index-all.json` で全体関係を解決する。
-  3. `index.json` で todo 対象を絞り、`context-pack.md` を補助として読む。
+  2. `index.json` と `deps-issues.json` を読み、current/future の対象と依存関係を解決する。
+  3. `context-pack.md` を人間向け補助として読む。
+  4. 監査・履歴参照・全体検索・escalation が必要な場合のみ `index-all.json` を読む。
 - Flow-B installer adapter sync:
   1. `init/update` が managed skill 一覧を解決する。
   2. generic skill と host adapter scaffold を配布/更新する。
@@ -207,7 +230,8 @@ participant "Generic Skill" as Skill
 
 Orchestrator -> Adapter: delegate task
 Adapter -> State: read active.json
-Adapter -> State: read index-all.json/index.json
+Adapter -> State: read index.json/deps-issues.json
+Adapter -> State: read index-all.json (if needed)
 Adapter -> Skill: apply workflow contract
 Skill -> State: resolve read order/commands
 Adapter --> Orchestrator: bounded execution plan
