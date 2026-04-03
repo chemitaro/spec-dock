@@ -56,6 +56,21 @@ class TestCliSync(CliRuntimeHarness):
             self._run_runtime(target, ["sync"])
             self.assertTrue((target / "spec-dock" / ".agent" / "index.json").is_file())
             self.assertTrue((target / "spec-dock" / ".agent" / "tree.json").is_file())
+            context_pack = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- entry: `spec-dock/.agent/active.json`", context_pack)
+            self.assertIn("- default working set: `spec-dock/.agent/index.json`", context_pack)
+            self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", context_pack)
+            self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", context_pack)
+            self.assertIn("- Start with `spec-dock/.agent/active.json`.", context_pack)
+            self.assertIn(
+                "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.",
+                context_pack,
+            )
+            self.assertIn(
+                "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.",
+                context_pack,
+            )
+            self.assertIn("human guidance", context_pack)
 
             # Index: flat nodes (agent-friendly).
             state = (target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8")

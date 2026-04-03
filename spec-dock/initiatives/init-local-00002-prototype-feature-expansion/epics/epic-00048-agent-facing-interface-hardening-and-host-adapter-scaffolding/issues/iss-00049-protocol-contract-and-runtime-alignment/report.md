@@ -92,3 +92,57 @@
   - QA reviewer が fail-closed deps path の assertion gap を指摘したため、implementation は広げず tests を追加して contract を閉じた
 - refactor:
   - projection literal を module-level constants に抽出して repeated string を減らした
+
+## 2026-04-03 S03 context pack and docs parity alignment
+- 実行コマンド:
+  - `python -m unittest tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_sync tests.test_init_update -v`
+  - `python -m unittest -q tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05.test_render_context_pack_states_entry_default_and_escalation_contract tests.cli_runtime.test_sync.TestCliSync.test_new_and_active_and_sync tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken`
+  - `./spec-dock/scripts/spec-dock active set iss-00049 --force`
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync && ./spec-dock/scripts/spec-dock validate`
+- test / validation 結果:
+  - focused unittest:
+    - pass
+    - 4 tests passed
+  - `./spec-dock/scripts/spec-dock sync`:
+    - pass
+  - `./spec-dock/scripts/spec-dock validate`:
+    - pass
+  - `./spec-dock/scripts/spec-dock sync && ./spec-dock/scripts/spec-dock validate`:
+    - pass
+  - broader unittest:
+    - 116 tests 中 112 pass / 4 fail
+    - fail したのは `tests.test_init_update` の import parity / plan-template 系で、今回の context-pack / reference_sync / placeholder guidance 変更面とは非関連と QA で判定
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - context-pack / docs / mirrored runtime generationの wording は整合しており、placeholder/active-none behavior も維持されている
+  - QG1 / `qa_reviewer`:
+    - 初回 findings:
+      - placeholder context-pack contract を `init` 側でさらに広く pin すると望ましい
+      - `reference_sync.md` の install/update parity coverage は追加余地がある
+    - 最終 verdict:
+      - `review_status: pass`
+    - reason:
+      - focused tests と `sync` / `validate` が変更面を直接カバーしており、broader unittest の 4 failures は S03 の blocker ではない
+- 修正内容:
+  - context-pack renderer を provider / dogfooding / local CLI / runtime mirror 全面で揃えた
+    - entry: `spec-dock/.agent/active.json`
+    - default working set: `spec-dock/.agent/index.json`
+    - default dependency view: `spec-dock/.agent/deps-issues.json`
+    - escalation only: `spec-dock/.agent/index-all.json`
+    - `spec-dock/active/context-pack.md` は human guidance であり唯一正本ではないことを明記した
+  - `reference_sync.md` を provider / dogfooding で同 wording に更新した
+    - agent-facing read contract
+    - runtime 内部 fallback と通常読取順の違い
+    - active-none でも entry contract は `active.json` であること
+  - tests を追加 / 更新して、active/placeholder context-pack wording と docs parity を固定した
+- 想定外と対処:
+  - 初見では `app.py` / `application/set_active.py` / `src/spec_dock/cli.py` が out-of-scope に見えたが、diff を精査すると context-pack renderer の mirror / shipped parity 反映だった
+  - broader unittest で 4 failures が出たため、focused tests と touched surface を切り分け、QA reviewer に blocker かどうかを確認した
+- generated dogfooding output:
+  - `spec-dock/active/context-pack.md` を `active set iss-00049 --force` で再生成し、新しい entry/default/escalation guidance を確認した
+- refactor:
+  - なし
