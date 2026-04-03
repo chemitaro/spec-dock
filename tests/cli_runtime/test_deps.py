@@ -2128,6 +2128,8 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertTrue((agent_dir / "tree-all.json").is_file())
 
             index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            self.assertEqual(index["projection"], "current-future")
+            self.assertNotIn("source", index)
             self.assertFalse(index["deps"]["valid"])
             self.assertEqual(index["deps"]["issue_edges"], [])
             self.assertIn("Dependency cycle detected", str(index["deps"]["error"]))
@@ -2137,6 +2139,8 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIsNone(index["nodes"]["iss-00303"]["deps"])
 
             index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_all["projection"], "full-history")
+            self.assertNotIn("source", index_all)
             self.assertFalse(index_all["deps"]["valid"])
             self.assertEqual(index_all["deps"]["issue_edges"], [])
             self.assertIn("Dependency cycle detected", str(index_all["deps"]["error"]))
@@ -2168,6 +2172,11 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIsNone(tree_all_issue_deps["iss-00303"])
 
             deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
+            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
+            self.assertEqual(
+                deps_issues["source"],
+                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+            )
             self.assertFalse(deps_issues["deps"]["valid"])
             self.assertIn("Dependency cycle detected", str(deps_issues["deps"]["error"]))
             self.assertEqual(deps_issues["nodes"], {})

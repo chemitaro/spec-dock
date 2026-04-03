@@ -55,3 +55,40 @@
   - stage commit 前に spec docs を是正し、re-review を通してから report を追記する形で収束させた
 - refactor:
   - なし
+
+## 2026-04-03 S02 payload metadata and dependency-view alignment
+- 実行コマンド:
+  - `python -m unittest tests.cli_runtime.test_sync tests.cli_runtime.test_deps tests.presentation_runtime.test_runtime_sync_s07 -v`
+- test 結果:
+  - 120 tests passed
+  - 対象:
+    - `tests.cli_runtime.test_sync`
+    - `tests.cli_runtime.test_deps`
+    - `tests.presentation_runtime.test_runtime_sync_s07`
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - 初回 verdict: pass
+    - 最終 verdict: pass
+    - `review_status: pass`
+  - QA / `qa_reviewer`:
+    - 初回 verdict: fail
+    - 指摘:
+      - fail-closed deps path で `index-all.json` と index artifacts の source-free contract を pin する回帰保護が不足していた
+    - fix 後 verdict: pass
+    - `review_status: pass`
+- 修正内容:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`
+    - `index.json` に top-level `projection=current-future` を追加した
+    - `index-all.json` に top-level `projection=full-history` を追加した
+    - `deps-issues.json` に top-level `projection=open-issues-dependency-view` を追加した
+    - top-level `source` は `deps-issues.json` の provenance のみに維持し、index artifacts には new top-level `source` を追加しない contract に揃えた
+  - `tests/cli_runtime/test_sync.py`
+    - valid path で `index.json` / `index-all.json` / `deps-issues.json` の top-level metadata contract を固定した
+  - `tests/cli_runtime/test_deps.py`
+    - fail-closed deps path で `index.json` / `index-all.json` / `deps-issues.json` の top-level metadata contract を固定した
+  - `tests/presentation_runtime/test_runtime_sync_s07.py`
+    - runtime-level valid path / fail-closed path の双方で top-level metadata contract を固定した
+- 想定外と対処:
+  - QA reviewer が fail-closed deps path の assertion gap を指摘したため、implementation は広げず tests を追加して contract を閉じた
+- refactor:
+  - projection literal を module-level constants に抽出して repeated string を減らした
