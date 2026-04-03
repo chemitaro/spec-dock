@@ -95,7 +95,7 @@ ID: "iss-00050"
   - scope:
     - thin adapter contract、issue boundary、final epic consistency
   - commit gate:
-    - 初回 SG1 pass 後は docs-only commit を原則作成し、final SG1 でも追加差分があれば commit する
+    - 初回 SG1 pass 後は `report.md` を更新し、その更新を含めて docs-only commit を原則作成する。final SG1 でも追加差分があれば同様に commit する
 - RG1 implementation review:
   - timing:
     - S02 完了後
@@ -103,14 +103,14 @@ ID: "iss-00050"
   - scope:
     - installer changes、asset layout、adapter thinness
   - commit gate:
-    - 各 RG1 pass 後に、その stage で確定した差分を 1 commit にまとめる
+    - 各 RG1 pass 後に `report.md` を更新し、その stage で確定した差分と report を 1 commit にまとめる
 - QG1 QA review:
   - timing:
     - S03 完了後
   - scope:
     - init/update behavior、parity evidence、validate
   - commit gate:
-    - QG1 pass 後に QA 反映済みの最終差分を commit し、S04 へ渡す
+    - QG1 pass 後に `report.md` を更新し、QA 反映済みの最終差分と report を commit して S04 へ渡す
 - step approval loop:
   - SG1 pass 後に S02 へ進む
   - S02 後は RG1 pass を取ってから S03 へ進む
@@ -125,7 +125,8 @@ ID: "iss-00050"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
-- 各 stage gate（SG/RG/QG）通過後は、その gate で確定した差分を原則 commit し、no-op の場合のみ `report.md` に理由を残す。
+- 各 review/test cycle は reviewer status が `pass` になるまで fix -> re-review / re-test を繰り返す。
+- 各 stage gate（SG/RG/QG）通過後は、先に `report.md` を更新し、その gate で確定した差分と report を原則まとめて commit する。no-op の場合のみ `report.md` に理由を残す。
 
 ## 実装ステップ
 
@@ -144,10 +145,10 @@ ID: "iss-00050"
   - SG1/spec review pass
 - expected tests:
   - なし（docs review only）
-- commit:
-  - thin adapter contract と metadata fixed point を commit し、後続の実装差分と分離する
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - spec review verdict / fixed point / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - thin adapter contract と metadata fixed point、および report 更新をまとめて commit し、後続の実装差分と分離する
 
 ### S02 — installer managed asset sync for host adapters
 - target:
@@ -222,10 +223,10 @@ ID: "iss-00050"
   - RG1 implementation review
 - expected tests:
   - relevant installer tests
-- commit:
-  - installer managed asset sync 差分を 1 commit として確定する
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - review verdict / test結果 / 修正内容を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - installer managed asset sync 差分と report 更新を 1 commit として確定する
 
 ### S03 — adapter thinness, dogfooding parity, docs parity
 - target:
@@ -303,10 +304,10 @@ ID: "iss-00050"
 - expected tests:
   - relevant installer tests
   - `./spec-dock/scripts/spec-dock validate`
-- commit:
-  - adapter thinness / parity / QA反映込みの差分を 1 commit として確定する
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - review verdict / QA verdict / parity evidence / validation結果を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - adapter thinness / parity / QA反映込みの差分と report 更新を 1 commit として確定する
 
 ### S04 — final spec review and close readiness
 - target:
@@ -323,10 +324,10 @@ ID: "iss-00050"
   - SG1/spec review pass
 - expected tests:
   - evidence review only
+- report update:
+  - final spec review verdict / closing evidence / no-op 理由を `./spec-dock/active/issue/report.md` に残す
 - commit:
   - final spec review で追加入力があれば closing commit を作成し、無ければ直前 gate の commit を最終成果として扱う
-- report update:
-  - `./spec-dock/active/issue/report.md`
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -346,7 +347,7 @@ ID: "iss-00050"
   - implementation review pass
   - QA review pass
 - commit expectation:
-  - final diff review 後に追加修正があれば最終 commit を作成し、追加修正が無ければ直前 gate の commit を最終成果として扱う
+  - final diff review -> report update 後に追加修正があれば最終 commit を作成し、追加修正が無ければ直前 gate の commit を最終成果として扱う
 
 ## 未確定事項
 - なし:
