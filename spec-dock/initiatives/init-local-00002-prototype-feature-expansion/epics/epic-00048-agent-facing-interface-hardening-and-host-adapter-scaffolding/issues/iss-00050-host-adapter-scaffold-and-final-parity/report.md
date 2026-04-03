@@ -200,3 +200,40 @@
   - `tests/test_init_update.py` の B 差分は scope creep 疑いがあったが、triage の通り existing runtime contract への parity test 追随として整理し、review gate でも blocker にならなかった
 - refactor:
   - なし
+
+## 2026-04-03 S04 final spec review and close readiness
+- 実行コマンド:
+  - `python -m unittest tests.test_init_update`
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+- test 結果:
+  - `python -m unittest tests.test_init_update`
+    - pass
+    - 83 tests passed
+  - `./spec-dock/scripts/spec-dock sync`
+    - pass
+    - 9 artifacts synced
+  - `./spec-dock/scripts/spec-dock validate`
+    - pass
+    - 12 nodes validated
+- reviewer verdict:
+  - spec / `spec_reviewer`:
+    - `review_status: pass`
+    - `close_readiness: ready`
+    - reason:
+      - `iss-00049` は protocol/runtime owner のまま、`iss-00050` は thin host-adapter / parity / final-review owner のままで、S01-S04 rollout order に矛盾がない
+  - final code / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - host-adapter installation、sync/runtime projection parity、context-pack/docs parity の branch diff は整合しており、close readiness を妨げる blocker は見つからなかった
+  - final QA / `qa_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - installer-managed host-adapter sync、metadata manifest、checked-in dogfooding parity、projection field 追加に対する test coverage は十分で、priority 0/1 の test gap はない
+- 修正内容:
+  - `report.md`
+    - final verification 結果、S04 spec review verdict、final code/QA diff review verdict、close readiness を追記した
+- 想定外と対処:
+  - `read_agent` が使えない環境制約は final gate でも継続したため、session events と completion notification を使って reviewer verdict を回収した
+- refactor:
+  - なし
