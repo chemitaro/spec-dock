@@ -49,6 +49,8 @@ Issue は実装の最小単位です。
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、plan upfront approval を得る
 - 各 step は `Red → Green → Refactor → review → fix → re-review → report → コミット/no-op` の順で進める
+- `Refactor` は Green 後の bounded decision point とし、plan では詳細 task を事前確定しない
+- cleanup が既知で大きい場合は `Green` / design / 別 step へ切り出す
 - review / QA / spec の各 stage gate は `pass` まで回す
 - 各 stage gate の `pass` 後は、`spec-dock/active/issue/report.md` を更新し、差分確認後に report とまとめてコミットするか no-op とするかを判断する
 - `1 step = 1 つの観測可能な振る舞い` を原則にし、各 step に観測用の 1 本のコマンドを置く
@@ -61,6 +63,7 @@ Issue は実装の最小単位です。
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
 - stage gate ごとの reviewer verdict / test結果 / 修正内容 / no-op 理由もここに残す
+- 実際に行った refactor は事前計画ではなくここに残す
 - 1 セッション 1 追記でよいが、未来の自分と reviewer が追える粒度を保つ
 
 ## 品質ゲート

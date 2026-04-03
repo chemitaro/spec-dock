@@ -110,10 +110,12 @@ ID: "<ISS_ID>"
   - ...
 
 ###### Refactor
-- cleanup target:
-  - ...
-- invariants to keep green:
-  - ...
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
