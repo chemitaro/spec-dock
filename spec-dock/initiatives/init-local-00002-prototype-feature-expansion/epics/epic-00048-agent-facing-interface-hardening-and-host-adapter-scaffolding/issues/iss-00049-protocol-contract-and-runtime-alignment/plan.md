@@ -85,7 +85,7 @@ ID: "iss-00049"
   - scope:
     - read-order contract、scope boundary、verification mapping
   - commit gate:
-    - SG1 pass 後は docs-only commit を原則作成し、no-op の場合だけ理由を `report.md` に残す
+    - SG1 pass 後に `report.md` を更新し、その更新を含めて docs-only commit を原則作成する。no-op の場合だけ理由を `report.md` に残す
 - RG1 implementation review:
   - timing:
     - S02 完了後
@@ -93,14 +93,14 @@ ID: "iss-00049"
   - scope:
     - payload metadata、context-pack wording、docs parity
   - commit gate:
-    - 各 RG1 pass 後に、その stage で確定した差分を 1 commit にまとめる
+    - 各 RG1 pass 後に `report.md` を更新し、その stage で確定した差分と report を 1 commit にまとめる
 - QG1 QA review:
   - timing:
     - S03 完了後
   - scope:
     - `sync` / `validate` と snapshot evidence
   - commit gate:
-    - QG1 pass 後に QA 反映済みの最終差分を commit し、S99 へ渡す
+    - QG1 pass 後に `report.md` を更新し、QA 反映済みの最終差分と report を commit して S99 へ渡す
 - step approval loop:
   - SG1 pass 後に S02 へ進む
   - S02 後は RG1 pass を取ってから S03 へ進む
@@ -114,7 +114,8 @@ ID: "iss-00049"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
-- 各 stage gate（SG/RG/QG）通過後は、その gate で確定した差分を原則 commit し、no-op の場合のみ `report.md` に理由を残す。
+- 各 review/test cycle は reviewer status が `pass` になるまで fix -> re-review / re-test を繰り返す。
+- 各 stage gate（SG/RG/QG）通過後は、先に `report.md` を更新し、その gate で確定した差分と report を原則まとめて commit する。no-op の場合のみ `report.md` に理由を残す。
 
 ## 実装ステップ
 
@@ -133,10 +134,10 @@ ID: "iss-00049"
   - SG1/spec review pass
 - expected tests:
   - なし（docs review only）
-- commit:
-  - docs fixed point を commit し、以後の実装差分と分離する
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - spec review verdict / fixed point / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - docs fixed point と report 更新をまとめて commit し、以後の実装差分と分離する
 
 ### S02 — payload metadata and dependency-view alignment
 - target:
@@ -209,10 +210,10 @@ ID: "iss-00049"
   - RG1/implementation review
 - expected tests:
   - relevant runtime/presentation tests
-- commit:
-  - payload metadata / deps view alignment を 1 commit として確定する
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - review verdict / test結果 / 修正内容を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - payload metadata / deps view alignment と report 更新を 1 commit として確定する
 
 ### S03 — context pack and docs parity alignment
 - target:
@@ -292,10 +293,10 @@ ID: "iss-00049"
   - `./spec-dock/scripts/spec-dock sync`
   - `./spec-dock/scripts/spec-dock validate`
   - relevant automated tests
-- commit:
-  - context pack / docs parity / QA反映込みの差分を 1 commit として確定する
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - review verdict / QA verdict / validation evidence / 追加修正内容を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - context pack / docs parity / QA反映込みの差分と report 更新を 1 commit として確定する
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -315,7 +316,7 @@ ID: "iss-00049"
   - implementation review pass
   - QA review pass
 - commit expectation:
-  - 追加修正があれば final diff review 後に最終 commit を作成し、追加修正が無ければ直前 gate の commit を最終成果として扱う
+  - 追加修正があれば final diff review -> report update の後に最終 commit を作成し、追加修正が無ければ直前 gate の commit を最終成果として扱う
 
 ## 未確定事項
 - なし:
