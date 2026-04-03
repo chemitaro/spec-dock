@@ -43,7 +43,7 @@ ID: "iss-00050"
   - `.agents/skills/` には repo local skills が共存するため、unknown custom dirs を保持する safety が重要。
 - 採用するパターン:
   - adapter も bundled skill として扱い、`SKILL.md` を managed asset sync に乗せる。
-  - adapter metadata が必要なら `.agents/host-adapters/meta.json` のような専用ファイルを installer managed asset として追加する。
+  - adapter metadata は `.agents/host-adapters/meta.json` を必須の installer managed asset として追加し、これを host adapter metadata の source of truth とする。
   - final parity は provider asset 更新 -> installer sync / dogfooding refresh -> tests / validate -> spec review の順で閉じる。
 - 採用しないもの:
   - installer とは別の ad-hoc generator 追加
@@ -97,9 +97,11 @@ ID: "iss-00050"
   - adapter assets:
     - `spec-dock-codex-adapter/SKILL.md`
     - `spec-dock-copilot-adapter/SKILL.md`
-  - adapter metadata（必要時）:
+  - adapter metadata:
     - `.agents/host-adapters/meta.json`
-    - targets / generated_by / updated_at を持つ
+    - 必須の managed asset として扱う
+    - `schema_version` / `targets` / `generated_by` / `updated_at` / `owner` を持つ安定契約とする
+    - `owner` と `generated_by` により、provider-side source of truth と installer-managed output の責務境界を明示する
   - docs parity:
     - provider asset docs と dogfooding docs が同じ host adapter guidance を指す
 
@@ -126,7 +128,7 @@ installer --> ownership : use ownership rules
 ownership --> assets : enumerate managed assets
 installer --> assets : copy/update
 installer --> installed : managed sync
-installer --> meta : optional managed sync
+installer --> meta : required managed sync
 installed ..> protocol : read contract only
 meta ..> protocol : declare targets
 tests ..> installer : verify init/update
@@ -146,7 +148,7 @@ parity ..> meta : inspect generated metadata
 ## 変更計画
 - Add:
   - host adapter skill assets
-  - optional adapter metadata asset
+  - required adapter metadata asset
   - installer tests / docs parity evidence
 - Modify:
   - `src/spec_dock/cli.py`
@@ -203,4 +205,4 @@ parity ..> meta : inspect generated metadata
 
 ## 未確定事項
 - なし:
-  - metadata file は `.agents/host-adapters/meta.json` に固定する。
+  - metadata file は `.agents/host-adapters/meta.json` に固定し、host adapter metadata の source of truth とする。

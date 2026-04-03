@@ -172,7 +172,7 @@ ID: "iss-00050"
   - adapter skill directories と metadata asset を定義する
 - files:
   - `src/spec_dock/assets/codex_skills/`
-  - optional metadata asset path
+  - required metadata asset path
 
 ##### I1 — add adapter assets
 - slice goal:
@@ -201,6 +201,7 @@ ID: "iss-00050"
 #### B2 — installer ownership and pruning
 - purpose:
   - managed ownership を安全に広げる
+  - unknown custom skills を保持したまま managed prune する
 - files:
   - `src/spec_dock/cli.py`
   - `tests/test_init_update.py`
@@ -212,6 +213,7 @@ ID: "iss-00050"
 ###### Red
 - failing test:
   - init/update managed skill tests
+  - unknown custom skill preservation test
 - expected failure:
   - adapter が配布されない、または pruning safety が崩れる
 
@@ -220,6 +222,7 @@ ID: "iss-00050"
   - managed skill names / ownership names / copy loop を更新
 - pass condition:
   - init/update tests が green
+  - unknown custom skills が preserve される
 
 ###### Refactor
 - 目的:
@@ -234,6 +237,7 @@ ID: "iss-00050"
   - RG1 implementation review
 - expected tests:
   - relevant installer tests
+  - unknown custom skill preservation test
 - report update:
   - review verdict / test結果 / 修正内容を `./spec-dock/active/issue/report.md` に残す
 - commit:
