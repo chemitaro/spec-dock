@@ -56,6 +56,25 @@ ID: "iss-00050"
   - `tests/test_init_update.py`
   - dogfooding `.agents/skills/` and related docs
 
+## 依存関係分析
+- upstream（先に固定するもの）:
+  - issue-00049 で固定した protocol / read order contract
+  - installer の managed skill sync / ownership / pruning safety
+  - bundled skill asset layout の既存パターン
+- downstream（upstream の上に載るもの）:
+  - Codex/Copilot host adapter asset 本体
+  - `.agents/host-adapters/meta.json`
+  - dogfooding workspace parity と関連 docs
+  - final spec review / closing evidence
+- 実装起点:
+  - 依存の少ない順に、adapter asset / metadata shape を先に固定し、その後 installer ownership と sync へ接続する。
+  - parity refresh と final review は upstream が固まった後でのみ成立するため最後に置く。
+- step sequencing implication:
+  - S01 は thin adapter contract と metadata contract の fixed point を作る。
+  - S02 は S01 で固定した asset/metadata を installer sync に載せる。
+  - S03 は S02 の実装結果を dogfooding workspace / docs parity / validate に展開する。
+  - S04 は S01-S03 の evidence が揃った後の close readiness review とする。
+
 ## 採用方針 / トレードオフ
 - 論点:
   - adapter を managed skill だけで表現するか、metadata file も持つか
@@ -88,21 +107,31 @@ ID: "iss-00050"
 ```plantuml
 @startuml
 skinparam monochrome true
+top to bottom direction
 
 rectangle "src/spec_dock/cli.py
 _install_skill()" as installer
+rectangle "_managed_skill_names()
+_managed_skill_ownership_names()" as ownership
 rectangle "assets/codex_skills
 generic + host adapters" as assets
 rectangle ".agents/skills
 managed output" as installed
 rectangle ".agents/host-adapters/meta.json" as meta
+rectangle "tests/test_init_update.py" as tests
+rectangle "dogfooding docs / workspace parity" as parity
 rectangle "issue-00049 protocol" as protocol
 
+installer --> ownership : use ownership rules
+ownership --> assets : enumerate managed assets
 installer --> assets : copy/update
 installer --> installed : managed sync
 installer --> meta : optional managed sync
 installed ..> protocol : read contract only
 meta ..> protocol : declare targets
+tests ..> installer : verify init/update
+parity ..> installed : inspect generated output
+parity ..> meta : inspect generated metadata
 @enduml
 ```
 

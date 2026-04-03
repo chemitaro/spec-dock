@@ -27,6 +27,13 @@ ID: "iss-00050"
   - unknown custom skills を pruning しない
   - adapter を thin entrypoint に保つ
 
+## 実装順序の根拠
+- `design.md` の依存関係分析を正本にする。
+- issue-00049 protocol / installer ownership / bundled asset pattern が upstream なので、これを前提に step を並べる。
+- 依存の少ない adapter asset / metadata contract を先に固定し、その contract を installer sync へ接続してから parity / final review へ進む。
+- したがって順序は S01（spec fixed point）→ S02（installer sync）→ S03（parity / docs / validate）→ S04（final review）とする。
+- TDD の各 iteration でも、asset shape → ownership/sync → parity/validation の順に閉じ、未解決依存を抱えたまま downstream step へ進まない。
+
 ## マイルストーン一覧
 - M1:
   - 対象:
