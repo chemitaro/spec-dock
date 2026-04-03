@@ -80,6 +80,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/issue/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
         ),
+        ".agents/skills/spec-dock-codex-adapter/SKILL.md": (
+            "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-copilot-adapter/SKILL.md": (
+            "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md"
+        ),
+        ".agents/host-adapters/meta.json": "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
         "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
@@ -1400,7 +1407,7 @@ with tempfile.TemporaryDirectory() as td:
 
     assert injected["done"], injected
     assert events == [], events
-    assert issue_gateway.calls == [(str(repo_root), 555, None)], issue_gateway.calls
+    assert issue_gateway.calls == [(str(repo_root), 555, "example/repo")], issue_gateway.calls
     assert sum(1 for record in node_repo.records if record.id == "iss-00555") == 1, node_repo.records
 """
         result = subprocess.run(
@@ -1865,6 +1872,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo(records, events),
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         active_state_store=active_state_store,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -2156,7 +2164,7 @@ with tempfile.TemporaryDirectory() as td:
     assert captured["resolve_calls"] == 2, captured
     assert result.node.parent_id == "epic-local-00002", result.node.parent_id
     assert "/epic-local-00002-session-rotation/" in result.node.path.as_posix(), result.node.path
-    assert issue_gateway.calls == [(str(repo_root), 777, None)], issue_gateway.calls
+    assert issue_gateway.calls == [(str(repo_root), 777, "example/repo")], issue_gateway.calls
     assert [name for name, _path in active_state_store.calls] == [
         "load_active_manifest_no_migrate",
         "load_active_manifest_no_migrate",
