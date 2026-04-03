@@ -14,15 +14,20 @@ ID: "iss-00049"
 
 ## 目的・制約
 - 目的:
-  - all/todo/active artifact の既存分離を、agent-facing contract として実装・docs・tests に固定する。
+  - all/todo/active artifact の既存分離を、agent-facing contract として runtime・provider docs・dogfooding docs・tests に固定する。
   - issue-00050 が host adapter を実装するときの fixed point を提供する。
 - MUST / MUST NOT:
   - MUST:
     - `active.json` / `index.json` / `deps-issues.json` / `index-all.json` / `context-pack.md` の責務を 1 つの read-order contract に揃える。
-    - `projection` と `source` metadata を既存 shape を大きく壊さずに追加する。
-    - provider docs と generated docs を同時に更新する。
+    - top-level metadata contract を artifact ごとに固定する:
+      - `index.json`: `projection=current-future` を追加し、new top-level `source` は追加しない。
+      - `index-all.json`: `projection=full-history` を追加し、new top-level `source` は追加しない。
+      - `deps-issues.json`: `projection=open-issues-dependency-view` を追加し、top-level `source` は artifact provenance（`index.json` と schema version）として維持する。
+      - 既存 per-node issue status `source` semantics は変更しない。
+    - provider docs と dogfooding docs のうち、本 issue が変更する contract surface を同時に更新する。
   - MUST NOT:
     - host adapter scaffold 自体を追加しない。
+    - issue-00050 が担当する adapter scaffold docs parity / final epic parity まで広げない。
     - full-history artifact を default working set に戻さない。
 - 非交渉制約:
   - `src/spec_dock/assets/spec_dock/...` を provider-side source of truth とする。
@@ -44,8 +49,8 @@ ID: "iss-00049"
   - `reference_sync.md` は all/todo projection を説明しているが、agent の既定読取順までは固定していない。
 - 採用するパターン:
   - 既存 artifact 名は維持し、meaning を metadata と docs で強化する。
-  - generated context pack と reference docs の両方で同じ read order を示す。
-  - projection metadata は `json_state.py` 側で付与し、tests で固定する。
+  - generated context pack と provider/dogfooding docs の両方で同じ read order を示す。
+  - projection metadata は `json_state.py` 側で付与し、top-level `source` の有無は artifact ごとに固定して tests で検証する。
 - 採用しないもの:
   - artifact 名の全面変更
   - new state file の追加
@@ -76,11 +81,15 @@ ID: "iss-00049"
   - `active.json`
     - entry / current target を示す最小文脈
   - `index.json`
-    - `projection=current-future` を示す default working set
+    - top-level `projection=current-future` を持つ default working set
+    - new top-level `source` は追加しない
   - `deps-issues.json`
-    - `projection=open-issues-dependency-view` を示す default dependency view
+    - top-level `projection=open-issues-dependency-view` を持つ default dependency view
+    - top-level `source` は artifact provenance（`index.json` と schema version）を維持する
+    - issue node / issue status の既存 `source` semantics はそのまま維持する
   - `index-all.json`
-    - `projection=full-history` を示す escalation artifact
+    - top-level `projection=full-history` を持つ escalation artifact
+    - new top-level `source` は追加しない
   - `context-pack.md`
     - human summary と read order の案内であり、唯一正本ではない
 
@@ -113,13 +122,13 @@ context ..> all
 - Class / Interface:
   - `render_index_artifact()` / `_build_state_payloads()`
 - responsibility:
-  - projection metadata を all/todo payload に埋める
+  - projection metadata を index/deps payload に埋め、top-level `source` contract を artifact ごとに維持する
 - collaboration:
   - `sync_state.py` が生成タイミングを制御し、docs/tests が意味を固定する
 
 ## 変更計画
 - Add:
-  - payload metadata（`projection`、必要なら `source`）
+  - payload metadata（artifact ごとに固定した `projection`、および `deps-issues.json` の provenance `source`）
 - Modify:
   - `json_state.py` の index/deps payload
   - `active_store.py` と presentation 側の context pack rendering
@@ -136,9 +145,9 @@ context ..> all
 ## 要件 → 設計マッピング
 - AC-001 -> docs と context pack に `active -> index/deps -> index-all(if needed)` を明示する
 - AC-002 -> payload metadata と tests で projection を固定する
-- AC-003 -> provider/dogfooding docs parity を同一 wording で保つ
-- EC-001 -> placeholder path でも entry contract は `active.json` で維持する
-- EC-002 -> deps invalid 時も `deps-issues.json` が default dependency view であることを崩さない
+- AC-003 -> 本 issue が変更した protocol contract surface について provider/dogfooding docs parity を同一 wording で保つ
+- EC-001 -> active-none placeholder path でも entry contract は `active.json` で維持し、context pack の read order で証明する
+- EC-002 -> deps invalid 時も `deps-issues.json` が default dependency view であり、top-level projection/provenance contract を崩さない
 - EC-003 -> full-history read path を docs/payload で辿れるようにする
 
 ## テスト戦略
@@ -156,16 +165,16 @@ context ..> all
 
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> docs/context-pack snapshot verification
-- AC-002 -> JSON payload verification
-- AC-003 -> provider/dogfooding parity verification
-- EC-001 -> active-none snapshot verification
-- EC-002 -> deps invalid placeholder verification
+- AC-002 -> JSON payload verification（artifact ごとの top-level `projection` / `source` contract を含む）
+- AC-003 -> provider/dogfooding parity verification（本 issue の contract surface 限定）
+- EC-001 -> active-none placeholder / context-pack read-order verification
+- EC-002 -> deps invalid placeholder / fail-closed provenance verification
 - EC-003 -> docs read-order verification
 
 ## リスク / 移行 / ロールバック（必要時）
 - risk:
-  - provider docs だけ更新して generated docs/context pack が追随しないと再び drift する。
-  - payload metadata の命名が曖昧だと issue-00050 で再解釈が入る。
+  - provider docs だけ更新して dogfooding docs/context pack が追随しないと再び drift する。
+  - artifact ごとの top-level `source` contract が曖昧だと issue-00050 で再解釈が入る。
 - migration:
   - 既存 file path は不変で、meaning だけを強化する。
 - rollback:
@@ -173,4 +182,4 @@ context ..> all
 
 ## 未確定事項
 - なし:
-  - payload metadata は `projection` と `source` を採用する。
+  - payload metadata の contract は artifact ごとに固定し、`deps-issues.json` top-level provenance `source` と既存 per-node issue status `source` semantics を維持する。

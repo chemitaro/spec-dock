@@ -21,7 +21,8 @@ ID: "epic-00048"
 ## Issue 分割方針
 - slicing principle:
   - protocol / runtime alignment と host adapter deployment を分け、設計契約を先に固定する。
-  - docs parity と final review は adapter deployment issue に内包し、仕上げ専用 issue は作らない。
+  - iss-00049 は自分が変更する protocol contract surface の runtime / provider docs / dogfooding docs / tests parity までを担当する。
+  - iss-00050 は host adapter scaffold work、adapter 起因の残件 parity、final epic parity/review を担当し、仕上げ専用 issue は作らない。
   - 各 issue は 1 つの成果責務を持ち、過細分化しない。
 - exceptions:
   - architecture-level invalid artifact prevention は本 epic では扱わず follow-up。
@@ -29,9 +30,9 @@ ID: "epic-00048"
 ## Issue 一覧（順序 / tranche 付き）
 - iss-00049-protocol-contract-and-runtime-alignment:
   - 目的:
-    - `active.json` / `index.json` / `deps-issues.json` / `index-all.json` / `context-pack.md` の責務を docs と runtime で一致させ、default working set と full-history の境界を固定する。
+    - `active.json` / `index.json` / `deps-issues.json` / `index-all.json` / `context-pack.md` の責務を runtime・provider docs・dogfooding docs・tests で一致させ、default working set と full-history の境界を固定する。
   - deliverable:
-    - protocol contract 更新、active/context 生成責務整理、通常実行では current-future projection を優先し full-history を第一選択にしない runtime/docs/tests alignment。
+    - protocol contract 更新、active/context 生成責務整理、artifact ごとの `projection` / `source` contract 固定、通常実行では current-future projection を優先し full-history を第一選択にしない runtime/provider-doc/dogfooding-doc/test alignment。
   - tranche:
     - tranche-1
   - closes:
@@ -41,9 +42,9 @@ ID: "epic-00048"
     - なし
 - iss-00050-host-adapter-scaffold-and-final-parity:
   - 目的:
-    - Codex/Copilot 向け host adapter scaffold を `init/update` managed asset として導入し、provider/dogfooding docs parity と final spec review まで閉じる。
+    - Codex/Copilot 向け host adapter scaffold を `init/update` managed asset として導入し、adapter 起因の残件 parity と final spec review を閉じる。
   - deliverable:
-    - adapter files、adapter metadata、installer 配布/更新、docs parity 修正、host parity 証跡、final review record。
+    - adapter files、adapter metadata、installer 配布/更新、remaining adapter/provider-doc/dogfooding-doc parity 修正、host parity 証跡、final review record。
   - tranche:
     - tranche-2
   - closes:
@@ -56,9 +57,9 @@ ID: "epic-00048"
 - G1 decomposition review:
   - 2 issue で E-RQ/E-AC が全て対応しているか確認。
 - G2 protocol readiness:
-  - protocol 変更が runtime/docs/tests に一貫して反映されているか確認。
+  - protocol 変更が iss-00049 の runtime/provider-doc/dogfooding-doc/test scope に一貫して反映されているか確認。
 - G3 adapter rollout readiness:
-  - adapter 配布、docs parity、host parity 証跡がそろっているか確認。
+  - adapter 配布、iss-00050 担当の残件 docs parity、host parity 証跡がそろっているか確認。
 - G9 final epic spec review:
   - E-AC closure と follow-up の明確化を確認。
 
@@ -73,7 +74,7 @@ ID: "epic-00048"
 - rollout order:
   - issue-01 -> issue-02
 - contract / docs refresh:
-  - issue-01 で protocol docs / runtime / tests を更新し、issue-02 で adapter 配布と docs parity を完了する。
+  - issue-01 で protocol contract surface の runtime / provider docs / dogfooding docs / tests を更新し、issue-02 で adapter 配布と残件 parity / final review を完了する。
 
 ## Issue readiness contract
 - Issue に要求する最低条件:
@@ -87,7 +88,7 @@ ID: "epic-00048"
 - integration / rollout complete:
   - protocol と adapter が両立し、host 間で実行導線が一致し、通常実行の第一選択が full-history になっていない。
 - docs impact resolved:
-  - provider/dogfooding docs parity が完了し、final review が pass している。
+  - iss-00049 対象の protocol docs parity と iss-00050 対象の adapter/final parity がそれぞれ完了し、final review が pass している。
 
 ## 依存 / ブロッカー
 - D-001:
@@ -98,4 +99,4 @@ ID: "epic-00048"
 ## 設計上の決定
 - D-003:
   - host adapter metadata は `.agents/host-adapters/meta.json` を第一案ではなく採用決定とする。
-  - issue-00049 では `projection` と `source` metadata を payload に明示する方針で実装へ進む。
+  - issue-00049 では artifact ごとの top-level metadata contract を固定する（`index.json`=`projection=current-future` / no new `source`、`index-all.json`=`projection=full-history` / no new `source`、`deps-issues.json`=`projection=open-issues-dependency-view` / provenance `source` 維持）。
