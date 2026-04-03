@@ -146,3 +146,59 @@
   - `spec-dock/active/context-pack.md` を `active set iss-00049 --force` で再生成し、新しい entry/default/escalation guidance を確認した
 - refactor:
   - なし
+
+## 2026-04-03 S99 final diff review
+- review scope:
+  - full branch diff: `38332b78fbbcc39e96b959f074281fd81f898534...HEAD`
+  - protocol contract surface:
+    - `active.json`
+    - `index.json`
+    - `deps-issues.json`
+    - `index-all.json`
+    - `context-pack.md`
+- 実行コマンド:
+  - `git --no-pager status --short`
+  - `git --no-pager log --oneline --decorate -3`
+  - `git --no-pager diff --stat 38332b78fbbcc39e96b959f074281fd81f898534...HEAD`
+- reviewer verdict:
+  - spec:
+    - SG1 fixed point / `spec_reviewer`: `review_status: pass`
+  - implementation:
+    - 初回 S99 final diff review / `code_reviewer`:
+      - `review_status: fail`
+      - finding:
+        - `src/spec_dock/assets/spec_dock/templates/issue/plan.md` の `commit/no-op` token が `コミット/no-op` に drift しており、`test_init_creates_expected_structure` の scaffold contract を壊していた
+    - blocker fix review / `code_reviewer`:
+      - `review_status: pass`
+      - reason:
+        - provider asset と dogfooding mirror の issue plan template を最小修正で `commit/no-op` に戻し、P1 regression が解消された
+  - QA:
+    - S99 final QA / `qa_reviewer`: `review_status: pass`
+    - reason:
+      - branch 全体の changed surface は targeted tests と `sync` / `validate` で十分に裏付けられており、残留リスクは non-blocking と判定された
+    - blocker fix QA / `qa_reviewer`:
+      - `review_status: pass`
+      - reason:
+        - `test_init_creates_expected_structure` と template parity coverage で token restore が十分に保護されている
+- 追加修正:
+  - `src/spec_dock/assets/spec_dock/templates/issue/plan.md`
+    - `Red → Green → Refactor → review → fix → re-review → report → commit/no-op` を復元した
+  - `spec-dock/templates/issue/plan.md`
+    - dogfooding mirror を同内容に揃えた
+- blocker fix 検証:
+  - `python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure`
+    - pass
+- final diff summary:
+  - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` のまま維持された
+  - dogfooding docs / runtime mirror は provider 変更と整合している
+  - host adapter scaffold / installer distribution への scope 拡張は含まれていない
+  - `index-all.json`、all/todo split、fail-closed behavior は維持された
+- 残留リスク:
+  - `tests.test_init_update` の broader suite には今回の touched surface と非関連な 4 failures が残っている
+  - `init` placeholder context-pack 契約の pin と `reference_sync.md` install/update parity coverage には P2 の強化余地がある
+  - これらは blocker ではなく、issue-00050 以降の follow-up 候補として handoff する
+- 想定外と対処:
+  - full branch diff review で issue scope 外寄りの template contract regression が branch diff 上に混入していることが判明した
+  - fix を issue plan template の token restore のみに絞り、re-review と最小 test で閉じた
+- refactor:
+  - なし
