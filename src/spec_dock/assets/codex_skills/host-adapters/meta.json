@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "owner": "spec-dock",
+  "targets": {
+    "codex": {
+      "enabled": true,
+      "entry_file": ".agents/skills/spec-dock-codex-adapter/SKILL.md"
+    },
+    "copilot": {
+      "enabled": true,
+      "entry_file": ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
+    }
+  },
+  "generated_by": "spec-dock update",
+  "updated_at": "2026-04-03T00:00:00Z"
+}
