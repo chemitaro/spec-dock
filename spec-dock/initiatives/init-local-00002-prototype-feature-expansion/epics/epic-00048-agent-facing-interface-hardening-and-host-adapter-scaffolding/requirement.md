@@ -21,13 +21,15 @@ ID: "epic-00048"
   - Codex/Copilot で再利用可能な薄い adapter scaffold の提供。
 
 ## 問題定義
-- 現状は `active.json`、`index-all.json`、`index.json`、`context-pack.md` の役割が docs 上で部分的にしか定義されておらず、agent の実行判断が実装者依存になりやすい。
+- 現状は `active.json`、`index.json`、`deps-issues.json`、`index-all.json`、`context-pack.md` の役割が docs 上で部分的にしか定義されておらず、agent の実行判断が実装者依存になりやすい。
+- current/future の実行判断に必要な projection と、full-history を含む監査・履歴・全体検索用データの境界が曖昧で、agent が通常実行でも過剰に広い state を読みに行きやすい。
 - host ごとの prompt や手順に依存して workflow が分岐し、同じ `spec-dock` 運用でも結果が揺れる。
 - `context-pack.md` だけでは機械処理に必要な情報が不足し、最終的に人間向け docs を追加解釈する必要がある。
 
 ## ユースケース
 - happy path:
-  - メイン orchestrator が spec-dock 専門 sub-agent に委任し、sub-agent が `active.json` を入口に `index-all.json` / `index.json` を使って対象と手順を決定する。
+  - メイン orchestrator が spec-dock 専門 sub-agent に委任し、sub-agent が `active.json` を入口に `index.json` / `deps-issues.json` を既定の working set として使って対象と手順を決定する。
+  - full-history が必要な監査・履歴参照・全体検索・escalation の場合のみ `index-all.json` を追加で読む。
   - Codex/Copilot のどちらでも同じ protocol に従い、`sync` / `validate` / docs 読み順が一致する。
 - exception / operation scenario:
   - active が未設定の場合は `active-none` placeholder を明示的に検知し、編集対象外として停止する。
@@ -35,7 +37,9 @@ ID: "epic-00048"
 
 ## Epic requirements
 - E-RQ-001:
-  - agent-facing protocol と human-facing summary の責務を分離し、`active.json` / `index-all.json` / `index.json` / `context-pack.md` の役割を明文化すること。
+  - agent-facing protocol と human-facing summary の責務を分離し、`active.json` / `index.json` / `deps-issues.json` / `index-all.json` / `context-pack.md` の役割を明文化すること。
+  - agent の通常実行では full-history を第一選択にせず、`active.json` を入口、`index.json` と `deps-issues.json` を current/future projection として既定読取対象にすること。
+  - `index-all.json` は full-history を含む監査・履歴・全体検索・escalation 用途として定義し、通常実行の第一選択ではないことを明記すること。
 - E-RQ-002:
   - host adapter は runtime state の再実装を持たず、core protocol 参照のみで動作する薄い構成にすること。
 - E-RQ-003:
@@ -43,7 +47,7 @@ ID: "epic-00048"
 - E-RQ-004:
   - docs と runtime contract の整合を保ち、provider / dogfooding 双方で同じ guidance を提供すること。
 - E-RQ-005:
-  - issue 分割は過細分化を避け、3 issue で完了可能なサイズに保つこと。
+  - issue 分割は過細分化を避け、2 issue で完了可能なサイズに保つこと。
 
 ## Epic acceptance criteria
 - E-AC-001:
@@ -52,7 +56,7 @@ ID: "epic-00048"
   - When:
     - agent が protocol に従って文脈取得を行う。
   - Then:
-    - 入口は `active.json`、全体判断は `index-all.json`、todo 絞り込みは `index.json`、補助説明は `context-pack.md` として一貫する。
+    - 入口は `active.json`、通常実行の working set は `index.json` と `deps-issues.json`、補助説明は `context-pack.md` として一貫し、`index-all.json` は必要時のみ参照される。
   - 観測点:
     - docs 記述、JSON shape、実行手順例の一致。
 - E-AC-002:
@@ -86,8 +90,9 @@ ID: "epic-00048"
 ## スコープ
 - MUST:
   - protocol の責務分離を docs と設計で固定する。
+  - agent の既定読取を current/future projection に寄せ、full-history を通常実行の第一選択にしないことを固定する。
   - host adapter scaffold を Codex/Copilot 向けに提供する。
-  - issue 分割を 3 issue で閉じる計画を定義する。
+  - issue 分割を 2 issue で閉じる計画を定義する。
 - MUST NOT:
   - host adapter に独自の状態解釈ロジックを持たせない。
   - メイン orchestrator 直操作を前提に複雑化した運用を推奨しない。
@@ -105,6 +110,7 @@ ID: "epic-00048"
   - docs 記述が state contract と一致しているか。
 - Never:
   - `context-pack.md` を唯一正本として扱う。
+  - `index-all.json` を通常実行の第一読取対象として固定しない。
   - adapter 側で `index-all.json` 相当を再生成する。
 
 ## 非機能要件
