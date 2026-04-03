@@ -26,6 +26,8 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `iteration` は 1 回の TDD cycle とし、内部に `Red / Green / Refactor` を置く
 - failing test は iteration ごとに 1 本ずつ進める
 - review / QA / docs / final diff は TDD cycle の外に置き、step gate / milestone gate / `S90` / `S99` に配置する
+- `Refactor` は bounded decision point として残し、事前に詳細な cleanup task を書き込まない
+- cleanup が最初から明確で大きい場合は、`Green` / design / 別 step で扱う
 - stage gate は `pass` まで回す
 - stage gate の `pass` 後は `report.md` を更新し、差分確認後に report とまとめてコミットする
 - cadence や approval policy の正本は `workflow_issue.md` に残し、この文書では plan 本文への埋め込み方だけを扱う
@@ -43,6 +45,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `ステップ一覧` と `要件 ↔ ステップ対応` を置く
 - `レビュー / QA ゲート方針` を置く
 - `実装ステップ` を step / block / iteration で書く
+- `Refactor` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
 - 各 step gate に `report update` と `commit` を置く
 - `S90 docs impact resolution / docs refresh` を必要時に入れる
 - `S99 final diff review quality gate` を必須で置く
