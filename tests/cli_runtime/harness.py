@@ -35,6 +35,8 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock-epic-planning",
     "spec-dock-issue-execution",
     "spec-dock-adr-facilitation",
+    "spec-dock-codex-adapter",
+    "spec-dock-copilot-adapter",
 )
 
 

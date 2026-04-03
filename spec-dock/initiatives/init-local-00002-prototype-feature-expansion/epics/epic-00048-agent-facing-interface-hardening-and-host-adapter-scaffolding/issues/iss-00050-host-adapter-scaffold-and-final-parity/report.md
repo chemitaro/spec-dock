@@ -100,3 +100,44 @@
   - docs-only で差分を閉じ、rerun で implementation start fixed point を通した
 - refactor:
   - なし
+
+## 2026-04-03 S02 installer managed asset sync for host adapters
+- 実行コマンド:
+  - `python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_init_installs_host_adapter_metadata_with_fixed_contract tests.test_init_update.TestInitUpdate.test_update_migrates_legacy_single_skill_and_preserves_custom_skill tests.test_init_update.TestInitUpdate.test_update_installs_full_skill_set_for_legacy_no_skill_repo tests.test_init_update.TestInitUpdate.test_update_skill_sync_converges_after_interrupted_run`
+  - `python -m unittest tests.test_init_update`
+- test 結果:
+  - focused installer tests:
+    - pass
+    - 6 tests passed
+  - broader `tests.test_init_update`:
+    - 83 tests run, 3 failures
+    - checked-in dogfooding/parity 系の failure として切り分けられ、S02 blocker ではないと reviewer が判定
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - installer sync / ownership / prune 変更は issue docs と整合しており、focused tests で new asset と metadata contract が保護されている
+  - QA / `qa_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - `.agents/host-adapters/meta.json` の exact contract と unknown custom skill preservation が test で固定されており、S02 scope に対する test adequacy gap は無い
+- 修正内容:
+  - `src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md`
+    - Codex 向け thin host adapter entrypoint を追加した
+  - `src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md`
+    - Copilot 向け thin host adapter entrypoint を追加した
+  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json`
+    - mandatory metadata asset を追加し、`schema_version` / `owner` / `targets` / `generated_by` / `updated_at` を固定した
+  - `src/spec_dock/cli.py`
+    - managed skill names に Codex/Copilot adapter を追加した
+    - installer sync で `.agents/host-adapters/meta.json` を配布・更新するようにした
+    - managed adapter install 完了前の fail-closed check を追加した
+  - `tests/cli_runtime/harness.py`
+    - expected managed skill set に host adapter 名を追加した
+  - `tests/test_init_update.py`
+    - bundled asset coverage、adapter routing contract、metadata exact shape、legacy update / custom skill preservation、interrupted run convergence を固定した
+- 想定外と対処:
+  - broader `tests.test_init_update` で 3 failures が残ったが、checked-in dogfooding/parity 側の未更新に紐づく failure と切り分けられ、S02 では blocker にしなかった
+  - S01 で non-blocking note だった `meta.json.targets` subshape は、この step で exact JSON assertion を追加して閉じた
+- refactor:
+  - なし

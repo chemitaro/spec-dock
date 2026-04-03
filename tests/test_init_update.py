@@ -5331,10 +5331,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
 
             skills_root = target / ".agents" / "skills"
+            meta_path = target / ".agents" / "host-adapters" / "meta.json"
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 if skill_name == "spec-driven-tdd-workflow":
                     continue
                 shutil.rmtree(skills_root / skill_name)
+            self._write_text_force(meta_path, '{"schema_version": 99}\n')
 
             custom_dir = skills_root / "my-custom-skill"
             custom_dir.mkdir(parents=True, exist_ok=True)
@@ -5343,6 +5345,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             self.assertEqual(main(["update", str(target)]), 0)
             self._assert_managed_skills_installed(target)
+            self.assertEqual(
+                json.loads(meta_path.read_text(encoding="utf-8")),
+                {
+                    "schema_version": 1,
+                    "owner": "spec-dock",
+                    "targets": {
+                        "codex": {
+                            "enabled": True,
+                            "entry_file": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                        },
+                        "copilot": {
+                            "enabled": True,
+                            "entry_file": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                        },
+                    },
+                    "generated_by": "spec-dock update",
+                    "updated_at": "2026-04-03T00:00:00Z",
+                },
+            )
             self.assertTrue((custom_dir / "SKILL.md").is_file())
             self.assertTrue((custom_dir / "notes.txt").is_file())
 
@@ -5401,6 +5422,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for skill_name in cli._managed_skill_names():
                 skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
                 self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
+            self.assertTrue(
+                (assets_dir / "codex_skills" / "host-adapters" / "meta.json").is_file(),
+                "missing bundled host adapter metadata asset",
+            )
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
@@ -5412,6 +5437,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
             adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
+            codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            copilot_adapter_text = (skills_dir / "spec-dock-copilot-adapter" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
 
         self.assertIn(
             "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.",
@@ -5434,6 +5465,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
         self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
+        self.assertIn("issue-00049", codex_adapter_text)
+        self.assertIn("spec-dock/docs/workflow_issue.md", codex_adapter_text)
+        self.assertIn("thin", codex_adapter_text.lower())
+        self.assertIn("issue-00049", copilot_adapter_text)
+        self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
+        self.assertIn("thin", copilot_adapter_text.lower())
 
         self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
@@ -5454,7 +5491,6 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/phase_plan.md`", epic_text)
         self.assertIn("create/import an epic", epic_text)
         self.assertIn("scope-specific constraints and decisions", epic_text)
-
         self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
@@ -5476,6 +5512,34 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
             self.assertNotIn("runtime-operations", skill_text)
+
+    def test_init_installs_host_adapter_metadata_with_fixed_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            meta_path = target / ".agents" / "host-adapters" / "meta.json"
+            self.assertTrue(meta_path.is_file(), f"missing host adapter metadata: {meta_path}")
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                meta,
+                {
+                    "schema_version": 1,
+                    "owner": "spec-dock",
+                    "targets": {
+                        "codex": {
+                            "enabled": True,
+                            "entry_file": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                        },
+                        "copilot": {
+                            "enabled": True,
+                            "entry_file": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                        },
+                    },
+                    "generated_by": "spec-dock update",
+                    "updated_at": "2026-04-03T00:00:00Z",
+                },
+            )
 
     def test_reference_sync_doc_matches_bundled_asset(self) -> None:
         import spec_dock.cli as cli

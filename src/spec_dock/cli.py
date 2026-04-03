@@ -32,6 +32,8 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-epic-planning",
     "spec-dock-issue-execution",
     "spec-dock-adr-facilitation",
+    "spec-dock-codex-adapter",
+    "spec-dock-copilot-adapter",
 )
 _LEGACY_MANAGED_SKILL_NAMES = ("spec-driven-tdd-workflow",)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
@@ -731,6 +733,8 @@ def _install_skill(target_root: Path) -> None:
     """
     with _assets_dir() as assets_dir:
         skills_root = target_root / ".agents" / "skills"
+        host_adapter_meta_src = assets_dir / "codex_skills" / "host-adapters" / "meta.json"
+        host_adapter_meta_dest = target_root / ".agents" / "host-adapters" / "meta.json"
         managed_skill_names = _managed_skill_names()
 
         # 1) Copy/update target managed skills.
@@ -742,6 +746,10 @@ def _install_skill(target_root: Path) -> None:
             dest_skill = skills_root / skill_name / "SKILL.md"
             _copy_file(src_skill, dest_skill)
 
+        if not host_adapter_meta_src.exists():
+            raise RuntimeError(f"Missing asset file: {host_adapter_meta_src}")
+        _copy_file(host_adapter_meta_src, host_adapter_meta_dest)
+
         # 2) Verify target managed skills were all installed before pruning.
         missing_skills = [
             skill_name
@@ -751,6 +759,11 @@ def _install_skill(target_root: Path) -> None:
         if missing_skills:
             joined = ", ".join(sorted(missing_skills))
             raise RuntimeError(f"managed skill sync incomplete (missing SKILL.md): {joined}")
+
+        if not host_adapter_meta_dest.is_file():
+            raise RuntimeError(
+                f"managed host adapter sync incomplete (missing meta.json): {host_adapter_meta_dest}"
+            )
 
         # 3) Prune obsolete managed skills only; preserve unknown custom dirs.
         managed_ownership = set(_managed_skill_ownership_names())
