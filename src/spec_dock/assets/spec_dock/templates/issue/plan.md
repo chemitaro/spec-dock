@@ -27,6 +27,15 @@ ID: "<ISS_ID>"
 - M2:
   - ...
 
+## 実装順序の根拠
+- 依存関係の正本:
+  - `design.md` の `依存関係分析` と module/dependency UML を参照する
+- sequencing rule:
+  - upstream / prerequisite / lower-dependency slice から先に step を組む
+  - downstream / dependent slice は前提が固まってから置く
+- step ordering notes:
+  - どの step が何に依存するかを短く書く
+
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
