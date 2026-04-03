@@ -5477,6 +5477,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
             self.assertNotIn("runtime-operations", skill_text)
 
+    def test_reference_sync_doc_matches_bundled_asset(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            bundled = (assets_dir / "spec_dock" / "docs" / "reference_sync.md").read_text(encoding="utf-8")
+
+        repo_copy = (
+            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "reference_sync.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(repo_copy, bundled)
+
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -6809,6 +6821,11 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             self.assertIn("- initiative: (none)", context_pack_text)
             self.assertIn("- epic: (none)", context_pack_text)
             self.assertIn("- issue: (none)", context_pack_text)
+            self.assertIn("- entry: `spec-dock/.agent/active.json`", context_pack_text)
+            self.assertIn("- default working set: `spec-dock/.agent/index.json`", context_pack_text)
+            self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", context_pack_text)
+            self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", context_pack_text)
+            self.assertIn("- Start with `spec-dock/.agent/active.json`.", context_pack_text)
             self.assertIn("- `spec-dock/active/initiative/README.md`", context_pack_text)
             self.assertIn("- `spec-dock/active/epic/README.md`", context_pack_text)
             self.assertIn("- `spec-dock/active/issue/README.md`", context_pack_text)

@@ -23,6 +23,12 @@
 - `spec-dock/.agent/tree.json`（todo projection のツリー）
 - `spec-dock/.agent/deps-issues.json`（todo issue-only 依存グラフ）
 
+agent-facing の読取契約:
+- entry: `spec-dock/.agent/active.json`
+- normal default working set: `spec-dock/.agent/index.json` + `spec-dock/.agent/deps-issues.json`
+- escalation only: `spec-dock/.agent/index-all.json`（full-history / audit / search）
+- `spec-dock/active/context-pack.md` はこの順序を案内する human guidance であり、唯一正本ではない
+
 `spec-dock/` 直下（人間向け）:
 - `spec-dock/tree-all.puml`（Readyボード, all）
 - `spec-dock/tree.puml`（Readyボード, todo）
@@ -81,6 +87,7 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - GitHubへアクセスしない
 - 既存スナップショットを使う場合は `index-all.json` を優先し、無ければ `index.json` へ fallback
 - どちらも無ければ issue status は `unknown`
+- この `index-all.json -> index.json` は issue status 補完のための runtime 内部 fallback であり、agent-facing の通常読取順ではない
 
 ## 6. active更新
 
@@ -89,6 +96,7 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - `sync --no-update-active`: active を更新しない
 - `sync --force`: `--no-update-active` 相当として扱い、active auto-update を行わない
 - `main` / `develop` など手がかりが無いブランチでは active は維持
+- active が未設定でも entry contract は `spec-dock/.agent/active.json` のままで、`spec-dock/active/context-pack.md` は placeholder README への human guidance を表示する
 
 ## 7. 矢印方向（JSONとPlantUML）
 

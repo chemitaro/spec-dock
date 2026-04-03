@@ -518,10 +518,20 @@ def render_context_pack(active_selection: ActiveSelection | None) -> str:
     lines.append(f"- issue: {issue_id or '(none)'}")
     lines.append("")
     lines.append("## Generated state")
-    lines.append("- index: `spec-dock/.agent/index.json`")
-    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("- entry: `spec-dock/.agent/active.json`")
+    lines.append("- default working set: `spec-dock/.agent/index.json`")
+    lines.append("- default dependency view: `spec-dock/.agent/deps-issues.json`")
+    lines.append("- escalation only: `spec-dock/.agent/index-all.json`")
+    lines.append("- human-oriented tree: `spec-dock/.agent/tree.json`")
     lines.append("")
     lines.append("## Read order")
+    lines.append("- Start with `spec-dock/.agent/active.json`.")
+    lines.append("- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.")
+    lines.append("- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.")
+    lines.append(
+        "- `spec-dock/active/context-pack.md` is human guidance that mirrors this contract; it is not the sole source of truth."
+    )
+    lines.append("- Then follow the active documents:")
     if initiative_id:
         lines.append("- `spec-dock/active/initiative/requirement.md`")
         lines.append("- `spec-dock/active/initiative/design.md`")
