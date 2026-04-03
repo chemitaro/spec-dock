@@ -68,7 +68,7 @@ ID: "<ISS_ID>"
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
 - cadence / approval policy は `workflow_issue.md` を正本とする。
-- 互換参照: `Red → Green → Refactor → review → fix → re-review → report → コミット/no-op`
+- 互換参照: `Red → Green → Refactor → review → fix → re-review → report → commit/no-op`
 - 各 step は 1 つの観測可能な振る舞いを単位とする。
 - `block` は optional concern group。単純な step では最小 wrapper 1 個でよい。
 - `iteration` は 1 回の TDD cycle とし、各 iteration は `Red → Green → Refactor` で閉じる。
