@@ -184,10 +184,12 @@ ID: "iss-00050"
   - asset existence / sync verification が green
 
 ###### Refactor
-- cleanup target:
-  - skill naming / ownership list の重複整理
-- invariants to keep green:
-  - unknown custom skills を壊さない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### B2 — installer ownership and pruning
 - purpose:
@@ -213,10 +215,12 @@ ID: "iss-00050"
   - init/update tests が green
 
 ###### Refactor
-- cleanup target:
-  - duplicated installer constants
-- invariants to keep green:
-  - unknown custom skills を保持する
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
@@ -263,10 +267,12 @@ ID: "iss-00050"
   - review で thin adapter contract を確認できる
 
 ###### Refactor
-- cleanup target:
-  - duplicated wording
-- invariants to keep green:
-  - host 固有差分は entry wording に限定する
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### B2 — parity and validation
 - purpose:
@@ -292,10 +298,12 @@ ID: "iss-00050"
   - validate pass と parity evidence が揃う
 
 ###### Refactor
-- cleanup target:
-  - parity-only noise の整理
-- invariants to keep green:
-  - manual-only drift を残さない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:

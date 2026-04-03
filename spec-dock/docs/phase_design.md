@@ -13,7 +13,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - 位置: 全体 workflow の `調査分析 → requirement → design → plan → 実装/品質ゲート` の `design`
 - 責務: requirement で固定した `WHAT / WHY` を、実装可能な HOW / guardrails に落とす
 - 前提入力: reviewer 承認レベルの `requirement.md`、既存実装 / docs / ADR、設計で閉じる論点
-- 固定すること: 方針、境界 / 契約、SoR / 依存、移行、観測性、テスト戦略
+- 固定すること: 方針、境界 / 契約、SoR / 依存、依存関係分析、移行、観測性、テスト戦略
 - 出力: reviewer が plan へ送れる `design.md` と必要な `research` / `disc` / `adr`
 - 非ゴール: requirement の不足のごまかし、比較表の本文への押し込み、実装手順の plan 化
 - 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有 gate は `workflow_*.md` が additive に定義する
@@ -50,15 +50,18 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 既存の責務分割
   - 現在の入出力契約
   - データ境界と SoR
+  - upstream / downstream / prerequisite の依存関係
+  - 依存の少ない実装起点
   - 既存テストの守備範囲
   - 移行 / 運用 / 監視で壊しうる点
 - 本文には採用結論と guardrails を残し、長い比較や生の調査ログは `discussions/` へ逃がす
 - UML は用途付き placeholder だけを残す
 - initiative では高レベル図を 1 箇所まで、epic / issue では module / context や class / interface の置き場を明示する
+- issue design では module / dependency UML を省略せず、依存方向と実装起点が読めるようにする
 - 先に埋める節:
   - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
   - Epic: `全体像`, `契約`, `データモデル`, `主要フロー`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
-  - Issue: `既存実装 / 規約の理解`, `採用方針 / トレードオフ`, `インターフェース契約`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
+  - Issue: `既存実装 / 規約の理解`, `依存関係分析`, `インターフェース契約`, `採用方針 / トレードオフ`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
 
 ## 論点の逃がし先
 
@@ -84,9 +87,9 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 この節は shared minimum gate です。通過後も scope 固有 gate は対応する `workflow_*.md` に追加で従います。
 
 - requirement の主要論点に対応する設計の置き場がある
-- 境界、契約、観測性、テスト戦略のうち必要なものが抜けていない
+- 境界、契約、依存関係分析、観測性、テスト戦略のうち必要なものが抜けていない
 - 既存パターンを採る / 採らない理由が説明できる
-- plan に渡せる変更単位の見取り図がある
+- plan に渡せる変更単位の見取り図と依存順がある
 - `design.md` と必要な `research` / `disc` / `adr` を束で渡せる
 - reviewer が「plan へ進めてよい」と判断できる
 
