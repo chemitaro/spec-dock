@@ -171,6 +171,10 @@ class TestCliSync(CliRuntimeHarness):
             self.assertEqual(tree_all["schema_version"], 2)
             self.assertEqual(index_todo["schema_version"], 2)
             self.assertEqual(tree_todo["schema_version"], 2)
+            self.assertEqual(index_all["projection"], "full-history")
+            self.assertNotIn("source", index_all)
+            self.assertEqual(index_todo["projection"], "current-future")
+            self.assertNotIn("source", index_todo)
 
             def _collect_tree_node_ids(items: list[dict[str, object]]) -> set[str]:
                 ids: set[str] = set()
@@ -715,6 +719,11 @@ class TestCliSync(CliRuntimeHarness):
 
             deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
             self.assertEqual(deps_issues["schema_version"], 1)
+            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
+            self.assertEqual(
+                deps_issues["source"],
+                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+            )
             self.assertEqual(
                 set(deps_issues["nodes"].keys()),
                 {"iss-00302", "iss-00303", "iss-00304", "iss-00305"},
@@ -1317,6 +1326,7 @@ class TestCliSync(CliRuntimeHarness):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_all["projection"], "full-history")
             self.assertTrue(index_all["deps"]["valid"])
             self.assertIsNone(index_all["deps"]["error"])
             self.assertEqual(
@@ -1330,6 +1340,7 @@ class TestCliSync(CliRuntimeHarness):
             self.assertTrue(index_all["nodes"]["iss-00301"]["deps"]["ready"])
 
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_todo["projection"], "current-future")
             self.assertTrue(index_todo["deps"]["valid"])
             self.assertIsNone(index_todo["deps"]["error"])
             self.assertEqual(index_todo["deps"]["issue_edges"], [])
@@ -1343,6 +1354,11 @@ class TestCliSync(CliRuntimeHarness):
             self.assertTrue(deps_issues_path.is_file())
             self.assertTrue(deps_issues_puml_path.is_file())
             deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
+            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
+            self.assertEqual(
+                deps_issues["source"],
+                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+            )
             self.assertTrue(deps_issues["deps"]["valid"])
             self.assertIsNone(deps_issues["deps"]["error"])
             self.assertNotIn("iss-00301", deps_issues["nodes"])  # done issue is filtered from todo projection
