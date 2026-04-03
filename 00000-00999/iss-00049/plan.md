@@ -23,6 +23,7 @@ ID: "iss-00049"
   - EC-003
 - 制約:
   - host adapter 実装は本 issue に含めない
+  - 本 issue は protocol contract surface の runtime/provider-doc/dogfooding-doc/test parity までを担当し、adapter scaffold 残件と final epic parity/review は issue-00050 に残す
   - full-history artifact を削除しない
   - provider-side source of truth から修正する
 
@@ -31,7 +32,7 @@ ID: "iss-00049"
   - 対象:
     - protocol contract の fixed point 化
   - exit:
-    - requirement/design/plan と provider docs の変更対象が一致している
+    - requirement/design/plan と epic plan の scope boundary、および provider docs の変更対象が一致している
 - M2:
   - 対象:
     - runtime payload / context pack alignment
@@ -41,34 +42,42 @@ ID: "iss-00049"
   - 対象:
     - docs/tests parity
   - exit:
-    - provider/dogfooding docs と relevant tests が一致して green になる
+    - 本 issue が変更する protocol contract surface について provider/dogfooding docs と relevant tests が一致して green になる
+    - adapter scaffold 起因の残件 parity / final epic review は issue-00050 に明示的に handoff されている
 
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
-    - protocol read order と payload responsibility が docs/design で固定される
+    - protocol read order・artifact metadata responsibility・issue-00049/00050 scope boundary が docs/design/epic plan で固定される
   - closes:
     - なし（baseline / spec gate）
   - review gate:
-    - spec review で issue contract が pass している
+    - spec review で issue contract、artifact ごとの metadata contract、issue-00049/00050 scope split が pass している
 - S02:
   - 観測可能な振る舞い:
-    - generated JSON payload が `current-future` / `full-history` / `open-issues-dependency-view` を表現できる
+    - generated JSON payload が次を表現できる:
+      - `index.json`: top-level `projection=current-future`、new top-level `source` なし
+      - `index-all.json`: top-level `projection=full-history`、new top-level `source` なし
+      - `deps-issues.json`: top-level `projection=open-issues-dependency-view`、top-level `source` は artifact provenance のまま
+      - existing per-node issue status `source` semantics unchanged
   - closes:
     - AC-002
     - EC-002
   - review gate:
     - payload verification tests が green
+    - fail-closed deps placeholder verification が green で、`deps-issues.json` の projection/provenance contract 維持が確認できる
 - S03:
   - 観測可能な振る舞い:
-    - context pack と docs が `active -> index/deps -> index-all(if needed)` を一貫して示す
+    - context pack と docs が `active -> index/deps -> index-all(if needed)` を一貫して示し、active-none placeholder path でも入口 contract を崩さない
   - closes:
     - AC-001
     - AC-003
     - EC-001
     - EC-003
   - review gate:
-    - docs parity と runtime verification が green
+    - provider/dogfooding docs parity（本 issue の contract surface）が green
+    - active-none placeholder / context-pack read-order verification が green
+    - runtime read-order verification が green
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S03
@@ -150,14 +159,14 @@ ID: "iss-00049"
 
 #### B1 — index payloads
 - purpose:
-  - `index.json` / `index-all.json` の projection を固定する
+  - `index.json` / `index-all.json` の projection と top-level `source` 非追加 contract を固定する
 - files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`
   - relevant tests
 
 ##### I1 — add projection metadata
 - slice goal:
-  - `current-future` と `full-history` を payload で判別可能にする
+  - `current-future` と `full-history` を payload で判別可能にし、index artifacts に new top-level `source` を増やさないことを固定する
 
 ###### Red
 - failing test:
@@ -181,13 +190,13 @@ ID: "iss-00049"
 
 #### B2 — deps view
 - purpose:
-  - `deps-issues.json` の default dependency view を固定する
+  - `deps-issues.json` の default dependency view と provenance `source` contract を固定する
 - files:
   - same as above
 
 ##### I1 — keep source/projection explicit
 - slice goal:
-  - issue-only dependency view の由来を payload と tests で固定する
+  - issue-only dependency view の projection と artifact provenance `source` を payload と tests で固定し、per-node issue status `source` semantics は維持する
 
 ###### Red
 - failing test:
@@ -197,9 +206,10 @@ ID: "iss-00049"
 
 ###### Green
 - minimum implementation:
-  - projection/source metadata を整える
+  - projection/source metadata contract を artifact ごとに整える
 - pass condition:
   - `deps-issues.json` verification が green
+  - fail-closed placeholder verification でも projection/provenance contract が崩れない
 
 ###### Refactor
 - 目的:
@@ -214,6 +224,7 @@ ID: "iss-00049"
   - RG1/implementation review
 - expected tests:
   - relevant runtime/presentation tests
+  - deps invalid placeholder / fail-closed verification
 - report update:
   - review verdict / test結果 / 修正内容を `./spec-dock/active/issue/report.md` に残す
 - commit:
@@ -240,7 +251,7 @@ ID: "iss-00049"
 
 ##### I1 — refresh read order and generated state section
 - slice goal:
-  - `deps-issues.json` と `index-all.json` の位置づけを明示する
+  - `deps-issues.json` と `index-all.json` の位置づけ、および active-none placeholder 時の入口 contract を明示する
 
 ###### Red
 - failing test:
@@ -253,6 +264,7 @@ ID: "iss-00049"
   - generated context pack wording を更新
 - pass condition:
   - snapshot verification が green
+  - active-none placeholder read-order verification が green
 
 ###### Refactor
 - 目的:
@@ -264,14 +276,14 @@ ID: "iss-00049"
 
 #### B2 — provider/dogfooding docs parity
 - purpose:
-  - docs explanation を runtime contract に揃える
+  - 本 issue が変更する protocol contract surface の docs explanation を runtime contract に揃える
 - files:
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
   - `spec-dock/docs/reference_sync.md`
 
 ##### I1 — align wording and examples
 - slice goal:
-  - normal path / escalation path の説明を統一する
+  - normal path / escalation path / issue-00049 と issue-00050 の責務境界の説明を統一する
 
 ###### Red
 - failing test:
@@ -301,6 +313,7 @@ ID: "iss-00049"
   - `./spec-dock/scripts/spec-dock sync`
   - `./spec-dock/scripts/spec-dock validate`
   - relevant automated tests
+  - active-none placeholder / context-pack verification
 - report update:
   - review verdict / QA verdict / validation evidence / 追加修正内容を `./spec-dock/active/issue/report.md` に残す
 - commit:
@@ -310,11 +323,11 @@ ID: "iss-00049"
 - 対象:
   - docs / assets / workflow
 - 対応:
-  - provider docs と dogfooding docs の parity を確認し、issue-00050 へ handoff できる fixed point を残す
+  - 本 issue が変更した protocol contract surface について provider docs と dogfooding docs の parity を確認し、adapter scaffold 起因の残件だけを issue-00050 へ handoff できる fixed point を残す
 
 ### S99 — final diff review quality gate
 - branch diff scope:
-  - issue-00049 で更新した provider docs / runtime / tests / dogfooding outputs
+  - issue-00049 で更新した protocol contract surface の provider docs / runtime / tests / dogfooding outputs
 - required validation:
   - relevant automated tests
   - `./spec-dock/scripts/spec-dock sync`
@@ -328,7 +341,7 @@ ID: "iss-00049"
 
 ## 未確定事項
 - なし:
-  - `projection` key naming は固定し、`source` metadata も追加する前提で S02 を進める。
+  - `projection` key naming は固定し、top-level `source` contract は artifact ごとに固定した前提で S02 を進める。
 
 ## final exit contract
 - AC/EC 達成:

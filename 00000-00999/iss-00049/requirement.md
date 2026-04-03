@@ -62,17 +62,23 @@ ID: "iss-00049"
 ## スコープ
 - MUST:
   - `active.json` / `index.json` / `deps-issues.json` / `index-all.json` / `context-pack.md` の責務と読み順を provider docs / generated docs / runtime artifact で一致させる。
+  - 本 issue が変更する protocol contract surface については、runtime・provider docs・dogfooding docs・tests の parity まで本 issue で固定する。
   - `index.json` を default working set / current-future projection、`index-all.json` を full-history / audit / search / escalation として明示する。
   - `deps-issues.json` を通常実行の dependency view として明示する。
   - `context-pack.md` の generated guidance を上記契約に沿って更新する。
   - runtime/tests を調整し、JSON shape と docs の説明が同じ意味を指すことを検証可能にする。
-  - `index.json` / `index-all.json` / `deps-issues.json` には `projection` を、必要箇所には `source` を持たせる。
+  - top-level metadata contract を artifact ごとに固定する:
+    - `index.json`: top-level `projection=current-future` を持ち、new top-level `source` は追加しない。
+    - `index-all.json`: top-level `projection=full-history` を持ち、new top-level `source` は追加しない。
+    - `deps-issues.json`: top-level `projection=open-issues-dependency-view` を持ち、top-level `source` は artifact provenance（`index.json` と schema version）として維持する。
+    - issue node / issue status に既存で入っている `source` の意味は変えない。
 - MUST NOT:
   - host adapter 実装や installer 配布ロジックの追加には踏み込まない。
   - `index-all.json` を削除したり、full-history artifact を弱めたりしない。
   - invalid artifact prevention の architecture-level 対処を本 issue に含めない。
 - OUT OF SCOPE:
   - Codex/Copilot adapter scaffold の導入
+  - adapter scaffold に伴う残件 docs parity と final epic review
   - `.agents/skills` managed asset 機構の変更
   - multi-host 展開
 
@@ -82,7 +88,6 @@ ID: "iss-00049"
   - 通常実行の working set は `index.json` と `deps-issues.json` である。
   - `index-all.json` は必要時のみ読む full-history artifact として残す。
 - Ask:
-  - projection 名や metadata key を payload にどこまで明示するか。
   - `context-pack.md` に machine-facing detail をどこまで書くか。
 - Never:
   - `context-pack.md` を唯一正本にしない。
@@ -119,7 +124,11 @@ ID: "iss-00049"
   - When:
     - current-future projection と full-history projection を確認する
   - Then:
-    - payload 上でも projection/用途が判別でき、tests で検証できる
+    - payload 上でも projection/用途が判別でき、tests で次を検証できる:
+      - `index.json` は top-level `projection=current-future` を持ち、new top-level `source` を持たない
+      - `index-all.json` は top-level `projection=full-history` を持ち、new top-level `source` を持たない
+      - `deps-issues.json` は top-level `projection=open-issues-dependency-view` を持ち、top-level `source` は artifact provenance のまま維持される
+      - 既存の per-node issue status `source` semantics は変わらない
   - 観測点:
     - `tests/presentation_runtime/` または `tests/cli_runtime/` の relevant tests
     - `spec-dock/.agent/index.json`
@@ -133,7 +142,8 @@ ID: "iss-00049"
   - When:
     - parity を確認する
   - Then:
-    - provider/dogfooding の protocol guidance に矛盾がない
+    - 本 issue が変更した protocol contract surface について、provider/dogfooding の protocol guidance に矛盾がない
+    - adapter scaffold 起因の残件 parity と final review は issue-00050 の責務として切り分けられている
   - 観測点:
     - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
     - `spec-dock/docs/reference_sync.md`
@@ -148,13 +158,16 @@ ID: "iss-00049"
   - 観測点:
     - `spec-dock/.agent/active.json`
     - `spec-dock/system/active-none/`
+    - `spec-dock/active/context-pack.md` または corresponding generated context-pack
 - EC-002:
   - 条件:
     - deps preflight failure により `deps-issues.json` が placeholder 上書きされる
   - 期待:
     - default dependency view という責務は維持しつつ、invalid state が payload と docs の両方で説明可能である
+    - `deps-issues.json` の top-level `projection=open-issues-dependency-view` と artifact provenance としての top-level `source` contract は fail-closed path でも崩れない
   - 観測点:
     - `sync --force` の generated payload
+    - `spec-dock/.agent/deps-issues.json`
     - `spec-dock/docs/reference_sync.md`
 - EC-003:
   - 条件:
@@ -185,4 +198,4 @@ ID: "iss-00049"
 
 ## 未確定事項
 - なし:
-  - `projection` と `source` metadata を payload に追加する方針で固定した。
+  - artifact ごとの top-level `projection` / `source` contract と既存 per-node issue status `source` semantics は固定した。
