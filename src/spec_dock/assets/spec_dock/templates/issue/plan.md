@@ -43,17 +43,23 @@ ID: "<ISS_ID>"
 - RG1 implementation review:
   - timing:
   - scope:
+  - commit gate:
+    - pass まで review loop を回し、pass 後に `report.md` を更新して差分確認後にコミットする
 - QG1 QA review:
   - timing:
   - scope:
+  - commit gate:
+    - pass まで test loop を回し、pass 後に `report.md` を更新して差分確認後にコミットする
 - SG1 spec review:
   - timing:
   - scope:
+  - commit gate:
+    - pass まで review loop を回し、pass 後に `report.md` を更新してドキュメントだけをコミットする
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
 - cadence / approval policy は `workflow_issue.md` を正本とする。
-- 互換参照: `Red → Green → Refactor → review → fix → re-review → report → commit/no-op`
+- 互換参照: `Red → Green → Refactor → review → fix → re-review → report → コミット/no-op`
 - 各 step は 1 つの観測可能な振る舞いを単位とする。
 - `block` は optional concern group。単純な step では最小 wrapper 1 個でよい。
 - `iteration` は 1 回の TDD cycle とし、各 iteration は `Red → Green → Refactor` で閉じる。
@@ -63,6 +69,9 @@ ID: "<ISS_ID>"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
+- 各 stage gate（SG/RG/QG）は `pass` まで回す。
+- 各 stage gate の `pass` 後は、`report.md` を更新し、差分確認後に report とまとめてコミットする。
+- no-op の場合のみ `report.md` に理由を残し、commit を省略できる。
 
 ## 実装ステップ
 
@@ -112,7 +121,9 @@ ID: "<ISS_ID>"
 - expected tests:
   - ...
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - reviewer verdict / test結果 / 修正内容 / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
 ### Sxx — <next observable behavior>
 - ...
@@ -136,6 +147,10 @@ ID: "<ISS_ID>"
   - ...
 - reviewer approvals:
   - ...
+- report update:
+  - final diff review verdict / closing evidence / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit expectation:
+  - `report.md` 更新後に差分確認し、追加修正があれば最終コミットを作成する。無ければ直前 gate のコミットを最終成果として扱う
 
 ## 未確定事項
 - Q-001:
