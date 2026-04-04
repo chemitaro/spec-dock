@@ -3,9 +3,9 @@
 ID: "epic-00048"
 タイトル: "Agent facing interface hardening and host adapter scaffolding"
 関連GitHub: ["#48"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-02"
+最終更新: "2026-04-04"
 依存: ["requirement.md"]
 親: ["init-local-00002"]
 ---
@@ -16,7 +16,7 @@ ID: "epic-00048"
 - target boundary:
   - host-neutral protocol（core）
   - host 非依存 workflow skill（generic）
-  - host-specific adapter scaffold（codex/copilot）
+  - thin host adapter skill（codex/copilot）
 - impacted area:
   - active/context 生成、derived state 読み取り、installer managed asset 配布、docs parity
 - existing relation:
@@ -65,13 +65,21 @@ copilot --> core : read-only reference
     - `.agent` 生成物更新 / 検証結果。
   - Errors:
     - required artifact 欠落、構造不整合。
+- API-003 `spec-dock init` / `spec-dock update`:
+  - Request:
+    - managed asset 同期。
+  - Response:
+    - `.agents/skills/*` と `.agents/host-adapters/meta.json` の整合。
+  - Errors:
+    - required managed file 欠落、manifest 不整合。
 
 ### Event（生成イベント）
 - EVT-001 installer managed-asset sync:
   - Producer:
     - `spec-dock init` / `spec-dock update`
   - Consumer:
-    - `.agents/skills` の generic skill、host adapter files
+    - `.agents/skills` の generic skill / adapter skill
+    - `.agents/host-adapters/meta.json`
   - Payload:
     - 配布対象ファイル、version marker、ownership。
 
@@ -82,6 +90,7 @@ copilot --> core : read-only reference
   - `deps-issues.json` は open/todo issue 向けの default dependency view。
   - `index-all.json` は full-history / audit / search / escalation only。
   - `context-pack.md` は human summary only であり、唯一正本ではない。
+  - `.agents/skills/*` は spec-dock 操作 guidance の正本。
 - consistency model:
   - 通常実行は `active.json` -> `index.json` / `deps-issues.json` の順で current/future を解決する。
   - `index-all.json` は full-history が必要な場合にのみ追加参照する。
@@ -89,24 +98,25 @@ copilot --> core : read-only reference
 
 ## データモデル
 - model / table changes:
-  - 新規 host adapter metadata（案: `.agents/host-adapters/meta.json`）を導入。
-  - runtime state schema は後方互換を維持しつつ、docs で責務を明示。
+  - 既存 host adapter metadata（`.agents/host-adapters/meta.json`）を採用し、adapter skill の managed mapping を保持する。
+  - runtime state schema は後方互換を維持しつつ、docs で責務を明示する。
 - invariants:
   - `active.json` は entry / current target の最小文脈。
   - `index.json` は default working set / current-future projection。
   - `deps-issues.json` は open/todo issue 向け dependency view。
   - `index-all.json` は full-history / audit / search / escalation only。
   - `context-pack.md` は human summary only。
+  - `.agents/skills/*` が adapter guidance の正本である。
   - host adapter は runtime state を複製しない。
 
-### JSON shape（例）
+### JSON / manifest shape（例）
 ```json
 {
   "active.json": {
     "initiative": {"id": "init-local-00002", "path": "..."},
     "epic": {"id": "epic-00048", "path": "..."},
     "issue": null,
-    "updated_at": "2026-04-02T00:00:00Z"
+    "updated_at": "2026-04-04T00:00:00Z"
   },
   "index.json": {
     "schema_version": 2,
@@ -125,6 +135,7 @@ copilot --> core : read-only reference
   "deps-issues.json": {
     "schema_version": 2,
     "projection": "open-issues-dependency-view",
+    "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
     "issues": {},
     "deps": {
       "issue_edges": [
@@ -135,17 +146,17 @@ copilot --> core : read-only reference
   "index-all.json": {
     "schema_version": 2,
     "projection": "full-history",
-    "source": {"index": "spec-dock/.agent/index-all.json", "schema_version": 2},
     "nodes": {}
   },
   "host_adapter_meta": {
     "schema_version": 1,
+    "owner": "spec-dock",
     "targets": {
       "codex": {"enabled": true, "entry_file": ".agents/skills/spec-dock-codex-adapter/SKILL.md"},
       "copilot": {"enabled": true, "entry_file": ".agents/skills/spec-dock-copilot-adapter/SKILL.md"}
     },
     "generated_by": "spec-dock update",
-    "updated_at": "2026-04-02T00:00:00Z"
+    "updated_at": "2026-04-04T00:00:00Z"
   }
 }
 ```
@@ -171,6 +182,7 @@ class IndexJson {
 class DepsIssuesJson {
   schema_version
   projection=open-issues-dependency-view
+  source
   issues
   deps.issue_edges
 }
@@ -178,7 +190,6 @@ class DepsIssuesJson {
 class IndexAllJson {
   schema_version
   projection=full-history
-  source
   nodes
 }
 
@@ -190,8 +201,10 @@ class ContextPackMd {
 
 class HostAdapterMeta {
   schema_version
+  owner
   targets.codex
   targets.copilot
+  generated_by
   updated_at
 }
 
@@ -213,8 +226,8 @@ HostAdapterMeta ..> IndexAllJson : escalation contract
   3. `context-pack.md` を人間向け補助として読む。
   4. 監査・履歴参照・全体検索・escalation が必要な場合のみ `index-all.json` を読む。
 - Flow-B installer adapter sync:
-  1. `init/update` が managed skill 一覧を解決する。
-  2. generic skill と host adapter scaffold を配布/更新する。
+  1. `init/update` が managed skill と metadata 一覧を解決する。
+  2. generic skill、adapter skill、adapter metadata を配布/更新する。
   3. obsolete managed adapter を pruning し、未知ディレクトリは保持する。
 
 ### UML（sequence / flow）
@@ -253,12 +266,12 @@ Adapter --> Orchestrator: bounded execution plan
 
 ## 移行戦略
 - migration strategy:
-  - 既存 workflow を維持しつつ docs と adapter を追加。
-  - state 正本は既存 `.agent` を継続使用。
+  - 既存 workflow を維持しつつ docs と adapter を追加する。
+  - state 正本は既存 `.agent` を継続使用する。
 - dual write/read if needed:
   - 不要。既存 state を read-only 利用し、adapter 側の独自 state を持たない。
 - rollback:
-  - adapter 配布のみ戻せるよう managed ownership で管理。
+  - adapter 配布のみ戻せるよう managed ownership で管理する。
 
 ## 観測性 / セキュリティ
 - observability:
@@ -282,19 +295,40 @@ Adapter --> Orchestrator: bounded execution plan
   - E-AC-003 -> installer managed asset tests
   - E-AC-004 -> docs parity + final spec review
 
-## 関連 ADR
-- 既存 ADR なし（必要なら issue 実装時に追加）
+## 既存完了済み issue との境界
+- `iss-00049`:
+  - protocol / runtime / docs / tests の current-future vs full-history 契約を固定済み。
+- `iss-00050`:
+  - thin adapter skill と adapter metadata の managed deployment を完了済み。
+- reading rule:
+  - 上記 2 issue の deliverable は本設計の baseline として保持し、再定義しない。
 
-## 未確定事項
-- Q-001:
-  - 質問:
-    - host adapter metadata の配置を `.agents` に固定するか。
-  - 選択肢:
-    - A:
-      - `.agents/host-adapters/meta.json` に配置。
-    - B:
-      - `.agent/host-adapters.json` に配置。
-  - 推奨案:
-    - A。runtime state 正本と adapter 管理情報の責務分離が明確。
-  - 影響範囲:
-    - installer/assets/tests/docs。
+## 追補: host-native shim extension
+- extension purpose:
+  - `.codex/agents/*.toml` と `.github/agents/*.agent.md` を host-native discovery 用 thin shim として追加する。
+  - native shim は新しい state owner ではなく、既存 `.agents/skills/*` と `.agents/host-adapters/meta.json` に委譲する extension として扱う。
+- reference:
+  - 追加根拠と issue 分割理由は `discussions/20260404t010500z-disc-host-native-agent-deployment-gap-analysis.md` を参照する。
+
+### extension source-of-truth
+- provider-side source:
+  - generic skill / thin adapter skill / metadata の既存 source-of-truth は維持する。
+  - native shim template は同じ provider-side managed asset 群に追加し、skill を参照する thin shim として管理する。
+- runtime / managed target:
+  - `.agents/skills/*` と `.agents/host-adapters/meta.json` は既存完了済み managed target のまま保持する。
+  - `.codex/agents/*.toml` / `.github/agents/*.agent.md` は extension で追加する managed target とし、state owner にはしない。
+
+### extension installer sync / prune
+- sync:
+  - 既存の skill / metadata sync の後段で native shim を同期し、done scope の installer behavior を壊さない順序で実装する。
+  - manifest は native files を追加表現できる shape へ拡張するが、既存 `targets.*.entry_file` contract は維持する。
+- prune:
+  - prune 対象は managed manifest に載る obsolete native shim のみに限定する。
+  - unknown custom skill / unknown custom native shim を削除しない既存安全策を継続する。
+
+### extension test strategy
+- regression baseline:
+  - `iss-00049` / `iss-00050` で固定済み protocol contract / thin adapter skill / metadata tests を回帰基準として維持する。
+- additive coverage:
+  - native shim 生成、更新、unknown custom file 保持、obsolete managed native file pruning を `tests/test_init_update.py` に追加する。
+  - dogfooding parity と manual validation は既存 parity evidence に native shim 観点を追補する。
