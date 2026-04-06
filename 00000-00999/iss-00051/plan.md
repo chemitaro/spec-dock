@@ -295,6 +295,14 @@ ID: "iss-00051"
     - Codex `delegation_evidence_expected=.agents/skills/spec-dock-codex-adapter/SKILL.md`
     - Copilot `delegation_evidence_expected=.agents/skills/spec-dock-copilot-adapter/SKILL.md`
   - gate-3 / gate-4 fixed keys と `baseline_inherited_closure` / `extension_closure` を report に記録
+  - direct host verification が unavailable な host では `fallback_evidence_required=true` を固定し、host ごとに次の bundle がそろった場合のみ `fallback_evidence_pass=true` と判定する
+    - managed shim file snapshot
+    - matching delegated skill file snapshot
+    - `delegation_evidence_expected` を満たす static delegation check
+    - `non_reimplementation_evidence_expected` を満たす host-scoped static check
+    - `direct_protocol_read_expected` を満たす host-scoped static check
+    - dated `transcript_fragment` または `ui_screenshot` または `cli_log`
+  - fallback host でも required host set は減らさず、`codex` / `copilot` の各 host block を別々に埋める
 - pass condition:
   - `extension_closure_pass=true`
 
