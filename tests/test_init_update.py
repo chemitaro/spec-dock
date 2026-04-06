@@ -269,6 +269,8 @@ class TestInitUpdate(CliRuntimeHarness):
     _NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN = (
         r"active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order"
     )
+    _CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN = r"(?m)^\s*developer_instructions\s*="
+    _CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN = r"(?m)^\s*instructions\s*="
 
     def _assert_canonical_rules_files_contract(self, text_map: dict[str, str]) -> None:
         for rel_suffix, expected in self._CANONICAL_RULES_EXPECTATIONS.items():
@@ -473,6 +475,18 @@ class TestInitUpdate(CliRuntimeHarness):
             text,
             self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN,
             f"native shim includes direct protocol read reference ({shim_label})",
+        )
+
+    def _assert_codex_native_shim_loader_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertRegex(
+            text,
+            self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN,
+            f"codex native shim missing developer_instructions key ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
+            f"codex native shim still uses legacy instructions key ({shim_label})",
         )
 
     def test_init_creates_expected_structure(self) -> None:
@@ -5550,6 +5564,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
             shim_label="bundled codex native shim",
         )
+        self._assert_codex_native_shim_loader_contract(
+            text=codex_text,
+            shim_label="bundled codex native shim",
+        )
         self._assert_native_shim_static_delegation_only_contract(
             text=copilot_text,
             delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
@@ -5669,10 +5687,132 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 shim_label="generated codex native shim",
             )
+            self._assert_codex_native_shim_loader_contract(
+                text=codex_text,
+                shim_label="generated codex native shim",
+            )
             self._assert_native_shim_static_delegation_only_contract(
                 text=copilot_text,
                 delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
                 shim_label="generated copilot native shim",
+            )
+
+    def test_update_normalizes_legacy_codex_native_shim_instructions_key(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+            with tempfile.TemporaryDirectory() as tmp_assets:
+                patched_assets_root = Path(tmp_assets) / "assets"
+                shutil.copytree(source_assets_root, patched_assets_root)
+
+                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_text = codex_shim_path.read_text(encoding="utf-8")
+                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
+                codex_shim_path.write_text(patched_text, encoding="utf-8")
+
+                @contextmanager
+                def _patched_assets_dir():
+                    yield patched_assets_root
+
+                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
+                    self.assertEqual(main(["update", str(target)]), 0)
+
+            generated_codex = (target / ".codex" / "agents" / "spec-dock.toml").read_text(encoding="utf-8")
+            self._assert_codex_native_shim_loader_contract(
+                text=generated_codex,
+                shim_label="generated codex native shim after legacy normalization",
+            )
+
+    def test_init_normalizes_legacy_codex_native_shim_instructions_key(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "repo"
+            target.mkdir(parents=True, exist_ok=True)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+            with tempfile.TemporaryDirectory() as tmp_assets:
+                patched_assets_root = Path(tmp_assets) / "assets"
+                shutil.copytree(source_assets_root, patched_assets_root)
+
+                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_text = codex_shim_path.read_text(encoding="utf-8")
+                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
+                codex_shim_path.write_text(patched_text, encoding="utf-8")
+
+                @contextmanager
+                def _patched_assets_dir():
+                    yield patched_assets_root
+
+                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+            generated_codex = (target / ".codex" / "agents" / "spec-dock.toml").read_text(encoding="utf-8")
+            self._assert_codex_native_shim_loader_contract(
+                text=generated_codex,
+                shim_label="generated codex native shim after init legacy normalization",
+            )
+
+    def test_update_rejects_codex_native_shim_without_instruction_keys(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+            with tempfile.TemporaryDirectory() as tmp_assets:
+                patched_assets_root = Path(tmp_assets) / "assets"
+                shutil.copytree(source_assets_root, patched_assets_root)
+
+                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_text = codex_shim_path.read_text(encoding="utf-8")
+                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                self.assertNotRegex(codex_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+
+                lines = codex_text.splitlines(keepends=True)
+                normalized_lines: list[str] = []
+                skipping_block = False
+                for line in lines:
+                    if not skipping_block and line.lstrip().startswith("developer_instructions"):
+                        skipping_block = True
+                        continue
+                    if skipping_block:
+                        if '"""' in line:
+                            skipping_block = False
+                        continue
+                    normalized_lines.append(line)
+
+                patched_text = "".join(normalized_lines)
+                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+                codex_shim_path.write_text(patched_text, encoding="utf-8")
+
+                @contextmanager
+                def _patched_assets_dir():
+                    yield patched_assets_root
+
+                stderr = io.StringIO()
+                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
+                    with redirect_stderr(stderr):
+                        exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "invalid codex native shim contract for host 'codex' (missing developer_instructions)",
+                stderr.getvalue(),
             )
 
     def test_update_manages_native_shims_with_gate_2_five_subchecks(self) -> None:
