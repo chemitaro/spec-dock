@@ -44,6 +44,7 @@ _DEFAULT_SPEC_DOCK_GITIGNORE = (
     ".work/\n"
     "active/\n"
 )
+_MANAGED_NATIVE_SHIM_PREFIXES = (".codex/agents/", ".github/agents/")
 
 
 @contextmanager
@@ -724,8 +725,13 @@ def _managed_skill_ownership_names() -> tuple[str, ...]:
     return tuple(dict.fromkeys((*_managed_skill_names(), *_LEGACY_MANAGED_SKILL_NAMES)))
 
 
+def _is_within_managed_native_shim_prefixes(path: Path) -> bool:
+    rel_posix = path.as_posix()
+    return any(rel_posix.startswith(prefix) for prefix in _MANAGED_NATIVE_SHIM_PREFIXES)
+
+
 def _install_skill(target_root: Path) -> None:
-    """Install/update managed agent skills into `.agents/skills/`.
+    """Install/update managed agent skills and host-native shims.
 
     Notes:
     - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
@@ -736,6 +742,7 @@ def _install_skill(target_root: Path) -> None:
         host_adapter_meta_src = assets_dir / "codex_skills" / "host-adapters" / "meta.json"
         host_adapter_meta_dest = target_root / ".agents" / "host-adapters" / "meta.json"
         managed_skill_names = _managed_skill_names()
+        native_shim_specs: list[tuple[Path, Path, tuple[Path, ...]]] = []
 
         # 1) Copy/update target managed skills.
         for skill_name in managed_skill_names:
@@ -748,7 +755,90 @@ def _install_skill(target_root: Path) -> None:
 
         if not host_adapter_meta_src.exists():
             raise RuntimeError(f"Missing asset file: {host_adapter_meta_src}")
+
+        manifest = json.loads(host_adapter_meta_src.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise RuntimeError(f"invalid host adapter metadata shape: {host_adapter_meta_src}")
+        targets = manifest.get("targets")
+        if not isinstance(targets, dict):
+            raise RuntimeError(f"invalid host adapter targets: {host_adapter_meta_src}")
+
+        for host_name, host_entry in targets.items():
+            if not isinstance(host_entry, dict):
+                raise RuntimeError(f"invalid host adapter target contract for host '{host_name}'")
+            native_shim = host_entry.get("native_shim")
+            if native_shim is None:
+                continue
+            if not isinstance(native_shim, dict):
+                raise RuntimeError(f"invalid native_shim contract for host '{host_name}'")
+            managed_raw = native_shim.get("managed")
+            if not isinstance(managed_raw, bool):
+                raise RuntimeError(f"invalid native_shim.managed for host '{host_name}'")
+            if not managed_raw:
+                continue
+
+            source_asset = native_shim.get("source_of_truth_asset")
+            if not isinstance(source_asset, str) or not source_asset.strip():
+                raise RuntimeError(f"invalid native_shim.source_of_truth_asset for host '{host_name}'")
+            source_asset_norm = source_asset.strip()
+            source_asset_rel = Path(source_asset_norm)
+            if re.match(r"^[A-Za-z]:", source_asset_norm) or source_asset_norm.startswith(("/", "\\")):
+                raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
+            if source_asset_rel.is_absolute() or ".." in source_asset_rel.parts:
+                raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
+            source_path = assets_dir / source_asset_rel
+            if not source_path.is_file():
+                raise RuntimeError(f"Missing asset file: {source_path}")
+
+            target_file = native_shim.get("target_file")
+            if not isinstance(target_file, str) or not target_file.strip():
+                raise RuntimeError(f"invalid native_shim.target_file for host '{host_name}'")
+            target_norm = target_file.strip()
+            target_rel = Path(target_norm)
+            if re.match(r"^[A-Za-z]:", target_norm) or target_norm.startswith(("/", "\\")):
+                raise RuntimeError(f"invalid native_shim.target_file path for host '{host_name}'")
+            if target_rel.is_absolute() or ".." in target_rel.parts:
+                raise RuntimeError(f"invalid native_shim.target_file path for host '{host_name}'")
+            if not _is_within_managed_native_shim_prefixes(target_rel):
+                raise RuntimeError(f"invalid native_shim.target_file path for host '{host_name}'")
+            target_path = target_root / target_rel
+
+            obsolete_raw = native_shim.get("obsolete_managed_paths", [])
+            if not isinstance(obsolete_raw, list):
+                raise RuntimeError(f"invalid native_shim.obsolete_managed_paths for host '{host_name}'")
+            obsolete_paths: list[Path] = []
+            for obsolete in obsolete_raw:
+                if not isinstance(obsolete, str) or not obsolete.strip():
+                    raise RuntimeError(
+                        f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                    )
+                obsolete_norm = obsolete.strip()
+                obsolete_rel = Path(obsolete_norm)
+                if re.match(r"^[A-Za-z]:", obsolete_norm) or obsolete_norm.startswith(("/", "\\")):
+                    raise RuntimeError(
+                        f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                    )
+                if obsolete_rel.is_absolute() or ".." in obsolete_rel.parts:
+                    raise RuntimeError(
+                        f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                    )
+                normalized_parts = tuple(part for part in obsolete_rel.parts if part not in ("", "."))
+                if not normalized_parts:
+                    raise RuntimeError(
+                        "invalid native_shim.obsolete_managed_paths item (current directory path) "
+                        f"for host '{host_name}'"
+                    )
+                if not _is_within_managed_native_shim_prefixes(obsolete_rel):
+                    raise RuntimeError(
+                        f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                    )
+                obsolete_paths.append(target_root / obsolete_rel)
+
+            native_shim_specs.append((source_path, target_path, tuple(obsolete_paths)))
+
         _copy_file(host_adapter_meta_src, host_adapter_meta_dest)
+        for source_path, target_path, _obsolete_paths in native_shim_specs:
+            _copy_file(source_path, target_path)
 
         # 2) Verify target managed skills were all installed before pruning.
         missing_skills = [
@@ -765,6 +855,11 @@ def _install_skill(target_root: Path) -> None:
                 f"managed host adapter sync incomplete (missing meta.json): {host_adapter_meta_dest}"
             )
 
+        missing_native_shims = [target_path for _src, target_path, _obsolete in native_shim_specs if not target_path.is_file()]
+        if missing_native_shims:
+            joined = ", ".join(sorted(path.as_posix() for path in missing_native_shims))
+            raise RuntimeError(f"managed host native shim sync incomplete (missing target): {joined}")
+
         # 3) Prune obsolete managed skills only; preserve unknown custom dirs.
         managed_ownership = set(_managed_skill_ownership_names())
         target_managed = set(managed_skill_names)
@@ -776,6 +871,22 @@ def _install_skill(target_root: Path) -> None:
             if skill_dir.name in target_managed:
                 continue
             shutil.rmtree(skill_dir, ignore_errors=True)
+
+        # 4) Prune only obsolete managed host-native shim paths from manifest ownership.
+        managed_native_targets = {target_path for _src, target_path, _obsolete in native_shim_specs}
+        obsolete_native_paths = {
+            obsolete_path
+            for _src, _target, obsolete_paths in native_shim_specs
+            for obsolete_path in obsolete_paths
+        }
+        for obsolete_path in obsolete_native_paths:
+            if obsolete_path in managed_native_targets:
+                continue
+            if obsolete_path.is_symlink() or obsolete_path.is_file():
+                obsolete_path.unlink(missing_ok=True)
+                continue
+            if obsolete_path.is_dir():
+                shutil.rmtree(obsolete_path, ignore_errors=True)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
