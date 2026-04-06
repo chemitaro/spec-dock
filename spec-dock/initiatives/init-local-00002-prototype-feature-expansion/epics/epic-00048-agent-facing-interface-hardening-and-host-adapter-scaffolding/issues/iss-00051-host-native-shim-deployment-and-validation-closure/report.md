@@ -297,3 +297,45 @@ rg -n 'active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order'
 
 ## 省略/例外メモ
 - direct host verification はこのセッションでは unavailable だったため、plan に定義した fallback evidence bundle を両 host に適用した。
+
+## 2026-04-07 completion guard wording follow-up
+- scope:
+  - delegated workflow completion gap に対して、skills / workflow docs / manual test docs の wording を補強した
+  - 既存の protocol/state 契約や shim の責務は変更せず、completion contract の明文化に限定した
+- changed source-of-truth files:
+  - `src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md`
+  - `src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md`
+  - `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- mirrored files:
+  - `.agents/skills/spec-dock-codex-adapter/SKILL.md`
+  - `.agents/skills/spec-dock-copilot-adapter/SKILL.md`
+  - `.agents/skills/spec-dock-issue-execution/SKILL.md`
+  - `spec-dock/docs/workflow_issue.md`
+- manual test docs:
+  - `manual-tests/reports/2026-04-06-iss-00051-native-shim-real-manual/plan.md`
+  - `manual-tests/reports/2026-04-06-iss-00051-native-shim-real-manual/checklist.md`
+  - `manual-tests/reports/2026-04-06-iss-00051-native-shim-real-manual/operator-brief.md`
+  - `manual-tests/workspaces/2026-04-06-iss-00051-native-shim-real-manual/trial-gh-current/repo/manual-test-plan.md`
+  - `manual-tests/workspaces/2026-04-06-iss-00051-native-shim-real-manual/trial-gh-current/repo/manual-test-checklist.md`
+  - `manual-tests/workspaces/2026-04-06-iss-00051-native-shim-real-manual/trial-gh-current/repo/operator-brief.md`
+  - `manual-tests/workspaces/2026-04-06-iss-00051-native-shim-real-manual/trial-local/repo/manual-test-plan.md`
+  - `manual-tests/workspaces/2026-04-06-iss-00051-native-shim-real-manual/trial-local/repo/manual-test-checklist.md`
+  - `manual-tests/workspaces/2026-04-06-iss-00051-native-shim-real-manual/trial-local/repo/operator-brief.md`
+- wording outcome:
+  - adapter skills は薄いまま維持しつつ、issue work では active issue が set され、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` が実データで埋まるまで完了扱いにしないと明記した
+  - issue execution skill には docs 4 点未充足時は `blocked` / 未完了、`sync` / `validate` / review の結果または未実施理由を `spec-dock/active/issue/report.md` に残すと明記した
+  - `workflow_issue.md` には issue 完了条件を docs 4 点 + `report.md` 証跡で定義し、未充足時は成功報告禁止と明記した
+  - manual test docs には `completion quality` phase を追加し、docs 4 点テンプレ残存チェックと environment blocker / product gap の分離記録を追加した
+  - `uvx --from . spec-dock ...` をこの suite で使わない理由は、`uv cache` が古い wheel を再利用して legacy `instructions =` を再生成しうえ、current-checkout installer path の portability 問題も隠してしまうため、という 1 文に統一した
+- review outcome:
+  - spec review: `pass`
+  - QA review: `pass`
+  - code review: `pass`
+  - initial review で指摘された manual test path 固定値、operator-brief drift、`active issue is fixed` の曖昧さは follow-up で解消した
+- validation:
+  - provider-side wording と dogfooding mirror の completion guard は一致している
+  - Codex/Copilot adapter wording は `active issue is set` にそろえて host 間 drift を防いだ
+- residual risk:
+  - manual test workspace 資料は archive と trial copy の 2 系統があるため、今後も drift 監視が必要
+  - wording contract の自動回帰テストはまだなく、将来追加の余地がある

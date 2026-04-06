@@ -59,6 +59,10 @@ Issue は実装の最小単位です。
 - 各 step は step result approval を得てから次へ進む
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
+- Issue work の完了条件は、active issue が確定しており、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` がテンプレートのままではなく、必要な `sync` / `validate` / review の結果または未実施理由が `report.md` に記録されていることである。
+- 4 点の issue docs のいずれかがテンプレートのまま、または実質未記入の状態で残る場合は、完了扱いにしない。
+- `sync` / `validate` / review を実施できない場合は、その理由、影響、次のアクションを `report.md` に残す。
+- 完了条件を満たせない状態は `blocked` または `未完了` として扱い、成功報告をしてはならない。
 
 ## report
 
