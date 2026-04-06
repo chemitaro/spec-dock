@@ -239,26 +239,26 @@ rg -n 'active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order'
     - review-artifacts.code-review.2026-04-06
 - extension_closure_pass: true
 
-## 2026-04-06 follow-up fix (`developer_instructions` contract hardening)
-- root-cause:
-  - manual test 実行時に `uvx --from . spec-dock init` を使うと、uv cache の古い wheel が再利用され、`.codex/agents/spec-dock.toml` に legacy key `instructions =` が再生成される経路が確認された。
-  - provider-side source of truth は `developer_instructions =` だったが、実行経路により generated output が drift した。
-- code fix:
-  - installer に Codex native shim contract 正規化を追加し、`instructions =` を検出した場合は `developer_instructions =` へ正規化するようにした。
-  - どちらの key も無い場合は fail-closed で `RuntimeError` を返す。
-- regression tests:
-  - bundled codex shim が `developer_instructions` を持ち、legacy `instructions` を持たないことを検証。
-  - generated codex shim でも同条件を検証。
-  - patched asset で legacy `instructions` を混入させた update 実行でも、generated output が `developer_instructions` へ正規化されることを検証。
-  - patched asset で legacy `instructions` を混入させた init 実行でも、generated output が `developer_instructions` へ正規化されることを検証。
-  - `developer_instructions` と legacy `instructions` の両方を欠落させた update 実行は fail-closed で停止することを検証。
-- manual test side fix:
-  - manual test の setup contract を更新し、canonical prep command を `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init <target> --force` に固定した。
-  - `uvx --from . spec-dock ...` は cache drift のためこの suite では使用禁止にした。
-  - `trial-local/repo` と `trial-gh-current/repo` は上記 canonical command で再初期化し、`.codex/agents/spec-dock.toml` の `developer_instructions` を再確認した。
-- follow-up review outcome:
-  - code review: `pass`
-  - QA review: `pass`（legacy `init` 正規化と fail-closed 欠落キー検査を追加後に gap 解消）
+## 2026-04-06 correction tranche finalization（S04-S06）
+- superseded note:
+  - 直前の「installer が shim 本文を正規化する」方針は撤回し、issue 要件どおり asset-copy contract（source asset bytes を target managed file へ copy/replace）に統一した。
+  - これにより installer は native shim 本文の生成/合成/正規化を持たず、manifest contract validation + copy/replace/prune の責務に限定した。
+- correction scope:
+  - `src/spec_dock/cli.py`:
+    - `init/update` で managed skill/native shim install plan を preflight し、required host contract（`codex`,`copilot`）を fail-closed で厳密検証
+    - canonical `entry_file` / `target_file` / `owner` / `delegates_to` / `managed=true` を検証
+    - `_install_spec_dock` は managed scaffold directory 全件 preflight 後に同期し、later asset 欠落時の partial update を防止
+  - `tests/test_init_update.py`:
+    - native shim の byte-for-byte parity regression
+    - malformed manifest / missing required host / canonical drift / path traversal / windows drive-relative / duplicate target / preflight failure の no-partial-update regression
+    - required host owner/delegates_to/entry_file drift の fail-closed regression
+- execution and validation:
+  - `python -m unittest tests.test_init_update` -> `Ran 105 tests in 10.879s` / `OK`
+  - `./spec-dock/scripts/spec-dock sync` -> `spec-dock: ok (sync)`
+  - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=13`
+- review outcome:
+  - code review: `pass`（blocking findings なし）
+  - QA review: `pass`（blocking findings なし）
   - spec review: `pass`
 
 
@@ -275,6 +275,14 @@ rg -n 'active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order'
   - reviewer: `code_reviewer`
   - result: `pass`
   - note: blocker-level safety/correctness issueなし
+- code-review.2026-04-06-correction:
+  - reviewer: `code_reviewer`
+  - result: `pass`
+  - note: required host exact contract validation と scaffold preflight 強化後の差分で blocker なし
+- qa-review.2026-04-06-correction:
+  - reviewer: `qa_reviewer`
+  - result: `pass`
+  - note: malformed manifest / missing assets / canonical drift / preflight failure の回帰カバレッジで blocker なし
 
 ## レビュー結果
 - spec review:

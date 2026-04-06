@@ -15,6 +15,7 @@ ID: "iss-00051"
 - `spec-dock init/update` 時に Codex / GitHub Copilot の host-native shim を managed 配備できる状態にする。
 - native shim の managed ownership / sync / prune / dogfooding validation を 1 issue の中で完結させる。
 - orchestrator が native shim を entrypoint にしつつ、実際の spec-dock 操作は既存 skill に委譲する契約を実装可能な粒度へ固定する。
+- native shim / host-native agent の配備方式を「コードで内容を組み立てる方式」ではなく、「provider-side assets に置いたファイル正本を installer がコピー配置する方式」へ統一する。
 
 ## 背景・現状
 - 現状の挙動:
@@ -43,16 +44,23 @@ ID: "iss-00051"
   - `.agents/host-adapters/meta.json` を `targets.<host>.native_shim.{managed,owner,target_file,source_of_truth_asset,delegates_to,obsolete_managed_paths}` を含む exact shape へ拡張する。
   - additive-only compatibility として、既存の `targets.codex.entry_file` / `targets.copilot.entry_file` は削除・改名・意味変更せず維持する。
   - provider-side source of truth に native shim asset を追加し、Codex 向け `.codex/agents/spec-dock.toml`、Copilot 向け `.github/agents/spec-dock.agent.md` を managed 配備できるようにする。
+  - Codex / Copilot の host-native agent file は provider-side assets に正本ファイルとして保持し、installer はその内容を target repo へコピー配置すること。
+  - native shim / host-native agent file の内容は installer code path で生成・合成・テンプレート展開しないこと。配置ロジックは path 解決、managed ownership、copy/replace、prune、validation に限定すること。
   - native shim asset の正の最小契約を固定する。
     - Codex TOML は `spec-dock` 識別子、spec-dock 操作委譲を示す説明、`.agents/skills/spec-dock-codex-adapter/SKILL.md` を指す委譲表現を必須にする。
     - Copilot agent markdown は `spec-dock` 識別子、spec-dock 操作委譲を示す説明、`.agents/skills/spec-dock-copilot-adapter/SKILL.md` を指す委譲表現を必須にする。
   - `src/spec_dock/cli.py` の installer sync/prune を拡張し、managed native shim だけを更新/削除し、unknown custom native file は保持する。
+  - install / update / reinstall 時の native shim / host-native agent 配備は、既存 managed skill file と同じ挙動にそろえること。
+    - fresh install では shipped asset を target へコピーする
+    - update / reinstall では managed target file を shipped asset で置換する
+    - unmanaged custom file は保持する
   - `tests/test_init_update.py` を中心に installer regression を追加し、gate-2 sync/prune verification を機械化する。
   - dogfooding workspace と manual validation 証跡を同 issue の closure evidence として残す。
 - MUST NOT:
   - native shim に runtime state payload の再定義や `active.json` / `index.json` / `deps-issues.json` / `index-all.json` / `read-order` の直接記述を持たせない。
   - `.agents/skills/*` を host-native shim へ置き換えない。skill は正本のまま維持する。
   - unknown custom native shim や unknown custom skill を prune しない。
+  - source asset が有効な場合に、installer が native shim / host-native agent file の本文を書き換えない。
 - OUT OF SCOPE:
   - protocol/state 契約そのものの再設計
   - `validate` / `doctor` の新しい責務追加
@@ -77,6 +85,25 @@ ID: "iss-00051"
 ## 前提
 - `iss-00049` / `iss-00050` は done のまま baseline accepted scope として維持される。
 - extension follow-up は `iss-00051` 単体で閉じる。
+- `iss-00051` 自体の native shim 導入作業（provider asset 追加、manifest 拡張、installer sync/prune、gate-2/gate-3/gate-4 baseline closure）は、既に 1 回実施済みである。
+- 今回これから行うのは、その実施済み tranche を取り消してやり直すことではなく、asset-copy install contract へ寄せる追加修正 tranche だけである。
+
+## canonical verification command family
+- correction tranche の正本コマンド系統は current checkout 直実行に固定する。
+- canonical command family:
+  - regression verification phase: `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init ...` / `... update ...`
+  - closure verification phase: `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .` / `... validate .`
+- 上記 2 phase は競合する別経路ではなく、同じ current-checkout verification family の中の用途別 step として扱う。
+
+## 今回の追加修正スコープ
+- 対象:
+  - host-native shim / agent 配備方式を「installer が本文を生成/補正する」扱いではなく、「provider-side asset の正本ファイルを copy/replace する」契約へ明示的に寄せること
+  - correction tranche で使う canonical verification command を current checkout 直実行へ統一すること（対象は init / update regression と closure verification）
+  - 追加修正に必要な regression と report evidence を追記すること
+- 対象外:
+  - 既に完了済みの native shim 導入本体を別方式で再実装すること
+  - `iss-00051` の baseline closure を取り消してゼロからやり直すこと
+  - `iss-00049` / `iss-00050` の accepted scope を変更すること
 
 ## 受け入れ条件
 - AC-001:
@@ -88,23 +115,26 @@ ID: "iss-00051"
     - `spec-dock init <repo>` または `spec-dock update <repo>` を実行する
   - Then:
     - `.codex/agents/spec-dock.toml` と `.github/agents/spec-dock.agent.md` が managed native shim として生成/更新される
+    - generated target file は対応する provider-side source asset の内容と byte-for-byte で一致する
     - `.agents/host-adapters/meta.json` が exact field shape を保持する
   - 観測点:
     - file tree
     - meta.json contents
+    - generated file contents
     - init/update regression tests
 - AC-002:
   - Actor:
     - installer
   - Given:
-    - `uvx --from . spec-dock init /tmp/spec-dock-native-shim-smoke` 済みの temp repo がある
+    - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init /tmp/spec-dock-native-shim-smoke --force` 済みの temp repo がある
     - obsolete managed native shim fixture として `/tmp/spec-dock-native-shim-smoke/.codex/agents/spec-dock-codex-adapter.toml` と `/tmp/spec-dock-native-shim-smoke/.github/agents/spec-dock-copilot-adapter.agent.md` を配置している
     - unknown custom native shim fixture として `/tmp/spec-dock-native-shim-smoke/.codex/agents/custom-reviewer.toml` と `/tmp/spec-dock-native-shim-smoke/.github/agents/custom-reviewer.agent.md` を配置している
   - When:
-    - `uvx --from . spec-dock update /tmp/spec-dock-native-shim-smoke` を実行する
+    - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update /tmp/spec-dock-native-shim-smoke` を実行する
   - Then:
     - obsolete managed native shim は prune される
     - unknown custom native shim と unknown custom skill は保持される
+    - managed native shim target は provider-side source asset で置換される
     - baseline skill / metadata は壊れず、`targets.codex.entry_file` / `targets.copilot.entry_file` は既存 contract のまま維持される
     - `gate_2_sync_prune_pass` は次の 5 subcheck が全て `true` のときのみ `true`
       - `managed_codex_shim_generated_or_updated.pass`
@@ -173,12 +203,28 @@ ID: "iss-00051"
     - final review を行う
   - Then:
     - report は `baseline_inherited_closure` と `extension_closure` を top-level に持つ fixed closure schema を維持する
+    - `baseline_inherited_closure.accepted_issues` と `baseline_inherited_closure.baseline_inherited_closure_pass` を必須で保持する
     - `extension_closure` には `follow_up_issue_id`, `follow_up_issue_ref`, `follow_up_issue_discussion_ref`, `follow_up_issue_status`, `gate_2_sync_prune_pass`, `gate_2_sync_prune_evidence`, `gate_3_manual_validation`, `gate_4_review_pass`, `gate_4_review_evidence`, `extension_closure_pass` を保持する
     - `gate_4_review_pass=true`
     - `extension_closure_pass=true`
   - 観測点:
     - `gate_4_review_evidence.*`
     - final diff review record
+- AC-005:
+  - Actor:
+    - installer / reviewer
+  - Given:
+    - `iss-00051` の baseline native shim 導入は完了済みである
+    - 今回の追加修正 tranche では asset-copy install contract を issue docs / code / tests に反映する
+  - When:
+    - current checkout installer を使って init/update regression と docs review を実行する
+  - Then:
+    - 既存の完了済み step は履歴として保持される
+    - 今回の実装対象は asset-copy contract へ寄せる追加修正だけである
+    - `plan.md` 上でも追加修正 step が独立して定義され、既存の実施済み step と混在しない
+  - 観測点:
+    - requirement / design / plan の tranche 記述
+    - additional correction step の review evidence
 
 ## 例外・エッジケース
 - EC-001:
@@ -215,6 +261,9 @@ ID: "iss-00051"
 - TERM-002:
   - managed native shim:
     - manifest に列挙され、installer sync/prune の対象になる shim。
+- TERM-004:
+  - asset-copy deployment:
+    - provider-side assets に置いた正本ファイルを installer が target へコピー / 置換する配備方式。installer は本文生成を持たない。
 - TERM-003:
   - required host set:
     - `codex` と `copilot` の両方。fallback は各 host の証跡種別を代替するが host 要件を減らさない。

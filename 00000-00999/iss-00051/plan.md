@@ -18,6 +18,7 @@ ID: "iss-00051"
   - AC-002
   - AC-003
   - AC-004
+  - AC-005
 - EC:
   - EC-001
   - EC-002
@@ -30,74 +31,88 @@ ID: "iss-00051"
 ## マイルストーン一覧
 - M1:
   - 対象:
-    - provider asset / manifest / installer sync-prune の実装と regression test
+    - baseline native shim 導入 tranche（完了済み履歴）
   - exit:
-    - gate-2 を機械検証できる状態
+    - S01-S03 が issue の履歴として保持される
 - M2:
   - 対象:
-    - dogfooding mirror / manual validation / final closure
+    - correction tranche の contract 追加と regression 更新
   - exit:
-    - gate-3 / gate-4 / extension_closure を同 issue で閉じる
+    - gate-2 を asset-copy contract で再検証できる状態
+- M3:
+  - 対象:
+    - correction tranche の dogfooding / review / closure
+  - exit:
+    - gate-3 / gate-4 / extension_closure を追加修正込みで閉じる
 
 ## 実装順序の根拠
 - 依存関係の正本:
   - `design.md` の `依存関係分析` と module/dependency UML を参照する
 - sequencing rule:
-  - manifest / asset / test contract を先に固定しないと installer 実装も manual validation schema もぶれる
-  - installer sync/prune が固まってから dogfooding/manual validation を回す
+  - baseline tranche は履歴として保持し、今回の correction tranche はその後ろに追加する
+  - correction tranche では asset-copy contract を先に固定し、その後に current-checkout regression verification、最後に current-checkout closure verification を更新する
 - step ordering notes:
-  - S01 が manifest shape と asset path を固定
-  - S02 が installer sync/prune と regression test を閉じる
-  - S03 が dogfooding/manual validation / final review evidence を閉じる
+  - baseline tranche（完了済み）: S01-S03
+  - correction tranche（今回の実装対象）: S04-S06
 
 ## ステップ一覧
-- S01:
-  - 観測可能な振る舞い:
-    - provider assets と manifest shape が issue contract と一致する
-  - closes:
-    - AC-001 の前半
-  - review gate:
-    - spec/design alignment
-- S02:
-  - 観測可能な振る舞い:
-    - init/update で native shim が生成/更新され、obsolete managed file だけが prune される
-  - closes:
-    - AC-001
-    - AC-002
-    - EC-002
-  - review gate:
-    - implementation review + regression tests
-- S03:
-  - 観測可能な振る舞い:
-    - dogfooding workspace と manual validation evidence が両 host 分そろい、fixed closure schema で final closure を判定できる
-  - closes:
-    - AC-003
-    - AC-004
-    - EC-001
-    - EC-003
-  - review gate:
-    - QA review + final spec review
+- baseline tranche（実施済み・read-only history）:
+  - S01:
+    - provider assets と manifest shape の baseline 固定
+  - S02:
+    - native shim 導入本体、installer sync/prune、baseline regression
+  - S03:
+    - dogfooding/manual validation / final closure の baseline evidence
+- correction tranche（今回の実装対象）:
+  - S04:
+    - 観測可能な振る舞い:
+      - asset-copy install contract が issue docs / design / test contract に独立 step として追加される
+    - closes:
+      - AC-005 の docs/tranche separation
+    - review gate:
+      - spec/design alignment
+  - S05:
+    - 観測可能な振る舞い:
+      - init/update が provider-side asset の copy/replace を正本として扱い、asset-copy parity regression が pass する
+    - closes:
+      - AC-001
+      - AC-002
+      - EC-002
+      - AC-005 の code/test correction
+    - review gate:
+      - implementation review + regression tests
+  - S06:
+    - 観測可能な振る舞い:
+      - dogfooding workspace と manual validation / final review evidence が correction tranche を含めて更新される
+    - closes:
+      - AC-003
+      - AC-004
+      - EC-001
+      - EC-003
+    - review gate:
+      - QA review + final spec review
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01, S02
-- AC-002 -> S02
-- AC-003 -> S03
-- AC-004 -> S03
-- EC-001 -> S03
-- EC-002 -> S02
-- EC-003 -> S03
+- AC-001 -> S05
+- AC-002 -> S05
+- AC-003 -> S06
+- AC-004 -> S06
+- AC-005 -> S04, S05, S06
+- EC-001 -> S06
+- EC-002 -> S05
+- EC-003 -> S06
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
   - timing:
-    - S02 実装後
+    - S05 実装後
   - scope:
     - manifest shape / installer sync-prune / tests
   - commit gate:
     - pass まで review loop を回し、pass 後に `report.md` を更新して差分確認後にコミットする
 - QG1 QA review:
   - timing:
-    - S03 manual validation evidence 収集後
+    - S06 manual validation evidence 収集後
   - scope:
     - gate-2 / gate-3 / gate-4 evidence
   - commit gate:
@@ -105,7 +120,7 @@ ID: "iss-00051"
 - SG1 spec review:
   - timing:
     - 実装着手前と final closure 前
-- scope:
+  - scope:
     - requirement / design / plan と fixed closure schema
   - commit gate:
     - pass まで review loop を回し、pass 後に `report.md` を更新してドキュメントだけをコミットする
@@ -123,28 +138,34 @@ ID: "iss-00051"
 
 ## 実装ステップ
 
-### S01 — native shim contract fixed point
+### baseline tranche（履歴保持・再実行しない）
+- S01-S03 は `iss-00051` の baseline native shim 導入で既に実施済み。
+- 今回の作業ではこれらを編集対象の step として再実行せず、証跡付きの履歴として保持する。
+
+### correction tranche（今回の追加修正 step）
+
+### S04 — asset-copy contract docs alignment
 - target:
-  - provider-side native shim assets の配置先
-  - manifest exact fields
-  - gate-2 / gate-3 / gate-4 evidence shape
+  - issue requirement / design / plan
+  - asset-copy install contract の追加定義
 - design refs:
-  - `design.md` の `インターフェース契約`
-  - `design.md` の `変更計画`
+  - `design.md` の `baseline tranche と correction tranche の境界`
+  - `design.md` の `今回の追加修正で変えるもの / 変えないもの`
 - step boundary:
-  - ここではコード本体より先に asset path / manifest shape / test fixture contract を固定する
+  - baseline tranche を残したまま、今回の修正対象が correction tranche のみであることを docs 上で固定する
 
 #### Red
 - failing test:
-  - manifest shape と provider asset path が存在しない/一致しないテストを追加する
+  - requirement / design / plan で baseline tranche と correction tranche が混在していることをレビューで検出する
 - expected failure:
-  - native shim asset 未存在または meta shape 不足で失敗する
+  - 追加修正 step が独立して定義されていないため spec review が fail する
 
 #### Green
 - minimum implementation:
-  - provider asset 配置先と manifest shape を追加する
+  - baseline tranche を履歴として保持し、追加修正 step を独立して追記する
+  - asset-copy install contract と current checkout 直実行の verification 手順を correction tranche に閉じる
 - pass condition:
-  - S02 で installer 実装に進める前提ファイルが揃う
+  - spec reviewer が correction tranche の独立性を確認できる
 
 #### Refactor
 - 目的:
@@ -156,28 +177,29 @@ ID: "iss-00051"
 
 #### step gate
 - review:
-  - manifest shape / asset path / issue docs 整合
+  - spec review
 - expected tests:
-  - targeted installer fixture tests
+  - issue docs consistency check
 - report update:
-  - reviewer verdict / test結果 / 修正内容を `spec-dock/active/issue/report.md` に残す
+  - reviewer verdict / 追加修正 step の定義内容を `spec-dock/active/issue/report.md` に残す
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
-### S02 — installer sync/prune and regression closure
+### S05 — asset-copy installer correction and regression
 - target:
   - `src/spec_dock/cli.py`
   - `tests/test_init_update.py`
   - related provider assets
 - design refs:
+  - `design.md` の `インターフェース契約`
   - `design.md` の `変更計画`
   - `design.md` の `テスト戦略`
 - step boundary:
-  - gate-2 sync/prune verification を通せる実装まで
+  - baseline native shim 導入本体は触らず、asset-copy parity と installer correction を追加修正として通せる実装まで
 
 #### Red
 - failing test:
-  - `uvx --from . spec-dock init /tmp/spec-dock-native-shim-smoke`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init /tmp/spec-dock-native-shim-smoke --force`
   - obsolete managed fixture:
     - `/tmp/spec-dock-native-shim-smoke/.codex/agents/spec-dock-codex-adapter.toml`
     - `/tmp/spec-dock-native-shim-smoke/.github/agents/spec-dock-copilot-adapter.agent.md`
@@ -202,14 +224,17 @@ ID: "iss-00051"
     - `obsolete_managed_fixture_pruned`
     - `unknown_custom_fixture_preserved`
     - `baseline_skill_and_metadata_untouched`
+  - generated target file と provider-side asset file の byte-for-byte parity check
 - expected failure:
-  - 現状は native shim 未配備 / prune policy 不足で失敗する
+  - 現状は asset-copy parity 未固定または verification command 不統一で失敗する
 
 #### Green
 - minimum implementation:
-  - manifest を読んで native shim を copy/update/prune する installer 拡張
+  - native shim / host-native agent 本文の生成・合成・テンプレート展開を持たず、source asset file を target managed file へ copy/replace する installer correction を実装する
+  - current checkout installer 直実行を canonical verification command として tests / docs / report に反映する
 - pass condition:
   - `gate_2_sync_prune_pass` の 5 subchecks を exact fixture/path/command sequence で tests と手順の両方から再現できる
+  - generated target file が対応する source asset file と byte-for-byte で一致する
 
 #### Refactor
 - 目的:
@@ -230,10 +255,11 @@ ID: "iss-00051"
   - `gate_2_sync_prune_evidence.managed_codex_shim_generated_or_updated`, `managed_copilot_shim_generated_or_updated`, `obsolete_managed_fixture_pruned`, `unknown_custom_fixture_preserved`, `baseline_skill_and_metadata_untouched` を `expected/observed/pass` で固定記録する
   - `unknown_custom_fixture_preserved` は unknown custom native shim と unknown custom skill の両方が update 後も残る場合のみ `pass=true`
   - `baseline_skill_and_metadata_untouched` は `.agents/skills/spec-dock-codex-adapter/SKILL.md` / `.agents/skills/spec-dock-copilot-adapter/SKILL.md` が残り、`targets.codex.entry_file=.agents/skills/spec-dock-codex-adapter/SKILL.md` と `targets.copilot.entry_file=.agents/skills/spec-dock-copilot-adapter/SKILL.md` が維持される場合のみ `pass=true`
+  - generated target file と provider-side asset file の parity 結果を記録し、本文生成ロジックを持たないことを確認する
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
-### S03 — dogfooding/manual validation and closure
+### S06 — correction validation and closure
 - target:
   - dogfooding workspace
   - manual validation evidence
@@ -242,67 +268,25 @@ ID: "iss-00051"
   - `design.md` の `テスト戦略`
   - `design.md` の `要件 / 例外 -> verification mapping`
 - step boundary:
-  - required host set の両 host を含む gate-3 と gate-4 を閉じる
+  - correction tranche に対応する required host set の両 host evidence と final review を追加で閉じる
 
 #### Red
 - failing test:
-  - evidence 欠落により closure 判定できない状態を明示する
+  - correction tranche の evidence 欠落により closure 判定できない状態を明示する
 - expected failure:
   - report fixed keys が埋まらない / one-host-only では closure できない
 
 #### Green
 - minimum implementation:
-  - `spec-dock update .`
-  - `spec-dock validate`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli validate .`
   - Codex canonical action:
     - `.codex/agents/spec-dock.toml` を選択し、`Summarize the active spec-dock target and the next workflow doc to read before editing.` を実行する
   - Copilot canonical action:
     - `.github/agents/spec-dock.agent.md` を選択し、同じ task 文面を実行する
-  - Codex / Copilot それぞれについて以下を host-scoped に記録する
-    - `selection_evidence_format`
-    - `selection_signal_expected_any`
-    - `selection_signal_observed`
-    - `selection_signal_pass`
-    - `response_target_expected`
-    - `response_target_observed`
-    - `response_target_pass`
-    - `next_doc_expected_any`
-    - `next_doc_observed`
-    - `next_doc_pass`
-    - `delegation_evidence_expected`
-    - `delegation_evidence_observed`
-    - `delegation_evidence_pass`
-    - `non_reimplementation_evidence_expected`
-    - `non_reimplementation_evidence_observed`
-    - `non_reimplementation_evidence_pass`
-    - `direct_protocol_read_expected`
-    - `direct_protocol_read_observed`
-    - `direct_protocol_read_pass`
-    - `fallback_evidence_required`
-    - `fallback_evidence_observed`
-    - `fallback_evidence_pass`
-  - static check は host-scoped に実行する
-    - Codex: `.codex/agents/spec-dock.toml` のみ
-    - Copilot: `.github/agents/spec-dock.agent.md` のみ
-  - `non_reimplementation_evidence_observed` には host ごとに次の 2 コマンドの no-match を固定記録する
-    - `rg -n '"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:|^\s*(schema_version|projection|nodes|issues|deps|source|updated_at)\s*=' <host shim>`
-    - `rg -n "\.agent/.*\.json|context-pack\.md" <host shim>`
-  - fixed expected values は事前に次で固定する
-    - Codex `selection_signal_expected_any=["spec-dock.toml", ".codex/agents/spec-dock.toml"]`
-    - Copilot `selection_signal_expected_any=["spec-dock.agent.md", ".github/agents/spec-dock.agent.md"]`
-    - shared `response_target_expected=active target summary or active-none stop`
-    - shared `next_doc_expected_any=["spec-dock/active/issue/requirement.md", "spec-dock/active/epic/requirement.md", "spec-dock/active/initiative/requirement.md", "spec-dock/system/active-none/requirement.md"]`
-    - Codex `delegation_evidence_expected=.agents/skills/spec-dock-codex-adapter/SKILL.md`
-    - Copilot `delegation_evidence_expected=.agents/skills/spec-dock-copilot-adapter/SKILL.md`
-  - gate-3 / gate-4 fixed keys と `baseline_inherited_closure` / `extension_closure` を report に記録
-  - direct host verification が unavailable な host では `fallback_evidence_required=true` を固定し、host ごとに次の bundle がそろった場合のみ `fallback_evidence_pass=true` と判定する
-    - managed shim file snapshot
-    - matching delegated skill file snapshot
-    - `delegation_evidence_expected` を満たす static delegation check
-    - `non_reimplementation_evidence_expected` を満たす host-scoped static check
-    - `direct_protocol_read_expected` を満たす host-scoped static check
-    - dated `transcript_fragment` または `ui_screenshot` または `cli_log`
-  - fallback host でも required host set は減らさず、`codex` / `copilot` の各 host block を別々に埋める
+  - Codex / Copilot それぞれについて gate-3 fixed keys を host-scoped に記録する
+  - gate-3 / gate-4 fixed keys と `baseline_inherited_closure` / `extension_closure` を report に記録する
+  - direct host verification が unavailable な host では `fallback_evidence_required=true` を固定し、artifact snapshot・static delegation check・non-reimplementation static check・dated transcript/ui screenshot/cli log の bundle で host block を閉じる
 - pass condition:
   - `extension_closure_pass=true`
 
@@ -318,13 +302,15 @@ ID: "iss-00051"
 - review:
   - QA review / final spec review
 - expected tests:
-  - `spec-dock update .`
-  - `spec-dock validate`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli validate .`
   - manual validation evidence
 - report update:
   - reviewer verdict / test結果 / evidence / closing judgment を `spec-dock/active/issue/report.md` に残す
-  - `report.md` には少なくとも `baseline_inherited_closure`、`extension_closure`、`follow_up_issue_*`、両 host の gate-3 fixed keys、`gate_4_review_evidence.*` を固定キーで残す
-  - `selection_signal_pass` / `response_target_pass` / `next_doc_pass` / `delegation_evidence_pass` / `non_reimplementation_evidence_pass` / `direct_protocol_read_pass` / `fallback_evidence_pass` を host ごとに判定し、required host set=`codex,copilot` の両方が満たされたときのみ closure 判定へ進む
+  - `report.md` には `baseline_inherited_closure.accepted_issues`、`baseline_inherited_closure.baseline_inherited_closure_pass`、`extension_closure.follow_up_issue_id`、`extension_closure.follow_up_issue_ref`、`extension_closure.follow_up_issue_discussion_ref`、`extension_closure.follow_up_issue_status`、`extension_closure.gate_2_sync_prune_pass`、`extension_closure.gate_2_sync_prune_evidence`、`extension_closure.gate_3_manual_validation`、`extension_closure.gate_4_review_pass`、`extension_closure.gate_4_review_evidence`、`extension_closure.extension_closure_pass` を固定キーで残す
+  - `extension_closure.gate_3_manual_validation.codex` と `...copilot` には `selection_evidence_format`、`selection_signal_expected_any`、`selection_signal_observed`、`selection_signal_pass`、`response_target_expected`、`response_target_observed`、`response_target_pass`、`next_doc_expected_any`、`next_doc_observed`、`next_doc_pass`、`delegation_evidence_expected`、`delegation_evidence_observed`、`delegation_evidence_pass`、`non_reimplementation_evidence_expected`、`non_reimplementation_evidence_observed`、`non_reimplementation_evidence_pass`、`direct_protocol_read_expected`、`direct_protocol_read_observed`、`direct_protocol_read_pass`、`fallback_evidence_required`、`fallback_evidence_observed`、`fallback_evidence_pass` を host ごとに固定キーで残す
+  - `extension_closure.gate_4_review_evidence` には `additive_only_scope_preserved_expected/observed/pass`、`single_follow_up_issue_rule_expected/observed/pass`、`native_manifest_shape_expected/observed/pass`、`report_schema_compliance_expected/observed/pass`、`discussion_schema_compliance_expected/observed/pass`、`host_native_scope_consistency_expected/observed/pass`、`final_review_ref` を固定キーで残す
+  - 上記 closure schema がそろった上で、`selection_signal_pass` / `response_target_pass` / `next_doc_pass` / `delegation_evidence_pass` / `non_reimplementation_evidence_pass` / `direct_protocol_read_pass` / `fallback_evidence_pass` を host ごとに判定し、required host set=`codex,copilot` の両方が満たされたときのみ closure 判定へ進む
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
@@ -336,11 +322,11 @@ ID: "iss-00051"
 
 ### S99 — final diff review quality gate
 - branch diff scope:
-  - `iss-00051...HEAD`
+  - `iss-00051...HEAD`（correction tranche の追加差分）
 - required validation:
   - relevant installer tests
-  - `spec-dock update .`
-  - `spec-dock validate`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli validate .`
   - gate-2 / gate-3 / gate-4 evidence complete
 - reviewer approvals:
   - code review
@@ -356,7 +342,7 @@ ID: "iss-00051"
 
 ## final exit contract
 - AC/EC 達成:
-  - AC-001..004 / EC-001..003 が gate evidence で閉じている
+  - AC-001..005 / EC-001..003 が gate evidence で閉じている
 - docs impact resolved:
   - provider / dogfooding / report が同期している
 - final diff approved:
