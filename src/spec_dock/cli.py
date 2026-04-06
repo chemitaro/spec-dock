@@ -730,6 +730,37 @@ def _is_within_managed_native_shim_prefixes(path: Path) -> bool:
     return any(rel_posix.startswith(prefix) for prefix in _MANAGED_NATIVE_SHIM_PREFIXES)
 
 
+def _normalize_codex_native_shim_contract(*, text: str, source_path: Path, host_name: str) -> str:
+    """Ensure Codex native shim TOML uses `developer_instructions` contract.
+
+    Legacy shim files may still contain `instructions =`.
+    We normalize that key to `developer_instructions =` to keep generated output
+    compatible with the Codex native agent loader contract.
+    """
+
+    if host_name != "codex":
+        return text
+
+    has_developer_key = bool(re.search(r"(?m)^\s*developer_instructions\s*=", text))
+    has_legacy_key = bool(re.search(r"(?m)^\s*instructions\s*=", text))
+
+    if has_developer_key:
+        return text
+
+    if has_legacy_key:
+        return re.sub(
+            r"(?m)^(\s*)instructions\s*=",
+            r"\1developer_instructions =",
+            text,
+            count=1,
+        )
+
+    raise RuntimeError(
+        "invalid codex native shim contract for host 'codex' "
+        f"(missing developer_instructions): {source_path}"
+    )
+
+
 def _install_skill(target_root: Path) -> None:
     """Install/update managed agent skills and host-native shims.
 
@@ -742,7 +773,7 @@ def _install_skill(target_root: Path) -> None:
         host_adapter_meta_src = assets_dir / "codex_skills" / "host-adapters" / "meta.json"
         host_adapter_meta_dest = target_root / ".agents" / "host-adapters" / "meta.json"
         managed_skill_names = _managed_skill_names()
-        native_shim_specs: list[tuple[Path, Path, tuple[Path, ...]]] = []
+        native_shim_specs: list[tuple[str, Path, Path, tuple[Path, ...]]] = []
 
         # 1) Copy/update target managed skills.
         for skill_name in managed_skill_names:
@@ -834,11 +865,21 @@ def _install_skill(target_root: Path) -> None:
                     )
                 obsolete_paths.append(target_root / obsolete_rel)
 
-            native_shim_specs.append((source_path, target_path, tuple(obsolete_paths)))
+            native_shim_specs.append((host_name, source_path, target_path, tuple(obsolete_paths)))
 
         _copy_file(host_adapter_meta_src, host_adapter_meta_dest)
-        for source_path, target_path, _obsolete_paths in native_shim_specs:
+        for host_name, source_path, target_path, _obsolete_paths in native_shim_specs:
             _copy_file(source_path, target_path)
+
+            if host_name == "codex":
+                current_text = target_path.read_text(encoding="utf-8")
+                normalized_text = _normalize_codex_native_shim_contract(
+                    text=current_text,
+                    source_path=source_path,
+                    host_name=host_name,
+                )
+                if normalized_text != current_text:
+                    target_path.write_text(normalized_text, encoding="utf-8")
 
         # 2) Verify target managed skills were all installed before pruning.
         missing_skills = [
@@ -855,7 +896,11 @@ def _install_skill(target_root: Path) -> None:
                 f"managed host adapter sync incomplete (missing meta.json): {host_adapter_meta_dest}"
             )
 
-        missing_native_shims = [target_path for _src, target_path, _obsolete in native_shim_specs if not target_path.is_file()]
+        missing_native_shims = [
+            target_path
+            for _host, _src, target_path, _obsolete in native_shim_specs
+            if not target_path.is_file()
+        ]
         if missing_native_shims:
             joined = ", ".join(sorted(path.as_posix() for path in missing_native_shims))
             raise RuntimeError(f"managed host native shim sync incomplete (missing target): {joined}")
@@ -873,10 +918,12 @@ def _install_skill(target_root: Path) -> None:
             shutil.rmtree(skill_dir, ignore_errors=True)
 
         # 4) Prune only obsolete managed host-native shim paths from manifest ownership.
-        managed_native_targets = {target_path for _src, target_path, _obsolete in native_shim_specs}
+        managed_native_targets = {
+            target_path for _host, _src, target_path, _obsolete in native_shim_specs
+        }
         obsolete_native_paths = {
             obsolete_path
-            for _src, _target, obsolete_paths in native_shim_specs
+            for _host, _src, _target, obsolete_paths in native_shim_specs
             for obsolete_path in obsolete_paths
         }
         for obsolete_path in obsolete_native_paths:

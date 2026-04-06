@@ -239,6 +239,28 @@ rg -n 'active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order'
     - review-artifacts.code-review.2026-04-06
 - extension_closure_pass: true
 
+## 2026-04-06 follow-up fix (`developer_instructions` contract hardening)
+- root-cause:
+  - manual test 実行時に `uvx --from . spec-dock init` を使うと、uv cache の古い wheel が再利用され、`.codex/agents/spec-dock.toml` に legacy key `instructions =` が再生成される経路が確認された。
+  - provider-side source of truth は `developer_instructions =` だったが、実行経路により generated output が drift した。
+- code fix:
+  - installer に Codex native shim contract 正規化を追加し、`instructions =` を検出した場合は `developer_instructions =` へ正規化するようにした。
+  - どちらの key も無い場合は fail-closed で `RuntimeError` を返す。
+- regression tests:
+  - bundled codex shim が `developer_instructions` を持ち、legacy `instructions` を持たないことを検証。
+  - generated codex shim でも同条件を検証。
+  - patched asset で legacy `instructions` を混入させた update 実行でも、generated output が `developer_instructions` へ正規化されることを検証。
+  - patched asset で legacy `instructions` を混入させた init 実行でも、generated output が `developer_instructions` へ正規化されることを検証。
+  - `developer_instructions` と legacy `instructions` の両方を欠落させた update 実行は fail-closed で停止することを検証。
+- manual test side fix:
+  - manual test の setup contract を更新し、canonical prep command を `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init <target> --force` に固定した。
+  - `uvx --from . spec-dock ...` は cache drift のためこの suite では使用禁止にした。
+  - `trial-local/repo` と `trial-gh-current/repo` は上記 canonical command で再初期化し、`.codex/agents/spec-dock.toml` の `developer_instructions` を再確認した。
+- follow-up review outcome:
+  - code review: `pass`
+  - QA review: `pass`（legacy `init` 正規化と fail-closed 欠落キー検査を追加後に gap 解消）
+  - spec review: `pass`
+
 
 ## review-artifacts
 - spec-review.2026-04-06:
