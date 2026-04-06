@@ -38,10 +38,11 @@ ID: "iss-00051"
   - meta.json は `entry_file` のみを持ち、native shim ownership を表せない。
 - 採用するパターン:
   - single manifest ownership
-  - provider asset -> installer sync -> dogfooding parity -> manual validation の一方向フロー
+  - provider asset -> installer copy/replace -> dogfooding parity -> manual validation の一方向フロー
 - 採用しないもの:
   - native shim に protocol read-order を埋め込む方式
   - host-native validation を別 issue に切り出す方式
+  - installer が native shim / host-native agent の本文を組み立てたりテンプレート展開したりする方式
 - 影響範囲:
   - `src/spec_dock/assets/codex_skills/`
   - `src/spec_dock/cli.py`
@@ -58,6 +59,7 @@ ID: "iss-00051"
   - B: `.agents/host-adapters/meta.json` を単一 manifest に拡張する
 - 決定:
   - B を採用する。skill と native shim の関係・ownership・obsolete path を同じ manifest に固定する方が sync/prune と review を一意にできる。
+  - 併せて、native shim / host-native agent の本文は provider-side assets を正本にし、installer は shared managed-file copy path で target へ配置する。本文修正が必要なら source asset を直し、installer 側で本文生成ロジックを増やさない。
 
 ## 依存関係分析
 - upstream / prerequisite:
@@ -69,11 +71,20 @@ ID: "iss-00051"
   - manual validation evidence
   - final issue closure
 - 実装起点:
-  - まず manifest shape と provider asset path を固定し、次に installer sync/prune、最後に dogfooding/manual validation を閉じる。
+  - baseline native shim 導入 tranche は完了済みとして保持し、その上に asset-copy contract correction tranche を追加する。
 - sequencing implications:
-  - S01: asset/manifest/test contract
-  - S02: installer sync/prune 実装
-  - S03: dogfooding/manual validation / docs closure
+  - baseline tranche (完了済み・再実行しない): S01-S03
+  - correction tranche (今回の実装対象): S04-S06
+
+## baseline tranche と correction tranche の境界
+- baseline tranche:
+  - `iss-00051` の native shim 導入本体。provider asset 追加、manifest 拡張、installer sync/prune、gate-2/gate-3/gate-4 baseline closure までを含む。
+  - 履歴として保持し、今回の追加修正では取り消さない。
+- correction tranche:
+  - native shim / host-native agent 配備方式を asset-copy contract として明示し、検証手順と regression をその契約にそろえる追加修正。
+  - baseline 実装をゼロから再実装するのではなく、installer と docs/test contract を追加で補正する。
+- design rule:
+  - 今回の実装対象は correction tranche のみとし、baseline tranche の完了済み step は read-only history として扱う。
 
 ### UML（必須: module / dependency）
 ```plantuml
@@ -82,7 +93,7 @@ top to bottom direction
 
 rectangle "epic extension contract\n(issue docs)" as contract
 rectangle "provider assets\nsrc/spec_dock/assets/codex_skills" as assets
-rectangle "installer sync/prune\nsrc/spec_dock/cli.py" as cli
+rectangle "installer copy/replace/prune\nsrc/spec_dock/cli.py" as cli
 rectangle "manifest\n.agents/host-adapters/meta.json" as manifest
 rectangle "native shim targets\n.codex/agents/*.toml\n.github/agents/*.agent.md" as shims
 rectangle "delegated skills\n.agents/skills/*" as skills
@@ -91,9 +102,9 @@ rectangle "dogfooding/manual validation\nspec-dock/ + report evidence" as valida
 
 contract --> assets : fixes source_of_truth_asset
 contract --> manifest : fixes exact fields
-assets --> cli : copied by update/init
+assets --> cli : copied as-is by update/init
 manifest --> cli : drives sync/prune
-cli --> shims : generate/update/prune
+cli --> shims : copy/replace/prune
 shims --> skills : delegate_to
 cli --> tests : regression target
 shims --> validation : selection target
@@ -101,6 +112,16 @@ skills --> validation : delegated behavior evidence
 tests --> validation : gate-2 baseline
 @enduml
 ```
+
+## canonical current-checkout verification path
+- canonical command family は current checkout 直実行に固定する。
+- regression verification phase:
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init <temp-repo> --force`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update <temp-repo>`
+- closure verification phase:
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .`
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli validate .`
+- 2 phase はどちらも correction tranche の正本 verification path であり、wrapper 経路や `uvx --from . spec-dock ...` を canonical path にしない。
 
 ## インターフェース契約
 - manifest:
@@ -128,6 +149,10 @@ tests --> validation : gate-2 baseline
 - provider assets:
   - `codex_skills/native-shims/spec-dock.toml`
   - `codex_skills/native-shims/spec-dock.agent.md`
+  - deployment rule:
+    - installer は provider-side asset file を target へそのままコピーする
+    - managed reinstall/update では target managed file を source asset で置換する
+    - source asset が契約違反なら fail-closed し、target 側で本文を書き換えて補正しない
   - canonical content minima:
     - Codex TOML は `spec-dock` 識別子、委譲説明、`.agents/skills/spec-dock-codex-adapter/SKILL.md` を指す委譲表現を持つ
     - Copilot agent markdown は `spec-dock` 識別子、委譲説明、`.agents/skills/spec-dock-copilot-adapter/SKILL.md` を指す委譲表現を持つ
@@ -135,6 +160,7 @@ tests --> validation : gate-2 baseline
   - Codex: `.codex/agents/spec-dock.toml`
   - Copilot: `.github/agents/spec-dock.agent.md`
 - native shim rules:
+  - asset-copy only
   - delegate to skill only
   - no structured state-payload key inline (`"schema_version"|"projection"|"nodes"|"issues"|"deps"|"source"|"updated_at"` or `schema_version|projection|nodes|issues|deps|source|updated_at` with `:` / `=`)
   - no `.agent/*.json` / `context-pack.md` inline reference
@@ -154,11 +180,15 @@ tests --> validation : gate-2 baseline
 - top-level report shape:
   - `baseline_inherited_closure`
   - `extension_closure`
+- baseline_inherited_closure required keys:
+  - `accepted_issues`
+  - `baseline_inherited_closure_pass`
 - extension identity:
   - `follow_up_issue_id`
   - `follow_up_issue_ref`
   - `follow_up_issue_discussion_ref`
   - `follow_up_issue_status`
+  - `extension_closure_pass`
 - gate-2 required keys:
   - `gate_2_sync_prune_pass`
   - `gate_2_sync_prune_evidence.managed_codex_shim_generated_or_updated.expected/observed/pass`
@@ -198,20 +228,30 @@ tests --> validation : gate-2 baseline
   - `host_native_scope_consistency_expected/observed/pass`
   - `final_review_ref`
 
+## 今回の追加修正で変えるもの / 変えないもの
+- 変えるもの:
+  - native shim / host-native agent 配備方式の表現を asset-copy contract にそろえる issue docs
+  - installer の copy/replace/validate path と、それを保証する regression
+  - current checkout 直実行を正本にする verification 手順
+- 変えないもの:
+  - baseline tranche で完了済みの native shim 導入本体
+  - `iss-00049` / `iss-00050` の accepted scope
+  - skill を正本とする delegation-only contract
+
 ## 変更計画
 - Add:
-  - native shim provider assets
-  - meta.json native_shim fields
-  - gate-2 / gate-3 evidence tests
+  - correction tranche 用の docs/tranche separation 記述
+  - asset-copy parity regression と current checkout verification 手順の追記
 - Modify:
-  - `src/spec_dock/cli.py` installer sync/prune
-  - `tests/test_init_update.py`
-  - dogfooding generated native shim files
+  - `src/spec_dock/cli.py` の installer copy/replace/validate path に関する correction 差分
+  - `tests/test_init_update.py` の correction tranche regression
+  - correction tranche に対応する report / manual validation evidence
 - Delete:
-  - obsolete managed shim fixtures in gate-2 verification only
+  - なし。baseline tranche の成果物や履歴 step は削除しない
 - Move/Rename:
   - なし
 - Read only:
+  - baseline tranche の完了済み native shim 導入本体
   - protocol/runtime core contract
 
 ## 要件 → 設計マッピング
@@ -219,6 +259,7 @@ tests --> validation : gate-2 baseline
 - AC-002 -> obsolete/custom fixture strategy + prune rule + baseline skill/metadata intact regression（`entry_file` invariants 含む）
 - AC-003 -> host-scoped manual validation evidence schema
 - AC-004 -> gate-4 fixed review keys + closure aggregation
+- AC-005 -> baseline/correction tranche 境界、correction-only change plan、追加修正 step の独立定義
 - EC-001 -> fallback evidence still counts per required host
 - EC-002 -> unknown custom native shim / unknown custom skill preserve
 - EC-003 -> discovery/delegation-only static checks
@@ -227,9 +268,10 @@ tests --> validation : gate-2 baseline
 - Unit:
   - なし。主対象は installer integration。
 - Integration:
-  - `tests/test_init_update.py` で init/update 後の shim 生成、manifest shape、obsolete prune、unknown preserve を確認。
+  - `tests/test_init_update.py` で init/update 後の shim copy/replace、manifest shape、obsolete prune、unknown preserve を確認。
+  - generated target file と provider-side asset file の byte-for-byte parity を確認。
 - E2E / manual:
-  - `spec-dock update .` 後に dogfooding workspace の `.codex/agents/spec-dock.toml` / `.github/agents/spec-dock.agent.md` を確認。
+  - `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .` と `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli validate .` の current checkout 実行後に dogfooding workspace の `.codex/agents/spec-dock.toml` / `.github/agents/spec-dock.agent.md` を確認する。
   - Codex/Copilot それぞれで canonical action を実行し、gate-3 fixed keys を report に残す。
 - migration / rollback / feature flag if needed:
   - rollback は native shim asset / manifest field / installer sync の 1 changeset 巻き戻しで対応。
@@ -238,7 +280,8 @@ tests --> validation : gate-2 baseline
 - AC-001 -> generated target file check + manifest field check
 - AC-002 -> gate-2 five-subcheck conjunction
 - AC-003 -> gate-3 host-scoped evidence
-- AC-004 -> fixed closure schema + gate-4 six-subcheck conjunction + extension_closure_pass
+- AC-004 -> fixed closure schema + gate-4 six-subcheck conjunction + baseline/extension closure required keys + extension_closure_pass
+- AC-005 -> spec review での tranche separation check + plan 上の correction-only step check
 - EC-001 -> fallback evidence for missing direct verification
 - EC-002 -> custom-reviewer fixture preserved
 - EC-003 -> direct protocol read / non-reimplementation no-match
@@ -246,9 +289,10 @@ tests --> validation : gate-2 baseline
 ## リスク / 移行 / ロールバック
 - リスク:
   - installer prune が managed/unmanaged 境界を誤ると custom native shim を消す
-  - host-native shim が skill への委譲ではなく固有ロジックを持つと drift する
+  - installer 側で本文正規化や生成ロジックを増やすと source asset と generated target の drift が起きる
 - 移行:
   - old obsolete fixture path は prune 対象として扱う
+  - 本文修正は generated target ではなく provider-side asset を更新して配布する
 - ロールバック:
   - native shim asset と meta field と installer sync をまとめて戻す
 
