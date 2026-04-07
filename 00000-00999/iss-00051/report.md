@@ -339,3 +339,14 @@ rg -n 'active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order'
 - residual risk:
   - manual test workspace 資料は archive と trial copy の 2 系統があるため、今後も drift 監視が必要
   - wording contract の自動回帰テストはまだなく、将来追加の余地がある
+
+- final follow-up:
+  - completion gate はさらに tightened し、`complete` には active issue の set/confirmed、docs 4 点の issue-specific content、required `sync` / `validate` の successful/pass outcome、required review の approval/pass outcome が必要と定義した
+  - required step が未実施、または実施済みでも unsuccessful / non-pass / non-approved の場合は `complete` を禁止し、`blocked` または `incomplete` として `reason` と `next action` を `report.md` に残すルールへ更新した
+  - Codex/Copilot adapter completion bullets は host intro 以外 byte-for-byte 同一に揃えた
+  - discussion `20260407t000000z-disc-skill-revision-best-practice-after-manual-test.md` の旧 candidate wording は superseded 扱いを明示し、最終ルールに合わせて整理した
+- final review outcome:
+  - spec review: `pass`（discussion に旧 candidate wording が残る non-blocking 指摘 1 件あり、追って整理済み）
+  - code review: `pass`
+- validation:
+  - provider-side skills/docs と mirrors の completion contract は一致している
