@@ -220,6 +220,30 @@ class TestCliActive(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00123")
 
+    def test_active_set_rejects_non_canonical_url_like_target_and_keeps_active_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target, issue_issue_number=123, issue_title="Current issue")
+            self._run_runtime(target, ["new", "issue", "--epic", "2", "--title", "Baseline issue", "--github-issue", "124"])
+
+            baseline = self._run_runtime_capture(target, ["active", "set", "iss-00124", "--force"])
+            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            active_path = target / "spec-dock" / ".agent" / "active.json"
+            before = active_path.read_text(encoding="utf-8")
+            baseline_active = json.loads(before)
+            self.assertEqual(baseline_active["issue"]["id"], "iss-00124")
+
+            invalid = self._run_runtime_capture(
+                target,
+                ["active", "set", "git@github.com:owner/repo/issues/123", "--force"],
+            )
+            self.assertNotEqual(invalid.returncode, 0, invalid.stdout + invalid.stderr)
+            self.assertIn("Invalid target", invalid.stderr)
+
+            after = active_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
     def test_active_set_rejects_conflict_between_positional_target_and_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
