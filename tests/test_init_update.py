@@ -1,10 +1,12 @@
 import json
+import io
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import zipfile
+from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -79,6 +81,17 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
         "spec-dock/docs/rules/issue/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
+        ),
+        ".agents/skills/spec-dock-codex-adapter/SKILL.md": (
+            "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-copilot-adapter/SKILL.md": (
+            "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md"
+        ),
+        ".agents/host-adapters/meta.json": "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
+        ".codex/agents/spec-dock.toml": "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
+        ".github/agents/spec-dock.agent.md": (
+            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md"
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
@@ -212,6 +225,52 @@ class TestInitUpdate(CliRuntimeHarness):
         "[reference_deps.md](reference_deps.md)",
         "[reference_sync.md](reference_sync.md)",
     )
+    _EXPECTED_HOST_ADAPTER_META = {
+        "schema_version": 1,
+        "owner": "spec-dock",
+        "targets": {
+            "codex": {
+                "enabled": True,
+                "entry_file": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                "native_shim": {
+                    "managed": True,
+                    "owner": "spec-dock",
+                    "target_file": ".codex/agents/spec-dock.toml",
+                    "source_of_truth_asset": "codex_skills/native-shims/spec-dock.toml",
+                    "delegates_to": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                    "obsolete_managed_paths": [
+                        ".codex/agents/spec-dock-codex-adapter.toml",
+                    ],
+                },
+            },
+            "copilot": {
+                "enabled": True,
+                "entry_file": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                "native_shim": {
+                    "managed": True,
+                    "owner": "spec-dock",
+                    "target_file": ".github/agents/spec-dock.agent.md",
+                    "source_of_truth_asset": "codex_skills/native-shims/spec-dock.agent.md",
+                    "delegates_to": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                    "obsolete_managed_paths": [
+                        ".github/agents/spec-dock-copilot-adapter.agent.md",
+                    ],
+                },
+            },
+        },
+        "generated_by": "spec-dock update",
+        "updated_at": "2026-04-06T00:00:00Z",
+    }
+    _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
+        r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
+        r"|^\s*(schema_version|projection|nodes|issues|deps|source|updated_at)\s*="
+    )
+    _NATIVE_SHIM_CONTEXT_INLINE_PATTERN = r"\.agent/.*\.json|context-pack\.md"
+    _NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN = (
+        r"active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order"
+    )
+    _CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN = r"(?m)^\s*developer_instructions\s*="
+    _CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN = r"(?m)^\s*instructions\s*="
 
     def _assert_canonical_rules_files_contract(self, text_map: dict[str, str]) -> None:
         for rel_suffix, expected in self._CANONICAL_RULES_EXPECTATIONS.items():
@@ -363,6 +422,153 @@ class TestInitUpdate(CliRuntimeHarness):
                     asset_path.read_text(encoding="utf-8"),
                     f"installed template diverged from provider asset: {rel_path}",
                 )
+
+    def _run_command_with_host_adapter_manifest_override(
+        self,
+        command: str,
+        target: Path,
+        manifest_override: dict[str, object],
+    ) -> tuple[int, str]:
+        def _mutate_assets(patched_assets_root: Path) -> None:
+            patched_meta = patched_assets_root / "codex_skills" / "host-adapters" / "meta.json"
+            patched_meta.write_text(
+                json.dumps(manifest_override, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+        return self._run_command_with_assets_override(
+            command,
+            target,
+            _mutate_assets,
+        )
+
+    def _run_command_with_assets_override(
+        self,
+        command: str,
+        target: Path,
+        mutate_assets: object,
+    ) -> tuple[int, str]:
+        repo_root = Path(__file__).resolve().parents[1]
+        source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+        with tempfile.TemporaryDirectory() as tmp_assets:
+            patched_assets_root = Path(tmp_assets) / "assets"
+            shutil.copytree(source_assets_root, patched_assets_root)
+            if callable(mutate_assets):
+                mutate_assets(patched_assets_root)
+
+            @contextmanager
+            def _patched_assets_dir():
+                yield patched_assets_root
+
+            err = io.StringIO()
+            with patch("spec_dock.cli._assets_dir", _patched_assets_dir), redirect_stderr(err):
+                code = main([command, str(target)])
+        return code, err.getvalue()
+
+    def _run_update_with_host_adapter_manifest_override(
+        self,
+        target: Path,
+        manifest_override: dict[str, object],
+    ) -> tuple[int, str]:
+        return self._run_command_with_host_adapter_manifest_override(
+            "update",
+            target,
+            manifest_override,
+        )
+
+    def _run_init_with_host_adapter_manifest_override(
+        self,
+        target: Path,
+        manifest_override: dict[str, object],
+    ) -> tuple[int, str]:
+        return self._run_command_with_host_adapter_manifest_override(
+            "init",
+            target,
+            manifest_override,
+        )
+
+    def _managed_contract_guard_paths(self) -> tuple[str, ...]:
+        managed_skill_paths = tuple(
+            f".agents/skills/{skill_name}/SKILL.md" for skill_name in _EXPECTED_MANAGED_SKILL_NAMES
+        )
+        return (
+            *managed_skill_paths,
+            ".agents/host-adapters/meta.json",
+            ".codex/agents/spec-dock.toml",
+            ".github/agents/spec-dock.agent.md",
+            ".codex/agents/spec-dock-codex-adapter.toml",
+            ".github/agents/spec-dock-copilot-adapter.agent.md",
+            "spec-dock/docs/guide.md",
+            "spec-dock/docs/workflow_issue.md",
+            "spec-dock/scripts/spec-dock",
+        )
+
+    def _seed_managed_contract_guard_snapshot(self, target: Path) -> dict[str, bytes | None]:
+        rel_paths = self._managed_contract_guard_paths()
+        for index, rel_path in enumerate(rel_paths):
+            self._write_text_force(
+                target / rel_path,
+                f"contract-failure-guard::{index}::{rel_path}\n",
+            )
+        return {
+            rel_path: (target / rel_path).read_bytes() if (target / rel_path).is_file() else None
+            for rel_path in rel_paths
+        }
+
+    def _assert_managed_contract_guard_unchanged(
+        self,
+        target: Path,
+        expected_snapshot: dict[str, bytes | None],
+    ) -> None:
+        for rel_path, expected_bytes in expected_snapshot.items():
+            path = target / rel_path
+            observed_bytes = path.read_bytes() if path.is_file() else None
+            self.assertEqual(
+                observed_bytes,
+                expected_bytes,
+                f"managed file changed despite manifest contract failure: {rel_path}",
+            )
+
+    def _assert_native_shim_static_delegation_only_contract(
+        self,
+        *,
+        text: str,
+        delegation_expected: str,
+        shim_label: str,
+    ) -> None:
+        self.assertIn(
+            delegation_expected,
+            text,
+            f"native shim missing delegation reference ({shim_label}): {delegation_expected}",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
+            f"native shim includes structured state payload keys ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
+            f"native shim includes .agent/*.json or context-pack inline reference ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN,
+            f"native shim includes direct protocol read reference ({shim_label})",
+        )
+
+    def _assert_codex_native_shim_loader_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertRegex(
+            text,
+            self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN,
+            f"codex native shim missing developer_instructions key ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
+            f"codex native shim still uses legacy instructions key ({shim_label})",
+        )
 
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -550,6 +756,8 @@ class TestInitUpdate(CliRuntimeHarness):
 
             skills_root = target / ".agents" / "skills"
             self._assert_managed_skills_installed(target)
+            self.assertTrue((target / ".codex" / "agents" / "spec-dock.toml").is_file())
+            self.assertTrue((target / ".github" / "agents" / "spec-dock.agent.md").is_file())
 
             skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("`discussions/`", skill_text)
@@ -1400,7 +1608,7 @@ with tempfile.TemporaryDirectory() as td:
 
     assert injected["done"], injected
     assert events == [], events
-    assert issue_gateway.calls == [(str(repo_root), 555, None)], issue_gateway.calls
+    assert issue_gateway.calls == [(str(repo_root), 555, "example/repo")], issue_gateway.calls
     assert sum(1 for record in node_repo.records if record.id == "iss-00555") == 1, node_repo.records
 """
         result = subprocess.run(
@@ -1865,6 +2073,7 @@ with tempfile.TemporaryDirectory() as td:
         node_repo=_StubNodeRepo(records, events),
         template_scaffolder=_StubTemplateScaffolder(events),
         issue_gateway=issue_gateway,
+        git_gateway=_StubGitGateway(),
         active_state_store=active_state_store,
         repo_root=repo_root,
         specdock_dir=specdock_dir,
@@ -2156,7 +2365,7 @@ with tempfile.TemporaryDirectory() as td:
     assert captured["resolve_calls"] == 2, captured
     assert result.node.parent_id == "epic-local-00002", result.node.parent_id
     assert "/epic-local-00002-session-rotation/" in result.node.path.as_posix(), result.node.path
-    assert issue_gateway.calls == [(str(repo_root), 777, None)], issue_gateway.calls
+    assert issue_gateway.calls == [(str(repo_root), 777, "example/repo")], issue_gateway.calls
     assert [name for name, _path in active_state_store.calls] == [
         "load_active_manifest_no_migrate",
         "load_active_manifest_no_migrate",
@@ -5331,10 +5540,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["init", str(target)]), 0)
 
             skills_root = target / ".agents" / "skills"
+            meta_path = target / ".agents" / "host-adapters" / "meta.json"
             for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 if skill_name == "spec-driven-tdd-workflow":
                     continue
                 shutil.rmtree(skills_root / skill_name)
+            self._write_text_force(meta_path, '{"schema_version": 99}\n')
 
             custom_dir = skills_root / "my-custom-skill"
             custom_dir.mkdir(parents=True, exist_ok=True)
@@ -5343,6 +5554,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             self.assertEqual(main(["update", str(target)]), 0)
             self._assert_managed_skills_installed(target)
+            self.assertEqual(
+                json.loads(meta_path.read_text(encoding="utf-8")),
+                self._EXPECTED_HOST_ADAPTER_META,
+            )
             self.assertTrue((custom_dir / "SKILL.md").is_file())
             self.assertTrue((custom_dir / "notes.txt").is_file())
 
@@ -5401,6 +5616,44 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for skill_name in cli._managed_skill_names():
                 skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
                 self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
+            self.assertTrue(
+                (assets_dir / "codex_skills" / "host-adapters" / "meta.json").is_file(),
+                "missing bundled host adapter metadata asset",
+            )
+            self.assertTrue(
+                (assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml").is_file(),
+                "missing bundled codex native shim asset",
+            )
+            self.assertTrue(
+                (assets_dir / "codex_skills" / "native-shims" / "spec-dock.agent.md").is_file(),
+                "missing bundled copilot native shim asset",
+            )
+
+    def test_bundled_native_shim_assets_satisfy_static_delegation_only_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            codex_path = assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml"
+            copilot_path = assets_dir / "codex_skills" / "native-shims" / "spec-dock.agent.md"
+            self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
+            self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
+            codex_text = codex_path.read_text(encoding="utf-8")
+            copilot_text = copilot_path.read_text(encoding="utf-8")
+
+        self._assert_native_shim_static_delegation_only_contract(
+            text=codex_text,
+            delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
+            shim_label="bundled codex native shim",
+        )
+        self._assert_codex_native_shim_loader_contract(
+            text=codex_text,
+            shim_label="bundled codex native shim",
+        )
+        self._assert_native_shim_static_delegation_only_contract(
+            text=copilot_text,
+            delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+            shim_label="bundled copilot native shim",
+        )
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
@@ -5412,6 +5665,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
             adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
+            codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            copilot_adapter_text = (skills_dir / "spec-dock-copilot-adapter" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
 
         self.assertIn(
             "`spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.",
@@ -5434,6 +5693,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
         self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
+        self.assertIn("issue-00049", codex_adapter_text)
+        self.assertIn("spec-dock/docs/workflow_issue.md", codex_adapter_text)
+        self.assertIn("thin", codex_adapter_text.lower())
+        self.assertIn("issue-00049", copilot_adapter_text)
+        self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
+        self.assertIn("thin", copilot_adapter_text.lower())
 
         self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
@@ -5454,7 +5719,6 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/phase_plan.md`", epic_text)
         self.assertIn("create/import an epic", epic_text)
         self.assertIn("scope-specific constraints and decisions", epic_text)
-
         self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
@@ -5476,6 +5740,723 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
             self.assertNotIn("runtime-operations", skill_text)
+
+    def test_init_installs_host_adapter_metadata_with_fixed_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            meta_path = target / ".agents" / "host-adapters" / "meta.json"
+            self.assertTrue(meta_path.is_file(), f"missing host adapter metadata: {meta_path}")
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(meta, self._EXPECTED_HOST_ADAPTER_META)
+
+    def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            expected_codex_bytes = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "codex_skills"
+                / "native-shims"
+                / "spec-dock.toml"
+            ).read_bytes()
+            expected_copilot_bytes = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "codex_skills"
+                / "native-shims"
+                / "spec-dock.agent.md"
+            ).read_bytes()
+
+            codex_path = target / ".codex" / "agents" / "spec-dock.toml"
+            copilot_path = target / ".github" / "agents" / "spec-dock.agent.md"
+            self.assertTrue(codex_path.is_file(), f"missing generated codex native shim: {codex_path}")
+            self.assertTrue(copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}")
+            self.assertEqual(
+                codex_path.read_bytes(),
+                expected_codex_bytes,
+                "generated codex native shim diverged from provider asset bytes",
+            )
+            self.assertEqual(
+                copilot_path.read_bytes(),
+                expected_copilot_bytes,
+                "generated copilot native shim diverged from provider asset bytes",
+            )
+            codex_text = codex_path.read_text(encoding="utf-8")
+            copilot_text = copilot_path.read_text(encoding="utf-8")
+
+            self._assert_native_shim_static_delegation_only_contract(
+                text=codex_text,
+                delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                shim_label="generated codex native shim",
+            )
+            self._assert_codex_native_shim_loader_contract(
+                text=codex_text,
+                shim_label="generated codex native shim",
+            )
+            self._assert_native_shim_static_delegation_only_contract(
+                text=copilot_text,
+                delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                shim_label="generated copilot native shim",
+            )
+
+    def test_update_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+            with tempfile.TemporaryDirectory() as tmp_assets:
+                patched_assets_root = Path(tmp_assets) / "assets"
+                shutil.copytree(source_assets_root, patched_assets_root)
+
+                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_text = codex_shim_path.read_text(encoding="utf-8")
+                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
+                self.assertRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                codex_shim_path.write_text(patched_text, encoding="utf-8")
+                expected_bytes = codex_shim_path.read_bytes()
+
+                @contextmanager
+                def _patched_assets_dir():
+                    yield patched_assets_root
+
+                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
+                    self.assertEqual(main(["update", str(target)]), 0)
+
+            generated_path = target / ".codex" / "agents" / "spec-dock.toml"
+            generated_text = generated_path.read_text(encoding="utf-8")
+            self.assertEqual(
+                generated_path.read_bytes(),
+                expected_bytes,
+                "update should copy legacy codex shim asset bytes without normalization",
+            )
+            self.assertRegex(generated_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+
+    def test_init_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "repo"
+            target.mkdir(parents=True, exist_ok=True)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+            with tempfile.TemporaryDirectory() as tmp_assets:
+                patched_assets_root = Path(tmp_assets) / "assets"
+                shutil.copytree(source_assets_root, patched_assets_root)
+
+                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_text = codex_shim_path.read_text(encoding="utf-8")
+                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
+                self.assertRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                codex_shim_path.write_text(patched_text, encoding="utf-8")
+                expected_bytes = codex_shim_path.read_bytes()
+
+                @contextmanager
+                def _patched_assets_dir():
+                    yield patched_assets_root
+
+                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+            generated_path = target / ".codex" / "agents" / "spec-dock.toml"
+            generated_text = generated_path.read_text(encoding="utf-8")
+            self.assertEqual(
+                generated_path.read_bytes(),
+                expected_bytes,
+                "init should copy legacy codex shim asset bytes without normalization",
+            )
+            self.assertRegex(generated_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+
+    def test_update_copies_codex_native_shim_without_instruction_keys_as_is(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            source_assets_root = repo_root / "src" / "spec_dock" / "assets"
+
+            with tempfile.TemporaryDirectory() as tmp_assets:
+                patched_assets_root = Path(tmp_assets) / "assets"
+                shutil.copytree(source_assets_root, patched_assets_root)
+
+                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_text = codex_shim_path.read_text(encoding="utf-8")
+                self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                self.assertNotRegex(codex_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+
+                lines = codex_text.splitlines(keepends=True)
+                normalized_lines: list[str] = []
+                skipping_block = False
+                for line in lines:
+                    if not skipping_block and line.lstrip().startswith("developer_instructions"):
+                        skipping_block = True
+                        continue
+                    if skipping_block:
+                        if '"""' in line:
+                            skipping_block = False
+                        continue
+                    normalized_lines.append(line)
+
+                patched_text = "".join(normalized_lines)
+                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+                self.assertNotRegex(patched_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+                codex_shim_path.write_text(patched_text, encoding="utf-8")
+                expected_bytes = codex_shim_path.read_bytes()
+
+                @contextmanager
+                def _patched_assets_dir():
+                    yield patched_assets_root
+
+                with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
+                    self.assertEqual(main(["update", str(target)]), 0)
+
+            generated_path = target / ".codex" / "agents" / "spec-dock.toml"
+            generated_text = generated_path.read_text(encoding="utf-8")
+            self.assertEqual(
+                generated_path.read_bytes(),
+                expected_bytes,
+                "update should copy codex shim asset bytes without instruction key validation",
+            )
+            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
+            self.assertNotRegex(generated_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
+
+    def test_update_manages_native_shims_with_gate_2_five_subchecks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            codex_shim_asset = (
+                repo_root / "src" / "spec_dock" / "assets" / "codex_skills" / "native-shims" / "spec-dock.toml"
+            )
+            copilot_shim_asset = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "codex_skills"
+                / "native-shims"
+                / "spec-dock.agent.md"
+            )
+            expected_codex_shim = codex_shim_asset.read_bytes()
+            expected_copilot_shim = copilot_shim_asset.read_bytes()
+
+            managed_codex_path = target / ".codex" / "agents" / "spec-dock.toml"
+            managed_copilot_path = target / ".github" / "agents" / "spec-dock.agent.md"
+            obsolete_codex_path = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            obsolete_copilot_path = target / ".github" / "agents" / "spec-dock-copilot-adapter.agent.md"
+            custom_codex_path = target / ".codex" / "agents" / "custom-reviewer.toml"
+            custom_copilot_path = target / ".github" / "agents" / "custom-reviewer.agent.md"
+            custom_skill_path = target / ".agents" / "skills" / "custom-reviewer" / "SKILL.md"
+            meta_path = target / ".agents" / "host-adapters" / "meta.json"
+
+            stale_managed_codex = b"name = \"stale-managed\"\n"
+            stale_managed_copilot = b"# stale managed copilot shim\n"
+            custom_codex_content = "name = \"custom-reviewer\"\n"
+            custom_copilot_content = "# custom reviewer copilot agent\n"
+            custom_skill_content = "# custom skill that must be preserved\n"
+
+            self._write_text_force(managed_codex_path, stale_managed_codex.decode("utf-8"))
+            self._write_text_force(managed_copilot_path, stale_managed_copilot.decode("utf-8"))
+            self._write_text_force(obsolete_codex_path, "obsolete managed codex shim\n")
+            self._write_text_force(obsolete_copilot_path, "obsolete managed copilot shim\n")
+            self._write_text_force(custom_codex_path, custom_codex_content)
+            self._write_text_force(custom_copilot_path, custom_copilot_content)
+            custom_skill_path.parent.mkdir(parents=True, exist_ok=True)
+            self._write_text_force(custom_skill_path, custom_skill_content)
+
+            self.assertEqual(main(["update", str(target)]), 0)
+
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            managed_codex_bytes = (
+                managed_codex_path.read_bytes() if managed_codex_path.is_file() else None
+            )
+            managed_copilot_bytes = (
+                managed_copilot_path.read_bytes() if managed_copilot_path.is_file() else None
+            )
+            gate_2_sync_prune_evidence: dict[str, dict[str, object]] = {
+                "managed_codex_shim_generated_or_updated": {
+                    "expected": "managed codex shim exists and matches provider asset",
+                    "observed": (
+                        f"exists={managed_codex_path.is_file()}, "
+                        f"matches_asset={managed_codex_bytes == expected_codex_shim}"
+                    ),
+                    "pass": managed_codex_path.is_file()
+                    and managed_codex_bytes == expected_codex_shim
+                    and managed_codex_bytes != stale_managed_codex,
+                },
+                "managed_copilot_shim_generated_or_updated": {
+                    "expected": "managed copilot shim exists and matches provider asset",
+                    "observed": (
+                        f"exists={managed_copilot_path.is_file()}, "
+                        f"matches_asset={managed_copilot_bytes == expected_copilot_shim}"
+                    ),
+                    "pass": managed_copilot_path.is_file()
+                    and managed_copilot_bytes == expected_copilot_shim
+                    and managed_copilot_bytes != stale_managed_copilot,
+                },
+                "obsolete_managed_fixture_pruned": {
+                    "expected": "obsolete managed fixtures are removed",
+                    "observed": f"codex_exists={obsolete_codex_path.exists()}, copilot_exists={obsolete_copilot_path.exists()}",
+                    "pass": (not obsolete_codex_path.exists()) and (not obsolete_copilot_path.exists()),
+                },
+                "unknown_custom_fixture_preserved": {
+                    "expected": "unknown custom native shims and custom skill are preserved",
+                    "observed": (
+                        f"codex_custom={custom_codex_path.read_text(encoding='utf-8') if custom_codex_path.is_file() else None}, "
+                        f"copilot_custom={custom_copilot_path.read_text(encoding='utf-8') if custom_copilot_path.is_file() else None}, "
+                        f"custom_skill_exists={custom_skill_path.is_file()}"
+                    ),
+                    "pass": custom_codex_path.is_file()
+                    and custom_codex_path.read_text(encoding="utf-8") == custom_codex_content
+                    and custom_copilot_path.is_file()
+                    and custom_copilot_path.read_text(encoding="utf-8") == custom_copilot_content
+                    and custom_skill_path.is_file()
+                    and custom_skill_path.read_text(encoding="utf-8") == custom_skill_content,
+                },
+                "baseline_skill_and_metadata_untouched": {
+                    "expected": "baseline adapter skills and entry_file contracts remain intact",
+                    "observed": (
+                        "codex_skill_exists="
+                        f"{(target / '.agents' / 'skills' / 'spec-dock-codex-adapter' / 'SKILL.md').is_file()}, "
+                        "copilot_skill_exists="
+                        f"{(target / '.agents' / 'skills' / 'spec-dock-copilot-adapter' / 'SKILL.md').is_file()}, "
+                        f"meta_entry_codex={meta.get('targets', {}).get('codex', {}).get('entry_file')}, "
+                        f"meta_entry_copilot={meta.get('targets', {}).get('copilot', {}).get('entry_file')}"
+                    ),
+                    "pass": (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").is_file()
+                    and (target / ".agents" / "skills" / "spec-dock-copilot-adapter" / "SKILL.md").is_file()
+                    and meta == self._EXPECTED_HOST_ADAPTER_META,
+                },
+            }
+            gate_2_sync_prune_pass = all(
+                bool(gate_2_sync_prune_evidence[subcheck]["pass"])
+                for subcheck in (
+                    "managed_codex_shim_generated_or_updated",
+                    "managed_copilot_shim_generated_or_updated",
+                    "obsolete_managed_fixture_pruned",
+                    "unknown_custom_fixture_preserved",
+                    "baseline_skill_and_metadata_untouched",
+                )
+            )
+
+            for subcheck, evidence in gate_2_sync_prune_evidence.items():
+                self.assertTrue(bool(evidence["pass"]), f"{subcheck} failed: {evidence}")
+            self.assertTrue(gate_2_sync_prune_pass, gate_2_sync_prune_evidence)
+
+    def test_update_rejects_non_boolean_native_shim_managed_values(self) -> None:
+        for invalid_managed in ("true", 1):
+            with self.subTest(invalid_managed=invalid_managed):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    malformed_manifest["targets"]["codex"]["native_shim"]["managed"] = invalid_managed
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn("invalid native_shim.managed for host 'codex'", stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_manifest_missing_required_native_shim_host(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"].pop("copilot")
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("missing required managed native shim hosts: copilot", stderr)
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_missing_or_null_required_host_native_shim_contract(self) -> None:
+        for mode in ("missing", "null"):
+            with self.subTest(mode=mode):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    if mode == "missing":
+                        malformed_manifest["targets"]["codex"].pop("native_shim")
+                    else:
+                        malformed_manifest["targets"]["codex"]["native_shim"] = None
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn("missing required native_shim contract for host 'codex'", stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_required_host_native_shim_managed_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"]["codex"]["native_shim"]["managed"] = False
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("required host 'codex' must define native_shim.managed=true", stderr)
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_required_host_native_shim_target_file_swaps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = (
+                ".github/agents/spec-dock.agent.md"
+            )
+            malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
+                ".codex/agents/spec-dock.toml"
+            )
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-dock.toml'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_duplicate_required_host_native_shim_target_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
+                ".codex/agents/spec-dock.toml"
+            )
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "duplicate native_shim.target_file '.codex/agents/spec-dock.toml'",
+                stderr,
+            )
+            self.assertIn("for hosts 'codex' and 'copilot'", stderr)
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_init_preflight_rejects_invalid_host_manifest_before_scaffold_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "repo"
+            target.mkdir(parents=True, exist_ok=True)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = (
+                ".github/agents/spec-dock.agent.md"
+            )
+
+            exit_code, stderr = self._run_init_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-dock.toml'",
+                stderr,
+            )
+            self.assertEqual(list(target.iterdir()), [], "preflight failure should not write managed scaffold files")
+
+    def test_update_preflight_rejects_missing_or_non_directory_later_managed_asset_before_mutation(self) -> None:
+        for mode in ("missing", "non_directory"):
+            with self.subTest(mode=mode):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+
+                    def _mutate_assets(patched_assets_root: Path) -> None:
+                        scripts_dir = patched_assets_root / "spec_dock" / "scripts"
+                        shutil.rmtree(scripts_dir)
+                        if mode == "non_directory":
+                            scripts_dir.write_text("invalid scaffold asset directory replacement\n", encoding="utf-8")
+
+                    exit_code, stderr = self._run_command_with_assets_override(
+                        "update",
+                        target,
+                        _mutate_assets,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    if mode == "missing":
+                        self.assertIn("Missing asset directory", stderr)
+                    else:
+                        self.assertIn("Invalid asset directory", stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_required_host_entry_file_drift_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"]["codex"]["entry_file"] = ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "required host 'codex' must use canonical entry_file '.agents/skills/spec-dock-codex-adapter/SKILL.md'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_missing_or_malformed_required_native_shim_owner_and_delegates_to_before_writes(
+        self,
+    ) -> None:
+        cases = (
+            ("owner_missing", "invalid native_shim.owner for host 'codex'"),
+            ("owner_non_string", "invalid native_shim.owner for host 'codex'"),
+            ("owner_drift", "required host 'codex' must use native_shim.owner 'spec-dock'"),
+            ("delegates_missing", "invalid native_shim.delegates_to for host 'codex'"),
+            ("delegates_non_string", "invalid native_shim.delegates_to for host 'codex'"),
+            (
+                "delegates_drift",
+                "required host 'codex' must use canonical native_shim.delegates_to "
+                "'.agents/skills/spec-dock-codex-adapter/SKILL.md'",
+            ),
+        )
+        for case_name, expected_error in cases:
+            with self.subTest(case_name=case_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    native_shim = malformed_manifest["targets"]["codex"]["native_shim"]
+
+                    if case_name == "owner_missing":
+                        native_shim.pop("owner")
+                    elif case_name == "owner_non_string":
+                        native_shim["owner"] = 1
+                    elif case_name == "owner_drift":
+                        native_shim["owner"] = "external-owner"
+                    elif case_name == "delegates_missing":
+                        native_shim.pop("delegates_to")
+                    elif case_name == "delegates_non_string":
+                        native_shim["delegates_to"] = 1
+                    elif case_name == "delegates_drift":
+                        native_shim["delegates_to"] = ".agents/skills/spec-dock-copilot-adapter/SKILL.md"
+                    else:
+                        raise AssertionError(f"unknown case_name: {case_name}")
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn(expected_error, stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_non_mapping_host_target_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["targets"]["codex"] = "not-a-map"
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("invalid host adapter target contract for host 'codex'", stderr)
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_current_dir_native_shim_obsolete_paths(self) -> None:
+        for invalid_obsolete_path in (".", "./"):
+            with self.subTest(invalid_obsolete_path=invalid_obsolete_path):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    malformed_manifest["targets"]["codex"]["native_shim"]["obsolete_managed_paths"] = [
+                        invalid_obsolete_path,
+                    ]
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn("native_shim.obsolete_managed_paths item (current directory path)", stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_parent_traversal_native_shim_paths(self) -> None:
+        cases: tuple[tuple[str, str, str], ...] = (
+            (
+                "source_of_truth_asset",
+                "../codex_skills/native-shims/spec-dock.toml",
+                "invalid native_shim.source_of_truth_asset path for host 'codex'",
+            ),
+            (
+                "target_file",
+                "../.codex/agents/spec-dock.toml",
+                "invalid native_shim.target_file path for host 'codex'",
+            ),
+            (
+                "obsolete_managed_paths",
+                "../.codex/agents/spec-dock-codex-adapter.toml",
+                "invalid native_shim.obsolete_managed_paths item for host 'codex'",
+            ),
+        )
+        for field, invalid_path, expected_error in cases:
+            with self.subTest(field=field, invalid_path=invalid_path):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    if field == "obsolete_managed_paths":
+                        malformed_manifest["targets"]["codex"]["native_shim"][field] = [invalid_path]
+                    else:
+                        malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn(expected_error, stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_windows_drive_relative_native_shim_paths(self) -> None:
+        cases: tuple[tuple[str, str], ...] = (
+            ("source_of_truth_asset", "invalid native_shim.source_of_truth_asset path for host 'codex'"),
+            ("target_file", "invalid native_shim.target_file path for host 'codex'"),
+            ("obsolete_managed_paths", "invalid native_shim.obsolete_managed_paths item for host 'codex'"),
+        )
+        invalid_paths = ("C:foo", "/foo", "\\foo")
+        for field, expected_error in cases:
+            for invalid_path in invalid_paths:
+                with self.subTest(field=field, invalid_path=invalid_path):
+                    with tempfile.TemporaryDirectory() as tmp:
+                        target = Path(tmp)
+                        self.assertEqual(main(["init", str(target)]), 0)
+                        before = self._seed_managed_contract_guard_snapshot(target)
+                        malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                        if field == "obsolete_managed_paths":
+                            malformed_manifest["targets"]["codex"]["native_shim"][field] = [invalid_path]
+                        else:
+                            malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
+
+                        exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                            target,
+                            malformed_manifest,
+                        )
+
+                        self.assertEqual(exit_code, 1)
+                        self.assertIn(expected_error, stderr)
+                        self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_native_shim_target_file_outside_managed_prefixes(self) -> None:
+        for invalid_target in ("README.md", ".agents/skills/spec-dock-codex-adapter/SKILL.md"):
+            with self.subTest(invalid_target=invalid_target):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = invalid_target
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn("invalid native_shim.target_file path for host 'codex'", stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_obsolete_native_shim_paths_outside_managed_prefixes(self) -> None:
+        for invalid_obsolete in ("README.md", ".agents/skills/spec-dock-codex-adapter/SKILL.md"):
+            with self.subTest(invalid_obsolete=invalid_obsolete):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+                    malformed_manifest["targets"]["codex"]["native_shim"]["obsolete_managed_paths"] = [
+                        invalid_obsolete
+                    ]
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn("invalid native_shim.obsolete_managed_paths item for host 'codex'", stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_reference_sync_doc_matches_bundled_asset(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            bundled = (assets_dir / "spec_dock" / "docs" / "reference_sync.md").read_text(encoding="utf-8")
+
+        repo_copy = (
+            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "reference_sync.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(repo_copy, bundled)
 
     def test_init_fails_without_force_when_spec_dock_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -6809,6 +7790,11 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             self.assertIn("- initiative: (none)", context_pack_text)
             self.assertIn("- epic: (none)", context_pack_text)
             self.assertIn("- issue: (none)", context_pack_text)
+            self.assertIn("- entry: `spec-dock/.agent/active.json`", context_pack_text)
+            self.assertIn("- default working set: `spec-dock/.agent/index.json`", context_pack_text)
+            self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", context_pack_text)
+            self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", context_pack_text)
+            self.assertIn("- Start with `spec-dock/.agent/active.json`.", context_pack_text)
             self.assertIn("- `spec-dock/active/initiative/README.md`", context_pack_text)
             self.assertIn("- `spec-dock/active/epic/README.md`", context_pack_text)
             self.assertIn("- `spec-dock/active/issue/README.md`", context_pack_text)

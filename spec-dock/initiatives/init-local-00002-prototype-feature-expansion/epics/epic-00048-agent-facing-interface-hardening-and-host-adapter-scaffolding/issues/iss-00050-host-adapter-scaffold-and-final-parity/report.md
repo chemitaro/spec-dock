@@ -25,4 +25,215 @@
 - verdict:
   - pass
 - note:
+  - 実装開始前の docs refresh は完了。GitHub Copilot orchestrator はこの版を前提に着手してよい
+- note:
   - host adapter metadata は `.agents/host-adapters/meta.json` に固定した
+
+## 2026-04-03 readiness review for implementation start
+- review scope:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+- findings:
+  - `design.md` に明示的な依存関係分析がなく、S01-S04 の順序根拠が文章として固定されていなかった。
+  - `plan.md` に依存関係分析から step 順を導く節がなく、shared template の現行期待とずれていた。
+- action:
+  - `design.md` に依存関係分析と dependency-oriented PlantUML を追記した。
+  - `plan.md` に `実装順序の根拠` を追加し、design から sequencing を導く契約を明記した。
+
+## 2026-04-03 spec re-review after readiness fixes
+- review scope:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `report.md`
+- checklist:
+  - design:
+    - upstream/downstream と実装起点が明示されていること
+    - module / dependency 図が implementation order と矛盾しないこと
+  - plan:
+    - step 順が design の依存関係分析から導かれていること
+    - review/test/report-before-commit flow が維持されていること
+  - scope:
+    - issue-00049 protocol を再定義せず、host adapter scaffold / parity / final review に閉じていること
+- findings:
+  - none
+- verdict:
+  - pass
+
+## 2026-04-03 S01 spec fixed point for host adapter deployment
+- 実行コマンド:
+  - `git --no-pager diff -- spec-dock/active/issue/design.md spec-dock/active/issue/plan.md`
+- review scope:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+  - `spec-dock/active/epic/requirement.md`
+  - `spec-dock/active/epic/design.md`
+  - `spec-dock/active/epic/plan.md`
+- 初回 reviewer verdict:
+  - fail
+- blocking findings:
+  - `design.md` が `.agents/host-adapters/meta.json` を optional に読める表現を残しており、S01 fixed point として不十分だった
+  - `plan.md` の S02 gate に unknown custom skill preservation が明示されておらず、managed prune safety の確認が不足していた
+- 修正内容:
+  - `design.md`
+    - `.agents/host-adapters/meta.json` を必須の installer managed asset として固定した
+    - host adapter metadata の source-of-truth / ownership 境界を明文化した
+    - metadata contract に `schema_version` / `targets` / `generated_by` / `updated_at` / `owner` を追加した
+    - metadata sync を optional ではなく required として設計に反映した
+  - `plan.md`
+    - S02/B2 に unknown custom skill preservation test を明示した
+    - S02 の pass condition に unknown custom skills preserve を追加した
+    - step gate の expected tests に preservation test を追加した
+- 再 review verdict:
+  - pass
+- reviewer result:
+  - `review_status: pass`
+  - reason:
+    - S01 fixed point として、metadata contract、unknown-skill preservation、issue boundary、rollout order が実装開始可能な粒度まで整合した
+  - non-blocking note:
+    - `meta.json.targets` の exact subshape は P2 として残っており、S02 で test 付きで pin する
+- 想定外と対処:
+  - 初回 spec review pass 済みでも、implementation start 観点では S01 fixed point の strictness が不足していた
+  - docs-only で差分を閉じ、rerun で implementation start fixed point を通した
+- refactor:
+  - なし
+
+## 2026-04-03 S02 installer managed asset sync for host adapters
+- 実行コマンド:
+  - `python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_init_installs_host_adapter_metadata_with_fixed_contract tests.test_init_update.TestInitUpdate.test_update_migrates_legacy_single_skill_and_preserves_custom_skill tests.test_init_update.TestInitUpdate.test_update_installs_full_skill_set_for_legacy_no_skill_repo tests.test_init_update.TestInitUpdate.test_update_skill_sync_converges_after_interrupted_run`
+  - `python -m unittest tests.test_init_update`
+- test 結果:
+  - focused installer tests:
+    - pass
+    - 6 tests passed
+  - broader `tests.test_init_update`:
+    - 83 tests run, 3 failures
+    - checked-in dogfooding/parity 系の failure として切り分けられ、S02 blocker ではないと reviewer が判定
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - installer sync / ownership / prune 変更は issue docs と整合しており、focused tests で new asset と metadata contract が保護されている
+  - QA / `qa_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - `.agents/host-adapters/meta.json` の exact contract と unknown custom skill preservation が test で固定されており、S02 scope に対する test adequacy gap は無い
+- 修正内容:
+  - `src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md`
+    - Codex 向け thin host adapter entrypoint を追加した
+  - `src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md`
+    - Copilot 向け thin host adapter entrypoint を追加した
+  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json`
+    - mandatory metadata asset を追加し、`schema_version` / `owner` / `targets` / `generated_by` / `updated_at` を固定した
+  - `src/spec_dock/cli.py`
+    - managed skill names に Codex/Copilot adapter を追加した
+    - installer sync で `.agents/host-adapters/meta.json` を配布・更新するようにした
+    - managed adapter install 完了前の fail-closed check を追加した
+  - `tests/cli_runtime/harness.py`
+    - expected managed skill set に host adapter 名を追加した
+  - `tests/test_init_update.py`
+    - bundled asset coverage、adapter routing contract、metadata exact shape、legacy update / custom skill preservation、interrupted run convergence を固定した
+- 想定外と対処:
+  - broader `tests.test_init_update` で 3 failures が残ったが、checked-in dogfooding/parity 側の未更新に紐づく failure と切り分けられ、S02 では blocker にしなかった
+  - S01 で non-blocking note だった `meta.json.targets` subshape は、この step で exact JSON assertion を追加して閉じた
+- refactor:
+  - なし
+
+## 2026-04-03 S03 triage note
+- `tests/test_init_update.py` の差分は次の 2 群に分けて扱う:
+  - A:
+    - host adapter asset / metadata / checked-in parity に直接必要な差分
+  - B:
+    - checked-in dogfooding runtime import parity test の期待値調整
+- B 差分の判定:
+  - keep
+- keep 理由:
+  - provider-side asset runtime と checked-in dogfooding runtime の `application/import_node.py` は、どちらも `current_repo_slug` 解決、`git_gateway` 使用、`issue_view_minimal(..., repo_slug=...)` 呼び出しを既に共有している
+  - したがって `issue_gateway.calls == (..., "example/repo")` と `git_gateway=_StubGitGateway()` の追加は host adapter 独自の新規仕様ではなく、既存 runtime 契約への parity test 追随である
+  - S02 で切り分けた broader `tests.test_init_update` の 3 failure はこの parity gap に対応しており、issue-00050 S03 の dogfooding parity closure として扱うのが妥当
+
+## 2026-04-03 S03 adapter thinness, dogfooding parity, docs parity
+- 実行コマンド:
+  - `PYTHONPATH=src python -m spec_dock.cli update .`
+  - `python -m unittest tests.test_init_update`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git --no-pager diff --cached --check`
+- test 結果:
+  - `python -m unittest tests.test_init_update`
+    - pass
+  - `./spec-dock/scripts/spec-dock validate`
+    - pass
+  - `git --no-pager diff --cached --check`
+    - pass
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - host adapter scaffold、checked-in parity、`json_state.py` の projection 追随、stale docs cleanup は accepted scope に収まっており、issue-00049 の protocol semantics を変えていない
+  - QA / `qa_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - adapter asset / metadata parity、custom skill preservation、projection field 追加、checked-in runtime parity test 追随に対する regression protection が十分であり、priority 0/1 の test gap はない
+- 修正内容:
+  - `.agents/host-adapters/meta.json`
+    - checked-in dogfooding metadata mirror を追加した
+  - `.agents/skills/spec-dock-codex-adapter/SKILL.md`
+    - Codex 向け thin host adapter entrypoint を checked-in dogfooding mirror に追加した
+  - `.agents/skills/spec-dock-copilot-adapter/SKILL.md`
+    - Copilot 向け thin host adapter entrypoint を checked-in dogfooding mirror に追加した
+  - `spec-dock/scripts/spec_dock_runtime/presentation/json_state.py`
+    - checked-in dogfooding runtime parity として `index.json` / `index-all.json` / `deps-issues.json` に `projection` を持たせた
+  - `tests/test_init_update.py`
+    - host adapter skill / metadata parity map を追加した
+    - checked-in dogfooding import parity test を current runtime contract に追随させた
+  - `spec-dock/docs/spec-dock-guide-old.md`
+  - `spec-dock/docs/spec-dock-guide.md`
+  - `spec-dock/docs/sync.md`
+  - `spec-dock/docs/workflow-adr.md`
+  - `spec-dock/docs/workflow-issue.md`
+    - provider-side asset 不在に伴う stale mirror cleanup として削除した
+- 想定外と対処:
+  - `read_agent` が使えない環境だったため reviewer verdict の回収経路が弱く、session events から reviewer output を抽出して gate evidence を確定した
+  - `tests/test_init_update.py` の B 差分は scope creep 疑いがあったが、triage の通り existing runtime contract への parity test 追随として整理し、review gate でも blocker にならなかった
+- refactor:
+  - なし
+
+## 2026-04-03 S04 final spec review and close readiness
+- 実行コマンド:
+  - `python -m unittest tests.test_init_update`
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+- test 結果:
+  - `python -m unittest tests.test_init_update`
+    - pass
+    - 83 tests passed
+  - `./spec-dock/scripts/spec-dock sync`
+    - pass
+    - 9 artifacts synced
+  - `./spec-dock/scripts/spec-dock validate`
+    - pass
+    - 12 nodes validated
+- reviewer verdict:
+  - spec / `spec_reviewer`:
+    - `review_status: pass`
+    - `close_readiness: ready`
+    - reason:
+      - `iss-00049` は protocol/runtime owner のまま、`iss-00050` は thin host-adapter / parity / final-review owner のままで、S01-S04 rollout order に矛盾がない
+  - final code / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - host-adapter installation、sync/runtime projection parity、context-pack/docs parity の branch diff は整合しており、close readiness を妨げる blocker は見つからなかった
+  - final QA / `qa_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - installer-managed host-adapter sync、metadata manifest、checked-in dogfooding parity、projection field 追加に対する test coverage は十分で、priority 0/1 の test gap はない
+- 修正内容:
+  - `report.md`
+    - final verification 結果、S04 spec review verdict、final code/QA diff review verdict、close readiness を追記した
+- 想定外と対処:
+  - `read_agent` が使えない環境制約は final gate でも継続したため、session events と completion notification を使って reviewer verdict を回収した
+- refactor:
+  - なし

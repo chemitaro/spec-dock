@@ -1532,6 +1532,10 @@ class TestRuntimeSyncS07(unittest.TestCase):
             index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             tree_todo = json.loads((specdock_dir / ".agent" / "tree.json").read_text(encoding="utf-8"))
             tree_all = json.loads((specdock_dir / ".agent" / "tree-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_todo["projection"], "current-future")
+            self.assertNotIn("source", index_todo)
+            self.assertEqual(index_all["projection"], "full-history")
+            self.assertNotIn("source", index_all)
             self.assertTrue(index_todo["deps"]["valid"])
             self.assertIsNone(index_todo["deps"]["error"])
             self.assertIn("iss-local-00001", index_todo["nodes"])
@@ -1583,6 +1587,11 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 self.assertFalse(node_path.startswith(repo_root.as_posix()), node_path)
 
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
+            self.assertEqual(
+                deps_issues["source"],
+                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+            )
             self.assertTrue(deps_issues["deps"]["valid"])
             self.assertIn("iss-local-00001", deps_issues["nodes"])
             self.assertNotIn("iss-local-00002", deps_issues["nodes"])
@@ -1671,10 +1680,23 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(result.state.warnings, ["deps_preflight_failed"])
 
             index = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
+            self.assertEqual(index["projection"], "current-future")
+            self.assertNotIn("source", index)
             self.assertFalse(index["deps"]["valid"])
             self.assertIn("Dependency cycle detected", str(index["deps"]["error"]))
 
+            index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_all["projection"], "full-history")
+            self.assertNotIn("source", index_all)
+            self.assertFalse(index_all["deps"]["valid"])
+            self.assertIn("Dependency cycle detected", str(index_all["deps"]["error"]))
+
             deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+            self.assertEqual(deps_issues["projection"], "open-issues-dependency-view")
+            self.assertEqual(
+                deps_issues["source"],
+                {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+            )
             self.assertFalse(deps_issues["deps"]["valid"])
             self.assertIn("Dependency cycle detected", str(deps_issues["deps"]["error"]))
 

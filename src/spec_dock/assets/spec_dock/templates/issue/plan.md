@@ -27,6 +27,15 @@ ID: "<ISS_ID>"
 - M2:
   - ...
 
+## 実装順序の根拠
+- 依存関係の正本:
+  - `design.md` の `依存関係分析` と module/dependency UML を参照する
+- sequencing rule:
+  - upstream / prerequisite / lower-dependency slice から先に step を組む
+  - downstream / dependent slice は前提が固まってから置く
+- step ordering notes:
+  - どの step が何に依存するかを短く書く
+
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
@@ -43,12 +52,18 @@ ID: "<ISS_ID>"
 - RG1 implementation review:
   - timing:
   - scope:
+  - commit gate:
+    - pass まで review loop を回し、pass 後に `report.md` を更新して差分確認後にコミットする
 - QG1 QA review:
   - timing:
   - scope:
+  - commit gate:
+    - pass まで test loop を回し、pass 後に `report.md` を更新して差分確認後にコミットする
 - SG1 spec review:
   - timing:
   - scope:
+  - commit gate:
+    - pass まで review loop を回し、pass 後に `report.md` を更新してドキュメントだけをコミットする
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -63,6 +78,9 @@ ID: "<ISS_ID>"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
+- 各 stage gate（SG/RG/QG）は `pass` まで回す。
+- 各 stage gate の `pass` 後は、`report.md` を更新し、差分確認後に report とまとめてコミットする。
+- no-op の場合のみ `report.md` に理由を残し、commit を省略できる。
 
 ## 実装ステップ
 
@@ -101,10 +119,12 @@ ID: "<ISS_ID>"
   - ...
 
 ###### Refactor
-- cleanup target:
-  - ...
-- invariants to keep green:
-  - ...
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
@@ -112,7 +132,9 @@ ID: "<ISS_ID>"
 - expected tests:
   - ...
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - reviewer verdict / test結果 / 修正内容 / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
 ### Sxx — <next observable behavior>
 - ...
@@ -136,6 +158,10 @@ ID: "<ISS_ID>"
   - ...
 - reviewer approvals:
   - ...
+- report update:
+  - final diff review verdict / closing evidence / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit expectation:
+  - `report.md` 更新後に差分確認し、追加修正があれば最終コミットを作成する。無ければ直前 gate のコミットを最終成果として扱う
 
 ## 未確定事項
 - Q-001:

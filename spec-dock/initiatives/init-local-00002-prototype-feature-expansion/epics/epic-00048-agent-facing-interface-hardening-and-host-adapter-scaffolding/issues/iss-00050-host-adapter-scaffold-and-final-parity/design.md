@@ -43,7 +43,7 @@ ID: "iss-00050"
   - `.agents/skills/` には repo local skills が共存するため、unknown custom dirs を保持する safety が重要。
 - 採用するパターン:
   - adapter も bundled skill として扱い、`SKILL.md` を managed asset sync に乗せる。
-  - adapter metadata が必要なら `.agents/host-adapters/meta.json` のような専用ファイルを installer managed asset として追加する。
+  - adapter metadata は `.agents/host-adapters/meta.json` を必須の installer managed asset として追加し、これを host adapter metadata の source of truth とする。
   - final parity は provider asset 更新 -> installer sync / dogfooding refresh -> tests / validate -> spec review の順で閉じる。
 - 採用しないもの:
   - installer とは別の ad-hoc generator 追加
@@ -55,6 +55,25 @@ ID: "iss-00050"
   - 必要なら `src/spec_dock/assets/spec_dock/...` の docs/assets
   - `tests/test_init_update.py`
   - dogfooding `.agents/skills/` and related docs
+
+## 依存関係分析
+- upstream（先に固定するもの）:
+  - issue-00049 で固定した protocol / read order contract
+  - installer の managed skill sync / ownership / pruning safety
+  - bundled skill asset layout の既存パターン
+- downstream（upstream の上に載るもの）:
+  - Codex/Copilot host adapter asset 本体
+  - `.agents/host-adapters/meta.json`
+  - dogfooding workspace parity と関連 docs
+  - final spec review / closing evidence
+- 実装起点:
+  - 依存の少ない順に、adapter asset / metadata shape を先に固定し、その後 installer ownership と sync へ接続する。
+  - parity refresh と final review は upstream が固まった後でのみ成立するため最後に置く。
+- step sequencing implication:
+  - S01 は thin adapter contract と metadata contract の fixed point を作る。
+  - S02 は S01 で固定した asset/metadata を installer sync に載せる。
+  - S03 は S02 の実装結果を dogfooding workspace / docs parity / validate に展開する。
+  - S04 は S01-S03 の evidence が揃った後の close readiness review とする。
 
 ## 採用方針 / トレードオフ
 - 論点:
@@ -78,9 +97,11 @@ ID: "iss-00050"
   - adapter assets:
     - `spec-dock-codex-adapter/SKILL.md`
     - `spec-dock-copilot-adapter/SKILL.md`
-  - adapter metadata（必要時）:
+  - adapter metadata:
     - `.agents/host-adapters/meta.json`
-    - targets / generated_by / updated_at を持つ
+    - 必須の managed asset として扱う
+    - `schema_version` / `targets` / `generated_by` / `updated_at` / `owner` を持つ安定契約とする
+    - `owner` と `generated_by` により、provider-side source of truth と installer-managed output の責務境界を明示する
   - docs parity:
     - provider asset docs と dogfooding docs が同じ host adapter guidance を指す
 
@@ -88,21 +109,31 @@ ID: "iss-00050"
 ```plantuml
 @startuml
 skinparam monochrome true
+top to bottom direction
 
 rectangle "src/spec_dock/cli.py
 _install_skill()" as installer
+rectangle "_managed_skill_names()
+_managed_skill_ownership_names()" as ownership
 rectangle "assets/codex_skills
 generic + host adapters" as assets
 rectangle ".agents/skills
 managed output" as installed
 rectangle ".agents/host-adapters/meta.json" as meta
+rectangle "tests/test_init_update.py" as tests
+rectangle "dogfooding docs / workspace parity" as parity
 rectangle "issue-00049 protocol" as protocol
 
+installer --> ownership : use ownership rules
+ownership --> assets : enumerate managed assets
 installer --> assets : copy/update
 installer --> installed : managed sync
-installer --> meta : optional managed sync
+installer --> meta : required managed sync
 installed ..> protocol : read contract only
 meta ..> protocol : declare targets
+tests ..> installer : verify init/update
+parity ..> installed : inspect generated output
+parity ..> meta : inspect generated metadata
 @enduml
 ```
 
@@ -117,7 +148,7 @@ meta ..> protocol : declare targets
 ## 変更計画
 - Add:
   - host adapter skill assets
-  - optional adapter metadata asset
+  - required adapter metadata asset
   - installer tests / docs parity evidence
 - Modify:
   - `src/spec_dock/cli.py`
@@ -174,4 +205,4 @@ meta ..> protocol : declare targets
 
 ## 未確定事項
 - なし:
-  - metadata file は `.agents/host-adapters/meta.json` に固定する。
+  - metadata file は `.agents/host-adapters/meta.json` に固定し、host adapter metadata の source of truth とする。

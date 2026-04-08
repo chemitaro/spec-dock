@@ -19,7 +19,7 @@ import sys
 from contextlib import contextmanager
 from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, NamedTuple
 
 from spec_dock import __version__
 
@@ -32,6 +32,8 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-epic-planning",
     "spec-dock-issue-execution",
     "spec-dock-adr-facilitation",
+    "spec-dock-codex-adapter",
+    "spec-dock-copilot-adapter",
 )
 _LEGACY_MANAGED_SKILL_NAMES = ("spec-driven-tdd-workflow",)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
@@ -42,6 +44,22 @@ _DEFAULT_SPEC_DOCK_GITIGNORE = (
     ".work/\n"
     "active/\n"
 )
+_MANAGED_NATIVE_SHIM_PREFIXES = (".codex/agents/", ".github/agents/")
+_REQUIRED_MANAGED_NATIVE_SHIM_HOSTS = ("codex", "copilot")
+_HOST_ADAPTER_META_ASSET_REL = Path("codex_skills") / "host-adapters" / "meta.json"
+_REQUIRED_MANAGED_NATIVE_SHIM_OWNER = "spec-dock"
+_REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_ENTRY_FILES = {
+    "codex": Path(".agents/skills/spec-dock-codex-adapter/SKILL.md"),
+    "copilot": Path(".agents/skills/spec-dock-copilot-adapter/SKILL.md"),
+}
+_REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_TARGET_FILES = {
+    "codex": Path(".codex/agents/spec-dock.toml"),
+    "copilot": Path(".github/agents/spec-dock.agent.md"),
+}
+_REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_DELEGATES_TO = {
+    "codex": Path(".agents/skills/spec-dock-codex-adapter/SKILL.md"),
+    "copilot": Path(".agents/skills/spec-dock-copilot-adapter/SKILL.md"),
+}
 
 
 @contextmanager
@@ -405,10 +423,20 @@ def _render_context_pack(*, initiative_id: str | None, epic_id: str | None, issu
     lines.append(f"- issue: {issue_value}")
     lines.append("")
     lines.append("## Generated state")
-    lines.append("- index: `spec-dock/.agent/index.json`")
-    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("- entry: `spec-dock/.agent/active.json`")
+    lines.append("- default working set: `spec-dock/.agent/index.json`")
+    lines.append("- default dependency view: `spec-dock/.agent/deps-issues.json`")
+    lines.append("- escalation only: `spec-dock/.agent/index-all.json`")
+    lines.append("- human-oriented tree: `spec-dock/.agent/tree.json`")
     lines.append("")
     lines.append("## Read order")
+    lines.append("- Start with `spec-dock/.agent/active.json`.")
+    lines.append("- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.")
+    lines.append("- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.")
+    lines.append(
+        "- `spec-dock/active/context-pack.md` is human guidance that mirrors this contract; it is not the sole source of truth."
+    )
+    lines.append("- Then follow the active documents:")
     if has_init:
         lines.append("- `spec-dock/active/initiative/requirement.md`")
         lines.append("- `spec-dock/active/initiative/design.md`")
@@ -658,16 +686,25 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
 
     with _assets_dir() as assets_dir:
         src_spec_dock = assets_dir / "spec_dock"
+        if not src_spec_dock.is_dir():
+            raise RuntimeError(f"Missing asset directory: {src_spec_dock}")
+
+        # Preflight all managed scaffold directories before any write.
+        managed_scaffold_sync_plan: list[tuple[Path, Path]] = []
+        for name in _MANAGED_DIRS:
+            src = src_spec_dock / name
+            if not src.exists():
+                raise RuntimeError(f"Missing asset directory: {src}")
+            if not src.is_dir():
+                raise RuntimeError(f"Invalid asset directory: {src}")
+            managed_scaffold_sync_plan.append((src, specdock_dir / name))
+
         specdock_dir.mkdir(parents=True, exist_ok=True)
 
         # Managed directories are owned by the installer and can be replaced on update.
         # The actual spec tree (`spec-dock/initiatives/**`) must be persistent and is
         # never removed by this installer.
-        for name in _MANAGED_DIRS:
-            src = src_spec_dock / name
-            dest = specdock_dir / name
-            if not src.exists():
-                raise RuntimeError(f"Missing asset directory: {src}")
+        for src, dest in managed_scaffold_sync_plan:
             _sync_tree(src, dest) if (dest.exists() or force) else shutil.copytree(src, dest)
 
         src_gitignore = src_spec_dock / ".gitignore"
@@ -712,48 +749,304 @@ def _managed_skill_ownership_names() -> tuple[str, ...]:
     return tuple(dict.fromkeys((*_managed_skill_names(), *_LEGACY_MANAGED_SKILL_NAMES)))
 
 
-def _install_skill(target_root: Path) -> None:
-    """Install/update managed agent skills into `.agents/skills/`.
+def _is_within_managed_native_shim_prefixes(path: Path) -> bool:
+    rel_posix = path.as_posix()
+    return any(rel_posix.startswith(prefix) for prefix in _MANAGED_NATIVE_SHIM_PREFIXES)
+
+
+class _ManagedNativeShimSpec(NamedTuple):
+    host_name: str
+    source_asset_rel: Path
+    target_rel: Path
+    obsolete_rel_paths: tuple[Path, ...]
+
+
+class _ManagedSkillInstallPlan(NamedTuple):
+    managed_skill_names: tuple[str, ...]
+    native_shim_specs: tuple[_ManagedNativeShimSpec, ...]
+
+
+def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallPlan:
+    managed_skill_names = _managed_skill_names()
+    required_hosts = set(_REQUIRED_MANAGED_NATIVE_SHIM_HOSTS)
+
+    for skill_name in managed_skill_names:
+        src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+        if not src_skill.exists():
+            raise RuntimeError(f"Missing asset file: {src_skill}")
+
+    host_adapter_meta_src = assets_dir / _HOST_ADAPTER_META_ASSET_REL
+    if not host_adapter_meta_src.exists():
+        raise RuntimeError(f"Missing asset file: {host_adapter_meta_src}")
+
+    manifest = json.loads(host_adapter_meta_src.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise RuntimeError(f"invalid host adapter metadata shape: {host_adapter_meta_src}")
+    targets = manifest.get("targets")
+    if not isinstance(targets, dict):
+        raise RuntimeError(f"invalid host adapter targets: {host_adapter_meta_src}")
+
+    missing_required_hosts = sorted(required_hosts.difference(targets.keys()))
+    if missing_required_hosts:
+        joined = ", ".join(missing_required_hosts)
+        raise RuntimeError(f"missing required managed native shim hosts: {joined}")
+
+    native_shim_specs: list[_ManagedNativeShimSpec] = []
+    native_target_file_owners: dict[Path, str] = {}
+    for host_name, host_entry in targets.items():
+        if not isinstance(host_entry, dict):
+            raise RuntimeError(f"invalid host adapter target contract for host '{host_name}'")
+
+        entry_file = host_entry.get("entry_file")
+        if not isinstance(entry_file, str) or not entry_file.strip():
+            raise RuntimeError(f"invalid host adapter entry_file for host '{host_name}'")
+        entry_file_norm = entry_file.strip()
+        entry_file_rel = Path(entry_file_norm)
+        if re.match(r"^[A-Za-z]:", entry_file_norm) or entry_file_norm.startswith(("/", "\\")):
+            raise RuntimeError(f"invalid host adapter entry_file path for host '{host_name}'")
+        if entry_file_rel.is_absolute() or ".." in entry_file_rel.parts:
+            raise RuntimeError(f"invalid host adapter entry_file path for host '{host_name}'")
+        canonical_entry_file = _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_ENTRY_FILES.get(host_name)
+        if canonical_entry_file is not None and entry_file_rel != canonical_entry_file:
+            raise RuntimeError(
+                f"required host '{host_name}' must use canonical entry_file "
+                f"'{canonical_entry_file.as_posix()}'"
+            )
+
+        native_shim = host_entry.get("native_shim")
+        if host_name in required_hosts and native_shim is None:
+            raise RuntimeError(f"missing required native_shim contract for host '{host_name}'")
+        if native_shim is None:
+            continue
+        if not isinstance(native_shim, dict):
+            raise RuntimeError(f"invalid native_shim contract for host '{host_name}'")
+        managed_raw = native_shim.get("managed")
+        if not isinstance(managed_raw, bool):
+            raise RuntimeError(f"invalid native_shim.managed for host '{host_name}'")
+        if host_name in required_hosts and not managed_raw:
+            raise RuntimeError(f"required host '{host_name}' must define native_shim.managed=true")
+        if not managed_raw:
+            continue
+
+        native_owner = native_shim.get("owner")
+        if not isinstance(native_owner, str) or not native_owner.strip():
+            raise RuntimeError(f"invalid native_shim.owner for host '{host_name}'")
+        native_owner_norm = native_owner.strip()
+        if host_name in required_hosts and native_owner_norm != _REQUIRED_MANAGED_NATIVE_SHIM_OWNER:
+            raise RuntimeError(
+                f"required host '{host_name}' must use native_shim.owner "
+                f"'{_REQUIRED_MANAGED_NATIVE_SHIM_OWNER}'"
+            )
+
+        delegates_to = native_shim.get("delegates_to")
+        if not isinstance(delegates_to, str) or not delegates_to.strip():
+            raise RuntimeError(f"invalid native_shim.delegates_to for host '{host_name}'")
+        delegates_to_norm = delegates_to.strip()
+        delegates_to_rel = Path(delegates_to_norm)
+        if re.match(r"^[A-Za-z]:", delegates_to_norm) or delegates_to_norm.startswith(("/", "\\")):
+            raise RuntimeError(f"invalid native_shim.delegates_to path for host '{host_name}'")
+        if delegates_to_rel.is_absolute() or ".." in delegates_to_rel.parts:
+            raise RuntimeError(f"invalid native_shim.delegates_to path for host '{host_name}'")
+        canonical_delegates_to = _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_DELEGATES_TO.get(host_name)
+        if canonical_delegates_to is not None and delegates_to_rel != canonical_delegates_to:
+            raise RuntimeError(
+                f"required host '{host_name}' must use canonical native_shim.delegates_to "
+                f"'{canonical_delegates_to.as_posix()}'"
+            )
+
+        source_asset = native_shim.get("source_of_truth_asset")
+        if not isinstance(source_asset, str) or not source_asset.strip():
+            raise RuntimeError(f"invalid native_shim.source_of_truth_asset for host '{host_name}'")
+        source_asset_norm = source_asset.strip()
+        source_asset_rel = Path(source_asset_norm)
+        if re.match(r"^[A-Za-z]:", source_asset_norm) or source_asset_norm.startswith(("/", "\\")):
+            raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
+        if source_asset_rel.is_absolute() or ".." in source_asset_rel.parts:
+            raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
+        source_path = assets_dir / source_asset_rel
+        if not source_path.is_file():
+            raise RuntimeError(f"Missing asset file: {source_path}")
+
+        target_file = native_shim.get("target_file")
+        if not isinstance(target_file, str) or not target_file.strip():
+            raise RuntimeError(f"invalid native_shim.target_file for host '{host_name}'")
+        target_norm = target_file.strip()
+        target_rel = Path(target_norm)
+        if re.match(r"^[A-Za-z]:", target_norm) or target_norm.startswith(("/", "\\")):
+            raise RuntimeError(f"invalid native_shim.target_file path for host '{host_name}'")
+        if target_rel.is_absolute() or ".." in target_rel.parts:
+            raise RuntimeError(f"invalid native_shim.target_file path for host '{host_name}'")
+        if not _is_within_managed_native_shim_prefixes(target_rel):
+            raise RuntimeError(f"invalid native_shim.target_file path for host '{host_name}'")
+        existing_owner = native_target_file_owners.get(target_rel)
+        if existing_owner is not None and existing_owner != host_name:
+            raise RuntimeError(
+                "duplicate native_shim.target_file "
+                f"'{target_rel.as_posix()}' for hosts '{existing_owner}' and '{host_name}'"
+            )
+        canonical_target = _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_TARGET_FILES.get(host_name)
+        if canonical_target is not None and target_rel != canonical_target:
+            raise RuntimeError(
+                f"required host '{host_name}' must use canonical native_shim.target_file "
+                f"'{canonical_target.as_posix()}'"
+            )
+        native_target_file_owners[target_rel] = host_name
+
+        obsolete_raw = native_shim.get("obsolete_managed_paths", [])
+        if not isinstance(obsolete_raw, list):
+            raise RuntimeError(f"invalid native_shim.obsolete_managed_paths for host '{host_name}'")
+        obsolete_rel_paths: list[Path] = []
+        for obsolete in obsolete_raw:
+            if not isinstance(obsolete, str) or not obsolete.strip():
+                raise RuntimeError(
+                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                )
+            obsolete_norm = obsolete.strip()
+            obsolete_rel = Path(obsolete_norm)
+            if re.match(r"^[A-Za-z]:", obsolete_norm) or obsolete_norm.startswith(("/", "\\")):
+                raise RuntimeError(
+                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                )
+            if obsolete_rel.is_absolute() or ".." in obsolete_rel.parts:
+                raise RuntimeError(
+                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                )
+            normalized_parts = tuple(part for part in obsolete_rel.parts if part not in ("", "."))
+            if not normalized_parts:
+                raise RuntimeError(
+                    "invalid native_shim.obsolete_managed_paths item (current directory path) "
+                    f"for host '{host_name}'"
+                )
+            if not _is_within_managed_native_shim_prefixes(obsolete_rel):
+                raise RuntimeError(
+                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
+                )
+            obsolete_rel_paths.append(obsolete_rel)
+
+        native_shim_specs.append(
+            _ManagedNativeShimSpec(
+                host_name=host_name,
+                source_asset_rel=source_asset_rel,
+                target_rel=target_rel,
+                obsolete_rel_paths=tuple(obsolete_rel_paths),
+            )
+        )
+
+    return _ManagedSkillInstallPlan(
+        managed_skill_names=managed_skill_names,
+        native_shim_specs=tuple(native_shim_specs),
+    )
+
+
+def _preflight_managed_skill_install_plan() -> _ManagedSkillInstallPlan:
+    with _assets_dir() as assets_dir:
+        return _build_managed_skill_install_plan(assets_dir)
+
+
+def _apply_managed_skill_install_plan(
+    target_root: Path,
+    *,
+    assets_dir: Path,
+    plan: _ManagedSkillInstallPlan,
+) -> None:
+    skills_root = target_root / ".agents" / "skills"
+    host_adapter_meta_src = assets_dir / _HOST_ADAPTER_META_ASSET_REL
+    host_adapter_meta_dest = target_root / ".agents" / "host-adapters" / "meta.json"
+    managed_skill_names = plan.managed_skill_names
+    managed_skill_sync_plan: list[tuple[Path, Path]] = []
+    native_shim_specs: list[tuple[str, Path, Path, tuple[Path, ...]]] = []
+
+    for skill_name in managed_skill_names:
+        src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+        if not src_skill.exists():
+            raise RuntimeError(f"Missing asset file: {src_skill}")
+        dest_skill = skills_root / skill_name / "SKILL.md"
+        managed_skill_sync_plan.append((src_skill, dest_skill))
+
+    if not host_adapter_meta_src.exists():
+        raise RuntimeError(f"Missing asset file: {host_adapter_meta_src}")
+
+    for native_spec in plan.native_shim_specs:
+        source_path = assets_dir / native_spec.source_asset_rel
+        if not source_path.is_file():
+            raise RuntimeError(f"Missing asset file: {source_path}")
+        target_path = target_root / native_spec.target_rel
+        obsolete_paths = tuple(target_root / obsolete_rel for obsolete_rel in native_spec.obsolete_rel_paths)
+        native_shim_specs.append((native_spec.host_name, source_path, target_path, obsolete_paths))
+
+    managed_ownership = set(_managed_skill_ownership_names())
+    target_managed = set(managed_skill_names)
+    managed_native_targets = {
+        target_path for _host, _src, target_path, _obsolete in native_shim_specs
+    }
+    obsolete_native_paths = {
+        obsolete_path
+        for _host, _src, _target, obsolete_paths in native_shim_specs
+        for obsolete_path in obsolete_paths
+    }
+
+    for source_path, target_path in managed_skill_sync_plan:
+        _copy_file(source_path, target_path)
+    _copy_file(host_adapter_meta_src, host_adapter_meta_dest)
+    for _host_name, source_path, target_path, _obsolete_paths in native_shim_specs:
+        _copy_file(source_path, target_path)
+
+    missing_skills = [
+        skill_name
+        for skill_name in managed_skill_names
+        if not (skills_root / skill_name / "SKILL.md").is_file()
+    ]
+    if missing_skills:
+        joined = ", ".join(sorted(missing_skills))
+        raise RuntimeError(f"managed skill sync incomplete (missing SKILL.md): {joined}")
+
+    if not host_adapter_meta_dest.is_file():
+        raise RuntimeError(
+            f"managed host adapter sync incomplete (missing meta.json): {host_adapter_meta_dest}"
+        )
+
+    missing_native_shims = [
+        target_path
+        for _host, _src, target_path, _obsolete in native_shim_specs
+        if not target_path.is_file()
+    ]
+    if missing_native_shims:
+        joined = ", ".join(sorted(path.as_posix() for path in missing_native_shims))
+        raise RuntimeError(f"managed host native shim sync incomplete (missing target): {joined}")
+
+    for skill_dir in skills_root.iterdir():
+        if not skill_dir.is_dir():
+            continue
+        if skill_dir.name not in managed_ownership:
+            continue
+        if skill_dir.name in target_managed:
+            continue
+        shutil.rmtree(skill_dir, ignore_errors=True)
+
+    for obsolete_path in obsolete_native_paths:
+        if obsolete_path in managed_native_targets:
+            continue
+        if obsolete_path.is_symlink() or obsolete_path.is_file():
+            obsolete_path.unlink(missing_ok=True)
+            continue
+        if obsolete_path.is_dir():
+            shutil.rmtree(obsolete_path, ignore_errors=True)
+
+
+def _install_skill(target_root: Path, *, plan: _ManagedSkillInstallPlan | None = None) -> None:
+    """Install/update managed agent skills and host-native shims.
 
     Notes:
     - Codex CLI discovers repository skills by scanning for `.agents/skills/`.
     - Other agents may adopt the same convention (Agent Skills open standard).
     """
     with _assets_dir() as assets_dir:
-        skills_root = target_root / ".agents" / "skills"
-        managed_skill_names = _managed_skill_names()
-
-        # 1) Copy/update target managed skills.
-        for skill_name in managed_skill_names:
-            src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
-            if not src_skill.exists():
-                raise RuntimeError(f"Missing asset file: {src_skill}")
-
-            dest_skill = skills_root / skill_name / "SKILL.md"
-            _copy_file(src_skill, dest_skill)
-
-        # 2) Verify target managed skills were all installed before pruning.
-        missing_skills = [
-            skill_name
-            for skill_name in managed_skill_names
-            if not (skills_root / skill_name / "SKILL.md").is_file()
-        ]
-        if missing_skills:
-            joined = ", ".join(sorted(missing_skills))
-            raise RuntimeError(f"managed skill sync incomplete (missing SKILL.md): {joined}")
-
-        # 3) Prune obsolete managed skills only; preserve unknown custom dirs.
-        managed_ownership = set(_managed_skill_ownership_names())
-        target_managed = set(managed_skill_names)
-        for skill_dir in skills_root.iterdir():
-            if not skill_dir.is_dir():
-                continue
-            if skill_dir.name not in managed_ownership:
-                continue
-            if skill_dir.name in target_managed:
-                continue
-            shutil.rmtree(skill_dir, ignore_errors=True)
-
+        install_plan = plan if plan is not None else _build_managed_skill_install_plan(assets_dir)
+        _apply_managed_skill_install_plan(
+            target_root,
+            assets_dir=assets_dir,
+            plan=install_plan,
+        )
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse CLI arguments (installer commands only)."""
@@ -785,12 +1078,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if ns.command == "init":
+            skill_install_plan = _preflight_managed_skill_install_plan()
             _install_spec_dock(target_root, force=bool(ns.force))
-            _install_skill(target_root)
+            _install_skill(target_root, plan=skill_install_plan)
         elif ns.command == "update":
             _require_specdock(target_root)
+            skill_install_plan = _preflight_managed_skill_install_plan()
             _install_spec_dock(target_root, force=True)
-            _install_skill(target_root)
+            _install_skill(target_root, plan=skill_install_plan)
         else:
             raise RuntimeError(f"Unknown command: {ns.command}")
     except Exception as e:

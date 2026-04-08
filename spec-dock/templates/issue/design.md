@@ -42,16 +42,32 @@ ID: "<ISS_ID>"
 - 決定:
   - ...
 
+## 依存関係分析
+- upstream / prerequisite:
+  - ...
+- downstream / dependent:
+  - ...
+- 実装起点:
+  - 依存の少ないもの / 先に固定すべき interface / 先に通すべき test を書く
+- sequencing implications:
+  - plan では upstream / prerequisite から順に step を組む
+
+### UML（必須: module / dependency）
+```plantuml
+@startuml
+top to bottom direction
+' overwrite this placeholder with the actual module/dependency diagram
+' place prerequisite / lower-dependency modules above, and dependent modules below
+
+rectangle "replace-with-module-a" as A
+rectangle "replace-with-module-b" as B
+A --> B : depends_on
+@enduml
+```
+
 ## インターフェース契約
 - API / function / protocol / data boundary:
   - ...
-
-### UML（推奨: module / dependency）
-```plantuml
-@startuml
-' module / dependency diagram
-@enduml
-```
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:

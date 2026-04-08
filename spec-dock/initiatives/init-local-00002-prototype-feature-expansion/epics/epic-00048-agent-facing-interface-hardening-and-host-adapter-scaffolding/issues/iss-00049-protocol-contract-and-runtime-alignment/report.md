@@ -24,3 +24,181 @@
   - pass
 - note:
   - `projection` / `source` metadata を採用決定として fixed point 化した
+
+## 2026-04-03 SG1 re-review
+- 実行コマンド:
+  - `git --no-pager diff -- spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/requirement.md spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/design.md spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/plan.md spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/plan.md`
+- review scope:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/epic/plan.md`
+  - `spec-dock/docs/workflow_issue.md`
+- 初回 reviewer verdict:
+  - fail
+- blocking findings:
+  - iss-00049 と iss-00050 の docs parity / final review 責務境界が issue/epic 間で食い違っていた
+  - artifact ごとの top-level `projection` / `source` contract が曖昧で、`deps-issues.json` provenance `source` と per-node issue status `source` semantics の境界が明示されていなかった
+- 修正内容:
+  - iss-00049 は protocol contract surface の runtime/provider-doc/dogfooding-doc/test parity を担当し、issue-00050 は adapter scaffold 残件と final epic parity/review を担当するよう issue/epic plan を整合させた
+  - `index.json` / `index-all.json` / `deps-issues.json` の artifact ごとの top-level metadata contract を requirement/design/plan で明文化した
+  - `index.json` / `index-all.json` には new top-level `source` を追加しないこと、`deps-issues.json` は provenance `source` を持ち、既存 per-node issue status `source` semantics は維持することを固定した
+  - EC-001 の active-none placeholder 証跡と EC-002 の fail-closed placeholder/provenance 証跡を step gate に明記した
+- 再 review verdict:
+  - pass
+- reviewer result:
+  - `review_status: pass`
+  - reason:
+    - issue-00049 / issue-00050 の scope split と artifact metadata contract が docs 上で固定され、P0/P1 spec ambiguity が解消された
+- 想定外と対処:
+  - 既存 report には SG1 pass とだけ残っていたが、reviewer の blocking findings を後追いで回収したため fixed point の根拠が不足していた
+  - stage commit 前に spec docs を是正し、re-review を通してから report を追記する形で収束させた
+- refactor:
+  - なし
+
+## 2026-04-03 S02 payload metadata and dependency-view alignment
+- 実行コマンド:
+  - `python -m unittest tests.cli_runtime.test_sync tests.cli_runtime.test_deps tests.presentation_runtime.test_runtime_sync_s07 -v`
+- test 結果:
+  - 120 tests passed
+  - 対象:
+    - `tests.cli_runtime.test_sync`
+    - `tests.cli_runtime.test_deps`
+    - `tests.presentation_runtime.test_runtime_sync_s07`
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - 初回 verdict: pass
+    - 最終 verdict: pass
+    - `review_status: pass`
+  - QA / `qa_reviewer`:
+    - 初回 verdict: fail
+    - 指摘:
+      - fail-closed deps path で `index-all.json` と index artifacts の source-free contract を pin する回帰保護が不足していた
+    - fix 後 verdict: pass
+    - `review_status: pass`
+- 修正内容:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py`
+    - `index.json` に top-level `projection=current-future` を追加した
+    - `index-all.json` に top-level `projection=full-history` を追加した
+    - `deps-issues.json` に top-level `projection=open-issues-dependency-view` を追加した
+    - top-level `source` は `deps-issues.json` の provenance のみに維持し、index artifacts には new top-level `source` を追加しない contract に揃えた
+  - `tests/cli_runtime/test_sync.py`
+    - valid path で `index.json` / `index-all.json` / `deps-issues.json` の top-level metadata contract を固定した
+  - `tests/cli_runtime/test_deps.py`
+    - fail-closed deps path で `index.json` / `index-all.json` / `deps-issues.json` の top-level metadata contract を固定した
+  - `tests/presentation_runtime/test_runtime_sync_s07.py`
+    - runtime-level valid path / fail-closed path の双方で top-level metadata contract を固定した
+- 想定外と対処:
+  - QA reviewer が fail-closed deps path の assertion gap を指摘したため、implementation は広げず tests を追加して contract を閉じた
+- refactor:
+  - projection literal を module-level constants に抽出して repeated string を減らした
+
+## 2026-04-03 S03 context pack and docs parity alignment
+- 実行コマンド:
+  - `python -m unittest tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_sync tests.test_init_update -v`
+  - `python -m unittest -q tests.cli_runtime.test_runtime_active_s05.TestRuntimeActiveS05.test_render_context_pack_states_entry_default_and_escalation_contract tests.cli_runtime.test_sync.TestCliSync.test_new_and_active_and_sync tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken`
+  - `./spec-dock/scripts/spec-dock active set iss-00049 --force`
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync && ./spec-dock/scripts/spec-dock validate`
+- test / validation 結果:
+  - focused unittest:
+    - pass
+    - 4 tests passed
+  - `./spec-dock/scripts/spec-dock sync`:
+    - pass
+  - `./spec-dock/scripts/spec-dock validate`:
+    - pass
+  - `./spec-dock/scripts/spec-dock sync && ./spec-dock/scripts/spec-dock validate`:
+    - pass
+  - broader unittest:
+    - 116 tests 中 112 pass / 4 fail
+    - fail したのは `tests.test_init_update` の import parity / plan-template 系で、今回の context-pack / reference_sync / placeholder guidance 変更面とは非関連と QA で判定
+- reviewer verdict:
+  - RG1 / `code_reviewer`:
+    - `review_status: pass`
+    - reason:
+      - context-pack / docs / mirrored runtime generationの wording は整合しており、placeholder/active-none behavior も維持されている
+  - QG1 / `qa_reviewer`:
+    - 初回 findings:
+      - placeholder context-pack contract を `init` 側でさらに広く pin すると望ましい
+      - `reference_sync.md` の install/update parity coverage は追加余地がある
+    - 最終 verdict:
+      - `review_status: pass`
+    - reason:
+      - focused tests と `sync` / `validate` が変更面を直接カバーしており、broader unittest の 4 failures は S03 の blocker ではない
+- 修正内容:
+  - context-pack renderer を provider / dogfooding / local CLI / runtime mirror 全面で揃えた
+    - entry: `spec-dock/.agent/active.json`
+    - default working set: `spec-dock/.agent/index.json`
+    - default dependency view: `spec-dock/.agent/deps-issues.json`
+    - escalation only: `spec-dock/.agent/index-all.json`
+    - `spec-dock/active/context-pack.md` は human guidance であり唯一正本ではないことを明記した
+  - `reference_sync.md` を provider / dogfooding で同 wording に更新した
+    - agent-facing read contract
+    - runtime 内部 fallback と通常読取順の違い
+    - active-none でも entry contract は `active.json` であること
+  - tests を追加 / 更新して、active/placeholder context-pack wording と docs parity を固定した
+- 想定外と対処:
+  - 初見では `app.py` / `application/set_active.py` / `src/spec_dock/cli.py` が out-of-scope に見えたが、diff を精査すると context-pack renderer の mirror / shipped parity 反映だった
+  - broader unittest で 4 failures が出たため、focused tests と touched surface を切り分け、QA reviewer に blocker かどうかを確認した
+- generated dogfooding output:
+  - `spec-dock/active/context-pack.md` を `active set iss-00049 --force` で再生成し、新しい entry/default/escalation guidance を確認した
+- refactor:
+  - なし
+
+## 2026-04-03 S99 final diff review
+- review scope:
+  - full branch diff: `38332b78fbbcc39e96b959f074281fd81f898534...HEAD`
+  - protocol contract surface:
+    - `active.json`
+    - `index.json`
+    - `deps-issues.json`
+    - `index-all.json`
+    - `context-pack.md`
+- 実行コマンド:
+  - `git --no-pager status --short`
+  - `git --no-pager log --oneline --decorate -3`
+  - `git --no-pager diff --stat 38332b78fbbcc39e96b959f074281fd81f898534...HEAD`
+- reviewer verdict:
+  - spec:
+    - SG1 fixed point / `spec_reviewer`: `review_status: pass`
+  - implementation:
+    - 初回 S99 final diff review / `code_reviewer`:
+      - `review_status: fail`
+      - finding:
+        - `src/spec_dock/assets/spec_dock/templates/issue/plan.md` の `commit/no-op` token が `コミット/no-op` に drift しており、`test_init_creates_expected_structure` の scaffold contract を壊していた
+    - blocker fix review / `code_reviewer`:
+      - `review_status: pass`
+      - reason:
+        - provider asset と dogfooding mirror の issue plan template を最小修正で `commit/no-op` に戻し、P1 regression が解消された
+  - QA:
+    - S99 final QA / `qa_reviewer`: `review_status: pass`
+    - reason:
+      - branch 全体の changed surface は targeted tests と `sync` / `validate` で十分に裏付けられており、残留リスクは non-blocking と判定された
+    - blocker fix QA / `qa_reviewer`:
+      - `review_status: pass`
+      - reason:
+        - `test_init_creates_expected_structure` と template parity coverage で token restore が十分に保護されている
+- 追加修正:
+  - `src/spec_dock/assets/spec_dock/templates/issue/plan.md`
+    - `Red → Green → Refactor → review → fix → re-review → report → commit/no-op` を復元した
+  - `spec-dock/templates/issue/plan.md`
+    - dogfooding mirror を同内容に揃えた
+- blocker fix 検証:
+  - `python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure`
+    - pass
+- final diff summary:
+  - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` のまま維持された
+  - dogfooding docs / runtime mirror は provider 変更と整合している
+  - host adapter scaffold / installer distribution への scope 拡張は含まれていない
+  - `index-all.json`、all/todo split、fail-closed behavior は維持された
+- 残留リスク:
+  - `tests.test_init_update` の broader suite には今回の touched surface と非関連な 4 failures が残っている
+  - `init` placeholder context-pack 契約の pin と `reference_sync.md` install/update parity coverage には P2 の強化余地がある
+  - これらは blocker ではなく、issue-00050 以降の follow-up 候補として handoff する
+- 想定外と対処:
+  - full branch diff review で issue scope 外寄りの template contract regression が branch diff 上に混入していることが判明した
+  - fix を issue plan template の token restore のみに絞り、re-review と最小 test で閉じた
+- refactor:
+  - なし

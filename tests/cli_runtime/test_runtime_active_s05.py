@@ -62,6 +62,54 @@ class _StubActiveStateStore:
 
 
 class TestRuntimeActiveS05(unittest.TestCase):
+    def test_render_context_pack_states_entry_default_and_escalation_contract(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_set_active,
+            infra_active_store,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+
+        manifest = infra_contracts.ActiveManifest(
+            initiative=infra_contracts.ActiveManifestEntry(
+                id="init-local-00001",
+                path="spec-dock/initiatives/init-local-00001-alpha",
+            ),
+            epic=infra_contracts.ActiveManifestEntry(
+                id="epic-local-00001",
+                path="spec-dock/initiatives/init-local-00001-alpha/epics/epic-local-00001-beta",
+            ),
+            issue=infra_contracts.ActiveManifestEntry(
+                id="iss-local-00001",
+                path=(
+                    "spec-dock/initiatives/init-local-00001-alpha/epics/"
+                    "epic-local-00001-beta/issues/iss-local-00001-gamma"
+                ),
+            ),
+        )
+
+        text = infra_active_store._render_context_pack(manifest)
+
+        self.assertIn("- entry: `spec-dock/.agent/active.json`", text)
+        self.assertIn("- default working set: `spec-dock/.agent/index.json`", text)
+        self.assertIn("- default dependency view: `spec-dock/.agent/deps-issues.json`", text)
+        self.assertIn("- escalation only: `spec-dock/.agent/index-all.json`", text)
+        self.assertIn("- Start with `spec-dock/.agent/active.json`.", text)
+        self.assertIn(
+            "- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.",
+            text,
+        )
+        self.assertIn(
+            "- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.",
+            text,
+        )
+        self.assertIn("human guidance", text)
+        self.assertIn("not the sole source of truth", text)
+        self.assertIn("- `spec-dock/active/issue/report.md`", text)
+
     def test_show_active_reads_agent_manifest_into_active_view_result(self) -> None:
         (
             _runtime_app,
