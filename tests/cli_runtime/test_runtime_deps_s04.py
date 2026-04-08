@@ -1235,3 +1235,33 @@ class TestRuntimeDepsS04(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_check_deps = original_application_check_deps
+
+    def test_legacy_deps_path_rejects_non_canonical_url_like_target(self) -> None:
+        (runtime_app, *_) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
+
+        calls = {"count": 0}
+        original_find_specdock_dir = runtime_app._find_specdock_dir
+        original_application_check_deps = cli_bootstrap.application_check_deps
+        try:
+            runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
+
+            def _fake_check_deps(req, ports):
+                del req, ports
+                calls["count"] += 1
+                raise AssertionError("application_check_deps must not run for invalid target")
+
+            cli_bootstrap.application_check_deps = _fake_check_deps
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = runtime_app.main(["deps", "check", "git@github.com:owner/repo/issues/123"])
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue().strip(), "")
+            self.assertIn("Invalid target", stderr.getvalue())
+            self.assertEqual(calls["count"], 0)
+        finally:
+            runtime_app._find_specdock_dir = original_find_specdock_dir
+            cli_bootstrap.application_check_deps = original_application_check_deps

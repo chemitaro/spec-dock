@@ -14,6 +14,10 @@ from .puml import (
     render_tree_ready_board_puml,
 )
 
+CURRENT_FUTURE_PROJECTION = "current-future"
+FULL_HISTORY_PROJECTION = "full-history"
+OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION = "open-issues-dependency-view"
+
 
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
@@ -363,11 +367,13 @@ def _build_state_payloads(result: SyncStateResult) -> tuple[dict[str, object], d
     }
     payload_all = {
         **common,
+        "projection": FULL_HISTORY_PROJECTION,
         "deps": deps_top_all,
         "nodes": nodes_all,
     }
     payload_todo = {
         **common,
+        "projection": CURRENT_FUTURE_PROJECTION,
         "deps": deps_top_todo,
         "nodes": nodes_todo,
     }
@@ -479,6 +485,7 @@ def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
         payload = {
             "schema_version": 1,
             "generated_at": result.generated_at,
+            "projection": OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION,
             "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
             "deps": {"valid": True, "error": None},
             "nodes": issue_nodes,
@@ -490,6 +497,7 @@ def render_deps_issues_artifact(result: SyncStateResult) -> DepsIssuesArtifact:
         payload = {
             "schema_version": 1,
             "generated_at": result.generated_at,
+            "projection": OPEN_ISSUES_DEPENDENCY_VIEW_PROJECTION,
             "source": {"index": "spec-dock/.agent/index.json", "schema_version": 2},
             "deps": {"valid": False, "error": result.deps_preflight_error},
             "nodes": {},
@@ -518,10 +526,20 @@ def render_context_pack(active_selection: ActiveSelection | None) -> str:
     lines.append(f"- issue: {issue_id or '(none)'}")
     lines.append("")
     lines.append("## Generated state")
-    lines.append("- index: `spec-dock/.agent/index.json`")
-    lines.append("- tree: `spec-dock/.agent/tree.json`")
+    lines.append("- entry: `spec-dock/.agent/active.json`")
+    lines.append("- default working set: `spec-dock/.agent/index.json`")
+    lines.append("- default dependency view: `spec-dock/.agent/deps-issues.json`")
+    lines.append("- escalation only: `spec-dock/.agent/index-all.json`")
+    lines.append("- human-oriented tree: `spec-dock/.agent/tree.json`")
     lines.append("")
     lines.append("## Read order")
+    lines.append("- Start with `spec-dock/.agent/active.json`.")
+    lines.append("- For normal work, read `spec-dock/.agent/index.json` and `spec-dock/.agent/deps-issues.json`.")
+    lines.append("- Read `spec-dock/.agent/index-all.json` only when full-history context is needed.")
+    lines.append(
+        "- `spec-dock/active/context-pack.md` is human guidance that mirrors this contract; it is not the sole source of truth."
+    )
+    lines.append("- Then follow the active documents:")
     if initiative_id:
         lines.append("- `spec-dock/active/initiative/requirement.md`")
         lines.append("- `spec-dock/active/initiative/design.md`")

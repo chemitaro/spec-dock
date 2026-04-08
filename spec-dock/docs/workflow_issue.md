@@ -47,17 +47,38 @@ Issue は実装の最小単位です。
 
 ## 実行 contract
 
-- 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、plan upfront approval を得る
-- 各 step は `Red → Green → Refactor → review → fix → re-review → report → commit/no-op` の順で進める
+- 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
+- 各 step は `Red → Green → Refactor → review → fix → re-review → report → コミット/no-op` の順で進める
+- `Refactor` は Green 後の bounded decision point とし、plan では詳細 task を事前確定しない
+- step 順は `design.md` の依存関係分析を根拠に、upstream / prerequisite から downstream へ組む
+- cleanup が既知で大きい場合は `Green` / design / 別 step へ切り出す
+- review / QA / spec の各 stage gate は `pass` まで回す
+- 各 stage gate の `pass` 後は、`spec-dock/active/issue/report.md` を更新し、差分確認後に report とまとめてコミットするか no-op とするかを判断する
 - `1 step = 1 つの観測可能な振る舞い` を原則にし、各 step に観測用の 1 本のコマンドを置く
 - `plan.md` では TDD cycle を step / block / iteration に埋め込み、配置ルールは `phase_plan_issue.md` に従う
 - 各 step は step result approval を得てから次へ進む
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
+- route だけ、または `active set` だけでは Issue work は完了しない
+- `complete` と報告してよいのは、active issue が set され、その対象 issue を確認でき、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が記録されている場合のみである
+- 4 点の issue docs のいずれかが untouched、template、placeholder、または実質未記入の状態で残る場合は `未完了` であり、成功報告をしてはならない
+- required step（`sync` / `validate` / `required review`）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
+- `blocked` は、外部依存、権限不足、サービス停止、その他の環境条件によって次の required action を進められない状態を指す
+- `blocked` の場合は `report.md` に reason と next action を残す。blocker type と impact は該当する場合に併記する
+- `未完了` は、product work、docs 更新、または証跡が不足している状態を指す。product gap は環境 blocker がない限り `blocked` ではなく `未完了` として扱う
+- `未完了` の場合も `report.md` に reason と next action を残す
+- 完了条件を満たせない状態は `blocked` または `未完了` として扱い、成功報告をしてはならない
 
 ## report
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
+- `complete` 判定に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡を残す
+- required step（`sync` / `validate` / `required review`）を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
+- `blocked` / `未完了` の場合は reason と next action を残し、環境 blocker と product gap を混在させない
+- `blocked` では blocker type と impact を該当する範囲で残す
+- stage gate ごとの reviewer verdict / test結果 / 修正内容 / no-op 理由もここに残す
+- 実際に行った refactor は事前計画ではなくここに残す
+- 依存関係の想定と違った実装順や refactor が必要になった場合もここに残す
 - 1 セッション 1 追記でよいが、未来の自分と reviewer が追える粒度を保つ
 
 ## 品質ゲート
@@ -75,7 +96,9 @@ Issue は実装の最小単位です。
   - docs impact / docs refresh step が必要なら入っている
   - final diff review quality gate が独立している
 - report:
-  - 実行コマンドと結果が残っている
+- `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が残っている
+- required step を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は `blocked` / `未完了` の reason と next action が残っている
+  - `blocked` の blocker type / impact が必要な場合に残っている
   - 想定外と対処が追える
 
 ## 仕上げ

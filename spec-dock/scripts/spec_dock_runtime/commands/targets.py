@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from ..application.contracts import TargetRef
 
 _num_re = re.compile(r"^[0-9]+$")
-_gh_issue_url_re = re.compile(r"/issues/(?P<num>[0-9]+)\b")
 _gh_issue_url_full_re = re.compile(
     r"^(?:https?://)?(?:www\.)?github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)/issues/(?P<num>[0-9]+)(?:[/?#].*)?$",
     re.IGNORECASE,
@@ -59,6 +58,11 @@ def parse_github_issue_target(target: str) -> int:
     return parse_github_issue_target_ref(target).issue_number
 
 
+def _looks_like_non_canonical_github_issue_target(raw: str) -> bool:
+    lowered = raw.lower()
+    return "github.com" in lowered or "issues/" in lowered or "/" in raw or ":" in raw
+
+
 def parse_github_issue_target_ref(target: str) -> GitHubIssueTarget:
     raw = target.strip()
     if not raw:
@@ -79,8 +83,7 @@ def parse_github_issue_target_ref(target: str) -> GitHubIssueTarget:
 
     # For import targets, accept either canonical GitHub issue URLs or pure issue numbers.
     # Reject URL-like strings to avoid bypassing repo-identity validation.
-    lowered = raw.lower()
-    if "github.com" in lowered or "issues/" in lowered or "/" in raw or ":" in raw:
+    if _looks_like_non_canonical_github_issue_target(raw):
         raise RuntimeError(
             "Invalid target. Use a GitHub issue number (e.g. 123 / #123) "
             "or a canonical URL like https://github.com/<owner>/<repo>/issues/123."
@@ -121,10 +124,11 @@ def parse_active_like_target(target: str) -> tuple[TargetRef, str]:
             "Invalid target. Use a GitHub issue URL like https://github.com/<owner>/<repo>/issues/123."
         )
 
-    match = _gh_issue_url_re.search(raw)
-    if match:
-        issue_number = int(match.group("num"))
-        return (_make_github_issue_target(issue_number=issue_number), _github_target_display(issue_number=issue_number))
+    if _looks_like_non_canonical_github_issue_target(raw):
+        raise RuntimeError(
+            "Invalid target. Use a GitHub issue number (e.g. 123 / #123), "
+            "a node id (e.g. iss-00123), or a canonical URL like https://github.com/<owner>/<repo>/issues/123."
+        )
 
     if raw.startswith("#") and _num_re.fullmatch(raw[1:]):
         issue_number = int(raw[1:])

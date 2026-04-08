@@ -27,6 +27,13 @@ ID: "iss-00050"
   - unknown custom skills を pruning しない
   - adapter を thin entrypoint に保つ
 
+## 実装順序の根拠
+- `design.md` の依存関係分析を正本にする。
+- issue-00049 protocol / installer ownership / bundled asset pattern が upstream なので、これを前提に step を並べる。
+- 依存の少ない adapter asset / metadata contract を先に固定し、その contract を installer sync へ接続してから parity / final review へ進む。
+- したがって順序は S01（spec fixed point）→ S02（installer sync）→ S03（parity / docs / validate）→ S04（final review）とする。
+- TDD の各 iteration でも、asset shape → ownership/sync → parity/validation の順に閉じ、未解決依存を抱えたまま downstream step へ進まない。
+
 ## マイルストーン一覧
 - M1:
   - 対象:
@@ -94,17 +101,23 @@ ID: "iss-00050"
     - S04 final close 前
   - scope:
     - thin adapter contract、issue boundary、final epic consistency
+  - commit gate:
+    - 初回 SG1 pass 後は `report.md` を更新し、その更新を含めて docs-only commit を原則作成する。final SG1 でも追加差分があれば同様に commit する
 - RG1 implementation review:
   - timing:
     - S02 完了後
     - S03 完了後
   - scope:
     - installer changes、asset layout、adapter thinness
+  - commit gate:
+    - 各 RG1 pass 後に `report.md` を更新し、その stage で確定した差分と report を 1 commit にまとめる
 - QG1 QA review:
   - timing:
     - S03 完了後
   - scope:
     - init/update behavior、parity evidence、validate
+  - commit gate:
+    - QG1 pass 後に `report.md` を更新し、QA 反映済みの最終差分と report を commit して S04 へ渡す
 - step approval loop:
   - SG1 pass 後に S02 へ進む
   - S02 後は RG1 pass を取ってから S03 へ進む
@@ -119,6 +132,8 @@ ID: "iss-00050"
 - docs impact が `none` でなければ `S90` を実行する。
 - 最後に `git diff <base>...HEAD` を対象に `S99 final diff review quality gate` を実施する。
 - reviewer verdict は `report.md` に残す。
+- 各 review/test cycle は reviewer status が `pass` になるまで fix -> re-review / re-test を繰り返す。
+- 各 stage gate（SG/RG/QG）通過後は、先に `report.md` を更新し、その gate で確定した差分と report を原則まとめて commit する。no-op の場合のみ `report.md` に理由を残す。
 
 ## 実装ステップ
 
@@ -138,7 +153,9 @@ ID: "iss-00050"
 - expected tests:
   - なし（docs review only）
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - spec review verdict / fixed point / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - thin adapter contract と metadata fixed point、および report 更新をまとめて commit し、後続の実装差分と分離する
 
 ### S02 — installer managed asset sync for host adapters
 - target:
@@ -155,7 +172,7 @@ ID: "iss-00050"
   - adapter skill directories と metadata asset を定義する
 - files:
   - `src/spec_dock/assets/codex_skills/`
-  - optional metadata asset path
+  - required metadata asset path
 
 ##### I1 — add adapter assets
 - slice goal:
@@ -174,14 +191,17 @@ ID: "iss-00050"
   - asset existence / sync verification が green
 
 ###### Refactor
-- cleanup target:
-  - skill naming / ownership list の重複整理
-- invariants to keep green:
-  - unknown custom skills を壊さない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### B2 — installer ownership and pruning
 - purpose:
   - managed ownership を安全に広げる
+  - unknown custom skills を保持したまま managed prune する
 - files:
   - `src/spec_dock/cli.py`
   - `tests/test_init_update.py`
@@ -193,6 +213,7 @@ ID: "iss-00050"
 ###### Red
 - failing test:
   - init/update managed skill tests
+  - unknown custom skill preservation test
 - expected failure:
   - adapter が配布されない、または pruning safety が崩れる
 
@@ -201,20 +222,26 @@ ID: "iss-00050"
   - managed skill names / ownership names / copy loop を更新
 - pass condition:
   - init/update tests が green
+  - unknown custom skills が preserve される
 
 ###### Refactor
-- cleanup target:
-  - duplicated installer constants
-- invariants to keep green:
-  - unknown custom skills を保持する
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
   - RG1 implementation review
 - expected tests:
   - relevant installer tests
+  - unknown custom skill preservation test
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - review verdict / test結果 / 修正内容を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - installer managed asset sync 差分と report 更新を 1 commit として確定する
 
 ### S03 — adapter thinness, dogfooding parity, docs parity
 - target:
@@ -251,10 +278,12 @@ ID: "iss-00050"
   - review で thin adapter contract を確認できる
 
 ###### Refactor
-- cleanup target:
-  - duplicated wording
-- invariants to keep green:
-  - host 固有差分は entry wording に限定する
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### B2 — parity and validation
 - purpose:
@@ -280,10 +309,12 @@ ID: "iss-00050"
   - validate pass と parity evidence が揃う
 
 ###### Refactor
-- cleanup target:
-  - parity-only noise の整理
-- invariants to keep green:
-  - manual-only drift を残さない
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
@@ -293,7 +324,9 @@ ID: "iss-00050"
   - relevant installer tests
   - `./spec-dock/scripts/spec-dock validate`
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - review verdict / QA verdict / parity evidence / validation結果を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - adapter thinness / parity / QA反映込みの差分と report 更新を 1 commit として確定する
 
 ### S04 — final spec review and close readiness
 - target:
@@ -311,7 +344,9 @@ ID: "iss-00050"
 - expected tests:
   - evidence review only
 - report update:
-  - `./spec-dock/active/issue/report.md`
+  - final spec review verdict / closing evidence / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - final spec review で追加入力があれば closing commit を作成し、無ければ直前 gate の commit を最終成果として扱う
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -330,6 +365,8 @@ ID: "iss-00050"
   - spec review pass
   - implementation review pass
   - QA review pass
+- commit expectation:
+  - final diff review -> report update 後に追加修正があれば最終 commit を作成し、追加修正が無ければ直前 gate の commit を最終成果として扱う
 
 ## 未確定事項
 - なし:
