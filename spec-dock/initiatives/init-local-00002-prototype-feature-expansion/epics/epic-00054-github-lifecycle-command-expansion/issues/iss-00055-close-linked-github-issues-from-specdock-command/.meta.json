@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00055",
+  "title": "Close Linked Github Issues From Specdock Command",
+  "slug": "close-linked-github-issues-from-specdock-command",
+  "created_at": "2026-04-08T22:52:41+09:00",
+  "updated_at": "2026-04-08T22:52:41+09:00",
+  "parent_id": "epic-00054",
+  "initiative_id": "init-local-00002",
+  "epic_id": "epic-00054",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 55,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
