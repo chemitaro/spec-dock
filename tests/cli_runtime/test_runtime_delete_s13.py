@@ -106,6 +106,14 @@ class _StubNodeReader:
         return list(self._records)
 
 
+class _RaisingNodeReader:
+    def __init__(self, message: str):
+        self._message = message
+
+    def load_node_records(self):
+        raise RuntimeError(self._message)
+
+
 class _StubDepsTopologyReader:
     def __init__(self, infra_contracts, dep_map):
         self._infra_contracts = infra_contracts
@@ -304,6 +312,7 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         issue_gateway=None,
         node_repo=None,
         active_state_store=None,
+        node_reader=None,
     ):
         app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
             _runtime_modules()
@@ -319,7 +328,7 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             dep_map or {},
         )
         return app_ports.Ports(
-            node_reader=_StubNodeReader(records),
+            node_reader=node_reader or _StubNodeReader(records),
             repo_root=repo_root,
             specdock_dir=repo_root / "spec-dock",
             deps_topology_reader=resolved_deps_topology_reader,
@@ -817,6 +826,74 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.assertEqual(result.target_id, "iss-local-00056")
         self.assertEqual(result.offending_node_ids, ["iss-local-00056"])
         self.assertIsNotNone(result.remote_close)
+        assert result.remote_close is not None
+        self.assertEqual(result.remote_close.closed, [])
+        self.assertEqual(result.remote_close.noop_already_closed, [])
+        self.assertEqual(result.remote_close.failed, [])
+        self.assertEqual(result.remote_close.skipped_not_attempted, [])
+
+    def test_target_local_metadata_load_failure_is_normalized_before_graph_build(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root)
+        target_meta_path = Path(records[2].meta_path)
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            node_reader=_RaisingNodeReader(f"Invalid JSON: {target_meta_path}: broken payload"),
+        )
+        target_meta_path.parent.mkdir(parents=True, exist_ok=True)
+        target_meta_path.write_text("{invalid-json", encoding="utf-8")
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "metadata_validation_failed")
+        self.assertEqual(result.target_id, "iss-local-00056")
+        self.assertEqual(result.offending_node_ids, ["iss-local-00056"])
+        self.assertEqual(
+            [(reason.node_id, reason.code) for reason in result.validation_reasons],
+            [("iss-local-00056", "metadata_validation_failed")],
+        )
+        assert result.remote_close is not None
+        self.assertEqual(result.remote_close.closed, [])
+        self.assertEqual(result.remote_close.noop_already_closed, [])
+        self.assertEqual(result.remote_close.failed, [])
+        self.assertEqual(result.remote_close.skipped_not_attempted, [])
+
+    def test_target_local_metadata_load_failure_uses_error_path_when_directory_match_is_ambiguous(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root)
+        ports = self._ports(records=records, repo_root=repo_root)
+        target_meta_path = Path(records[2].meta_path)
+        target_meta_path.parent.mkdir(parents=True, exist_ok=True)
+        target_meta_path.write_text("{invalid-json", encoding="utf-8")
+        duplicate_dir = target_meta_path.parent.parent / f"{records[2].id}-shadow"
+        duplicate_dir.mkdir(parents=True, exist_ok=True)
+        (duplicate_dir / ".meta.json").write_text("{}\n", encoding="utf-8")
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            node_reader=_RaisingNodeReader(f"Invalid JSON: {target_meta_path}: broken payload"),
+        )
+        target_meta_path.write_text("{invalid-json", encoding="utf-8")
+
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "metadata_validation_failed")
+        self.assertEqual(result.target_id, "iss-local-00056")
+        self.assertEqual(result.offending_node_ids, ["iss-local-00056"])
+        self.assertEqual(
+            [(reason.node_id, reason.code) for reason in result.validation_reasons],
+            [("iss-local-00056", "metadata_validation_failed")],
+        )
         assert result.remote_close is not None
         self.assertEqual(result.remote_close.closed, [])
         self.assertEqual(result.remote_close.noop_already_closed, [])
