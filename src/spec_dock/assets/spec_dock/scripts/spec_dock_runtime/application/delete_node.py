@@ -248,6 +248,27 @@ def _iter_managed_nodes(graph: SpecGraph) -> list[SpecNode]:
     return [node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")]
 
 
+def _is_canonical_managed_node_dir(*, specdock_dir: Path, node_dir: Path, kind: SpecNodeKind) -> bool:
+    try:
+        relative_parts = node_dir.resolve().relative_to(specdock_dir.resolve()).parts
+    except Exception:
+        return False
+    if kind == "initiative":
+        return len(relative_parts) == 2 and relative_parts[0] == "initiatives"
+    if kind == "epic":
+        return (
+            len(relative_parts) == 4
+            and relative_parts[0] == "initiatives"
+            and relative_parts[2] == "epics"
+        )
+    return (
+        len(relative_parts) == 6
+        and relative_parts[0] == "initiatives"
+        and relative_parts[2] == "epics"
+        and relative_parts[4] == "issues"
+    )
+
+
 def _node_kind_from_prefix(prefix: str) -> SpecNodeKind | None:
     mapping: dict[str, SpecNodeKind] = {
         "init": "initiative",
@@ -269,11 +290,7 @@ def _matching_target_directories(specdock_dir: Path, *, canonical_id: str, kind:
         name = path.name.lower()
         if name != canonical_id and not name.startswith(expected_prefix):
             continue
-        if kind == "initiative" and path.parent != initiatives_root:
-            continue
-        if kind == "epic" and path.parent.name != "epics":
-            continue
-        if kind == "issue" and path.parent.name != "issues":
+        if not _is_canonical_managed_node_dir(specdock_dir=specdock_dir, node_dir=path, kind=kind):
             continue
         matches.append(path)
     return sorted(matches)
@@ -300,11 +317,7 @@ def _target_node_dir_from_error_message(
     expected_prefix = f"{canonical_id}-"
     if name != canonical_id and not name.startswith(expected_prefix):
         return None
-    if kind == "initiative" and node_dir.parent != specdock_dir / "initiatives":
-        return None
-    if kind == "epic" and node_dir.parent.name != "epics":
-        return None
-    if kind == "issue" and node_dir.parent.name != "issues":
+    if not _is_canonical_managed_node_dir(specdock_dir=specdock_dir, node_dir=node_dir, kind=kind):
         return None
     return node_dir
 

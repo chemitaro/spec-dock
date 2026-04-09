@@ -5,7 +5,7 @@ ID: "iss-00056"
 関連GitHub: ["#56"]
 状態: "draft | approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-09"
+最終更新: "2026-04-10"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -375,6 +375,54 @@ python -m unittest -v \
 #### メモ
 - `uvx --from /srv/mount/spec-dock` は uncommitted working-tree change を manual verification 用 SUT へ反映しなかったため、working tree verification では `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init/update` を使った。
 - `.meta.json` が `444` である点は readonly metadata permission contract と整合するため、manual setup observation として残し、blocking defect からは外した。
+
+### 2026-04-10 17:00 - 17:40
+
+#### 対象
+- Step: S04 follow-up remediation / review-closeout
+- AC/EC: live-manual-defect-01
+
+#### 実施内容
+- code review fail を受け、target-local metadata fallback の candidate selection を再度補強した。
+- `initiatives/<init>` / `initiatives/<init>/epics/<epic>` / `initiatives/<init>/epics/<epic>/issues/<issue>` の canonical tree placement だけを fallback 候補に通す helper を追加し、stale / non-canonical な duplicate-like directory が混ざっても structured `metadata_validation_failed` contract が崩れないようにした。
+- CLI regression は `--id` に加えて positional target (`delete iss-00056 --yes --json`) も追加し、manual defect-1 の selector variation を自動回帰へ固定した。
+- full regression / validate / fresh review cycle を再実施し、implementation / QA / spec の 3 review すべてを pass に戻した。
+
+#### 実行コマンド / 結果
+```bash
+python -m py_compile \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py \
+  tests/cli_runtime/test_runtime_delete_s13.py \
+  tests/cli_runtime/test_delete.py
+
+python -m unittest -v \
+  tests.cli_runtime.test_runtime_delete_s13 \
+  tests.cli_runtime.test_delete \
+  tests.cli_runtime.test_runtime_shell_s11 \
+  tests.cli_runtime.test_runtime_close_s12 \
+  tests.cli_runtime.test_runtime_active_s06 \
+  tests.cli_runtime.test_runtime_deps_s04 \
+  tests.cli_runtime.test_close
+
+./spec-dock/scripts/spec-dock validate
+```
+
+- `py_compile`: success
+- targeted/full regression subset: `Ran 113 tests ... OK`
+- dogfooding validate: `spec-dock: ok (validate) nodes=17`
+- implementation review: `pass`
+- QA review: `pass`
+- spec review: `pass`
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - canonical tree placement filter を追加し、target-local metadata fallback の stale/non-canonical candidate 混入を除外
+- `tests/cli_runtime/test_runtime_delete_s13.py` - canonical/non-canonical duplicate-like directory regression を追加
+- `tests/cli_runtime/test_delete.py` - positional target `--json` regression を追加
+- `spec-dock/active/issue/report.md` - S04 follow-up remediation と final review 結果を追記
+
+#### メモ
+- non-blocking として、`load_node_records()` が `.meta.json` path を含まない generic runtime error を返し、canonical directory が複数ある異常環境では structured fallback が成立しない余地は残るが、今回の defect-1 scope と acceptance には影響しない。
+- live manual summary / execution log の final verdict は `pass` のままで、blocking defect は解消済みと判断した。
 
 ## 省略/例外メモ (必須)
 - なし

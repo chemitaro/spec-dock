@@ -266,6 +266,29 @@ class TestCliDelete(CliRuntimeHarness):
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertEqual(state["state"], "OPEN")
 
+    def test_delete_issue_target_invalid_metadata_positional_returns_structured_json(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        target, issue_dir, state_path, env = self._setup_delete_target_repo(issue_number=56)
+        meta_path = issue_dir / ".meta.json"
+        meta_path.chmod(meta_path.stat().st_mode | 0o200)
+        meta_path.write_text("{invalid-json", encoding="utf-8")
+        p = self._run_runtime_capture(target, ["delete", "iss-00056", "--yes", "--json"], env=env)
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        payload = json.loads(p.stdout)
+        self.assertEqual(payload["status"], "metadata_validation_failed")
+        self.assertEqual(payload["target_id"], "iss-00056")
+        self.assertEqual(payload["offending_node_ids"], ["iss-00056"])
+        self.assertEqual(payload["remote_close"]["closed"], [])
+        self.assertEqual(payload["remote_close"]["noop_already_closed"], [])
+        self.assertEqual(payload["remote_close"]["failed"], [])
+        self.assertEqual(payload["remote_close"]["skipped_not_attempted"], [])
+        self.assertEqual(p.stderr, "")
+        self.assertTrue(issue_dir.exists())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        self.assertEqual(state["state"], "OPEN")
+
 
 class TestFsRepoDeleteTree(unittest.TestCase):
     def test_delete_tree_retries_permission_error_for_readonly_meta(self) -> None:
