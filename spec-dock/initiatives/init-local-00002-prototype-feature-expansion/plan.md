@@ -44,15 +44,23 @@ ID: "init-local-00002"
     - Metric-002
   - depends on:
     - `init-local-00003` の blocker が閉じていること
-- epic-0002-collaboration-and-lifecycle-expansion:
+- epic-00054-github-lifecycle-command-expansion:
   - 目的:
-    - GitHub / collaboration / lifecycle の feature value を広げる。
+    - GitHub / lifecycle の feature value を広げ、dogfooding で不足が見えた command-side lifecycle completeness を補う。
   - deliverable:
-    - collaboration-facing capability backlog の整理と追加
+    - SpecDock から linked GitHub issue を close できる command と、local spec node を directory ごと削除できる安全な delete contract の定義、および 2 issue で完結する実装計画
   - metric link:
     - Metric-002
   - depends on:
     - epic-0001-core-workflow-completeness
+  - 背景:
+    - 現在の dogfooding では issue 作成は command 側で完結する一方、issue close は GitHub Web UI に戻る必要があり、lifecycle が途中で分断されている。
+    - さらに local tree の整理も手作業で directory 削除に頼っており、issue / epic / initiative の local cleanup を command 化する operator value がある。
+    - ただし GitHub-side delete は事故リスクが高いため、この epic では remote handling を close-only とし、remote delete は success path に含めない。
+  - 実行方針:
+    - 2 issue 構成で進める。
+    - 第1 issue で close command を実装し、その issue 自身の docs/tests/review/success verification まで閉じる。
+    - 第2 issue で local delete を実装し、その issue 自身の docs/tests/review/success verification に加えて epic 全体の final review / final validation まで閉じる。
 - epic-0003-operator-value-expansion:
   - 目的:
     - operator が日常運用で得られる feature value を広げる。
@@ -77,9 +85,11 @@ ID: "init-local-00002"
 - sequencing rationale:
   - まず core workflow completeness を優先する。
   - そのうえで collaboration/lifecycle と operator value を拡張する。
+  - `epic-00054` はその最初の具体化であり、create 後に Web UI へ戻っている lifecycle gap と、手作業 directory cleanup を command contract へ戻す役割を持つ。
+  - `epic-00054` は review-only issue を別建てせず、各 implementation issue に review と成功性確認を内包する。
   - post-prototype 候補は current initiative の出口を曖昧にしないよう最後に整理する。
 - parallelizable:
-  - epic-0002 と epic-0003 は並行検討できる。
+  - `epic-00054` と epic-0003 は並行検討できる。
 
 ## 意思決定ゲート
 - G1 strategy review:
@@ -128,10 +138,10 @@ ID: "init-local-00002"
 ## 未確定事項
 - Q-001:
   - 質問:
-    - epic-0002 と epic-0003 のどちらを先に進めるか。
+    - `epic-00054` と epic-0003 のどちらを先に進めるか。
   - 選択肢:
     - A:
-      - collaboration / lifecycle
+      - collaboration / lifecycle（`epic-00054`）
     - B:
       - operator value
   - 推奨案:
