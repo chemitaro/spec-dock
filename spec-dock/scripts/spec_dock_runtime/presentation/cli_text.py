@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+
 from ..application.contracts import (
     ActiveClearResult,
     ActiveSetResult,
     ActiveViewResult,
     CloseNodeResult,
+    DeleteNodeResult,
     CreateDiscussionDocResult,
     CreateNodeResult,
     DepsCheckResult,
@@ -212,6 +215,118 @@ def render_close_text(result: CloseNodeResult, *, target_display: str) -> CliTex
             )
         ],
         stderr_lines=[],
+        warnings=list(result.warnings),
+    )
+
+
+def _delete_remote_close_payload(result: DeleteNodeResult) -> dict[str, list[str]]:
+    if result.remote_close is None:
+        return {
+            "closed": [],
+            "noop_already_closed": [],
+            "failed": [],
+            "skipped_not_attempted": [],
+        }
+    return {
+        "closed": list(result.remote_close.closed),
+        "noop_already_closed": list(result.remote_close.noop_already_closed),
+        "failed": list(result.remote_close.failed),
+        "skipped_not_attempted": list(result.remote_close.skipped_not_attempted),
+    }
+
+
+def _delete_validation_reasons_payload(result: DeleteNodeResult) -> list[dict[str, str | None]]:
+    return [
+        {
+            "node_id": reason.node_id,
+            "code": reason.code,
+            "message": reason.message,
+        }
+        for reason in result.validation_reasons
+    ]
+
+
+def _build_delete_json_payload(result: DeleteNodeResult) -> dict[str, object]:
+    status = result.status
+    blockers = {
+        "invalid_selector_combination",
+        "invalid_selector_syntax",
+        "target_not_found",
+        "ambiguous_target",
+        "active_conflict",
+        "dependency_conflict",
+        "recursive_required",
+        "confirmation_required",
+    }
+    if status in blockers:
+        return {
+            "status": status,
+            "target_id": result.target_id,
+            "offending_node_ids": list(result.offending_node_ids),
+            "validation_reasons": _delete_validation_reasons_payload(result),
+        }
+    if status == "metadata_validation_failed":
+        return {
+            "status": status,
+            "target_id": result.target_id,
+            "offending_node_ids": list(result.offending_node_ids),
+            "validation_reasons": _delete_validation_reasons_payload(result),
+            "remote_close": _delete_remote_close_payload(result),
+        }
+    if status == "remote_close_failed":
+        return {
+            "status": status,
+            "target_id": result.target_id,
+            "remote_close": _delete_remote_close_payload(result),
+            "deleted_node_ids": list(result.deleted_node_ids),
+        }
+    if status == "local_delete_partial_failure":
+        return {
+            "status": status,
+            "target_id": result.target_id,
+            "deleted_node_ids": list(result.deleted_node_ids),
+            "remaining_node_ids": list(result.remaining_node_ids),
+            "remote_close": _delete_remote_close_payload(result),
+            "active_restore_result": result.active_restore_result,
+            "recovery_guidance": list(result.recovery_guidance),
+            "dependency_scrub_failures": [
+                {
+                    "node_id": failure.node_id,
+                    "edge_target_id": failure.edge_target_id,
+                }
+                for failure in result.dependency_scrub_failures
+            ],
+        }
+    # `ok`
+    return {
+        "status": status,
+        "target_id": result.target_id,
+        "deleted_node_ids": list(result.deleted_node_ids),
+        "remaining_node_ids": list(result.remaining_node_ids),
+        "remote_close": _delete_remote_close_payload(result),
+        "active_restore_result": result.active_restore_result,
+    }
+
+
+def render_delete_text(result: DeleteNodeResult, *, json_output: bool) -> CliText:
+    if json_output:
+        return CliText(
+            stdout_lines=[json.dumps(_build_delete_json_payload(result), ensure_ascii=False, indent=2)],
+            stderr_lines=[],
+            warnings=[],
+        )
+
+    if result.status == "ok":
+        return CliText(
+            stdout_lines=[f"spec-dock: ok (delete) target={result.target_id}"],
+            stderr_lines=[],
+            warnings=list(result.warnings),
+        )
+    return CliText(
+        stdout_lines=[],
+        stderr_lines=[
+            f"spec-dock: blocked (delete) status={result.status} target={result.target_id or '(none)'}"
+        ],
         warnings=list(result.warnings),
     )
 

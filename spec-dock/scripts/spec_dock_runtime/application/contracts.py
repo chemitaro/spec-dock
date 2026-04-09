@@ -160,6 +160,69 @@ class CloseNodeResult:
     warnings: list[str]
 
 
+DeleteTerminalStatus = Literal[
+    "ok",
+    "invalid_selector_combination",
+    "invalid_selector_syntax",
+    "target_not_found",
+    "ambiguous_target",
+    "active_conflict",
+    "dependency_conflict",
+    "recursive_required",
+    "confirmation_required",
+    "metadata_validation_failed",
+    "remote_close_failed",
+    "local_delete_partial_failure",
+]
+
+
+@dataclass(frozen=True)
+class DeleteValidationReason:
+    node_id: str | None
+    code: str
+    message: str
+
+
+@dataclass(frozen=True)
+class DeleteRemoteCloseBuckets:
+    closed: list[str]
+    noop_already_closed: list[str]
+    failed: list[str]
+    skipped_not_attempted: list[str]
+
+
+@dataclass(frozen=True)
+class DeleteDependencyScrubFailure:
+    node_id: str
+    edge_target_id: str
+
+
+@dataclass(frozen=True)
+class DeleteNodeRequest:
+    positional_target: str | None
+    node_id: str | None
+    github_issue: str | None
+    recursive: bool
+    force: bool
+    confirmed: bool
+    json_output: bool
+
+
+@dataclass(frozen=True)
+class DeleteNodeResult:
+    status: DeleteTerminalStatus
+    target_id: str | None
+    deleted_node_ids: list[str]
+    remaining_node_ids: list[str]
+    remote_close: DeleteRemoteCloseBuckets | None
+    offending_node_ids: list[str]
+    validation_reasons: list[DeleteValidationReason]
+    active_restore_result: Literal["cleared", "restored", "restore_failed", "not_needed"] | None
+    recovery_guidance: list[str]
+    dependency_scrub_failures: list[DeleteDependencyScrubFailure]
+    warnings: list[str]
+
+
 @dataclass(frozen=True)
 class ShowActiveRequest:
     pass
@@ -286,6 +349,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    delete_node: Callable[[DeleteNodeRequest], DeleteNodeResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("delete_node is not configured")
+    )
     close_node: Callable[[CloseNodeRequest], CloseNodeResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("close_node is not configured")
     )

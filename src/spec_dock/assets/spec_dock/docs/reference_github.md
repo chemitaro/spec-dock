@@ -103,7 +103,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 
 `delete` は destructive command であり、`close` より強い safety boundary を持ちます。
 
-- `delete <target> --yes`: `123` / `#123` / canonical GitHub issue URL / node id を受け付けます
+- `delete <target> --yes`: node id だけを受け付けます
 - `delete --id <node-id> --yes`: explicit node target
 - `delete --github-issue <n> --yes`: explicit GitHub issue target
 - `delete` は selector 解決後に local guardrail / subtree metadata validation / required remote close barrier を通してから mutation を開始します
