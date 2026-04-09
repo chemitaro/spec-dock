@@ -125,7 +125,7 @@ spec-dock: ok (validate) nodes=17
 - `tests/cli_runtime/test_close.py` - close command E2E / sync confirmation tests を追加
 
 #### コミット
-- pending
+- `8c5deac08f51e234a36b1826d984b790cd74bf27`
 
 #### メモ
 - implementation review は pass。non-blocking comment として positional target の command-level coverage 追加提案があり、`tests/cli_runtime/test_close.py` に反映した。
