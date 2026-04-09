@@ -1,0 +1,449 @@
+---
+種別: 要件定義書（Issue）
+ID: "iss-00056"
+タイトル: "Delete Local Spec Nodes With Safeguards And Epic Final Closeout"
+関連GitHub: ["#56"]
+状態: "draft | approved"
+作成者: "Codex CLI"
+最終更新: "2026-04-09"
+親: ["epic-00054", "init-local-00002"]
+---
+
+# iss-00056 Delete Local Spec Nodes With Safeguards And Epic Final Closeout — 要件定義（WHAT / WHY）
+
+## 目的
+- issue / epic / initiative の local spec node を command 側から安全に削除できるようにし、手作業 directory cleanup を operator contract として置き換える。
+- local delete の destructive 境界、remote close-only、epic final close-out を 1 issue の中で固定し、`epic-00054` 全体の完成条件をこの issue で閉じる。
+
+## 背景・現状
+- 現状の挙動:
+  - local spec node を不要化した場合、現在は maintainer が手作業で directory を削除している。
+  - linked GitHub issue を伴う node でも、remote side に対する安全な後処理 contract は定義されていない。
+  - `epic-00054` では issue55 が close command を担い、issue56 が local delete と final close-out を担う想定である。
+- 現状の課題:
+  - 手作業削除は active pointer、deps、parent-child subtree、generated state との整合を壊しやすい。
+  - local delete と remote lifecycle close の関係が docs / runtime / tests で未定義であり、事故時の説明責任が弱い。
+  - epic final review / final validation を別 issue に逃がさず、この issue 自身で閉じる必要がある。
+- 再現手順:
+  1. issue / epic / initiative の local node を不要化する。
+  2. delete command が無いため、対象 directory を手作業で削除する。
+  3. active pointer、deps、linked GitHub issue、generated state は別途手動確認になる。
+- 観測点:
+  - UI:
+    - 該当なし。runtime は CLI 主体である。
+  - HTTP:
+    - 該当なし。remote side は `gh` CLI を利用する。
+  - DB:
+    - 該当なし。
+  - Log:
+    - fs deletion contract が runtime command surface に存在しない。
+    - active/deps/sync は存在するが delete orchestration は未実装である。
+- 情報源:
+  - `spec-dock/docs/reference_deps.md`
+  - `spec-dock/docs/reference_sync.md`
+  - `spec-dock/docs/reference_github.md`
+  - `spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/requirement.md`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py`
+
+## 対象ユーザー / 利用シナリオ（必要時）
+- 主な利用者:
+  - daily dogfooding を行う maintainer
+  - local tree cleanup を command 経由で安全に実施したい operator
+- 代表シナリオ:
+  - 不要になった issue node を delete し、linked GitHub issue は close-only で処理する。
+  - 不要になった epic / initiative を subtree ごと削除し、child node と linked GitHub issue 群を一貫して扱う。
+  - issue56 完了時に epic 全体の final review / final validation / close-out evidence をまとめる。
+
+## スコープ
+- MUST:
+  - issue / epic / initiative の local directory delete を top-level `delete` command として提供すること
+  - target が parent scope の場合、subtree delete は explicit recursive opt-in でのみ許可すること
+  - active pointer / dependency / subtree impact に対する guardrail を持つこと
+  - linked GitHub issue がある場合、remote handling は close-only とし、delete を実行しないこと
+  - issue56 自身の review / success verification に加え、epic final review / final validation / close-out evidence を保持すること
+- MUST NOT:
+  - GitHub-side issue delete を扱わない
+  - recursive intent なしに epic / initiative subtree を削除しない
+  - active/deps conflict を silent に無視しない
+- OUT OF SCOPE:
+  - GitHub-side issue delete
+  - unrelated generated artifact の包括的 garbage collection
+  - issue55 の close command 自体の初回導入
+
+## 境界
+- Always:
+  - canonical CLI surface は `./spec-dock/scripts/spec-dock delete <target> [--recursive] [--yes] [--force] [--json]`、`./spec-dock/scripts/spec-dock delete --id <node-id> [--recursive] [--yes] [--force] [--json]`、`./spec-dock/scripts/spec-dock delete --github-issue <issue-number> [--recursive] [--yes] [--force] [--json]` とする
+  - `<target>` は node id だけを受け付ける positional alias とし、path や title は受け付けない
+  - selector 未指定は `invalid_selector_combination` とし、`target_id` は `null` を返す
+  - `<target>` と `--id` は repo root 配下の `spec-dock/initiatives/**` に存在する local spec nodes 全体を探索対象に、directory basename から抽出した canonical node id token への完全一致で解決する
+  - `<target>` / `--id` は 0 件なら `target_not_found`、2 件以上なら `ambiguous_target`、1 件のときだけ delete target として採用する
+  - selector は `<target>` / `--id` / `--github-issue` のいずれか 1 つだけ指定でき、複数指定は `invalid_selector_combination` とする
+  - `--github-issue <issue-number>` は digits-only decimal を受け付け、`#56` や URL は受け付けない
+  - `--github-issue` input は positive base-10 integer へ正規化して比較し、leading-zero form は同じ integer として扱う
+  - malformed `--github-issue` input は `invalid_selector_syntax` とする
+  - `--github-issue <issue-number>` は repo root 配下の `spec-dock/initiatives/**` に存在する local spec nodes 全体を探索対象に解決し、0 件なら explicit not-found error、2 件以上なら explicit ambiguous-target error、1 件のときだけ delete target として採用する
+  - `<target>` / `--id` resolution 中に無関係な node の invalid metadata に遭遇しても、その node は id match 判定から除外し、selector status 自体は変えない
+  - `<target>` / `--id` resolution 中に、要求された node id に一致する would-match node が invalid metadata を持つ場合は `metadata_validation_failed` とし、その node を `offending_node_ids` に返す
+  - `--force` はどの selector form とも併用可能だが、overrideable conflict が無い場合は no-op flag として扱う
+  - machine-readable result は `--json` 指定時に stdout へ JSON object 1 件で返し、human-readable text とは混在させない
+  - delete の主操作は local directory / subtree removal である
+  - remote side は close-only であり、delete は success path に含めない
+  - terminal status は `ok` / `invalid_selector_combination` / `invalid_selector_syntax` / `target_not_found` / `ambiguous_target` / `active_conflict` / `dependency_conflict` / `recursive_required` / `confirmation_required` / `metadata_validation_failed` / `remote_close_failed` / `local_delete_partial_failure` のいずれかとする
+  - terminal status が `ok` のときだけ process exit は zero、それ以外は non-zero とする
+  - machine-verifiable result fields は `status`, `target_id`, `deleted_node_ids`, `remaining_node_ids`, `remote_close`, `offending_node_ids`, `validation_reasons`, `active_restore_result`, `recovery_guidance`, `dependency_scrub_failures` とする
+  - `validation_reasons.code` vocabulary は `invalid_selector_combination`, `invalid_selector_syntax`, `target_not_found`, `ambiguous_target`, `active_conflict`, `dependency_conflict`, `recursive_required`, `confirmation_required`, `metadata_validation_failed` とする
+  - parent scope delete は target node だけでなく subtree 全体を対象とする
+  - active guard evaluation set は delete target 自身と、subtree delete の場合は subtree 内全 node に対する active selection を対象とする
+  - dependency guard evaluation set は delete target subtree から subtree 外へ出る blocker / blocked dependency edges を対象とし、subtree 内部だけで閉じる dependency edges は guard 対象外とする
+  - local preflight precedence は `invalid_selector_combination` / `invalid_selector_syntax` → selector resolve (`target_not_found` / `ambiguous_target` / `metadata_validation_failed`) → `confirmation_required` → `recursive_required` → `active_conflict` → `dependency_conflict` の順とする
+  - active/deps/missing-target/missing `--recursive`/missing `--yes` の local preflight がすべて通過し、subtree 全体の linked GitHub metadata validation と required remote close set resolve が完了するまでは、remote close 実行を開始しない
+  - subtree 全体の linked GitHub metadata validation は全 node を走査して offender を集約し、node id の lexical 昇順で報告したうえで fail する
+  - subtree 全体の linked GitHub metadata validation では、各 node が `unlinked` または `linked-and-normalized` のどちらかであることを確認する
+  - `unlinked` は `github_repo_owner` / `github_repo_name` / `github_issue_number` がすべて absent または null の状態だけを指す
+  - `linked-and-normalized` は `github_repo_owner` / `github_repo_name` / `github_issue_number` がすべて present で、owner/repo は trim 後 non-empty string、issue number は JSON integer または trim 後 digits-only string として読み取れ、positive base-10 integer へ正規化可能である状態を指す
+  - owner/repo の mixed-case は lowercase 正規化で受理する
+  - owner/repo の empty string / whitespace-only / non-string、issue number の non-integer / non-positive / digits-only でない string / normalize 不可は invalid metadata とする
+  - `github_repo_owner` / `github_repo_name` / `github_issue_number` の一部だけが存在する partial linkage は invalid metadata として扱い、pre-close failure にする
+  - `.meta.json` の missing / unreadable / malformed、または linked GitHub fields の normalize 失敗は pre-close validation failure とし、required remote close set resolve を失敗させる
+  - `--github-issue` selector resolution 中に、要求された issue number に normalize 後一致するはずの node が `.meta.json` invalid metadata を持つ場合は `metadata_validation_failed` とし、その node を `offending_node_ids` に返す
+  - `--github-issue` selector resolution 中に、要求された issue number と無関係な invalid metadata node に遭遇しても、その node は match 集計から除外し、selector status 自体は変えない
+  - parent scope request に `--recursive` が無い場合は、required remote close set の計算も実行も行わず fail-fast する
+  - `--recursive` requirement は child-presence ではなく node-kind based とし、epic / initiative delete は child の有無にかかわらず `--recursive` 必須とする
+  - issue delete で `--recursive` が指定された場合は accepted no-op とし、status はそのまま通常の delete outcome を使う
+  - node kind の canonical source of truth は target node directory の path placement と id prefix の一致とし、`spec-dock/initiatives/**` 配下で `init*` は initiative、`epic*` は epic、`iss*` は issue と判定する
+  - local spec node の discovery predicate は、canonical tree placement にあり、directory basename から `init...` / `epic...` / `iss...` の canonical node id token を 1 件だけ抽出できる directory とする
+  - would-match target directory に `.meta.json` missing / unreadable / malformed がある場合は `metadata_validation_failed` とし、`target_not_found` にはしない
+  - partially scaffolded / stale / malformed directories で selector と無関係なものは selector resolution から除外する
+  - recursive subtree delete では、対象 subtree に必要な remote close がすべて成功してから local removal を開始する
+  - authoritative local metadata source は各 node directory 配下の `.meta.json` とし、`github_repo_owner` / `github_repo_name` / `github_issue_number` を linked GitHub identity の正本とする
+  - canonical remote issue identifier は `<owner>/<repo>#<number>` とし、`owner` / `repo` は lowercase、`number` は base-10 integer 表現へ正規化した `github_issue_number` を使う
+  - required remote close set は、target subtree 内で `.meta.json` 上 canonical remote issue identifier を持つ node 群から導出した unique canonical remote issue identifier 集合からなる
+  - linked GitHub issue を持たない node は required remote close set に含めない
+  - duplicate linkage がある場合でも、同一 canonical remote issue identifier は 1 回だけ close 対象に含める
+  - required remote close set は `owner/repo` の lexical 昇順、次に normalized issue number の numeric 昇順で実行する
+  - already-closed remote issue は close success / no-op として扱う
+  - local metadata から canonical remote issue identifier を組み立てられない場合は pre-close validation failure として扱い、local delete を開始しない
+  - remote issue not found は remote close failure として扱い、failed canonical remote issue identifier を返す
+  - required remote close set の実行中に failure が出た場合、その時点で remote close 実行を停止し、local delete は開始しない
+  - local subtree delete は deepest-first で行い、同一 depth 内は node id の lexical 昇順で実行する
+  - remote close result reporting は canonical remote issue identifier ごとに `closed` / `noop_already_closed` / `failed` / `skipped_not_attempted` のいずれかで表現し、各 list は `owner/repo` の lexical 昇順、次に normalized issue number の numeric 昇順で報告する
+  - pre-close validation / resolve failure では remote close result buckets は空とし、代わりに offending node ids と validation reasons を node id の lexical 昇順で報告する
+  - successful forced delete で active target または active subtree member が削除された場合、active selection は削除済み node を参照しない状態へ clear し、`active_restore_result` は `cleared` とする
+  - local delete failure では delete 開始前の active selection snapshot から deleted node ids を除外した selection を restore 対象とし、候補が空なら clear へフォールバックする
+  - successful forced delete で subtree 外へ出る dependency edges が存在した場合、surviving nodes 側の dependency metadata から deleted node ids への参照を scrub し、dangling reference を残さない
+  - dependency scrub は local subtree delete 完了後に実行する
+  - remote close 成功後に local delete が失敗した場合、command terminal status は `local_delete_partial_failure` とし、process exit は non-zero、deleted node ids / remaining node ids / active restore result / recovery guidance を報告する
+  - active restore result は `cleared` / `restored` / `restore_failed` / `not_needed` の 4 値で報告する
+  - local delete partial failure では retry は自動実行せず、post-failure validation evidence を残す
+  - remote close が失敗した場合、local delete は継続せず中断し、partial destructive state を避ける
+  - destructive delete は explicit confirmation 必須とし、confirmation 無しには local delete を開始しない
+  - `--force` は active/deps conflict override にだけ使い、missing-target、missing `--recursive`、confirmation 欠如、remote close failure は override しない
+  - generated artifacts / symlinks / docs の refresh は `delete` command 自身では行わず、post-delete では follow-up `validate` / `sync --github` による refresh と観測を前提にする
+  - epic final close-out は issue56 の中で完了させる
+- Never:
+  - recursive opt-in なしで parent subtree を消すこと
+  - close と delete を同義として扱うこと
+  - review-only issue を別に立てて epic close-out を逃がすこと
+
+## 非交渉制約
+- destructive operation なので、default は fail-fast / confirm-required であること
+- existing create / import / sync / validate / active / deps contract を壊さないこと
+- local delete と epic final close-out の両方を、この issue 自身の evidence で閉じること
+
+## Machine-readable result contract
+- common field shapes:
+  - `target_id`:
+    - resolved target がある場合は node id string
+    - selector validation failure など resolved target が無い場合は `null`
+  - `offending_node_ids`:
+    - node-level validation を行っていない pre-target failure では空配列
+    - node-level validation failure では node id lexical order の string array
+    - `ambiguous_target` では candidate node ids を node id lexical order で返す
+    - `active_conflict` では active selection に含まれる delete target / subtree member node ids を返す
+    - `dependency_conflict` では delete target subtree 側 node ids と subtree 外 edge 相手 node ids の両方を返す
+  - `validation_reasons`:
+    - object array `{ "node_id": string | null, "code": string, "message": string }`
+    - pre-target failure では `node_id` は `null`
+    - node-level failure では `node_id` を必須とし、`offending_node_ids` 内のいずれかを指す
+  - `remote_close`:
+    - object with keys `closed`, `noop_already_closed`, `failed`, `skipped_not_attempted`
+    - 各 key は canonical remote issue identifier string array
+    - 各 array は `owner/repo` lexical + issue number numeric order
+  - `recovery_guidance`:
+    - string array
+    - guidance priority order で返す
+  - `dependency_scrub_failures`:
+    - object array `{ "node_id": string, "edge_target_id": string }`
+    - node id lexical order, then edge target id lexical order
+- `ok`:
+  - required fields:
+    - `status`
+    - `target_id`
+    - `deleted_node_ids`
+    - `remaining_node_ids`
+    - `remote_close`
+    - `active_restore_result`
+  - ordering:
+    - `deleted_node_ids` は local subtree delete order
+    - `remaining_node_ids` は delete target subtree から削除されずに残った node ids を node id lexical order で返す
+    - `remote_close.closed` / `remote_close.noop_already_closed` は `owner/repo` lexical + issue number numeric order
+  - constraints:
+    - `remaining_node_ids` は空配列
+    - `active_restore_result` は `cleared` または `not_needed`
+- `invalid_selector_combination` / `invalid_selector_syntax` / `target_not_found` / `ambiguous_target` / `active_conflict` / `dependency_conflict` / `recursive_required` / `confirmation_required`:
+  - required fields:
+    - `status`
+    - `target_id`
+    - `offending_node_ids`
+    - `validation_reasons`
+  - forbidden fields:
+    - `deleted_node_ids`
+    - `remote_close`
+- `metadata_validation_failed`:
+  - required fields:
+    - `status`
+    - `target_id`
+    - `offending_node_ids`
+    - `validation_reasons`
+    - `remote_close`
+  - constraints:
+    - `remote_close` は各 bucket が空配列
+- `remote_close_failed`:
+  - required fields:
+    - `status`
+    - `target_id`
+    - `remote_close`
+    - `deleted_node_ids`
+  - constraints:
+    - `deleted_node_ids` は空
+    - `remote_close.failed` / `remote_close.skipped_not_attempted` を含む
+  - forbidden fields:
+    - `remaining_node_ids`
+    - `offending_node_ids`
+    - `validation_reasons`
+    - `dependency_scrub_failures`
+- `local_delete_partial_failure`:
+  - required fields:
+    - `status`
+    - `target_id`
+    - `deleted_node_ids`
+    - `remaining_node_ids`
+    - `remote_close`
+    - `active_restore_result`
+    - `recovery_guidance`
+    - `dependency_scrub_failures`
+  - ordering:
+    - `deleted_node_ids` は local subtree delete order
+    - `remaining_node_ids` は delete target subtree のうち未削除 node ids を node id lexical order で返す
+  - includes:
+    - filesystem delete failure
+    - dependency scrub failure
+  - constraints:
+    - filesystem delete failure により subtree delete が未完了の場合、dependency scrub は未実行で `dependency_scrub_failures` は空配列
+  - forbidden fields:
+    - `offending_node_ids`
+    - `validation_reasons`
+
+## 前提
+- issue55 で close capability が先に導入される
+- remote close は `gh` auth / permission / repo linkage を前提にする
+- delete 前後の generated state 確認には `validate` / `sync --github` を用いる
+
+## 受け入れ条件
+- command acceptance:
+  - AC-001
+  - AC-002
+- non-command completion criteria:
+  - AC-003
+
+- AC-001:
+  - Actor:
+    - maintainer
+  - Given:
+    - local issue node が存在し、linked GitHub issue を持つ
+  - When:
+    - maintainer が `--yes` を付けて delete command を issue target へ明示実行する
+  - Then:
+    - issue directory が local workspace から削除される
+    - linked GitHub issue は delete ではなく close-only で扱われる
+    - linked GitHub issue の close success が local delete 開始条件になる
+    - remote close が失敗した場合、issue directory delete は開始されない
+    - processed remote issue 一覧は `owner/repo` の lexical 昇順、次に normalized issue number の numeric 昇順で観測できる
+    - already-closed remote issue は no-op として区別して観測できる
+    - preflight failure の場合は remote close set の計算 / 実行が始まっていないことを観測できる
+    - `--json` の success / failure payload が status vocabulary、required/forbidden fields、ordering rules に一致していることを観測できる
+    - `--github-issue` selector でも同じ contract で issue target delete が観測できる
+    - local delete 前後の guardrail と結果が CLI / docs / tests で観測できる
+  - 観測点:
+    - runtime / CLI tests
+    - filesystem assertions
+    - docs contract
+- AC-002:
+  - Actor:
+    - maintainer
+  - Given:
+    - child node を持つ epic または initiative が存在する
+  - When:
+    - maintainer が `--recursive --yes` を付けて parent delete を実行する
+  - Then:
+    - subtree の local directory が一貫して削除される
+    - subtree 内 linked GitHub issue 群は close-only で扱われる
+    - required remote close が 1 つでも失敗した場合、local subtree removal は開始されない
+    - required remote close set は canonical remote issue identifier で dedupe され、`owner/repo` の lexical 昇順、次に normalized issue number の numeric 昇順で観測できる
+    - remote close failure 時は closed issue 一覧 / failed issue が canonical remote issue identifier で観測できる
+    - duplicate linkage がある場合でも同一 canonical remote issue identifier は 1 回だけ処理されたことを観測できる
+    - `--json` の success / failure payload が status vocabulary、required/forbidden fields、ordering rules に一致していることを観測できる
+    - child cascade の境界と safety wording が docs / tests で固定される
+  - 観測点:
+    - runtime / CLI tests
+    - filesystem assertions
+    - docs contract
+- AC-003:
+  - 種別:
+    - non-command completion criteria
+  - Actor:
+    - maintainer
+  - Given:
+    - issue55 / issue56 の実装・docs 更新・validation がそろっている
+  - When:
+    - maintainer が issue56 の final close-out を確認する
+  - Then:
+    - `epic-00054` の close / delete 境界、remote delete exclusion、review-only issue 不採用方針が final review で一貫している
+    - issue56 自身が epic final review / final validation / close-out evidence を保持している
+  - 観測点:
+    - provider / dogfooding docs parity
+    - `validate`
+    - `sync --github`
+    - final spec review evidence
+
+## 例外・エッジケース
+- EC-001:
+  - 条件:
+    - target または subtree 内に active pointer が含まれる
+  - 期待:
+    - delete は default で fail-fast し、明示 override 無しには実行されない
+    - `--force --yes` を付け、他の guardrail を満たす場合に限り delete を継続できる
+    - override 無しでは remote close set の計算 / 実行も開始しない
+  - 観測点:
+    - runtime / CLI tests
+- EC-002:
+  - 条件:
+    - target または subtree が dependency graph 上で blocker / blocked 関係にある
+  - 期待:
+    - guardrail が発火し、override 無しには destructive delete を進めない
+    - `--force --yes` を付け、他の guardrail を満たす場合に限り delete を継続できる
+    - override 無しでは remote close set の計算 / 実行も開始しない
+  - 観測点:
+    - runtime / CLI tests
+- EC-003:
+  - 条件:
+    - parent scope delete に recursive opt-in が無い
+  - 期待:
+    - delete は fail-fast し、child を持つ parent scope を削除しない
+    - required remote close set の計算 / 実行も開始しない
+    - `--yes` だけでは recursive opt-in を満たさない
+  - 観測点:
+    - runtime / CLI tests
+- EC-004:
+  - 条件:
+    - remote close が失敗する
+  - 期待:
+    - local delete は継続せず中断し、partial destructive state を避ける
+    - remote close 実行は failure 時点で停止する
+    - command は closed / noop_already_closed / failed / skipped_not_attempted を canonical remote issue identifier で明示的に返す
+    - `--force` でも override されない
+  - 観測点:
+    - runtime / CLI tests
+- EC-009:
+  - 条件:
+    - subtree 内の descendant に missing / unreadable / malformed `.meta.json`、partial linkage、または normalize 不可 metadata がある
+  - 期待:
+    - subtree-wide validation は全 offender を集約したうえで fail-closed し、remote close / local delete は 0 件である
+    - remote close result buckets は空で、offending node ids と validation reasons が node id の lexical 昇順で返る
+  - 観測点:
+    - runtime / CLI tests
+- EC-010:
+  - 条件:
+    - remote close は完了したが、filesystem deletion が途中または完了前に失敗する
+  - 期待:
+    - command terminal status は `local_delete_partial_failure`、process exit は non-zero になる
+    - deleted node ids / remaining node ids / active restore result / recovery guidance が返る
+    - 自動 retry は行わず、post-failure validation evidence を残す
+  - 観測点:
+    - runtime / CLI tests
+- EC-005:
+  - 条件:
+    - target path が既に存在しない
+  - 期待:
+    - command は explicit error を返し、誤指定と partial cleanup の見落としを fail-fast で露出する
+    - `--force` でも override されない
+  - 観測点:
+    - runtime / CLI tests
+- EC-006:
+  - 条件:
+    - destructive confirmation `--yes` が無い
+  - 期待:
+    - command は confirmation required error を返し、remote close / local delete を開始しない
+    - required remote close set の計算 / 実行も開始しない
+    - `--force` でも override されない
+  - 観測点:
+    - runtime / CLI tests
+- EC-007:
+  - 条件:
+    - subtree 内で複数 node が同一 canonical remote issue identifier を参照している
+  - 期待:
+    - required remote close set は dedupe され、同一 canonical remote issue identifier は 1 回だけ close 対象になる
+    - success / failure report も dedupe 後の canonical remote issue identifier を返す
+  - 観測点:
+    - runtime / CLI tests
+- EC-008:
+  - 条件:
+    - required remote close set 内に already-closed remote issue が含まれる
+  - 期待:
+    - already-closed remote issue は success / no-op として扱われる
+    - canonical remote issue identifier 付きで no-op として観測できる
+  - 観測点:
+    - runtime / CLI tests
+
+## 入力→出力例（必要時）
+- EX-001:
+  - Input:
+    - `./spec-dock/scripts/spec-dock delete --id iss-00056 --yes`
+  - Output:
+    - issue directory delete success
+    - linked GitHub issue close-only success
+- EX-002:
+  - Input:
+    - `./spec-dock/scripts/spec-dock delete --id epic-00054 --recursive --yes`
+  - Output:
+    - subtree delete success
+    - subtree-linked GitHub issues close-only success
+- EX-003:
+  - Input:
+    - `./spec-dock/scripts/spec-dock validate`
+    - `./spec-dock/scripts/spec-dock sync --github`
+  - Output:
+    - epic final close-out に必要な consistency evidence
+
+## 用語（ドメイン語彙）
+- TERM-001:
+  - local delete:
+    - `spec-dock/initiatives/**` 配下の node directory または subtree を local workspace から除去する操作
+- TERM-002:
+  - recursive opt-in:
+    - parent scope delete を意図的に許可する explicit flag であり、この issue では `--recursive` を指す
+- TERM-005:
+  - destructive confirmation:
+    - local delete を実際に開始してよいことを示す explicit confirmation であり、この issue では `--yes` を指す
+- TERM-003:
+  - close-only:
+    - linked GitHub issue を delete せず closed state に遷移させる remote handling
+- TERM-004:
+  - epic final close-out:
+    - issue56 自身の evidence により `epic-00054` の final review / final validation / docs parity / success conclusion を閉じること
+
+## 未確定事項
+- なし:
+  - recursive subtree delete は remote close 全成功後にだけ local removal を開始する
+  - missing target は explicit error として扱う
