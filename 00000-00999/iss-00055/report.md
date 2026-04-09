@@ -69,7 +69,7 @@ pass
 - `tests/cli_runtime/test_runtime_close_s12.py` - S01 seam / QA regression tests を追加
 
 #### コミット
-- pending
+- `c6434363fd69345a6e6ad77c0c265b9cc4802580`
 
 #### メモ
 - spec reviewer は S01 scope adherence を `pass`。
@@ -79,6 +79,59 @@ pass
 ## 遭遇した問題と解決 (任意)
 - 問題: reviewer session が途中で停止・消失することがあった
   - 解決: 不要 session を close し、fresh reviewer で再実行した
+
+### 2026-04-09 08:05 - 09:10
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002
+
+#### 実施内容
+- top-level `close` command を parser / registry / command wrapper / CLI renderer に接続した。
+- provider-side と dogfooding 側の `reference_github.md` を更新し、close-only / non-cascade / no local mutation / `sync --github` confirmation path を明記した。
+- command-level E2E として `--id` / `--github-issue` に加え、positional issue number、canonical URL、`close -> sync --github` による `done` 観測まで tests を追加した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_close tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04
+
+OK (55 tests)
+
+implementation review (S02)
+
+pass
+
+qa review (S02)
+
+pass
+
+spec review (S02)
+
+pass
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=17
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` - top-level `close` parser を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py` - `close` command registration を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/close.py` - close command args / run path を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - close success/no-op renderer を追加
+- `src/spec_dock/assets/spec_dock/docs/reference_github.md` - close command contract と confirmation path を追記
+- `spec-dock/docs/reference_github.md` - dogfooding docs parity を更新
+- `tests/cli_runtime/test_runtime_shell_s11.py` - close command wrapper smoke test を追加
+- `tests/cli_runtime/test_close.py` - close command E2E / sync confirmation tests を追加
+
+#### コミット
+- pending
+
+#### メモ
+- implementation review は pass。non-blocking comment として positional target の command-level coverage 追加提案があり、`tests/cli_runtime/test_close.py` に反映した。
+- qa review は pass。non-blocking note として positional node-id、explicit error path、`already_closed=true` の command-level 表示 coverage が残留リスクとして記録されたが、blocking finding はなかった。
+- spec review は pass。issue docs と close-only / non-cascade / no local mutation / `sync --github` confirmation path の整合が確認された。
+- `close` command 自体は local tree / docs / generated artifacts を直接変更せず、`sync --github` 実行後に `iss-00055` が `done` として観測されることを test で固定した。
 
 ## 学んだこと (任意)
 - `close_node` は `set_active` / `check_deps` と同じ target resolve contract を踏襲できる
