@@ -146,6 +146,21 @@ class DepsCheckResult:
 
 
 @dataclass(frozen=True)
+class CloseNodeRequest:
+    target: TargetRef
+
+
+@dataclass(frozen=True)
+class CloseNodeResult:
+    node_id: str
+    node_kind: str
+    github_issue_number: int
+    issue_snapshot: IssueSnapshot
+    already_closed: bool
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
 class ShowActiveRequest:
     pass
 
@@ -271,6 +286,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    close_node: Callable[[CloseNodeRequest], CloseNodeResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("close_node is not configured")
+    )
     doctor: Callable[[DoctorRequest], DoctorResult] = (
         lambda _req: DoctorResult(ok=True, findings=[], warnings=[])
     )

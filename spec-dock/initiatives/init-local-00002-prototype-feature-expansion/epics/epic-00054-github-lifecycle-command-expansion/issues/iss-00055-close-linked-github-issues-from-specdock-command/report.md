@@ -133,6 +133,44 @@ spec-dock: ok (validate) nodes=17
 - spec review は pass。issue docs と close-only / non-cascade / no local mutation / `sync --github` confirmation path の整合が確認された。
 - `close` command 自体は local tree / docs / generated artifacts を直接変更せず、`sync --github` 実行後に `iss-00055` が `done` として観測されることを test で固定した。
 
+### 2026-04-09 09:20 - 09:35
+
+#### 対象
+- Step: final close-out
+- AC/EC: AC-001, AC-002
+
+#### 実施内容
+- `uvx --from . spec-dock update .` で dogfooding workspace を current branch の shipped asset に更新し、`close` command を consumer-side runtime へ反映した。
+- `./spec-dock/scripts/spec-dock close --id iss-00055` を実行して linked GitHub issue `#55` を `CLOSED` へ遷移させた。
+- `./spec-dock/scripts/spec-dock sync --github` を実行し、active は維持したまま generated artifacts を再生成した。
+
+#### 実行コマンド / 結果
+```bash
+uvx --from . spec-dock update .
+
+spec-dock: ok (update) -> /srv/mount/spec-dock
+
+./spec-dock/scripts/spec-dock close --id iss-00055
+
+spec-dock: ok (close) target=iss-00055 node=iss-00055 kind=issue github=#55 state=CLOSED already_closed=false
+
+./spec-dock/scripts/spec-dock sync --github
+
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+```
+
+#### 変更したファイル
+- `spec-dock/scripts/spec_dock_runtime/**` - provider-side changeを dogfooding workspace へ反映
+- `spec-dock/docs/**` - shipped docs rename/addition を dogfooding workspace へ反映
+- `spec-dock/active/issue/report.md` - close / sync の証跡を追記
+
+#### コミット
+- pending
+
+#### メモ
+- close command は update 後の dogfooding runtime で正常に利用できた。
+- `sync --github` 後も active pointer は `iss-00055` のまま維持された。
+
 ## 学んだこと (任意)
 - `close_node` は `set_active` / `check_deps` と同じ target resolve contract を踏襲できる
 - close failure は fallback read が `CLOSED` のときだけ success/no-op に正規化すべき

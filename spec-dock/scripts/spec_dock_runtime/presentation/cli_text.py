@@ -4,6 +4,7 @@ from ..application.contracts import (
     ActiveClearResult,
     ActiveSetResult,
     ActiveViewResult,
+    CloseNodeResult,
     CreateDiscussionDocResult,
     CreateNodeResult,
     DepsCheckResult,
@@ -198,6 +199,21 @@ def render_active_set_text(result: ActiveSetResult, *, target_display: str) -> C
 def render_active_clear_text(result: ActiveClearResult) -> CliText:
     del result
     return CliText(stdout_lines=["spec-dock: ok (active clear)"], stderr_lines=[], warnings=[])
+
+
+def render_close_text(result: CloseNodeResult, *, target_display: str) -> CliText:
+    state = str(result.issue_snapshot.state).strip().upper() or "UNKNOWN"
+    return CliText(
+        stdout_lines=[
+            (
+                "spec-dock: ok (close) "
+                f"target={target_display} node={result.node_id} kind={result.node_kind} "
+                f"github=#{result.github_issue_number} state={state} already_closed={'true' if result.already_closed else 'false'}"
+            )
+        ],
+        stderr_lines=[],
+        warnings=list(result.warnings),
+    )
 
 
 def render_sync_text(result: SyncCommandResult) -> CliText:
