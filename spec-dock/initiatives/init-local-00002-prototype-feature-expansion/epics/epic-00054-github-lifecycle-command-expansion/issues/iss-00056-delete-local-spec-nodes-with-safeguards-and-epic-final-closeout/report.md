@@ -174,13 +174,71 @@ pass
 - `spec-dock/active/issue/report.md` - S02 実装記録を追記
 
 #### コミット
-- pending
+- `8a62e363da65bbad8f91772f6032f621abc1b4c9`
 
 #### メモ
 - implementation review は pass。non-blocking として force-required partial failure guidance で `--force` を保持する改善余地が残るとコメントされた。
 - qa review は pass。non-blocking として clear fallback branch と `fs_repo.delete_tree` 異常系 coverage の追加余地が残るとコメントされた。
 - spec review は pass。S02 scope に issue-target partial-failure を明示したことで、review gate と contract の不整合は解消した。
 - S02 では parent recursive delete / dependency scrub / epic final close-out は未着手のままであり、S03 で扱う。
+
+### 2026-04-09 16:45 - 20:10
+
+#### 対象
+- Step: S03 I1
+- AC/EC: AC-002, EC-010
+
+#### 実施内容
+- parent recursive delete を provider-side runtime に追加し、epic / initiative target の subtree local delete を deepest-first、同一 depth では lexical order で実行する contract を実装した。
+- subtree 内 linked GitHub issue 群は remote close-only の barrier を先に通し、1 件でも failure があれば local subtree removal を開始しないよう固定した。
+- force path では boundary dependency conflict を override した上で、surviving initiative / epic / issue の `deps.json` から deleted subtree への参照を scrub する経路を追加した。
+- dependency scrub は local node id、numeric issue number、repo-scoped issue ref、canonical GitHub issue URL を扱い、survivor context で曖昧な numeric ref は保持するようにした。
+- local subtree delete の partial failure では deleted / remaining node ids、active restore result、dependency scrub failures、recovery guidance を structured payload で返すようにした。
+- partial failure guidance は元の invocation semantics を維持し、`--recursive` / `--force` を伴っていた delete は retry command に同じ flag を残すよう修正した。
+- code review 指摘に対応し、force path の deps topology load failure を generic exception へ落とさず requirement vocabulary に沿った `metadata_validation_failed` へ fail-closed mapping する path を追加した。
+- topology load failure では remote close / local delete を開始しないことを tests で固定した。
+
+#### 実行コマンド / 結果
+```bash
+python -m py_compile src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py tests/cli_runtime/test_runtime_delete_s13.py
+
+success
+
+python -m unittest -v tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_close
+
+Ran 108 tests in 3.213s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=17
+
+implementation review (S03 I1)
+
+pass
+
+qa review (S03 I1)
+
+pass
+
+spec review (S03 I1)
+
+pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - parent recursive delete、dependency scrub、topology load failure fail-closed、partial failure guidance を追加
+- `tests/cli_runtime/test_runtime_delete_s13.py` - parent recursive delete / dependency scrub / topology load failure / partial failure guidance の regression tests を追加
+- `spec-dock/active/issue/report.md` - S03 I1 実装記録を追記
+
+#### コミット
+- S03 I1 実装差分は close-out 時に commit hash を追記する
+
+#### メモ
+- implementation review は一度 fail。topology load failure が structured result 契約と requirement vocabulary を破る P1 指摘に対し、`metadata_validation_failed` へ fail-closed mapping を追加し、fresh rerun で pass となった。
+- qa review は pass。non-blocking として raw int dependency ref 専用回帰、`json_store` 経由 scrub path、childless parent の `--recursive` 専用回帰に追加余地が残る。
+- spec review は pass。non-blocking として partial failure retry guidance は invocation semantics を保持すべきと指摘され、`--recursive` / `--force` を復元する形へ修正済み。
+- S03 I1 完了時点で parent recursive delete / partial failure / dependency scrub / topology load failure fail-closed のコア契約は固定された。残りは commit、`sync --github`、`iss-00056` close、epic final close-out evidence である。
 
 ## 遭遇した問題と解決 (任意)
 - 問題: spec review で `confirmation_required` の意味論が requirement と衝突すると指摘された

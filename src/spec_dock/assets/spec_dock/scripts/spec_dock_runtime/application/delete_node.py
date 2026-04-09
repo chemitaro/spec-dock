@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import re
 import shutil
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
@@ -12,6 +13,7 @@ from ..domain.tree import build_graph
 from ..infra.contracts import ActiveManifest, ActiveStateSnapshot, StoredMetaRecord
 from .contracts import (
     ClearActiveRequest,
+    DeleteDependencyScrubFailure,
     DeleteTerminalStatus,
     DeleteNodeRequest,
     DeleteNodeResult,
@@ -22,6 +24,13 @@ from .github_issue_targets import normalize_repo_slug
 from .ports import Ports
 
 _NUM_RE = re.compile(r"^[0-9]+$")
+_SCOPED_ISSUE_REF_RE = re.compile(
+    r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)#(?P<num>[0-9]+)$"
+)
+_GITHUB_ISSUE_URL_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)/issues/(?P<num>[0-9]+)(?:[/?#].*)?$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -126,6 +135,32 @@ def _metadata_failure_result(
     )
 
 
+def _dependency_topology_load_failure_result(
+    *,
+    target_id: str,
+    message: str,
+) -> DeleteNodeResult:
+    return DeleteNodeResult(
+        status="metadata_validation_failed",
+        target_id=target_id,
+        deleted_node_ids=[],
+        remaining_node_ids=[],
+        remote_close=_empty_remote_close(),
+        offending_node_ids=[],
+        validation_reasons=[
+            DeleteValidationReason(
+                node_id=target_id,
+                code="metadata_validation_failed",
+                message=message,
+            )
+        ],
+        active_restore_result=None,
+        recovery_guidance=[],
+        dependency_scrub_failures=[],
+        warnings=[],
+    )
+
+
 def _remote_close_failed_result(
     *,
     target_id: str,
@@ -155,6 +190,7 @@ def _local_delete_partial_failure_result(
     remote_close: DeleteRemoteCloseBuckets,
     active_restore_result: Literal["cleared", "restored", "restore_failed", "not_needed"],
     recovery_guidance: list[str],
+    dependency_scrub_failures: list[DeleteDependencyScrubFailure] | None = None,
     warnings: list[str] | None = None,
 ) -> DeleteNodeResult:
     return DeleteNodeResult(
@@ -167,7 +203,7 @@ def _local_delete_partial_failure_result(
         validation_reasons=[],
         active_restore_result=active_restore_result,
         recovery_guidance=list(recovery_guidance),
-        dependency_scrub_failures=[],
+        dependency_scrub_failures=list(dependency_scrub_failures or []),
         warnings=list(warnings or []),
     )
 
@@ -176,21 +212,36 @@ def _build_partial_failure_recovery_guidance(
     *,
     restore_guidance: str,
     target: SpecNode,
+    recursive: bool,
+    force: bool,
     remaining_node_ids: list[str],
+    dependency_scrub_failures: list[DeleteDependencyScrubFailure] | None = None,
 ) -> list[str]:
+    retry_args = ["--id", target.id]
+    if recursive:
+        retry_args.append("--recursive")
+    if force:
+        retry_args.append("--force")
+    retry_args.append("--yes")
+    retry_command = "./spec-dock/scripts/spec-dock delete " + " ".join(retry_args)
     manual_follow_up = (
-        f"resolve filesystem errors and rerun `./spec-dock/scripts/spec-dock delete --id {target.id} --yes`"
+        f"resolve filesystem errors and rerun `{retry_command}`"
         if remaining_node_ids
         else (
             f"inspect `{target.path.as_posix()}` and surrounding workspace for partial-delete artifacts before continuing"
         )
     )
-    return [
+    guidance = [
         restore_guidance,
         "run `./spec-dock/scripts/spec-dock validate` to verify local tree and active pointers",
         "run `./spec-dock/scripts/spec-dock sync --github` to refresh derived issue/dependency artifacts",
-        manual_follow_up,
     ]
+    if dependency_scrub_failures:
+        guidance.append(
+            "repair surviving initiative/epic/issue deps.json references listed in dependency_scrub_failures before continuing"
+        )
+    guidance.append(manual_follow_up)
+    return guidance
 
 
 def _iter_managed_nodes(graph: SpecGraph) -> list[SpecNode]:
@@ -408,15 +459,64 @@ def _subtree_ids(target: SpecNode, graph: SpecGraph) -> set[str]:
 
 
 def _subtree_issue_ids(target: SpecNode, graph: SpecGraph) -> set[str]:
-    if target.kind == "issue":
-        return {target.id}
-    if target.kind == "epic":
-        return {node.id for node in graph.nodes_by_id.values() if node.kind == "issue" and node.epic_id == target.id}
-    return {
-        node.id
-        for node in graph.nodes_by_id.values()
-        if node.kind == "issue" and node.initiative_id == target.id
-    }
+    return set(_issue_ids_for_scope_node(node=target, graph=graph))
+
+
+def _issue_ids_for_scope_node(*, node: SpecNode, graph: SpecGraph) -> list[str]:
+    if node.kind == "issue":
+        return [node.id]
+    if node.kind == "epic":
+        return sorted(
+            [item.id for item in graph.nodes_by_id.values() if item.kind == "issue" and item.epic_id == node.id]
+        )
+    if node.kind == "initiative":
+        return sorted(
+            [item.id for item in graph.nodes_by_id.values() if item.kind == "issue" and item.initiative_id == node.id]
+        )
+    return []
+
+
+def _collect_boundary_dependency_edges(
+    *,
+    dep_map: dict[str, list[str]],
+    subtree_ids: set[str],
+    subtree_issue_ids: set[str],
+    graph: SpecGraph,
+) -> tuple[set[str], dict[str, set[str]]]:
+    conflict_node_ids: set[str] = set()
+    surviving_issue_to_deleted_issue_ids: dict[str, set[str]] = {}
+
+    for issue_id in sorted(subtree_issue_ids):
+        for dep_id in sorted(dep_map.get(issue_id, [])):
+            if dep_id in subtree_issue_ids:
+                continue
+            conflict_node_ids.add(issue_id)
+            conflict_node_ids.add(dep_id)
+
+    for issue_id, deps in dep_map.items():
+        if issue_id in subtree_issue_ids:
+            continue
+        for dep_id in deps:
+            if dep_id not in subtree_issue_ids:
+                continue
+            conflict_node_ids.add(issue_id)
+            conflict_node_ids.add(dep_id)
+            surviving_issue_to_deleted_issue_ids.setdefault(issue_id, set()).add(dep_id)
+
+    surviving_node_to_deleted_issue_ids: dict[str, set[str]] = {}
+    for node in _iter_managed_nodes(graph):
+        if node.id in subtree_ids:
+            continue
+        issue_ids = _issue_ids_for_scope_node(node=node, graph=graph)
+        if not issue_ids:
+            continue
+        edge_target_ids: set[str] = set()
+        for issue_id in issue_ids:
+            edge_target_ids.update(surviving_issue_to_deleted_issue_ids.get(issue_id, set()))
+        if edge_target_ids:
+            surviving_node_to_deleted_issue_ids[node.id] = edge_target_ids
+
+    return conflict_node_ids, surviving_node_to_deleted_issue_ids
 
 
 def _active_ids(manifest: ActiveManifest | None) -> set[str]:
@@ -548,14 +648,209 @@ def _close_remote_issues_barrier(
     return remote_close, None
 
 
-def _delete_local_issue_directory(*, target: SpecNode, ports: Ports) -> None:
+def _delete_local_node_directory(*, node: SpecNode, ports: Ports) -> None:
     if ports.node_repo is not None:
         delete_tree = getattr(ports.node_repo, "delete_tree", None)
         if callable(delete_tree):
-            delete_tree(target.path)
+            delete_tree(node.path)
             return
-    if target.path.exists():
-        shutil.rmtree(target.path)
+    if node.path.exists():
+        shutil.rmtree(node.path)
+
+
+def _subtree_delete_order(*, subtree_ids: set[str], graph: SpecGraph) -> list[SpecNode]:
+    ordered_nodes = [graph.nodes_by_id[node_id] for node_id in sorted(subtree_ids) if node_id in graph.nodes_by_id]
+    depth_cache: dict[str, int] = {}
+
+    def _depth(node_id: str) -> int:
+        if node_id in depth_cache:
+            return depth_cache[node_id]
+        node = graph.nodes_by_id.get(node_id)
+        if node is None or node.parent_id is None or node.parent_id not in subtree_ids:
+            depth_cache[node_id] = 0
+            return 0
+        depth_cache[node_id] = _depth(node.parent_id) + 1
+        return depth_cache[node_id]
+
+    ordered_nodes.sort(key=lambda node: (-_depth(node.id), node.id))
+    return ordered_nodes
+
+
+def _delete_subtree_locally(
+    *,
+    ordered_nodes: list[SpecNode],
+    ports: Ports,
+) -> tuple[list[str], list[str], bool]:
+    deleted_node_ids: list[str] = []
+    deleted_set: set[str] = set()
+
+    for node in ordered_nodes:
+        try:
+            _delete_local_node_directory(node=node, ports=ports)
+            deleted_node_ids.append(node.id)
+            deleted_set.add(node.id)
+        except Exception:
+            if not node.path.exists() and node.id not in deleted_set:
+                deleted_node_ids.append(node.id)
+                deleted_set.add(node.id)
+            remaining_node_ids = sorted(node_id for node_id in (item.id for item in ordered_nodes) if node_id not in deleted_set)
+            return deleted_node_ids, remaining_node_ids, False
+
+    return deleted_node_ids, [], True
+
+
+def _load_deps_payload(path: Path, *, ports: Ports) -> dict[str, Any]:
+    if not path.exists():
+        return {"schema_version": 1, "depends_on": []}
+    if ports.json_store is not None:
+        payload = ports.json_store.load_json(path)
+    else:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Invalid deps.json schema: {path}: expected object")
+    depends_on = payload.get("depends_on")
+    if not isinstance(depends_on, list):
+        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on must be a list")
+    payload["depends_on"] = depends_on
+    if payload.get("schema_version") is None:
+        payload["schema_version"] = 1
+    return payload
+
+
+def _write_deps_payload(path: Path, payload: dict[str, Any], *, ports: Ports) -> None:
+    if ports.json_store is not None:
+        ports.json_store.write_json(path, payload)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _ref_matches_deleted_node(
+    *,
+    ref: object,
+    deleted_node_ids_lower: set[str],
+    deleted_issue_number_to_node_ids: dict[int, set[str]],
+    deleted_scoped_refs: set[tuple[str, int]],
+) -> bool:
+    if isinstance(ref, str):
+        raw = ref.strip()
+        lowered = raw.lower()
+        if lowered in deleted_node_ids_lower:
+            return True
+        if raw.isdigit():
+            number = int(raw)
+            return len(deleted_issue_number_to_node_ids.get(number, set())) == 1
+        scoped_match = _SCOPED_ISSUE_REF_RE.fullmatch(raw)
+        if scoped_match is not None:
+            scoped_slug = normalize_repo_slug(scoped_match.group("owner"), scoped_match.group("repo"))
+            if scoped_slug is None:
+                return False
+            return (scoped_slug, int(scoped_match.group("num"))) in deleted_scoped_refs
+        url_match = _GITHUB_ISSUE_URL_RE.fullmatch(raw)
+        if url_match is not None:
+            scoped_slug = normalize_repo_slug(url_match.group("owner"), url_match.group("repo"))
+            if scoped_slug is None:
+                return False
+            return (scoped_slug, int(url_match.group("num"))) in deleted_scoped_refs
+        return False
+
+    if isinstance(ref, bool):
+        return False
+    if isinstance(ref, int):
+        return len(deleted_issue_number_to_node_ids.get(ref, set())) == 1
+    return False
+
+
+def _build_deleted_ref_match_context(
+    *,
+    deleted_node_ids: set[str],
+    graph: SpecGraph,
+) -> tuple[set[str], dict[str, tuple[int, str | None]]]:
+    deleted_node_ids_lower: set[str] = set()
+    issue_refs_by_node_id: dict[str, tuple[int, str | None]] = {}
+    for node_id in sorted(deleted_node_ids):
+        node = graph.nodes_by_id.get(node_id)
+        if node is None:
+            continue
+        deleted_node_ids_lower.add(node.id.lower())
+        issue_number = _normalize_issue_number(node.github_issue_number)
+        if issue_number is None:
+            continue
+        repo_slug = normalize_repo_slug(node.github_repo_owner, node.github_repo_name)
+        issue_refs_by_node_id[node.id] = (issue_number, repo_slug)
+    return deleted_node_ids_lower, issue_refs_by_node_id
+
+
+def _build_survivor_ref_match_context(
+    *,
+    edge_target_ids: set[str],
+    issue_refs_by_node_id: dict[str, tuple[int, str | None]],
+) -> tuple[dict[int, set[str]], set[tuple[str, int]]]:
+    issue_number_to_node_ids: dict[int, set[str]] = {}
+    scoped_refs: set[tuple[str, int]] = set()
+    for edge_target_id in sorted(edge_target_ids):
+        issue_ref = issue_refs_by_node_id.get(edge_target_id)
+        if issue_ref is None:
+            continue
+        issue_number, repo_slug = issue_ref
+        issue_number_to_node_ids.setdefault(issue_number, set()).add(edge_target_id)
+        if repo_slug is not None:
+            scoped_refs.add((repo_slug, issue_number))
+    return issue_number_to_node_ids, scoped_refs
+
+
+def _scrub_surviving_dependency_refs(
+    *,
+    surviving_node_to_deleted_issue_ids: dict[str, set[str]],
+    deleted_subtree_node_ids: set[str],
+    graph: SpecGraph,
+    ports: Ports,
+) -> list[DeleteDependencyScrubFailure]:
+    failures: list[DeleteDependencyScrubFailure] = []
+    deleted_node_ids_lower, deleted_issue_refs_by_node_id = _build_deleted_ref_match_context(
+        deleted_node_ids=deleted_subtree_node_ids,
+        graph=graph,
+    )
+
+    for survivor_id in sorted(surviving_node_to_deleted_issue_ids):
+        edge_target_ids = set(surviving_node_to_deleted_issue_ids[survivor_id])
+        deleted_issue_number_to_node_ids, deleted_scoped_refs = _build_survivor_ref_match_context(
+            edge_target_ids=edge_target_ids,
+            issue_refs_by_node_id=deleted_issue_refs_by_node_id,
+        )
+        sorted_edge_target_ids = sorted(edge_target_ids)
+        survivor = graph.nodes_by_id.get(survivor_id)
+        if survivor is None:
+            failures.extend(
+                DeleteDependencyScrubFailure(node_id=survivor_id, edge_target_id=edge_target_id)
+                for edge_target_id in sorted_edge_target_ids
+            )
+            continue
+        deps_path = survivor.path / "deps.json"
+        try:
+            payload = _load_deps_payload(deps_path, ports=ports)
+            depends_on = cast(list[object], payload["depends_on"])
+            filtered_depends_on = [
+                ref
+                for ref in depends_on
+                if not _ref_matches_deleted_node(
+                    ref=ref,
+                    deleted_node_ids_lower=deleted_node_ids_lower,
+                    deleted_issue_number_to_node_ids=deleted_issue_number_to_node_ids,
+                    deleted_scoped_refs=deleted_scoped_refs,
+                )
+            ]
+            if len(filtered_depends_on) != len(depends_on):
+                payload["depends_on"] = filtered_depends_on
+                _write_deps_payload(deps_path, payload, ports=ports)
+        except Exception:
+            failures.extend(
+                DeleteDependencyScrubFailure(node_id=survivor_id, edge_target_id=edge_target_id)
+                for edge_target_id in sorted_edge_target_ids
+            )
+
+    failures.sort(key=lambda item: (item.node_id, item.edge_target_id))
+    return failures
 
 
 def _drop_deleted_nodes_from_manifest(
@@ -702,42 +997,34 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 validation_message="active selection intersects delete target",
             )
 
-    if not req.force and ports.deps_topology_reader is not None:
+    surviving_node_to_deleted_issue_ids: dict[str, set[str]] = {}
+    if ports.deps_topology_reader is not None:
         specdock_dir = _resolve_specdock_dir(ports)
-        topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
+        try:
+            topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
+        except Exception as exc:
+            message = str(exc).strip() or "failed to load dependency topology"
+            return _dependency_topology_load_failure_result(
+                target_id=target.id,
+                message=message,
+            )
         dep_map = dict(topology.issue_depends_on_map)
         subtree_issue_ids = _subtree_issue_ids(target, graph)
-        dep_conflicts: set[str] = set()
-
-        for issue_id in sorted(subtree_issue_ids):
-            for dep_id in sorted(dep_map.get(issue_id, [])):
-                if dep_id not in subtree_issue_ids:
-                    dep_conflicts.add(issue_id)
-                    dep_conflicts.add(dep_id)
-        for issue_id, deps in dep_map.items():
-            if issue_id in subtree_issue_ids:
-                continue
-            for dep_id in deps:
-                if dep_id in subtree_issue_ids:
-                    dep_conflicts.add(issue_id)
-                    dep_conflicts.add(dep_id)
-
-        if dep_conflicts:
-            return _result(
-                status="dependency_conflict",
-                target_id=target.id,
-                offending_node_ids=sorted(dep_conflicts),
-                validation_code="dependency_conflict",
-                validation_message="dependency edge crosses delete subtree boundary",
-            )
-
-    if target.kind != "issue":
-        return _result(
-            status="confirmation_required",
-            target_id=target.id,
-            validation_code="confirmation_required",
-            validation_message="parent target delete is deferred in S02",
+        dep_conflicts, surviving_node_to_deleted_issue_ids = _collect_boundary_dependency_edges(
+            dep_map=dep_map,
+            subtree_ids=subtree_ids,
+            subtree_issue_ids=subtree_issue_ids,
+            graph=graph,
         )
+        if dep_conflicts:
+            if not req.force:
+                return _result(
+                    status="dependency_conflict",
+                    target_id=target.id,
+                    offending_node_ids=sorted(dep_conflicts),
+                    validation_code="dependency_conflict",
+                    validation_message="dependency edge crosses delete subtree boundary",
+                )
 
     required_remote_targets, subtree_metadata_failure = _subtree_remote_close_targets(
         subtree_ids=subtree_ids,
@@ -778,11 +1065,12 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
     if remote_failure is not None:
         return remote_failure
 
-    try:
-        _delete_local_issue_directory(target=target, ports=ports)
-    except Exception:
-        deleted_node_ids = [] if target.path.exists() else [target.id]
-        remaining_node_ids = [target.id] if target.path.exists() else []
+    delete_order = _subtree_delete_order(subtree_ids=subtree_ids, graph=graph)
+    deleted_node_ids, remaining_node_ids, local_delete_succeeded = _delete_subtree_locally(
+        ordered_nodes=delete_order,
+        ports=ports,
+    )
+    if not local_delete_succeeded:
         warnings = ["local_delete_failed"]
         active_restore_result: Literal["cleared", "restored", "restore_failed", "not_needed"] = "not_needed"
         restore_guidance = "active restore was not needed because local delete did not remove target nodes"
@@ -790,7 +1078,7 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             active_restore_result, restore_warnings, restore_guidance = _repair_active_after_clear_failure(
                 ports=ports,
                 active_snapshot=active_snapshot,
-                deleted_node_ids={target.id},
+                deleted_node_ids=set(deleted_node_ids),
             )
             for warning in restore_warnings:
                 if warning not in warnings:
@@ -806,43 +1094,84 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             recovery_guidance=_build_partial_failure_recovery_guidance(
                 restore_guidance=restore_guidance,
                 target=target,
+                recursive=req.recursive,
+                force=req.force,
                 remaining_node_ids=remaining_node_ids,
             ),
+            dependency_scrub_failures=[],
             warnings=warnings,
         )
 
     active_restore_result = "not_needed"
     warnings: list[str] = []
+    restore_guidance = "active restore was not needed after local delete"
+    dependency_scrub_failures: list[DeleteDependencyScrubFailure] = []
+    if req.force and surviving_node_to_deleted_issue_ids:
+        dependency_scrub_failures = _scrub_surviving_dependency_refs(
+            surviving_node_to_deleted_issue_ids=surviving_node_to_deleted_issue_ids,
+            deleted_subtree_node_ids=subtree_ids,
+            graph=graph,
+            ports=ports,
+        )
+        if dependency_scrub_failures:
+            warnings.append("dependency_scrub_failed")
+
     if needs_active_repair:
         from .set_active import clear_active as clear_active_use_case
 
         try:
             clear_active_use_case(ClearActiveRequest(), ports)
             active_restore_result = "cleared"
+            restore_guidance = "active clear completed after local delete"
         except Exception:
             active_restore_result, warnings, restore_guidance = _repair_active_after_clear_failure(
                 ports=ports,
                 active_snapshot=active_snapshot,
-                deleted_node_ids={target.id},
+                deleted_node_ids=set(deleted_node_ids),
             )
+            if dependency_scrub_failures and "dependency_scrub_failed" not in warnings:
+                warnings.append("dependency_scrub_failed")
             return _local_delete_partial_failure_result(
                 target_id=target.id,
-                deleted_node_ids=[target.id],
+                deleted_node_ids=deleted_node_ids,
                 remaining_node_ids=[],
                 remote_close=remote_close,
                 active_restore_result=active_restore_result,
                 recovery_guidance=_build_partial_failure_recovery_guidance(
                     restore_guidance=restore_guidance,
                     target=target,
+                    recursive=req.recursive,
+                    force=req.force,
                     remaining_node_ids=[],
+                    dependency_scrub_failures=dependency_scrub_failures,
                 ),
+                dependency_scrub_failures=dependency_scrub_failures,
                 warnings=warnings,
             )
+
+    if dependency_scrub_failures:
+        return _local_delete_partial_failure_result(
+            target_id=target.id,
+            deleted_node_ids=deleted_node_ids,
+            remaining_node_ids=[],
+            remote_close=remote_close,
+            active_restore_result=active_restore_result,
+            recovery_guidance=_build_partial_failure_recovery_guidance(
+                restore_guidance=restore_guidance,
+                target=target,
+                recursive=req.recursive,
+                force=req.force,
+                remaining_node_ids=[],
+                dependency_scrub_failures=dependency_scrub_failures,
+            ),
+            dependency_scrub_failures=dependency_scrub_failures,
+            warnings=warnings,
+        )
 
     return DeleteNodeResult(
         status="ok",
         target_id=target.id,
-        deleted_node_ids=[target.id],
+        deleted_node_ids=deleted_node_ids,
         remaining_node_ids=[],
         remote_close=remote_close,
         offending_node_ids=[],
