@@ -141,6 +141,8 @@ ID: "iss-00056"
   - `--force` は active/deps conflict override にだけ使い、missing-target、missing `--recursive`、confirmation 欠如、remote close failure は override しない
   - generated artifacts / symlinks / docs の refresh は `delete` command 自身では行わず、post-delete では follow-up `validate` / `sync --github` による refresh と観測を前提にする
   - epic final close-out は issue56 の中で完了させる
+  - staged implementation note として、S01 I1 の間だけは actual delete 未実装の preflight-ready path を `confirmation_required` で返してよい
+  - 上記 staged implementation note は temporary contract であり、S01 I2 以降では `confirmation_required` を未確認ケース専用へ戻し、最終 close-out までに正規化する
 - Never:
   - recursive opt-in なしで parent subtree を消すこと
   - close と delete を同義として扱うこと
