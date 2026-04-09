@@ -424,5 +424,55 @@ python -m unittest -v \
 - non-blocking として、`load_node_records()` が `.meta.json` path を含まない generic runtime error を返し、canonical directory が複数ある異常環境では structured fallback が成立しない余地は残るが、今回の defect-1 scope と acceptance には影響しない。
 - live manual summary / execution log の final verdict は `pass` のままで、blocking defect は解消済みと判断した。
 
+### 2026-04-10 18:10 - 18:40
+
+#### 対象
+- Step: PR #57 review triage / blocker fix
+- AC/EC: review-feedback-triage
+
+#### 実施内容
+- PR `#57` の Copilot / Codex review を取得し、今回必須で対応するものと proposal を切り分けた。
+- 必須対応と判定したのは 2 点である。
+  - `delete <target> --yes` の positional target を `123` / `#123` / URL も受け付けるように読める docs mismatch
+  - repo-local dogfooding runtime に `delete` surface が未反映で、`spec-dock/docs/reference_github.md` と実装がずれている parity gap
+- proposal と判定したのは 1 点である。
+  - delete remote-close barrier で `issue_close` failure 後に post-failure `issue_view_snapshot` を再確認する改善提案
+- blocker fix として provider/dogfooding docs の `delete <target>` 記述を node id only に修正し、あわせて `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .` で dogfooding workspace を refresh して repo-local runtime parity を回復した。
+
+#### 分析結果
+- Copilot comment 1 / 3:
+  - 判定: blocker
+  - 理由: `delete <target>` は実装上 node id positional alias であり、数字 / URL を受け付けると読む余地がある docs は誤案内になる。
+- Copilot comment 2 / 3:
+  - 判定: blocker
+  - 理由: dogfooding docs が top-level `delete` を案内しているのに、repo-local runtime copy に parser/registry/delete command が無い状態は parity 不整合である。
+- Codex P2 comment:
+  - 判定: proposal
+  - 理由: race hardening の改善提案であり、現 requirement/design の acceptance や current blocker には含まれない。現時点では checks failure でも contract mismatch でもない。
+
+#### 実行コマンド / 結果
+```bash
+PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli update .
+
+./spec-dock/scripts/spec-dock --help
+./spec-dock/scripts/spec-dock delete --help
+./spec-dock/scripts/spec-dock validate
+```
+
+- `spec-dock: ok (update) -> /srv/mount/spec-dock`
+- repo-local runtime help に `delete` が現れることを確認
+- repo-local `delete --help` が表示されることを確認
+- dogfooding validate は継続して成功
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_github.md` - `delete <target>` の target syntax を実装どおり node id only へ修正
+- `spec-dock/docs/reference_github.md` - dogfooding docs 側も同じ wording に修正
+- `spec-dock/scripts/spec_dock_runtime/**` - refresh により repo-local runtime parity を回復
+- `spec-dock/active/issue/report.md` - review triage と blocker/proposal の判定を追記
+
+#### メモ
+- Codex の P2 は follow-up 候補として残すが、今回の PR blocker ではない。
+- review 指摘は「docs mismatch は修正」「proposal は今回は見送る」の方針で整理した。
+
 ## 省略/例外メモ (必須)
 - なし
