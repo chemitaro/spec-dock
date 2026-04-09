@@ -228,6 +228,7 @@ ID: "iss-00056"
 ##### I1 — active/deps/recursive/path-missing guardrails
 - slice goal:
   - mutation 前に selector と local guardrail で block すべきケースをすべて弾く
+  - staged implementation note として、all-local-guardrails-pass かつ `--yes` 済みの経路は S01 I1 では `confirmation_required` interim placeholder で観測してよい
 
 ###### Red
 - failing test:
@@ -258,6 +259,7 @@ ID: "iss-00056"
   - missing-target error payload contract
   - confirmation-required error payload contract
   - bounded `--force` contract
+  - interim placeholder としての preflight-ready path
 - pass condition:
   - selector / guardrail / status payload / exit-code tests が通る
 

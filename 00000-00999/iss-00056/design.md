@@ -220,6 +220,8 @@ cmd --> app : invoke
   - subtree-wide metadata validation failure では remote close buckets は空配列で固定する
   - required remote close 実行中に 1 件でも失敗したら、その時点で close を停止し、未着手 remainder は `skipped_not_attempted` として返す
   - `--force` は `active_conflict` / `dependency_conflict` にしか効かない
+  - staged implementation note として、S01 I1 の間だけは all-local-guardrails-pass かつ `--yes` 済みでも mutation phase 未実装のため `confirmation_required` を interim placeholder status として返してよい
+  - 上記 interim placeholder は temporary であり、S01 I2/S02 で actual mutation / remote-close barrier path が入るまでの措置とする。final close-out までには `confirmation_required` を missing confirmation 専用へ戻す
 - dependency guard boundary:
   - dependency preflight は delete target subtree から subtree 外へ出る blocker / blocked edges だけを conflict 対象にする
   - subtree 内部だけで閉じる dependency edges は guard failure にしない
