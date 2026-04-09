@@ -320,6 +320,7 @@ ID: "iss-00056"
   - issue delete command path
   - remote close-only
   - local leaf directory removal
+  - issue-target partial-failure handling after local delete
 - design refs:
   - `design.md` の `インターフェース契約`
   - `design.md` の `変更計画`
@@ -339,6 +340,7 @@ ID: "iss-00056"
 ##### I1 — issue delete success path
 - slice goal:
   - issue target delete が explicit `--yes` 下で remote close-only と local delete を一貫して実行する
+  - issue target の post-delete active repair failure も structured partial-failure として観測できる
 
 ###### Red
 - failing test:
@@ -370,8 +372,10 @@ ID: "iss-00056"
 - expected tests:
   - issue delete integration
   - remote close-only assertions
+  - issue-target remote close failure keeps local tree unchanged
   - filesystem assertions
   - `--json` payload assertions
+  - `local_delete_partial_failure` payload / exit-code assertions
 - report update:
   - reviewer verdict / test結果 / 修正内容 / no-op 理由を `./spec-dock/active/issue/report.md` に残す
 - commit:

@@ -368,9 +368,11 @@ ID: "iss-00056"
 - EC-010:
   - 条件:
     - remote close は完了したが、filesystem deletion が途中または完了前に失敗する
+    - または local delete 完了後の active repair / dependency scrub が失敗する
   - 期待:
     - command terminal status は `local_delete_partial_failure`、process exit は non-zero になる
     - deleted node ids / remaining node ids / active restore result / recovery guidance が返る
+    - local delete 後の active repair failure も同じ terminal status に集約し、best-effort repair を試みたうえで結果を返す
     - 自動 retry は行わず、post-failure validation evidence を残す
   - 観測点:
     - runtime / CLI tests
