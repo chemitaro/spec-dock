@@ -32,6 +32,9 @@ class NodeRepository(Protocol):
     def write_meta(self, dest_dir: Path, record: StoredMetaRecord) -> None:
         ...
 
+    def delete_tree(self, node_path: Path) -> None:
+        ...
+
 
 class TemplateScaffolder(Protocol):
     def render_text(self, text: str, replacements: dict[str, str]) -> str:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import stat
 import sys
 import time
 from pathlib import Path
@@ -431,3 +433,27 @@ def backfill_github_repo_scope(meta_path: Path, *, repo_owner: str, repo_name: s
     except OSError as exc:
         raise RuntimeError(f"Failed to backfill github scope: {meta_path}: {exc}") from exc
     return True
+
+
+def _handle_rmtree_permission_error(func, path, exc_info) -> None:
+    exc = exc_info[1]
+    if not isinstance(exc, PermissionError):
+        raise exc
+    try:
+        current_mode = os.stat(path).st_mode
+        os.chmod(path, current_mode | stat.S_IWRITE)
+        func(path)
+    except OSError:
+        raise exc
+
+
+def delete_tree(node_path: Path) -> None:
+    target = Path(node_path)
+    if not target.exists():
+        return
+    if not target.is_dir():
+        raise RuntimeError(f"delete target is not a directory: {target.as_posix()}")
+    try:
+        shutil.rmtree(target, onerror=_handle_rmtree_permission_error)
+    except OSError as exc:
+        raise RuntimeError(f"failed to delete node directory: {target.as_posix()}: {exc}") from exc
