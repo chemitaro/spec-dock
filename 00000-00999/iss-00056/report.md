@@ -232,13 +232,66 @@ pass
 - `spec-dock/active/issue/report.md` - S03 I1 実装記録を追記
 
 #### コミット
-- S03 I1 実装差分は close-out 時に commit hash を追記する
+- `63bdf8b60a9256007c96fbef6d2814d91b7f788f`
 
 #### メモ
 - implementation review は一度 fail。topology load failure が structured result 契約と requirement vocabulary を破る P1 指摘に対し、`metadata_validation_failed` へ fail-closed mapping を追加し、fresh rerun で pass となった。
 - qa review は pass。non-blocking として raw int dependency ref 専用回帰、`json_store` 経由 scrub path、childless parent の `--recursive` 専用回帰に追加余地が残る。
 - spec review は pass。non-blocking として partial failure retry guidance は invocation semantics を保持すべきと指摘され、`--recursive` / `--force` を復元する形へ修正済み。
 - S03 I1 完了時点で parent recursive delete / partial failure / dependency scrub / topology load failure fail-closed のコア契約は固定された。残りは commit、`sync --github`、`iss-00056` close、epic final close-out evidence である。
+
+### 2026-04-09 20:15 - 20:35
+
+#### 対象
+- Step: S90 / S99 / final close-out
+- AC/EC: AC-003
+
+#### 実施内容
+- S03 I1 の実装差分を commit し、delete command の parent recursive delete / dependency scrub / topology fail-closed / docs parity を確定した。
+- `./spec-dock/scripts/spec-dock close --id iss-00056` を実行し、linked GitHub issue `#56` を CLOSED へ遷移させた。
+- `./spec-dock/scripts/spec-dock sync --github` を実行し、dogfooding workspace の index / tree / deps / dashboard を更新して `iss-00056` の local status を `done` へ同期した。
+- 続けて `./spec-dock/scripts/spec-dock close --id epic-00054` と `./spec-dock/scripts/spec-dock sync --github` を実行し、epic `#54` の close-out と progress snapshot 更新まで完了した。
+
+#### 実行コマンド / 結果
+```bash
+git commit -m "feat(runtime): 親ノード削除とclose-out契約を追加する" -m "- parent recursive delete と dependency scrub を追加する
+- topology load failure の fail-closed と retry guidance を整える
+- delete / close-out の dogfooding docs と report を更新する
+
+Refs: #56"
+
+[iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout 63bdf8b] feat(runtime): 親ノード削除とclose-out契約を追加する
+
+./spec-dock/scripts/spec-dock close --id iss-00056
+
+spec-dock: ok (close) target=iss-00056 node=iss-00056 kind=issue github=#56 state=CLOSED already_closed=false
+
+./spec-dock/scripts/spec-dock sync --github
+
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+./spec-dock/scripts/spec-dock close --id epic-00054
+
+spec-dock: ok (close) target=epic-00054 node=epic-00054 kind=epic github=#54 state=CLOSED already_closed=false
+
+./spec-dock/scripts/spec-dock sync --github
+
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+```
+
+#### 変更したファイル
+- `spec-dock/.agent/index-all.json` - `iss-00056` を `done`、`epic-00054` を GitHub CLOSED / progress done=2 へ同期
+- `spec-dock/tree-all.puml` - `iss-00056 [DONE]` を反映
+- `spec-dock/dashboard.md` - ready board を再生成
+- `spec-dock/active/issue/report.md` - final close-out evidence を追記
+- `spec-dock/active/epic/report.md` - epic close-out evidence を追記
+
+#### コミット
+- `63bdf8b60a9256007c96fbef6d2814d91b7f788f`
+
+#### メモ
+- final close-out 後の `spec-dock/.agent/index-all.json` では `iss-00056.status=done`、`iss-00056.github.state=CLOSED`、`epic-00054.github.state=CLOSED`、`epic-00054.progress.done=2` を確認した。
+- non-blocking の残件は raw int dependency ref 専用 scrub 回帰、`json_store` 経路 scrub 回帰、childless parent の `--recursive` 専用回帰であり、issue acceptance には影響しない。
 
 ## 遭遇した問題と解決 (任意)
 - 問題: spec review で `confirmation_required` の意味論が requirement と衝突すると指摘された
