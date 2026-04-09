@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import shutil
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
 from ..infra.contracts import ActiveManifest, ActiveStateSnapshot, StoredMetaRecord
 from .contracts import (
+    ClearActiveRequest,
     DeleteTerminalStatus,
     DeleteNodeRequest,
     DeleteNodeResult,
@@ -84,7 +86,7 @@ def _result(
         status=cast(DeleteTerminalStatus, status),
         target_id=target_id,
         deleted_node_ids=[],
-        remaining_node_ids=[target_id] if status == "ok" and target_id is not None else [],
+        remaining_node_ids=[],
         remote_close=_empty_remote_close() if status == "ok" else None,
         offending_node_ids=sorted(offending_node_ids or []),
         validation_reasons=reasons,
@@ -143,6 +145,52 @@ def _remote_close_failed_result(
         dependency_scrub_failures=[],
         warnings=list(warnings or []),
     )
+
+
+def _local_delete_partial_failure_result(
+    *,
+    target_id: str,
+    deleted_node_ids: list[str],
+    remaining_node_ids: list[str],
+    remote_close: DeleteRemoteCloseBuckets,
+    active_restore_result: Literal["cleared", "restored", "restore_failed", "not_needed"],
+    recovery_guidance: list[str],
+    warnings: list[str] | None = None,
+) -> DeleteNodeResult:
+    return DeleteNodeResult(
+        status="local_delete_partial_failure",
+        target_id=target_id,
+        deleted_node_ids=list(deleted_node_ids),
+        remaining_node_ids=list(remaining_node_ids),
+        remote_close=remote_close,
+        offending_node_ids=[],
+        validation_reasons=[],
+        active_restore_result=active_restore_result,
+        recovery_guidance=list(recovery_guidance),
+        dependency_scrub_failures=[],
+        warnings=list(warnings or []),
+    )
+
+
+def _build_partial_failure_recovery_guidance(
+    *,
+    restore_guidance: str,
+    target: SpecNode,
+    remaining_node_ids: list[str],
+) -> list[str]:
+    manual_follow_up = (
+        f"resolve filesystem errors and rerun `./spec-dock/scripts/spec-dock delete --id {target.id} --yes`"
+        if remaining_node_ids
+        else (
+            f"inspect `{target.path.as_posix()}` and surrounding workspace for partial-delete artifacts before continuing"
+        )
+    )
+    return [
+        restore_guidance,
+        "run `./spec-dock/scripts/spec-dock validate` to verify local tree and active pointers",
+        "run `./spec-dock/scripts/spec-dock sync --github` to refresh derived issue/dependency artifacts",
+        manual_follow_up,
+    ]
 
 
 def _iter_managed_nodes(graph: SpecGraph) -> list[SpecNode]:
@@ -500,6 +548,96 @@ def _close_remote_issues_barrier(
     return remote_close, None
 
 
+def _delete_local_issue_directory(*, target: SpecNode, ports: Ports) -> None:
+    if ports.node_repo is not None:
+        delete_tree = getattr(ports.node_repo, "delete_tree", None)
+        if callable(delete_tree):
+            delete_tree(target.path)
+            return
+    if target.path.exists():
+        shutil.rmtree(target.path)
+
+
+def _drop_deleted_nodes_from_manifest(
+    manifest: ActiveManifest | None,
+    *,
+    deleted_node_ids: set[str],
+) -> ActiveManifest | None:
+    if manifest is None:
+        return None
+
+    def _filter_entry(entry):
+        if entry is None:
+            return None
+        if entry.id in deleted_node_ids:
+            return None
+        return entry
+
+    return ActiveManifest(
+        initiative=_filter_entry(manifest.initiative),
+        epic=_filter_entry(manifest.epic),
+        issue=_filter_entry(manifest.issue),
+    )
+
+
+def _manifest_has_entries(manifest: ActiveManifest | None) -> bool:
+    return bool(
+        manifest is not None
+        and (manifest.initiative is not None or manifest.epic is not None or manifest.issue is not None)
+    )
+
+
+def _repair_active_after_clear_failure(
+    *,
+    ports: Ports,
+    active_snapshot: ActiveStateSnapshot | None,
+    deleted_node_ids: set[str],
+) -> tuple[Literal["cleared", "restored", "restore_failed"], list[str], str]:
+    warnings = ["active_clear_failed"]
+    if active_snapshot is None:
+        warnings.append("active_restore_failed")
+        return (
+            "restore_failed",
+            warnings,
+            "active repair failed after local delete; rerun `./spec-dock/scripts/spec-dock active clear`",
+        )
+
+    repaired_manifest = _drop_deleted_nodes_from_manifest(active_snapshot.manifest, deleted_node_ids=deleted_node_ids)
+    try:
+        if _manifest_has_entries(repaired_manifest):
+            from .set_active import _build_context_pack_text, commit_active_state
+
+            assert repaired_manifest is not None
+            context_pack_text = _build_context_pack_text(repaired_manifest)
+            commit_active_state(
+                persisted_manifest=repaired_manifest,
+                patch_manifest=repaired_manifest,
+                ports=ports,
+                context_pack_text=context_pack_text,
+            )
+            return (
+                "restored",
+                warnings,
+                "active clear failed after local delete; best-effort active repair was applied",
+            )
+
+        from .set_active import clear_active as clear_active_use_case
+
+        clear_active_use_case(ClearActiveRequest(), ports)
+        return (
+            "cleared",
+            warnings,
+            "active clear failed once after local delete; clear fallback completed",
+        )
+    except Exception:
+        warnings.append("active_restore_failed")
+        return (
+            "restore_failed",
+            warnings,
+            "active repair failed after local delete; rerun `./spec-dock/scripts/spec-dock active clear`",
+        )
+
+
 def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
     records = ports.node_reader.load_node_records()
     if not records:
@@ -550,11 +688,12 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
         )
 
     subtree_ids = _subtree_ids(target, graph)
-    if not req.force and ports.active_state_store is not None:
+    active_conflicts: list[str] = []
+    if ports.active_state_store is not None:
         specdock_dir = _resolve_specdock_dir(ports)
         active_manifest = ports.active_state_store.load_active_manifest(specdock_dir).manifest
         active_conflicts = sorted(_active_ids(active_manifest) & subtree_ids)
-        if active_conflicts:
+        if active_conflicts and not req.force:
             return _result(
                 status="active_conflict",
                 target_id=target.id,
@@ -592,6 +731,14 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 validation_message="dependency edge crosses delete subtree boundary",
             )
 
+    if target.kind != "issue":
+        return _result(
+            status="confirmation_required",
+            target_id=target.id,
+            validation_code="confirmation_required",
+            validation_message="parent target delete is deferred in S02",
+        )
+
     required_remote_targets, subtree_metadata_failure = _subtree_remote_close_targets(
         subtree_ids=subtree_ids,
         graph=graph,
@@ -617,8 +764,9 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
             messages_by_node_id={},
         )
 
+    needs_active_repair = bool(req.force and active_conflicts and ports.active_state_store is not None)
     active_snapshot: ActiveStateSnapshot | None = None
-    if required_remote_targets and ports.active_state_store is not None:
+    if ports.active_state_store is not None and (bool(required_remote_targets) or needs_active_repair):
         active_snapshot = ports.active_state_store.snapshot_current_state(_resolve_specdock_dir(ports))
 
     remote_close, remote_failure = _close_remote_issues_barrier(
@@ -630,10 +778,77 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
     if remote_failure is not None:
         return remote_failure
 
-    # S01 I2 scope: metadata + remote-close barrier contract only. Actual local delete starts from later slices.
-    return _result(
-        status="confirmation_required",
+    try:
+        _delete_local_issue_directory(target=target, ports=ports)
+    except Exception:
+        deleted_node_ids = [] if target.path.exists() else [target.id]
+        remaining_node_ids = [target.id] if target.path.exists() else []
+        warnings = ["local_delete_failed"]
+        active_restore_result: Literal["cleared", "restored", "restore_failed", "not_needed"] = "not_needed"
+        restore_guidance = "active restore was not needed because local delete did not remove target nodes"
+        if needs_active_repair and deleted_node_ids:
+            active_restore_result, restore_warnings, restore_guidance = _repair_active_after_clear_failure(
+                ports=ports,
+                active_snapshot=active_snapshot,
+                deleted_node_ids={target.id},
+            )
+            for warning in restore_warnings:
+                if warning not in warnings:
+                    warnings.append(warning)
+        elif deleted_node_ids:
+            restore_guidance = "active restore was not needed for the partially deleted target"
+        return _local_delete_partial_failure_result(
+            target_id=target.id,
+            deleted_node_ids=deleted_node_ids,
+            remaining_node_ids=remaining_node_ids,
+            remote_close=remote_close,
+            active_restore_result=active_restore_result,
+            recovery_guidance=_build_partial_failure_recovery_guidance(
+                restore_guidance=restore_guidance,
+                target=target,
+                remaining_node_ids=remaining_node_ids,
+            ),
+            warnings=warnings,
+        )
+
+    active_restore_result = "not_needed"
+    warnings: list[str] = []
+    if needs_active_repair:
+        from .set_active import clear_active as clear_active_use_case
+
+        try:
+            clear_active_use_case(ClearActiveRequest(), ports)
+            active_restore_result = "cleared"
+        except Exception:
+            active_restore_result, warnings, restore_guidance = _repair_active_after_clear_failure(
+                ports=ports,
+                active_snapshot=active_snapshot,
+                deleted_node_ids={target.id},
+            )
+            return _local_delete_partial_failure_result(
+                target_id=target.id,
+                deleted_node_ids=[target.id],
+                remaining_node_ids=[],
+                remote_close=remote_close,
+                active_restore_result=active_restore_result,
+                recovery_guidance=_build_partial_failure_recovery_guidance(
+                    restore_guidance=restore_guidance,
+                    target=target,
+                    remaining_node_ids=[],
+                ),
+                warnings=warnings,
+            )
+
+    return DeleteNodeResult(
+        status="ok",
         target_id=target.id,
-        validation_code="confirmation_required",
-        validation_message="preflight and remote-close barrier passed; local delete is deferred in S01 I2",
+        deleted_node_ids=[target.id],
+        remaining_node_ids=[],
+        remote_close=remote_close,
+        offending_node_ids=[],
+        validation_reasons=[],
+        active_restore_result=active_restore_result,
+        recovery_guidance=[],
+        dependency_scrub_failures=[],
+        warnings=warnings,
     )

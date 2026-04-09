@@ -116,13 +116,71 @@ pass
 - `spec-dock/active/issue/report.md` - S01 I2 実装記録を追記
 
 #### コミット
-- pending
+- `09a12f0c4ddad538f42348abb99be2d5b69bf25c`
 
 #### メモ
 - implementation review は pass。non-blocking として `graph.nodes_by_id` ベースの selector/close-set resolve は後続 slice で `.meta.json` authoritative read へ寄せる余地があるとコメントされた。
 - qa review は pass。`metadata_validation_failed` / `remote_close_failed` の JSON field matrix と remote failure で local delete 未開始を確認した。
 - spec review は pass。S01 I2 の bounded scope と issue docs の barrier contract が整合していることを確認した。
 - actual local delete / partial failure / dependency scrub は未着手であり、次の S02/S03 で扱う。
+
+### 2026-04-09 11:15 - 16:40
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, EC-010
+
+#### 実施内容
+- issue target delete の success path を provider-side runtime に追加し、`delete iss-00056 --yes` / `--id` / `--github-issue` / issue + `--recursive` accepted no-op を end-to-end で通した。
+- S02 の review loop で見つかった blocker を順に解消した。
+- parent target が S02 で remote close / subtree metadata validation へ入らないよう early-stop へ修正した。
+- forced issue delete が active target を削除した場合に active を clear し、失敗時は snapshot から survivor を復旧する best-effort repair を入れた。
+- `already_closed` remote issue success path、remote close failure で local delete 未開始、Windows read-only `.meta.json` を含む local delete retry、post-close local delete failure の `local_delete_partial_failure` を tests で固定した。
+- `local_delete_partial_failure` を S02 の issue-target partial-failure slice として requirement / plan に明記し、review scope と contract を整合させた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_close
+
+Ran 98 tests in 3.711s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=17
+
+implementation review (S02)
+
+pass
+
+qa review (S02)
+
+pass
+
+spec review (S02)
+
+pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - issue target delete success path、post-delete active repair、local delete partial failure を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - delete use case に必要な active snapshot / node repo seam を公開
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - delete path の active store / node repo wiring を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - read-only file を含む tree delete retry を追加
+- `tests/cli_runtime/test_runtime_delete_s13.py` - success / already-closed / remote-close-failed / active repair / local delete partial failure / JSON matrix regression tests を追加
+- `tests/cli_runtime/test_delete.py` - command-level delete E2E と gh stub strictness / read-only delete retry test を追加
+- `spec-dock/active/issue/requirement.md` - `local_delete_partial_failure` に post-delete active repair failure を含める契約を明記
+- `spec-dock/active/issue/plan.md` - S02 gate に issue-target partial-failure slice と JSON / remote-failure coverage を追加
+- `spec-dock/active/issue/report.md` - S02 実装記録を追記
+
+#### コミット
+- pending
+
+#### メモ
+- implementation review は pass。non-blocking として force-required partial failure guidance で `--force` を保持する改善余地が残るとコメントされた。
+- qa review は pass。non-blocking として clear fallback branch と `fs_repo.delete_tree` 異常系 coverage の追加余地が残るとコメントされた。
+- spec review は pass。S02 scope に issue-target partial-failure を明示したことで、review gate と contract の不整合は解消した。
+- S02 では parent recursive delete / dependency scrub / epic final close-out は未着手のままであり、S03 で扱う。
 
 ## 遭遇した問題と解決 (任意)
 - 問題: spec review で `confirmation_required` の意味論が requirement と衝突すると指摘された
