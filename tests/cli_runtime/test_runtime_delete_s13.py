@@ -1,0 +1,661 @@
+import contextlib
+import io
+import json
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+def _runtime_modules():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.application import contracts as app_contracts
+        from spec_dock_runtime.application import delete_node as app_delete_node
+        from spec_dock_runtime.application import ports as app_ports
+        from spec_dock_runtime.cli import dispatch as cli_dispatch
+        from spec_dock_runtime.cli import parser as cli_parser
+        from spec_dock_runtime.cli import registry as cli_registry
+        from spec_dock_runtime.domain import models as domain_models
+        from spec_dock_runtime.infra import contracts as infra_contracts
+    finally:
+        sys.path.pop(0)
+    return app_contracts, app_delete_node, app_ports, cli_dispatch, cli_parser, cli_registry, domain_models, infra_contracts
+
+
+def _record(
+    infra_contracts,
+    *,
+    repo_root: Path,
+    kind: str,
+    node_id: str,
+    parent_id: str | None,
+    initiative_id: str | None,
+    epic_id: str | None,
+    github_issue_number: int | None,
+) -> object:
+    if kind == "initiative":
+        node_dir = repo_root / "spec-dock" / "initiatives" / f"{node_id}-title"
+    elif kind == "epic":
+        node_dir = (
+            repo_root
+            / "spec-dock"
+            / "initiatives"
+            / "init-local-00001-title"
+            / "epics"
+            / f"{node_id}-title"
+        )
+    else:
+        node_dir = (
+            repo_root
+            / "spec-dock"
+            / "initiatives"
+            / "init-local-00001-title"
+            / "epics"
+            / "epic-local-00001-title"
+            / "issues"
+            / f"{node_id}-title"
+        )
+    return infra_contracts.StoredMetaRecord(
+        kind=kind,
+        id=node_id,
+        title=node_id,
+        slug="title",
+        path=node_dir.as_posix(),
+        parent_id=parent_id,
+        initiative_id=initiative_id,
+        epic_id=epic_id,
+        github_issue_number=github_issue_number,
+        meta_path=(node_dir / ".meta.json").as_posix(),
+        github_repo_owner=None,
+        github_repo_name=None,
+    )
+
+
+class _StubNodeReader:
+    def __init__(self, records):
+        self._records = list(records)
+
+    def load_node_records(self):
+        return list(self._records)
+
+
+class _StubDepsTopologyReader:
+    def __init__(self, infra_contracts, dep_map):
+        self._infra_contracts = infra_contracts
+        self._dep_map = dict(dep_map)
+
+    def load_issue_depends_on_map(self, specdock_dir, graph):
+        del specdock_dir, graph
+        return self._infra_contracts.DepsTopologyLoadResult(issue_depends_on_map=dict(self._dep_map), warnings=[])
+
+
+class _StubActiveStateStore:
+    def __init__(self, infra_contracts, manifest):
+        self._infra_contracts = infra_contracts
+        self._manifest = manifest
+
+    def load_active_manifest(self, specdock_dir):
+        del specdock_dir
+        return self._infra_contracts.ActiveManifestLoadResult(
+            manifest=self._manifest,
+            source="agent.active",
+            warnings=[],
+        )
+
+
+class TestRuntimeDeleteS13(unittest.TestCase):
+    def _new_repo_root(self) -> Path:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        return Path(temp_dir.name)
+
+    def _records(self, infra_contracts, repo_root: Path):
+        return [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=11,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=22,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00056",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=56,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00057",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=57,
+            ),
+        ]
+
+    def _ports(self, *, records, dep_map=None, active_manifest=None, repo_root=None):
+        app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        del app_contracts
+        if repo_root is None:
+            repo_root = Path("/repo")
+        for record in records:
+            Path(record.path).mkdir(parents=True, exist_ok=True)
+        return app_ports.Ports(
+            node_reader=_StubNodeReader(records),
+            repo_root=repo_root,
+            specdock_dir=repo_root / "spec-dock",
+            deps_topology_reader=_StubDepsTopologyReader(infra_contracts, dep_map or {}),
+            active_state_store=_StubActiveStateStore(infra_contracts, active_manifest),
+        )
+
+    def _request(self, app_contracts, **overrides):
+        payload = {
+            "positional_target": None,
+            "node_id": None,
+            "github_issue": None,
+            "recursive": False,
+            "force": False,
+            "confirmed": False,
+            "json_output": False,
+        }
+        payload.update(overrides)
+        return app_contracts.DeleteNodeRequest(**payload)
+
+    def test_selector_missing_returns_invalid_selector_combination(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(self._request(app_contracts), ports)
+        self.assertEqual(result.status, "invalid_selector_combination")
+
+    def test_selector_multiple_returns_invalid_selector_combination(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, positional_target="iss-local-00056", node_id="iss-local-00056"),
+            ports,
+        )
+        self.assertEqual(result.status, "invalid_selector_combination")
+
+    def test_malformed_github_issue_returns_invalid_selector_syntax(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(self._request(app_contracts, github_issue="#56"), ports)
+        self.assertEqual(result.status, "invalid_selector_syntax")
+
+    def test_node_id_exact_match_resolve(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result_pos = app_delete_node.delete_node(
+            self._request(app_contracts, positional_target="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result_pos.status, "confirmation_required")
+        self.assertEqual(result_pos.target_id, "iss-local-00056")
+        result_id = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result_id.status, "confirmation_required")
+        self.assertEqual(result_id.target_id, "iss-local-00056")
+
+    def test_github_issue_selector_is_normalized(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, github_issue="00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+        self.assertEqual(result.target_id, "iss-local-00056")
+
+    def test_ambiguous_target_for_github_issue(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root) + [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="epic",
+                node_id="epic-local-00002",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=56,
+            )
+        ]
+        ports = self._ports(records=records, repo_root=repo_root)
+        result = app_delete_node.delete_node(self._request(app_contracts, github_issue="56", confirmed=True), ports)
+        self.assertEqual(result.status, "ambiguous_target")
+        self.assertIn("epic-local-00002", result.offending_node_ids)
+        self.assertIn("iss-local-00056", result.offending_node_ids)
+
+    def test_unrelated_invalid_id_record_is_ignored(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root) + [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="not-a-canonical-id",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=99,
+            )
+        ]
+        ports = self._ports(records=records, repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+        self.assertEqual(result.target_id, "iss-local-00056")
+
+    def test_preflight_precedence_confirmation_before_recursive_active_deps(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        manifest = infra_contracts.ActiveManifest(
+            initiative=infra_contracts.ActiveManifestEntry(id="init-local-00001", path="spec-dock/initiatives/x"),
+            epic=None,
+            issue=None,
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(
+            records=self._records(infra_contracts, repo_root),
+            dep_map={"iss-local-00056": ["iss-local-00057"], "iss-local-00057": []},
+            active_manifest=manifest,
+            repo_root=repo_root,
+        )
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="init-local-00001", confirmed=False, recursive=False),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+
+    def test_active_conflict(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(id="iss-local-00056", path="spec-dock/initiatives/x"),
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(
+            records=self._records(infra_contracts, repo_root),
+            active_manifest=manifest,
+            repo_root=repo_root,
+        )
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "active_conflict")
+
+    def test_dependency_conflict(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(
+            records=self._records(infra_contracts, repo_root),
+            dep_map={"iss-local-00056": ["iss-local-00057"], "iss-local-00057": []},
+            repo_root=repo_root,
+        )
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "dependency_conflict")
+
+    def test_subtree_internal_dependency_is_not_conflict(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(
+            records=self._records(infra_contracts, repo_root),
+            dep_map={"iss-local-00056": ["iss-local-00057"], "iss-local-00057": []},
+            repo_root=repo_root,
+        )
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="epic-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+
+    def test_missing_recursive_for_parent(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="epic-local-00001", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "recursive_required")
+
+    def test_missing_target_path(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root)
+        ports = self._ports(records=records, repo_root=repo_root)
+        shutil.rmtree(Path(records[2].path))
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "target_not_found")
+
+    def test_missing_yes(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(self._request(app_contracts, node_id="iss-local-00056"), ports)
+        self.assertEqual(result.status, "confirmation_required")
+
+    def test_force_does_not_override_missing_target_recursive_yes(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+
+        result_missing_target = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-99999", confirmed=True, force=True),
+            ports,
+        )
+        self.assertEqual(result_missing_target.status, "target_not_found")
+
+        result_missing_recursive = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="epic-local-00001", confirmed=True, force=True),
+            ports,
+        )
+        self.assertEqual(result_missing_recursive.status, "recursive_required")
+
+        result_missing_yes = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", force=True, confirmed=False),
+            ports,
+        )
+        self.assertEqual(result_missing_yes.status, "confirmation_required")
+
+    def test_force_positive_path_overrides_active_and_dependency_conflict(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(id="iss-local-00056", path="spec-dock/initiatives/x"),
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(
+            records=self._records(infra_contracts, repo_root),
+            dep_map={"iss-local-00056": ["iss-local-00057"], "iss-local-00057": []},
+            active_manifest=manifest,
+            repo_root=repo_root,
+        )
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", force=True, confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+        self.assertEqual(result.target_id, "iss-local-00056")
+
+    def test_issue_recursive_flag_is_accepted_noop(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", recursive=True, confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+
+    def test_delete_command_positional_selector_wiring_and_json_exit_code(self) -> None:
+        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
+            _runtime_modules()
+        )
+        captured = {}
+
+        def _delete(req):
+            captured["request"] = req
+            return app_contracts.DeleteNodeResult(
+                status="dependency_conflict",
+                target_id="iss-local-00056",
+                deleted_node_ids=[],
+                remaining_node_ids=[],
+                remote_close=None,
+                offending_node_ids=["iss-local-00057"],
+                validation_reasons=[
+                    app_contracts.DeleteValidationReason(
+                        node_id="iss-local-00056",
+                        code="dependency_conflict",
+                        message="dependency edge crosses delete subtree boundary",
+                    )
+                ],
+                active_restore_result=None,
+                recovery_guidance=[],
+                dependency_scrub_failures=[],
+                warnings=[],
+            )
+
+        use_cases = app_contracts.UseCases(
+            create_initiative=lambda req: None,  # type: ignore[return-value]
+            create_epic=lambda req: None,  # type: ignore[return-value]
+            create_issue=lambda req: None,  # type: ignore[return-value]
+            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            import_initiative=lambda req: None,  # type: ignore[return-value]
+            import_epic=lambda req: None,  # type: ignore[return-value]
+            import_issue=lambda req: None,  # type: ignore[return-value]
+            set_active=lambda req: None,  # type: ignore[return-value]
+            show_active=lambda req: None,  # type: ignore[return-value]
+            clear_active=lambda req: None,  # type: ignore[return-value]
+            sync=lambda req: None,  # type: ignore[return-value]
+            check_deps=lambda req: None,  # type: ignore[return-value]
+            validate_tree=lambda req: None,  # type: ignore[return-value]
+            delete_node=_delete,
+        )
+
+        registry = cli_registry.build_registry()
+        parser = cli_parser.build_parser(registry)
+        ns = parser.parse_args(["delete", "iss-local-00056", "--yes", "--json"])
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+
+        self.assertEqual(exit_code, 1)
+        request = captured["request"]
+        self.assertEqual(request.positional_target, "iss-local-00056")
+        self.assertTrue(request.confirmed)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "dependency_conflict")
+        self.assertEqual(set(payload.keys()), {"status", "target_id", "offending_node_ids", "validation_reasons"})
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_delete_json_field_matrix_for_blocker_statuses(self) -> None:
+        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
+            _runtime_modules()
+        )
+        statuses = [
+            "invalid_selector_combination",
+            "invalid_selector_syntax",
+            "target_not_found",
+            "ambiguous_target",
+            "active_conflict",
+            "dependency_conflict",
+            "recursive_required",
+            "confirmation_required",
+        ]
+        registry = cli_registry.build_registry()
+        parser = cli_parser.build_parser(registry)
+
+        for status in statuses:
+            def _delete(_req, status=status):
+                return app_contracts.DeleteNodeResult(
+                    status=status,
+                    target_id="iss-local-00056",
+                    deleted_node_ids=[],
+                    remaining_node_ids=[],
+                    remote_close=app_contracts.DeleteRemoteCloseBuckets(
+                        closed=[],
+                        noop_already_closed=[],
+                        failed=[],
+                        skipped_not_attempted=[],
+                    ),
+                    offending_node_ids=["iss-local-00057"],
+                    validation_reasons=[
+                        app_contracts.DeleteValidationReason(
+                            node_id="iss-local-00056",
+                            code=status,
+                            message=status,
+                        )
+                    ],
+                    active_restore_result="not_needed",
+                    recovery_guidance=["noop"],
+                    dependency_scrub_failures=[
+                        app_contracts.DeleteDependencyScrubFailure(
+                            node_id="iss-local-00056",
+                            edge_target_id="iss-local-00057",
+                        )
+                    ],
+                    warnings=[],
+                )
+
+            use_cases = app_contracts.UseCases(
+                create_initiative=lambda req: None,  # type: ignore[return-value]
+                create_epic=lambda req: None,  # type: ignore[return-value]
+                create_issue=lambda req: None,  # type: ignore[return-value]
+                create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+                import_initiative=lambda req: None,  # type: ignore[return-value]
+                import_epic=lambda req: None,  # type: ignore[return-value]
+                import_issue=lambda req: None,  # type: ignore[return-value]
+                set_active=lambda req: None,  # type: ignore[return-value]
+                show_active=lambda req: None,  # type: ignore[return-value]
+                clear_active=lambda req: None,  # type: ignore[return-value]
+                sync=lambda req: None,  # type: ignore[return-value]
+                check_deps=lambda req: None,  # type: ignore[return-value]
+                validate_tree=lambda req: None,  # type: ignore[return-value]
+                delete_node=_delete,
+            )
+
+            ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes", "--json"])
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+
+            self.assertEqual(exit_code, 1, status)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["status"], status)
+            self.assertEqual(
+                set(payload.keys()),
+                {"status", "target_id", "offending_node_ids", "validation_reasons"},
+            )
+            self.assertEqual(stderr.getvalue(), "")
+
+    def test_preflight_pass_path_does_not_look_like_delete_success(self) -> None:
+        app_contracts, app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+
+        use_cases = app_contracts.UseCases(
+            create_initiative=lambda req: None,  # type: ignore[return-value]
+            create_epic=lambda req: None,  # type: ignore[return-value]
+            create_issue=lambda req: None,  # type: ignore[return-value]
+            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            import_initiative=lambda req: None,  # type: ignore[return-value]
+            import_epic=lambda req: None,  # type: ignore[return-value]
+            import_issue=lambda req: None,  # type: ignore[return-value]
+            set_active=lambda req: None,  # type: ignore[return-value]
+            show_active=lambda req: None,  # type: ignore[return-value]
+            clear_active=lambda req: None,  # type: ignore[return-value]
+            sync=lambda req: None,  # type: ignore[return-value]
+            check_deps=lambda req: None,  # type: ignore[return-value]
+            validate_tree=lambda req: None,  # type: ignore[return-value]
+            delete_node=lambda _req: result,
+        )
+        registry = cli_registry.build_registry()
+        parser = cli_parser.build_parser(registry)
+        ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes"])
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        self.assertEqual(exit_code, 1)
+        self.assertNotIn("ok (delete)", stdout.getvalue())
+        self.assertIn("blocked (delete) status=confirmation_required", stderr.getvalue())
