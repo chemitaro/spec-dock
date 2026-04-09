@@ -134,6 +134,19 @@ def issue_view_snapshot_raw(repo_root: Path, *, issue_number: int, repo_slug: st
     return data
 
 
+def issue_close_raw(repo_root: Path, *, issue_number: int, repo_slug: str | None = None) -> dict[str, Any]:
+    ensure_gh_available()
+    cmd = ["gh", "issue", "close", str(issue_number)]
+    normalized_repo_slug = (repo_slug or "").strip()
+    if normalized_repo_slug:
+        cmd.extend(["--repo", normalized_repo_slug])
+    try:
+        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+    return issue_view_snapshot_raw(repo_root, issue_number=issue_number, repo_slug=repo_slug)
+
+
 def _parse_repo_identity_from_issue_url(url: str) -> tuple[str | None, str | None]:
     matched = _GH_ISSUE_REPO_URL_RE.search(str(url).strip())
     if matched is None:
@@ -192,4 +205,9 @@ def issue_view_minimal(repo_root: Path, issue_number: int, *, repo_slug: str | N
 
 def issue_view_snapshot(repo_root: Path, issue_number: int, *, repo_slug: str | None = None) -> IssueSnapshot:
     raw = issue_view_snapshot_raw(repo_root, issue_number=issue_number, repo_slug=repo_slug)
+    return _issue_snapshot_from_raw(raw, repo_slug=repo_slug)
+
+
+def issue_close(repo_root: Path, issue_number: int, *, repo_slug: str | None = None) -> IssueSnapshot:
+    raw = issue_close_raw(repo_root, issue_number=issue_number, repo_slug=repo_slug)
     return _issue_snapshot_from_raw(raw, repo_slug=repo_slug)
