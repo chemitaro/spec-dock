@@ -50,5 +50,12 @@ ID: "epic-00054"
 - planned-issue-02-delete-local-spec-nodes-with-guardrails:
   - local delete and subtree safety。docs/tests/review/success verification に加えて、epic final review / final validation / close-out evidence をこの issue で閉じる。
 
+## 実装更新（2026-04-10）
+- `iss-00055` は close command 実装と close-out まで完了済みである。
+- `iss-00056` は S03 I1 まで完了し、parent recursive delete、remote close barrier、dependency scrub、partial failure payload、topology load failure fail-closed が provider-side runtime に実装された。
+- 最新検証は `python -m unittest -v tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_close` で `Ran 108 tests ... OK`、`./spec-dock/scripts/spec-dock validate` で `spec-dock: ok (validate) nodes=17` である。
+- `iss-00056` の implementation review / qa review は pass。non-blocking として raw int dependency ref 専用回帰と `json_store` 経路 scrub 回帰に追加余地が残る。
+- 未完は commit、`sync --github` を含む final evidence 固定、`iss-00056` close、epic close-out である。
+
 ## 省略/例外メモ (必須)
 - 本 epic は dogfooding feedback の記録と今後の実装計画を固定するために開いたものであり、2026-04-08 時点では code change を伴う execution は行っていない。
