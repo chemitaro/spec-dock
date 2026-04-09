@@ -305,5 +305,76 @@ spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree
 - S01 I2 では subtree-wide metadata validation と remote-close barrier を先に固定する
 - selector 解決は `graph.nodes_by_id` ベースから requirement の basename token discovery へ寄せる余地が残る
 
+### 2026-04-10
+
+#### 対象
+- Step: S04 I1
+- AC/EC: live-manual-defect-01
+
+#### 実施内容
+- live manual test `mt-08` で見つかった defect-1 を受けて、`delete_node()` の graph 構築前 `load_node_records()` 失敗を delete 専用に補足する remediation を追加した。
+- selector が `<target>` / `--id` のときだけ canonical node id から target-local directory を再特定し、target `.meta.json` が missing / unreadable / malformed / non-object の場合は `metadata_validation_failed` の structured result へ正規化するようにした。
+- あわせて application regression と actual runtime regression を追加し、target-local metadata edge でも `--json` contract が plain error text へ崩れないことを固定する準備を入れた。
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - target-local metadata parse failure の fallback normalize を追加
+- `tests/cli_runtime/test_runtime_delete_s13.py` - graph 構築前 load failure の application regression を追加
+- `tests/cli_runtime/test_delete.py` - actual runtime `delete --id ... --yes --json` regression を追加
+
+#### メモ
+- remediation は delete command 専用の wrapper seam に閉じ、unrelated malformed node による全体 load failure の扱いは従来どおり fail-closed に残した。
+- manual rerun / validate / commit evidence はこの後続けて積む想定であり、S04 report は remediation entrypoint と defect traceability を先に残している。
+
+### 2026-04-10 16:20 - 16:50
+
+#### 対象
+- Step: S04 I1 / S04 I2 / close-out
+- AC/EC: live-manual-defect-01
+
+#### 実施内容
+- target-local metadata remediation を live rerun に合わせて補強し、`load_node_records()` が `RuntimeError` を返したときに、exception message 内の target `.meta.json` path から canonical target directory を逆引きできる fallback を追加した。
+- これにより、directory discovery が曖昧なときでも `<target>` / `--id` の delete 専用 wrapper seam で `metadata_validation_failed` を structured result へ正規化できるようにした。
+- runtime regression と CLI regression を更新し、graph build 前 load failure と live-like ambiguous directory 条件を固定した。
+- live manual `mt-08` は fresh workspace を working tree installer (`PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init/update`) で作り直して rerun し、target metadata edge が structured JSON へ正規化されることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m py_compile \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py \
+  tests/cli_runtime/test_runtime_delete_s13.py \
+  tests/cli_runtime/test_delete.py
+
+python -m unittest -v \
+  tests.cli_runtime.test_runtime_delete_s13 \
+  tests.cli_runtime.test_delete \
+  tests.cli_runtime.test_runtime_shell_s11 \
+  tests.cli_runtime.test_runtime_close_s12 \
+  tests.cli_runtime.test_runtime_active_s06 \
+  tests.cli_runtime.test_runtime_deps_s04 \
+  tests.cli_runtime.test_close
+
+./spec-dock/scripts/spec-dock validate
+```
+
+- `py_compile`: success
+- targeted/full regression subset: `Ran 111 tests ... OK`
+- dogfooding validate: `spec-dock: ok (validate) nodes=17`
+- live manual rerun evidence:
+  - `manual-tests/reports/2026-04-10-epic-00054-github-lifecycle-live-manual/evidence/mt-08-topology-metadata-edges-rerun.txt`
+  - target metadata edge now returns structured `metadata_validation_failed` JSON with `target_id=iss-00048` and `offending_node_ids=["iss-00048"]`
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - exception message の `.meta.json` path から target-local metadata failure を逆引きする fallback を追加
+- `tests/cli_runtime/test_runtime_delete_s13.py` - ambiguous directory 条件でも target-local metadata normalization が効く regression を追加
+- `tests/cli_runtime/test_delete.py` - readonly metadata setup に沿う actual runtime regression を維持
+- `manual-tests/reports/2026-04-10-epic-00054-github-lifecycle-live-manual/execution-log.md` - mt-08 rerun pass を追記
+- `manual-tests/reports/2026-04-10-epic-00054-github-lifecycle-live-manual/checklist.md` - mt-08 status を pass へ更新
+- `manual-tests/reports/2026-04-10-epic-00054-github-lifecycle-live-manual/summary.md` - final verdict を pass へ更新
+- `spec-dock/active/issue/report.md` - S04 remediation / rerun close-out evidence を追記
+
+#### メモ
+- `uvx --from /srv/mount/spec-dock` は uncommitted working-tree change を manual verification 用 SUT へ反映しなかったため、working tree verification では `PYTHONPATH=/srv/mount/spec-dock/src python -m spec_dock.cli init/update` を使った。
+- `.meta.json` が `444` である点は readonly metadata permission contract と整合するため、manual setup observation として残し、blocking defect からは外した。
+
 ## 省略/例外メモ (必須)
 - なし
