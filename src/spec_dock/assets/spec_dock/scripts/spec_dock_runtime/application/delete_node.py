@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import re
 from pathlib import Path
 from typing import cast
@@ -7,7 +8,7 @@ from typing import cast
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
-from ..infra.contracts import ActiveManifest, StoredMetaRecord
+from ..infra.contracts import ActiveManifest, ActiveStateSnapshot, StoredMetaRecord
 from .contracts import (
     DeleteTerminalStatus,
     DeleteNodeRequest,
@@ -15,9 +16,17 @@ from .contracts import (
     DeleteRemoteCloseBuckets,
     DeleteValidationReason,
 )
+from .github_issue_targets import normalize_repo_slug
 from .ports import Ports
 
 _NUM_RE = re.compile(r"^[0-9]+$")
+
+
+@dataclass(frozen=True)
+class _CanonicalRemoteIssue:
+    repo_slug: str
+    issue_number: int
+    identifier: str
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -86,8 +95,106 @@ def _result(
     )
 
 
+def _metadata_failure_result(
+    *,
+    target_id: str | None,
+    offending_node_ids: list[str],
+    messages_by_node_id: dict[str, str],
+) -> DeleteNodeResult:
+    sorted_ids = sorted(offending_node_ids)
+    return DeleteNodeResult(
+        status="metadata_validation_failed",
+        target_id=target_id,
+        deleted_node_ids=[],
+        remaining_node_ids=[],
+        remote_close=_empty_remote_close(),
+        offending_node_ids=sorted_ids,
+        validation_reasons=[
+            DeleteValidationReason(
+                node_id=node_id,
+                code="metadata_validation_failed",
+                message=messages_by_node_id.get(node_id, "metadata_validation_failed"),
+            )
+            for node_id in sorted_ids
+        ],
+        active_restore_result=None,
+        recovery_guidance=[],
+        dependency_scrub_failures=[],
+        warnings=[],
+    )
+
+
+def _remote_close_failed_result(
+    *,
+    target_id: str,
+    remote_close: DeleteRemoteCloseBuckets,
+    warnings: list[str] | None = None,
+) -> DeleteNodeResult:
+    return DeleteNodeResult(
+        status="remote_close_failed",
+        target_id=target_id,
+        deleted_node_ids=[],
+        remaining_node_ids=[],
+        remote_close=remote_close,
+        offending_node_ids=[],
+        validation_reasons=[],
+        active_restore_result=None,
+        recovery_guidance=[],
+        dependency_scrub_failures=[],
+        warnings=list(warnings or []),
+    )
+
+
 def _iter_managed_nodes(graph: SpecGraph) -> list[SpecNode]:
     return [node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")]
+
+
+def _normalize_issue_number(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or _NUM_RE.fullmatch(raw) is None:
+            return None
+        normalized = int(raw)
+        return normalized if normalized > 0 else None
+    return None
+
+
+def _validate_node_metadata(
+    node: SpecNode,
+    *,
+    require_meta_file: bool = True,
+) -> tuple[_CanonicalRemoteIssue | None, str | None]:
+    if require_meta_file and not node.meta_path.exists():
+        return None, f"missing metadata file: {node.meta_path.as_posix()}"
+
+    owner = node.github_repo_owner
+    repo = node.github_repo_name
+    issue_number_raw = node.github_issue_number
+    has_owner = owner is not None
+    has_repo = repo is not None
+    has_issue = issue_number_raw is not None
+    present_count = int(has_owner) + int(has_repo) + int(has_issue)
+    if present_count == 0:
+        return None, None
+    if present_count != 3:
+        return None, "partial github linkage is invalid"
+    if not isinstance(owner, str) or not isinstance(repo, str):
+        return None, "github repo scope must be string values"
+    repo_slug = normalize_repo_slug(owner, repo)
+    if repo_slug is None:
+        return None, "github repo scope must be non-empty strings"
+    issue_number = _normalize_issue_number(issue_number_raw)
+    if issue_number is None:
+        return None, "github issue number must be a positive integer"
+    return _CanonicalRemoteIssue(
+        repo_slug=repo_slug,
+        issue_number=issue_number,
+        identifier=f"{repo_slug}#{issue_number}",
+    ), None
 
 
 def _resolve_node_id_matches(graph: SpecGraph, raw_input: str) -> tuple[str | None, DeleteNodeResult | None]:
@@ -114,7 +221,7 @@ def _resolve_node_id_matches(graph: SpecGraph, raw_input: str) -> tuple[str | No
         )
 
     canonical = format_id(prefix, num, local=is_local)
-    matches = []
+    matches: list[SpecNode] = []
     for node in _iter_managed_nodes(graph):
         try:
             node_prefix, node_local, node_num = parse_id(node.id)
@@ -122,7 +229,7 @@ def _resolve_node_id_matches(graph: SpecGraph, raw_input: str) -> tuple[str | No
             # Ignore malformed unrelated ids during selector resolution.
             continue
         if node_prefix == prefix and node_local == is_local and node_num == num:
-            matches.append(node.id)
+            matches.append(node)
 
     if not matches:
         return None, _result(
@@ -130,14 +237,31 @@ def _resolve_node_id_matches(graph: SpecGraph, raw_input: str) -> tuple[str | No
             validation_code="target_not_found",
             validation_message=f"target not found: {canonical}",
         )
+    invalid_messages: dict[str, str] = {}
+    for node in matches:
+        _canonical_remote, validation_error = _validate_node_metadata(
+            node,
+            require_meta_file=node.path.exists(),
+        )
+        if validation_error is not None:
+            invalid_messages[node.id] = validation_error
+    if invalid_messages:
+        sorted_invalid_ids = sorted(invalid_messages)
+        resolved_target_id = sorted_invalid_ids[0] if len(sorted_invalid_ids) == 1 else None
+        return None, _metadata_failure_result(
+            target_id=resolved_target_id,
+            offending_node_ids=sorted_invalid_ids,
+            messages_by_node_id=invalid_messages,
+        )
+
     if len(matches) > 1:
         return None, _result(
             status="ambiguous_target",
-            offending_node_ids=matches,
+            offending_node_ids=[node.id for node in matches],
             validation_code="ambiguous_target",
             validation_message=f"ambiguous selector: {canonical}",
         )
-    return matches[0], None
+    return matches[0].id, None
 
 
 def _resolve_github_issue_matches(graph: SpecGraph, raw_input: str) -> tuple[str | None, DeleteNodeResult | None]:
@@ -155,27 +279,42 @@ def _resolve_github_issue_matches(graph: SpecGraph, raw_input: str) -> tuple[str
             validation_code="invalid_selector_syntax",
             validation_message=f"--github-issue must be a positive integer: {raw_input}",
         )
-    matches = sorted(
-        [
-            node.id
-            for node in _iter_managed_nodes(graph)
-            if node.github_issue_number is not None and int(node.github_issue_number) == issue_number
-        ]
-    )
+    matches: list[SpecNode] = []
+    for node in _iter_managed_nodes(graph):
+        normalized_issue_number = _normalize_issue_number(node.github_issue_number)
+        if normalized_issue_number == issue_number:
+            matches.append(node)
     if not matches:
         return None, _result(
             status="target_not_found",
             validation_code="target_not_found",
             validation_message=f"no node linked to github issue: {issue_number}",
         )
+    invalid_messages: dict[str, str] = {}
+    for node in matches:
+        _canonical_remote, validation_error = _validate_node_metadata(
+            node,
+            require_meta_file=node.path.exists(),
+        )
+        if validation_error is not None:
+            invalid_messages[node.id] = validation_error
+    if invalid_messages:
+        sorted_invalid_ids = sorted(invalid_messages)
+        resolved_target_id = sorted_invalid_ids[0] if len(sorted_invalid_ids) == 1 else None
+        return None, _metadata_failure_result(
+            target_id=resolved_target_id,
+            offending_node_ids=sorted_invalid_ids,
+            messages_by_node_id=invalid_messages,
+        )
+
     if len(matches) > 1:
         return None, _result(
             status="ambiguous_target",
-            offending_node_ids=matches,
+            offending_node_ids=[node.id for node in matches],
             validation_code="ambiguous_target",
             validation_message=f"ambiguous github issue selector: {issue_number}",
         )
-    return matches[0], None
+    return matches[0].id, None
 
 
 def _resolve_target_id(req: DeleteNodeRequest, graph: SpecGraph) -> tuple[str | None, DeleteNodeResult | None]:
@@ -243,6 +382,122 @@ def _active_ids(manifest: ActiveManifest | None) -> set[str]:
     if manifest.issue is not None:
         out.add(manifest.issue.id)
     return out
+
+
+def _subtree_remote_close_targets(
+    *,
+    subtree_ids: set[str],
+    graph: SpecGraph,
+) -> tuple[list[_CanonicalRemoteIssue] | None, DeleteNodeResult | None]:
+    invalid_messages: dict[str, str] = {}
+    canonical_targets: dict[tuple[str, int], _CanonicalRemoteIssue] = {}
+    for node_id in sorted(subtree_ids):
+        node = graph.nodes_by_id.get(node_id)
+        if node is None:
+            continue
+        canonical_remote, validation_error = _validate_node_metadata(node)
+        if validation_error is not None:
+            invalid_messages[node.id] = validation_error
+            continue
+        if canonical_remote is None:
+            continue
+        canonical_targets[(canonical_remote.repo_slug, canonical_remote.issue_number)] = canonical_remote
+    if invalid_messages:
+        return None, _metadata_failure_result(
+            target_id=None,
+            offending_node_ids=sorted(invalid_messages),
+            messages_by_node_id=invalid_messages,
+        )
+    ordered_keys = sorted(canonical_targets.keys(), key=lambda item: (item[0], item[1]))
+    ordered_targets = [canonical_targets[key] for key in ordered_keys]
+    return ordered_targets, None
+
+
+def _close_remote_issues_barrier(
+    *,
+    target_id: str,
+    required_targets: list[_CanonicalRemoteIssue],
+    ports: Ports,
+    active_snapshot: ActiveStateSnapshot | None,
+) -> tuple[DeleteRemoteCloseBuckets, DeleteNodeResult | None]:
+    remote_close = _empty_remote_close()
+    if not required_targets:
+        return remote_close, None
+
+    if ports.issue_gateway is None or ports.repo_root is None:
+        first = required_targets[0].identifier
+        remote_close.failed.append(first)
+        remote_close.skipped_not_attempted.extend([item.identifier for item in required_targets[1:]])
+        return remote_close, _remote_close_failed_result(
+            target_id=target_id,
+            remote_close=remote_close,
+            warnings=["issue_gateway_unavailable_for_delete"],
+        )
+
+    for index, target in enumerate(required_targets):
+        try:
+            current = ports.issue_gateway.issue_view_snapshot(
+                ports.repo_root,
+                target.issue_number,
+                repo_slug=target.repo_slug,
+            )
+        except RuntimeError:
+            remote_close.failed.append(target.identifier)
+            remote_close.skipped_not_attempted.extend([item.identifier for item in required_targets[index + 1 :]])
+            warnings: list[str] = []
+            if ports.active_state_store is not None and active_snapshot is not None:
+                try:
+                    ports.active_state_store.restore_previous_state(_resolve_specdock_dir(ports), active_snapshot)
+                except Exception:
+                    warnings.append("active_restore_failed")
+            return remote_close, _remote_close_failed_result(
+                target_id=target_id,
+                remote_close=remote_close,
+                warnings=warnings,
+            )
+
+        if str(current.state).strip().upper() == "CLOSED":
+            remote_close.noop_already_closed.append(target.identifier)
+            continue
+
+        try:
+            closed = ports.issue_gateway.issue_close(
+                ports.repo_root,
+                target.issue_number,
+                repo_slug=target.repo_slug,
+            )
+        except RuntimeError:
+            remote_close.failed.append(target.identifier)
+            remote_close.skipped_not_attempted.extend([item.identifier for item in required_targets[index + 1 :]])
+            warnings = []
+            if ports.active_state_store is not None and active_snapshot is not None:
+                try:
+                    ports.active_state_store.restore_previous_state(_resolve_specdock_dir(ports), active_snapshot)
+                except Exception:
+                    warnings.append("active_restore_failed")
+            return remote_close, _remote_close_failed_result(
+                target_id=target_id,
+                remote_close=remote_close,
+                warnings=warnings,
+            )
+
+        if str(closed.state).strip().upper() == "CLOSED":
+            remote_close.closed.append(target.identifier)
+            continue
+        remote_close.failed.append(target.identifier)
+        remote_close.skipped_not_attempted.extend([item.identifier for item in required_targets[index + 1 :]])
+        warnings = []
+        if ports.active_state_store is not None and active_snapshot is not None:
+            try:
+                ports.active_state_store.restore_previous_state(_resolve_specdock_dir(ports), active_snapshot)
+            except Exception:
+                warnings.append("active_restore_failed")
+        return remote_close, _remote_close_failed_result(
+            target_id=target_id,
+            remote_close=remote_close,
+            warnings=warnings,
+        )
+    return remote_close, None
 
 
 def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
@@ -337,10 +592,48 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
                 validation_message="dependency edge crosses delete subtree boundary",
             )
 
-    # S01 I1 scope: preflight contract only. Actual delete starts from later slices.
+    required_remote_targets, subtree_metadata_failure = _subtree_remote_close_targets(
+        subtree_ids=subtree_ids,
+        graph=graph,
+    )
+    if subtree_metadata_failure is not None:
+        return DeleteNodeResult(
+            status="metadata_validation_failed",
+            target_id=target.id,
+            deleted_node_ids=[],
+            remaining_node_ids=[],
+            remote_close=subtree_metadata_failure.remote_close,
+            offending_node_ids=subtree_metadata_failure.offending_node_ids,
+            validation_reasons=subtree_metadata_failure.validation_reasons,
+            active_restore_result=None,
+            recovery_guidance=[],
+            dependency_scrub_failures=[],
+            warnings=[],
+        )
+    if required_remote_targets is None:
+        return _metadata_failure_result(
+            target_id=target.id,
+            offending_node_ids=[],
+            messages_by_node_id={},
+        )
+
+    active_snapshot: ActiveStateSnapshot | None = None
+    if required_remote_targets and ports.active_state_store is not None:
+        active_snapshot = ports.active_state_store.snapshot_current_state(_resolve_specdock_dir(ports))
+
+    remote_close, remote_failure = _close_remote_issues_barrier(
+        target_id=target.id,
+        required_targets=required_remote_targets,
+        ports=ports,
+        active_snapshot=active_snapshot,
+    )
+    if remote_failure is not None:
+        return remote_failure
+
+    # S01 I2 scope: metadata + remote-close barrier contract only. Actual local delete starts from later slices.
     return _result(
         status="confirmation_required",
         target_id=target.id,
         validation_code="confirmation_required",
-        validation_message="preflight passed; delete execution is deferred in S01 I1",
+        validation_message="preflight and remote-close barrier passed; local delete is deferred in S01 I2",
     )

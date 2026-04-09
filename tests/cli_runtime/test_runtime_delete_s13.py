@@ -42,6 +42,8 @@ def _record(
     initiative_id: str | None,
     epic_id: str | None,
     github_issue_number: int | None,
+    github_repo_owner: str | None = None,
+    github_repo_name: str | None = None,
 ) -> object:
     if kind == "initiative":
         node_dir = repo_root / "spec-dock" / "initiatives" / f"{node_id}-title"
@@ -76,8 +78,21 @@ def _record(
         epic_id=epic_id,
         github_issue_number=github_issue_number,
         meta_path=(node_dir / ".meta.json").as_posix(),
-        github_repo_owner=None,
-        github_repo_name=None,
+        github_repo_owner=github_repo_owner,
+        github_repo_name=github_repo_name,
+    )
+
+
+def _issue_snapshot(domain_models, *, issue_number: int, state: str, owner: str, repo: str):
+    return domain_models.IssueSnapshot(
+        issue_number=issue_number,
+        state=state,
+        title=f"Issue {issue_number}",
+        labels=[],
+        updated_at="2026-04-09T00:00:00Z",
+        url=f"https://github.com/{owner}/{repo}/issues/{issue_number}",
+        repo_owner=owner,
+        repo_name=repo,
     )
 
 
@@ -99,18 +114,80 @@ class _StubDepsTopologyReader:
         return self._infra_contracts.DepsTopologyLoadResult(issue_depends_on_map=dict(self._dep_map), warnings=[])
 
 
+class _StubIssueGateway:
+    def __init__(self, *, domain_models, view_states=None, close_failures=None):
+        self._domain_models = domain_models
+        self._view_states = dict(view_states or {})
+        self._close_failures = set(close_failures or set())
+        self.view_calls = []
+        self.close_calls = []
+
+    def issue_view_snapshot(self, repo_root, issue_number, *, repo_slug=None):
+        slug = str(repo_slug or "").strip().lower()
+        number = int(issue_number)
+        self.view_calls.append((str(repo_root), slug, number))
+        state = self._view_states.get((slug, number), "OPEN")
+        owner, _sep, repo = slug.partition("/")
+        return _issue_snapshot(
+            self._domain_models,
+            issue_number=number,
+            state=state,
+            owner=owner or "example",
+            repo=repo or "repo",
+        )
+
+    def issue_close(self, repo_root, issue_number, *, repo_slug=None):
+        slug = str(repo_slug or "").strip().lower()
+        number = int(issue_number)
+        self.close_calls.append((str(repo_root), slug, number))
+        key = (slug, number)
+        if key in self._close_failures:
+            raise RuntimeError(f"close failed: {slug}#{number}")
+        self._view_states[key] = "CLOSED"
+        owner, _sep, repo = slug.partition("/")
+        return _issue_snapshot(
+            self._domain_models,
+            issue_number=number,
+            state="CLOSED",
+            owner=owner or "example",
+            repo=repo or "repo",
+        )
+
+
 class _StubActiveStateStore:
     def __init__(self, infra_contracts, manifest):
         self._infra_contracts = infra_contracts
         self._manifest = manifest
+        self.calls = []
 
     def load_active_manifest(self, specdock_dir):
+        self.calls.append(("load_active_manifest", str(specdock_dir)))
         del specdock_dir
         return self._infra_contracts.ActiveManifestLoadResult(
             manifest=self._manifest,
             source="agent.active",
             warnings=[],
         )
+
+    def snapshot_current_state(self, specdock_dir):
+        self.calls.append(("snapshot_current_state", str(specdock_dir)))
+        return self._infra_contracts.ActiveStateSnapshot(
+            manifest=self._manifest,
+            context_pack_text="snapshot",
+            active_json_text=None,
+            managed_agent_state={},
+        )
+
+    def restore_previous_state(self, specdock_dir, snapshot):
+        self.calls.append(("restore_previous_state", str(specdock_dir), snapshot))
+
+
+class _StubNodeRepository:
+    def __init__(self):
+        self.delete_calls = []
+
+    def delete_tree(self, node_path):
+        self.delete_calls.append(str(node_path))
 
 
 class TestRuntimeDeleteS13(unittest.TestCase):
@@ -119,7 +196,13 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.addCleanup(temp_dir.cleanup)
         return Path(temp_dir.name)
 
-    def _records(self, infra_contracts, repo_root: Path):
+    def _records(self, infra_contracts, repo_root: Path, *, with_github_links: bool = False):
+        github_owner = "example" if with_github_links else None
+        github_repo = "repo" if with_github_links else None
+        init_issue_number = 11 if with_github_links else None
+        epic_issue_number = 22 if with_github_links else None
+        issue_56_number = 56 if with_github_links else None
+        issue_57_number = 57 if with_github_links else None
         return [
             _record(
                 infra_contracts,
@@ -129,7 +212,9 @@ class TestRuntimeDeleteS13(unittest.TestCase):
                 parent_id=None,
                 initiative_id=None,
                 epic_id=None,
-                github_issue_number=11,
+                github_issue_number=init_issue_number,
+                github_repo_owner=github_owner,
+                github_repo_name=github_repo,
             ),
             _record(
                 infra_contracts,
@@ -139,7 +224,9 @@ class TestRuntimeDeleteS13(unittest.TestCase):
                 parent_id="init-local-00001",
                 initiative_id="init-local-00001",
                 epic_id=None,
-                github_issue_number=22,
+                github_issue_number=epic_issue_number,
+                github_repo_owner=github_owner,
+                github_repo_name=github_repo,
             ),
             _record(
                 infra_contracts,
@@ -149,7 +236,9 @@ class TestRuntimeDeleteS13(unittest.TestCase):
                 parent_id="epic-local-00001",
                 initiative_id="init-local-00001",
                 epic_id="epic-local-00001",
-                github_issue_number=56,
+                github_issue_number=issue_56_number,
+                github_repo_owner=github_owner,
+                github_repo_name=github_repo,
             ),
             _record(
                 infra_contracts,
@@ -159,11 +248,23 @@ class TestRuntimeDeleteS13(unittest.TestCase):
                 parent_id="epic-local-00001",
                 initiative_id="init-local-00001",
                 epic_id="epic-local-00001",
-                github_issue_number=57,
+                github_issue_number=issue_57_number,
+                github_repo_owner=github_owner,
+                github_repo_name=github_repo,
             ),
         ]
 
-    def _ports(self, *, records, dep_map=None, active_manifest=None, repo_root=None):
+    def _ports(
+        self,
+        *,
+        records,
+        dep_map=None,
+        active_manifest=None,
+        repo_root=None,
+        issue_gateway=None,
+        node_repo=None,
+        active_state_store=None,
+    ):
         app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
             _runtime_modules()
         )
@@ -172,12 +273,15 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             repo_root = Path("/repo")
         for record in records:
             Path(record.path).mkdir(parents=True, exist_ok=True)
+            Path(record.meta_path).write_text("{}", encoding="utf-8")
         return app_ports.Ports(
             node_reader=_StubNodeReader(records),
             repo_root=repo_root,
             specdock_dir=repo_root / "spec-dock",
             deps_topology_reader=_StubDepsTopologyReader(infra_contracts, dep_map or {}),
-            active_state_store=_StubActiveStateStore(infra_contracts, active_manifest),
+            active_state_store=active_state_store or _StubActiveStateStore(infra_contracts, active_manifest),
+            issue_gateway=issue_gateway,
+            node_repo=node_repo,
         )
 
     def _request(self, app_contracts, **overrides):
@@ -243,11 +347,19 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.assertEqual(result_id.target_id, "iss-local-00056")
 
     def test_github_issue_selector_is_normalized(self) -> None:
-        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
             _runtime_modules()
         )
         repo_root = self._new_repo_root()
-        ports = self._ports(records=self._records(infra_contracts, repo_root), repo_root=repo_root)
+        issue_gateway = _StubIssueGateway(
+            domain_models=domain_models,
+            view_states={("example/repo", 56): "OPEN"},
+        )
+        ports = self._ports(
+            records=self._records(infra_contracts, repo_root, with_github_links=True),
+            repo_root=repo_root,
+            issue_gateway=issue_gateway,
+        )
         result = app_delete_node.delete_node(
             self._request(app_contracts, github_issue="00056", confirmed=True),
             ports,
@@ -260,7 +372,7 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             _runtime_modules()
         )
         repo_root = self._new_repo_root()
-        records = self._records(infra_contracts, repo_root) + [
+        records = self._records(infra_contracts, repo_root, with_github_links=True) + [
             _record(
                 infra_contracts,
                 repo_root=repo_root,
@@ -270,6 +382,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
                 initiative_id="init-local-00001",
                 epic_id=None,
                 github_issue_number=56,
+                github_repo_owner="example",
+                github_repo_name="repo",
             )
         ]
         ports = self._ports(records=records, repo_root=repo_root)
@@ -478,6 +592,288 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         )
         self.assertEqual(result.status, "confirmation_required")
 
+    def test_would_match_target_invalid_metadata_returns_metadata_validation_failed(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root)
+        ports = self._ports(records=records, repo_root=repo_root)
+        Path(records[2].meta_path).unlink()
+        result = app_delete_node.delete_node(
+            self._request(app_contracts, node_id="iss-local-00056", confirmed=True),
+            ports,
+        )
+        self.assertEqual(result.status, "metadata_validation_failed")
+        self.assertEqual(result.target_id, "iss-local-00056")
+        self.assertEqual(result.offending_node_ids, ["iss-local-00056"])
+        self.assertIsNotNone(result.remote_close)
+        assert result.remote_close is not None
+        self.assertEqual(result.remote_close.closed, [])
+        self.assertEqual(result.remote_close.noop_already_closed, [])
+        self.assertEqual(result.remote_close.failed, [])
+        self.assertEqual(result.remote_close.skipped_not_attempted, [])
+
+    def test_subtree_wide_invalid_metadata_aggregates_with_empty_remote_buckets(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00056",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=56,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00057",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=57,
+            ),
+        ]
+        records[2] = infra_contracts.StoredMetaRecord(
+            kind=records[2].kind,
+            id=records[2].id,
+            title=records[2].title,
+            slug=records[2].slug,
+            path=records[2].path,
+            parent_id=records[2].parent_id,
+            initiative_id=records[2].initiative_id,
+            epic_id=records[2].epic_id,
+            github_issue_number=records[2].github_issue_number,
+            meta_path=records[2].meta_path,
+            github_repo_owner="example",
+            github_repo_name=None,
+        )
+        records[3] = infra_contracts.StoredMetaRecord(
+            kind=records[3].kind,
+            id=records[3].id,
+            title=records[3].title,
+            slug=records[3].slug,
+            path=records[3].path,
+            parent_id=records[3].parent_id,
+            initiative_id=records[3].initiative_id,
+            epic_id=records[3].epic_id,
+            github_issue_number=0,
+            meta_path=records[3].meta_path,
+            github_repo_owner="example",
+            github_repo_name="repo",
+        )
+        ports = self._ports(records=records, repo_root=repo_root)
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="epic-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+        self.assertEqual(result.status, "metadata_validation_failed")
+        self.assertEqual(result.target_id, "epic-local-00001")
+        self.assertEqual(result.offending_node_ids, ["iss-local-00056", "iss-local-00057"])
+        self.assertEqual([reason.node_id for reason in result.validation_reasons], ["iss-local-00056", "iss-local-00057"])
+        self.assertIsNotNone(result.remote_close)
+        assert result.remote_close is not None
+        self.assertEqual(result.remote_close.closed, [])
+        self.assertEqual(result.remote_close.noop_already_closed, [])
+        self.assertEqual(result.remote_close.failed, [])
+        self.assertEqual(result.remote_close.skipped_not_attempted, [])
+
+    def test_remote_close_set_is_deduped_ordered_and_already_closed_goes_noop_bucket(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="initiative",
+                node_id="init-local-00001",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=2,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="epic",
+                node_id="epic-local-00001",
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=3,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00056",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=3,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00057",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=1,
+            ),
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00058",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=9,
+            ),
+        ]
+        records[0] = infra_contracts.StoredMetaRecord(**{**records[0].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
+        records[1] = infra_contracts.StoredMetaRecord(**{**records[1].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
+        records[2] = infra_contracts.StoredMetaRecord(**{**records[2].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
+        records[3] = infra_contracts.StoredMetaRecord(**{**records[3].__dict__, "github_repo_owner": "beta", "github_repo_name": "repo"})
+        records[4] = infra_contracts.StoredMetaRecord(**{**records[4].__dict__, "github_repo_owner": "gamma", "github_repo_name": "repo"})
+        issue_gateway = _StubIssueGateway(
+            domain_models=domain_models,
+            view_states={
+                ("alpha/repo", 2): "CLOSED",
+                ("alpha/repo", 3): "OPEN",
+                ("beta/repo", 1): "OPEN",
+                ("gamma/repo", 9): "OPEN",
+            },
+            close_failures={("beta/repo", 1)},
+        )
+        node_repo = _StubNodeRepository()
+        active_store = _StubActiveStateStore(infra_contracts, manifest=None)
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            issue_gateway=issue_gateway,
+            node_repo=node_repo,
+            active_state_store=active_store,
+        )
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+        self.assertEqual(result.status, "remote_close_failed")
+        self.assertIsNotNone(result.remote_close)
+        assert result.remote_close is not None
+        self.assertEqual(result.remote_close.noop_already_closed, ["alpha/repo#2"])
+        self.assertEqual(result.remote_close.closed, ["alpha/repo#3"])
+        self.assertEqual(result.remote_close.failed, ["beta/repo#1"])
+        self.assertEqual(result.remote_close.skipped_not_attempted, ["gamma/repo#9"])
+        self.assertEqual(
+            issue_gateway.view_calls,
+            [
+                (str(repo_root), "alpha/repo", 2),
+                (str(repo_root), "alpha/repo", 3),
+                (str(repo_root), "beta/repo", 1),
+            ],
+        )
+        self.assertEqual(
+            issue_gateway.close_calls,
+            [
+                (str(repo_root), "alpha/repo", 3),
+                (str(repo_root), "beta/repo", 1),
+            ],
+        )
+        self.assertEqual(node_repo.delete_calls, [])
+        self.assertIn(("snapshot_current_state", str(repo_root / "spec-dock")), active_store.calls)
+        restore_calls = [call for call in active_store.calls if call[0] == "restore_previous_state"]
+        self.assertEqual(len(restore_calls), 1)
+
+    def test_all_required_remote_closes_succeed_before_local_delete_starts(self) -> None:
+        app_contracts, app_delete_node, _app_ports, _cli_dispatch, _cli_parser, _cli_registry, domain_models, infra_contracts = (
+            _runtime_modules()
+        )
+        repo_root = self._new_repo_root()
+        records = self._records(infra_contracts, repo_root, with_github_links=True)
+        records[0] = infra_contracts.StoredMetaRecord(**{**records[0].__dict__, "github_repo_owner": "zeta", "github_repo_name": "repo"})
+        records[1] = infra_contracts.StoredMetaRecord(**{**records[1].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
+        records[2] = infra_contracts.StoredMetaRecord(**{**records[2].__dict__, "github_repo_owner": "alpha", "github_repo_name": "repo"})
+        records[3] = infra_contracts.StoredMetaRecord(**{**records[3].__dict__, "github_repo_owner": "beta", "github_repo_name": "repo"})
+        issue_gateway = _StubIssueGateway(
+            domain_models=domain_models,
+            view_states={
+                ("alpha/repo", 22): "OPEN",
+                ("alpha/repo", 56): "OPEN",
+                ("beta/repo", 57): "OPEN",
+                ("zeta/repo", 11): "OPEN",
+            },
+        )
+        node_repo = _StubNodeRepository()
+        ports = self._ports(
+            records=records,
+            repo_root=repo_root,
+            issue_gateway=issue_gateway,
+            node_repo=node_repo,
+        )
+        result = app_delete_node.delete_node(
+            self._request(
+                app_contracts,
+                node_id="init-local-00001",
+                confirmed=True,
+                recursive=True,
+            ),
+            ports,
+        )
+        self.assertEqual(result.status, "confirmation_required")
+        self.assertEqual(
+            issue_gateway.close_calls,
+            [
+                (str(repo_root), "alpha/repo", 22),
+                (str(repo_root), "alpha/repo", 56),
+                (str(repo_root), "beta/repo", 57),
+                (str(repo_root), "zeta/repo", 11),
+            ],
+        )
+        self.assertEqual(node_repo.delete_calls, [])
+
     def test_delete_command_positional_selector_wiring_and_json_exit_code(self) -> None:
         app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
             _runtime_modules()
@@ -620,6 +1016,123 @@ class TestRuntimeDeleteS13(unittest.TestCase):
                 {"status", "target_id", "offending_node_ids", "validation_reasons"},
             )
             self.assertEqual(stderr.getvalue(), "")
+
+    def test_delete_json_field_matrix_for_metadata_validation_failed_and_remote_close_failed(self) -> None:
+        app_contracts, _app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, _infra_contracts = (
+            _runtime_modules()
+        )
+        registry = cli_registry.build_registry()
+        parser = cli_parser.build_parser(registry)
+
+        def _metadata_failed(_req):
+            return app_contracts.DeleteNodeResult(
+                status="metadata_validation_failed",
+                target_id="epic-local-00001",
+                deleted_node_ids=[],
+                remaining_node_ids=[],
+                remote_close=app_contracts.DeleteRemoteCloseBuckets(
+                    closed=[],
+                    noop_already_closed=[],
+                    failed=[],
+                    skipped_not_attempted=[],
+                ),
+                offending_node_ids=["iss-local-00056"],
+                validation_reasons=[
+                    app_contracts.DeleteValidationReason(
+                        node_id="iss-local-00056",
+                        code="metadata_validation_failed",
+                        message="metadata invalid",
+                    )
+                ],
+                active_restore_result=None,
+                recovery_guidance=[],
+                dependency_scrub_failures=[],
+                warnings=[],
+            )
+
+        use_cases_metadata_failed = app_contracts.UseCases(
+            create_initiative=lambda req: None,  # type: ignore[return-value]
+            create_epic=lambda req: None,  # type: ignore[return-value]
+            create_issue=lambda req: None,  # type: ignore[return-value]
+            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            import_initiative=lambda req: None,  # type: ignore[return-value]
+            import_epic=lambda req: None,  # type: ignore[return-value]
+            import_issue=lambda req: None,  # type: ignore[return-value]
+            set_active=lambda req: None,  # type: ignore[return-value]
+            show_active=lambda req: None,  # type: ignore[return-value]
+            clear_active=lambda req: None,  # type: ignore[return-value]
+            sync=lambda req: None,  # type: ignore[return-value]
+            check_deps=lambda req: None,  # type: ignore[return-value]
+            validate_tree=lambda req: None,  # type: ignore[return-value]
+            delete_node=_metadata_failed,
+        )
+
+        ns_metadata = parser.parse_args(["delete", "--id", "epic-local-00001", "--yes", "--json"])
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_dispatch.dispatch(ns_metadata, registry, use_cases_metadata_failed)
+
+        self.assertEqual(exit_code, 1)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(
+            set(payload.keys()),
+            {"status", "target_id", "offending_node_ids", "validation_reasons", "remote_close"},
+        )
+        self.assertEqual(payload["status"], "metadata_validation_failed")
+        self.assertEqual(stderr.getvalue(), "")
+
+        def _remote_close_failed(_req):
+            return app_contracts.DeleteNodeResult(
+                status="remote_close_failed",
+                target_id="epic-local-00001",
+                deleted_node_ids=[],
+                remaining_node_ids=[],
+                remote_close=app_contracts.DeleteRemoteCloseBuckets(
+                    closed=["alpha/repo#22"],
+                    noop_already_closed=[],
+                    failed=["beta/repo#57"],
+                    skipped_not_attempted=["zeta/repo#99"],
+                ),
+                offending_node_ids=[],
+                validation_reasons=[],
+                active_restore_result="restored",
+                recovery_guidance=["retry"],
+                dependency_scrub_failures=[],
+                warnings=[],
+            )
+
+        use_cases_remote_failed = app_contracts.UseCases(
+            create_initiative=lambda req: None,  # type: ignore[return-value]
+            create_epic=lambda req: None,  # type: ignore[return-value]
+            create_issue=lambda req: None,  # type: ignore[return-value]
+            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            import_initiative=lambda req: None,  # type: ignore[return-value]
+            import_epic=lambda req: None,  # type: ignore[return-value]
+            import_issue=lambda req: None,  # type: ignore[return-value]
+            set_active=lambda req: None,  # type: ignore[return-value]
+            show_active=lambda req: None,  # type: ignore[return-value]
+            clear_active=lambda req: None,  # type: ignore[return-value]
+            sync=lambda req: None,  # type: ignore[return-value]
+            check_deps=lambda req: None,  # type: ignore[return-value]
+            validate_tree=lambda req: None,  # type: ignore[return-value]
+            delete_node=_remote_close_failed,
+        )
+
+        ns_remote = parser.parse_args(["delete", "--id", "epic-local-00001", "--yes", "--json"])
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_dispatch.dispatch(ns_remote, registry, use_cases_remote_failed)
+
+        self.assertEqual(exit_code, 1)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(
+            set(payload.keys()),
+            {"status", "target_id", "remote_close", "deleted_node_ids"},
+        )
+        self.assertEqual(payload["status"], "remote_close_failed")
+        self.assertEqual(stderr.getvalue(), "")
 
     def test_preflight_pass_path_does_not_look_like_delete_success(self) -> None:
         app_contracts, app_delete_node, _app_ports, cli_dispatch, cli_parser, cli_registry, _domain_models, infra_contracts = (
