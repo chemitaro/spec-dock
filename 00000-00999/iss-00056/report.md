@@ -72,13 +72,57 @@ pass
 - `spec-dock/active/issue/report.md` - issue56 の着手ログと S01 I1 実装記録を更新
 
 #### コミット
-- pending
+- `7f7865dc06b7330dfc22b29f01e4e4caff92c448`
 
 #### メモ
 - implementation review は pass。non-blocking として `confirmation_required` の interim semantics は S01 I2/S02 で正規化が必要とコメントされた。
 - qa review は pass。前回 blocker だった `--json` field matrix と preflight pass の見え方は解消済み。
 - spec review は pass。issue docs に staged implementation note を追加したことで、S01 I1 の interim semantics が docs と整合した。
 - S01 I1 の範囲上、actual delete / subtree metadata barrier / required remote close set / partial failure handling は未着手であり、次の S01 I2 で扱う。
+
+### 2026-04-09 10:30 - 11:10
+
+#### 対象
+- Step: S01 I2
+- AC/EC: EC-004, EC-007, EC-008, EC-009
+
+#### 実施内容
+- subtree-wide metadata validation と required remote close barrier を bounded scope で追加した。
+- would-match target invalid metadata、subtree-wide invalid metadata aggregation、canonical remote issue identifier dedupe/order、already-closed noop bucket、remote close failure abort を tests で固定した。
+- actual local delete / partial failure / dependency scrub はこの slice では未実装のまま据え置いた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_runtime_shell_s11 tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_close
+
+OK (81 tests)
+
+implementation review (S01 I2)
+
+pass
+
+qa review (S01 I2)
+
+pass
+
+spec review (S01 I2)
+
+pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - metadata validation / required remote close barrier / active snapshot restore path を追加
+- `tests/cli_runtime/test_runtime_delete_s13.py` - metadata_validation_failed / remote_close_failed / dedupe-ordering / already-closed noop / restore regression tests を追加
+- `spec-dock/active/issue/report.md` - S01 I2 実装記録を追記
+
+#### コミット
+- pending
+
+#### メモ
+- implementation review は pass。non-blocking として `graph.nodes_by_id` ベースの selector/close-set resolve は後続 slice で `.meta.json` authoritative read へ寄せる余地があるとコメントされた。
+- qa review は pass。`metadata_validation_failed` / `remote_close_failed` の JSON field matrix と remote failure で local delete 未開始を確認した。
+- spec review は pass。S01 I2 の bounded scope と issue docs の barrier contract が整合していることを確認した。
+- actual local delete / partial failure / dependency scrub は未着手であり、次の S02/S03 で扱う。
 
 ## 遭遇した問題と解決 (任意)
 - 問題: spec review で `confirmation_required` の意味論が requirement と衝突すると指摘された
