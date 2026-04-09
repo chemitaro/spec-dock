@@ -26,12 +26,19 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 
 ## 2. 何が GitHub を更新し、何が読み取りだけか
 
-### 更新する（GitHub Issue を作成する）
+### 更新する（GitHub Issue を作成する / クローズする）
 
 - `new initiative` / `new epic` / `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
   - `--create-github-issue` は同じ意味の explicit alias です
   - `initiative / epic / issue` では GitHub linkage が mandatory です
   - `--no-github` は compatibility option として残っていますが、contract error で reject されます
+- `close` は linked GitHub Issue をクローズします（`gh issue close`）
+  - top-level command として `./spec-dock/scripts/spec-dock close <target>` / `--id <node-id>` / `--github-issue <n>` を受け付けます
+  - close 対象は target node 自身の linked GitHub issue のみです
+  - `issue` / `epic` / `initiative` のいずれを target にしても child へ cascade close しません
+  - remote mutation は close-only です。GitHub side delete は扱いません
+  - close command 自体は local tree / docs / generated artifacts を直接更新しません
+  - close 後の local `done` 観測は `./spec-dock/scripts/spec-dock sync --github` の既存経路に委ねます
 
 ### 読み取りだけ（非交渉）
 
@@ -72,6 +79,17 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - target 解決はローカル node（`.meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
 - `--checkout` 時に作業ツリーが dirty の場合は安全のため checkout を中断します
 - `--checkout` を伴う場合、ブランチ名は `<id>-<slug>`（不適合なら `<id>`）へ正規化されます（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
+
+## 4.5 `close` の target syntax と副作用境界
+
+`close` は `active set` / `deps check` と同じ target syntax を使います。
+
+- `close <target>`: `123` / `#123` / canonical GitHub issue URL / node id を受け付けます
+- `close --id <node-id>`: explicit node target
+- `close --github-issue <n>`: explicit GitHub issue target
+- `close` は target node を解決した上で、その node に linked された `github.issue_number` だけを close します
+- local directory / docs / generated artifacts / active pointers は close command で直接変更しません
+- local state を GitHub の `CLOSED` へ追随させるのは `sync --github` の責務です
 
 ## 5. `github.issue_number` のリンクと一意性（重要）
 
