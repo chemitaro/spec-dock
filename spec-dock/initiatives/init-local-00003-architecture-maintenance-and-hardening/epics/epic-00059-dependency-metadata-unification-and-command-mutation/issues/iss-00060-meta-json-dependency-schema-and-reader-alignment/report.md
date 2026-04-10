@@ -48,7 +48,7 @@ git diff -- spec-dock/active/epic/design.md spec-dock/active/epic/plan.md src/sp
 - `spec-dock/active/issue/report.md` - S01 review / fix / pass を記録
 
 #### コミット
-- pending
+- `cc52538` `docs(epic-00059): .meta.json依存契約を整列`
 
 #### メモ
 - S01 gate verdict: spec review pass
@@ -56,14 +56,39 @@ git diff -- spec-dock/active/epic/design.md spec-dock/active/epic/plan.md src/sp
 
 ---
 
-### 2026-04-10 HH:MM - HH:MM
+### 2026-04-10 05:03 - 05:52
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-002, EC-001, EC-002, EC-003
 
 #### 実施内容
-- ...
+- `infra/deps_reader.py` を `.meta.json` only reader に切り替え、`schema_version` を型込みで厳密検証するよう補強した。
+- `tests/cli_runtime/test_deps.py` と `tests/cli_runtime/test_sync.py` の dependency fixture を `.meta.json` ベースへ移行し、missing-field default / no-fallback / schema error / schema_version missing/bool / unresolved / shorthand compile / empty expansion warning / downstream smoke を固定した。
+- implementation review で `.meta.json` cutover後に `deps.json` fixture が残っていた回帰を検出し、追加で test module 全体を `.meta.json` 契約へ追従させた。
+- main workspace で `python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_sync` を実行し、80 tests / OK を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_sync
+
+- implementation review: pass
+- QA review: pass（P2 の追加否定ケース提案のみ）
+- 80 tests / OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py` - `.meta.json` only read path と strict schema guard へ更新
+- `tests/cli_runtime/test_deps.py` - dependency-focused fixture と fail-closed regression を `.meta.json` 契約へ移行
+- `tests/cli_runtime/test_sync.py` - downstream smoke を `.meta.json` 契約へ移行
+
+#### コミット
+- pending
+
+#### メモ
+- RG1 verdict: pass
+- QG1 verdict: pass
+- reviewer から P2 として、top-level 非 object / `depends_on: [{}]` の否定ケースを追加すると将来の fail-closed 回帰保護がさらに強くなる提案があった
 
 ---
 

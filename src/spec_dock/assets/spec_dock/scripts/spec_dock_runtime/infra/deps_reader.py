@@ -19,29 +19,27 @@ _gh_issue_url_full_re = re.compile(
 )
 
 
-def _load_deps_json(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {"schema_version": 1, "depends_on": []}
-
+def _load_meta_depends_on(path: Path) -> list[Any]:
     data = load_json(path)
     if not isinstance(data, dict):
-        raise RuntimeError(f"Invalid deps.json schema: {path}: expected a JSON object")
+        raise RuntimeError(f"Invalid .meta.json schema: {path}: expected a JSON object")
 
-    if data.get("schema_version") != 1:
-        raise RuntimeError(f"Invalid deps.json schema: {path}: schema_version must be 1")
+    schema_version = data.get("schema_version")
+    if isinstance(schema_version, bool) or not isinstance(schema_version, int) or schema_version != 1:
+        raise RuntimeError(f"Invalid .meta.json schema: {path}: schema_version must be 1")
 
-    depends_on = data.get("depends_on")
+    depends_on = data.get("depends_on", [])
     if not isinstance(depends_on, list):
-        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on must be a list")
+        raise RuntimeError(f"Invalid .meta.json schema: {path}: depends_on must be a list")
 
     for i, ref in enumerate(depends_on):
         if isinstance(ref, bool):
-            raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on[{i}] must be a string or int")
+            raise RuntimeError(f"Invalid .meta.json schema: {path}: depends_on[{i}] must be a string or int")
         if isinstance(ref, (str, int)):
             continue
-        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on[{i}] must be a string or int")
+        raise RuntimeError(f"Invalid .meta.json schema: {path}: depends_on[{i}] must be a string or int")
 
-    return {"schema_version": 1, "depends_on": depends_on}
+    return depends_on
 
 
 def _normalize_repo_slug(owner: str | None, repo: str | None) -> str | None:
@@ -261,21 +259,21 @@ def _resolved_direct_depends_on(
     src = graph.nodes_by_id.get(src_id)
     if src is None:
         raise RuntimeError(f"Internal error: missing node: {src_id}")
-    deps_path = src.path / "deps.json"
-    deps = _load_deps_json(deps_path)
+    meta_path = src.path / ".meta.json"
+    depends_on = _load_meta_depends_on(meta_path)
     resolved = [
         _resolve_dep_ref(
             graph,
             ref,
-            src_path=deps_path,
+            src_path=meta_path,
             current_repo_slug=current_repo_slug,
         )
-        for ref in (deps.get("depends_on") or [])
+        for ref in depends_on
     ]
     deduped = sorted(set(resolved), key=deps_node_sort_key)
     for dep_id in deduped:
         if _is_descendant(graph, src_id=src_id, candidate_dep_id=dep_id):
-            raise RuntimeError(f"Invalid dependency: {src_id} cannot depend on its descendant {dep_id} (in {deps_path})")
+            raise RuntimeError(f"Invalid dependency: {src_id} cannot depend on its descendant {dep_id} (in {meta_path})")
     return deduped
 
 
@@ -318,7 +316,7 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
         if not src_issue_ids:
             continue
         src_node = graph.nodes_by_id[src_id]
-        deps_path = src_node.path / "deps.json"
+        meta_path = src_node.path / ".meta.json"
         direct_dep_node_ids = _resolved_direct_depends_on(
             graph,
             src_id,
@@ -340,7 +338,7 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
                     if dep_issue_id == src_issue_id:
                         raise RuntimeError(
                             "Invalid dependency: self edge produced: "
-                            f"{src_issue_id} depends_on={dep_node_id} (in {deps_path})"
+                            f"{src_issue_id} depends_on={dep_node_id} (in {meta_path})"
                         )
                     issue_depends_on[src_issue_id].add(dep_issue_id)
 

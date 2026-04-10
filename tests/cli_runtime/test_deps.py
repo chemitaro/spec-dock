@@ -66,6 +66,18 @@ class TestCliDeps(CliRuntimeHarness):
         meta["github"] = github_dict
         self._write_json_force(meta_path, meta)
 
+    def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
+        meta_path = node_dir / ".meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["depends_on"] = depends_on
+        self._write_json_force(meta_path, meta)
+
+    def _set_meta_schema_version(self, node_dir: Path, schema_version: int) -> None:
+        meta_path = node_dir / ".meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["schema_version"] = schema_version
+        self._write_json_force(meta_path, meta)
+
     def _make_gh_issue_list_and_view_stub(
         self,
         bin_dir: Path,
@@ -206,10 +218,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [201]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [201])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -269,10 +278,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -571,10 +577,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00124-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -617,10 +620,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00124-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -671,10 +671,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00124-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -720,10 +717,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             for ref in forms:
                 with self.subTest(ref=ref):
-                    (target_issue_dir / "deps.json").write_text(
-                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    self._set_meta_depends_on(target_issue_dir, [ref])
                     p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
                     self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
                     data = json.loads(p.stdout)
@@ -768,10 +762,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             for ref in forms:
                 with self.subTest(ref=ref):
-                    (target_issue_dir / "deps.json").write_text(
-                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    self._set_meta_depends_on(target_issue_dir, [ref])
                     p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
                     self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
                     self.assertIn("Unresolved dependency ref:", p.stderr)
@@ -835,10 +826,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             for ref in forms:
                 with self.subTest(ref=ref):
-                    (target_issue_dir / "deps.json").write_text(
-                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    self._set_meta_depends_on(target_issue_dir, [ref])
                     p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
                     self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
                     data = json.loads(p.stdout)
@@ -910,10 +898,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (main_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(main_issue_dir, ["epic-00202"])
             blocker_issue_dir = (
                 target
                 / "spec-dock"
@@ -924,10 +909,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00401-open-blocker"
             )
-            (blocker_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [403]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(blocker_issue_dir, [403])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1001,10 +983,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1075,10 +1054,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, ["iss-00301"])
 
             (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
@@ -1177,10 +1153,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1236,10 +1209,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1300,10 +1270,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
@@ -1347,10 +1314,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1405,10 +1369,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1463,10 +1424,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1497,7 +1455,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["target_status"]["source"], "local")
             self.assertEqual(p.stderr.strip(), "")
 
-    def test_deps_check_missing_deps_json_is_empty(self) -> None:
+    def test_deps_check_missing_meta_depends_on_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1505,6 +1463,59 @@ class TestCliDeps(CliRuntimeHarness):
                 target,
                 initiative_issue_number=101,
                 epic_issue_number=201,
+            )
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, ["iss-local-99999"])
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta.pop("depends_on", None)
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", local_ids["iss-00301"], "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertTrue(data["ready"])
+            self.assertEqual(data["effective_depends_on"], [])
+
+    def test_deps_check_missing_meta_depends_on_ignores_stale_legacy_deps_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta.pop("depends_on", None)
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            # Legacy stale file must not be used as a fallback source.
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-99999"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
             )
 
             p = self._run_runtime_capture(target, ["deps", "check", local_ids["iss-00301"], "--json"])
@@ -1555,7 +1566,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn("iss-local-00002", requirement)
             self.assertNotIn("iss-00407", requirement)
 
-    def test_deps_json_parse_error_fails_with_path(self) -> None:
+    def test_meta_json_parse_error_fails_with_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1575,14 +1586,14 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-add-refresh-token"
             )
-            (issue_dir / "deps.json").write_text("{\n", encoding="utf-8")  # invalid JSON
+            self._write_text_force(issue_dir / ".meta.json", "{\n")  # invalid JSON
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
             self.assertIn("Invalid JSON", p.stderr)
 
-    def test_deps_json_schema_error_fails_with_reason(self) -> None:
+    def test_meta_schema_error_fails_with_reason(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1604,17 +1615,17 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-add-refresh-token"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 2, "depends_on": []}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            meta_path = issue_dir / ".meta.json"
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["depends_on"] = {"invalid": "type"}
+            self._write_json_force(meta_path, meta)
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("deps.json", p.stderr)
-            self.assertIn("schema_version", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("depends_on must be a list", p.stderr)
 
-    def test_deps_json_schema_rejects_boolean_dep_ref(self) -> None:
+    def test_meta_schema_rejects_boolean_dep_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1636,15 +1647,111 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-add-refresh-token"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [True]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            meta_path = issue_dir / ".meta.json"
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["depends_on"] = [True]
+            self._write_json_force(meta_path, meta)
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
             self.assertIn("depends_on[0]", p.stderr)
+
+    def test_meta_schema_version_must_be_1(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [])
+            self._set_meta_schema_version(issue_dir, 2)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("schema_version must be 1", p.stderr)
+
+    def test_meta_schema_version_missing_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [])
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta.pop("schema_version", None)
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("schema_version must be 1", p.stderr)
+
+    def test_meta_schema_version_rejects_boolean_true(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [])
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta["schema_version"] = True
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("schema_version must be 1", p.stderr)
 
     def test_deps_unresolved_ref_reports_ref_and_deps_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1669,16 +1776,12 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-issue-one"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-99999"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, ["iss-99999"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("iss-99999", p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
 
     def test_deps_canonicalizes_width_variants(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1701,10 +1804,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-issue-two"
             )
-            (issue_two_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-301"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_two_dir, ["iss-301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -1734,15 +1834,12 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-issue-one"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("123", p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
 
     def test_deps_effective_depends_on_merges_parents_and_dedups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1764,21 +1861,9 @@ class TestCliDeps(CliRuntimeHarness):
             target_issue_dir = epic_dir / "issues" / "iss-00303-target"
 
             # Parent initiative/epic both depend on the same dep (dedup expected).
-            (init_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-401"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (epic_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00401"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(init_dir, ["iss-401"])
+            self._set_meta_depends_on(epic_dir, ["iss-00401"])
+            self._set_meta_depends_on(target_issue_dir, ["iss-00302"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00303", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -1803,16 +1888,8 @@ class TestCliDeps(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00201-jwt-auth"
 
-            (init_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00401"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (epic_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00402"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(init_dir, ["iss-00401"])
+            self._set_meta_depends_on(epic_dir, ["iss-00402"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "epic-00201", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -1932,11 +2009,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-issue-one"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -1955,12 +2028,8 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_title="Issue one",
             )
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
-            deps_path = init_dir / "deps.json"
-            deps_path.write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            deps_path = init_dir / ".meta.json"
+            self._set_meta_depends_on(init_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "init-00101"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -1987,16 +2056,8 @@ class TestCliDeps(CliRuntimeHarness):
             issue_one_dir = epic_dir / "issues" / "iss-00301-issue-one"
             issue_two_dir = epic_dir / "issues" / "iss-00302-issue-two"
 
-            (issue_one_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (issue_two_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_one_dir, ["iss-00302"])
+            self._set_meta_depends_on(issue_two_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -2024,16 +2085,8 @@ class TestCliDeps(CliRuntimeHarness):
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
-            (cycle_a_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00303"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (cycle_b_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
+            self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301", "--json"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -2061,16 +2114,8 @@ class TestCliDeps(CliRuntimeHarness):
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
-            (cycle_a_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00303"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (cycle_b_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
+            self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -2105,16 +2150,8 @@ class TestCliDeps(CliRuntimeHarness):
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
-            (cycle_a_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00303"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (cycle_b_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
+            self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
             (agent_dir / "index.json").unlink(missing_ok=True)
             (agent_dir / "tree.json").unlink(missing_ok=True)
