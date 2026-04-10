@@ -218,6 +218,127 @@ class RuntimeShellS11Tests(unittest.TestCase):
         self.assertIn("spec-dock: ok (active set) target=github#123", stdout.getvalue())
         self.assertEqual(stderr.getvalue(), "")
 
+    def test_close_command_wrapper_smoke(self) -> None:
+        (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
+            _runtime_modules()
+        )
+
+        captured: dict[str, object] = {}
+
+        def _close_node(req):
+            captured["request"] = req
+            return app_contracts.CloseNodeResult(
+                node_id="iss-local-00001",
+                node_kind="issue",
+                github_issue_number=123,
+                issue_snapshot=domain_models.IssueSnapshot(
+                    issue_number=123,
+                    state="CLOSED",
+                    title="Issue 123",
+                    labels=[],
+                    updated_at="2026-04-09T00:00:00Z",
+                    url="https://github.com/example/repo/issues/123",
+                    repo_owner="example",
+                    repo_name="repo",
+                ),
+                already_closed=False,
+                warnings=[],
+            )
+
+        use_cases = app_contracts.UseCases(
+            create_initiative=lambda req: None,  # type: ignore[return-value]
+            create_epic=lambda req: None,  # type: ignore[return-value]
+            create_issue=lambda req: None,  # type: ignore[return-value]
+            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            import_initiative=lambda req: None,  # type: ignore[return-value]
+            import_epic=lambda req: None,  # type: ignore[return-value]
+            import_issue=lambda req: None,  # type: ignore[return-value]
+            set_active=lambda req: None,  # type: ignore[return-value]
+            show_active=lambda req: None,  # type: ignore[return-value]
+            clear_active=lambda req: None,  # type: ignore[return-value]
+            sync=lambda req: None,  # type: ignore[return-value]
+            check_deps=lambda req: None,  # type: ignore[return-value]
+            validate_tree=lambda req: None,  # type: ignore[return-value]
+            close_node=_close_node,
+        )
+
+        registry = cli_registry.build_registry()
+        parser = cli_parser.build_parser(registry)
+        ns = parser.parse_args(["close", "--github-issue", "123"])
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+
+        self.assertEqual(exit_code, 0)
+        request = captured.get("request")
+        self.assertIsNotNone(request)
+        self.assertEqual(request.target.kind, "github_issue")
+        self.assertEqual(request.target.github_issue_number, 123)
+        self.assertIn("spec-dock: ok (close) target=github#123", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_delete_command_wrapper_smoke(self) -> None:
+        (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, _domain_models) = (
+            _runtime_modules()
+        )
+
+        captured: dict[str, object] = {}
+
+        def _delete_node(req):
+            captured["request"] = req
+            return app_contracts.DeleteNodeResult(
+                status="ok",
+                target_id="iss-local-00001",
+                deleted_node_ids=[],
+                remaining_node_ids=["iss-local-00001"],
+                remote_close=app_contracts.DeleteRemoteCloseBuckets(
+                    closed=[],
+                    noop_already_closed=[],
+                    failed=[],
+                    skipped_not_attempted=[],
+                ),
+                offending_node_ids=[],
+                validation_reasons=[],
+                active_restore_result="not_needed",
+                recovery_guidance=[],
+                dependency_scrub_failures=[],
+                warnings=[],
+            )
+
+        use_cases = app_contracts.UseCases(
+            create_initiative=lambda req: None,  # type: ignore[return-value]
+            create_epic=lambda req: None,  # type: ignore[return-value]
+            create_issue=lambda req: None,  # type: ignore[return-value]
+            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            import_initiative=lambda req: None,  # type: ignore[return-value]
+            import_epic=lambda req: None,  # type: ignore[return-value]
+            import_issue=lambda req: None,  # type: ignore[return-value]
+            set_active=lambda req: None,  # type: ignore[return-value]
+            show_active=lambda req: None,  # type: ignore[return-value]
+            clear_active=lambda req: None,  # type: ignore[return-value]
+            sync=lambda req: None,  # type: ignore[return-value]
+            check_deps=lambda req: None,  # type: ignore[return-value]
+            validate_tree=lambda req: None,  # type: ignore[return-value]
+            delete_node=_delete_node,
+        )
+
+        registry = cli_registry.build_registry()
+        parser = cli_parser.build_parser(registry)
+        ns = parser.parse_args(["delete", "iss-local-00001", "--yes"])
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+
+        self.assertEqual(exit_code, 0)
+        request = captured.get("request")
+        self.assertIsNotNone(request)
+        self.assertEqual(request.positional_target, "iss-local-00001")
+        self.assertTrue(request.confirmed)
+        self.assertIn("spec-dock: ok (delete) target=iss-local-00001", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+
     def test_deps_json_stdout_only_and_text_warning_regression(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
             _runtime_modules()

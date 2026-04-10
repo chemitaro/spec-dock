@@ -26,12 +26,27 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 
 ## 2. 何が GitHub を更新し、何が読み取りだけか
 
-### 更新する（GitHub Issue を作成する）
+### 更新する（GitHub Issue を作成する / クローズする）
 
 - `new initiative` / `new epic` / `new issue`（デフォルト）は GitHub Issue を作ります（`gh issue create`）
   - `--create-github-issue` は同じ意味の explicit alias です
   - `initiative / epic / issue` では GitHub linkage が mandatory です
   - `--no-github` は compatibility option として残っていますが、contract error で reject されます
+- `close` は linked GitHub Issue をクローズします（`gh issue close`）
+  - top-level command として `./spec-dock/scripts/spec-dock close <target>` / `--id <node-id>` / `--github-issue <n>` を受け付けます
+  - close 対象は target node 自身の linked GitHub issue のみです
+  - `issue` / `epic` / `initiative` のいずれを target にしても child へ cascade close しません
+  - remote mutation は close-only です。GitHub side delete は扱いません
+  - close command 自体は local tree / docs / generated artifacts を直接更新しません
+  - close 後の local `done` 観測は `./spec-dock/scripts/spec-dock sync --github` の既存経路に委ねます
+- `delete` は local spec node を削除し、linked GitHub Issue があれば close-only で扱います
+  - top-level command として `./spec-dock/scripts/spec-dock delete <target> --yes` / `--id <node-id> --yes` / `--github-issue <n> --yes` を受け付けます
+  - `issue` target は leaf delete を行い、linked GitHub issue は local delete 前に close します
+  - `epic` / `initiative` target は `--recursive --yes` が必須で、subtree 内 linked GitHub issue 群の required remote close barrier が全件通った場合だけ local subtree removal を開始します
+  - `--force` は active conflict / dependency boundary conflict override に限定され、GitHub side delete を有効にするものではありません
+  - remote mutation は close-only です。GitHub side delete は扱いません
+  - remote close failure や subtree metadata validation failure 時は local delete を開始しません
+  - local delete 後の derived artifact 追随は `./spec-dock/scripts/spec-dock sync --github` と `./spec-dock/scripts/spec-dock validate` の責務です
 
 ### 読み取りだけ（非交渉）
 
@@ -72,6 +87,33 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - target 解決はローカル node（`.meta.json`）を優先し、未解決なら checkout/active 変更なしで失敗します
 - `--checkout` 時に作業ツリーが dirty の場合は安全のため checkout を中断します
 - `--checkout` を伴う場合、ブランチ名は `<id>-<slug>`（不適合なら `<id>`）へ正規化されます（非ASCIIブランチ名を避ける）。詳細は [reference_naming.md](reference_naming.md) を参照してください。
+
+## 4.5 `close` の target syntax と副作用境界
+
+`close` は `active set` / `deps check` と同じ target syntax を使います。
+
+- `close <target>`: `123` / `#123` / canonical GitHub issue URL / node id を受け付けます
+- `close --id <node-id>`: explicit node target
+- `close --github-issue <n>`: explicit GitHub issue target
+- `close` は target node を解決した上で、その node に linked された `github.issue_number` だけを close します
+- local directory / docs / generated artifacts / active pointers は close command で直接変更しません
+- local state を GitHub の `CLOSED` へ追随させるのは `sync --github` の責務です
+
+## 4.6 `delete` の target syntax と safety boundary
+
+`delete` は destructive command であり、`close` より強い safety boundary を持ちます。
+
+- `delete <target> --yes`: node id だけを受け付けます
+- `delete --id <node-id> --yes`: explicit node target
+- `delete --github-issue <n> --yes`: explicit GitHub issue target
+- `delete` は selector 解決後に local guardrail / subtree metadata validation / required remote close barrier を通してから mutation を開始します
+- `issue` target の `--recursive` は accepted no-op です
+- `epic` / `initiative` target は `--recursive --yes` が必須です。`--recursive` なしでは local subtree removal を行いません
+- `--force` は active conflict / dependency boundary conflict override に限定されます
+- parent recursive delete では subtree 内 linked GitHub issue 群を close-only で扱い、1 件でも remote close に失敗した場合は local subtree removal を開始しません
+- GitHub side delete は扱いません。remote side は常に close-only です
+- partial failure 時は structured status / payload で deleted / remaining node ids、dependency scrub failures、retry guidance を返します
+- delete 後の docs / generated artifacts / local done 観測は `sync --github` と `validate` で確認します
 
 ## 5. `github.issue_number` のリンクと一意性（重要）
 

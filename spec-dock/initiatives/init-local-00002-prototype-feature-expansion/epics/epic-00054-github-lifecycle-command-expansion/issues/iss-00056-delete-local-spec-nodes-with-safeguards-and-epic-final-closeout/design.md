@@ -5,7 +5,7 @@ ID: "iss-00056"
 関連GitHub: ["#56"]
 状態: "draft | approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-09"
+最終更新: "2026-04-10"
 依存: ["requirement.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -136,6 +136,7 @@ cmd --> app : invoke
     - active/deps conflict override は `--force`
     - destructive confirmation は `--yes`
     - machine-readable payload は `--json` 指定時に stdout JSON object 1 件
+    - `--json` 指定時に target `.meta.json` parse failure が graph 構築前に発生しても、delete command は plain error text ではなく `metadata_validation_failed` の JSON payload を返す
 - application contracts:
     - `DeleteNodeRequest(target_selector, recursive, force, confirmed, json_mode)`
     - `DeleteNodeResult(status, target_id, deleted_node_ids, remaining_node_ids, remote_close, offending_node_ids, validation_reasons, active_restore_result, recovery_guidance, dependency_scrub_failures)`
@@ -147,6 +148,8 @@ cmd --> app : invoke
     - remote mutation は close-only
     - local mutation は target subtree の directory removal
     - active / generated state は command 後に `validate` / `sync --github` で観測する
+  - wrapper seam:
+    - `node_reader.load_node_records()` が raise した場合でも、delete selector が `<target>` / `--id` の target-local metadata edge を特定できるなら command/application seam で `DeleteNodeResult(status=metadata_validation_failed, ...)` へ正規化する
 
 ## selector / result canonicalization
 - selector canonicalization:
@@ -199,6 +202,7 @@ cmd --> app : invoke
   - `metadata_validation_failed`:
     - required: `status`, `target_id`, `offending_node_ids`, `validation_reasons`, `remote_close`
     - constraints: `remote_close` buckets はすべて空配列
+    - target-local `.meta.json` parse failure を wrapper seam で吸収した場合も同じ field matrix を使う
   - `remote_close_failed`:
     - required: `status`, `target_id`, `remote_close`, `deleted_node_ids`
     - constraints: `deleted_node_ids=[]`
@@ -218,8 +222,11 @@ cmd --> app : invoke
 - barrier rules:
   - 上記 local preflight が通過し、subtree-wide linked GitHub metadata validation と required remote close set resolve が成功するまでは remote close を開始しない
   - subtree-wide metadata validation failure では remote close buckets は空配列で固定する
+  - graph 構築前の target-local metadata parse failure も `metadata_validation_failed` へ正規化し、`remote_close` 空 buckets のまま fail-closed にする
   - required remote close 実行中に 1 件でも失敗したら、その時点で close を停止し、未着手 remainder は `skipped_not_attempted` として返す
   - `--force` は `active_conflict` / `dependency_conflict` にしか効かない
+  - staged implementation note として、S01 I1 の間だけは all-local-guardrails-pass かつ `--yes` 済みでも mutation phase 未実装のため `confirmation_required` を interim placeholder status として返してよい
+  - 上記 interim placeholder は temporary であり、S01 I2/S02 で actual mutation / remote-close barrier path が入るまでの措置とする。final close-out までには `confirmation_required` を missing confirmation 専用へ戻す
 - dependency guard boundary:
   - dependency preflight は delete target subtree から subtree 外へ出る blocker / blocked edges だけを conflict 対象にする
   - subtree 内部だけで閉じる dependency edges は guard failure にしない
@@ -337,6 +344,7 @@ DeleteNodeResult ..> NodeRepository
 - E2E / manual:
   - dogfooding repo で issue / epic / initiative delete contract を確認する
   - issue56 完了時に `validate` / `sync --github` / docs parity / final spec review を再実行する
+  - live GitHub manual test で `delete --json` target metadata edge を再実行し、plain error text ではなく structured JSON payload が返ることを確認する
 - migration / rollback / feature flag if needed:
   - migration 不要
   - rollback は delete command surface と fs seam を issue 単位で戻す
@@ -380,6 +388,7 @@ DeleteNodeResult ..> NodeRepository
    - `<target>` / `--id` / `--github-issue` の 1-of selector rule を確認する。
    - `spec-dock/initiatives/**` を探索し、canonical node id token または normalized github issue number で target を解決する。
    - would-match target が invalid metadata の場合は `metadata_validation_failed` を返し、`offending_node_ids` / `validation_reasons` を埋める。
+   - `node_reader.load_node_records()` が target-local `.meta.json` 破損で失敗した場合でも、selector が `<target>` / `--id` なら canonical tree placement から target path を再特定し、`metadata_validation_failed` の structured result へ正規化する。
 2. local preflight:
    - requirement の precedence に従い `confirmation_required`、`recursive_required`、`active_conflict`、`dependency_conflict` を順に評価する。
    - epic / initiative は child 有無にかかわらず node-kind based に `--recursive` 必須とする。

@@ -5,7 +5,7 @@ ID: "iss-00056"
 関連GitHub: ["#56"]
 状態: "draft | approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-09"
+最終更新: "2026-04-10"
 親: ["epic-00054", "init-local-00002"]
 ---
 
@@ -24,6 +24,7 @@ ID: "iss-00056"
   - 手作業削除は active pointer、deps、parent-child subtree、generated state との整合を壊しやすい。
   - local delete と remote lifecycle close の関係が docs / runtime / tests で未定義であり、事故時の説明責任が弱い。
   - epic final review / final validation を別 issue に逃がさず、この issue 自身で閉じる必要がある。
+  - live manual test で、target `.meta.json` 破損時の `delete --json` が `metadata_validation_failed` の structured payload ではなく plain error text を返し、machine-readable contract と食い違う不具合が確認された。
 - 再現手順:
   1. issue / epic / initiative の local node を不要化する。
   2. delete command が無いため、対象 directory を手作業で削除する。
@@ -87,6 +88,7 @@ ID: "iss-00056"
   - `<target>` / `--id` resolution 中に、要求された node id に一致する would-match node が invalid metadata を持つ場合は `metadata_validation_failed` とし、その node を `offending_node_ids` に返す
   - `--force` はどの selector form とも併用可能だが、overrideable conflict が無い場合は no-op flag として扱う
   - machine-readable result は `--json` 指定時に stdout へ JSON object 1 件で返し、human-readable text とは混在させない
+  - `--json` 指定時は、target selector の解決前後に起きる node record load / `.meta.json` parse failure を可能な限り `DeleteNodeResult` へ正規化し、plain error text を返さない
   - delete の主操作は local directory / subtree removal である
   - remote side は close-only であり、delete は success path に含めない
   - terminal status は `ok` / `invalid_selector_combination` / `invalid_selector_syntax` / `target_not_found` / `ambiguous_target` / `active_conflict` / `dependency_conflict` / `recursive_required` / `confirmation_required` / `metadata_validation_failed` / `remote_close_failed` / `local_delete_partial_failure` のいずれかとする
@@ -114,6 +116,7 @@ ID: "iss-00056"
   - node kind の canonical source of truth は target node directory の path placement と id prefix の一致とし、`spec-dock/initiatives/**` 配下で `init*` は initiative、`epic*` は epic、`iss*` は issue と判定する
   - local spec node の discovery predicate は、canonical tree placement にあり、directory basename から `init...` / `epic...` / `iss...` の canonical node id token を 1 件だけ抽出できる directory とする
   - would-match target directory に `.meta.json` missing / unreadable / malformed がある場合は `metadata_validation_failed` とし、`target_not_found` にはしない
+  - target selector が `<target>` / `--id` で、would-match target directory 自身の `.meta.json` missing / unreadable / malformed により node record loading が失敗した場合でも、`--json` 指定時は `metadata_validation_failed` の structured payload を返す
   - partially scaffolded / stale / malformed directories で selector と無関係なものは selector resolution から除外する
   - recursive subtree delete では、対象 subtree に必要な remote close がすべて成功してから local removal を開始する
   - authoritative local metadata source は各 node directory 配下の `.meta.json` とし、`github_repo_owner` / `github_repo_name` / `github_issue_number` を linked GitHub identity の正本とする
@@ -141,6 +144,8 @@ ID: "iss-00056"
   - `--force` は active/deps conflict override にだけ使い、missing-target、missing `--recursive`、confirmation 欠如、remote close failure は override しない
   - generated artifacts / symlinks / docs の refresh は `delete` command 自身では行わず、post-delete では follow-up `validate` / `sync --github` による refresh と観測を前提にする
   - epic final close-out は issue56 の中で完了させる
+  - staged implementation note として、S01 I1 の間だけは actual delete 未実装の preflight-ready path を `confirmation_required` で返してよい
+  - 上記 staged implementation note は temporary contract であり、S01 I2 以降では `confirmation_required` を未確認ケース専用へ戻し、最終 close-out までに正規化する
 - Never:
   - recursive opt-in なしで parent subtree を消すこと
   - close と delete を同義として扱うこと
@@ -209,6 +214,7 @@ ID: "iss-00056"
     - `remote_close`
   - constraints:
     - `remote_close` は各 bucket が空配列
+    - target directory 自身の `.meta.json` parse failure を command wrapper / application seam で吸収した場合でも、同一 field matrix を維持する
 - `remote_close_failed`:
   - required fields:
     - `status`
@@ -366,9 +372,11 @@ ID: "iss-00056"
 - EC-010:
   - 条件:
     - remote close は完了したが、filesystem deletion が途中または完了前に失敗する
+    - または local delete 完了後の active repair / dependency scrub が失敗する
   - 期待:
     - command terminal status は `local_delete_partial_failure`、process exit は non-zero になる
     - deleted node ids / remaining node ids / active restore result / recovery guidance が返る
+    - local delete 後の active repair failure も同じ terminal status に集約し、best-effort repair を試みたうえで結果を返す
     - 自動 retry は行わず、post-failure validation evidence を残す
   - 観測点:
     - runtime / CLI tests
