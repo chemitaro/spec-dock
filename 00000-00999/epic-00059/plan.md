@@ -26,7 +26,7 @@ ID: "epic-00059"
   - hard cutover judgment は T3 完了時に固定し、entry 条件の実施・充足も T3 で完了させる。T4 は final evidence packaging/review に限定する。
 
 ## Issue 一覧（順序 / tranche 付き）
-- iss-xxxx-schema-and-reader-alignment:
+- iss-00060-meta-json-dependency-schema-and-reader-alignment:
   - 目的:
     - `.meta.json` dependency schema と `infra/deps_reader.py` の read contract を確定する。
   - deliverable:
@@ -37,7 +37,7 @@ ID: "epic-00059"
     - E-RQ-001, E-AC-001
   - depends on:
     - なし
-- iss-xxxx-command-mutation-contract:
+- iss-00061-dependency-mutation-command-contract:
   - 目的:
     - `deps add/remove` を導入し fail-closed validation を mutation path に組み込む。
   - deliverable:
@@ -47,8 +47,8 @@ ID: "epic-00059"
   - closes:
     - E-RQ-002, E-RQ-003, E-AC-002
   - depends on:
-    - iss-xxxx-schema-and-reader-alignment
-- iss-xxxx-downstream-parity-and-cutover-readiness:
+    - iss-00060-meta-json-dependency-schema-and-reader-alignment
+- iss-00062-downstream-parity-and-cutover-readiness:
   - 目的:
     - delete/sync/active/validate の依存解釈を `.meta.json` SoT に統一し、hard cutover entry 条件を実施・充足・記録したうえで judgment を固定する。
   - deliverable:
@@ -58,8 +58,8 @@ ID: "epic-00059"
   - closes:
     - E-RQ-004, E-AC-003, E-AC-004
   - depends on:
-    - iss-xxxx-command-mutation-contract
-- iss-xxxx-docs-tests-dogfooding-and-final-review:
+    - iss-00061-dependency-mutation-command-contract
+- iss-00063-final-regression-parity-and-cutover-closure:
   - 目的:
     - T3 で固定済みの cutover judgment を前提に、final regression / parity confirmation / spec review / close summary を完了する。
   - deliverable:
@@ -69,13 +69,13 @@ ID: "epic-00059"
   - closes:
     - E-AC-005, epic final close review
   - depends on:
-    - iss-xxxx-downstream-parity-and-cutover-readiness
+    - iss-00062-downstream-parity-and-cutover-readiness
 
 ## cutover evidence ownership
-- T3 integration owner（`iss-xxxx-downstream-parity-and-cutover-readiness`）:
+- T3 integration owner（`iss-00062-downstream-parity-and-cutover-readiness`）:
   - hard cutover judgment と E-AC-003 readiness verdict の primary owner。
   - 自身の `report.md` に docs 更新結果、dogfooding checked-in data manual fix 完了 path/scope、targeted regression summary、`./spec-dock/scripts/spec-dock validate` / `sync` の command line・exit code・結果要約、judgment verdict を残す。
-- T4 closure owner（`iss-xxxx-docs-tests-dogfooding-and-final-review`）:
+- T4 closure owner（`iss-00063-final-regression-parity-and-cutover-closure`）:
   - E-AC-005 final closure と final parity / final spec review の primary owner。
   - 自身の `report.md` に final regression summary、T3 evidence bundle review 結果、必要な parity reconfirmation、final spec review verdict を残し、epic `report.md` には close summary だけを反映する。
 
