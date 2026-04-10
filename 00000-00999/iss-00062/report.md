@@ -228,7 +228,7 @@ python -m unittest -v \
 - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/report.md` - S04 evidence と final gate verdict を追記
 
 #### コミット
-- 実施予定（S04 final close-out 差分）
+- `be47006` `fix(cutover): dogfooding依存cutoverとruntime同期を完了`
 
 #### メモ
 - residual risk (non-blocking): full `python -m unittest discover -v` は未実行で、issue scope に紐づく focused regression と runtime command evidence を final gate とした
