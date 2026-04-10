@@ -138,6 +138,54 @@ python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.t
 
 ---
 
+### 2026-04-10 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, AC-005, EC-003, EC-005
+
+#### 実施内容
+- provider-side `reference_deps.md` / `reference_sync.md` / `workflow_issue.md` と dogfooding mirror を更新し、hard cutover entry 条件、manual fix、`validate` / `sync` evidence、T3/T4 owner split、fixed-key contract を明文化した。
+- provider / dogfooding の templates から legacy `deps.json` seed を削除し、`tests/test_init_update.py` に docs mirror parity と non-seed regression を追加した。
+- focused tests、provider/mirror diff、S03 必須文言の存在確認を実施し、SG1/spec review は pass と判断した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_reference_deps_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity -v
+diff -u src/spec_dock/assets/spec_dock/docs/reference_deps.md spec-dock/docs/reference_deps.md
+diff -u src/spec_dock/assets/spec_dock/docs/reference_sync.md spec-dock/docs/reference_sync.md
+diff -u src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+python - <<'PY'
+# SG1-check: required phrases present
+PY
+
+- focused suite: Ran 9 tests
+- focused suite: OK
+- provider/mirror docs diff: 3件とも差分なし
+- SG1-check: pass
+- SG1 spec review: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md` - hard cutover entry contract と T3/T4 split を追記
+- `src/spec_dock/assets/spec_dock/docs/reference_sync.md` - hard cutover verification contract と evidence 記録要件を追記
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - issue-level hard cutover evidence contract と fixed-key 群を追加
+- `spec-dock/docs/reference_deps.md` - provider-side 正本と同期
+- `spec-dock/docs/reference_sync.md` - provider-side 正本と同期
+- `spec-dock/docs/workflow_issue.md` - provider-side 正本と同期
+- `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/deps.json` - legacy seed を削除
+- `spec-dock/templates/{initiative,epic,issue}/deps.json` - checked-in mirror から legacy seed を削除
+- `tests/test_init_update.py` - docs mirror parity と non-seed regression を追加
+
+#### コミット
+- 未実施
+
+#### メモ
+- residual risk: focused coverage のみ実行しており、S03 変更範囲に対する全体回帰は S04 final gate へ残している
+- residual risk: `workflow_issue.md` は汎用 contract を追加したが、fixed-key の実運用確認は S04 の report 記録で最終確認する
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: active issue docs の As-Is に `deps_reader.py` / docs の旧前提が残っており、`iss-00060` / `iss-00061` の実装済み事実と一致していなかった
   - 解決: upstream report と provider-side source/tests を権威ソースに据え、current gap を `delete scrub` と `template/init-update legacy seed` に絞り直した
