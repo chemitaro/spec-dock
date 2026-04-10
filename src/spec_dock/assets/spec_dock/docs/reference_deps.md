@@ -19,23 +19,29 @@
 
 ## 1. 結論（v2）
 
-- `deps.json` の shorthand（`init-*` / `epic-*` / GitHub issue番号）を展開し、canonical な issue->issue direct edge にコンパイルします。
-- `deps check` は v2 evaluator（issue-only canonical graph）で `ready / blockers / effective_depends_on` を判定します。
-- `active set`（issue target）は v2の `ready` をガード条件に使い、`ready=false` ならデフォルトで失敗します。
-- `sync` は `index-*.json` の `deps.issue_edges` と `deps-issues.*`（todo issue-only）を生成します。
+- canonical storage は node 直下 `.meta.json` の top-level `depends_on` です。
+- reader（`infra/deps_reader.py`）は `.meta.json` だけを読み、`deps.json` dual-read / auto-migration は行いません。
+- `depends_on` の field absence は `[]` と同義です。
+- raw value grammar は既存 shorthand に限定し、node id / GitHub issue number（int または numeric string）/ `owner/repo#123` / canonical issue URL のみを許可します。
+- shorthand は canonical な issue->issue direct edge にコンパイルされ、downstream consumer は既存 `DepsTopologyLoadResult` surface を継続利用します。
+- rollback は compatibility mode ではなく issue diff revert 前提です。
 
-## 2. `deps.json`（ノード直下 / 任意）
+## 2. `.meta.json`（ノード直下 / 任意）
 
 配置場所:
-- initiative: `<initiative-dir>/deps.json`
-- epic: `<epic-dir>/deps.json`
-- issue: `<issue-dir>/deps.json`
+- initiative: `<initiative-dir>/.meta.json`
+- epic: `<epic-dir>/.meta.json`
+- issue: `<issue-dir>/.meta.json`
 
-スキーマ:
+スキーマ例:
 
 ```json
 {
   "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00100",
+  "title": "Example issue",
+  "slug": "example-issue",
   "depends_on": [
     "iss-00123",
     "epic-local-00001",
@@ -48,121 +54,43 @@
 ```
 
 ルール:
-- `schema_version` は `1` 固定
-- `depends_on` 要素は node id、GitHub issue番号（int / 数字文字列）、repo-scoped ref（`owner/repo#123` / canonical issue URL）
+- `depends_on` は optional top-level field です
+- field absence は `[]` と同義です
+- `depends_on` 要素は node id、GitHub issue番号（int / numeric string）、repo-scoped ref（`owner/repo#123` / canonical issue URL）に限定されます
 - shorthand は最終的に issue->issue edge へ還元されます
-- `deps.json` が無い場合は `depends_on=[]`
+- reader は `.meta.json` だけを読み、legacy `deps.json` は migration 入力にも fallback read source にもしません
 
 構造エラー（fail-fast）:
-- JSONパース不正 / schema不正
+- JSONパース不正 / top-level object 不正 / `depends_on` の型不正
+- unsupported element type / unsupported string
 - 未解決参照
 - 親->配下（descendant）依存
 - 自己依存（shorthand展開で生じる implicit self も含む）
-- 循環依存（cycle）
 
 補足:
 - shorthand 展開結果が空でもエラーにはせず、warning `deps_ref_expanded_to_empty` を出します。
+- no dual-read / no auto-migration / rollback-by-revert を前提にします。
 
-## 3. v2評価の基本
+## 3. reader contract
 
-- 評価グラフは issue-only（canonical direct edges）
-- `effective_depends_on` は closure かつ Done除外
-- `unknown` は Done扱いしない（安全側）
-- issue の `ready`:
-  - `status==done` は常に `ready=true`
-  - それ以外は closure が空かつ status が unknown でない場合のみ `ready=true`
+- `infra/deps_reader.py` は node 直下 `.meta.json` から `depends_on` を読みます。
+- shorthand 解決、issue-level direct edge compile、dedupe、deterministic sort、descendant/self reject、warning `deps_ref_expanded_to_empty` は current contract を維持します。
+- downstream consumer 向けの return shape は既存 `DepsTopologyLoadResult(issue_depends_on_map, warnings)` のままです。
+- cycle detection、mutation、delete scrub、`validate` / `sync` / `active set` parity はこの T1 reference update の完了条件に含めません。
 
-## 4. `deps check`
+## 4. downstream boundary note
 
-```bash
-./spec deps check <target>
-./spec deps check --id <node-id>
-./spec deps check --github-issue <n>
-./spec deps check <target> --github
-./spec deps check <target> --json
-```
+- `deps check`、`active set`、`validate`、`sync`、`delete` は compiled dependency result を消費する downstream consumer です。
+- この文書更新は `.meta.json` schema と reader contract の固定を目的とし、mutation command や downstream parity が完了済みであることを意味しません。
+- provider-side のこのファイルが dependency reference の正本であり、dogfooding 側 copy は secondary verification です。
 
-終了コード:
-- `0`: ready
-- `3`: blocked（unknown を含む）
-- `1`: 実行時エラー（構造エラー等）
-- `2`: 引数エラー（argparse）
+## 5. migration / rollback guardrails
 
-target 指定:
-- 後方互換として `<target>` は維持されます
-- explicit form として `--id <node-id>` / `--github-issue <n>` も使えます
-- `<target>` / `--id` / `--github-issue` は **ちょうど1つ**だけ指定してください
+- no dual-read: reader は `.meta.json` のみを対象にし、`deps.json` fallback read を持ちません。
+- no auto-migration: runtime は `deps.json` から `.meta.json` への自動変換・救済を行いません。
+- rollback-by-revert: compatibility mode は導入せず、issue diff revert で戻します。
 
-`--github`:
-- `gh issue list` を参照して OPEN/CLOSED を判定
-- 失敗時は `gh_fetch_failed` warn で unknown 扱い
-- 取得漏れは `gh_index_incomplete` warn
+## 6. hard cutover owner boundary
 
-`--github` なし:
-- GitHub へアクセスしない
-- snapshot は `spec-dock/.agent/index-all.json` 優先、無ければ `spec-dock/.agent/index.json`
-- snapshotが無い/不足なら unknown（blocked 側）
-
-`--json` 出力（stable keys）:
-
-```json
-{
-  "schema_version": 1,
-  "target": "iss-00302",
-  "ready": false,
-  "effective_depends_on": ["iss-00301"],
-  "blockers": ["iss-00301"],
-  "nodes": {
-    "iss-00301": {"state": "blocked", "ready": false}
-  },
-  "warnings": []
-}
-```
-
-## 5. `active set` の deps guard（v2）
-
-```bash
-./spec active set <issue-id>
-./spec active set --id <issue-id>
-./spec active set --github-issue <n>
-./spec active set <issue-id> --force
-```
-
-- issue target は v2 evaluator で判定
-- 後方互換として `<target>` は維持されます
-- explicit form として `--id <node-id>` / `--github-issue <n>` も使えます
-- `<target>` / `--id` / `--github-issue` の併用はできません
-- ブロック条件は `not ready`（`blockers` の有無ではない）
-- `ready=false` かつ `--force` なし: 失敗（exit=1）し、`spec-dock/.agent/active.json` は更新しない
-- `--force` あり: `deps_blocked` 警告を出して active 更新を続行
-- `--github` なし時は snapshot（`index-all -> index`）を使い、無ければ unknown で blocked
-
-## 6. `sync` における deps 生成物（v2）
-
-`.agent/`:
-- `index-all.json` / `tree-all.json`（all）
-- `index.json` / `tree.json`（todo projection）
-- `deps-issues.json`（todo issue-only graph）
-
-人間向け:
-- `spec-dock/deps-issues.puml`
-- `spec-dock/tree-all.puml`
-- `spec-dock/tree.puml`
-- `spec-dock/dashboard.md`
-
-`sync --force` かつ deps preflight失敗時:
-- `deps.valid=false`, `deps.error` を持つ placeholder で上書き
-- `deps-issues.json` は `nodes={}`, `edges=[]` で上書き（削除しない）
-- `sync --force` は active auto-update を行わない（`--no-update-active` 相当）
-
-legacy v1 生成物は廃止:
-- `.agent/deps.json`, `.agent/deps.puml`, `.agent/deps.todo.puml` は `sync` で削除
-
-## 7. 矢印方向（JSON vs PlantUML）
-
-- JSON edge（`deps.issue_edges` / `deps-issues.json.edges`）:
-  - `depends_on` 方向（`dependent -> prerequisite`）
-- PlantUML（`deps-issues.puml`）:
-  - blocks 表示（`prerequisite -> dependent`）
-
-同一依存を用途別に向きを変えて表現しています。
+- legacy `deps.json` checked-in data manual fix と dogfooding `./spec-dock/scripts/spec-dock validate` / `sync` evidence、hard cutover judgment の primary owner は `iss-00062` です。
+- `iss-00060` が固定するのは `.meta.json` schema、reader contract、provider-side dependency docs 正本更新までです。
