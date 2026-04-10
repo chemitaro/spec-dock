@@ -7,6 +7,7 @@ from ..domain.deps import ensure_issue_dependency_add_would_not_create_cycle, is
 from ..domain.models import SpecNodeSeed, SpecNodeKind
 from ..domain.tree import build_graph
 from ..domain.validation import ensure_current_graph_and_deps_valid
+from ..infra.contracts import DirectDependencyResolution
 from ..infra.contracts import StoredMetaRecord
 from .contracts import MutateDepsError, MutateDepsRequest, MutateDepsResult
 from .ports import Ports
@@ -53,6 +54,33 @@ def _raise_mutation_error(
     )
 
 
+def _load_direct_matching_refs(
+    req: MutateDepsRequest,
+    *,
+    ports: Ports,
+    graph,
+    from_issue_id: str,
+    to_issue_id: str,
+) -> list[object]:
+    load_direct_resolutions = getattr(ports.deps_topology_reader, "load_direct_dependency_resolutions", None)
+    if not callable(load_direct_resolutions):
+        return []
+
+    try:
+        resolutions = cast(
+            list[DirectDependencyResolution],
+            load_direct_resolutions(_resolve_specdock_dir(ports), graph, from_issue_id),
+        )
+    except RuntimeError as error:
+        _raise_mutation_error(req, code="preflight_validate_failed", detail=str(error))
+
+    return [
+        item.raw_ref
+        for item in resolutions
+        if item.resolved_node_id == to_issue_id
+    ]
+
+
 def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
     if req.action not in ("add", "remove"):
         raise RuntimeError(f"Unsupported deps mutation action: {req.action}")
@@ -61,11 +89,11 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
     if ports.deps_topology_reader is None:
         raise RuntimeError("deps_topology_reader is required")
 
-    records = ports.node_reader.load_node_records()
-    graph = build_graph([_to_spec_node_seed(record) for record in records])
-    topology = ports.deps_topology_reader.load_issue_depends_on_map(_resolve_specdock_dir(ports), graph)
-    issue_depends_on_map = dict(topology.issue_depends_on_map)
     try:
+        records = ports.node_reader.load_node_records()
+        graph = build_graph([_to_spec_node_seed(record) for record in records])
+        topology = ports.deps_topology_reader.load_issue_depends_on_map(_resolve_specdock_dir(ports), graph)
+        issue_depends_on_map = dict(topology.issue_depends_on_map)
         ensure_current_graph_and_deps_valid(
             graph,
             issue_depends_on_map,
@@ -102,16 +130,29 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
             detail=f"to node is not issue: {to_node.id} ({to_node.kind})",
         )
 
+    direct_edge_exists = issue_dependency_exists(
+        issue_depends_on_map,
+        from_issue_id=from_node.id,
+        to_issue_id=to_node.id,
+    )
+    direct_matching_refs: list[object] = []
+    load_direct_resolutions = getattr(ports.deps_topology_reader, "load_direct_dependency_resolutions", None)
+    if callable(load_direct_resolutions):
+        direct_matching_refs = _load_direct_matching_refs(
+            req,
+            ports=ports,
+            graph=graph,
+            from_issue_id=from_node.id,
+            to_issue_id=to_node.id,
+        )
+        direct_edge_exists = bool(direct_matching_refs)
+
     if req.action == "add":
         add_issue_dependency = getattr(ports.node_repo, "add_issue_dependency", None)
         if not callable(add_issue_dependency):
             raise RuntimeError("add_issue_dependency is not configured")
 
-        if issue_dependency_exists(
-            issue_depends_on_map,
-            from_issue_id=from_node.id,
-            to_issue_id=to_node.id,
-        ):
+        if direct_edge_exists:
             return MutateDepsResult(
                 action=req.action,
                 from_id=from_node.id,
@@ -144,18 +185,14 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
         remove_issue_dependency = getattr(ports.node_repo, "remove_issue_dependency", None)
         if not callable(remove_issue_dependency):
             raise RuntimeError("remove_issue_dependency is not configured")
-        if not issue_dependency_exists(
-            issue_depends_on_map,
-            from_issue_id=from_node.id,
-            to_issue_id=to_node.id,
-        ):
+        if not direct_edge_exists:
             _raise_mutation_error(
                 req,
                 code="edge_not_found",
                 detail=f"Dependency edge not found: {from_node.id} -> {to_node.id}",
             )
         try:
-            remove_issue_dependency(from_node.meta_path, to_node.id)
+            remove_issue_dependency(from_node.meta_path, to_node.id, matching_refs=direct_matching_refs)
         except RuntimeError as error:
             _raise_mutation_error(req, code="write_failed", detail=str(error))
 

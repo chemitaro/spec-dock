@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,54 @@ class TestCliDeps(CliRuntimeHarness):
             if payload.get("id") == node_id:
                 return meta_path
         raise AssertionError(f"meta path not found for node id: {node_id}")
+
+    def _create_cross_epic_inherited_dependency_fixture(self, target: Path) -> dict[str, str]:
+        self._create_same_repo_linked_hierarchy(
+            target,
+            owner="example",
+            repo="repo",
+            initiative_issue_number=101,
+            epic_issue_number=201,
+            issue_issue_number=301,
+            issue_title="From issue",
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "epic",
+                "--initiative",
+                "101",
+                "--github-issue",
+                "202",
+                "--title",
+                "Dependency epic",
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "issue",
+                "--epic",
+                "202",
+                "--github-issue",
+                "302",
+                "--title",
+                "To issue",
+            ],
+        )
+        from_issue_id = "iss-00301"
+        to_issue_id = "iss-00302"
+        from_epic_id = "epic-00201"
+        to_epic_id = "epic-00202"
+        self._set_meta_depends_on(self._find_meta_path_by_id(target, from_epic_id).parent, [to_epic_id])
+        return {
+            "iss-00301": from_issue_id,
+            "iss-00302": to_issue_id,
+            "epic-00201": from_epic_id,
+            "epic-00202": to_epic_id,
+        }
 
     def _make_gh_issue_list_and_view_stub(
         self,
@@ -2424,6 +2473,33 @@ class TestCliDeps(CliRuntimeHarness):
             from_meta = json.loads(after_second)
             self.assertEqual(from_meta.get("depends_on"), [to_id])
 
+    def test_deps_add_inherited_only_edge_adds_direct_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_cross_epic_inherited_dependency_fixture(target)
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            before = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            before_refs = before.get("depends_on", [])
+            self.assertFalse(any(str(dep) == to_id for dep in before_refs if isinstance(dep, (str, int))))
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.stderr.strip(), "")
+            self.assertEqual(
+                p.stdout.strip(),
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+            )
+
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(after.get("depends_on"), [to_id])
+
     def test_deps_remove_updates_meta_json_and_returns_updated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2461,6 +2537,70 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIsNotNone(from_meta)
             assert from_meta is not None
             self.assertEqual(from_meta.get("depends_on"), [])
+
+    def test_deps_remove_inherited_only_edge_returns_edge_not_found(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_cross_epic_inherited_dependency_fixture(target)
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_removes_shorthand_direct_refs_by_issue_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                owner="example",
+                repo="repo",
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="From issue",
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "To issue"],
+            )
+            from_id = "iss-00301"
+            to_id = "iss-00302"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            shorthand_refs: list[object] = [
+                302,
+                "302",
+                "example/repo#302",
+                "https://github.com/example/repo/issues/302",
+            ]
+
+            for shorthand_ref in shorthand_refs:
+                with self.subTest(shorthand_ref=shorthand_ref):
+                    self._set_meta_depends_on(from_meta_path.parent, [shorthand_ref])
+                    p = self._run_runtime_capture(
+                        target,
+                        ["deps", "remove", "--from", from_id, "--to", to_id],
+                    )
+                    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertEqual(p.stderr.strip(), "")
+                    self.assertEqual(
+                        p.stdout.strip(),
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                    )
+                    after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+                    self.assertEqual(after.get("depends_on"), [])
 
     def test_deps_add_broken_current_graph_fails_preflight_before_duplicate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2500,6 +2640,62 @@ class TestCliDeps(CliRuntimeHarness):
             after = meta_paths_by_id[from_id].read_text(encoding="utf-8")
             self.assertEqual(after, before)
 
+    def test_deps_add_malformed_meta_json_returns_preflight_validate_failed_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Broken issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            broken_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+            self._write_text_force(broken_meta_path, "{\n")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=preflight_validate_failed", p.stderr)
+            self.assertIn("Invalid JSON", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_invalid_depends_on_schema_returns_preflight_validate_failed_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Broken issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            broken_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+            self._set_meta_depends_on(broken_meta_path.parent, {"invalid": "type"})
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=preflight_validate_failed", p.stderr)
+            self.assertIn("depends_on must be a list", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
     def test_deps_remove_not_found_returns_edge_not_found_and_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2523,6 +2719,141 @@ class TestCliDeps(CliRuntimeHarness):
 
             after = from_meta_path.read_text(encoding="utf-8")
             self.assertEqual(after, before)
+
+    def test_deps_remove_non_issue_from_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["epic-00201"]
+            to_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_non_issue_to_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["epic-00201"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_unresolved_target_returns_edge_not_found_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", "iss-local-99999"],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_unresolved_source_returns_edge_not_found_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            to_id = local_ids["iss-00302"]
+            to_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = to_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", "iss-local-99998", "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = to_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_write_failure_returns_write_failed_and_no_write(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are required for this test")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            added = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            from_issue_dir = from_meta_path.parent
+            before = from_meta_path.read_text(encoding="utf-8")
+            original_mode = stat.S_IMODE(from_issue_dir.stat().st_mode)
+            try:
+                from_issue_dir.chmod(0o555)
+                removed = self._run_runtime_capture(
+                    target,
+                    ["deps", "remove", "--from", from_id, "--to", to_id],
+                )
+            finally:
+                from_issue_dir.chmod(original_mode)
+
+            self.assertEqual(removed.returncode, 1, removed.stdout + removed.stderr)
+            self.assertEqual(removed.stdout.strip(), "")
+            self.assertIn("code=write_failed", removed.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+            self.assertEqual(json.loads(after).get("depends_on"), [to_id])
 
     def test_deps_remove_broken_current_graph_fails_preflight_before_edge_not_found(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

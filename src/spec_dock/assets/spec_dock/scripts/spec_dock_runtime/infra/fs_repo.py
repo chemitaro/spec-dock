@@ -84,23 +84,29 @@ def _write_meta_json_with_permission_contract(meta_path: Path, payload: dict[str
                 _warn(f"readonly_lock_failed: {meta_path} ({reason})")
 
 
-def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+def _atomic_write_json(path: Path, payload: dict[str, Any], *, readonly_mode: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f".{path.name}.tmp-",
-        dir=path.parent.as_posix(),
-    )
-    os.close(fd)
-    tmp_path = Path(tmp_name)
     stage = "write_temp"
+    tmp_path: Path | None = None
     try:
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{path.name}.tmp-",
+            dir=path.parent.as_posix(),
+        )
+        os.close(fd)
+        tmp_path = Path(tmp_name)
         write_json(tmp_path, payload)
+        stage = "lock"
+        lock_mode = readonly_mode
+        if lock_mode is None:
+            lock_mode = _readonly_mode_preserving_read_bits(tmp_path.stat().st_mode)
+        tmp_path.chmod(lock_mode)
         stage = "replace"
         os.replace(tmp_path, path)
     except OSError as exc:
         raise RuntimeError(f"write_failed[{stage}]: {path}: {exc}") from exc
     finally:
-        if tmp_path.exists():
+        if tmp_path is not None and tmp_path.exists():
             try:
                 tmp_path.unlink()
             except OSError:
@@ -126,22 +132,19 @@ def _write_meta_json_atomic_with_permission_contract(meta_path: Path, payload: d
             unlocked_for_write = True
 
     try:
-        _atomic_write_json(meta_path, payload)
+        _atomic_write_json(meta_path, payload, readonly_mode=readonly_mode)
     except RuntimeError as exc:
         write_failed_error = exc
 
-    if meta_path.exists() and (write_failed_error is None or unlocked_for_write):
-        try:
-            if readonly_mode is None:
-                readonly_mode = _readonly_mode_preserving_read_bits(meta_path.stat().st_mode)
-            meta_path.chmod(readonly_mode)
-        except OSError as exc:
-            lock_error = _write_failed_error("lock", meta_path, exc)
-            if write_failed_error is not None:
-                raise RuntimeError(f"{write_failed_error}; {lock_error}") from exc
-            raise lock_error from exc
-
     if write_failed_error is not None:
+        if unlocked_for_write and meta_path.exists():
+            try:
+                if readonly_mode is None:
+                    readonly_mode = _readonly_mode_preserving_read_bits(meta_path.stat().st_mode)
+                meta_path.chmod(readonly_mode)
+            except OSError as exc:
+                lock_error = _write_failed_error("lock", meta_path, exc)
+                raise RuntimeError(f"{write_failed_error}; {lock_error}") from exc
         raise write_failed_error
 
 
@@ -471,7 +474,7 @@ def add_issue_dependency(meta_path: Path, to_id: str) -> None:
     _write_meta_json_atomic_with_permission_contract(meta_path, meta)
 
 
-def remove_issue_dependency(meta_path: Path, to_id: str) -> None:
+def remove_issue_dependency(meta_path: Path, to_id: str, *, matching_refs: list[object] | None = None) -> None:
     meta = load_json(meta_path)
     if not isinstance(meta, dict):
         raise RuntimeError(f"Invalid .meta.json (expected object): {meta_path}")
@@ -485,7 +488,12 @@ def remove_issue_dependency(meta_path: Path, to_id: str) -> None:
         raise RuntimeError(f"Invalid .meta.json schema: {meta_path}: depends_on must be a list")
 
     to_id_text = str(to_id)
-    meta["depends_on"] = [dep for dep in depends_on if str(dep) != to_id_text]
+    matching_ref_values = list(matching_refs or [])
+    meta["depends_on"] = [
+        dep
+        for dep in depends_on
+        if str(dep) != to_id_text and not any(dep == ref for ref in matching_ref_values)
+    ]
     if "updated_at" in meta:
         meta["updated_at"] = now_iso()
     _write_meta_json_atomic_with_permission_contract(meta_path, meta)

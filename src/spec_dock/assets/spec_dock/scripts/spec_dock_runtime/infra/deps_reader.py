@@ -6,6 +6,7 @@ from typing import Any
 
 from ..domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
 from ..domain.models import SpecGraph
+from .contracts import DirectDependencyResolution
 from .contracts import DepsTopologyLoadResult
 from .git_cli import origin_github_repo_slug
 from .json_store import load_json
@@ -275,6 +276,31 @@ def _resolved_direct_depends_on(
         if _is_descendant(graph, src_id=src_id, candidate_dep_id=dep_id):
             raise RuntimeError(f"Invalid dependency: {src_id} cannot depend on its descendant {dep_id} (in {meta_path})")
     return deduped
+
+
+def load_direct_dependency_resolutions(
+    specdock_dir: Path,
+    graph: SpecGraph,
+    src_id: str,
+) -> list[DirectDependencyResolution]:
+    src = graph.nodes_by_id.get(src_id)
+    if src is None:
+        raise RuntimeError(f"Node not found: {src_id}")
+    meta_path = src.path / ".meta.json"
+    current_repo_slug = _resolve_current_repo_slug(specdock_dir)
+    depends_on = _load_meta_depends_on(meta_path)
+    return [
+        DirectDependencyResolution(
+            raw_ref=ref,
+            resolved_node_id=_resolve_dep_ref(
+                graph,
+                ref,
+                src_path=meta_path,
+                current_repo_slug=current_repo_slug,
+            ),
+        )
+        for ref in depends_on
+    ]
 
 
 def _issue_ids_for_dep_node(graph: SpecGraph, node_id: str) -> list[str]:

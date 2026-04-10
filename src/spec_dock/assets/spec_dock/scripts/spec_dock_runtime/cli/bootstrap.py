@@ -58,8 +58,8 @@ class _NodeRepository:
     def add_issue_dependency(self, meta_path: Path, to_id: str) -> None:
         infra_fs_repo.add_issue_dependency(meta_path, to_id)
 
-    def remove_issue_dependency(self, meta_path: Path, to_id: str) -> None:
-        infra_fs_repo.remove_issue_dependency(meta_path, to_id)
+    def remove_issue_dependency(self, meta_path: Path, to_id: str, *, matching_refs: list[object] | None = None) -> None:
+        infra_fs_repo.remove_issue_dependency(meta_path, to_id, matching_refs=matching_refs)
 
     def delete_tree(self, node_path: Path) -> None:
         infra_fs_repo.delete_tree(node_path)
@@ -157,6 +157,9 @@ class _ActiveStateStore:
 class _DepsTopologyReader:
     def load_issue_depends_on_map(self, specdock_dir: Path, graph):
         return infra_deps_reader.load_issue_depends_on_map(specdock_dir, graph)
+
+    def load_direct_dependency_resolutions(self, specdock_dir: Path, graph, src_id: str):
+        return infra_deps_reader.load_direct_dependency_resolutions(specdock_dir, graph, src_id)
 
 
 @dataclass(frozen=True)
