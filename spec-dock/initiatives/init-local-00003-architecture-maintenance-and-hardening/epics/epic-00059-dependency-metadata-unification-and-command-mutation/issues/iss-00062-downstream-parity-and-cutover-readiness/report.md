@@ -99,6 +99,45 @@ python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_
 
 ---
 
+### 2026-04-10 00:00 - 00:00
+
+#### 対象
+- Step: S02
+- AC/EC: AC-002, EC-004
+
+#### 実施内容
+- `active` / `sync` / `validate` の shared topology reader 前提を再確認し、mismatch は見つからなかったため、最小差分として regression test のみ追加した。
+- `test_runtime_active_s06.py` で `active set` が blocked failure でも topology reader 経由で依存解決していることを呼び出し回数で固定した。
+- `test_runtime_deps_s04.py` で `collect_sync_state` が shared topology reader の `issue_depends_on_map` を取り込み、`deps_state` に反映することを固定した。
+- RG1 implementation review と QG1 QA review を実施し、いずれも pass を確認した。non-blocking の residual risk として、`calls == 1` の厳密アサーションの brittleness、`sys.path` 差し替え import の保守性、warning 伝播 / `sync --force` 分岐の reader 契約を今回新規拡張していない点を記録した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_validate_s02 -v
+python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 -v
+
+- focused suite: Ran 138 tests in 35.344s
+- focused suite: OK
+- flaky check subset: Ran 37 tests in 0.703s
+- flaky check subset: OK
+- RG1 implementation review: pass
+- QG1 QA review: pass
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/test_runtime_active_s06.py` - `active set` blocked failure 時でも topology reader が使われることを呼び出しカウントで固定
+- `tests/cli_runtime/test_runtime_deps_s04.py` - `collect_sync_state` が shared topology reader の dependency map を `deps_state` に反映する回帰を追加
+
+#### コミット
+- 未実施
+
+#### メモ
+- non-blocking: `calls == 1` の厳密アサーションは将来の内部実装変更で brittle になる可能性がある
+- non-blocking: `test_runtime_deps_s04.py` の `sys.path` 一時差し替え import は機能上問題ないが、将来のテスト構成変更時に影響を受けやすい
+- `validate` 側の shared topology reader 接続確認は既存回帰依存で、今回差分では新規強化していない
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題: active issue docs の As-Is に `deps_reader.py` / docs の旧前提が残っており、`iss-00060` / `iss-00061` の実装済み事実と一致していなかった
   - 解決: upstream report と provider-side source/tests を権威ソースに据え、current gap を `delete scrub` と `template/init-update legacy seed` に絞り直した

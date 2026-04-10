@@ -270,6 +270,81 @@ class _StubGitGateway:
 
 
 class TestRuntimeDepsS04(unittest.TestCase):
+    def test_collect_sync_state_reads_shared_topology_map(self) -> None:
+        (
+            _runtime_app,
+            _app_check_deps,
+            app_contracts,
+            app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            _domain_models,
+            infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import sync_state as app_sync_state
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            records = [
+                replace(
+                    record,
+                    github_repo_owner="current",
+                    github_repo_name="repo",
+                )
+                for record in _sample_records(infra_contracts, repo_root=repo_root)
+            ]
+            _materialize_required_artifacts(records)
+            deps_reader = _StubDepsTopologyReader(
+                {
+                    "iss-local-00001": [],
+                    "iss-local-00002": ["iss-local-00001"],
+                }
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                derived_state_reader=_StubDerivedStateReader(
+                    {"iss-local-00001": "open", "iss-local-00002": "open"}
+                ),
+                issue_gateway=_StubIssueGateway([]),
+                deps_topology_reader=deps_reader,
+            )
+
+            state = app_sync_state.collect_sync_state(
+                app_contracts.SyncRequest(
+                    force=False,
+                    github_enabled=False,
+                    issue_limit=10000,
+                    update_active_from_branch=False,
+                ),
+                ports,
+            )
+
+        self.assertEqual(deps_reader.calls, 1)
+        self.assertEqual(state.issue_depends_on_map.get("iss-local-00002"), ["iss-local-00001"])
+        self.assertTrue(
+            any(
+                node.node_id == "iss-local-00002" and node.effective_depends_on == ["iss-local-00001"]
+                for node in state.deps_state.nodes
+            )
+        )
+        self.assertIsNone(state.deps_preflight_error)
+
     def test_status_context_source_selection(self) -> None:
         (
             _runtime_app,
