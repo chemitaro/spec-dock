@@ -149,3 +149,14 @@ else deps preflight failed and --force
 end
 @enduml
 ```
+
+## 9. hard cutover verification contract（iss-00062 / iss-00063）
+
+- hard cutover entry 条件は `docs 更新 + checked-in data manual fix + validate/sync evidence` の 3 点を満たしたときだけ充足です。
+- `validate` / `sync` evidence は少なくとも次を issue-level `report.md` に記録します:
+  - 実行コマンド
+  - exit code
+  - pass/fail
+  - 結果要約（targeted regression summary を含む）
+- `iss-00062`（T3 integration）が entry 条件と hard cutover judgment の primary owner、`iss-00063`（T4 closure）はその judgment を前提に final parity / close review を行う follow-up owner です。
+- この split は no fallback / no dual-read / `.meta.json` only contract を維持するための固定境界であり、T4 側で entry 条件や verdict を再定義しません。
