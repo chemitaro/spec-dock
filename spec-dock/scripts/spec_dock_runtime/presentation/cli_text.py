@@ -13,6 +13,8 @@ from ..application.contracts import (
     DepsCheckResult,
     DoctorResult,
     ImportNodeResult,
+    MutateDepsError,
+    MutateDepsResult,
     SyncCommandResult,
     ValidationResult,
 )
@@ -155,6 +157,35 @@ def render_deps_check_text(result: DepsCheckResult) -> CliText:
             *[f"- {blocker}" for blocker in blockers],
         ],
         warnings=list(result.warnings),
+    )
+
+
+def render_deps_mutation_text(result: MutateDepsResult) -> CliText:
+    return CliText(
+        stdout_lines=[
+            (
+                f"spec-dock: ok (deps {result.action}) "
+                f"from={result.from_id} to={result.to_id} result={result.result}"
+            )
+        ],
+        stderr_lines=[],
+        warnings=list(result.warnings),
+    )
+
+
+def render_deps_mutation_error_text(error: MutateDepsError) -> CliText:
+    stderr_lines = [
+        (
+            f"spec-dock: error (deps {error.action}) "
+            f"from={error.from_id} to={error.to_id} code={error.code}"
+        )
+    ]
+    if error.detail:
+        stderr_lines.append(f"- {error.detail}")
+    return CliText(
+        stdout_lines=[],
+        stderr_lines=stderr_lines,
+        warnings=[],
     )
 
 
