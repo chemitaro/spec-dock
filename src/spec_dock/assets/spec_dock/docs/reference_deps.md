@@ -6,6 +6,8 @@
 ./spec deps check <target> [--github] [--gh-limit N] [--json]
 ./spec deps check --id <node-id> [--github] [--gh-limit N] [--json]
 ./spec deps check --github-issue <n> [--github] [--gh-limit N] [--json]
+./spec deps add --from <node-id> --to <node-id>
+./spec deps remove --from <node-id> --to <node-id>
 ./spec active set <target> [--github] [--gh-limit N] [--force|-f] [--checkout]
 ./spec active set --id <node-id> [--github] [--gh-limit N] [--force|-f] [--checkout]
 ./spec active set --github-issue <n> [--github] [--gh-limit N] [--force|-f] [--checkout]
@@ -17,13 +19,19 @@
 - 総合: [guide.md](guide.md)
 - sync: [reference_sync.md](reference_sync.md)
 
-## 1. 結論（v2）
+## 1. 結論（v3）
 
 - canonical storage は node 直下 `.meta.json` の top-level `depends_on` です。
 - reader（`infra/deps_reader.py`）は `.meta.json` だけを読み、`deps.json` dual-read / auto-migration は行いません。
+- runtime mutation surface は `deps add --from <id> --to <id>` と `deps remove --from <id> --to <id>` です。
+- mutation 対象は existing issue node から existing issue node への direct edge のみです。
+- current graph validation は duplicate add / remove not-found / node kind 判定より先に走り、失敗時は `preflight_validate_failed` error で no-write です。
+- healthy graph に対する duplicate add は success/no-op で、CLI は `result=unchanged` を返します。
+- `deps remove` の edge 不在は success/no-op に丸めず `edge_not_found` error です。
 - `depends_on` の field absence は `[]` と同義です。
 - raw value grammar は既存 shorthand に限定し、node id / GitHub issue number（int または numeric string）/ `owner/repo#123` / canonical issue URL のみを許可します。
 - shorthand は canonical な issue->issue direct edge にコンパイルされ、downstream consumer は既存 `DepsTopologyLoadResult` surface を継続利用します。
+- add/remove は `.meta.json` だけを書き換え、write failure 時も partial write を残さない atomic replace を前提にします。
 - rollback は compatibility mode ではなく issue diff revert 前提です。
 
 ## 2. `.meta.json`（ノード直下 / 任意）
@@ -76,21 +84,40 @@
 - `infra/deps_reader.py` は node 直下 `.meta.json` から `depends_on` を読みます。
 - shorthand 解決、issue-level direct edge compile、dedupe、deterministic sort、descendant/self reject、warning `deps_ref_expanded_to_empty` は current contract を維持します。
 - downstream consumer 向けの return shape は既存 `DepsTopologyLoadResult(issue_depends_on_map, warnings)` のままです。
-- cycle detection、mutation、delete scrub、`validate` / `sync` / `active set` parity はこの T1 reference update の完了条件に含めません。
+- `deps add/remove` の mutation contract は次節の通りで、delete scrub と `validate` / `sync` / `active set` parity の詳細はこの reference の主題に含めません。
 
-## 4. downstream boundary note
+## 4. mutation contract
+
+コマンド surface:
+
+```bash
+./spec deps add --from <node-id> --to <node-id>
+./spec deps remove --from <node-id> --to <node-id>
+```
+
+契約:
+- add/remove ともに current graph preflight-first です。この preflight は dependency graph consistency を対象とし、GitHub mandatory linkage は mutation preflight では強制しません（local-compat mode、`enforce_github_mandatory_linkage=False`）。graph が壊れている場合は duplicate add / remove not-found / non-issue node 判定より前に `preflight_validate_failed` error で終了します。
+- `--from` / `--to` は existing issue node id のみを受け付けます。existing initiative / epic など non-issue node は `unsupported_node_kind` error です。
+- duplicate add / remove not-found の存在判定は compiled dependency / inherited dependency ではなく、`from` node 直下 `.meta.json.depends_on` に保持された raw direct ref の有無を基準にします。
+- `deps add` は healthy graph に限り duplicate edge を success/no-op とし、CLI は `spec-dock: ok (deps add) ... result=unchanged` を返します。依存配列へ同一 edge を重複保存しません。
+- `deps remove` は healthy graph でも対象 edge が無ければ `edge_not_found` error です。remove not-found を no-op success にはしません。
+- add/remove 成功時の CLI は `from=<id> to=<id> result=updated` を返します。
+- mutation write path は node 直下 `.meta.json` の `depends_on` のみです。`deps.json` fallback write や互換モードはありません。
+- write failure は `write_failed` error で返し、temp file + replace の atomic write により partial write を残しません。rollback は compatibility mode ではなく issue diff revert 前提です。
+
+## 5. downstream boundary note
 
 - `deps check`、`active set`、`validate`、`sync`、`delete` は compiled dependency result を消費する downstream consumer です。
-- この文書更新は `.meta.json` schema と reader contract の固定を目的とし、mutation command や downstream parity が完了済みであることを意味しません。
+- この文書は `.meta.json` schema / reader / `deps check` / `deps add/remove` の command contract を固定するもので、downstream parity や hard cutover 完了を意味しません。
 - provider-side のこのファイルが dependency reference の正本であり、dogfooding 側 copy は secondary verification です。
 
-## 5. migration / rollback guardrails
+## 6. migration / rollback guardrails
 
 - no dual-read: reader は `.meta.json` のみを対象にし、`deps.json` fallback read を持ちません。
 - no auto-migration: runtime は `deps.json` から `.meta.json` への自動変換・救済を行いません。
 - rollback-by-revert: compatibility mode は導入せず、issue diff revert で戻します。
 
-## 6. hard cutover owner boundary
+## 7. hard cutover owner boundary
 
 - legacy `deps.json` checked-in data manual fix と dogfooding `./spec-dock/scripts/spec-dock validate` / `sync` evidence、hard cutover judgment の primary owner は `iss-00062` です。
-- `iss-00060` が固定するのは `.meta.json` schema、reader contract、provider-side dependency docs 正本更新までです。
+- `iss-00060` / `iss-00061` がこの reference で固定するのは `.meta.json` schema、reader contract、mutation command contract、provider-side dependency docs 正本更新までです。

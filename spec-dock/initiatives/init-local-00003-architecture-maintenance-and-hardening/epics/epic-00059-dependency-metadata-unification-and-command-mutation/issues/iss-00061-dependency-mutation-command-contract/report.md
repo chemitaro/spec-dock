@@ -14,8 +14,9 @@ ID: "iss-00061"
 
 ## 実装サマリー (任意)
 - active initiative / epic / issue と `iss-00060` の docs / report / 現状実装を突き合わせ、`iss-00061` の requirement / design / plan を実装開始可能な粒度まで具体化した。
-- spec review では upstream prerequisite の権威付けと write-failure atomicity の検証契約が不足していたため、issue docs と `iss-00060` status fields を補正し、再レビューで pass を取得した。
-- 実装コード変更はまだ着手しておらず、本 report は implementation readiness と review evidence の記録に限定する。
+- `deps add/remove` の command/application/domain/infra/presentation/tests を TDD で実装し、S01-S04 の step commit を積み上げて mutation contract を完成させた。
+- S90 で provider-side `reference_deps.md` 正本と dogfooding copy を更新し、S99 では reviewer fail を受けて remove write-failure regression、atomic lock failure/no-write 契約、mutation preflight scope の明文化まで含めて最終整合を取った。
+- 最終 focused validation は `python -m unittest tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_deps` で `Ran 104 tests ... OK` である。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -209,11 +210,98 @@ python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_de
 - `tests/cli_runtime/test_runtime_deps_s04.py` - atomic no-partial-write、temp cleanup、permission preservation、wrapper error rendering の runtime tests を追加
 
 #### コミット
-- 未作成（この後 S04 commit を実施）
+- `9fde052` `fix(deps): s04のエラー契約と原子書き込みを統一`
 
 #### メモ
 - final pass 時点では `write_failed` が `stat` / `chmod` / `replace` / cleanup 系失敗でも typed error に正規化され、partial write を残さないことを focused tests で確認した。
 - QA からは CLI-level remove `write_failed` regression と lock-failure contract の追加余地が示されたが、現時点では non-blocking suggestion 扱いである。
+
+---
+
+### 2026-04-10 08:49 - 08:55
+
+#### 対象
+- Step: S90
+- AC/EC: docs impact resolution
+
+#### 実施内容
+- `deps add/remove` が公開 command surface になったため、provider-side 正本 `reference_deps.md` と dogfooding copy の両方を更新した。
+- command surface、issue->issue direct edge only、current graph preflight-first、duplicate add=`result=unchanged`、remove not-found=`edge_not_found`、`.meta.json` only、atomic no-partial-write / rollback-by-revert を reference に追記した。
+- provider-side 正本と dogfooding copy が一致していることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "deps add|deps remove|depends_on|reference_deps|deps check" src/spec_dock/assets/spec_dock/docs spec-dock/docs
+
+- docs impact: change required
+- provider-side reference_deps.md と dogfooding copy を更新
+- provider-side / dogfooding copy 一致確認: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md` - mutation command contract と atomic no-partial-write 契約を追記
+- `spec-dock/docs/reference_deps.md` - dogfooding copy を provider-side 正本に同期
+
+#### コミット
+- 未作成（S99 の final diff review 後に docs/report 差分をまとめてコミット）
+
+#### メモ
+- docs 変更は command surface の公開差分に限定し、downstream parity / hard cutover 判断は引き続き `iss-00062` の責務として据え置いた。
+
+---
+
+### 2026-04-10 08:56 - 09:32
+
+#### 対象
+- Step: S99
+- AC/EC: final diff review quality gate
+
+#### 実施内容
+- S01-S04 + S90 を含む final diff を対象に reviewer 群へ final gate を依頼した。
+- 初回 QA review で `deps remove` の `write_failed` CLI 回帰テスト不足と relock failure branch の未固定が指摘されたため、provider-side runtime/tests に focused regression を追加した。
+- 続く spec/QA review で、mutation preflight scope と `write_failed[lock]` の no-write 契約が docs/report と完全に一致していない点が指摘されたため、issue docs と reference docs に `dependency graph consistency only` / `enforce_github_mandatory_linkage=False` を明文化し、atomic write を `tmp作成 -> write -> tmpへreadonly lock -> replace` へ改めて lock failure を replace 前 failure に寄せた。
+- さらに QA 指摘を受け、malformed `.meta.json` / `depends_on` schema failure も `code=preflight_validate_failed` に正規化する preflight mapping を追加した。
+- 続く implementation review で、compiled topology と direct metadata の取り違えにより `deps add/remove` が direct edge 無しでも `unchanged` / `updated` を返しうる点が指摘されたため、direct dependency existence/removal を raw metadata 基準へ寄せ、shorthand direct ref の remove と remove-side unresolved/non-issue regression まで追加した。
+- 最終修正後に `python -m unittest tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_deps` を再実行し、104 tests すべて green を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_deps
+
+- Ran 104 tests in 24.525s
+- OK
+- reviewed scope: `HEAD~4..working tree`
+- initial QA review: fail
+- fix 1: remove write_failed CLI regression + mkstemp/write_temp mapping を追加
+- fix 2: mutation preflight scope を docs に明文化し、lock failure を replace 前 failure/no-write に修正
+- fix 3: topology load / malformed `.meta.json` / invalid `depends_on` schema も typed `preflight_validate_failed` へ統一
+- fix 4: direct/raw dependency semantics で add/remove 判定と shorthand remove を整合化
+- final implementation review: pass
+- final QA review: pass
+- final spec review: pass
+- S99 verdict: final diff review pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - temp file creation failure を `write_failed[write_temp]` に正規化し、lock failure を replace 前 no-write failure に修正
+- `tests/cli_runtime/test_deps.py` - `deps remove` write failure の CLI/no-write regression を追加
+- `tests/cli_runtime/test_runtime_deps_s04.py` - lock failure no-write / `write_failed[lock]` / `write_failed[write_temp]` regression を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - topology load / malformed meta 失敗を typed `preflight_validate_failed` に正規化
+- `tests/cli_runtime/test_deps.py` - malformed `.meta.json` / invalid `depends_on` schema の typed preflight/no-write regression を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/{mutate_deps,ports}.py` - direct dependency existence/resolution contract を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/{contracts,deps_reader,fs_repo}.py` - direct dependency resolution と shorthand direct ref remove を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - direct dependency reader wiring を追加
+- `tests/cli_runtime/{test_deps,test_runtime_deps_s04}.py` - direct-edge add/remove, shorthand remove, remove unresolved/non-issue regression を追加
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/{requirement,design,report}.md` - mutation preflight scope と S99 closing evidence を更新
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md` - mutation preflight scope を明文化
+- `spec-dock/docs/reference_deps.md` - dogfooding copy を同期
+
+#### コミット
+- 未作成（fresh final reviews pass 後に S99 docs/report/runtime 差分を最終コミット）
+
+#### メモ
+- final gate では reviewer fail をそのまま close へ持ち込まず、contract mismatch を code/tests/docs/report の全レイヤで是正してから fresh review を通した。
+- mutation preflight は current dependency graph invalid を止める gate であり、GitHub mandatory linkage は import/sync と同じ local-compat mode の対象外として固定した。
 
 ---
 
@@ -232,5 +320,5 @@ python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_de
 - S01 着手前に `MutateDepsRequest/Result`、error taxonomy、atomic write helper の test seam を先に固定すると TDD が進めやすい
 
 ## 省略/例外メモ (必須)
-- 実装コード、テスト追加、`sync` / `validate` 実行、dogfooding manual verification は未着手
-- この段階では implementation readiness と spec review pass の取得のみを実施した
+- repo-wide `validate` / `sync` evidence と hard cutover judgment は計画通り `iss-00062` へ委譲し、本 issue では focused mutation validation のみを実施した
+- dogfooding runtime copy へのコード同期や manual runtime verification は本 issue のスコープ外として扱い、docs copy は provider-side 正本に同期した
