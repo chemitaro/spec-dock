@@ -123,7 +123,7 @@ python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_sync te
 - `spec-dock/active/issue/report.md` - S90/S99 の evidence と close-ready verdict を記録
 
 #### コミット
-- pending
+- `2b4acc6` `test(iss-00060): active依存ガード回帰を補強`
 
 #### メモ
 - S90 verdict: provider-side docs update 済み、dogfooding copy と整合
