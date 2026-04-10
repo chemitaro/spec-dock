@@ -767,6 +767,16 @@ class TestInitUpdate(CliRuntimeHarness):
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
 
+    def test_init_does_not_seed_legacy_node_deps_json_templates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            templates_dir = target / "spec-dock" / "templates"
+            self.assertFalse((templates_dir / "initiative" / "deps.json").exists())
+            self.assertFalse((templates_dir / "epic" / "deps.json").exists())
+            self.assertFalse((templates_dir / "issue" / "deps.json").exists())
+
     def test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -6454,6 +6464,30 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         repo_copy = (
             Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "reference_sync.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(repo_copy, bundled)
+
+    def test_reference_deps_doc_matches_bundled_asset(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            bundled = (assets_dir / "spec_dock" / "docs" / "reference_deps.md").read_text(encoding="utf-8")
+
+        repo_copy = (
+            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "reference_deps.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(repo_copy, bundled)
+
+    def test_workflow_issue_doc_matches_bundled_asset(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            bundled = (assets_dir / "spec_dock" / "docs" / "workflow_issue.md").read_text(encoding="utf-8")
+
+        repo_copy = (
+            Path(__file__).resolve().parents[1] / "spec-dock" / "docs" / "workflow_issue.md"
         ).read_text(encoding="utf-8")
 
         self.assertEqual(repo_copy, bundled)

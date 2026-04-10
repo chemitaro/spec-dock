@@ -121,3 +121,13 @@
 
 - legacy `deps.json` checked-in data manual fix と dogfooding `./spec-dock/scripts/spec-dock validate` / `sync` evidence、hard cutover judgment の primary owner は `iss-00062` です。
 - `iss-00060` / `iss-00061` がこの reference で固定するのは `.meta.json` schema、reader contract、mutation command contract、provider-side dependency docs 正本更新までです。
+
+## 8. hard cutover entry contract（T3/T4 split）
+
+- hard cutover entry 条件は次の 3 点に固定します:
+  - docs 更新（provider-side 正本 + dogfooding mirror）
+  - checked-in dogfooding data の legacy `deps.json` manual fix
+  - `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` の実測 evidence
+- manual fix は checked-in data の修正に限定し、runtime fallback / dual-read / auto-migration は導入しません。
+- hard cutover judgment の primary owner は T3 integration issue（`iss-00062`）です。T4 closure issue（`iss-00063`）は T3 judgment を参照して final parity / close review を実施します。
+- cutover evidence の fixed-key contract（`cutover_entry.*` / `cutover_judgment.*`、`targeted_regression_summary` 含む）は `workflow_issue.md` を正本として追跡します。
