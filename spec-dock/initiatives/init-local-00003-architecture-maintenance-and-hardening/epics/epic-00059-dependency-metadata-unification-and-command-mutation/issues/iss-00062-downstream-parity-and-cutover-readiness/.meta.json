@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00062",
+  "title": "Downstream parity and cutover readiness",
+  "slug": "downstream-parity-and-cutover-readiness",
+  "created_at": "2026-04-10T11:30:38+09:00",
+  "updated_at": "2026-04-10T11:30:38+09:00",
+  "parent_id": "epic-00059",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00059",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 62,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

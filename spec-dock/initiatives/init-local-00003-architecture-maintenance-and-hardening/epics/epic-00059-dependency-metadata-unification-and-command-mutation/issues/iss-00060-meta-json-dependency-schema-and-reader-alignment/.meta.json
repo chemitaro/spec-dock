@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00060",
+  "title": "Meta json dependency schema and reader alignment",
+  "slug": "meta-json-dependency-schema-and-reader-alignment",
+  "created_at": "2026-04-10T11:30:29+09:00",
+  "updated_at": "2026-04-10T11:30:29+09:00",
+  "parent_id": "epic-00059",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00059",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 60,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
