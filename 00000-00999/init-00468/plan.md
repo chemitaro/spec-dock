@@ -5,7 +5,7 @@ ID: "init-local-00003"
 関連GitHub: []
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-27"
+最終更新: "2026-04-10"
 依存: ["requirement.md", "design.md"]
 ---
 
@@ -31,9 +31,9 @@ ID: "init-local-00003"
     - 新 epic が issue 5本まで計画化されている
 - M3:
   - deliverable:
-    - 新 contract に沿った実装 epic が継続追加できる状態になっている
+    - dependency metadata unification と command mutation の architecture epic が portfolio に追加される
   - exit:
-    - initiative portfolio と epic readiness contract が明確である
+    - SoT/persistence/migration を扱う epic が initiative guardrail 付きで計画化されている
 
 ## Epic ポートフォリオ
 - epic-00033-github-backed-identity-and-adr-mirror-workflow:
@@ -44,15 +44,25 @@ ID: "init-local-00003"
   - status:
     - planned (current priority)
   - portfolio role:
-    - GitHub issue #33 と連携した current epic。新 contract（GitHub-backed identity mandatory）へ移行するための優先実行対象。
+    - GitHub issue #33 と連携した current epic。新 identity contract（GitHub-backed identity mandatory）への移行を担う。
+- epic-00059-dependency-metadata-unification-and-command-mutation:
+  - 目的:
+    - dependency metadata の SoT を `.meta.json` に統合し、command-based mutation contract を導入する。
+  - metric link:
+    - Metric-001, Metric-003
+  - status:
+    - planned (next priority)
+  - portfolio role:
+    - source-of-truth/persistence boundary/migration を扱う architecture epic の正本。誤作成された `epic-00058` は削除済み（GitHub #58 close 済み）であり、canonical 実装先は `epic-00059` とする。
 
 ## 順序と理由
 - sequencing rationale:
   - initiative では固定的な終点を持たず、epic を追加し続ける。
-  - 当面は `epic-00033` を優先し、新 identity contract と ADR workflow を先に閉じる。
-  - その後に必要な architecture concern を追加 epic として取り込む。
+  - まず `epic-00033` の identity/ADR contract を完了し、次に `epic-00059` で dependency SoT 境界を統合する。
+  - `epic-00059` は reader/schema -> mutation command -> downstream parity/migration -> docs/final review の順で進める。
+  - `epic-00059` の hard cutover judgment は T3 integration で固定し、T4 は docs/dogfooding evidence の確認と final review に限定する。
 - parallelizable:
-  - future epic は追加可能だが、contract-heavy epic は同時多発させない。
+  - 複数 epic の計画は並行可能だが、state boundary を変更する実装 epic は同時本番化しない。
 
 ## 意思決定ゲート
 - G1 initiative scope review:
@@ -61,6 +71,7 @@ ID: "init-local-00003"
   - epic が single coherent contract を持っているか
 - G3 migration boundary review:
   - rebuildable workspace 前提と backward compatibility boundary が明示されているか
+  - hard cutover judgment を T4 へ持ち越さず、T3 integration で固定する guardrail が保たれているか
 - G9 final initiative plan review:
   - new epic が initiative goal に沿っているか
 
@@ -69,11 +80,12 @@ ID: "init-local-00003"
   - source-of-truth / generated artifacts / migration boundary が明記されている
   - backward compatibility をどう扱うかが明記されている
   - 実装 issue 分解と順序がある
+  - hard cutover judgment を持つ epic は T3 integration までに判断と entry 条件を固定し、T4 を証跡確認に限定している
 
 ## final exit contract
 - initiative は open-ended のため final close は定義しない。
 - 代わりに、各 epic が initiative guardrail と整合していることを継続条件とする。
-- 当面の milestone exit は `epic-00033` が planning 完了すること。
+- 当面の milestone exit は `epic-00033` の計画実行着手と `epic-00059` の計画化完了。
 
 ## 依存 / ブロッカー
 - D-001:
@@ -82,15 +94,5 @@ ID: "init-local-00003"
   - single GitHub repo 前提の維持
 
 ## 未確定事項
-- Q-001:
-  - 質問:
-    - 次に追加される architecture epic の優先順位付けを initiative plan に都度反映するか。
-  - 選択肢:
-    - A:
-      - 反映する
-    - B:
-      - discussion のみで扱う
-  - 推奨案:
-    - A
-  - 影響範囲:
-    - initiative portfolio maintenance
+- なし:
+  - `epic-00059` の `deps.json` hard cutover judgment は T3 integration で固定し、T4 は docs/dogfooding evidence 確認と final review に限定する。
