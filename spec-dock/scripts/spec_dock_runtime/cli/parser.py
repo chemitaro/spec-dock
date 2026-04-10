@@ -48,6 +48,9 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(active_sub.add_parser("show", help="Show current active pointers"), registry, "active_show")
     _bind_leaf(active_sub.add_parser("clear", help="Clear active pointers"), registry, "active_clear")
 
+    _bind_leaf(sub.add_parser("delete", help="Delete local spec nodes with safeguards"), registry, "delete")
+    _bind_leaf(sub.add_parser("close", help="Close the linked GitHub issue for a node target"), registry, "close")
+
     _bind_leaf(
         sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)"),
         registry,

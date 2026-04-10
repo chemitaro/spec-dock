@@ -4,10 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..application.check_deps import check_deps as application_check_deps
+from ..application.close_node import close_node as application_close_node
 from ..application.create_node import create_discussion_doc as application_create_discussion_doc
 from ..application.create_node import create_epic as application_create_epic
 from ..application.create_node import create_initiative as application_create_initiative
 from ..application.create_node import create_issue as application_create_issue
+from ..application.delete_node import delete_node as application_delete_node
 from ..application.doctor import doctor as application_doctor
 from ..application.contracts import UseCases
 from ..application.import_node import import_epic as application_import_epic
@@ -51,6 +53,9 @@ class _NodeRepository:
 
     def write_meta(self, dest_dir: Path, record):
         infra_fs_repo.write_meta(dest_dir, record)
+
+    def delete_tree(self, node_path: Path) -> None:
+        infra_fs_repo.delete_tree(node_path)
 
     def backfill_github_repo_scope(self, meta_path: Path, *, repo_owner: str, repo_name: str) -> bool:
         return infra_fs_repo.backfill_github_repo_scope(
@@ -101,6 +106,13 @@ class _IssueGateway:
 
     def issue_view_snapshot(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
         return infra_github_cli.issue_view_snapshot(
+            repo_root,
+            issue_number=issue_number,
+            repo_slug=repo_slug,
+        )
+
+    def issue_close(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
+        return infra_github_cli.issue_close(
             repo_root,
             issue_number=issue_number,
             repo_slug=repo_slug,
@@ -217,6 +229,8 @@ def build_runtime(specdock_dir: Path) -> BootstrapContext:
         clear_active=lambda req: application_clear_active(req, ports),
         sync=lambda req: application_sync(req, ports),
         check_deps=lambda req: application_check_deps(req, ports),
+        delete_node=lambda req: application_delete_node(req, ports),
+        close_node=lambda req: application_close_node(req, ports),
         validate_tree=lambda req: application_validate_tree(req, ports),
         doctor=lambda req: application_doctor(req, ports),
     )

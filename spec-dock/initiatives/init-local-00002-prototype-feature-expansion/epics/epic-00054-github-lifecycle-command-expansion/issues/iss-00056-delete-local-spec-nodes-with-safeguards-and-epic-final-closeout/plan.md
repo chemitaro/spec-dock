@@ -5,7 +5,7 @@ ID: "iss-00056"
 関連GitHub: ["#56"]
 状態: "draft | approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-09"
+最終更新: "2026-04-10"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -52,6 +52,11 @@ ID: "iss-00056"
     - parent recursive delete と epic final close-out を完了する
   - exit:
     - subtree delete、docs parity、`validate` / `sync --github`、issue56 report を正本とした epic final close-out evidence が完了する
+- M4:
+  - 対象:
+    - live manual defect remediation と regression re-validation を完了する
+  - exit:
+    - target `.meta.json` parse failure 時の `delete --json` が structured payload を返し、manual rerun で defect が再現しない
 
 ## 実装順序の根拠
 - 依存関係の正本:
@@ -59,9 +64,10 @@ ID: "iss-00056"
 - sequencing rule:
   - upstream / prerequisite / lower-dependency slice から先に step を組む
   - downstream / dependent slice は前提が固まってから置く
-- step ordering notes:
+  - step ordering notes:
   - S01 で destructive preflight と subtree-wide remote-close barrier と delete seam を固めてからでないと、S02/S03 の実行順が不安定になる
   - S02 は leaf issue delete を先に通し、S03 で parent recursive と epic close-out を載せる
+  - live manual defect は close-out 後に見つかったため、既存 S01-S03 の記録は保持したまま S04 で remediation と rerun を積み増す
   - S90/S99 は issue56 自身と epic final close-out の両方を閉じるため必須
 
 ## ステップ一覧
@@ -103,11 +109,21 @@ ID: "iss-00056"
     - RG3
     - QG3
     - SG3
+- S04:
+  - 観測可能な振る舞い:
+    - target-local metadata edge でも `delete --json` の structured contract が崩れず、manual rerun で live defect が解消される
+  - closes:
+    - live-manual-defect-01
+  - review gate:
+    - RG4
+    - QG4
+    - SG4
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S02
 - AC-002 -> S03
 - AC-003 -> S03
+- live-manual-defect-01 -> S04
 - EC-001 -> S01
 - EC-002 -> S01
 - EC-003 -> S01
@@ -175,6 +191,21 @@ ID: "iss-00056"
     - issue56 の final close-out gate が epic-00054 の acceptance を閉じているか
   - commit gate:
     - pass まで review loop を回し、pass 後に `report.md` を更新してドキュメントだけをコミットする
+- RG4 implementation review:
+  - timing:
+    - S04 完了後
+  - scope:
+    - delete command の target-local metadata parse failure 正規化、CLI wrapper 例外処理、manual defect remediation
+- QG4 QA review:
+  - timing:
+    - S04 完了後
+  - scope:
+    - `delete --json` target metadata edge regression、manual defect rerun sufficiency
+- SG4 spec review:
+  - timing:
+    - S04 完了後
+  - scope:
+    - live manual defect が requirement/design の machine-readable contract と整合する形で解消されているか
 
 ## 実行ルール（全ステップ共通）
 - plan 全体は実装着手前に承認する。
@@ -228,6 +259,7 @@ ID: "iss-00056"
 ##### I1 — active/deps/recursive/path-missing guardrails
 - slice goal:
   - mutation 前に selector と local guardrail で block すべきケースをすべて弾く
+  - staged implementation note として、all-local-guardrails-pass かつ `--yes` 済みの経路は S01 I1 では `confirmation_required` interim placeholder で観測してよい
 
 ###### Red
 - failing test:
@@ -258,6 +290,7 @@ ID: "iss-00056"
   - missing-target error payload contract
   - confirmation-required error payload contract
   - bounded `--force` contract
+  - interim placeholder としての preflight-ready path
 - pass condition:
   - selector / guardrail / status payload / exit-code tests が通る
 
@@ -318,6 +351,7 @@ ID: "iss-00056"
   - issue delete command path
   - remote close-only
   - local leaf directory removal
+  - issue-target partial-failure handling after local delete
 - design refs:
   - `design.md` の `インターフェース契約`
   - `design.md` の `変更計画`
@@ -337,6 +371,7 @@ ID: "iss-00056"
 ##### I1 — issue delete success path
 - slice goal:
   - issue target delete が explicit `--yes` 下で remote close-only と local delete を一貫して実行する
+  - issue target の post-delete active repair failure も structured partial-failure として観測できる
 
 ###### Red
 - failing test:
@@ -368,8 +403,10 @@ ID: "iss-00056"
 - expected tests:
   - issue delete integration
   - remote close-only assertions
+  - issue-target remote close failure keeps local tree unchanged
   - filesystem assertions
   - `--json` payload assertions
+  - `local_delete_partial_failure` payload / exit-code assertions
 - report update:
   - reviewer verdict / test結果 / 修正内容 / no-op 理由を `./spec-dock/active/issue/report.md` に残す
 - commit:
@@ -472,6 +509,93 @@ ID: "iss-00056"
   - `sync --github`
 - report update:
   - reviewer verdict / test結果 / 修正内容 / final close-out evidence を `./spec-dock/active/issue/report.md` に残す
+- commit:
+  - report 更新後に差分確認し、この stage の差分とまとめてコミットする
+
+### S04 — live manual defect remediation and rerun
+- target:
+  - `delete --json` target-local metadata edge remediation
+  - targeted regression tests
+  - live manual rerun
+- design refs:
+  - `design.md` の `インターフェース契約`
+  - `design.md` の `preflight / mutation state machine`
+- step boundary:
+  - 既存 S01-S03 の記録は書き換えない
+  - remediation は追補 step として積み増す
+
+#### B1 — structured json remediation
+- purpose:
+  - target `.meta.json` parse failure でも `delete --json` が plain error text へ逃げないようにする
+- files:
+  - delete command implementation
+  - application seam
+  - targeted tests
+
+##### I1 — target-local metadata edge normalization
+- slice goal:
+  - `node_reader.load_node_records()` の例外を delete 専用に吸収し、target-local metadata edge を `metadata_validation_failed` へ正規化する
+
+###### Red
+- failing test:
+  - broken target `.meta.json` + `delete --id <target> --yes --json` returns structured JSON
+  - same edge with positional `<target>` returns structured JSON
+  - unrelated malformed node still does not hijack selector outcome
+- expected failure:
+  - current live defect (`plain error text`) が再現する
+
+###### Green
+- minimum implementation:
+  - delete wrapper/application seam で target-local metadata parse failure の fallback normalize
+  - existing `metadata_validation_failed` field matrix を再利用
+- pass condition:
+  - targeted automated regressions が通る
+
+###### Refactor
+- 目的:
+  - delete 以外の command contract を壊さず、exception-to-result 境界を明確にする
+- guardrail:
+  - `--json` 時の stdout JSON 1件 contract を維持する
+
+#### B2 — manual rerun and evidence closure
+- purpose:
+  - live manual defect の再現条件で再テストし、summary/checklist を更新する
+- files:
+  - manual-tests reports
+  - issue report
+
+##### I1 — targeted manual rerun
+- slice goal:
+  - mt-08 を中心に live rerun を行い、manual summary を partial-pass から pass へ更新する
+
+###### Red
+- failing test:
+  - existing manual evidence で defect-1 が再現済み
+- expected failure:
+  - old summary remains `partial-pass`
+
+###### Green
+- minimum implementation:
+  - targeted live rerun
+  - execution-log/checklist/summary 更新
+- pass condition:
+  - mt-08 が pass になり、critical scenarios を含む overall verdict が pass になる
+
+###### Refactor
+- 目的:
+  - manual defect report と code change の traceability を残す
+- guardrail:
+  - manual evidence path を固定し、previous run との差分が読める状態にする
+
+#### step gate
+- review:
+  - RG4 / QG4 / SG4
+- expected tests:
+  - targeted delete metadata-edge regression
+  - affected delete command runtime tests
+  - live manual rerun (`mt-08`, 必要なら related scenarios)
+- report update:
+  - reviewer verdict / manual rerun結果 / defect closure を `./spec-dock/active/issue/report.md` に追記する
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
