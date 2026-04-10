@@ -229,6 +229,15 @@ def validate_deps_cycles(issue_depends_on_map: dict[str, list[str]]) -> None:
                 stack.append((dep_id, 0))
 
 
+def issue_dependency_exists(
+    issue_depends_on_map: dict[str, list[str]],
+    *,
+    from_issue_id: str,
+    to_issue_id: str,
+) -> bool:
+    return to_issue_id in issue_depends_on_map.get(from_issue_id, [])
+
+
 def evaluate_readiness(
     graph: SpecGraph,
     issue_depends_on_map: dict[str, list[str]],

@@ -3,12 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from ..domain.deps import validate_deps_cycles
+from ..domain.deps import issue_dependency_exists
 from ..domain.models import SpecNodeSeed, SpecNodeKind
 from ..domain.tree import build_graph
+from ..domain.validation import ensure_current_graph_and_deps_valid
 from ..infra.contracts import StoredMetaRecord
 from .contracts import MutateDepsRequest, MutateDepsResult
 from .ports import Ports
+from .repo_context import resolve_current_repo_slug
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -47,7 +49,14 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
     records = ports.node_reader.load_node_records()
     graph = build_graph([_to_spec_node_seed(record) for record in records])
     topology = ports.deps_topology_reader.load_issue_depends_on_map(_resolve_specdock_dir(ports), graph)
-    validate_deps_cycles(dict(topology.issue_depends_on_map))
+    issue_depends_on_map = dict(topology.issue_depends_on_map)
+    ensure_current_graph_and_deps_valid(
+        graph,
+        issue_depends_on_map,
+        repo_root=ports.repo_root,
+        current_repo_slug=resolve_current_repo_slug(ports),
+        enforce_github_mandatory_linkage=False,
+    )
 
     from_node = graph.nodes_by_id.get(req.from_id)
     to_node = graph.nodes_by_id.get(req.to_id)
@@ -63,6 +72,20 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
     add_issue_dependency = getattr(ports.node_repo, "add_issue_dependency", None)
     if not callable(add_issue_dependency):
         raise RuntimeError("add_issue_dependency is not configured")
+
+    if issue_dependency_exists(
+        issue_depends_on_map,
+        from_issue_id=from_node.id,
+        to_issue_id=to_node.id,
+    ):
+        return MutateDepsResult(
+            action=req.action,
+            from_id=from_node.id,
+            to_id=to_node.id,
+            result="unchanged",
+            warnings=[],
+        )
+
     add_issue_dependency(from_node.meta_path, to_node.id)
 
     return MutateDepsResult(
