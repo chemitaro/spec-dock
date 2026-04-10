@@ -18,17 +18,20 @@ ID: "iss-00062"
 ## 背景・現状
 - 現状の挙動:
   - `epic-00059` の requirement / design / plan で、dependency metadata の SoT を `.meta.json` に統一し、hard cutover judgment を T3 で固定する方針は決まっている。
-  - 一方で downstream contract を持つ `application/delete_node.py`、`application/set_active.py`、`application/sync_state.py`、`application/validate_tree.py` は、issue レベルではまだ `.meta.json` SoT への parity 要件と cutover evidence owner が具体化されていない。
-  - `spec-dock/docs/reference_deps.md` と `spec-dock/docs/reference_sync.md` は `deps.json` を前提にした記述を残しており、checked-in dogfooding data にも `spec-dock/initiatives/**/deps.json` が残っている。
+  - `iss-00060` により `infra/deps_reader.py` は `.meta.json` を唯一の dependency read source とする契約へ移行済みで、`iss-00061` により `deps add/remove` の mutation contract と provider-side `reference_deps.md` 正本更新も完了している。
+  - downstream command のうち `application/set_active.py`、`application/sync_state.py`、`application/validate_tree.py` はすでに shared topology reader を消費しているが、`application/delete_node.py` の dependency scrub はなお `deps.json` を直接読み書きしている。
+  - `reference_sync.md` / `workflow_issue.md` には T3/T4 owner split、manual fix 手順、`iss-00062/report.md` fixed-key contract がまだ織り込まれておらず、checked-in dogfooding data と provider-side templates / init-update coverage には `deps.json` が残っている。
 - 現状の課題:
-  - mutation contract が `iss-00061` で固定されても、downstream command が同じ dependency graph を観測しなければ E-RQ-004 は閉じない。
+  - mutation contract が `iss-00061` で固定されても、delete scrub と scaffold/template 側が legacy `deps.json` を残したままでは E-RQ-004 の downstream parity と cutover readiness は閉じない。
+  - `set_active` / `sync` / `validate` は shared topology reader に寄っているため、T3 では広い再実装ではなく targeted regression による parity lock と mismatch 時のみの最小修正が必要である。
   - docs 更新、dogfooding checked-in data manual fix、`./spec-dock/scripts/spec-dock validate` / `sync` evidence が揃わない限り、hard cutover judgment は固定できない。
   - T3 / T4 の owner split が issue レベルで明文化されていないと、T4 が T3 judgment を再定義する余地が残る。
 - 再現手順:
   1. `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/{requirement.md,design.md,plan.md}` を確認する。
   2. `spec-dock/docs/reference_deps.md` と `spec-dock/docs/reference_sync.md` を確認する。
   3. `find spec-dock/initiatives -name 'deps.json' | sort` を実行し、checked-in dogfooding data に legacy file が残っていることを確認する。
-  4. `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{application,infra}` 配下の downstream module を確認する。
+  4. `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{application,infra}` 配下の downstream module を確認し、`delete_node.py` だけが legacy scrub path を保持していることを確認する。
+  5. `src/spec_dock/assets/spec_dock/templates/*/deps.json` と `tests/test_init_update.py` を確認し、新規 scaffold / update coverage でも legacy file がまだ seeded されることを確認する。
 - 観測点:
   - CLI:
     - `./spec-dock/scripts/spec-dock validate`
@@ -43,6 +46,8 @@ ID: "iss-00062"
   - `epic-00059/requirement.md`
   - `epic-00059/design.md`
   - `epic-00059/plan.md`
+  - `iss-00060/report.md`
+  - `iss-00061/report.md`
   - `epic-00059/discussions/20260410t013236z-disc-cutover-entry-criteria-and-remove-response.md`
   - `spec-dock/docs/workflow_issue.md`
   - `spec-dock/docs/phase_requirement.md`
@@ -62,9 +67,10 @@ ID: "iss-00062"
 ## スコープ
 - MUST:
   - `application/delete_node.py` の dependency scrub contract を `.meta.json` SoT と整合させる。
-  - `application/set_active.py`、`application/sync_state.py`、`application/validate_tree.py` の dependency 解釈を単一 SoT に揃え、parity test で固定する。
+  - `application/set_active.py`、`application/sync_state.py`、`application/validate_tree.py` の dependency 解釈が単一 SoT にそろっていることを targeted regression で固定し、mismatch が見つかった場合のみ最小修正する。
   - cutover boundary tests を追加し、legacy `deps.json` 残存時の boundary と manual-fix 前提を明示する。
   - provider-side docs 正本 `src/spec_dock/assets/spec_dock/docs/reference_deps.md`、`src/spec_dock/assets/spec_dock/docs/reference_sync.md`、`src/spec_dock/assets/spec_dock/docs/workflow_issue.md` と、その dogfooding docs mirror `spec-dock/docs/reference_deps.md`、`spec-dock/docs/reference_sync.md`、`spec-dock/docs/workflow_issue.md` に、dependency SoT、manual fix、`validate` / `sync` evidence、report ownership contract を反映する。
+  - provider-side templates / init-update coverage が cutover 後に legacy `deps.json` を再生成しないよう、`src/spec_dock/assets/spec_dock/templates/*/deps.json` と `tests/test_init_update.py` を整合させる。
   - checked-in dogfooding data 配下の legacy dependency data を manual fix し、cutover に追従させる。
   - `iss-00062/report.md` に hard cutover entry 条件、evidence bundle、targeted regression summary、judgment verdict を固定キーで記録できる schema を定義する。
 - MUST NOT:
@@ -101,6 +107,7 @@ ID: "iss-00062"
 ## 前提
 - `iss-00060` が `.meta.json` dependency schema と reader alignment の基盤を提供する。
 - `iss-00061` が `deps add/remove` mutation contract を固定する。
+- upstream prerequisite の実装完了判定は `iss-00060` / `iss-00061` の issue-level `report.md` と provider-side source / tests を権威ソースとし、front matter の状態表示だけでは判定しない。
 - `iss-00063` は T3 judgment fixed 後の final closure owner として後続に控えている。
 
 ## 受け入れ条件
@@ -159,6 +166,19 @@ ID: "iss-00062"
     - `requirement.md`
     - `design.md`
     - `plan.md`
+- AC-005 scaffold/template cutover parity:
+  - Actor:
+    - maintainer
+  - Given:
+    - provider-side shipped scaffold と init/update coverage が存在する。
+  - When:
+    - cutover readiness の観点で template / installer contract を確認する。
+  - Then:
+    - new init/update path は node-scoped legacy `deps.json` を再生成しない。
+    - `.meta.json` only contract と checked-in dogfooding data manual fix 方針が矛盾しない。
+  - 観測点:
+    - `src/spec_dock/assets/spec_dock/templates/*`
+    - `tests/test_init_update.py`
 
 ## 例外・エッジケース
 - EC-001:
@@ -191,6 +211,14 @@ ID: "iss-00062"
   - 観測点:
     - targeted runtime test
     - `report.md`
+- EC-005:
+  - 条件:
+    - downstream runtime parity は取れているが、template / init-update path が legacy `deps.json` を再生成する。
+  - 期待:
+    - hard cutover judgment は fixed に進めず、template / test contract を修正する。
+  - 観測点:
+    - `src/spec_dock/assets/spec_dock/templates/*`
+    - `tests/test_init_update.py`
 
 ## 入力→出力例
 - EX-001:
