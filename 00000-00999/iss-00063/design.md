@@ -5,7 +5,7 @@ ID: "iss-00063"
 関連GitHub: ["#63"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-04-10"
+最終更新: "2026-04-11"
 依存: ["requirement.md"]
 親: ["epic-00059", "init-local-00003"]
 ---
@@ -23,7 +23,7 @@ ID: "iss-00063"
     - final regression suite の正本、review-only inherited item、rerun-required item、pass 条件、記録先を fixed contract として設計に落とす。
     - `same dependency graph` の canonical graph 表現、command ごとの観測値、mismatch 条件を fixed contract として設計に落とす。
     - evidence 欠落時の blocker path を明記する。
-    - `iss-00062/report.md` completed state を T4 close-out execution の開始前提として明記する。
+    - `iss-00062/report.md` 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） を T4 close-out execution の開始前提として明記し、本文 evidence と frontmatter/status が不整合な場合の blocker path を明記する。
   - MUST NOT:
     - T3 evidence の primary ownership を奪わない。
     - source code / runtime contract 変更を plan に含めない。
@@ -34,7 +34,7 @@ ID: "iss-00063"
   - epic `report.md` を更新できるのは S04 close reporting step のみとし、S02/S03/S90 は issue `report.md` だけを更新対象にする。
   - `workflow_issue.md` に従い、required command / review / report update が pass しない限り complete にしない。
 - 前提:
-  - `iss-00062/report.md` が hard cutover judgment の正本として存在し、template / placeholder ではない completed state になっている。
+  - `iss-00062/report.md` が hard cutover judgment の正本として存在し、template / placeholder ではなく本文 evidence を持っている。
   - T4 では docs/report 更新と command evidence 取得のみを扱う。
 
 ## 既存実装 / 規約の理解
@@ -48,6 +48,7 @@ ID: "iss-00063"
 - 現状理解:
   - epic plan は `iss-00063` を T4 closure owner と定義し、deliverable を final regression suite、parity confirmation、T3 evidence bundle review / packaging、T4 issue `report.md`、epic `report.md` に固定している。
   - T3 issue `report.md` は hard cutover judgment の正本であり、T4 はその entry 条件を再充足するのではなく、最終回帰・parity・spec review をもって epic close 可能性を判断する。
+  - current repo では `iss-00062/report.md` に cutover judgment と focused suite の実測記録が残っている一方、frontmatter/status はなお `draft` のため、T4 では metadata/status 整合確認を prerequisite に含め、未解消の間は blocker として停止する必要がある。
   - issue workflow 上、close-out evidence と reviewer verdict は `report.md` に残す必要がある。
 - 採用するパターン:
   - report-centered closure pattern:
@@ -98,7 +99,7 @@ ID: "iss-00063"
 - 実装起点:
   - 先に T3/T4 ownership と required evidence surface を固定し、その後に regression / parity / review / report の順で close path を組む。
 - sequencing implications:
-  - plan では S01 で issue docs を固定し、`iss-00062/report.md` completed state を確認してから S02 で command / regression evidence、S03 で T3 bundle review / packaging、S04 で close record / close summary、最後に docs refresh と final diff review を置く。
+  - plan では S01 で issue docs を固定し、`iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合することを確認してから S02 で command / regression evidence、S03 で T3 bundle review / packaging、S04 で close record / close summary、最後に docs refresh と final diff review を置く。
   - S02/S03/S90 は epic `report.md` を更新しない。epic `report.md` の更新は S04 close reporting にのみ属する。
 
 ### UML（必須: module / dependency）
@@ -141,15 +142,17 @@ t4 --> epic : close summary only
   - source of truth:
     - 本 issue `requirement.md` AC-001 / TERM-002 を suite 正本とし、実行時 evidence の正本は T4 issue `report.md` に置く。
   - review-only inherited item:
-    - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 -v`
+    - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate -v`
     - `python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_validate_s02 -v`
-    - `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_fails_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity -v`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_reference_deps_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity -v`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets`
   - rerun-required item:
     - `./spec-dock/scripts/spec-dock sync`
     - `./spec-dock/scripts/spec-dock validate`
     - `./spec-dock/scripts/spec-dock active set <target-id>`。`<target-id>` は `iss-00062/report.md` で active parity 観測対象として固定済みの id を参照する。
   - substitution rule:
-    - review-only inherited item は、`iss-00062/report.md` に command line、exit code、pass verdict、対象 test 名が揃っている場合だけ T4 review で代替できる。
+    - review-only inherited item は、`iss-00062/report.md` に command line、exit code、pass verdict、対象 test 名が揃っている場合だけ T4 の evidence review で代替できる。step gate の rerun-required test には含めない。
+    - `python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 -v` は `iss-00062/report.md` S02 の flaky-check subset であり、fixed inherited suite には含めない。T4 では supplemental evidence としてのみ参照できる。
     - rerun-required item は T4 で再実行し、review だけで代替してはならない。
   - pass rule:
     - review-only inherited item が全件 traceable で、rerun-required item が全件 pass し、いずれも T4 issue `report.md` に verdict を残した場合だけ suite `pass` とする。
@@ -203,7 +206,7 @@ t4 --> epic : close summary only
     - evidence 欠落
     - required command failure
     - report 間の close claim mismatch
-    - `iss-00062/report.md` incomplete または active parity 用 `<target-id>` 不明
+    - `iss-00062/report.md` incomplete、frontmatter/status と本文 evidence の不整合、または active parity 用 `<target-id>` 不明
   - behavior:
     - `report.md` に blocker / next action を残し、epic close を止める
   - owner:
@@ -252,7 +255,7 @@ t4 --> epic : close summary only
   - final regression suite の review-only inherited item traceability 確認
   - `set-active` / `sync` / `validate` の parity confirmation
 - E2E / manual:
-  - `iss-00062/report.md` completed state の prerequisite check
+  - `iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合する prerequisite check
   - T3 issue `report.md` の evidence bundle review
   - T4 issue `report.md` final parity/spec review record 作成
   - S04 での epic `report.md` close summary review
@@ -277,7 +280,7 @@ t4 --> epic : close summary only
 - mitigation:
   - T3 evidence review を独立 step にし、欠落時は blocker 化する。
   - epic `report.md` は S04 まで更新しない。
-  - `iss-00062/report.md` completed state を満たさない限り S02 以降へ進まない。
+  - `iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合しない限り S02 以降へ進まず、T4 は blocker 記録だけを残す。
 - rollback:
   - issue docs / report / epic report の差分 revert のみ。runtime contract や T3 judgment には手を触れない。
 

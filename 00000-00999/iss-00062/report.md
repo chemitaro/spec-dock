@@ -3,9 +3,9 @@
 ID: "iss-00062"
 タイトル: "Downstream parity and cutover readiness"
 関連GitHub: ["#62"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-10"
+最終更新: "2026-04-11"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00059", "init-local-00003"]
 ---
@@ -81,6 +81,7 @@ git diff -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-
 ```bash
 python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate -v
 
+- targeted regression exit_code: `0`
 - Ran 151 tests in 37.585s
 - OK
 - RG1 implementation review: pass
@@ -117,8 +118,10 @@ python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_
 python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_validate_s02 -v
 python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 -v
 
+- focused suite exit_code: `0`
 - focused suite: Ran 138 tests in 35.344s
 - focused suite: OK
+- flaky check subset exit_code: `0`
 - flaky check subset: Ran 37 tests in 0.703s
 - flaky check subset: OK
 - RG1 implementation review: pass
@@ -160,9 +163,12 @@ python - <<'PY'
 # SG1-check: required phrases present
 PY
 
+- focused suite exit_code: `0`
 - focused suite: Ran 9 tests
 - focused suite: OK
+- provider/mirror docs diff exit_code: `0`
 - provider/mirror docs diff: 3件とも差分なし
+- SG1-check exit_code: `0`
 - SG1-check: pass
 - SG1 spec review: pass
 ```
@@ -212,9 +218,13 @@ python -m unittest -v \
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 
+- focused suite exit_code: `0`
 - focused suite: Ran 7 tests in 0.607s
 - focused suite: OK
+- active parity target_id: `iss-00062`
+- validate exit_code: `0`
 - validate: `spec-dock: ok (validate) nodes=22`
+- sync exit_code: `0`
 - sync: `spec-dock: ok (sync)` / `active unchanged (matched id in branch: iss-00062)`
 - final RG1 implementation review: pass
 - final QG1 QA review: pass

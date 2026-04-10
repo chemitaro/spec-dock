@@ -5,7 +5,7 @@ ID: "iss-00063"
 関連GitHub: ["#63"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-04-10"
+最終更新: "2026-04-11"
 親: ["epic-00059", "init-local-00003"]
 ---
 
@@ -22,7 +22,7 @@ ID: "iss-00063"
   - T4 issue `iss-00063` は、T3 judgment fixed 後の final regression / parity confirmation / close review を担当する closure tranche と定義されている。
   - T3 issue `report.md` は cutover readiness / judgment の正本であり、T4 はその証跡を review / package したうえで final closure record を作る役割を持つ。
 - 現状の課題:
-  - `iss-00063` の issue docs はテンプレートのままで、T4 closure owner が何を再実行し、何を review し、何を `report.md` / epic `report.md` に残すべきかが固定されていない。
+  - `iss-00063` の issue docs は T4 closure owner 向けの骨格までは埋まっているが、`iss-00062/report.md` の実測証跡に追従した review-only inherited regression suite と、T3 report metadata/status の前提ギャップがまだ固定されていない。
   - final regression / parity confirmation / spec review の責務分界が曖昧なままだと、T3 judgment を再判定したり、逆に E-AC-005 の final close evidence が不足したまま epic close を主張したりする危険がある。
   - `final regression suite` の正本、`same dependency graph` の判定方法、epic `report.md` を更新できる step が曖昧なままだと、reviewer が T3/T4 の owner split を追えない。
 - 再現手順:
@@ -108,7 +108,8 @@ ID: "iss-00063"
 - 新たな uppercase path を作らない。
 
 ## 前提
-- `iss-00062/report.md` が template / placeholder ではなく、hard cutover judgment、docs 更新、dogfooding checked-in data manual fix、`validate` / `sync` evidence を実値で記録した completed state になっている。
+- `iss-00062/report.md` が template / placeholder ではなく、hard cutover judgment、docs 更新、dogfooding checked-in data manual fix、`validate` / `sync` evidence を実値で記録している。
+- T4 が S02 へ進むには、`iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合している必要がある。status mismatch が残る間は T4 は S01 の blocker 記録までしか行わず、S02 以降へ進まない。
 - T4 は T3 judgment fixed 後の repo state を対象に close-out を行う。
 - 必要な product change が残っていれば、その時点で本 issue は `blocked` または `未完了` であり close 不可である。
 
@@ -118,15 +119,17 @@ ID: "iss-00063"
     - 本 issue `requirement.md` の AC-001 と TERM-002。実行時の詳細記録先は T4 issue `report.md` の final regression section とする。
   - suite item:
     - review-only inherited targeted regression:
-      - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 -v`
+      - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate -v`
       - `python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_validate_s02 -v`
-      - `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_fails_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity -v`
+      - `python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_reference_deps_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity -v`
+      - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets`
     - rerun-required final commands:
       - `./spec-dock/scripts/spec-dock sync`
       - `./spec-dock/scripts/spec-dock validate`
       - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `<target-id>` は `iss-00062/report.md` に active parity の観測対象として記録済みの id を使う。id が記録されていなければ blocker とする。
   - review substitution scope:
-    - T3 で pass 済みの targeted regression は `iss-00062/report.md` の command line、exit code、pass verdict、対象 test 名が揃っている場合に限り、T4 では review-only で代替できる。
+    - T3 で pass 済みの targeted regression は `iss-00062/report.md` の command line、exit code、pass verdict、対象 test 名が揃っている場合に限り、T4 では review-only evidence として扱う。rerun gate には含めない。
+    - `python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 -v` は `iss-00062/report.md` S02 の flaky-check subset であり、fixed inherited suite には含めない。T4 では supplemental evidence としてのみ参照できる。
     - T4 では `sync` / `validate` / 必要時 `active set` の final command evidence を review だけで代替してはならない。
   - pass 条件:
     - review-only inherited targeted regression がすべて `iss-00062/report.md` から追える。
@@ -158,7 +161,7 @@ ID: "iss-00063"
   - Actor:
     - T4 closure owner / reviewer
   - Given:
-    - T3 issue `report.md` に hard cutover judgment evidence があり、`iss-00062/report.md` completed state が確認できる
+    - T3 issue `report.md` に hard cutover judgment evidence があり、`iss-00062/report.md` 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） が確認できる
   - When:
     - T4 が fixed final regression suite を実行または review し、その対象、結果、判定を issue `report.md` に記録する
   - Then:
@@ -238,7 +241,7 @@ ID: "iss-00063"
     - 両 report の記述差分
 - EC-004:
   - 条件:
-    - `iss-00062/report.md` が incomplete、または final regression suite の review-only inherited item を追跡できない
+    - `iss-00062/report.md` が incomplete、frontmatter/status と本文 evidence が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合しない、または final regression suite の review-only inherited item を追跡できない
   - 期待:
     - T4 は S04 へ進まず `blocked` と next action を記録し、epic `report.md` を更新しない
   - 観測点:
@@ -261,7 +264,7 @@ ID: "iss-00063"
     - `iss-00062/report.md` に集約された hard cutover judgment、docs 更新、manual fix、`validate` / `sync` evidence 一式。
 - TERM-002:
   - final regression suite:
-    - T4 で最終 close 前に確認する固定 regression test / command 群。review-only inherited targeted regression 3 件と rerun-required final command 2-3 件で構成し、T3 judgment を再判定せず close readiness だけを再確認する。
+    - T4 で最終 close 前に確認する固定 regression test / command 群。review-only inherited targeted regression 4 件と rerun-required final command 2-3 件で構成し、T3 judgment を再判定せず close readiness だけを再確認する。
 - TERM-003:
   - parity confirmation:
     - `set-active` / `sync` / `validate` が、`.meta.json` SoT 由来の正規化 `issue_depends_on_map` を同じ graph 表現として観測していることの最終確認。
