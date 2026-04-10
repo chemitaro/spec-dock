@@ -9,6 +9,7 @@
   "parent_id": "epic-00054",
   "initiative_id": "init-local-00002",
   "epic_id": "epic-00054",
+  "depends_on": [],
   "_spec_dock": {
     "managed": true,
     "do_not_edit": true,

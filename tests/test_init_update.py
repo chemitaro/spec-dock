@@ -261,6 +261,77 @@ class TestInitUpdate(CliRuntimeHarness):
         "generated_by": "spec-dock update",
         "updated_at": "2026-04-06T00:00:00Z",
     }
+    _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00050-host-adapter-scaffold-and-final-parity/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00051-host-native-shim-deployment-and-validation-closure/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00052-reject-non-canonical-git-issue-targets/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00055-close-linked-github-issues-from-specdock-command/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00035-sync-adr-symlink-mirror/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00037-migration-guardrails-and-validation-hardening/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00060-meta-json-dependency-schema-and-reader-alignment/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json",
+    )
+    _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00050-host-adapter-scaffold-and-final-parity/.meta.json": [
+            "iss-00049"
+        ],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00051-host-native-shim-deployment-and-validation-closure/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00052-reject-non-canonical-git-issue-targets/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00055-close-linked-github-issues-from-specdock-command/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00035-sync-adr-symlink-mirror/.meta.json": [
+            "iss-00036"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00036-timestamp-based-discussion-and-adr-naming/.meta.json": [
+            "iss-00034"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00037-migration-guardrails-and-validation-hardening/.meta.json": [
+            "iss-00034",
+            "iss-00036",
+            "iss-00035",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00038-docs-dogfooding-parity-and-final-regression-gate/.meta.json": [
+            "iss-00034",
+            "iss-00036",
+            "iss-00035",
+            "iss-00037",
+            "iss-00040",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00040-sync-fail-closed-hardening-and-test-realignment/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00060-meta-json-dependency-schema-and-reader-alignment/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json": [],
+    }
+    _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
+        "iss-00035": ["iss-00036"],
+        "iss-00036": ["iss-00034"],
+        "iss-00037": ["iss-00034", "iss-00035", "iss-00036"],
+        "iss-00038": ["iss-00034", "iss-00035", "iss-00036", "iss-00037", "iss-00040"],
+        "iss-00050": ["iss-00049"],
+    }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
         r"|^\s*(schema_version|projection|nodes|issues|deps|source|updated_at)\s*="
@@ -1108,6 +1179,256 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
+
+    def test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        initiatives_root = repo_root / "spec-dock" / "initiatives"
+        self.assertTrue(
+            initiatives_root.is_dir(),
+            f"checked-in dogfooding initiatives tree missing: {initiatives_root}",
+        )
+        meta_paths = sorted(initiatives_root.rglob(".meta.json"))
+        self.assertGreater(
+            len(meta_paths),
+            0,
+            f"checked-in dogfooding initiatives tree is empty of .meta.json: {initiatives_root}",
+        )
+        observed_meta_paths = [meta_path.relative_to(repo_root).as_posix() for meta_path in meta_paths]
+        self.assertEqual(
+            observed_meta_paths,
+            list(self._CHECKED_IN_DOGFOODING_META_JSON_PATHS),
+            "checked-in dogfooding .meta.json path set diverged from cutover snapshot",
+        )
+
+        legacy_deps_paths = sorted(
+            path.relative_to(repo_root).as_posix() for path in initiatives_root.rglob("deps.json")
+        )
+        self.assertEqual(
+            legacy_deps_paths,
+            [],
+            f"checked-in dogfooding initiatives still contain legacy deps.json: {legacy_deps_paths}",
+        )
+
+        missing_depends_on_paths: list[str] = []
+        non_list_depends_on_paths: list[str] = []
+        observed_depends_on_by_meta_path: dict[str, list[object]] = {}
+        for meta_path in meta_paths:
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            rel_meta_path = meta_path.relative_to(repo_root).as_posix()
+            if "depends_on" not in payload:
+                missing_depends_on_paths.append(rel_meta_path)
+                continue
+            depends_on = payload["depends_on"]
+            if not isinstance(depends_on, list):
+                non_list_depends_on_paths.append(rel_meta_path)
+                continue
+            observed_depends_on_by_meta_path[rel_meta_path] = depends_on
+        self.assertEqual(
+            missing_depends_on_paths,
+            [],
+            "checked-in dogfooding .meta.json missing explicit depends_on: "
+            f"{missing_depends_on_paths}",
+        )
+        self.assertEqual(
+            non_list_depends_on_paths,
+            [],
+            "checked-in dogfooding .meta.json has non-list depends_on values: "
+            f"{non_list_depends_on_paths}",
+        )
+        self.assertEqual(
+            observed_depends_on_by_meta_path,
+            self._CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH,
+            "checked-in dogfooding depends_on values diverged from cutover baseline",
+        )
+
+    def test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
+        self.assertTrue(
+            checked_in_initiatives_root.is_dir(),
+            f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}",
+        )
+        self.assertGreater(
+            len(list(checked_in_initiatives_root.rglob(".meta.json"))),
+            0,
+            "checked-in dogfooding initiatives tree must contain .meta.json before runtime cutover checks",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+
+            target_initiatives_root = target / "spec-dock" / "initiatives"
+            shutil.rmtree(target_initiatives_root)
+            shutil.copytree(checked_in_initiatives_root, target_initiatives_root)
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+
+            sync_result = self._run_runtime_capture(target, ["sync"])
+            self.assertEqual(
+                sync_result.returncode,
+                0,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
+
+            runtime_map_check_code = f"""
+import json
+import sys
+from pathlib import Path
+
+runtime_scripts_dir = Path({str(target / "spec-dock" / "scripts")!r})
+specdock_dir = Path({str(target / "spec-dock")!r})
+sys.path.insert(0, str(runtime_scripts_dir))
+try:
+    from spec_dock_runtime.application import contracts as app_contracts
+    from spec_dock_runtime.cli import bootstrap as runtime_bootstrap
+finally:
+    sys.path.pop(0)
+
+runtime = runtime_bootstrap.build_runtime(specdock_dir)
+result = runtime.use_cases.sync(
+    app_contracts.SyncRequest(
+        force=False,
+        github_enabled=False,
+        issue_limit=200,
+        update_active_from_branch=False,
+    )
+)
+if result.artifact_failure is not None:
+    raise AssertionError(f"runtime sync artifact failure: {{result.artifact_failure}}")
+
+expected_non_empty = {json.dumps(self._CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP, ensure_ascii=False)}
+observed_full = result.state.issue_depends_on_map
+observed_non_empty = {{issue_id: deps for issue_id, deps in observed_full.items() if deps}}
+assert observed_non_empty == expected_non_empty, json.dumps(
+    {{
+        "expected_non_empty": expected_non_empty,
+        "observed_non_empty": observed_non_empty,
+        "observed_full": observed_full,
+    }},
+    ensure_ascii=False,
+    indent=2,
+)
+"""
+            runtime_map_result = subprocess.run(
+                [sys.executable, "-c", runtime_map_check_code],
+                cwd=str(target),
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                runtime_map_result.returncode,
+                0,
+                msg=(
+                    "runtime issue_depends_on_map mismatch on cutover snapshot\n"
+                    f"stdout:\n{runtime_map_result.stdout}\n"
+                    f"stderr:\n{runtime_map_result.stderr}"
+                ),
+            )
+
+    def test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        checked_in_initiatives_root = repo_root / "spec-dock" / "initiatives"
+        self.assertTrue(
+            checked_in_initiatives_root.is_dir(),
+            f"checked-in dogfooding initiatives tree missing: {checked_in_initiatives_root}",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._overlay_checked_in_dogfooding_runtime(target)
+
+            target_initiatives_root = target / "spec-dock" / "initiatives"
+            shutil.rmtree(target_initiatives_root)
+            shutil.copytree(checked_in_initiatives_root, target_initiatives_root)
+
+            def _find_issue_meta_path(issue_id: str) -> Path:
+                matches: list[Path] = []
+                for meta_path in target_initiatives_root.rglob(".meta.json"):
+                    payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                    if payload.get("type") == "issue" and payload.get("id") == issue_id:
+                        matches.append(meta_path)
+                self.assertEqual(
+                    len(matches),
+                    1,
+                    f"cutover snapshot must have exactly one issue meta for {issue_id}: {matches}",
+                )
+                return matches[0]
+
+            from_issue_id = "iss-00063"
+            to_issue_id = "iss-00062"
+            from_meta_path = _find_issue_meta_path(from_issue_id)
+            self.assertEqual(
+                json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on"),
+                [],
+                f"expected empty depends_on before deps add on {from_issue_id}",
+            )
+
+            add_result = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_issue_id, "--to", to_issue_id],
+            )
+            self.assertEqual(
+                add_result.returncode,
+                0,
+                msg=f"deps add stdout:\n{add_result.stdout}\ndeps add stderr:\n{add_result.stderr}",
+            )
+            self.assertIn(
+                f"spec-dock: ok (deps add) from={from_issue_id} to={to_issue_id} result=updated",
+                add_result.stdout,
+            )
+            self.assertEqual(
+                json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on"),
+                [to_issue_id],
+                "deps add did not persist expected depends_on edge into .meta.json",
+            )
+
+            remove_result = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_issue_id, "--to", to_issue_id],
+            )
+            self.assertEqual(
+                remove_result.returncode,
+                0,
+                msg=(
+                    f"deps remove stdout:\n{remove_result.stdout}\n"
+                    f"deps remove stderr:\n{remove_result.stderr}"
+                ),
+            )
+            self.assertIn(
+                f"spec-dock: ok (deps remove) from={from_issue_id} to={to_issue_id} result=updated",
+                remove_result.stdout,
+            )
+            self.assertEqual(
+                json.loads(from_meta_path.read_text(encoding="utf-8")).get("depends_on"),
+                [],
+                "deps remove did not clear depends_on edge from .meta.json",
+            )
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (validate)", validate_result.stdout)
+
+            sync_result = self._run_runtime_capture(target, ["sync"])
+            self.assertEqual(
+                sync_result.returncode,
+                0,
+                msg=f"sync stdout:\n{sync_result.stdout}\nsync stderr:\n{sync_result.stderr}",
+            )
+            self.assertIn("spec-dock: ok (sync)", sync_result.stdout)
 
     def test_checked_in_dogfooding_runtime_mirror_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
