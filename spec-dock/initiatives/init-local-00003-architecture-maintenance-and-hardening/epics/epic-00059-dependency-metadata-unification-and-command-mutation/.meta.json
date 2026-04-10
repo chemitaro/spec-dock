@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-00059",
+  "title": "Dependency metadata unification and command mutation",
+  "slug": "dependency-metadata-unification-and-command-mutation",
+  "created_at": "2026-04-10T09:33:01+09:00",
+  "updated_at": "2026-04-10T09:33:01+09:00",
+  "parent_id": "init-local-00003",
+  "initiative_id": "init-local-00003",
+  "epic_id": null,
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 59,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
