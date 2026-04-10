@@ -28,6 +28,7 @@ ID: "iss-00061"
   - failure 時は no-write を保証する。
 - 前提:
   - `.meta.json` schema / reader は `iss-00060` で整列済み。
+  - 実装正本は provider-side shipped runtime（`src/spec_dock/assets/spec_dock/...`）であり、dogfooding runtime copy は verification 対象ではあっても mutation contract の直接実装先ではない。
 
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
@@ -46,8 +47,10 @@ ID: "iss-00061"
 - 現状理解:
   - parser/registry は `deps check` のみを `deps` subtree に束ねている。
   - command 実行結果は `CommandOutcome(exit_code, CliText)` に正規化され、success は stdout、domain/validation failure は stderr へ出す既存流儀がある。
+  - `iss-00060` により `infra/deps_reader.py` は `.meta.json` only へ整列済みで、`deps` / `sync` / `active` の read-side regression も同契約へ追従済みである。
   - dependency graph の評価・cycle 検証は `domain/deps.py` と `domain/validation.py` に既存資産がある。
-  - write path は dependency mutation 用に未整備で、delete 側には局所的な scrub/write が存在する。
+  - `infra/fs_repo.py` の公開 write API は現在 `write_meta(dest_dir, record)` が中心で、dependency mutation 専用 helper は未整備である。
+  - `tests/cli_runtime/test_deps.py` には `test_deps_commands_do_not_mutate_meta_json` があり、mutation command 導入前 baseline として no-write が固定されている。
 - 採用するパターン:
   - `deps` command は既存 `commands/deps.py` に subcommand を追加し、typed args -> application request -> `CommandOutcome` の流れを維持する。
   - validation は application で graph load / current graph preflight を行い、その後に issue node kind 判定と requested mutation の妥当性を判定する。
@@ -79,12 +82,14 @@ ID: "iss-00061"
 ## 依存関係分析
 - upstream / prerequisite:
   - `iss-00060` の `.meta.json` schema / reader contract
+  - `iss-00060/report.md` に記録された close-ready evidence と `S99 verdict: final diff review pass`
   - `application/contracts.py` / `commands/contracts.py` の既存 request-result パターン
   - `domain/deps.py` / `domain/validation.py` の graph validation 資産
 - downstream / dependent:
   - `deps check` の read parity
   - `iss-00062` で扱う delete/sync/active/validate parity と validate evidence / hard cutover judgment
-  - operator docs / command reference
+  - provider-side operator docs / command reference（`src/spec_dock/assets/spec_dock/docs/reference_deps.md`）
+  - dogfooding docs copy（`spec-dock/docs/reference_deps.md`）の secondary verification
 - 実装起点:
   - 依存の少ない起点は application/domain の mutation contract 定義と integration test fixture。
   - その後に parser/handler と presentation、最後に fs write adapter を閉じる。
@@ -130,7 +135,7 @@ Repo --> Reader : shared meta/dependency boundary
   - `application/contracts.py` に `MutateDepsRequest` と `MutateDepsResult` を追加する。
   - `MutateDepsRequest` は `action=add|remove`, `from_id`, `to_id` を持つ。
   - `MutateDepsResult` は少なくとも `action`, `from_id`, `to_id`, `result=updated|unchanged`, `warnings` を持つ。
-  - error は exception または validation result から command handler が `stderr` / non-zero に正規化する。
+  - mutation 起因の error は generic `RuntimeError` fallback に流さず、command handler が `stderr` / non-zero の typed failure として正規化する。
   - error taxonomy には少なくとも `preflight_*`, `unsupported_node_kind`, `edge_not_found` を含める。
 - presentation contract:
   - success stdout:
@@ -147,6 +152,7 @@ Repo --> Reader : shared meta/dependency boundary
 - data boundary:
   - write/read とも `.meta.json` dependency field を対象にする。
   - duplicate add success 時は write しないか、同値 write に収束させるが、永続状態は非重複のままにする。
+  - atomic write は same-directory temp file + `os.replace` 相当の不可分置換で定義し、failure 時も元の `.meta.json` を保全する。
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:
@@ -205,6 +211,8 @@ MutateDepsUseCase --> MutateDepsResult
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
+  - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
+  - `spec-dock/docs/reference_deps.md`
   - `tests/cli_runtime/test_deps.py`
   - `tests/cli_runtime/test_runtime_deps_s04.py`
 - Delete:
@@ -252,12 +260,15 @@ MutateDepsUseCase --> MutateDepsResult
 - migration / rollback / feature flag if needed:
   - feature flag は導入しない。
   - rollback は T2 差分 revert。write path は `.meta.json` のみなので dual-write cleanup は不要。
+- write failure verification:
+  - `infra/fs_repo.py` の dependency mutation helper に failure injection 可能な test seam を用意し、write/replace failure でも partial write が残らないことを確認する。
 
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> integration test で exit `0`、stdout `result=updated`、`.meta.json` 更新を確認。
 - AC-002 -> integration test で exit `0`、stdout `result=unchanged`、storage non-dup を確認。
 - AC-003 -> integration test で exit `0`、edge 削除を確認。
 - AC-004 -> integration test で exit `1` または `2`、stderr と no-write を確認。
+- EC-006 -> write failure injection test で error code と original `.meta.json` 保全を確認。
 - EC-001 -> broken current graph fixture で preflight error を確認。
 - EC-002 -> healthy graph + edge absent fixture で `edge_not_found` を確認。
 - EC-003 -> non-issue node fixture で `unsupported_node_kind` を確認。
