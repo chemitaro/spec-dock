@@ -18,8 +18,10 @@ ID: "iss-00061"
   - validation order と CLI response/error contract を固定し、healthy graph 時のみ duplicate add を no-op success にする。
 - MUST / MUST NOT:
   - MUST current graph validation を mutation target node kind 判定、edge existence 判定、mutation decision より先に実行する。
+  - MUST mutation preflight は dependency graph consistency を対象にし、GitHub mandatory linkage は `enforce_github_mandatory_linkage=False` で現行 import/sync と同じ local-compat mode を取る。
   - MUST remove not-found を error に固定する。
   - MUST mutation target を issue node -> issue node に限定し、non-issue node input を `unsupported_node_kind` error に固定する。
+  - MUST duplicate add / remove existence 判定は compiled topology ではなく `from` node 直下 `.meta.json.depends_on` の raw direct ref 基準で行う。
   - MUST `.meta.json` を唯一の write path に使う。
   - MUST NOT `deps.json` fallback や silent repair を追加しない。
 - 非交渉制約:
@@ -54,6 +56,7 @@ ID: "iss-00061"
 - 採用するパターン:
   - `deps` command は既存 `commands/deps.py` に subcommand を追加し、typed args -> application request -> `CommandOutcome` の流れを維持する。
   - validation は application で graph load / current graph preflight を行い、その後に issue node kind 判定と requested mutation の妥当性を判定する。
+  - mutation preflight は `ensure_current_graph_and_deps_valid(..., enforce_github_mandatory_linkage=False)` を使い、current dependency graph invalid を止める一方で GitHub linkage mandatory mismatch は本 issue の gate から外す。
   - write は `infra/fs_repo.py` へ寄せ、atomic file update を共通化する。
 - 採用しないもの:
   - `deps add/remove` を `app.py` の monolith helper に直書きすること。
@@ -229,7 +232,7 @@ MutateDepsUseCase --> MutateDepsResult
 ## 要件 → 設計マッピング
 - AC-001 -> add command parser、application mutation flow、atomic write、success renderer。
 - AC-002 -> current graph preflight -> duplicate-edge 判定順序、`result=unchanged` renderer、non-dup persistence。
-- AC-003 -> remove mutation flow、edge existence check、success renderer。
+- AC-003 -> remove mutation flow、direct edge existence check、success renderer。
 - AC-004 -> error code taxonomy、stderr renderer、no-write guarantee。
 - EC-001 -> application preflight が requested mutation より先に graph invalid を返す。
 - EC-002 -> current graph preflight 後の domain/application の edge existence error。
@@ -240,13 +243,15 @@ MutateDepsUseCase --> MutateDepsResult
 
 ## テスト戦略
 - Unit:
-  - domain helper で duplicate-edge 判定、remove existence 判定、requested mutation validation を固定する。
+  - domain/helper で duplicate-edge 判定、remove existence 判定、direct ref resolution、requested mutation validation を固定する。
   - preflight helper が current graph invalid を先に返し、issue node kind 判定より優先する順序を固定する。
 - Integration:
   - `tests/cli_runtime/test_deps.py`:
     - `deps add` updated success
     - healthy duplicate add -> `result=unchanged`
     - `deps remove` updated success
+    - inherited-only dependency では add=`updated` / remove=`edge_not_found`
+    - shorthand direct ref remove
     - broken current graph + remove absent edge -> preflight error
     - remove not-found -> error
     - non-issue `from` / `to` -> `unsupported_node_kind`
@@ -255,7 +260,8 @@ MutateDepsUseCase --> MutateDepsResult
   - `tests/cli_runtime/test_runtime_deps_s04.py`:
     - command wrapper / exit code / stdout-stderr separation / registry wiring
 - E2E / manual:
-  - local dogfooding repo で `deps add/remove` 実行後に mutation command contract と `deps check` を確認する。
+  - local dogfooding repo での `deps add/remove` + `deps check` manual verification は secondary verification 候補であり、本 issue の required gate には含めない。
+  - required gate は provider-side runtime の focused unittest evidence と review pass で閉じる。
   - downstream parity / `validate` evidence は `iss-00062` の owner scope に委譲する。
 - migration / rollback / feature flag if needed:
   - feature flag は導入しない。
