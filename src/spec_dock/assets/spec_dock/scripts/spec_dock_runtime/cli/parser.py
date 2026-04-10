@@ -64,6 +64,11 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         registry,
         "deps_check",
     )
+    _bind_leaf(
+        deps_sub.add_parser("add", help="Add an issue dependency edge"),
+        registry,
+        "deps_add",
+    )
 
     p_import = sub.add_parser("import", help="Import an existing GitHub issue as a spec node")
     import_sub = p_import.add_subparsers(dest="import_kind", required=True)
