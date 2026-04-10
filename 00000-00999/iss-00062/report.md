@@ -15,7 +15,8 @@ ID: "iss-00062"
 ## 実装サマリー (任意)
 - active initiative / epic / issue と `iss-00060` / `iss-00061` の docs / report / provider-side source を突き合わせ、`iss-00062` の実質的な未解消ギャップを `delete_node.py` の legacy scrub、repo-wide manual fix、cutover evidence owner、template/init-update legacy seed に整理した。
 - active issue の requirement / design / plan を現行実装に合わせて補正し、scaffold/template cutover parity と prerequisite authority を追加して、実装開始前の契約を固定した。
-- review 観点では blocking finding は残しておらず、実装着手の前提は `delete scrub -> targeted parity regression lock -> docs/scaffold/report schema -> manual fix + evidence` で合意可能な状態に整えた。
+- S01〜S04 を通して provider-side runtime / docs / scaffold / checked-in dogfooding data を `.meta.json` 単一 SoT に揃え、checked-in runtime mirror も provider assets へ再同期した。
+- final gate では repo-wide manual fix、checked-in runtime `validate` / `sync` / `deps add` / `deps remove` parity、runtime mirror parity、final RG1 / QG1 pass まで確認した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -91,7 +92,7 @@ python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_
 - `tests/cli_runtime/test_delete.py` - post-delete downstream regression を追加し、`validate` / `sync` / `active set` で deleted node 非再観測を固定
 
 #### コミット
-- 未実施
+- `2f43fab` `fix(delete): .meta.jsonへ依存scrubを統一`
 
 #### メモ
 - residual risk (non-blocking): `node_repo` が存在するのに `remove_issue_dependency` 未実装の場合の専用テストは未追加
@@ -129,7 +130,7 @@ python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.t
 - `tests/cli_runtime/test_runtime_deps_s04.py` - `collect_sync_state` が shared topology reader の dependency map を `deps_state` に反映する回帰を追加
 
 #### コミット
-- 未実施
+- `fb83e07` `test(parity): shared topology reader回帰を固定`
 
 #### メモ
 - non-blocking: `calls == 1` の厳密アサーションは将来の内部実装変更で brittle になる可能性がある
@@ -178,11 +179,60 @@ PY
 - `tests/test_init_update.py` - docs mirror parity と non-seed regression を追加
 
 #### コミット
-- 未実施
+- `17cc557` `docs(cutover): hard cutover契約とseed削除を固定`
 
 #### メモ
 - residual risk: focused coverage のみ実行しており、S03 変更範囲に対する全体回帰は S04 final gate へ残している
 - residual risk: `workflow_issue.md` は汎用 contract を追加したが、fixed-key の実運用確認は S04 の report 記録で最終確認する
+
+---
+
+### 2026-04-10 00:00 - 00:00
+
+#### 対象
+- Step: S04
+- AC/EC: AC-003, EC-002
+
+#### 実施内容
+- checked-in dogfooding data `spec-dock/initiatives/**` の legacy `deps.json` を repo-wide で撤去し、全 `.meta.json` に `depends_on` を明示移行した。
+- `tests/test_init_update.py` を強化し、checked-in initiatives snapshot の `.meta.json` path 集合 / `depends_on` baseline / runtime mirror parity / cutover snapshot `validate` / `sync` / `deps add` / `deps remove` を回帰として固定した。
+- checked-in runtime mirror `spec-dock/scripts/spec_dock_runtime/**` の drift を provider assets に同期し、mirror runtime でも `.meta.json.depends_on` topology が解釈される状態へ復旧した。
+- review loop では initial QA / code review findings に従って test の証明力を段階的に強化し、最後は final RG1 / QG1 ともに pass を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot \
+  tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure \
+  tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync
+
+- focused suite: Ran 7 tests in 0.607s
+- focused suite: OK
+- validate: `spec-dock: ok (validate) nodes=22`
+- sync: `spec-dock: ok (sync)` / `active unchanged (matched id in branch: iss-00062)`
+- final RG1 implementation review: pass
+- final QG1 QA review: pass
+```
+
+#### 変更したファイル
+- `spec-dock/initiatives/**/.meta.json` - repo-wide checked-in dogfooding nodes の `depends_on` を明示化
+- `spec-dock/initiatives/**/deps.json` - legacy dependency files を repo-wide で削除
+- `spec-dock/scripts/spec_dock_runtime/**` - checked-in runtime mirror を provider assets へ同期し、`.meta.json` dependency semantics と mutation command surface を復旧
+- `tests/test_init_update.py` - cutover snapshot / runtime mirror parity / deps mutation parity / `.meta.json` baseline guard を追加
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/report.md` - S04 evidence と final gate verdict を追記
+
+#### コミット
+- 実施予定（S04 final close-out 差分）
+
+#### メモ
+- residual risk (non-blocking): full `python -m unittest discover -v` は未実行で、issue scope に紐づく focused regression と runtime command evidence を final gate とした
+- residual risk (non-blocking): checked-in snapshot baseline は path / `depends_on` fixed 値に依存するため、将来 snapshot 自体を更新する際は `tests/test_init_update.py` の baseline 更新が必要
 
 ---
 
