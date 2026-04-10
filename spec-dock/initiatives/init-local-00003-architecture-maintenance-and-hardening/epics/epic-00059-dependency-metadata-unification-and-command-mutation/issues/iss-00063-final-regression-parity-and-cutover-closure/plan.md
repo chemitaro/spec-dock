@@ -5,7 +5,7 @@ ID: "iss-00063"
 関連GitHub: ["#63"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-04-10"
+最終更新: "2026-04-11"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00059", "init-local-00003"]
 ---
@@ -31,14 +31,14 @@ ID: "iss-00063"
   - source code は変更しない
   - `./spec-dock/scripts/spec-dock validate` を required command とする
   - epic `report.md` は close summary のみ、詳細 evidence は issue `report.md`
-  - `iss-00062/report.md` が completed state になるまで S02-S99 に着手しない
+  - `iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合するまで S02-S99 に着手しない
 
 ## 実行前提 / blocker
 - prerequisite:
-  - `iss-00062/report.md` が template / placeholder ではなく、hard cutover judgment、docs 更新、manual fix、`validate` / `sync` evidence を実値で持つ completed state であること。
+  - `iss-00062/report.md` が template / placeholder ではなく、hard cutover judgment、docs 更新、manual fix、`validate` / `sync` evidence を実値で持ち、本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合していること。
   - `iss-00062/report.md` に active parity の観測対象 `<target-id>` が記録されていること。未記録なら T4 は blocker。
 - blocker policy:
-  - prerequisite 不成立時は S02 以降へ進まず、T4 issue `report.md` に blocker / next action を記録する。
+  - prerequisite 不成立時は S02 以降へ進まず、T4 issue `report.md` に blocker / next action を記録する。status mismatch が未解消なら S01 完了後も blocker のまま止める。
   - prerequisite 不成立の間は epic `report.md` を更新しない。
 
 ## マイルストーン一覧
@@ -72,7 +72,7 @@ ID: "iss-00063"
   - final report / epic close summary は evidence と review verdict が揃ってから実施する
 - step ordering notes:
   - S01 が baseline 固定、S02 が command / regression evidence、S03 が T3 evidence packaging、S04 が close record、S90/S99 が docs refresh と最終品質ゲートを担当する
-  - `iss-00062/report.md` completed state の prerequisite check が通るまで S02-S99 は開始しない
+  - `iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合する prerequisite check が通るまで S02-S99 は開始しない
   - epic `report.md` を更新してよいのは S04 だけで、S02/S03/S90 は issue `report.md` 以外へ close claim を広げない
 
 ## ステップ一覧
@@ -203,13 +203,13 @@ ID: "iss-00063"
 
 ###### Red
 - failing review:
-  - issue docs が template / placeholder のため、T4 close path を説明できない
+  - issue docs が current implementation と inherited evidence を十分に反映できず、T4 close path と blocker path を説明できない
 - expected failure:
   - reviewer が execution へ進めない
 
 ###### Green
 - minimum implementation:
-  - requirement/design/plan に ownership、deliverable、step、gate、blocker path を記入する
+  - requirement/design/plan に ownership、deliverable、step、gate、blocker path を current implementation と `iss-00062/report.md` 実測証跡に合わせて記入する
 - pass condition:
   - SG1 で plan upfront approval を得られる
 
@@ -238,7 +238,7 @@ ID: "iss-00063"
   - `design.md` の `regression boundary`
   - `design.md` の `parity boundary`
 - step boundary:
-  - prerequisite として `iss-00062/report.md` completed state を確認してから着手する
+  - prerequisite として `iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合することを確認してから着手する
   - drift が見つかった場合は close を止め、補修実装へは進まない
   - epic `report.md` はこの step では更新しない
 
@@ -261,15 +261,20 @@ ID: "iss-00063"
 ###### Green
 - minimum implementation:
   - `iss-00062/report.md` から final regression suite の review-only inherited item を review し、次を fixed item として T4 issue `report.md` に記録する
-    - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 -v`
+    - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate -v`
     - `python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_validate_s02 -v`
-    - `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_fails_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity -v`
-  - rerun-required final command として次を実行し、`same dependency graph` 観測値とともに report に記録する
-    - `./spec-dock/scripts/spec-dock sync`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_reference_deps_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_overlap_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_scoped_deps_ref_parity tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_numeric_deps_ref_foreign_only_fail_closed_parity -v`
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_deps_mutation_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_init_does_not_seed_legacy_node_deps_json_templates tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets`
+  - canonical graph 抽出は rerun-required command 実行前の同一 repo snapshot で 1 回だけ行い、入力を `spec-dock/initiatives/**/.meta.json` の current checked-in payload とする
+    - shorthand 解決と issue-level compile は `iss-00062` までで承認済みの shared topology reader semantics に従い、`issue_id -> depends_on_id` の sorted unique tuple 集合へ正規化する
+    - report には canonical tuple 集合そのもの、抽出対象 snapshot（`git rev-parse HEAD` と `git status --short` の要約）、および使用した `<target-id>` を残す
+  - rerun-required final command は canonical graph 抽出後、repo state を変える report 更新や追加 mutation を挟まず、次の順序で同一 snapshot 観測として取得する
+    - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `<target-id>` は `iss-00062/report.md` 記録済み id を使う。既に active の場合は `active unchanged` を parity 観測として採用し、別 target へ切り替えない
     - `./spec-dock/scripts/spec-dock validate`
-    - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `<target-id>` は `iss-00062/report.md` 記録済み id を使う
+    - `./spec-dock/scripts/spec-dock sync`
+  - 途中で working tree、`.meta.json`、`spec-dock/.agent/**`、active target のいずれかが変わった場合は同一 snapshot 条件が崩れるため、その parity run を破棄して最初から採り直す
 - pass condition:
-  - RG1 で regression / parity evidence が pass
+  - RG1 で regression / parity evidence が passし、canonical tuple 集合と command 観測値の対応が report から追える
 
 ###### Refactor
 - 目的:
@@ -282,17 +287,20 @@ ID: "iss-00063"
 #### step gate
 - review:
   - final regression suite の正本、review-only inherited item、rerun-required item、parity verdict、failure 時 next action が report にある
-- expected tests:
-  - review-only inherited item:
-    - `python -m unittest tests.cli_runtime.test_delete tests.cli_runtime.test_runtime_delete_s13 -v`
-    - `python -m unittest tests.cli_runtime.test_active tests.cli_runtime.test_sync tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 tests.cli_runtime.test_runtime_validate_s02 -v`
-    - `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_fails_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_sync_validation_boundary_prefers_structure_error tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_doctor_fail_when_required_artifact_missing tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_create_lock_missing_meta_diagnosis_parity -v`
-  - `./spec-dock/scripts/spec-dock validate`
-  - `./spec-dock/scripts/spec-dock sync`
-  - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `iss-00062/report.md` の記録済み id がある場合
+- expected checks:
+  - review-only evidence trace:
+    - `iss-00062/report.md` に fixed inherited suite 4件の command line / exit code / pass verdict / 対象 test 名が揃っていること
+    - `python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 -v` は ancillary flaky-check subset として必要時のみ supplemental reference に使い、required suite には数えないこと
+  - canonical graph trace:
+    - canonical tuple 集合の抽出元 snapshot、tuple 集合そのもの、`<target-id>` が report に揃っていること
+    - `active set` / `validate` / `sync` が canonical graph 抽出後に no-intervening-change で取得されたこと
+  - rerun-required commands:
+    - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `iss-00062/report.md` の記録済み id がある場合
+    - `./spec-dock/scripts/spec-dock validate`
+    - `./spec-dock/scripts/spec-dock sync`
 - report update:
-  - S02 の command / review 結果を `./spec-dock/active/issue/report.md` に残す
-  - `final_regression_suite.source`、`final_regression_suite.items.reviewed`、`final_regression_suite.items.rerun`、`final_regression_suite.pass`、`parity_confirmation.graph_contract`、`parity_confirmation.observations.active_set`、`parity_confirmation.observations.sync`、`parity_confirmation.observations.validate` を読める形で残す
+  - S02 の command / review 結果は canonical graph 抽出と rerun-required command を同一 snapshot で採取した後に `./spec-dock/active/issue/report.md` に残す
+  - `final_regression_suite.source`、`final_regression_suite.items.reviewed`、`final_regression_suite.items.ancillary`、`final_regression_suite.items.rerun`、`final_regression_suite.pass`、`parity_confirmation.graph_contract.snapshot`、`parity_confirmation.graph_contract.canonical_tuples`、`parity_confirmation.graph_contract.target_id`、`parity_confirmation.observations.active_set`、`parity_confirmation.observations.validate`、`parity_confirmation.observations.sync` を読める形で残す
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
@@ -353,7 +361,7 @@ ID: "iss-00063"
 - design refs:
   - `design.md` の `close reporting boundary`
 - step boundary:
-  - prerequisite として `iss-00062/report.md` completed state と S02/S03 pass を確認してから着手する
+  - prerequisite として `iss-00062/report.md` の本文 evidence と frontmatter/status が 完了状態（frontmatter `状態: "approved"` + 本文 evidence complete） として整合し、S02/S03 pass を確認してから着手する。不整合が残る場合は S04 へ進まず blocker を維持する
   - issue `report.md` を detailed evidence の正本にし、epic `report.md` は close summary のみを更新する
   - epic `report.md` を更新してよい唯一の step とする
 
