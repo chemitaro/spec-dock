@@ -47,12 +47,14 @@ ID: "epic-00059"
 
 ## データモデル
 - schema options:
-  - Option A: `.meta.json` に `depends_on: ["node-id", ...]` を持つ（node 単位）。
+  - Option A: `.meta.json` に top-level `depends_on` を持つ（node 単位、raw value grammar は node id / GitHub issue number int or numeric string / `owner/repo#123` / canonical issue URL）。
   - Option B: `.meta.json` に `dependencies: {"from": ["to", ...]}` を持つ（graph 単位）。
 - chosen direction:
   - Option A を採用。node metadata と同居させることで delete/sync/active の局所更新と整合しやすい。
 - invariants:
   - node id は既存命名規則に一致。
+  - `depends_on` は optional top-level field とし、field absence は `[]` と同義で扱う。
+  - `depends_on` の raw value grammar は issue spec と同じ既存 shorthand に限定し、node id / GitHub issue number（int または numeric string）/ `owner/repo#123` / canonical issue URL のみ許可する。
   - `depends_on` は node ごとに重複なし配列で保持する。
   - self loop 不可。
   - unresolved target 不可。
@@ -96,12 +98,12 @@ ID: "epic-00059"
     - dogfooding 側は checked-in data を手動修正して cutover に追従する。
 - cutover gate:
   - hard cutover judgment は T3 integration 完了時に固定する。
-  - T3 integration tranche が docs 更新、dogfooding checked-in data manual fix、`./spec-dock/scripts/spec-dock validate` / `sync` evidence 採取を実施し、entry 条件充足を確認してから judgment を固定する。
+  - T1 foundation（`iss-00060`）が provider-side dependency docs 正本更新を担当し、T3 integration（`iss-00062`）が dogfooding checked-in data manual fix、`./spec-dock/scripts/spec-dock validate` / `sync` evidence 採取、cutover judgment 固定を担当する。
   - evidence owner / placement:
     - T3 integration owner の issue-level `report.md` を hard cutover judgment の正本にする。
     - T4 closure owner の issue-level `report.md` を E-AC-005 final closure と final parity / spec review の正本にし、epic `report.md` は close summary だけを保持する。
   - minimum evidence bundle:
-    - docs 更新対象の差分要約。
+    - T1 で更新された provider-side dependency docs 正本との差分確認結果。
     - dogfooding checked-in data manual fix 対象 path / scope。
     - targeted regression summary。
     - `./spec-dock/scripts/spec-dock validate` / `sync` の command line、exit code、結果要約。
@@ -153,7 +155,7 @@ ID: "epic-00059"
 - rollback action:
   - issue 単位で変更差分を戻す。fallback reader や read-only 退避は導入しない。
 - operational guard:
-  - T3 で docs 更新、dogfooding checked-in data manual fix、`validate` / `sync` evidence 採取を完了して cutover gate を閉じる。
+  - T1 で provider-side dependency docs 正本更新を完了し、T3 で dogfooding checked-in data manual fix と `validate` / `sync` evidence 採取を完了して cutover gate を閉じる。
   - T4 ではその judgment を前提に final regression / parity confirmation / spec review / close summary だけを行う。
 
 ## 未確定事項

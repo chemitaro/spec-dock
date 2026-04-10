@@ -30,7 +30,7 @@ ID: "epic-00059"
   - 目的:
     - `.meta.json` dependency schema と `infra/deps_reader.py` の read contract を確定する。
   - deliverable:
-    - schema 定義、reader 実装、hard cutover boundary note、unit tests。
+    - schema 定義、reader 実装、provider-side dependency docs（`src/spec_dock/assets/spec_dock/docs/reference_deps.md`）正本更新、hard cutover boundary note、unit tests。
   - tranche:
     - T1 foundation
   - closes:
@@ -52,7 +52,7 @@ ID: "epic-00059"
   - 目的:
     - delete/sync/active/validate の依存解釈を `.meta.json` SoT に統一し、hard cutover entry 条件を実施・充足・記録したうえで judgment を固定する。
   - deliverable:
-    - `application/delete_node.py` scrub、`application/{set_active,sync_state,validate_tree}.py` parity、cutover boundary tests、docs 更新、dogfooding checked-in data manual fix 実施、`./spec-dock/scripts/spec-dock validate` / `sync` evidence、cutover evidence contract、T3 issue `report.md` judgment record。
+    - `application/delete_node.py` scrub、`application/{set_active,sync_state,validate_tree}.py` parity、cutover boundary tests、dogfooding checked-in data manual fix 実施、`./spec-dock/scripts/spec-dock validate` / `sync` evidence、cutover evidence contract、hard cutover judgment primary owner record（T3 issue `report.md`）。
   - tranche:
     - T3 integration
   - closes:
@@ -74,7 +74,8 @@ ID: "epic-00059"
 ## cutover evidence ownership
 - T3 integration owner（`iss-00062-downstream-parity-and-cutover-readiness`）:
   - hard cutover judgment と E-AC-003 readiness verdict の primary owner。
-  - 自身の `report.md` に docs 更新結果、dogfooding checked-in data manual fix 完了 path/scope、targeted regression summary、`./spec-dock/scripts/spec-dock validate` / `sync` の command line・exit code・結果要約、judgment verdict を残す。
+  - 自身の `report.md` に dogfooding checked-in data manual fix 完了 path/scope、targeted regression summary、`./spec-dock/scripts/spec-dock validate` / `sync` の command line・exit code・結果要約、judgment verdict を残す。
+  - provider-side dependency docs 正本更新は T1（`iss-00060`）の差分を正本として参照する。
 - T4 closure owner（`iss-00063-final-regression-parity-and-cutover-closure`）:
   - E-AC-005 final closure と final parity / final spec review の primary owner。
   - 自身の `report.md` に final regression summary、T3 evidence bundle review 結果、必要な parity reconfirmation、final spec review verdict を残し、epic `report.md` には close summary だけを反映する。
@@ -86,7 +87,7 @@ ID: "epic-00059"
   - mutation 導入後も delete/sync/active/validate が同一 graph を観測し、T3 で hard cutover judgment を固定できるか。
   - `deps add` 実行前に current graph validation が走り、不整合時は fail-closed error になり、正常時だけ既存 edge が `result=unchanged` の success/no-op として扱われるか。
 - G3 rollout/docs impact:
-  - hard cutover 手順、manual fix、`validate` / `sync` evidence contract が T3 で実施・反映され、T3/T4 issue `report.md` と epic `report.md` の owner/shape が明示されているか。
+  - provider-side dependency docs 正本更新が T1 で完了し、hard cutover 手順、manual fix、`validate` / `sync` evidence contract が T3 で実施・反映され、T3/T4 issue `report.md` と epic `report.md` の owner/shape が明示されているか。
 - G9 final epic spec review:
   - E-AC すべてに test と実測証跡があるか。
 
@@ -100,9 +101,10 @@ ID: "epic-00059"
 
 ## ロールアウト / docs impact
 - rollout order:
-  - schema/reader -> mutation command -> downstream parity -> docs/final review。
+  - schema/reader + provider-side dependency docs 正本更新 -> mutation command -> downstream parity + dogfooding manual fix / evidence -> final review。
 - contract / docs refresh:
-  - command reference、dependency schema、hard cutover/manual-fix runbook、operator guide を更新。
+  - T1（`iss-00060`）で provider-side dependency reference docs 正本を更新する。
+  - T3（`iss-00062`）で dogfooding checked-in data manual fix と `validate` / `sync` evidence、cutover judgment を記録する。
 
 ## Issue readiness contract
 - Issue に要求する最低条件:
