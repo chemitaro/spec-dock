@@ -93,11 +93,49 @@ python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_de
 - `tests/cli_runtime/test_runtime_deps_s04.py` - runtime wrapper/delegation smoke を追加
 
 #### コミット
-- 未作成（この後 S01 commit を実施）
+- `a29e296` `feat(runtime): deps add の最小 mutation 経路を追加`
 
 #### メモ
 - S01 は happy path のみで、duplicate/no-op、remove、詳細な error family、write-failure atomicity は未実装のまま維持している。
 - 現在の add write は `depends_on` への最小追記実装で、重複排除は S02 で扱う前提である。
+
+---
+
+### 2026-04-10 08:03 - 08:03
+
+#### 対象
+- Step: S02
+- AC/EC: AC-002, EC-001
+
+#### 実施内容
+- `deps add` 実行時に current graph preflight を duplicate 判定より先に実行し、healthy graph でのみ `result=unchanged` を返す no-op 契約を追加した。
+- duplicate add 時に `.meta.json` を再書き込みしないこと、および current graph が壊れている場合は duplicate success へ進まず preflight error を返すことを TDD で固定した。
+- implementation review と QA review を実施し、S02 scope で blocking finding が無いことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_deps
+python -m unittest tests.cli_runtime.test_runtime_deps_s04
+
+- tests.cli_runtime.test_deps: Ran 61 tests / OK
+- tests.cli_runtime.test_runtime_deps_s04: Ran 13 tests / OK
+- implementation review: pass
+- QA review: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - preflight-first と duplicate `unchanged` no-write を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py` - duplicate edge 判定 helper を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - current graph preflight helper を追加
+- `tests/cli_runtime/test_deps.py` - duplicate add unchanged と broken current graph preflight-first を追加
+- `tests/cli_runtime/test_runtime_deps_s04.py` - `result=unchanged` の runtime rendering を追加
+
+#### コミット
+- 未作成（この後 S02 commit を実施）
+
+#### メモ
+- preflight は S02 時点では local-compat fixture を維持するため `enforce_github_mandatory_linkage=False` で実行している。
+- non-issue node / remove / invalid add 詳細 error family は S04 で扱う。
 
 ---
 
