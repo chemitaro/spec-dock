@@ -248,134 +248,6 @@ def _iter_managed_nodes(graph: SpecGraph) -> list[SpecNode]:
     return [node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")]
 
 
-def _is_canonical_managed_node_dir(*, specdock_dir: Path, node_dir: Path, kind: SpecNodeKind) -> bool:
-    try:
-        relative_parts = node_dir.resolve().relative_to(specdock_dir.resolve()).parts
-    except Exception:
-        return False
-    if kind == "initiative":
-        return len(relative_parts) == 2 and relative_parts[0] == "initiatives"
-    if kind == "epic":
-        return (
-            len(relative_parts) == 4
-            and relative_parts[0] == "initiatives"
-            and relative_parts[2] == "epics"
-        )
-    return (
-        len(relative_parts) == 6
-        and relative_parts[0] == "initiatives"
-        and relative_parts[2] == "epics"
-        and relative_parts[4] == "issues"
-    )
-
-
-def _node_kind_from_prefix(prefix: str) -> SpecNodeKind | None:
-    mapping: dict[str, SpecNodeKind] = {
-        "init": "initiative",
-        "epic": "epic",
-        "iss": "issue",
-    }
-    return mapping.get(prefix)
-
-
-def _matching_target_directories(specdock_dir: Path, *, canonical_id: str, kind: SpecNodeKind) -> list[Path]:
-    initiatives_root = specdock_dir / "initiatives"
-    if not initiatives_root.exists():
-        return []
-    matches: list[Path] = []
-    expected_prefix = f"{canonical_id}-"
-    for path in initiatives_root.rglob("*"):
-        if not path.is_dir():
-            continue
-        name = path.name.lower()
-        if name != canonical_id and not name.startswith(expected_prefix):
-            continue
-        if not _is_canonical_managed_node_dir(specdock_dir=specdock_dir, node_dir=path, kind=kind):
-            continue
-        matches.append(path)
-    return sorted(matches)
-
-
-def _target_node_dir_from_error_message(
-    *,
-    message: str,
-    specdock_dir: Path,
-    canonical_id: str,
-    kind: SpecNodeKind,
-) -> Path | None:
-    normalized_root = specdock_dir.resolve().as_posix().rstrip("/")
-    match = re.search(re.escape(normalized_root) + r"[^:\n]*?/\.meta\.json", message)
-    if match is None:
-        return None
-    meta_path = Path(match.group(0))
-    try:
-        node_dir = meta_path.parent.resolve()
-        node_dir.relative_to(specdock_dir.resolve())
-    except Exception:
-        return None
-    name = node_dir.name.lower()
-    expected_prefix = f"{canonical_id}-"
-    if name != canonical_id and not name.startswith(expected_prefix):
-        return None
-    if not _is_canonical_managed_node_dir(specdock_dir=specdock_dir, node_dir=node_dir, kind=kind):
-        return None
-    return node_dir
-
-
-def _target_local_metadata_failure_result(
-    req: DeleteNodeRequest,
-    ports: Ports,
-    error: RuntimeError | None = None,
-) -> DeleteNodeResult | None:
-    raw_selector = str(req.node_id or req.positional_target or "").strip()
-    if not raw_selector:
-        return None
-    try:
-        prefix, is_local, num = parse_id(raw_selector.lower())
-    except RuntimeError:
-        return None
-    kind = _node_kind_from_prefix(prefix)
-    if kind is None:
-        return None
-    canonical_id = format_id(prefix, num, local=is_local)
-    specdock_dir = _resolve_specdock_dir(ports)
-    node_dir = None
-    if error is not None:
-        node_dir = _target_node_dir_from_error_message(
-            message=str(error),
-            specdock_dir=specdock_dir,
-            canonical_id=canonical_id,
-            kind=kind,
-        )
-    if node_dir is None:
-        matches = _matching_target_directories(
-            specdock_dir,
-            canonical_id=canonical_id,
-            kind=kind,
-        )
-        if len(matches) != 1:
-            return None
-        node_dir = matches[0]
-    meta_path = node_dir / ".meta.json"
-    try:
-        loaded = json.loads(meta_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        message = f"Invalid JSON: {meta_path}: {exc}"
-    except UnicodeDecodeError as exc:
-        message = f"Failed to read: {meta_path}: {exc}"
-    except OSError as exc:
-        message = f"Failed to read: {meta_path}: {exc}"
-    else:
-        if isinstance(loaded, dict):
-            return None
-        message = f"Invalid .meta.json (expected object): {meta_path}"
-    return _metadata_failure_result(
-        target_id=canonical_id,
-        offending_node_ids=[canonical_id],
-        messages_by_node_id={canonical_id: message},
-    )
-
-
 def _normalize_issue_number(value: object) -> int | None:
     if value is None or isinstance(value, bool):
         return None
@@ -1062,13 +934,7 @@ def _repair_active_after_clear_failure(
 
 
 def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
-    try:
-        records = ports.node_reader.load_node_records()
-    except RuntimeError as error:
-        selector_metadata_failure = _target_local_metadata_failure_result(req, ports, error=error)
-        if selector_metadata_failure is not None:
-            return selector_metadata_failure
-        raise
+    records = ports.node_reader.load_node_records()
     if not records:
         return _result(
             status="target_not_found",
