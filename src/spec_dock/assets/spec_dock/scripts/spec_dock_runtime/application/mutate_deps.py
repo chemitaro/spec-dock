@@ -39,7 +39,7 @@ def _resolve_specdock_dir(ports: Ports) -> Path:
 
 
 def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
-    if req.action != "add":
+    if req.action not in ("add", "remove"):
         raise RuntimeError(f"Unsupported deps mutation action: {req.action}")
     if ports.node_repo is None:
         raise RuntimeError("node_repo is required")
@@ -69,24 +69,30 @@ def mutate_deps(req: MutateDepsRequest, ports: Ports) -> MutateDepsResult:
     if to_node.kind != "issue":
         raise RuntimeError(f"unsupported_node_kind: {req.to_id}")
 
-    add_issue_dependency = getattr(ports.node_repo, "add_issue_dependency", None)
-    if not callable(add_issue_dependency):
-        raise RuntimeError("add_issue_dependency is not configured")
+    if req.action == "add":
+        add_issue_dependency = getattr(ports.node_repo, "add_issue_dependency", None)
+        if not callable(add_issue_dependency):
+            raise RuntimeError("add_issue_dependency is not configured")
 
-    if issue_dependency_exists(
-        issue_depends_on_map,
-        from_issue_id=from_node.id,
-        to_issue_id=to_node.id,
-    ):
-        return MutateDepsResult(
-            action=req.action,
-            from_id=from_node.id,
-            to_id=to_node.id,
-            result="unchanged",
-            warnings=[],
-        )
+        if issue_dependency_exists(
+            issue_depends_on_map,
+            from_issue_id=from_node.id,
+            to_issue_id=to_node.id,
+        ):
+            return MutateDepsResult(
+                action=req.action,
+                from_id=from_node.id,
+                to_id=to_node.id,
+                result="unchanged",
+                warnings=[],
+            )
 
-    add_issue_dependency(from_node.meta_path, to_node.id)
+        add_issue_dependency(from_node.meta_path, to_node.id)
+    else:
+        remove_issue_dependency = getattr(ports.node_repo, "remove_issue_dependency", None)
+        if not callable(remove_issue_dependency):
+            raise RuntimeError("remove_issue_dependency is not configured")
+        remove_issue_dependency(from_node.meta_path, to_node.id)
 
     return MutateDepsResult(
         action=req.action,

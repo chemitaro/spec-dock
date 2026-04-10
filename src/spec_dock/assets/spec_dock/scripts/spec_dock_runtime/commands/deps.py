@@ -21,7 +21,7 @@ class DepsCheckArgs(CommandArgs):
 
 
 @dataclass(frozen=True)
-class DepsAddArgs(CommandArgs):
+class DepsMutationArgs(CommandArgs):
     from_id: str
     to_id: str
 
@@ -35,8 +35,13 @@ def command_specs() -> dict[str, CommandSpec]:
         ),
         "deps_add": CommandSpec(
             add_arguments=_add_deps_add_arguments,
-            args_factory=_deps_add_args,
+            args_factory=_deps_mutation_args,
             run=_run_deps_add,
+        ),
+        "deps_remove": CommandSpec(
+            add_arguments=_add_deps_add_arguments,
+            args_factory=_deps_mutation_args,
+            run=_run_deps_remove,
         ),
     }
 
@@ -84,10 +89,10 @@ def _deps_check_args(ns: argparse.Namespace) -> CommandArgs:
     )
 
 
-def _deps_add_args(ns: argparse.Namespace) -> CommandArgs:
+def _deps_mutation_args(ns: argparse.Namespace) -> CommandArgs:
     from_id = _normalize_issue_id(str(getattr(ns, "from_id", "")), field="--from")
     to_id = _normalize_issue_id(str(getattr(ns, "to_id", "")), field="--to")
-    return DepsAddArgs(from_id=from_id, to_id=to_id)
+    return DepsMutationArgs(from_id=from_id, to_id=to_id)
 
 
 def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
@@ -112,10 +117,22 @@ def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 
 
 def _run_deps_add(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
-    typed = _expect_deps_add_args(args)
+    typed = _expect_deps_mutation_args(args)
     result = use_cases.mutate_deps(
         MutateDepsRequest(
             action="add",
+            from_id=typed.from_id,
+            to_id=typed.to_id,
+        )
+    )
+    return CommandOutcome(exit_code=0, text=render_deps_mutation_text(result))
+
+
+def _run_deps_remove(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    typed = _expect_deps_mutation_args(args)
+    result = use_cases.mutate_deps(
+        MutateDepsRequest(
+            action="remove",
             from_id=typed.from_id,
             to_id=typed.to_id,
         )
@@ -139,7 +156,7 @@ def _expect_deps_check_args(args: CommandArgs) -> DepsCheckArgs:
     return args
 
 
-def _expect_deps_add_args(args: CommandArgs) -> DepsAddArgs:
-    if not isinstance(args, DepsAddArgs):
-        raise RuntimeError("Invalid command args for deps add")
+def _expect_deps_mutation_args(args: CommandArgs) -> DepsMutationArgs:
+    if not isinstance(args, DepsMutationArgs):
+        raise RuntimeError("Invalid command args for deps mutation")
     return args

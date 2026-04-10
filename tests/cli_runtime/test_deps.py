@@ -2417,6 +2417,44 @@ class TestCliDeps(CliRuntimeHarness):
             from_meta = json.loads(after_second)
             self.assertEqual(from_meta.get("depends_on"), [to_id])
 
+    def test_deps_remove_updates_meta_json_and_returns_updated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            added = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+
+            removed = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+            self.assertEqual(removed.stderr.strip(), "")
+            self.assertEqual(
+                removed.stdout.strip(),
+                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+            )
+
+            from_meta: dict[str, object] | None = None
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                if payload.get("id") == from_id:
+                    from_meta = payload
+                    break
+            self.assertIsNotNone(from_meta)
+            assert from_meta is not None
+            self.assertEqual(from_meta.get("depends_on"), [])
+
     def test_deps_add_broken_current_graph_fails_preflight_before_duplicate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

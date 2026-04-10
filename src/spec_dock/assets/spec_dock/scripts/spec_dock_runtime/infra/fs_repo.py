@@ -406,6 +406,30 @@ def add_issue_dependency(meta_path: Path, to_id: str) -> None:
         raise RuntimeError(f"Failed to update dependency: {meta_path}: {exc}") from exc
 
 
+def remove_issue_dependency(meta_path: Path, to_id: str) -> None:
+    meta = load_json(meta_path)
+    if not isinstance(meta, dict):
+        raise RuntimeError(f"Invalid .meta.json (expected object): {meta_path}")
+
+    depends_on_raw = meta.get("depends_on")
+    if depends_on_raw is None:
+        depends_on: list[Any] = []
+    elif isinstance(depends_on_raw, list):
+        depends_on = list(depends_on_raw)
+    else:
+        raise RuntimeError(f"Invalid .meta.json schema: {meta_path}: depends_on must be a list")
+
+    to_id_text = str(to_id)
+    meta["depends_on"] = [dep for dep in depends_on if str(dep) != to_id_text]
+    if "updated_at" in meta:
+        meta["updated_at"] = now_iso()
+
+    try:
+        _write_meta_json_with_permission_contract(meta_path, meta)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to update dependency: {meta_path}: {exc}") from exc
+
+
 def backfill_github_repo_scope(meta_path: Path, *, repo_owner: str, repo_name: str) -> bool:
     normalized_owner = str(repo_owner or "").strip().lower()
     normalized_repo = str(repo_name or "").strip().lower()
