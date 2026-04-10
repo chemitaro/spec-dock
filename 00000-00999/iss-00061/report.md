@@ -131,11 +131,49 @@ python -m unittest tests.cli_runtime.test_runtime_deps_s04
 - `tests/cli_runtime/test_runtime_deps_s04.py` - `result=unchanged` の runtime rendering を追加
 
 #### コミット
-- 未作成（この後 S02 commit を実施）
+- `9505092` `feat(runtime): deps add の重複追加を unchanged として扱う`
 
 #### メモ
 - preflight は S02 時点では local-compat fixture を維持するため `enforce_github_mandatory_linkage=False` で実行している。
 - non-issue node / remove / invalid add 詳細 error family は S04 で扱う。
+
+---
+
+### 2026-04-10 08:19 - 08:19
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003
+
+#### 実施内容
+- `deps remove --from <id> --to <id>` の happy path を TDD で実装し、existing issue->issue edge を削除して `result=updated` を返す最小経路を追加した。
+- parser / command / use case / repo helper / runtime wiring を remove path に拡張し、S01/S02 の add 契約を壊さないことを focused tests で確認した。
+- implementation review を実施し、S03 scope で blocking finding が無いことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_deps_s04
+
+- Ran 76 tests in 18.411s
+- OK
+- implementation review: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` - `deps remove` subcommand を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` - remove args / request 生成 / happy-path outcome を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - remove action の success path を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - `.meta.json` の dependency 削除 helper を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - remove helper wiring を追加
+- `tests/cli_runtime/test_deps.py` - remove success integration を追加
+- `tests/cli_runtime/test_runtime_deps_s04.py` - remove runtime delegation smoke を追加
+
+#### コミット
+- 未作成（この後 S03 commit を実施）
+
+#### メモ
+- remove not-found や broader error taxonomy は未実装で、S04 でまとめて扱う。
+- 現段階の remove は happy path のみで、existing edge がある前提に限定している。
 
 ---
 
