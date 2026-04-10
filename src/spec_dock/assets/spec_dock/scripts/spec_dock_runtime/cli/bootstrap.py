@@ -15,6 +15,7 @@ from ..application.contracts import UseCases
 from ..application.import_node import import_epic as application_import_epic
 from ..application.import_node import import_initiative as application_import_initiative
 from ..application.import_node import import_issue as application_import_issue
+from ..application.mutate_deps import mutate_deps as application_mutate_deps
 from ..application.ports import Ports
 from ..application.set_active import clear_active as application_clear_active
 from ..application.set_active import set_active as application_set_active
@@ -53,6 +54,9 @@ class _NodeRepository:
 
     def write_meta(self, dest_dir: Path, record):
         infra_fs_repo.write_meta(dest_dir, record)
+
+    def add_issue_dependency(self, meta_path: Path, to_id: str) -> None:
+        infra_fs_repo.add_issue_dependency(meta_path, to_id)
 
     def delete_tree(self, node_path: Path) -> None:
         infra_fs_repo.delete_tree(node_path)
@@ -229,6 +233,7 @@ def build_runtime(specdock_dir: Path) -> BootstrapContext:
         clear_active=lambda req: application_clear_active(req, ports),
         sync=lambda req: application_sync(req, ports),
         check_deps=lambda req: application_check_deps(req, ports),
+        mutate_deps=lambda req: application_mutate_deps(req, ports),
         delete_node=lambda req: application_delete_node(req, ports),
         close_node=lambda req: application_close_node(req, ports),
         validate_tree=lambda req: application_validate_tree(req, ports),

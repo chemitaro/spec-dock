@@ -145,6 +145,26 @@ class DepsCheckResult:
     warnings: list[str]
 
 
+MutateDepsAction = Literal["add", "remove"]
+MutateDepsResultKind = Literal["updated", "unchanged"]
+
+
+@dataclass(frozen=True)
+class MutateDepsRequest:
+    action: MutateDepsAction
+    from_id: str
+    to_id: str
+
+
+@dataclass(frozen=True)
+class MutateDepsResult:
+    action: MutateDepsAction
+    from_id: str
+    to_id: str
+    result: MutateDepsResultKind
+    warnings: list[str]
+
+
 @dataclass(frozen=True)
 class CloseNodeRequest:
     target: TargetRef
@@ -349,6 +369,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    mutate_deps: Callable[[MutateDepsRequest], MutateDepsResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("mutate_deps is not configured")
+    )
     delete_node: Callable[[DeleteNodeRequest], DeleteNodeResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("delete_node is not configured")
     )

@@ -2341,3 +2341,35 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn(p.returncode, (0, 3), p.stdout + p.stderr)
             after = issue_meta.read_text(encoding="utf-8")
             self.assertEqual(after, before)
+
+    def test_deps_add_updates_meta_json_and_returns_updated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.stderr.strip(), "")
+            self.assertEqual(
+                p.stdout.strip(),
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+            )
+
+            from_meta: dict[str, object] | None = None
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                if payload.get("id") == from_id:
+                    from_meta = payload
+                    break
+            self.assertIsNotNone(from_meta)
+            assert from_meta is not None
+            self.assertEqual(from_meta.get("depends_on"), [to_id])
