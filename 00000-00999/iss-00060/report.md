@@ -3,8 +3,8 @@
 ID: "iss-00060"
 タイトル: "Meta json dependency schema and reader alignment"
 関連GitHub: ["#60"]
-状態: "draft | approved"
-作成者: "<YOUR_NAME>"
+状態: "approved"
+作成者: "Codex CLI"
 最終更新: "2026-04-10"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00059", "init-local-00003"]

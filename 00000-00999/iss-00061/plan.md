@@ -23,6 +23,8 @@ ID: "iss-00061"
   - EC-002
   - EC-003
   - EC-004
+  - EC-005
+  - EC-006
 - 制約:
   - current graph validation 優先
   - remove not-found = error
@@ -43,13 +45,14 @@ ID: "iss-00061"
     - add updated、duplicate unchanged、remove updated、not-found/current-graph-invalid error が integration で通る。
 - M3 closure:
   - 対象:
-    - docs impact、targeted mutation verification、final diff review、rollback 観点確認
+    - docs impact（provider-side 正本 + dogfooding copy verification）、targeted mutation verification、final diff review、rollback 観点確認
   - exit:
     - required tests が通り、T2 scope の closing evidence が揃っている。
 
 ## 実装順序の根拠
 - 依存関係の正本:
   - `design.md` の `依存関係分析` と module/dependency UML を参照する。
+  - upstream prerequisite completion 判定は `iss-00060/report.md` の close-ready evidence と `S99 verdict: final diff review pass` を authoritative source とする。
 - sequencing rule:
   - parser だけ先に足しても write/validation order が不明だと contract を固定できないため、application/domain contract と integration test を先に置く。
   - duplicate-edge semantics は current graph validation 順序に依存するため、no-op success より先に preflight error を固定する。
@@ -85,13 +88,14 @@ ID: "iss-00061"
     - remove write path / renderer レビュー
 - S04:
   - 観測可能な振る舞い:
-    - remove not-found、non-issue node input、invalid add request、parser error が deterministic な error/no-write として返る。
+    - remove not-found、non-issue node input、invalid add request、parser error、write failure が deterministic な error/no-write として返る。
   - closes:
     - AC-004
     - EC-002
     - EC-003
     - EC-004
     - EC-005
+    - EC-006
   - review gate:
     - error contract / exit code / no-write guarantee レビュー
 
@@ -105,6 +109,7 @@ ID: "iss-00061"
 - EC-003 -> S04
 - EC-004 -> S04
 - EC-005 -> S04
+- EC-006 -> S04
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
@@ -456,9 +461,31 @@ ID: "iss-00061"
 - guardrail:
   - parse error exit `2` を維持する。
 
+##### I5 — write failure preserves original `.meta.json`
+- slice goal:
+  - `.meta.json` 更新中の write/replace failure でも partial write を残さない。
+
+###### Red
+- failing test:
+  - dependency mutation helper の write/replace failure 注入 test を追加し、original `.meta.json` が保持されることを期待する。
+- expected failure:
+  - 破損した `.meta.json` が残る、または error contract が曖昧になる。
+
+###### Green
+- minimum implementation:
+  - same-directory temp file + replace の atomic write helper を導入し、write failure を typed error として返す。
+- pass condition:
+  - write failure injection test が通り、保存前後 diff が一致する。
+
+###### Refactor
+- 目的:
+  - failure injection seam と production write path の責務を分離する。
+- guardrail:
+  - success path の `result=updated|unchanged` 契約を変えず、generic RuntimeError fallback に戻さない。
+
 #### step gate
 - review:
-  - error code taxonomy、stderr shape、no-write guarantee、rollback 前提を確認する。
+  - error code taxonomy、stderr shape、no-write guarantee、write failure atomicity、rollback 前提を確認する。
 - expected tests:
   - `python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_deps_s04`
 - report update:
@@ -474,10 +501,12 @@ ID: "iss-00061"
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
-  - docs / assets
+  - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
+  - `spec-dock/docs/reference_deps.md`
 - 対応:
-  - `deps add/remove` を公開 command surface にした場合、runtime command reference と operator-facing docs の差分要否を確定する。
-  - 実装 issue で docs 変更が不要なら、その理由を `report.md` に明記して `none` 扱いの判断根拠を残す。
+  - `deps add/remove` を公開 command surface にした場合、provider-side command reference 正本の差分要否を確定する。
+  - provider-side 正本を更新した場合は dogfooding copy を secondary verification として同期確認する。
+  - 実装 issue で docs 変更が不要なら、その理由と provider-side/dogfooding copy を変更しない根拠を `report.md` に明記して `none` 扱いの判断根拠を残す。
 
 ### S99 — final diff review quality gate
 - branch diff scope:
@@ -498,10 +527,11 @@ ID: "iss-00061"
 
 ## final exit contract
 - AC/EC 達成:
-  - AC-001..004 と EC-001..005 を integration / wrapper test と CLI 観測点で説明できる。
+  - AC-001..004 と EC-001..006 を integration / wrapper test と CLI 観測点で説明できる。
   - duplicate add の `result=unchanged` が current graph validation success 後にのみ成立する。
   - remove not-found が error/no-write として固定され、broken current graph では `edge_not_found` より preflight failure が優先される。
   - non-issue node input が `unsupported_node_kind` として固定されている。
+  - write/replace failure でも original `.meta.json` が保持され、partial write が残らない。
 - docs impact resolved:
   - command surface 変更に対する docs 更新要否が判断され、必要なら反映、不要なら理由が `report.md` に残っている。
 - final diff approved:

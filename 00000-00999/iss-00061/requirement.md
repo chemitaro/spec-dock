@@ -18,7 +18,8 @@ ID: "iss-00061"
 ## 背景・現状
 - 現状の挙動:
   - runtime には `deps check` は存在するが、依存関係を更新する `deps add/remove` は未提供である。
-  - 依存整合性の検査は read path 側に寄っており、mutation 実行前に current graph 自体を fail-closed に止める command contract が未定義である。
+  - `iss-00060` により read path は `.meta.json` SoT へ整列済みで、dependency 整合性の検査は read path 側に寄っている一方、mutation 実行前に current graph 自体を fail-closed に止める command contract は未定義である。
+  - 現行 test には `deps check` 実行で `.meta.json` が変化しない baseline（`test_deps_commands_do_not_mutate_meta_json`）があり、mutation command 導入後も fail-closed / no-write 境界を明示的に更新する必要がある。
 - 現状の課題:
   - command 不在のままでは、依存変更が JSON 直編集や ad-hoc 修正に寄りやすく、duplicate edge や not-found remove の扱いが実装者依存になる。
   - current graph が既に壊れている場合でも、duplicate add を no-op 扱いしてしまうと corruption を見逃す。
@@ -55,6 +56,7 @@ ID: "iss-00061"
   - current graph が正常な場合だけ duplicate add を success/no-op（`result=unchanged`）とし、dependency 配列の non-dup invariant を維持する。
   - remove not-found を success/no-op に丸めず error に固定する。
   - integration test で CLI response/error contract と no-write guarantee を固定する。
+  - command surface が変わるため、provider-side の dependency/operator docs 更新要否を本 issue で解決し、`src/spec_dock/assets/spec_dock/docs/reference_deps.md` を正本、`spec-dock/docs/reference_deps.md` を secondary verification として扱う。
 - MUST NOT:
   - `deps.json` fallback read/write や temporary compatibility path を追加しない。
   - delete/sync/active/validate の全面的な parity work をこの issue に混ぜ込まない。
@@ -84,6 +86,9 @@ ID: "iss-00061"
 
 ## 前提
 - `iss-00060-meta-json-dependency-schema-and-reader-alignment` により `.meta.json` dependency schema と reader contract が先に固まっている。
+- `iss-00060` で provider-side `reference_deps.md` 正本、dogfooding copy、`deps` / `sync` / `active` の read-side regression が `.meta.json` 契約へ追従済みである。
+- upstream prerequisite の authoritative source は `iss-00060/report.md` とし、`S99 verdict: final diff review pass` と close-ready evidence をもって T1 foundation 完了とみなす。
+- この issue の実装正本は provider-side shipped runtime（`src/spec_dock/assets/spec_dock/...`）であり、dogfooding runtime copy は update/sync 前に一時的に遅れていても本 issue の前提不成立とはみなさない。
 - issue 対象は mutation contract に集中し、downstream parity / validate evidence / hard cutover judgment は `iss-00062` へ渡す。
 
 ## 受け入れ条件
@@ -173,6 +178,13 @@ ID: "iss-00061"
     - argparse error と usage を返し、application まで進まない。
   - 観測点:
     - exit code `2`、stderr、no-write。
+- EC-006 write failure atomicity:
+  - 条件:
+    - current graph は valid だが、`.meta.json` 更新の最終書き込みまたは置換で I/O failure が発生する。
+  - 期待:
+    - CLI は write failure を識別できる non-zero error で終了し、partial write や壊れた `.meta.json` を残さない。
+  - 観測点:
+    - 失敗注入 test、stderr の error code/message、保存前後 diff。
 
 ## 入力→出力例（必要時）
 - EX-001:

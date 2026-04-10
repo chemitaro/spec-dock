@@ -3,7 +3,7 @@
 ID: "iss-00060"
 タイトル: "Meta json dependency schema and reader alignment"
 関連GitHub: ["#60"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-10"
 依存: ["requirement.md"]
