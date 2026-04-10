@@ -2373,3 +2373,84 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIsNotNone(from_meta)
             assert from_meta is not None
             self.assertEqual(from_meta.get("depends_on"), [to_id])
+
+    def test_deps_add_duplicate_returns_unchanged_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            first = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+
+            from_meta_path: Path | None = None
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                if payload.get("id") == from_id:
+                    from_meta_path = meta_path
+                    break
+            self.assertIsNotNone(from_meta_path)
+            assert from_meta_path is not None
+
+            before_second = from_meta_path.read_text(encoding="utf-8")
+            second = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(second.stderr.strip(), "")
+            self.assertEqual(
+                second.stdout.strip(),
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+            )
+
+            after_second = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after_second, before_second)
+            from_meta = json.loads(after_second)
+            self.assertEqual(from_meta.get("depends_on"), [to_id])
+
+    def test_deps_add_broken_current_graph_fails_preflight_before_duplicate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Cycle A"), (303, "Cycle B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            cycle_b_id = local_ids["iss-00303"]
+
+            meta_paths_by_id: dict[str, Path] = {}
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                node_id = payload.get("id")
+                if isinstance(node_id, str):
+                    meta_paths_by_id[node_id] = meta_path
+
+            self._set_meta_depends_on(meta_paths_by_id[from_id].parent, [to_id])
+            self._set_meta_depends_on(meta_paths_by_id[to_id].parent, [cycle_b_id])
+            self._set_meta_depends_on(meta_paths_by_id[cycle_b_id].parent, [to_id])
+
+            before = meta_paths_by_id[from_id].read_text(encoding="utf-8")
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("Dependency cycle detected", p.stderr)
+            self.assertNotIn("result=unchanged", p.stderr)
+            self.assertNotIn("result=unchanged", p.stdout)
+
+            after = meta_paths_by_id[from_id].read_text(encoding="utf-8")
+            self.assertEqual(after, before)

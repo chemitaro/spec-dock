@@ -1320,3 +1320,52 @@ class TestRuntimeDepsS04(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
+
+    def test_legacy_deps_add_path_renders_unchanged_result(self) -> None:
+        (
+            runtime_app,
+            _app_check_deps,
+            app_contracts,
+            _app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            _domain_models,
+            _infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
+
+        original_find_specdock_dir = runtime_app._find_specdock_dir
+        original_application_mutate_deps = cli_bootstrap.application_mutate_deps
+        try:
+            runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
+
+            def _fake_mutate_deps(req, ports):
+                del req, ports
+                return app_contracts.MutateDepsResult(
+                    action="add",
+                    from_id="iss-local-00001",
+                    to_id="iss-local-00002",
+                    result="unchanged",
+                    warnings=[],
+                )
+
+            cli_bootstrap.application_mutate_deps = _fake_mutate_deps
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = runtime_app.main(
+                    ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue().strip(), "")
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                "spec-dock: ok (deps add) from=iss-local-00001 to=iss-local-00002 result=unchanged",
+            )
+        finally:
+            runtime_app._find_specdock_dir = original_find_specdock_dir
+            cli_bootstrap.application_mutate_deps = original_application_mutate_deps
