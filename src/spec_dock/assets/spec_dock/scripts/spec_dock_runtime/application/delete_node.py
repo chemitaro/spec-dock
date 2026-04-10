@@ -238,7 +238,7 @@ def _build_partial_failure_recovery_guidance(
     ]
     if dependency_scrub_failures:
         guidance.append(
-            "repair surviving initiative/epic/issue deps.json references listed in dependency_scrub_failures before continuing"
+            "repair surviving initiative/epic/issue .meta.json depends_on references listed in dependency_scrub_failures before continuing"
         )
     guidance.append(manual_follow_up)
     return guidance
@@ -827,25 +827,25 @@ def _delete_subtree_locally(
     return deleted_node_ids, [], True
 
 
-def _load_deps_payload(path: Path, *, ports: Ports) -> dict[str, Any]:
+def _load_meta_payload(path: Path, *, ports: Ports) -> dict[str, Any]:
     if not path.exists():
-        return {"schema_version": 1, "depends_on": []}
+        raise RuntimeError(f"Missing .meta.json: {path}")
     if ports.json_store is not None:
         payload = ports.json_store.load_json(path)
     else:
         payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise RuntimeError(f"Invalid deps.json schema: {path}: expected object")
+        raise RuntimeError(f"Invalid .meta.json schema: {path}: expected object")
     depends_on = payload.get("depends_on")
+    if depends_on is None:
+        depends_on = []
     if not isinstance(depends_on, list):
-        raise RuntimeError(f"Invalid deps.json schema: {path}: depends_on must be a list")
+        raise RuntimeError(f"Invalid .meta.json schema: {path}: depends_on must be a list")
     payload["depends_on"] = depends_on
-    if payload.get("schema_version") is None:
-        payload["schema_version"] = 1
     return payload
 
 
-def _write_deps_payload(path: Path, payload: dict[str, Any], *, ports: Ports) -> None:
+def _write_meta_payload(path: Path, payload: dict[str, Any], *, ports: Ports) -> None:
     if ports.json_store is not None:
         ports.json_store.write_json(path, payload)
         return
@@ -954,9 +954,9 @@ def _scrub_surviving_dependency_refs(
                 for edge_target_id in sorted_edge_target_ids
             )
             continue
-        deps_path = survivor.path / "deps.json"
+        meta_path = survivor.path / ".meta.json"
         try:
-            payload = _load_deps_payload(deps_path, ports=ports)
+            payload = _load_meta_payload(meta_path, ports=ports)
             depends_on = cast(list[object], payload["depends_on"])
             filtered_depends_on = [
                 ref
@@ -969,8 +969,27 @@ def _scrub_surviving_dependency_refs(
                 )
             ]
             if len(filtered_depends_on) != len(depends_on):
-                payload["depends_on"] = filtered_depends_on
-                _write_deps_payload(deps_path, payload, ports=ports)
+                refs_to_remove = [
+                    ref
+                    for ref in depends_on
+                    if _ref_matches_deleted_node(
+                        ref=ref,
+                        deleted_node_ids_lower=deleted_node_ids_lower,
+                        deleted_issue_number_to_node_ids=deleted_issue_number_to_node_ids,
+                        deleted_scoped_refs=deleted_scoped_refs,
+                    )
+                ]
+                remove_issue_dependency = (
+                    getattr(ports.node_repo, "remove_issue_dependency", None) if ports.node_repo is not None else None
+                )
+                if ports.node_repo is not None and not callable(remove_issue_dependency):
+                    raise RuntimeError("remove_issue_dependency is not configured")
+                if callable(remove_issue_dependency):
+                    anchor_target_id = sorted_edge_target_ids[0] if sorted_edge_target_ids else ""
+                    remove_issue_dependency(meta_path, anchor_target_id, matching_refs=refs_to_remove)
+                else:
+                    payload["depends_on"] = filtered_depends_on
+                    _write_meta_payload(meta_path, payload, ports=ports)
         except Exception:
             failures.extend(
                 DeleteDependencyScrubFailure(node_id=survivor_id, edge_target_id=edge_target_id)
