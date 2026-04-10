@@ -16,6 +16,12 @@ from tests.cli_runtime.harness import (
 
 
 class TestCliActive(CliRuntimeHarness):
+    def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
+        meta_path = node_dir / ".meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["depends_on"] = depends_on
+        self._write_json_force(meta_path, meta)
+
     def test_active_set_initiative_and_epic_keep_missing_layers_as_placeholder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -964,10 +970,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1027,10 +1030,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1090,10 +1090,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00401", "--force"])
             self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
@@ -1157,10 +1154,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1214,16 +1208,8 @@ class TestCliActive(CliRuntimeHarness):
                 / "epic-00201-jwt-auth"
                 / "issues"
             )
-            (issue_dir / "iss-00301-cycle-a" / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (issue_dir / "iss-00302-cycle-b" / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir / "iss-00301-cycle-a", ["iss-00302"])
+            self._set_meta_depends_on(issue_dir / "iss-00302-cycle-b", ["iss-00301"])
 
             # S06: topology invalid/cycle is fail-fast even when unreachable from target.
             p = self._run_runtime_capture(target, ["active", "set", "iss-00303", "--force"])
@@ -1274,10 +1260,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             # Baseline: set ready dep issue to active.
             self._run_runtime(target, ["active", "set", "iss-00301", "--force"])
@@ -1399,10 +1382,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00301", "--force"])
             self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
@@ -1477,10 +1457,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             baseline = self._run_runtime_capture(target, ["active", "set", "iss-00401", "--force"])
             self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
@@ -1544,10 +1521,7 @@ class TestCliActive(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
             self._run_runtime(target, ["sync", "--no-update-active"])
             agent_dir = target / "spec-dock" / ".agent"

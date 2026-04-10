@@ -1625,6 +1625,65 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn(".meta.json", p.stderr)
             self.assertIn("depends_on must be a list", p.stderr)
 
+    def test_meta_schema_root_non_object_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._write_text_force(issue_dir / ".meta.json", "[]\n")
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("expected object", p.stderr)
+
+    def test_meta_schema_rejects_object_dep_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [{}])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("depends_on[0]", p.stderr)
+            self.assertIn("must be a string or int", p.stderr)
+
     def test_meta_schema_rejects_boolean_dep_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
