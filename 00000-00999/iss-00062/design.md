@@ -33,6 +33,7 @@ ID: "iss-00062"
 - 前提:
   - `iss-00060` と `iss-00061` が `.meta.json` schema / reader / mutation contract を提供済みである。
   - checked-in dogfooding data 配下には legacy `deps.json` が残っており、manual fix 対象になる。
+  - provider-side templates / init-update coverage にも legacy `deps.json` seed が残っている。
 
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
@@ -57,16 +58,18 @@ ID: "iss-00062"
   - `tests/cli_runtime/test_runtime_deps_s04.py`
   - `tests/cli_runtime/test_runtime_validate_s02.py`
   - `tests/test_init_update.py`
+  - `iss-00060/report.md`
+  - `iss-00061/report.md`
 - 現状理解:
   - downstream command は application layer から `deps_topology_reader.load_issue_depends_on_map()` に依存しているため、SoT 統一の起点は `infra/deps_reader.py` になる。
-  - `infra/deps_reader.py` は現時点で `deps.json` を直接読む契約を持っており、cutover 後に downstream parity を揃えるにはこの境界の更新が必要である。
-  - `delete_node.py` は dependency source を scrub する責務を持つため、SoT 変更後に stale edge を残さない contract を最初に固定する必要がある。
-  - `set_active.py`、`sync_state.py`、`validate_tree.py` は同じ topology reader を使っていても、テストと docs が旧 SoT を残していると parity が崩れる。
-  - docs と checked-in dogfooding data には `deps.json` 前提が残っているため、T3 では runtime 変更だけでなく operator-facing contract と repo data の manual fix が必要である。
+  - `infra/deps_reader.py` は `iss-00060` によりすでに `.meta.json` を直接読む契約へ移行済みであり、`set_active.py` / `sync_state.py` / `validate_tree.py` も shared topology reader を消費している。
+  - `delete_node.py` は dependency source を scrub する責務を持つが、現時点では `deps.json` を直接読み書きしているため、SoT 変更後に stale edge を残さない contract をここで直す必要がある。
+  - `reference_deps.md` は `iss-00060` / `iss-00061` の成果として `.meta.json` SoT と hard cutover owner boundary をすでに反映している一方、`reference_sync.md` と `workflow_issue.md` には T3/T4 split と report fixed keys がまだ不足している。
+  - docs と checked-in dogfooding data に加え、provider-side templates と `tests/test_init_update.py` にも `deps.json` 前提が残っているため、T3 では runtime 変更だけでなく operator-facing contract、scaffold seed、repo data の manual fix が必要である。
   - cutover/manual-fix 案内の docs 正本は provider-side の `reference_deps.md` / `reference_sync.md` / `workflow_issue.md` に置き、dogfooding 側は同名 mirror を更新対象にそろえると既存の reference/workflow 分割と矛盾しない。
   - 採用するパターン:
   - dependency topology は infra reader で集中解決し、application 側は共通 topology を消費する。
-  - provider docs を先に更新し、その後 dogfooding mirror と checked-in data を追従させる。
+  - provider docs / scaffold seed を先に更新し、その後 dogfooding mirror と checked-in data を追従させる。
   - cutover evidence は `report.md` の session log に fixed key を残す。
 - 採用しないもの:
   - command ごとの個別 dependency 解釈
@@ -81,6 +84,7 @@ ID: "iss-00062"
   - `infra/fs_repo.py`
   - downstream parity tests
   - provider docs / dogfooding docs mirror
+  - provider templates / init-update coverage
   - checked-in dogfooding data (`spec-dock/initiatives/**`)
   - `iss-00062/report.md` に残す evidence shape
 
@@ -110,6 +114,10 @@ ID: "iss-00062"
     - `.meta.json` dependency schema と reader boundary
   - `iss-00061`:
     - `deps add/remove` mutation contract
+  - `iss-00060/report.md` / `iss-00061/report.md`:
+    - prerequisite completion と review evidence の権威ソース
+  - provider templates / `tests/test_init_update.py`:
+    - cutover 後に legacy file を再seedしない scaffold contract
   - `infra/deps_reader.py`:
     - downstream application が共有する topology source
   - checked-in dogfooding data:
@@ -124,10 +132,11 @@ ID: "iss-00062"
   - `iss-00063`:
     - T3 judgment fixed を受けて final closure を行う
 - 実装起点:
-  - 先に delete scrub と topology read boundary を固定し、保存後 graph が壊れないことを保証する。
-  - 次に active/sync/validate parity をそろえ、最後に docs/manual fix/evidence を束ねて judgment を固定する。
+  - 先に delete scrub を `.meta.json` SoT へ寄せ、保存後 graph が壊れないことを保証する。
+  - 次に active/sync/validate parity を targeted regression で固定し、mismatch があれば最小修正する。
+  - その後 docs / scaffold seed / report schema を束ね、最後に manual fix と command evidence で judgment を固定する。
 - sequencing implications:
-  - plan は `delete scrub -> active/sync/validate parity -> docs/report contract -> manual fix + validate/sync evidence` の順に組む。
+  - plan は `delete scrub -> active/sync/validate regression lock -> docs/scaffold/report contract -> manual fix + validate/sync evidence` の順に組む。
 
 ### UML（必須: module / dependency）
 ```plantuml
@@ -179,6 +188,10 @@ Report --> T4
   - dogfooding docs mirror の更新対象は `spec-dock/docs/reference_deps.md`、`spec-dock/docs/reference_sync.md`、`spec-dock/docs/workflow_issue.md` の 3 点に限定し、README / guide はリンク整合が崩れない限り対象外とする。
   - checked-in dogfooding data の manual-fix 手順は `reference_deps.md` に置き、`reference_sync.md` には `validate` / `sync` による cutover verification と evidence 採取手順を置く。
   - T3/T4 owner split と issue report evidence contract は `workflow_issue.md` に置き、`iss-00062/report.md` を primary evidence、`iss-00063/report.md` を follow-up consumer として案内する。
+- scaffold/template contract:
+  - provider-side scaffold は `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}` を正本とし、node-scoped legacy `deps.json` を cutover 後の seeded artifact として残さない。
+  - `tests/test_init_update.py` は init/update 後の managed repo が `.meta.json` only contract に従うことを検証する。
+  - checked-in dogfooding data manual fix と scaffold seed cleanup の両方がそろって初めて hard cutover readiness を主張できる。
 - cutover evidence contract:
   - hard cutover judgment の primary owner は `iss-00062`。
   - `iss-00062/report.md` には、少なくとも次の fixed key を残せるようにする。
@@ -222,16 +235,21 @@ Report --> T4
   - report fixed-key contract を記述する evidence block
 - Modify:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py`
+  - downstream parity tests
+  - provider docs / dogfooding docs mirror
+  - `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/deps.json`
+  - `tests/test_init_update.py`
+  - checked-in dogfooding data の `.meta.json`
+- Conditional Modify:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/validate_tree.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py`
-  - downstream parity tests
-  - provider docs / dogfooding docs mirror
-  - checked-in dogfooding data の `.meta.json`
+  - targeted regression で mismatch が見つかった場合のみ変更対象にする
 - Delete:
   - checked-in dogfooding data 配下で legacy dependency source として残る `spec-dock/initiatives/**/deps.json`
+  - provider-side scaffold に残る `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/deps.json`
 - Move/Rename:
   - なし
 - Read only:
@@ -243,10 +261,12 @@ Report --> T4
 - AC-002 -> shared topology reader による active/sync/validate parity
 - AC-003 -> docs/manual fix/evidence bundle + T3 judgment fixation
 - AC-004 -> `iss-00062/report.md` fixed key contract + `iss-00063` follow-up ownership
+- AC-005 -> scaffold/template legacy seed cleanup + init/update contract alignment
 - EC-001 -> multi-inbound scrub or fail-closed detection
 - EC-002 -> legacy file 残存時の boundary failure
 - EC-003 -> evidence incomplete なら judgment fixed に進めない gate
 - EC-004 -> parity mismatch 発見時の stop-and-record policy
+- EC-005 -> template/init-update で legacy file を再seedした場合の judgment stop
 - constraint -> provider-side SoT / no fallback / T3 owner fixed
 
 ## テスト戦略
@@ -275,17 +295,19 @@ Report --> T4
 - AC-002 -> active/sync/validate targeted runtime tests + CLI evidence
 - AC-003 -> docs diff + manual-fix diff + `validate` / `sync` evidence + report record
 - AC-004 -> issue spec review + report fixed-key presence review
+- AC-005 -> template diff + `tests/test_init_update.py` coverage
 - EC-001 -> multi-inbound delete scenario test
 - EC-002 -> cutover boundary test + manual-fix precondition check
 - EC-003 -> report review
 - EC-004 -> parity mismatch reproducer and report entry
+- EC-005 -> scaffold seed regression test
 - constraint -> final diff review で fallback / dual-read 不導入を確認
 
 ## リスク / 移行 / ロールバック
 - risk:
   - checked-in dogfooding data の manual fix scope が広く、取りこぼすと `validate` / `sync` evidence が不成立になる。
   - downstream parity を command ごとに直すと、reader contract が再び分岐する。
-  - docs だけ先に更新すると、dogfooding data と runtime が追いつく前に運用誤認を生む。
+  - docs だけ先に更新すると、dogfooding data / scaffold seed / runtime が追いつく前に運用誤認を生む。
 - migration:
   - runtime fallback なしで hard cutover するため、manual fix と docs 更新が migration 本体になる。
 - rollback:
