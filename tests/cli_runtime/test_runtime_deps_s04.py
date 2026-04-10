@@ -1369,3 +1369,58 @@ class TestRuntimeDepsS04(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
+
+    def test_legacy_deps_remove_path_delegates_and_exit_code_zero(self) -> None:
+        (
+            runtime_app,
+            _app_check_deps,
+            app_contracts,
+            _app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            _domain_models,
+            _infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
+
+        calls: dict[str, object] = {}
+        original_find_specdock_dir = runtime_app._find_specdock_dir
+        original_application_mutate_deps = cli_bootstrap.application_mutate_deps
+        try:
+            runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
+
+            def _fake_mutate_deps(req, ports):
+                calls["req"] = req
+                calls["ports"] = ports
+                return app_contracts.MutateDepsResult(
+                    action="remove",
+                    from_id="iss-local-00001",
+                    to_id="iss-local-00002",
+                    result="updated",
+                    warnings=[],
+                )
+
+            cli_bootstrap.application_mutate_deps = _fake_mutate_deps
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = runtime_app.main(
+                    ["deps", "remove", "--from", "iss-local-00001", "--to", "iss-local-00002"]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue().strip(), "")
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                "spec-dock: ok (deps remove) from=iss-local-00001 to=iss-local-00002 result=updated",
+            )
+            req = calls["req"]
+            self.assertEqual(req.action, "remove")
+            self.assertEqual(req.from_id, "iss-local-00001")
+            self.assertEqual(req.to_id, "iss-local-00002")
+        finally:
+            runtime_app._find_specdock_dir = original_find_specdock_dir
+            cli_bootstrap.application_mutate_deps = original_application_mutate_deps

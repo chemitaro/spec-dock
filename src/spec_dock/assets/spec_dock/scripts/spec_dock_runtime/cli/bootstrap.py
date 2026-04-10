@@ -58,6 +58,9 @@ class _NodeRepository:
     def add_issue_dependency(self, meta_path: Path, to_id: str) -> None:
         infra_fs_repo.add_issue_dependency(meta_path, to_id)
 
+    def remove_issue_dependency(self, meta_path: Path, to_id: str) -> None:
+        infra_fs_repo.remove_issue_dependency(meta_path, to_id)
+
     def delete_tree(self, node_path: Path) -> None:
         infra_fs_repo.delete_tree(node_path)
 
