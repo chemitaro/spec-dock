@@ -3,9 +3,13 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 
-from ..application.contracts import CheckDepsRequest, MutateDepsRequest, TargetRef, UseCases
+from ..application.contracts import CheckDepsRequest, MutateDepsError, MutateDepsRequest, TargetRef, UseCases
 from ..domain.ids import format_id, parse_id
-from ..presentation.cli_text import render_deps_check_text, render_deps_mutation_text
+from ..presentation.cli_text import (
+    render_deps_check_text,
+    render_deps_mutation_error_text,
+    render_deps_mutation_text,
+)
 from ..presentation.contracts import CliText
 from ..presentation.json_state import render_deps_check_json
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
@@ -90,8 +94,8 @@ def _deps_check_args(ns: argparse.Namespace) -> CommandArgs:
 
 
 def _deps_mutation_args(ns: argparse.Namespace) -> CommandArgs:
-    from_id = _normalize_issue_id(str(getattr(ns, "from_id", "")), field="--from")
-    to_id = _normalize_issue_id(str(getattr(ns, "to_id", "")), field="--to")
+    from_id = _normalize_node_id(str(getattr(ns, "from_id", "")), field="--from")
+    to_id = _normalize_node_id(str(getattr(ns, "to_id", "")), field="--to")
     return DepsMutationArgs(from_id=from_id, to_id=to_id)
 
 
@@ -117,37 +121,34 @@ def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 
 
 def _run_deps_add(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
-    typed = _expect_deps_mutation_args(args)
-    result = use_cases.mutate_deps(
-        MutateDepsRequest(
-            action="add",
-            from_id=typed.from_id,
-            to_id=typed.to_id,
-        )
-    )
-    return CommandOutcome(exit_code=0, text=render_deps_mutation_text(result))
+    return _run_deps_mutation(action="add", args=args, use_cases=use_cases)
 
 
 def _run_deps_remove(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    return _run_deps_mutation(action="remove", args=args, use_cases=use_cases)
+
+
+def _run_deps_mutation(*, action: str, args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_deps_mutation_args(args)
-    result = use_cases.mutate_deps(
-        MutateDepsRequest(
-            action="remove",
-            from_id=typed.from_id,
-            to_id=typed.to_id,
+    try:
+        result = use_cases.mutate_deps(
+            MutateDepsRequest(
+                action=action,
+                from_id=typed.from_id,
+                to_id=typed.to_id,
+            )
         )
-    )
+    except MutateDepsError as error:
+        return CommandOutcome(exit_code=1, text=render_deps_mutation_error_text(error))
     return CommandOutcome(exit_code=0, text=render_deps_mutation_text(result))
 
 
-def _normalize_issue_id(value: str, *, field: str) -> str:
+def _normalize_node_id(value: str, *, field: str) -> str:
     raw = value.strip().lower()
     if not raw:
         raise RuntimeError(f"{field} is required")
     prefix, is_local, num = parse_id(raw)
-    if prefix != "iss":
-        raise RuntimeError(f"{field} must be an issue id: {value}")
-    return format_id("iss", num, local=is_local)
+    return format_id(prefix, num, local=is_local)
 
 
 def _expect_deps_check_args(args: CommandArgs) -> DepsCheckArgs:

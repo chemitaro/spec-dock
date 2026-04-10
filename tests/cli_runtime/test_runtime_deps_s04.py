@@ -2,6 +2,8 @@ import contextlib
 from dataclasses import replace
 import io
 import json
+import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -1424,3 +1426,279 @@ class TestRuntimeDepsS04(unittest.TestCase):
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             cli_bootstrap.application_mutate_deps = original_application_mutate_deps
+
+    def test_legacy_deps_add_path_renders_typed_error_contract(self) -> None:
+        (
+            runtime_app,
+            _app_check_deps,
+            app_contracts,
+            _app_ports,
+            _app_status_context,
+            _app_validate_tree,
+            _domain_models,
+            _infra_contracts,
+            _presentation_cli_text,
+            _presentation_json_state,
+        ) = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
+
+        original_find_specdock_dir = runtime_app._find_specdock_dir
+        original_application_mutate_deps = cli_bootstrap.application_mutate_deps
+        try:
+            runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
+
+            def _fake_mutate_deps(req, ports):
+                del req, ports
+                raise app_contracts.MutateDepsError(
+                    action="add",
+                    from_id="iss-local-00001",
+                    to_id="iss-local-00002",
+                    code="write_failed",
+                    detail="write_failed[replace]: simulated replace failure",
+                )
+
+            cli_bootstrap.application_mutate_deps = _fake_mutate_deps
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = runtime_app.main(
+                    ["deps", "add", "--from", "iss-local-00001", "--to", "iss-local-00002"]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue().strip(), "")
+            self.assertIn(
+                "spec-dock: error (deps add) from=iss-local-00001 to=iss-local-00002 code=write_failed",
+                stderr.getvalue(),
+            )
+            self.assertIn("- write_failed[replace]: simulated replace failure", stderr.getvalue())
+        finally:
+            runtime_app._find_specdock_dir = original_find_specdock_dir
+            cli_bootstrap.application_mutate_deps = original_application_mutate_deps
+
+    def test_fs_repo_atomic_replace_failure_preserves_original_meta_json(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import fs_repo
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir.mkdir(parents=True, exist_ok=True)
+            meta_path = node_dir / ".meta.json"
+            meta_path.write_text(
+                json.dumps({"id": "iss-local-00001", "type": "issue", "depends_on": []}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            original = meta_path.read_text(encoding="utf-8")
+
+            original_replace = fs_repo.os.replace
+            try:
+                def _failing_replace(src, dst):
+                    del src, dst
+                    raise OSError("simulated replace failure")
+
+                fs_repo.os.replace = _failing_replace
+                with self.assertRaises(RuntimeError) as ctx:
+                    fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
+            finally:
+                fs_repo.os.replace = original_replace
+
+            self.assertIn("write_failed", str(ctx.exception))
+            self.assertEqual(meta_path.read_text(encoding="utf-8"), original)
+            tmp_files = [p for p in node_dir.iterdir() if p.name.startswith(".meta.json.tmp-")]
+            self.assertEqual(tmp_files, [])
+
+    def test_fs_repo_atomic_replace_failure_preserves_original_meta_json_on_remove(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import fs_repo
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir.mkdir(parents=True, exist_ok=True)
+            meta_path = node_dir / ".meta.json"
+            meta_path.write_text(
+                json.dumps(
+                    {
+                        "id": "iss-local-00001",
+                        "type": "issue",
+                        "depends_on": ["iss-local-00002"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            original = meta_path.read_text(encoding="utf-8")
+
+            original_replace = fs_repo.os.replace
+            try:
+                def _failing_replace(src, dst):
+                    del src, dst
+                    raise OSError("simulated replace failure")
+
+                fs_repo.os.replace = _failing_replace
+                with self.assertRaises(RuntimeError) as ctx:
+                    fs_repo.remove_issue_dependency(meta_path, "iss-local-00002")
+            finally:
+                fs_repo.os.replace = original_replace
+
+            self.assertIn("write_failed", str(ctx.exception))
+            self.assertEqual(meta_path.read_text(encoding="utf-8"), original)
+            tmp_files = [p for p in node_dir.iterdir() if p.name.startswith(".meta.json.tmp-")]
+            self.assertEqual(tmp_files, [])
+
+    def test_fs_repo_atomic_write_preserves_existing_read_bits(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are required for this test")
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import fs_repo
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir.mkdir(parents=True, exist_ok=True)
+            meta_path = node_dir / ".meta.json"
+            meta_path.write_text(
+                json.dumps({"id": "iss-local-00001", "type": "issue", "depends_on": []}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            meta_path.chmod(0o444)
+            expected_mode = stat.S_IMODE(meta_path.stat().st_mode)
+
+            fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
+
+            written = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(written.get("depends_on"), ["iss-local-00002"])
+            self.assertEqual(stat.S_IMODE(meta_path.stat().st_mode), expected_mode)
+
+    def test_fs_repo_atomic_unlock_failure_maps_to_write_failed(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are required for this test")
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import fs_repo
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir.mkdir(parents=True, exist_ok=True)
+            meta_path = node_dir / ".meta.json"
+            meta_path.write_text(
+                json.dumps({"id": "iss-local-00001", "type": "issue", "depends_on": []}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            meta_path.chmod(0o444)
+            before = meta_path.read_text(encoding="utf-8")
+
+            original_chmod = fs_repo.Path.chmod
+            try:
+                def _failing_chmod(self, mode, *args, **kwargs):
+                    if self == meta_path and (mode & 0o200):
+                        raise OSError("simulated unlock failure")
+                    return original_chmod(self, mode, *args, **kwargs)
+
+                fs_repo.Path.chmod = _failing_chmod
+                with self.assertRaises(RuntimeError) as ctx:
+                    fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
+            finally:
+                fs_repo.Path.chmod = original_chmod
+
+            self.assertIn("write_failed[unlock]", str(ctx.exception))
+            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
+
+    def test_fs_repo_atomic_stat_failure_maps_to_write_failed(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import fs_repo
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir.mkdir(parents=True, exist_ok=True)
+            meta_path = node_dir / ".meta.json"
+            meta_path.write_text(
+                json.dumps({"id": "iss-local-00001", "type": "issue", "depends_on": []}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            before = meta_path.read_text(encoding="utf-8")
+
+            original_exists = fs_repo.Path.exists
+            original_stat = fs_repo.Path.stat
+            try:
+                def _forced_exists(self):
+                    if self == meta_path:
+                        return True
+                    return original_exists(self)
+
+                def _failing_stat(self, *args, **kwargs):
+                    if self == meta_path:
+                        raise OSError("simulated stat failure")
+                    return original_stat(self, *args, **kwargs)
+
+                fs_repo.Path.exists = _forced_exists
+                fs_repo.Path.stat = _failing_stat
+                with self.assertRaises(RuntimeError) as ctx:
+                    fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
+            finally:
+                fs_repo.Path.exists = original_exists
+                fs_repo.Path.stat = original_stat
+
+            self.assertIn("write_failed[stat]", str(ctx.exception))
+            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)

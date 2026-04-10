@@ -78,6 +78,13 @@ class TestCliDeps(CliRuntimeHarness):
         meta["schema_version"] = schema_version
         self._write_json_force(meta_path, meta)
 
+    def _find_meta_path_by_id(self, target: Path, node_id: str) -> Path:
+        for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            if payload.get("id") == node_id:
+                return meta_path
+        raise AssertionError(f"meta path not found for node id: {node_id}")
+
     def _make_gh_issue_list_and_view_stub(
         self,
         bin_dir: Path,
@@ -2491,4 +2498,230 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertNotIn("result=unchanged", p.stdout)
 
             after = meta_paths_by_id[from_id].read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_not_found_returns_edge_not_found_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_broken_current_graph_fails_preflight_before_edge_not_found(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Cycle A"), (303, "Cycle B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            cycle_b_id = local_ids["iss-00303"]
+
+            to_meta_path = self._find_meta_path_by_id(target, to_id)
+            cycle_b_meta_path = self._find_meta_path_by_id(target, cycle_b_id)
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            self._set_meta_depends_on(to_meta_path.parent, [cycle_b_id])
+            self._set_meta_depends_on(cycle_b_meta_path.parent, [to_id])
+
+            before = from_meta_path.read_text(encoding="utf-8")
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=preflight_validate_failed", p.stderr)
+            self.assertNotIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_non_issue_node_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["epic-00201"]
+            to_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_non_issue_to_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["epic-00201"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_unresolved_target_returns_invalid_add_unresolved_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", "iss-local-99999"],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=invalid_add_unresolved", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_unresolved_source_returns_invalid_add_unresolved_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            to_id = local_ids["iss-00302"]
+            to_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = to_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", "iss-local-99998", "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=invalid_add_unresolved", p.stderr)
+
+            after = to_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_self_dependency_returns_invalid_add_self_dependency_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Solo issue"),),
+            )
+            issue_id = local_ids["iss-00301"]
+            issue_meta_path = self._find_meta_path_by_id(target, issue_id)
+            before = issue_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", issue_id, "--to", issue_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=invalid_add_self_dependency", p.stderr)
+
+            after = issue_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_cycle_request_returns_invalid_add_cycle_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            first = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", to_id, "--to", from_id],
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+
+            before = from_meta_path.read_text(encoding="utf-8")
+            second = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(second.returncode, 1, second.stdout + second.stderr)
+            self.assertEqual(second.stdout.strip(), "")
+            self.assertIn("code=invalid_add_cycle", second.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_missing_required_flag_returns_parser_error_exit_two_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id],
+            )
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("usage:", p.stderr)
+            self.assertIn("--to", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
             self.assertEqual(after, before)

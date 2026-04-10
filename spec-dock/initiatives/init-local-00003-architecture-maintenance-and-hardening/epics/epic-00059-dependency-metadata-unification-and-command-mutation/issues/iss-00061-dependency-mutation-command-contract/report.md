@@ -169,11 +169,51 @@ python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_de
 - `tests/cli_runtime/test_runtime_deps_s04.py` - remove runtime delegation smoke を追加
 
 #### コミット
-- 未作成（この後 S03 commit を実施）
+- `d4c2ce0` `feat(runtime): deps remove のコマンド契約を追加`
 
 #### メモ
 - remove not-found や broader error taxonomy は未実装で、S04 でまとめて扱う。
 - 現段階の remove は happy path のみで、existing edge がある前提に限定している。
+
+---
+
+### 2026-04-10 08:29 - 08:48
+
+#### 対象
+- Step: S04
+- AC/EC: AC-004, EC-002, EC-003, EC-004, EC-005, EC-006
+
+#### 実施内容
+- `deps add/remove` の error family を TDD で拡張し、remove not-found、invalid add/remove request、non-issue node input、cycle add、parser error、write failure を deterministic な CLI contract として固定した。
+- application では typed `MutateDepsError` により fail-closed に統一し、infra では same-directory temp + replace の atomic write と temp cleanup、readonly lock の再適用、unlock/stat/replace 系失敗の `write_failed` 化を実装した。
+- 初回 implementation review で write-failure mapping と permission bit preservation に欠陥が見つかったため修正し、再 review / re-QA で pass を取得した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_deps_s04
+
+- Ran 91 tests in 20.999s
+- OK
+- implementation review: fail -> fix -> pass
+- QA review: pass
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - typed `MutateDepsError` と mutation error code contract を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - fail-closed mutation orchestration、cycle/not-found/invalid/write failure mapping を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` - node id normalization と mutation error handling を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py` - issue edge existence / cycle detection helper を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - atomic temp+replace write、temp cleanup、readonly read-bit preserve/relock、write failure mapping を追加
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - mutation error renderer を追加
+- `tests/cli_runtime/test_deps.py` - add/remove の error contract、unsupported node、cycle、write failure の integration を追加
+- `tests/cli_runtime/test_runtime_deps_s04.py` - atomic no-partial-write、temp cleanup、permission preservation、wrapper error rendering の runtime tests を追加
+
+#### コミット
+- 未作成（この後 S04 commit を実施）
+
+#### メモ
+- final pass 時点では `write_failed` が `stat` / `chmod` / `replace` / cleanup 系失敗でも typed error に正規化され、partial write を残さないことを focused tests で確認した。
+- QA からは CLI-level remove `write_failed` regression と lock-failure contract の追加余地が示されたが、現時点では non-blocking suggestion 扱いである。
 
 ---
 

@@ -165,6 +165,24 @@ class MutateDepsResult:
     warnings: list[str]
 
 
+class MutateDepsError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        action: MutateDepsAction,
+        from_id: str,
+        to_id: str,
+        code: str,
+        detail: str | None = None,
+    ) -> None:
+        self.action = action
+        self.from_id = from_id
+        self.to_id = to_id
+        self.code = code
+        self.detail = detail
+        super().__init__(detail or code)
+
+
 @dataclass(frozen=True)
 class CloseNodeRequest:
     target: TargetRef
