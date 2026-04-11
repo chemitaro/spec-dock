@@ -103,6 +103,7 @@ ID: "iss-00063"
 - final regression / parity confirmation の required command では `./spec-dock/scripts/spec-dock validate` を成功させる。
 - final regression suite の正本は本 issue spec とし、追加/削除を ad hoc に決めない。
 - `same dependency graph` は `.meta.json` SoT 由来の正規化 `issue_depends_on_map` を比較基準とし、順序差だけでは pass/fail を変えない。
+- same-snapshot parity は checked-in `.meta.json` graph snapshot と rerun-required command 観測の整合を要求する。手順外の repo mutation は禁止するが、rerun-required command 自身が生成する `spec-dock/.agent/**` / `dashboard.md` / `*.puml` 更新や、`sync` 自身が branch matching により active target を current branch issue へ復元する副作用は、`.meta.json` / canonical tuple 集合が不変で command exit が success の場合に限り expected output として許容する。
 - epic `report.md` の更新は S04 close reporting だけで許可し、S02/S90 では更新しない。
 - epic close summary は T4 issue `report.md` と矛盾してはならない。
 - 新たな uppercase path を作らない。
@@ -155,6 +156,7 @@ ID: "iss-00063"
     - `active set` の `blocker_ids` が同じ graph snapshot から導かれる依存集合と一致しない。
     - `sync` または `validate` が、他 command が参照していない edge/error を示す。
     - 同一 repo snapshot で採った観測として説明できない。
+    - ただし rerun-required command 自身が生成する `spec-dock/.agent/**` / `dashboard.md` / `*.puml` 更新や、`sync` が `matched id in branch: <current-issue>` を理由に active target を current branch issue へ復元しただけで、`.meta.json` / canonical tuple 集合が不変なら mismatch とは扱わない。
 
 ## 受け入れ条件
 - AC-001:
@@ -187,6 +189,7 @@ ID: "iss-00063"
     - `sync` の rendered edge tuple summary
     - `validate` の exit code / validation error summary
     - issue `report.md` の parity section
+    - `sync` の active restore reason（branch matching による復元が起きた場合）
 - AC-003:
   - Actor:
     - T4 closure owner / reviewer

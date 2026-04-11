@@ -272,7 +272,8 @@ ID: "iss-00063"
     - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `<target-id>` は `iss-00062/report.md` 記録済み id を使う。既に active の場合は `active unchanged` を parity 観測として採用し、別 target へ切り替えない
     - `./spec-dock/scripts/spec-dock validate`
     - `./spec-dock/scripts/spec-dock sync`
-  - 途中で working tree、`.meta.json`、`spec-dock/.agent/**`、active target のいずれかが変わった場合は同一 snapshot 条件が崩れるため、その parity run を破棄して最初から採り直す
+  - canonical graph 抽出後は、rerun-required command 自身の expected output 以外の手順外 mutation を挟かない。`.meta.json` の変更、別 command による graph mutation、または active target が `sync` の `matched id in branch: <current-issue>` による復元以外の理由で変わった場合は同一 snapshot 条件が崩れるため、その parity run を破棄して最初から採り直す
+  - `active set` / `validate` / `sync` が生成する `spec-dock/.agent/**` / `dashboard.md` / `*.puml` 更新と、`sync` 自身の success result に含まれる branch-match active restore は expected runtime side effect として許容し、その reason と復元先 id を parity observation に記録する
 - pass condition:
   - RG1 で regression / parity evidence が passし、canonical tuple 集合と command 観測値の対応が report から追える
 
@@ -293,9 +294,10 @@ ID: "iss-00063"
     - `python -m unittest tests.cli_runtime.test_runtime_active_s06 tests.cli_runtime.test_runtime_deps_s04 -v` は ancillary flaky-check subset として必要時のみ supplemental reference に使い、required suite には数えないこと
   - canonical graph trace:
     - canonical tuple 集合の抽出元 snapshot、tuple 集合そのもの、`<target-id>` が report に揃っていること
-    - `active set` / `validate` / `sync` が canonical graph 抽出後に no-intervening-change で取得されたこと
+    - `active set` / `validate` / `sync` が canonical graph 抽出後に手順外 mutation なしで取得されたこと
+    - 例外として、rerun-required command 自身が生成する `spec-dock/.agent/**` / `dashboard.md` / `*.puml` 更新と、`sync` success result に含まれる branch-match active restore だけは parity observation として許容され、blocker 扱いされていないこと
   - rerun-required commands:
-    - `./spec-dock/scripts/spec-dock active set <target-id>` ただし `iss-00062/report.md` の記録済み id がある場合
+    - `./spec-dock/scripts/spec-dock active set <target-id>`。`iss-00062/report.md` に記録済み id が無ければ S02 は blocker / fail とし、この command を省略して `validate` / `sync` だけで進めてはならない
     - `./spec-dock/scripts/spec-dock validate`
     - `./spec-dock/scripts/spec-dock sync`
 - report update:
