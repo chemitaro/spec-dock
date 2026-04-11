@@ -11,6 +11,7 @@ ADR（Architecture Decision Record）は、意思決定を仕様（requirement/d
 - Epic: [workflow_epic.md](workflow_epic.md)
 - Issue: [workflow_issue.md](workflow_issue.md)
 - 命名と採番: [reference_naming.md](reference_naming.md)
+- 依存関係: [reference_deps.md](reference_deps.md)
 
 ## 1. いつ ADR を起こすか
 
@@ -61,6 +62,18 @@ runtime command（scope を明示）:
 レビュー/合意後に:
 - Decision を確定し、必要ならステータスを `accepted` にする
 - 影響がある仕様（design/plan）へリンクして反映する
+
+## 3.5 依存変更を伴う ADR の運用
+
+ADR で Issue 間依存の追加/削除を採用した場合は、次の command-first contract で反映します。
+
+```bash
+./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
+```
 
 ## 4. 品質ゲート（ADR）
 
