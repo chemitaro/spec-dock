@@ -62,7 +62,7 @@ ID: "iss-00064"
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`
-  - `src/spec_dock/assets/spec_dock/docs/workflow_tree.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`
   - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
@@ -107,7 +107,7 @@ ID: "iss-00064"
 ## 機械的検証ルール
 - Positive assertions:
   - provider command path required files:
-    - `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow_tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}`
+    - `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}`
   - mirror command path required files:
     - `spec-dock/docs/{README.md,guide.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md,reference_deps.md,reference_sync.md,reference_github.md,sync.md,spec-dock-guide-old.md}`
   - storage contract required files:
@@ -129,7 +129,7 @@ ID: "iss-00064"
 - Allowed exception:
   - `spec-dock/docs/spec-dock-guide-old.md` では deprecated/historical warning の中で旧表記に言及してよいが、同一文書に current doc link、current command path、legacy framing string を必須で置く。
 - Strict current-doc set:
-  - `src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow_tree.md,workflow_adr.md}`
+  - `src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md}`
   - `spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md}`
   - `src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
   - `.agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
@@ -206,13 +206,13 @@ ID: "iss-00064"
     - docs/help/skill verification と required command evidence
   - pass 条件:
     - strict current-doc negative check:
-      - `rg -n '\./spec\b' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow_tree.md,workflow_adr.md} spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md} src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md .agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
+      - `rg -n '\./spec(\s|$)' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md} spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md} src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md .agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
       - 期待: 0 件
     - strict legacy-name negative check:
-      - `rg -n 'deps\.json|meta\.json' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow_tree.md,workflow_adr.md} spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md} src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md .agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
+      - `rg -n 'deps\.json|meta\.json' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md} spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md} src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md .agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
       - 期待: 0 件
     - provider command path positive check:
-      - `rg -n '\./spec-dock/scripts/spec-dock' src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow_tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}`
+      - `rg -n '\./spec-dock/scripts/spec-dock' src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}`
       - 期待: 10 ファイルすべてで 1 件以上
     - mirror command path positive check:
       - `rg -n '\./spec-dock/scripts/spec-dock' spec-dock/docs/{README.md,guide.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md,reference_deps.md,reference_sync.md,reference_github.md,sync.md,spec-dock-guide-old.md}`
