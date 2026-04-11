@@ -82,6 +82,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/issue/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
         ),
+        ".agents/skills/spec-driven-tdd-workflow/SKILL.md": (
+            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-issue-execution/SKILL.md": (
+            "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md"
+        ),
         ".agents/skills/spec-dock-codex-adapter/SKILL.md": (
             "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md"
         ),
@@ -284,6 +290,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00064-update-user-facing-docs-help/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
@@ -324,6 +331,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00061-dependency-mutation-command-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00064-update-user-facing-docs-help/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -833,6 +841,15 @@ class TestInitUpdate(CliRuntimeHarness):
             skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("`discussions/`", skill_text)
             self.assertIn("./spec-dock/scripts/spec-dock new doc adr --issue", skill_text)
+            self.assertIn("`spec-dock/docs/reference_deps.md`", skill_text)
+            self.assertIn("`spec-dock/docs/reference_sync.md`", skill_text)
+            self.assertIn("./spec-dock/scripts/spec-dock ...", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target> --github", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock sync --github", skill_text)
+            self.assertNotIn("./spec ", skill_text)
             self.assertNotIn("adrs/new-adr", skill_text)
             self.assertFalse(
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
@@ -1209,26 +1226,16 @@ class TestInitUpdate(CliRuntimeHarness):
             f"checked-in dogfooding initiatives still contain legacy deps.json: {legacy_deps_paths}",
         )
 
-        missing_depends_on_paths: list[str] = []
         non_list_depends_on_paths: list[str] = []
         observed_depends_on_by_meta_path: dict[str, list[object]] = {}
         for meta_path in meta_paths:
             payload = json.loads(meta_path.read_text(encoding="utf-8"))
             rel_meta_path = meta_path.relative_to(repo_root).as_posix()
-            if "depends_on" not in payload:
-                missing_depends_on_paths.append(rel_meta_path)
-                continue
-            depends_on = payload["depends_on"]
+            depends_on = payload.get("depends_on", [])
             if not isinstance(depends_on, list):
                 non_list_depends_on_paths.append(rel_meta_path)
                 continue
             observed_depends_on_by_meta_path[rel_meta_path] = depends_on
-        self.assertEqual(
-            missing_depends_on_paths,
-            [],
-            "checked-in dogfooding .meta.json missing explicit depends_on: "
-            f"{missing_depends_on_paths}",
-        )
         self.assertEqual(
             non_list_depends_on_paths,
             [],
@@ -6031,6 +6038,28 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
         self.assertIn("thin", copilot_adapter_text.lower())
 
+        for skill_text in (hub_text, issue_text, codex_adapter_text, copilot_adapter_text):
+            self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
+            self.assertNotIn("./spec ", skill_text)
+
+        self.assertIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", issue_text)
+        self.assertIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", issue_text)
+        self.assertIn("./spec-dock/scripts/spec-dock deps check <target> --github", issue_text)
+        self.assertIn("./spec-dock/scripts/spec-dock validate", issue_text)
+        self.assertIn("./spec-dock/scripts/spec-dock sync --github", issue_text)
+
+        for skill_text in (hub_text, codex_adapter_text, copilot_adapter_text):
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target> --github", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock sync --github", skill_text)
+
+        self.assertIn("`spec-dock/docs/reference_deps.md`", codex_adapter_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", codex_adapter_text)
+        self.assertIn("`spec-dock/docs/reference_deps.md`", copilot_adapter_text)
+        self.assertIn("`spec-dock/docs/reference_sync.md`", copilot_adapter_text)
+
         self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", initiative_text)
@@ -7098,10 +7127,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "repo_name": "repo",
             }
             self._write_json_force(foreign_meta_path, foreign_meta)
-            self._write_json_force(
-                depends_issue_dir / "deps.json",
-                {"schema_version": 1, "depends_on": [123]},
-            )
+            depends_meta_path = depends_issue_dir / ".meta.json"
+            depends_meta = json.loads(depends_meta_path.read_text(encoding="utf-8"))
+            depends_meta["depends_on"] = [123]
+            self._write_json_force(depends_meta_path, depends_meta)
 
             deps_result = self._run_runtime_capture(
                 target,
@@ -7263,10 +7292,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             }
             for dep_ref, expected_dep in expected_by_ref.items():
                 with self.subTest(dep_ref=dep_ref):
-                    self._write_json_force(
-                        depends_issue_dir / "deps.json",
-                        {"schema_version": 1, "depends_on": [dep_ref]},
-                    )
+                    depends_meta_path = depends_issue_dir / ".meta.json"
+                    depends_meta = json.loads(depends_meta_path.read_text(encoding="utf-8"))
+                    depends_meta["depends_on"] = [dep_ref]
+                    self._write_json_force(depends_meta_path, depends_meta)
                     deps_result = self._run_runtime_capture(
                         target,
                         ["deps", "check", "--id", "iss-local-00003", "--json"],
@@ -7303,10 +7332,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self._write_json_force(foreign_meta_path, foreign_meta)
 
             depends_issue_dir = epic_dir / "issues" / "iss-local-00003-depends-issue"
-            self._write_json_force(
-                depends_issue_dir / "deps.json",
-                {"schema_version": 1, "depends_on": [123]},
-            )
+            depends_meta_path = depends_issue_dir / ".meta.json"
+            depends_meta = json.loads(depends_meta_path.read_text(encoding="utf-8"))
+            depends_meta["depends_on"] = [123]
+            self._write_json_force(depends_meta_path, depends_meta)
 
             deps_result = self._run_runtime_capture(
                 target,

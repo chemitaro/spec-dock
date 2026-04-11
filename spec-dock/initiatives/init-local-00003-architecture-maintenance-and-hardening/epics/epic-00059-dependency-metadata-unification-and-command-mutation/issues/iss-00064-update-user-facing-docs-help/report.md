@@ -241,3 +241,196 @@ findings=[]
 
 #### メモ
 - 次は S03 として skills / optional tests / final QA evidence を閉じる。
+
+### 2026-04-11 13:10 - 14:10
+
+#### 対象
+- Step: S03 / RG3 / QG1 preparation
+- AC/EC: AC-001, AC-002, AC-003, EC-003
+
+#### 実施内容
+- skill への command guidance を role-based minimal policy に整理した。
+- `spec-dock-issue-execution` のみ concrete `deps add/remove/check` と `validate` / `sync --github` を保持し、hub / host adapter は docs 参照中心へ戻した。
+- user follow-up を受けて duplication を再評価し、過剰な同文コマンド block を削減した。
+- `tests/test_init_update.py` の checked-in dogfooding snapshot 定数に `iss-00064` を追加した。
+- `.meta.json` only contract に合わせて runtime subprocess parity tests の fixture を `deps.json` から `.meta.json` へ更新した。
+- QG1 実測中に `./spec-dock/...` を誤検知する `./spec\b` regex を発見したため、`plan.md` の strict negative check を `./spec(\s|$)` へ補正した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n '\./spec(\s|$)' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md} spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md} src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md .agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md
+# result: no output
+
+rg -n 'deps\.json|meta\.json' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md} spec-dock/docs/{README.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md} src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md .agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md
+# result: no output
+
+./spec-dock/scripts/spec-dock --help
+# result: ok; commands include new, active, delete, close, sync, deps, import, validate, doctor
+
+./spec-dock/scripts/spec-dock deps --help
+# result: ok; deps subcommands include check, add, remove
+
+./spec-dock/scripts/spec-dock validate
+# result: spec-dock: ok (validate) nodes=23
+
+./spec-dock/scripts/spec-dock sync --github
+# result: spec-dock: ok (sync) ... active unchanged (matched id in branch: iss-00064)
+
+python -m unittest tests.test_init_update tests.cli_runtime.test_wrappers
+# result: Ran 117 tests in 13.274s\n# result: OK
+```
+
+#### レビュー結果
+```text
+RG3 implementation review
+review_status=pass
+reviewer=Ptolemy
+findings=[]
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- `src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md`
+- `src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md`
+- `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- `.agents/skills/spec-dock-codex-adapter/SKILL.md`
+- `.agents/skills/spec-dock-copilot-adapter/SKILL.md`
+- `tests/test_init_update.py`
+- `tests/cli_runtime/test_wrappers.py`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/plan.md`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/report.md`
+
+#### コミット
+- 未実施
+
+#### メモ
+- 次は QA reviewer による QG1 判定と、S99 final diff review quality gate を行う。
+
+## Docs-Only Sanity Checks (iss-00064)
+- この issue で保持する正本証跡は docs/help/skill follow-up に対する sanity check のみ。
+- 実測済み command evidence:
+  - `./spec-dock/scripts/spec-dock --help`
+  - `./spec-dock/scripts/spec-dock deps --help`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync --github`
+- 実測済み test evidence:
+  - `python -m unittest tests.test_init_update tests.cli_runtime.test_wrappers`
+- 実装判断:
+  - skills は role-based minimal policy とし、具体 command block は `spec-dock-issue-execution` に限定した。
+  - hub / host adapter は current runtime path guardrail と docs reference を持つ薄い adapter とした。
+
+## Canonical Evidence Owners (read-only references)
+- `iss-00060`
+  - provider-side dependency reference docs refresh の canonical owner。
+- `iss-00062`
+  - hard cutover `validate` / `sync` readiness と dependency metadata cutover evidence の canonical owner。
+- `iss-00063`
+  - final regression parity / close review / epic close evidence の canonical owner。
+- `iss-00064`
+  - 上記 owner を置き換えず、利用者向け docs/help/skill の follow-up sanity check と wording alignment のみを扱う。
+
+### 2026-04-11 14:10 - 14:35
+
+#### 対象
+- Step: QG1 hardening follow-up
+- AC/EC: EC-003
+
+#### 実施内容
+- QA review の non-blocking 指摘を受けて、QG1 regex を future rerun でも有効な形に修正した。
+- checked-in `.agents` mirror skill の parity coverage を `tests/test_init_update.py` に追加した。
+- full optional test suite を再実行し、117 tests の成功を再確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update tests.cli_runtime.test_wrappers
+# result: Ran 117 tests in 12.440s
+# result: OK
+```
+
+#### レビュー結果
+```text
+QG1 QA review
+review_status=pass
+reviewer=Fermat
+findings:
+- [P2] strict current-doc grep regex correction in plan.md
+- [P2] checked-in mirror parity coverage for hub/issue skills
+resolution:
+- both addressed before close-out
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/plan.md`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/report.md`
+
+#### コミット
+- 未実施
+
+#### メモ
+- 次は S99 final diff review quality gate を実施する。
+
+
+### 2026-04-11 14:36 - 14:55
+
+#### 対象
+- Step: S99 close-out verification
+- AC/EC: EC-003
+
+#### 実施内容
+- user follow-up を受けて、skill command guidance の duplication を final close 条件として再点検した。
+- final reviewer では、issue-execution にのみ concrete command block を残し、hub / host adapter は runtime path guardrail と docs reference のみに留める方針が regression なく維持されていることを確認した。
+- full target suite、runtime help、`validate`、`sync --github` を再実測し、close-out 時点の working tree 差分が docs/help/skill follow-up と parity test hardening のみであることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update tests.cli_runtime.test_wrappers
+# result: Ran 117 tests in 12.648s
+# result: OK
+
+./spec-dock/scripts/spec-dock --help
+# result: ok; commands include new, active, delete, close, sync, deps, import, validate, doctor
+
+./spec-dock/scripts/spec-dock deps --help
+# result: ok; deps subcommands include check, add, remove
+
+./spec-dock/scripts/spec-dock validate
+# result: spec-dock: ok (validate) nodes=23
+
+./spec-dock/scripts/spec-dock sync --github
+# result: spec-dock: sync: active unchanged (matched id in branch: iss-00064)
+# result: spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+```
+
+#### レビュー結果
+```text
+S99 final diff QA review
+review_status=pass
+reviewer=Ohm
+findings=[]
+residual_risks:
+- 一部は文字列断片一致ベースの検証のため、意味同等な wording 変更には検出粒度が粗い可能性がある。
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md`
+- `src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md`
+- `src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md`
+- `src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md`
+- `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+- `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- `.agents/skills/spec-dock-codex-adapter/SKILL.md`
+- `.agents/skills/spec-dock-copilot-adapter/SKILL.md`
+- `tests/test_init_update.py`
+- `tests/cli_runtime/test_wrappers.py`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/design.md`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/plan.md`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/report.md`
+
+#### コミット
+- 未実施
+
+#### メモ
+- 実装・review・verification は完了。残作業は final commit と clean tree 確認のみ。
