@@ -2,6 +2,7 @@
 
 spec-dock の docs レイヤ、概念、生成物を最短で把握するための入口です。
 scope 固有の手順は `workflow_*.md`、shared な requirement / design の作法は `phase_*.md`、plan は `phase_plan.md` と `phase_plan_<scope>.md` の二段構成、コマンドや制約は `reference_*.md` を正本とします。
+runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
 
 ## docs の読み分け
 
@@ -43,6 +44,9 @@ Initiative
 ## 生成物と SSOT
 
 - SSOT: `spec-dock/initiatives/**/.meta.json`
+- issue dependency metadata の canonical storage は node 直下 `.meta.json` の top-level `depends_on` です
+- 依存変更は `./spec-dock/scripts/spec-dock deps add/remove/check` の command-first mutation で行います
+- legacy `deps.json` / `meta.json` は current storage や fallback read/write ではありません（no dual-read / manual migration）
 - 主な生成物: `spec-dock/active/**`, `spec-dock/.agent/{active,index,tree}*.json`, `spec-dock/{tree,deps-issues}*.puml`, `spec-dock/dashboard.md`
 - `spec-dock/adrs/` は generated ADR mirror です（`sync` で rebuild / gitignore 対象）
 - GitHub は入口として連携できるが、仕様ツリーの正はローカル metadata
@@ -84,6 +88,18 @@ spec-dock/
 3. 対象 scope の `workflow_*.md` を正本にし、requirement / design は shared playbook、plan は `phase_plan.md` → `phase_plan_<scope>.md` の順で書く
 4. Initiative は Epic 分解、Epic は Issue 分割、Issue は TDD ベースの execution contract を plan に落とす
 5. `validate` / `sync` で整合性と生成物を更新する
+
+## 代表コマンド（runtime script）
+
+```bash
+./spec-dock/scripts/spec-dock active set <id|#num|url>
+./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
+```
+
 
 ## 次に読む
 

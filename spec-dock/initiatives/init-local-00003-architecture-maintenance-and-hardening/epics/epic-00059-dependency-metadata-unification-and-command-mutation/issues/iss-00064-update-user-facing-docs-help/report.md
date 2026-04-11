@@ -185,3 +185,59 @@ findings=[]
 
 #### メモ
 - 次は S02 として dogfooding mirror / old docs を current contract に揃える。
+
+### 2026-04-11 12:35 - 13:10
+
+#### 対象
+- Step: S02 / RG2
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002
+
+#### 実施内容
+- dogfooding mirror docs 10 ファイルを provider-side docs SoT と整合する内容に更新した。
+- `workflow-issue.md` / `workflow-adr.md` / `sync.md` / `spec-dock-guide-old.md` を deprecated / historical alias または shortcut として再整理した。
+- old/secondary docs では current doc link、current command path、legacy framing を明示した。
+- `sync.md` と `spec-dock-guide-old.md` で `.meta.json` top-level `depends_on` と `deps add/remove/check` の command-first mutation を追記した。
+- `Optional Tests` 2 ファイルは変更不要だったため no-op とした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_reference_sync_doc_matches_bundled_asset \
+  tests.test_init_update.TestInitUpdate.test_reference_deps_doc_matches_bundled_asset \
+  tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset \
+  tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure \
+  tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs
+# result: Ran 6 tests ... OK
+```
+
+#### レビュー結果
+```text
+RG2 implementation review
+review_status=pass
+reviewer=Gauss
+findings=[]
+```
+
+#### 変更したファイル
+- `spec-dock/docs/README.md`
+- `spec-dock/docs/guide.md`
+- `spec-dock/docs/workflow_issue.md`
+- `spec-dock/docs/workflow-issue.md`
+- `spec-dock/docs/workflow_epic.md`
+- `spec-dock/docs/workflow_initiative.md`
+- `spec-dock/docs/workflow-tree.md`
+- `spec-dock/docs/workflow_adr.md`
+- `spec-dock/docs/workflow-adr.md`
+- `spec-dock/docs/reference_deps.md`
+- `spec-dock/docs/reference_sync.md`
+- `spec-dock/docs/reference_github.md`
+- `spec-dock/docs/sync.md`
+- `spec-dock/docs/spec-dock-guide-old.md`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/report.md`
+
+#### コミット
+- 未実施
+
+#### メモ
+- 次は S03 として skills / optional tests / final QA evidence を閉じる。

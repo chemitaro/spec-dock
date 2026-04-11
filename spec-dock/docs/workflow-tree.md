@@ -130,6 +130,19 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 
 ---
 
+## 5.4 依存変更（Issue 間）
+
+```bash
+./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
+```
+
+- Issue 依存の canonical storage は node metadata の top-level `depends_on` です（詳細は `reference_deps.md`）。
+- metadata の手編集を current/fallback 運用にせず、command-first で更新してください。
+
 ## 6. 典型的な落とし穴（防止策）
 
 - GitHub を使えない環境で `new` が失敗 → `gh` と current repo の GitHub linkage を整えるか、既存 current-repo Issue に `--github-issue <n>` でリンクする（`reference_github.md`）
