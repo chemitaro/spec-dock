@@ -181,7 +181,8 @@ t4 --> epic : close summary only
     - tuple 集合の欠落/追加/重複。
     - `active set` の `blocker_ids` が同一 graph snapshot から導かれる依存集合と一致しない。
     - `sync` / `validate` のどちらかが、他 command が観測していない edge または error を示す。
-    - 同一 repo snapshot で採った観測として説明できない。
+    - 同一 checked-in `.meta.json` snapshot から採った観測として説明できない。
+    - ただし rerun-required command 自身が生成する `spec-dock/.agent/**` / `dashboard.md` / `*.puml` 更新や、`sync` の exit が success で reason が `matched id in branch: <current-issue>` による active restore だけなら、`.meta.json` / canonical tuple 集合が不変である限り parity drift ではなく expected runtime side effect として扱う。
 - evidence review boundary:
   - input:
     - `iss-00062/report.md`
@@ -209,6 +210,7 @@ t4 --> epic : close summary only
     - `iss-00062/report.md` incomplete、frontmatter/status と本文 evidence の不整合、または active parity 用 `<target-id>` 不明
   - behavior:
     - `report.md` に blocker / next action を残し、epic close を止める
+    - 例外として rerun-required command 自身が生成する `spec-dock/.agent/**` / `dashboard.md` / `*.puml` 更新と、`sync` の branch-match active restore は parity section に observed side effect として明記し、blocker にはしない
   - owner:
     - reviewer judgement / follow-up issue
 
