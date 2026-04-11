@@ -17,6 +17,7 @@ ID: "iss-00063"
 - `iss-00063` の requirement / design / plan を current repo reality に合わせて補正し、review-only inherited regression suite、fail-closed blocker semantics、canonical graph extraction 手順、same-snapshot parity discipline を固定した。
 - あわせて upstream prerequisite である `iss-00062/report.md` の frontmatter / `target_id` / exit code 記録を T4 前提 shape に整え、spec review pass を取得した。
 - same-snapshot 条件で canonical tuple 抽出、review-only inherited suite の再確認、`active set` / `validate` / `sync` rerun を行い、final regression parity を pass と判定した。
+- `iss-00062/report.md` を T3 evidence bundle として索引化し、hard cutover judgment / docs cutover / manual fix / final gate の参照先と reviewer verdict を T4 close review 用に束ねた。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -166,6 +167,75 @@ parity_confirmation:
 - RG1 初回レビューでは `sync` が branch matching により active issue を `iss-00063` へ復元する side effect を same-snapshot drift と解釈する指摘を受けたため、requirement/design/plan に expected runtime side effect の許容条件を追記して再レビューへ回した。
 - その後の spec review では `.agent` generated artifacts も rerun-required command の expected output である点を追加で明文化し、same-snapshot 判定を checked-in `.meta.json` graph と手順外 mutation 禁止に絞り直した。
 - contract 補正後、spec review は pass（non-blocking P2: missing `<target-id>` blocker wording を plan に再明記）、続く RG1 evidence review も pass となり、S02 gate を通過した。
+
+
+
+### 2026-04-11 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-003, EC-001
+
+#### 実施内容
+- `iss-00062/report.md` を T3 evidence bundle の正本として review し、T4 close review に必要な evidence surface を judgment fixed / regression lock / docs-template cutover / manual fix and final gate の4群に整理した。
+- T3 report 自体は rewrite せず、T4 側で required evidence reference と reviewer 向けの読む順番を index 化した。
+- required evidence に欠落は見つからず、`active parity target_id=iss-00062`、focused suite exit code、docs/provider parity、repo-wide manual fix、final RG1/QG1 pass まで T3 report 単体から追跡可能であると判断した。
+
+#### 実行コマンド / 結果
+```bash
+sed -n '1,320p' spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/report.md
+
+t3_evidence_bundle:
+  source: iss-00062/report.md
+  review_verdict: pass
+  blocker: none
+  required_references:
+    - section: implementation readiness / spec review loop
+      proves:
+        - upstream prerequisites and current-gap framing were fixed before execution
+        - upfront spec review pass was recorded
+    - section: S01
+      proves:
+        - delete scrub cutover was completed on `.meta.json` SoT
+        - targeted regression command and RG1 pass were recorded
+        - commit: 2f43fab
+    - section: S02
+      proves:
+        - shared topology reader parity regressions were locked
+        - focused suite exit_code=0 and flaky subset supplemental evidence were recorded
+        - RG1 pass / QG1 pass were recorded
+        - commit: fb83e07
+    - section: S03
+      proves:
+        - provider docs and templates were cut over from legacy deps seed
+        - docs mirror parity and SG1 spec review pass were recorded
+        - commit: 17cc557
+    - section: S04
+      proves:
+        - checked-in dogfooding initiatives manual fix was completed
+        - runtime mirror parity and cutover snapshot tests passed
+        - active parity target_id=iss-00062 was recorded
+        - validate exit_code=0 and sync exit_code=0 were recorded
+        - final RG1 pass / final QG1 pass were recorded
+        - commit: be47006
+  close_review_order:
+    - prerequisites/spec lock
+    - delete scrub parity
+    - shared topology reader parity
+    - docs/template cutover
+    - manual fix and final gate
+```
+
+#### 変更したファイル
+- `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/report.md` - S03 T3 evidence bundle review / packaging index を追加
+
+#### コミット
+- pending（S03 RG1 pass 済み。stage commit をこの後作成）
+
+#### メモ
+- T3 report に不足があれば blocker 化する前提だったが、current `iss-00062/report.md` は target_id / exit_code / review verdict / commit 境界まで揃っており、T4 close review の入力として十分だった。
+- T4 は T3 judgment 自体を書き換えず、close review で辿るべき section と proves を束ねる役割に限定した。
+- S03 RG1 evidence review は pass で、required evidence reference / blocker semantics / non-rewrite boundary の3点が現行 contract に整合すると確認された。
 
 
 ---
