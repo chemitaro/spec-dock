@@ -130,3 +130,58 @@ focus:
 
 #### メモ
 - 次は issue docs を SG1 pass 状態でコミットし、S01 の実装を dev coder に委任する。
+
+### 2026-04-11 12:05 - 12:35
+
+#### 対象
+- Step: S01 / RG1
+- AC/EC: AC-001, AC-002, AC-003, EC-002
+
+#### 実施内容
+- provider-side docs SoT 10 ファイルを current contract に更新した。
+- `./spec ...` を `./spec-dock/scripts/spec-dock ...` に統一した。
+- `guide.md` / `reference_deps.md` / `reference_sync.md` / `reference_github.md` で `.meta.json` top-level `depends_on` と command-first mutation を明示した。
+- `README.md` / workflow 群 / reference 群に `deps add/remove/check` と `validate` / `sync --github` の導線を追加した。
+- `workflow_tree.md` は実ファイル名が `workflow-tree.md` のため、その実体に対して修正した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n '\./spec\s' src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}
+# result: no output
+
+rg -n 'deps\.json|meta\.json' src/spec_dock/assets/spec_dock/docs/{README.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md}
+# result: no output
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure
+# result: OK
+
+python -m unittest tests.cli_runtime.test_wrappers.TestCliRulesContract.test_scaffold_docs_point_to_runtime_commands_and_rules_docs
+# result: OK
+```
+
+#### レビュー結果
+```text
+RG1 implementation review
+review_status=pass
+reviewer=Heisenberg
+findings=[]
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/docs/README.md`
+- `src/spec_dock/assets/spec_dock/docs/guide.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_github.md`
+- `spec-dock/.../iss-00064-update-user-facing-docs-help/report.md`
+
+#### コミット
+- 未実施
+
+#### メモ
+- 次は S02 として dogfooding mirror / old docs を current contract に揃える。
