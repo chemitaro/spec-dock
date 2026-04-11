@@ -3,7 +3,7 @@
 対象コマンド:
 
 ```bash
-./spec sync [--github] [--gh-limit N] [--no-update-active] [--force]
+./spec-dock/scripts/spec-dock sync [--github] [--gh-limit N] [--no-update-active] [--force]
 ```
 
 関連:
@@ -15,6 +15,7 @@
 
 `sync` はローカル SSOT（`spec-dock/initiatives/**/.meta.json`）を走査し、v2 の観測点を生成します（git 管理しない）。
 `meta.json`（レガシー名）はサポート対象外で、検出時はエラー停止します（`.meta.json` へ手動移行してください）。
+依存更新は `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、実行後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` で整合を確認します。
 
 `.agent/`（機械向け）:
 - `spec-dock/.agent/index-all.json`（全ノード）
@@ -76,7 +77,7 @@ deps 構造エラー（未解決参照 / self / cycle / descendant依存 / schem
 - `--force` はデバッグ/リカバリ用途のため、depsの成否に関わらず active auto-update を無効化（`--no-update-active` 相当）
 
 削除ではなく上書きにすることで、stale 参照を防ぎます。
-`--force` 実行後に active を更新したい場合は、`./spec active set <target>` を使って明示更新してください。
+`--force` 実行後に active を更新したい場合は、`./spec-dock/scripts/spec-dock active set <target>` を使って明示更新してください。
 
 ## 5. `--github` とスナップショット
 

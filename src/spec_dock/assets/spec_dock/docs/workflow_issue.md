@@ -28,6 +28,10 @@ Issue は実装の最小単位です。
 ./spec-dock/scripts/spec-dock active set --github-issue <n>
 ./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url> --checkout
 ./spec-dock/scripts/spec-dock active show
+
+./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ```
 
 - `import issue` で `--epic` を省略した場合は current active から親 epic を解決する
@@ -38,6 +42,7 @@ Issue は実装の最小単位です。
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存未解決なら `active set` は通常失敗する。確認は `./spec-dock/scripts/spec-dock deps check <target> --github`
 - 例外で進める場合だけ `./spec-dock/scripts/spec-dock active set <target> --github --force`
+- 依存 edge の追加/削除は metadata を直編集せず `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>` / `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>` を使う
 
 ## spec authoring
 
@@ -109,7 +114,7 @@ Issue は実装の最小単位です。
   - `cutover_judgment.fixed_at`
   - `cutover_judgment.follow_up_issue_id`
   - `cutover_judgment.notes`
-- no fallback / no dual-read / `.meta.json` only contract を崩す救済策は採用しない。
+- no fallback / no dual-read contract を崩す救済策は採用しない（canonical storage / mutation contract の詳細は [reference_deps.md](reference_deps.md) を参照）。
 
 ## 品質ゲート
 
