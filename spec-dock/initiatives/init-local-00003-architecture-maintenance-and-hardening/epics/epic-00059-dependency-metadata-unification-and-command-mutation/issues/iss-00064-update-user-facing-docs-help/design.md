@@ -38,7 +38,7 @@ ID: "iss-00064"
 
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
-  - `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow_tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}`
+  - `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,workflow_issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,reference_deps.md,reference_sync.md,reference_github.md}`
   - `spec-dock/docs/{README.md,guide.md,workflow_issue.md,workflow-issue.md,workflow_epic.md,workflow_initiative.md,workflow-tree.md,workflow_adr.md,workflow-adr.md,reference_deps.md,reference_sync.md,reference_github.md,sync.md,spec-dock-guide-old.md}`
   - `.agents/skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
   - `src/spec_dock/assets/codex_skills/{spec-driven-tdd-workflow,spec-dock-issue-execution,spec-dock-codex-adapter,spec-dock-copilot-adapter}/SKILL.md`
@@ -136,7 +136,7 @@ report --> report : ownership separation headings
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_epic.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md`
-  - `src/spec_dock/assets/spec_dock/docs/workflow_tree.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow-tree.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_adr.md`
   - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
