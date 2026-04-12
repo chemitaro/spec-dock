@@ -865,6 +865,43 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertFalse((templates_dir / "epic" / "deps.json").exists())
             self.assertFalse((templates_dir / "issue" / "deps.json").exists())
 
+    def test_init_prunes_legacy_node_deps_json_templates_from_stale_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            def _mutate_assets(patched_assets_root: Path) -> None:
+                for scope in ("initiative", "epic", "issue"):
+                    deps_path = patched_assets_root / "spec_dock" / "templates" / scope / "deps.json"
+                    deps_path.parent.mkdir(parents=True, exist_ok=True)
+                    deps_path.write_text("legacy deps fixture\n", encoding="utf-8")
+
+            exit_code, _stderr = self._run_command_with_assets_override("init", target, _mutate_assets)
+            self.assertEqual(exit_code, 0)
+
+            templates_dir = target / "spec-dock" / "templates"
+            self.assertFalse((templates_dir / "initiative" / "deps.json").exists())
+            self.assertFalse((templates_dir / "epic" / "deps.json").exists())
+            self.assertFalse((templates_dir / "issue" / "deps.json").exists())
+
+    def test_update_prunes_legacy_node_deps_json_templates_from_stale_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            def _mutate_assets(patched_assets_root: Path) -> None:
+                for scope in ("initiative", "epic", "issue"):
+                    deps_path = patched_assets_root / "spec_dock" / "templates" / scope / "deps.json"
+                    deps_path.parent.mkdir(parents=True, exist_ok=True)
+                    deps_path.write_text("legacy deps fixture\n", encoding="utf-8")
+
+            exit_code, _stderr = self._run_command_with_assets_override("update", target, _mutate_assets)
+            self.assertEqual(exit_code, 0)
+
+            templates_dir = target / "spec-dock" / "templates"
+            self.assertFalse((templates_dir / "initiative" / "deps.json").exists())
+            self.assertFalse((templates_dir / "epic" / "deps.json").exists())
+            self.assertFalse((templates_dir / "issue" / "deps.json").exists())
+
     def test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
