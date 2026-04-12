@@ -17,7 +17,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 補足:
 - `spec-dock update` は managed files/docs/templates/scripts/skills を refresh しますが、old workspace の in-place migration は保証しません
 - dependency metadata の canonical storage は `.meta.json` top-level `depends_on` であり、追加/削除/確認は `./spec-dock/scripts/spec-dock deps add/remove/check` の command-first mutation を使います（詳細: `reference_deps.md`）
-- legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で吸収されず current create / import / validate / sync が reject / fail-fast しうります
+- legacy `meta.json`（旧名）、partial linkage、current-repo mismatch などの old contract 不整合は、`update` で吸収されず current create / import / validate / sync が reject / fail-fast しうる
 - その場合は auto-migrate を期待せず、手動で normalize するか workspace を rebuild してください
 
 代表的な解決材料（`gh` 側）:

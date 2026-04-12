@@ -103,7 +103,7 @@ def _atomic_write_json(path: Path, payload: dict[str, Any], *, readonly_mode: in
         tmp_path.chmod(lock_mode)
         stage = "replace"
         os.replace(tmp_path, path)
-    except OSError as exc:
+    except Exception as exc:
         raise RuntimeError(f"write_failed[{stage}]: {path}: {exc}") from exc
     finally:
         if tmp_path is not None and tmp_path.exists():

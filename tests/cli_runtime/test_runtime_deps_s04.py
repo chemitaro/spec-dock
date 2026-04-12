@@ -1782,6 +1782,61 @@ class TestRuntimeDepsS04(unittest.TestCase):
             self.assertIn("write_failed[unlock]", str(ctx.exception))
             self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
 
+    def test_fs_repo_atomic_non_oserror_write_failure_maps_to_write_failed_and_restores_readonly(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are required for this test")
+
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import fs_repo
+        finally:
+            sys.path.pop(0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            node_dir = Path(tmp) / "spec-dock" / "initiatives" / "init-local-00001-auth" / "epics" / "epic-local-00001-main" / "issues" / "iss-local-00001-target"
+            node_dir.mkdir(parents=True, exist_ok=True)
+            meta_path = node_dir / ".meta.json"
+            meta_path.write_text(
+                json.dumps({"id": "iss-local-00001", "type": "issue", "depends_on": []}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
+            )
+            meta_path.chmod(0o444)
+            expected_mode = stat.S_IMODE(meta_path.stat().st_mode)
+            before = meta_path.read_text(encoding="utf-8")
+
+            original_write_json = fs_repo.write_json
+            try:
+                def _failing_write_json(path, payload):
+                    if (
+                        path != meta_path
+                        and path.parent == meta_path.parent
+                        and ".meta.json.tmp-" in path.name
+                    ):
+                        raise TypeError("simulated non-oserror write failure")
+                    return original_write_json(path, payload)
+
+                fs_repo.write_json = _failing_write_json
+                with self.assertRaises(RuntimeError) as ctx:
+                    fs_repo.add_issue_dependency(meta_path, "iss-local-00002")
+            finally:
+                fs_repo.write_json = original_write_json
+
+            self.assertIn("write_failed[write_temp]", str(ctx.exception))
+            self.assertIn("simulated non-oserror write failure", str(ctx.exception))
+            self.assertEqual(meta_path.read_text(encoding="utf-8"), before)
+            self.assertEqual(stat.S_IMODE(meta_path.stat().st_mode), expected_mode)
+            tmp_files = [p for p in node_dir.iterdir() if ".meta.json.tmp-" in p.name]
+            self.assertEqual(tmp_files, [])
+
     def test_fs_repo_atomic_lock_failure_maps_to_write_failed_lock_and_preserves_original(self) -> None:
         if os.name != "posix":
             self.skipTest("POSIX permission bits are required for this test")
