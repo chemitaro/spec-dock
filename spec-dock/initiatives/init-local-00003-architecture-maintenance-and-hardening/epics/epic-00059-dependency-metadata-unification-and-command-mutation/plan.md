@@ -5,7 +5,7 @@ ID: "epic-00059"
 関連GitHub: ["#59"]
 状態: "draft"
 作成者: "Codex CLI"
-最終更新: "2026-04-10"
+最終更新: "2026-04-12"
 依存: ["requirement.md", "design.md"]
 親: ["init-local-00003"]
 ---
@@ -70,6 +70,17 @@ ID: "epic-00059"
     - E-AC-005, epic final close review
   - depends on:
     - iss-00062-downstream-parity-and-cutover-readiness
+- iss-00064-update-user-facing-docs-help:
+  - 目的:
+    - hard cutover 後に残った利用者向け docs/help/skill の導線と runtime contract 表記を current implementation に整合させる。
+  - deliverable:
+    - provider-side / dogfooding docs refresh、skill の重複ガイダンス整理、legacy template `deps.json` cleanup の installer hardening、focused regression と live manual confirmation。
+  - tranche:
+    - T4b docs/help follow-up
+  - closes:
+    - epic close readiness の docs/help alignment residual
+  - depends on:
+    - iss-00063-final-regression-parity-and-cutover-closure
 
 ## cutover evidence ownership
 - T3 integration owner（`iss-00062-downstream-parity-and-cutover-readiness`）:
@@ -79,6 +90,9 @@ ID: "epic-00059"
 - T4 closure owner（`iss-00063-final-regression-parity-and-cutover-closure`）:
   - E-AC-005 final closure と final parity / final spec review の primary owner。
   - 自身の `report.md` に final regression summary、T3 evidence bundle review 結果、必要な parity reconfirmation、final spec review verdict を残し、epic `report.md` には close summary だけを反映する。
+- T4b docs/help follow-up owner（`iss-00064-update-user-facing-docs-help`）:
+  - T4 close 後に判明した利用者向け docs/help/skill の residual mismatch を解消する secondary owner。
+  - core runtime closure は再オープンせず、docs/help alignment・installer cleanup hardening・manual confirmation を自身の `report.md` に残し、epic `report.md` の close summary を補完する。
 
 ## 統合チェックポイント
 - G1 decomposition review:
@@ -90,6 +104,7 @@ ID: "epic-00059"
   - provider-side dependency docs 正本更新が T1 で完了し、hard cutover 手順、manual fix、`validate` / `sync` evidence contract が T3 で実施・反映され、T3/T4 issue `report.md` と epic `report.md` の owner/shape が明示されているか。
 - G9 final epic spec review:
   - E-AC すべてに test と実測証跡があるか。
+  - close 後 follow-up として扱う docs/help residual が epic report と live docs に整合して反映されているか。
 
 ## 品質ゲート
 - test / observability / migration / docs:
@@ -105,6 +120,7 @@ ID: "epic-00059"
 - contract / docs refresh:
   - T1（`iss-00060`）で provider-side dependency reference docs 正本を更新する。
   - T3（`iss-00062`）で dogfooding checked-in data manual fix と `validate` / `sync` evidence、cutover judgment を記録する。
+  - T4b（`iss-00064`）で利用者向け docs/help/skill の runtime path / `.meta.json` contract / command discovery を current implementation に合わせて補完し、epic close summary を最新化する。
 
 ## Issue readiness contract
 - Issue に要求する最低条件:

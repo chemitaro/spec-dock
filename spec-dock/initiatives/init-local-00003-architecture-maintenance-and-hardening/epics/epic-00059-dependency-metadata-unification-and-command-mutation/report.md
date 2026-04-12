@@ -4,7 +4,7 @@ ID: "epic-00059"
 タイトル: "Dependency metadata unification and command mutation"
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-11"
+最終更新: "2026-04-12"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
 ---
@@ -14,7 +14,8 @@ ID: "epic-00059"
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
   - `iss-00060` で `.meta.json` schema / reader contract、`iss-00061` で mutation contract、`iss-00062` で downstream parity / hard cutover judgment、`iss-00063` で final regression parity / close record / final reviews まで完了した。
-  - 本 epic の close 条件はすべて満たされ、残タスクはない。
+  - close 後 residual として `iss-00064` を起票し、利用者向け docs/help/skill の runtime path / `.meta.json` contract / command discovery の整合、installer の legacy template `deps.json` cleanup hardening、manual confirmation を完了した。
+  - 本 epic の core runtime close 条件は `iss-00063` 時点で満たされており、`iss-00064` で close 後の docs/help alignment residual も解消済みである。
 - 次のマイルストーン:
   - なし（epic close 完了）。
 - ブロッカー:
@@ -29,6 +30,7 @@ ID: "epic-00059"
 - `iss-00061-dependency-mutation-command-contract`: Done
 - `iss-00062-downstream-parity-and-cutover-readiness`: Done
 - `iss-00063-final-regression-parity-and-cutover-closure`: Done
+- `iss-00064-update-user-facing-docs-help`: Done
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - `E-AC-001`: Pass（証拠: `iss-00060` schema/read contract、epic requirement の `.meta.json` SoT 定義）
@@ -46,7 +48,15 @@ ID: "epic-00059"
   - なし。
 
 ## フォローアップ（別Issue化） (必須)
-- 現時点ではなし。
+- `iss-00064-update-user-facing-docs-help`:
+  - 扱い:
+    - T4 close 後に判明した docs/help alignment residual を epic 内 follow-up として処理済み。
+  - 解消内容:
+    - user-facing docs/help/skill の runtime path / `.meta.json` contract / command discovery を current implementation に整合。
+    - installer の legacy template `deps.json` cleanup を harden し、focused regression と手動確認で再発防止を確認。
+  - 状態:
+    - 完了済み。現時点で未処理の follow-up はなし。
 
 ## 省略/例外メモ (必須)
 - `python -m unittest discover -v` の full baseline は本 epic close 条件には含めず、issue-scoped focused regression と dogfooding command evidence を採用した。
+- `iss-00064` は core runtime の close verdict を差し替えるものではなく、close 後 residual の docs/help alignment と installer hardening を補完する issue として扱った。
