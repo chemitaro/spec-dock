@@ -65,9 +65,11 @@ class _StubDepsTopologyReader:
         self._infra_contracts = infra_contracts
         self._issue_depends_on_map = dict(issue_depends_on_map)
         self._warnings = list(warnings or [])
+        self.calls = 0
 
     def load_issue_depends_on_map(self, specdock_dir, graph):
         del specdock_dir, graph
+        self.calls += 1
         return self._infra_contracts.DepsTopologyLoadResult(
             issue_depends_on_map=dict(self._issue_depends_on_map),
             warnings=list(self._warnings),
@@ -276,6 +278,7 @@ class TestRuntimeActiveS06(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "active set blocked"):
             app_set_active.set_active(req, ports)
+        self.assertEqual(ports.deps_topology_reader.calls, 1)
         calls = [name for name, *_rest in ports.active_state_store.calls]
         self.assertNotIn("snapshot_current_state", calls)
         self.assertNotIn("write_active_manifest", calls)

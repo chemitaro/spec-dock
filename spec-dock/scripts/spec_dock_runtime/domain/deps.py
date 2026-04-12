@@ -229,6 +229,31 @@ def validate_deps_cycles(issue_depends_on_map: dict[str, list[str]]) -> None:
                 stack.append((dep_id, 0))
 
 
+def issue_dependency_exists(
+    issue_depends_on_map: dict[str, list[str]],
+    *,
+    from_issue_id: str,
+    to_issue_id: str,
+) -> bool:
+    return to_issue_id in issue_depends_on_map.get(from_issue_id, [])
+
+
+def ensure_issue_dependency_add_would_not_create_cycle(
+    issue_depends_on_map: dict[str, list[str]],
+    *,
+    from_issue_id: str,
+    to_issue_id: str,
+) -> None:
+    candidate_map: dict[str, list[str]] = {
+        issue_id: list(depends_on)
+        for issue_id, depends_on in issue_depends_on_map.items()
+    }
+    candidate_map.setdefault(from_issue_id, [])
+    candidate_map.setdefault(to_issue_id, [])
+    candidate_map[from_issue_id].append(to_issue_id)
+    validate_deps_cycles(candidate_map)
+
+
 def evaluate_readiness(
     graph: SpecGraph,
     issue_depends_on_map: dict[str, list[str]],

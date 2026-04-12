@@ -648,6 +648,10 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
     for name in ("requirement.md", "design.md", "plan.md", "report.md"):
         (templates_dir / name).unlink(missing_ok=True)
 
+    # v1-era package contamination can leak template-scoped deps.json files.
+    for scope in ("initiative", "epic", "issue"):
+        (templates_dir / scope / "deps.json").unlink(missing_ok=True)
+
     # v1 used nested `current/` and `completed/` directories under templates.
     for dirname in ("current", "completed"):
         for d in sorted(templates_dir.rglob(dirname), key=lambda x: len(str(x)), reverse=True):

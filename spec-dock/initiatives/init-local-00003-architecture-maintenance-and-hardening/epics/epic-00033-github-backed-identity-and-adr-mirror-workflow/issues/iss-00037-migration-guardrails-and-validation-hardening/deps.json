@@ -1,8 +1,0 @@
-{
-  "schema_version": 1,
-  "depends_on": [
-    "iss-00034",
-    "iss-00036",
-    "iss-00035"
-  ]
-}

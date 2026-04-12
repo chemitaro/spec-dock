@@ -225,6 +225,27 @@ class _StubNodeRepository:
     def __init__(self):
         self.delete_calls = []
 
+    def remove_issue_dependency(self, meta_path, to_id, *, matching_refs=None):
+        meta_file = Path(meta_path)
+        payload = json.loads(meta_file.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"Invalid .meta.json (expected object): {meta_file}")
+        depends_on_raw = payload.get("depends_on")
+        if depends_on_raw is None:
+            depends_on = []
+        elif isinstance(depends_on_raw, list):
+            depends_on = list(depends_on_raw)
+        else:
+            raise RuntimeError(f"Invalid .meta.json schema: {meta_file}: depends_on must be a list")
+        to_id_text = str(to_id)
+        matching_ref_values = list(matching_refs or [])
+        payload["depends_on"] = [
+            dep
+            for dep in depends_on
+            if str(dep) != to_id_text and not any(dep == ref for ref in matching_ref_values)
+        ]
+        meta_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     def delete_tree(self, node_path):
         self.delete_calls.append(str(node_path))
 
@@ -1557,8 +1578,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             node_repo=_DeletingNodeRepository(),
         )
 
-        init_deps = Path(records[0].path) / "deps.json"
-        init_deps.write_text(
+        init_meta = Path(records[0].path) / ".meta.json"
+        init_meta.write_text(
             json.dumps(
                 {
                     "schema_version": 1,
@@ -1570,8 +1591,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        epic_deps = Path(records[4].path) / "deps.json"
-        epic_deps.write_text(
+        epic_meta = Path(records[4].path) / ".meta.json"
+        epic_meta.write_text(
             json.dumps(
                 {
                     "schema_version": 1,
@@ -1583,8 +1604,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        issue_deps = Path(records[5].path) / "deps.json"
-        issue_deps.write_text(
+        issue_meta = Path(records[5].path) / ".meta.json"
+        issue_meta.write_text(
             json.dumps(
                 {
                     "schema_version": 1,
@@ -1614,9 +1635,9 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.assertEqual(result.remaining_node_ids, [])
         self.assertEqual(result.active_restore_result, "not_needed")
         self.assertEqual(result.dependency_scrub_failures, [])
-        self.assertEqual(json.loads(init_deps.read_text(encoding="utf-8"))["depends_on"], ["iss-local-00058", "epic-local-00002"])
-        self.assertEqual(json.loads(epic_deps.read_text(encoding="utf-8"))["depends_on"], ["iss-local-00058"])
-        self.assertEqual(json.loads(issue_deps.read_text(encoding="utf-8"))["depends_on"], ["iss-local-00058"])
+        self.assertEqual(json.loads(init_meta.read_text(encoding="utf-8"))["depends_on"], ["iss-local-00058", "epic-local-00002"])
+        self.assertEqual(json.loads(epic_meta.read_text(encoding="utf-8"))["depends_on"], ["iss-local-00058"])
+        self.assertEqual(json.loads(issue_meta.read_text(encoding="utf-8"))["depends_on"], ["iss-local-00058"])
         self.assertFalse(Path(records[1].path).exists())
         self.assertFalse(Path(records[2].path).exists())
         self.assertFalse(Path(records[3].path).exists())
@@ -1726,8 +1747,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             issue_gateway=issue_gateway,
         )
 
-        survivor_deps = Path(records[6].path) / "deps.json"
-        survivor_deps.write_text(
+        survivor_meta = Path(records[6].path) / ".meta.json"
+        survivor_meta.write_text(
             json.dumps(
                 {
                     "schema_version": 1,
@@ -1769,7 +1790,7 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.assertEqual(result.active_restore_result, "not_needed")
         self.assertEqual(result.dependency_scrub_failures, [])
         self.assertEqual(
-            json.loads(survivor_deps.read_text(encoding="utf-8"))["depends_on"],
+            json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"],
             [
                 "https://github.com/other/repo/issues/56",
                 "iss-local-00058",
@@ -1887,8 +1908,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             issue_gateway=issue_gateway,
         )
 
-        survivor_deps = Path(records[6].path) / "deps.json"
-        survivor_deps.write_text(
+        survivor_meta = Path(records[6].path) / ".meta.json"
+        survivor_meta.write_text(
             json.dumps(
                 {
                     "schema_version": 1,
@@ -1927,7 +1948,7 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.assertEqual(result.active_restore_result, "not_needed")
         self.assertEqual(result.dependency_scrub_failures, [])
         self.assertEqual(
-            json.loads(survivor_deps.read_text(encoding="utf-8"))["depends_on"],
+            json.loads(survivor_meta.read_text(encoding="utf-8"))["depends_on"],
             [
                 "56",
                 "iss-local-00058",
@@ -2015,8 +2036,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             dep_map={"iss-local-00058": ["iss-local-00056"]},
             node_repo=_DeletingNodeRepository(),
         )
-        survivor_deps = Path(records[5].path) / "deps.json"
-        survivor_deps.write_text("{invalid-json", encoding="utf-8")
+        survivor_meta = Path(records[5].path) / ".meta.json"
+        survivor_meta.write_text("{invalid-json", encoding="utf-8")
 
         result = app_delete_node.delete_node(
             self._request(

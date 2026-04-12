@@ -289,6 +289,83 @@ class TestCliDelete(CliRuntimeHarness):
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertEqual(state["state"], "OPEN")
 
+    def test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        target, issue56_dir, state_path, env = self._setup_delete_target_repo(issue_number=56)
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "epic",
+                "--initiative",
+                "1",
+                "--title",
+                "Survivor epic",
+                "--github-issue",
+                "20",
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "issue",
+                "--epic",
+                "20",
+                "--title",
+                "Survivor issue",
+                "--github-issue",
+                "58",
+            ],
+        )
+        self._run_runtime(target, ["deps", "add", "--from", "iss-00058", "--to", "iss-00056"])
+
+        issue58_matches = list((target / "spec-dock" / "initiatives").rglob("iss-00058-*"))
+        self.assertEqual(len(issue58_matches), 1)
+        issue58_dir = issue58_matches[0]
+        issue58_meta_path = issue58_dir / ".meta.json"
+        self.assertIn(
+            "iss-00056",
+            [str(item).lower() for item in json.loads(issue58_meta_path.read_text(encoding="utf-8")).get("depends_on", [])],
+        )
+
+        deleted = self._run_runtime_capture(
+            target,
+            ["delete", "--id", "iss-00056", "--force", "--yes", "--json"],
+            env=env,
+        )
+        self.assertEqual(deleted.returncode, 0, deleted.stdout + deleted.stderr)
+        deleted_payload = json.loads(deleted.stdout)
+        self.assertEqual(deleted_payload["status"], "ok")
+        self.assertEqual(deleted_payload["target_id"], "iss-00056")
+        self.assertFalse(issue56_dir.exists())
+
+        scrubbed_meta = json.loads(issue58_meta_path.read_text(encoding="utf-8"))
+        self.assertNotIn("iss-00056", [str(item).lower() for item in scrubbed_meta.get("depends_on", [])])
+
+        validated = self._run_runtime_capture(target, ["validate"], env=env)
+        self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+
+        synced = self._run_runtime_capture(target, ["sync"], env=env)
+        self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+        deps_payload = json.loads((target / "spec-dock" / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+        self.assertFalse(
+            any(
+                edge.get("from") == "iss-00058" and edge.get("to") == "iss-00056"
+                for edge in deps_payload.get("edges", [])
+                if isinstance(edge, dict)
+            )
+        )
+
+        activated = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00058", "--force"], env=env)
+        self.assertEqual(activated.returncode, 0, activated.stdout + activated.stderr)
+        self.assertIn("spec-dock: ok (active set)", activated.stdout)
+        self.assertNotIn("iss-00056", activated.stdout + activated.stderr)
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        self.assertEqual(state["state"], "CLOSED")
+
 
 class TestFsRepoDeleteTree(unittest.TestCase):
     def test_delete_tree_retries_permission_error_for_readonly_meta(self) -> None:

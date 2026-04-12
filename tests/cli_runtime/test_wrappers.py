@@ -68,6 +68,18 @@ class TestCliRulesContract(CliRuntimeHarness):
             issue_discussions_rules = (
                 target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
             ).read_text(encoding="utf-8")
+            hub_skill = (
+                target / ".agents" / "skills" / "spec-driven-tdd-workflow" / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            issue_skill = (
+                target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            codex_adapter_skill = (
+                target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            copilot_adapter_skill = (
+                target / ".agents" / "skills" / "spec-dock-copilot-adapter" / "SKILL.md"
+            ).read_text(encoding="utf-8")
 
             self.assertIn("`spec-dock/docs/rules/**`", templates_readme)
             self.assertIn("`rules.md` symlink", templates_readme)
@@ -149,6 +161,30 @@ class TestCliRulesContract(CliRuntimeHarness):
                 self.assertIn("spec-dock/docs/", text)
                 self.assertIn(expected_command, text)
                 self.assertNotIn("./spec ", text)
+            for skill_text in (hub_skill, issue_skill, codex_adapter_skill, copilot_adapter_skill):
+                self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
+                self.assertNotIn("./spec ", skill_text)
+
+            self.assertIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", issue_skill)
+            self.assertIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", issue_skill)
+            self.assertIn("./spec-dock/scripts/spec-dock deps check <target> --github", issue_skill)
+            self.assertIn("./spec-dock/scripts/spec-dock validate", issue_skill)
+            self.assertIn("./spec-dock/scripts/spec-dock sync --github", issue_skill)
+
+            for skill_text in (hub_skill, codex_adapter_skill, copilot_adapter_skill):
+                self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
+                self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
+                self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target> --github", skill_text)
+                self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
+                self.assertNotIn("./spec-dock/scripts/spec-dock sync --github", skill_text)
+
+            self.assertIn("`spec-dock/docs/reference_deps.md`", hub_skill)
+            self.assertIn("`spec-dock/docs/reference_sync.md`", hub_skill)
+            self.assertIn("`spec-dock/docs/reference_deps.md`", codex_adapter_skill)
+            self.assertIn("`spec-dock/docs/reference_sync.md`", codex_adapter_skill)
+            self.assertIn("`spec-dock/docs/reference_deps.md`", copilot_adapter_skill)
+            self.assertIn("`spec-dock/docs/reference_sync.md`", copilot_adapter_skill)
+
             self.assertNotIn("--no-github", initiative_epics_rules)
 
     def test_new_doc_numbering_and_validate_ignore_initiative_discussion_rules_symlink(self) -> None:

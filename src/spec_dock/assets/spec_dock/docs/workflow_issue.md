@@ -28,6 +28,10 @@ Issue は実装の最小単位です。
 ./spec-dock/scripts/spec-dock active set --github-issue <n>
 ./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url> --checkout
 ./spec-dock/scripts/spec-dock active show
+
+./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ```
 
 - `import issue` で `--epic` を省略した場合は current active から親 epic を解決する
@@ -38,6 +42,7 @@ Issue は実装の最小単位です。
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存未解決なら `active set` は通常失敗する。確認は `./spec-dock/scripts/spec-dock deps check <target> --github`
 - 例外で進める場合だけ `./spec-dock/scripts/spec-dock active set <target> --github --force`
+- 依存 edge の追加/削除は metadata を直編集せず `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>` / `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>` を使う
 
 ## spec authoring
 
@@ -80,6 +85,36 @@ Issue は実装の最小単位です。
 - 実際に行った refactor は事前計画ではなくここに残す
 - 依存関係の想定と違った実装順や refactor が必要になった場合もここに残す
 - 1 セッション 1 追記でよいが、未来の自分と reviewer が追える粒度を保つ
+
+## hard cutover evidence contract（必要な issue のみ）
+
+- issue plan が hard cutover を含む場合、entry 条件は `docs 更新 + checked-in data manual fix + validate/sync evidence` の 3 点を必須にする。
+- T3/T4 owner split は次に固定する:
+  - T3 integration issue（例: `iss-00062`）が entry 条件充足と hard cutover judgment の primary owner
+  - T4 closure issue（例: `iss-00063`）は T3 judgment を参照して final parity / close review を実施
+- hard cutover evidence の fixed-key contract は issue-level `report.md` に残す。最低限、以下のキー群を使う:
+  - `cutover_entry.docs_update.paths`
+  - `cutover_entry.docs_update.pass`
+  - `cutover_entry.manual_fix.paths`
+  - `cutover_entry.manual_fix.pass`
+  - `cutover_entry.boundary_tests`
+  - `cutover_entry.validate.command`
+  - `cutover_entry.validate.exit_code`
+  - `cutover_entry.validate.pass`
+  - `cutover_entry.sync.command`
+  - `cutover_entry.sync.exit_code`
+  - `cutover_entry.sync.pass`
+  - `cutover_entry.targeted_regression_summary.scope`
+  - `cutover_entry.targeted_regression_summary.results`
+  - `cutover_entry.targeted_regression_summary.pass`
+  - `cutover_entry.entry_conditions_pass`
+  - `cutover_judgment.owner_issue_id`
+  - `cutover_judgment.owner_role`
+  - `cutover_judgment.verdict`
+  - `cutover_judgment.fixed_at`
+  - `cutover_judgment.follow_up_issue_id`
+  - `cutover_judgment.notes`
+- no fallback / no dual-read contract を崩す救済策は採用しない（canonical storage / mutation contract の詳細は [reference_deps.md](reference_deps.md) を参照）。
 
 ## 品質ゲート
 
