@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00072",
+  "title": "Legacy authority retirement and final spec close",
+  "slug": "legacy-authority-retirement-and-final-spec-close",
+  "created_at": "2026-04-12T20:36:35+09:00",
+  "updated_at": "2026-04-12T20:36:44+09:00",
+  "parent_id": "epic-00067",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00067",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 72,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00071"
+  ]
+}
