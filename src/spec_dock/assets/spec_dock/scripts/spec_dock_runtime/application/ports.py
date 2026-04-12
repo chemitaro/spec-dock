@@ -11,6 +11,7 @@ from ..infra.contracts import ActiveManifest
 from ..infra.contracts import ActiveManifestLoadResult
 from ..infra.contracts import ActiveStateSnapshot
 from ..infra.contracts import DepsTopologyLoadResult
+from ..infra.contracts import DirectDependencyResolution
 from ..infra.contracts import StoredMetaRecord
 from ..presentation.contracts import ArtifactBundle
 
@@ -30,6 +31,12 @@ class NodeRepository(Protocol):
         ...
 
     def write_meta(self, dest_dir: Path, record: StoredMetaRecord) -> None:
+        ...
+
+    def add_issue_dependency(self, meta_path: Path, to_id: str) -> None:
+        ...
+
+    def remove_issue_dependency(self, meta_path: Path, to_id: str, *, matching_refs: list[object] | None = None) -> None:
         ...
 
     def delete_tree(self, node_path: Path) -> None:
@@ -113,6 +120,14 @@ class ActiveStateStore(Protocol):
 
 class DepsTopologyReader(Protocol):
     def load_issue_depends_on_map(self, specdock_dir: Path, graph: SpecGraph) -> DepsTopologyLoadResult:
+        ...
+
+    def load_direct_dependency_resolutions(
+        self,
+        specdock_dir: Path,
+        graph: SpecGraph,
+        src_id: str,
+    ) -> list[DirectDependencyResolution]:
         ...
 
 

@@ -27,6 +27,12 @@ class DepsTopologyLoadResult:
 
 
 @dataclass(frozen=True)
+class DirectDependencyResolution:
+    raw_ref: object
+    resolved_node_id: str
+
+
+@dataclass(frozen=True)
 class ActiveManifestEntry:
     id: str
     path: str | None

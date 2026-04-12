@@ -145,6 +145,44 @@ class DepsCheckResult:
     warnings: list[str]
 
 
+MutateDepsAction = Literal["add", "remove"]
+MutateDepsResultKind = Literal["updated", "unchanged"]
+
+
+@dataclass(frozen=True)
+class MutateDepsRequest:
+    action: MutateDepsAction
+    from_id: str
+    to_id: str
+
+
+@dataclass(frozen=True)
+class MutateDepsResult:
+    action: MutateDepsAction
+    from_id: str
+    to_id: str
+    result: MutateDepsResultKind
+    warnings: list[str]
+
+
+class MutateDepsError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        action: MutateDepsAction,
+        from_id: str,
+        to_id: str,
+        code: str,
+        detail: str | None = None,
+    ) -> None:
+        self.action = action
+        self.from_id = from_id
+        self.to_id = to_id
+        self.code = code
+        self.detail = detail
+        super().__init__(detail or code)
+
+
 @dataclass(frozen=True)
 class CloseNodeRequest:
     target: TargetRef
@@ -349,6 +387,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    mutate_deps: Callable[[MutateDepsRequest], MutateDepsResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("mutate_deps is not configured")
+    )
     delete_node: Callable[[DeleteNodeRequest], DeleteNodeResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("delete_node is not configured")
     )

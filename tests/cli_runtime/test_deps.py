@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -65,6 +66,73 @@ class TestCliDeps(CliRuntimeHarness):
         github_dict.pop("repo_name", None)
         meta["github"] = github_dict
         self._write_json_force(meta_path, meta)
+
+    def _set_meta_depends_on(self, node_dir: Path, depends_on: object) -> None:
+        meta_path = node_dir / ".meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["depends_on"] = depends_on
+        self._write_json_force(meta_path, meta)
+
+    def _set_meta_schema_version(self, node_dir: Path, schema_version: int) -> None:
+        meta_path = node_dir / ".meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["schema_version"] = schema_version
+        self._write_json_force(meta_path, meta)
+
+    def _find_meta_path_by_id(self, target: Path, node_id: str) -> Path:
+        for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            if payload.get("id") == node_id:
+                return meta_path
+        raise AssertionError(f"meta path not found for node id: {node_id}")
+
+    def _create_cross_epic_inherited_dependency_fixture(self, target: Path) -> dict[str, str]:
+        self._create_same_repo_linked_hierarchy(
+            target,
+            owner="example",
+            repo="repo",
+            initiative_issue_number=101,
+            epic_issue_number=201,
+            issue_issue_number=301,
+            issue_title="From issue",
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "epic",
+                "--initiative",
+                "101",
+                "--github-issue",
+                "202",
+                "--title",
+                "Dependency epic",
+            ],
+        )
+        self._run_runtime(
+            target,
+            [
+                "new",
+                "issue",
+                "--epic",
+                "202",
+                "--github-issue",
+                "302",
+                "--title",
+                "To issue",
+            ],
+        )
+        from_issue_id = "iss-00301"
+        to_issue_id = "iss-00302"
+        from_epic_id = "epic-00201"
+        to_epic_id = "epic-00202"
+        self._set_meta_depends_on(self._find_meta_path_by_id(target, from_epic_id).parent, [to_epic_id])
+        return {
+            "iss-00301": from_issue_id,
+            "iss-00302": to_issue_id,
+            "epic-00201": from_epic_id,
+            "epic-00202": to_epic_id,
+        }
 
     def _make_gh_issue_list_and_view_stub(
         self,
@@ -206,10 +274,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [201]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [201])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -269,10 +334,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -571,10 +633,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00124-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -617,10 +676,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00124-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -671,10 +727,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00124-target-issue"
             )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(target_issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -720,10 +773,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             for ref in forms:
                 with self.subTest(ref=ref):
-                    (target_issue_dir / "deps.json").write_text(
-                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    self._set_meta_depends_on(target_issue_dir, [ref])
                     p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
                     self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
                     data = json.loads(p.stdout)
@@ -768,10 +818,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             for ref in forms:
                 with self.subTest(ref=ref):
-                    (target_issue_dir / "deps.json").write_text(
-                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    self._set_meta_depends_on(target_issue_dir, [ref])
                     p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124"])
                     self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
                     self.assertIn("Unresolved dependency ref:", p.stderr)
@@ -835,10 +882,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             for ref in forms:
                 with self.subTest(ref=ref):
-                    (target_issue_dir / "deps.json").write_text(
-                        json.dumps({"schema_version": 1, "depends_on": [ref]}, ensure_ascii=False, indent=2) + "\n",
-                        encoding="utf-8",
-                    )
+                    self._set_meta_depends_on(target_issue_dir, [ref])
                     p = self._run_runtime_capture(target, ["deps", "check", "--id", "iss-00124", "--json"])
                     self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
                     data = json.loads(p.stdout)
@@ -910,10 +954,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-target-issue"
             )
-            (main_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["epic-00202"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(main_issue_dir, ["epic-00202"])
             blocker_issue_dir = (
                 target
                 / "spec-dock"
@@ -924,10 +965,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00401-open-blocker"
             )
-            (blocker_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [403]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(blocker_issue_dir, [403])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1001,10 +1039,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1075,10 +1110,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, ["iss-00301"])
 
             (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
@@ -1177,10 +1209,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1236,10 +1265,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1300,10 +1326,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
@@ -1347,10 +1370,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1405,10 +1425,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1463,10 +1480,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-target-issue"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [301]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [301])
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1497,7 +1511,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["target_status"]["source"], "local")
             self.assertEqual(p.stderr.strip(), "")
 
-    def test_deps_check_missing_deps_json_is_empty(self) -> None:
+    def test_deps_check_missing_meta_depends_on_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1505,6 +1519,59 @@ class TestCliDeps(CliRuntimeHarness):
                 target,
                 initiative_issue_number=101,
                 epic_issue_number=201,
+            )
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, ["iss-local-99999"])
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta.pop("depends_on", None)
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", local_ids["iss-00301"], "--json"])
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            data = json.loads(p.stdout)
+            self.assertTrue(data["ready"])
+            self.assertEqual(data["effective_depends_on"], [])
+
+    def test_deps_check_missing_meta_depends_on_ignores_stale_legacy_deps_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001-auth-platform"
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-add-refresh-token"
+            )
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta.pop("depends_on", None)
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            # Legacy stale file must not be used as a fallback source.
+            (issue_dir / "deps.json").write_text(
+                json.dumps({"schema_version": 1, "depends_on": ["iss-local-99999"]}, ensure_ascii=False, indent=2)
+                + "\n",
+                encoding="utf-8",
             )
 
             p = self._run_runtime_capture(target, ["deps", "check", local_ids["iss-00301"], "--json"])
@@ -1555,7 +1622,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIn("iss-local-00002", requirement)
             self.assertNotIn("iss-00407", requirement)
 
-    def test_deps_json_parse_error_fails_with_path(self) -> None:
+    def test_meta_json_parse_error_fails_with_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1575,14 +1642,14 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-add-refresh-token"
             )
-            (issue_dir / "deps.json").write_text("{\n", encoding="utf-8")  # invalid JSON
+            self._write_text_force(issue_dir / ".meta.json", "{\n")  # invalid JSON
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
             self.assertIn("Invalid JSON", p.stderr)
 
-    def test_deps_json_schema_error_fails_with_reason(self) -> None:
+    def test_meta_schema_error_fails_with_reason(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1604,17 +1671,17 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-add-refresh-token"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 2, "depends_on": []}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            meta_path = issue_dir / ".meta.json"
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["depends_on"] = {"invalid": "type"}
+            self._write_json_force(meta_path, meta)
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("deps.json", p.stderr)
-            self.assertIn("schema_version", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("depends_on must be a list", p.stderr)
 
-    def test_deps_json_schema_rejects_boolean_dep_ref(self) -> None:
+    def test_meta_schema_root_non_object_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1636,15 +1703,170 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-add-refresh-token"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [True]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._write_text_force(issue_dir / ".meta.json", "[]\n")
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("expected object", p.stderr)
+
+    def test_meta_schema_rejects_object_dep_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [{}])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
             self.assertIn("depends_on[0]", p.stderr)
+            self.assertIn("must be a string or int", p.stderr)
+
+    def test_meta_schema_rejects_boolean_dep_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            meta_path = issue_dir / ".meta.json"
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["depends_on"] = [True]
+            self._write_json_force(meta_path, meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("depends_on[0]", p.stderr)
+
+    def test_meta_schema_version_must_be_1(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [])
+            self._set_meta_schema_version(issue_dir, 2)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("schema_version must be 1", p.stderr)
+
+    def test_meta_schema_version_missing_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [])
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta.pop("schema_version", None)
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("schema_version must be 1", p.stderr)
+
+    def test_meta_schema_version_rejects_boolean_true(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+            self._remove_all_github_links(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00301-add-refresh-token"
+            )
+            self._set_meta_depends_on(issue_dir, [])
+            issue_meta_path = issue_dir / ".meta.json"
+            issue_meta = json.loads(issue_meta_path.read_text(encoding="utf-8"))
+            issue_meta["schema_version"] = True
+            self._write_json_force(issue_meta_path, issue_meta)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn(".meta.json", p.stderr)
+            self.assertIn("schema_version must be 1", p.stderr)
 
     def test_deps_unresolved_ref_reports_ref_and_deps_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1669,16 +1891,12 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-issue-one"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-99999"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, ["iss-99999"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("iss-99999", p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
 
     def test_deps_canonicalizes_width_variants(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1701,10 +1919,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00302-issue-two"
             )
-            (issue_two_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-301"]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_two_dir, ["iss-301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -1734,15 +1949,12 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-issue-one"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": [123]}, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, [123])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("123", p.stderr)
-            self.assertIn("deps.json", p.stderr)
+            self.assertIn(".meta.json", p.stderr)
 
     def test_deps_effective_depends_on_merges_parents_and_dedups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1764,21 +1976,9 @@ class TestCliDeps(CliRuntimeHarness):
             target_issue_dir = epic_dir / "issues" / "iss-00303-target"
 
             # Parent initiative/epic both depend on the same dep (dedup expected).
-            (init_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-401"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (epic_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00401"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (target_issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(init_dir, ["iss-401"])
+            self._set_meta_depends_on(epic_dir, ["iss-00401"])
+            self._set_meta_depends_on(target_issue_dir, ["iss-00302"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00303", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -1803,16 +2003,8 @@ class TestCliDeps(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00201-jwt-auth"
 
-            (init_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00401"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (epic_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00402"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(init_dir, ["iss-00401"])
+            self._set_meta_depends_on(epic_dir, ["iss-00402"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "epic-00201", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
@@ -1932,11 +2124,7 @@ class TestCliDeps(CliRuntimeHarness):
                 / "issues"
                 / "iss-00301-issue-one"
             )
-            (issue_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -1955,12 +2143,8 @@ class TestCliDeps(CliRuntimeHarness):
                 issue_title="Issue one",
             )
             init_dir = target / "spec-dock" / "initiatives" / "init-00101-auth-platform"
-            deps_path = init_dir / "deps.json"
-            deps_path.write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            deps_path = init_dir / ".meta.json"
+            self._set_meta_depends_on(init_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "init-00101"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -1987,16 +2171,8 @@ class TestCliDeps(CliRuntimeHarness):
             issue_one_dir = epic_dir / "issues" / "iss-00301-issue-one"
             issue_two_dir = epic_dir / "issues" / "iss-00302-issue-two"
 
-            (issue_one_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (issue_two_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00301"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(issue_one_dir, ["iss-00302"])
+            self._set_meta_depends_on(issue_two_dir, ["iss-00301"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -2024,16 +2200,8 @@ class TestCliDeps(CliRuntimeHarness):
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
-            (cycle_a_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00303"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (cycle_b_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
+            self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301", "--json"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -2061,16 +2229,8 @@ class TestCliDeps(CliRuntimeHarness):
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
-            (cycle_a_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00303"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (cycle_b_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
+            self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
             p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -2105,16 +2265,8 @@ class TestCliDeps(CliRuntimeHarness):
             )
             cycle_a_dir = epic_dir / "issues" / "iss-00302-cycle-a"
             cycle_b_dir = epic_dir / "issues" / "iss-00303-cycle-b"
-            (cycle_a_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00303"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
-            (cycle_b_dir / "deps.json").write_text(
-                json.dumps({"schema_version": 1, "depends_on": ["iss-00302"]}, ensure_ascii=False, indent=2)
-                + "\n",
-                encoding="utf-8",
-            )
+            self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
+            self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
             (agent_dir / "index.json").unlink(missing_ok=True)
             (agent_dir / "tree.json").unlink(missing_ok=True)
@@ -2244,4 +2396,663 @@ class TestCliDeps(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00301", "--json"])
             self.assertIn(p.returncode, (0, 3), p.stdout + p.stderr)
             after = issue_meta.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_updates_meta_json_and_returns_updated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.stderr.strip(), "")
+            self.assertEqual(
+                p.stdout.strip(),
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+            )
+
+            from_meta: dict[str, object] | None = None
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                if payload.get("id") == from_id:
+                    from_meta = payload
+                    break
+            self.assertIsNotNone(from_meta)
+            assert from_meta is not None
+            self.assertEqual(from_meta.get("depends_on"), [to_id])
+
+    def test_deps_add_duplicate_returns_unchanged_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            first = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+
+            from_meta_path: Path | None = None
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                if payload.get("id") == from_id:
+                    from_meta_path = meta_path
+                    break
+            self.assertIsNotNone(from_meta_path)
+            assert from_meta_path is not None
+
+            before_second = from_meta_path.read_text(encoding="utf-8")
+            second = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(second.stderr.strip(), "")
+            self.assertEqual(
+                second.stdout.strip(),
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+            )
+
+            after_second = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after_second, before_second)
+            from_meta = json.loads(after_second)
+            self.assertEqual(from_meta.get("depends_on"), [to_id])
+
+    def test_deps_add_inherited_only_edge_adds_direct_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_cross_epic_inherited_dependency_fixture(target)
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            before = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            before_refs = before.get("depends_on", [])
+            self.assertFalse(any(str(dep) == to_id for dep in before_refs if isinstance(dep, (str, int))))
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertEqual(p.stderr.strip(), "")
+            self.assertEqual(
+                p.stdout.strip(),
+                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+            )
+
+            after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(after.get("depends_on"), [to_id])
+
+    def test_deps_remove_updates_meta_json_and_returns_updated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            added = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+
+            removed = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+            self.assertEqual(removed.stderr.strip(), "")
+            self.assertEqual(
+                removed.stdout.strip(),
+                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+            )
+
+            from_meta: dict[str, object] | None = None
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                if payload.get("id") == from_id:
+                    from_meta = payload
+                    break
+            self.assertIsNotNone(from_meta)
+            assert from_meta is not None
+            self.assertEqual(from_meta.get("depends_on"), [])
+
+    def test_deps_remove_inherited_only_edge_returns_edge_not_found(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_cross_epic_inherited_dependency_fixture(target)
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_removes_shorthand_direct_refs_by_issue_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                owner="example",
+                repo="repo",
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+                issue_title="From issue",
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "To issue"],
+            )
+            from_id = "iss-00301"
+            to_id = "iss-00302"
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            shorthand_refs: list[object] = [
+                302,
+                "302",
+                "example/repo#302",
+                "https://github.com/example/repo/issues/302",
+            ]
+
+            for shorthand_ref in shorthand_refs:
+                with self.subTest(shorthand_ref=shorthand_ref):
+                    self._set_meta_depends_on(from_meta_path.parent, [shorthand_ref])
+                    p = self._run_runtime_capture(
+                        target,
+                        ["deps", "remove", "--from", from_id, "--to", to_id],
+                    )
+                    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertEqual(p.stderr.strip(), "")
+                    self.assertEqual(
+                        p.stdout.strip(),
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                    )
+                    after = json.loads(from_meta_path.read_text(encoding="utf-8"))
+                    self.assertEqual(after.get("depends_on"), [])
+
+    def test_deps_add_broken_current_graph_fails_preflight_before_duplicate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Cycle A"), (303, "Cycle B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            cycle_b_id = local_ids["iss-00303"]
+
+            meta_paths_by_id: dict[str, Path] = {}
+            for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                node_id = payload.get("id")
+                if isinstance(node_id, str):
+                    meta_paths_by_id[node_id] = meta_path
+
+            self._set_meta_depends_on(meta_paths_by_id[from_id].parent, [to_id])
+            self._set_meta_depends_on(meta_paths_by_id[to_id].parent, [cycle_b_id])
+            self._set_meta_depends_on(meta_paths_by_id[cycle_b_id].parent, [to_id])
+
+            before = meta_paths_by_id[from_id].read_text(encoding="utf-8")
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("preflight validate failed", p.stderr)
+            self.assertIn("Dependency cycle detected", p.stderr)
+            self.assertNotIn("result=unchanged", p.stderr)
+            self.assertNotIn("result=unchanged", p.stdout)
+
+            after = meta_paths_by_id[from_id].read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_malformed_meta_json_returns_preflight_validate_failed_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Broken issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            broken_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+            self._write_text_force(broken_meta_path, "{\n")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=preflight_validate_failed", p.stderr)
+            self.assertIn("Invalid JSON", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_invalid_depends_on_schema_returns_preflight_validate_failed_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Broken issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            broken_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+            self._set_meta_depends_on(broken_meta_path.parent, {"invalid": "type"})
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=preflight_validate_failed", p.stderr)
+            self.assertIn("depends_on must be a list", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_not_found_returns_edge_not_found_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_non_issue_from_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["epic-00201"]
+            to_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_non_issue_to_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["epic-00201"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_unresolved_target_returns_edge_not_found_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", "iss-local-99999"],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_unresolved_source_returns_edge_not_found_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            to_id = local_ids["iss-00302"]
+            to_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = to_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", "iss-local-99998", "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=edge_not_found", p.stderr)
+
+            after = to_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_remove_write_failure_returns_write_failed_and_no_write(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are required for this test")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+
+            added = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            from_issue_dir = from_meta_path.parent
+            before = from_meta_path.read_text(encoding="utf-8")
+            original_mode = stat.S_IMODE(from_issue_dir.stat().st_mode)
+            try:
+                from_issue_dir.chmod(0o555)
+                removed = self._run_runtime_capture(
+                    target,
+                    ["deps", "remove", "--from", from_id, "--to", to_id],
+                )
+            finally:
+                from_issue_dir.chmod(original_mode)
+
+            self.assertEqual(removed.returncode, 1, removed.stdout + removed.stderr)
+            self.assertEqual(removed.stdout.strip(), "")
+            self.assertIn("code=write_failed", removed.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+            self.assertEqual(json.loads(after).get("depends_on"), [to_id])
+
+    def test_deps_remove_broken_current_graph_fails_preflight_before_edge_not_found(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "Cycle A"), (303, "Cycle B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            cycle_b_id = local_ids["iss-00303"]
+
+            to_meta_path = self._find_meta_path_by_id(target, to_id)
+            cycle_b_meta_path = self._find_meta_path_by_id(target, cycle_b_id)
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            self._set_meta_depends_on(to_meta_path.parent, [cycle_b_id])
+            self._set_meta_depends_on(cycle_b_meta_path.parent, [to_id])
+
+            before = from_meta_path.read_text(encoding="utf-8")
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=preflight_validate_failed", p.stderr)
+            self.assertNotIn("code=edge_not_found", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_non_issue_node_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["epic-00201"]
+            to_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_non_issue_to_input_returns_unsupported_node_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["epic-00201"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=unsupported_node_kind", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_unresolved_target_returns_invalid_add_unresolved_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            from_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", "iss-local-99999"],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=invalid_add_unresolved", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_unresolved_source_returns_invalid_add_unresolved_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "From issue"), (302, "To issue")),
+            )
+            to_id = local_ids["iss-00302"]
+            to_meta_path = self._find_meta_path_by_id(target, to_id)
+            before = to_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", "iss-local-99998", "--to", to_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=invalid_add_unresolved", p.stderr)
+
+            after = to_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_self_dependency_returns_invalid_add_self_dependency_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Solo issue"),),
+            )
+            issue_id = local_ids["iss-00301"]
+            issue_meta_path = self._find_meta_path_by_id(target, issue_id)
+            before = issue_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", issue_id, "--to", issue_id],
+            )
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertEqual(p.stdout.strip(), "")
+            self.assertIn("code=invalid_add_self_dependency", p.stderr)
+
+            after = issue_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_cycle_request_returns_invalid_add_cycle_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            to_id = local_ids["iss-00302"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+
+            first = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", to_id, "--to", from_id],
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+
+            before = from_meta_path.read_text(encoding="utf-8")
+            second = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+            )
+            self.assertEqual(second.returncode, 1, second.stdout + second.stderr)
+            self.assertEqual(second.stdout.strip(), "")
+            self.assertIn("code=invalid_add_cycle", second.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
+            self.assertEqual(after, before)
+
+    def test_deps_add_missing_required_flag_returns_parser_error_exit_two_and_no_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            local_ids = self._create_local_compat_hierarchy(
+                target,
+                issues=((301, "Issue A"), (302, "Issue B")),
+            )
+            from_id = local_ids["iss-00301"]
+            from_meta_path = self._find_meta_path_by_id(target, from_id)
+            before = from_meta_path.read_text(encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id],
+            )
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("usage:", p.stderr)
+            self.assertIn("--to", p.stderr)
+
+            after = from_meta_path.read_text(encoding="utf-8")
             self.assertEqual(after, before)

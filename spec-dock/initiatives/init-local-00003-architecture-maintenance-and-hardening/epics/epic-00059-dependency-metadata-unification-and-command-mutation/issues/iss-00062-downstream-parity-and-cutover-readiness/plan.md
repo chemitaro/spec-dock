@@ -18,11 +18,13 @@ ID: "iss-00062"
   - AC-002
   - AC-003
   - AC-004
+  - AC-005
 - EC:
   - EC-001
   - EC-002
   - EC-003
   - EC-004
+  - EC-005
 - 制約:
   - `.meta.json` 単一 SoT を崩さない
   - hard cutover judgment は T3 で fixed にする
@@ -32,14 +34,14 @@ ID: "iss-00062"
 ## マイルストーン一覧
 - M1:
   - 対象:
-    - delete scrub と downstream parity の runtime contract 固定
+    - delete scrub 修正と downstream parity regression lock
   - exit:
-    - delete / active / sync / validate の targeted tests が `.meta.json` SoT 前提で green になる
+    - delete / active / sync / validate の targeted tests が `.meta.json` SoT 前提で green になり、shared topology reader 前提が regression として固定される
 - M2:
   - 対象:
-    - docs / report schema / cutover boundary contract 固定
+    - docs / scaffold / report schema / cutover boundary contract 固定
   - exit:
-    - `reference_deps.md` / `reference_sync.md` / `workflow_issue.md` の provider-side 正本と dogfooding mirror に SoT / manual fix / evidence owner が反映され、report fixed key に targeted regression summary を含めて追える
+    - `reference_deps.md` / `reference_sync.md` / `workflow_issue.md` の provider-side 正本と dogfooding mirror に SoT / manual fix / evidence owner が反映され、provider templates / init-update coverage が legacy `deps.json` を再seedせず、report fixed key に targeted regression summary を含めて追える
 - M3:
   - 対象:
     - checked-in dogfooding data manual fix と cutover evidence 採取
@@ -49,13 +51,14 @@ ID: "iss-00062"
 ## 実装順序の根拠
 - 依存関係の正本:
   - `design.md` の `依存関係分析` と module/dependency UML を参照する
+  - `iss-00060/report.md` / `iss-00061/report.md` と provider-side source / focused tests を prerequisite completion の権威ソースとする
 - sequencing rule:
-  - delete scrub を先に固定し、保存後 graph が壊れないことを保証してから active/sync/validate parity を揃える
-  - docs / report schema は runtime contract が見えた後に固定し、最後に manual fix と command evidence を束ねて judgment を閉じる
+  - delete scrub を先に固定し、保存後 graph が壊れないことを保証してから active/sync/validate parity を regression として固める
+  - docs / scaffold / report schema は runtime contract が見えた後に固定し、最後に manual fix と command evidence を束ねて judgment を閉じる
 - step ordering notes:
   - S01 は S02 の前提になる downstream data integrity を閉じ、post-delete snapshot で `validate` / `sync` / `active set` が deleted node を再観測しないことまで固定する
   - S02 は S03/S04 の validation semantics を決める
-  - S03 は S04 の evidence / report 記録形式を固定する
+  - S03 は S04 の evidence / report 記録形式と scaffold seed boundary を固定する
   - S04 は cutover judgment を実際に fixed にする唯一の step
 
 ## ステップ一覧
@@ -77,12 +80,14 @@ ID: "iss-00062"
     - active/sync/validate targeted tests が pass
 - S03:
   - 観測可能な振る舞い:
-    - docs と report schema が hard cutover entry 条件と T3/T4 owner split を正しく案内する
+    - docs / scaffold / report schema が hard cutover entry 条件と T3/T4 owner split を正しく案内し、legacy `deps.json` を再seedしない
   - closes:
     - AC-004
+    - AC-005
     - EC-003
+    - EC-005
   - review gate:
-    - docs diff と report fixed-key contract が reviewer に説明できる
+    - docs diff / scaffold diff と report fixed-key contract が reviewer に説明できる
 - S04:
   - 観測可能な振る舞い:
     - checked-in dogfooding data manual fix、cutover boundary evidence、`validate` / `sync` 実測、judgment fixed record が揃う
@@ -97,10 +102,12 @@ ID: "iss-00062"
 - AC-002 -> S02
 - AC-003 -> S04
 - AC-004 -> S03
+- AC-005 -> S03
 - EC-001 -> S01
 - EC-002 -> S04
 - EC-003 -> S03
 - EC-004 -> S02
+- EC-005 -> S03
 
 ## レビュー / QA ゲート方針
 - SG1 spec review:
@@ -110,6 +117,7 @@ ID: "iss-00062"
   - scope:
     - T3/T4 owner split
     - cutover evidence contract
+    - scaffold/template cutover parity
     - step decomposition と verification mapping
 - RG1 implementation review:
   - timing:
@@ -120,7 +128,7 @@ ID: "iss-00062"
   - scope:
     - downstream parity
     - delete scrub contract
-    - docs / manual-fix boundary
+    - docs / scaffold / manual-fix boundary
     - no fallback / no dual-read
 - QG1 QA review:
   - timing:
@@ -129,6 +137,7 @@ ID: "iss-00062"
   - scope:
     - targeted runtime tests
     - cutover boundary tests
+    - init/update scaffold regression
     - `validate` / `sync` evidence
 - step approval loop:
   - SG1/spec review pass を取得するまで implementation を開始しない
@@ -229,7 +238,7 @@ ID: "iss-00062"
 - design refs:
   - `spec-dock/active/issue/design.md`
 - step boundary:
-  - active/sync/validate が同一 topology reader に収束するところまでを扱う
+  - active/sync/validate が同一 topology reader に収束していることを targeted regression で固定し、mismatch が見つかった場合のみ最小修正するところまでを扱う
 
 #### update_plan（着手時に登録）
 - [ ] `update_plan` に step の作業単位を登録した
@@ -314,19 +323,23 @@ ID: "iss-00062"
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
 
-### S03 — docs refresh and report schema lock
+### S03 — docs, scaffold, and report schema lock
 - target:
   - `src/spec_dock/assets/spec_dock/docs/reference_deps.md`
   - `src/spec_dock/assets/spec_dock/docs/reference_sync.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/templates/initiative/deps.json`
+  - `src/spec_dock/assets/spec_dock/templates/epic/deps.json`
+  - `src/spec_dock/assets/spec_dock/templates/issue/deps.json`
   - `spec-dock/docs/reference_deps.md`
   - `spec-dock/docs/reference_sync.md`
   - `spec-dock/docs/workflow_issue.md`
+  - `tests/test_init_update.py`
   - `spec-dock/active/issue/report.md`
 - design refs:
   - `spec-dock/active/issue/design.md`
 - step boundary:
-  - operator docs と report fixed-key contract を judgment 前に固定する
+  - operator docs / scaffold seed / report fixed-key contract を judgment 前に固定する
 
 #### update_plan（着手時に登録）
 - [ ] `update_plan` に step の作業単位を登録した
@@ -370,7 +383,40 @@ ID: "iss-00062"
   - この step の範囲を超えて広げない
   - 必要がなければスキップしてよい
 
-#### B2 — report fixed-key schema lock
+#### B2 — scaffold/template legacy seed cleanup
+- purpose:
+  - fresh scaffold / update path が cutover 後に legacy `deps.json` を再seedしないようにする
+- files:
+  - `src/spec_dock/assets/spec_dock/templates/initiative/deps.json`
+  - `src/spec_dock/assets/spec_dock/templates/epic/deps.json`
+  - `src/spec_dock/assets/spec_dock/templates/issue/deps.json`
+  - `tests/test_init_update.py`
+
+##### I1 — remove scaffold seed of legacy deps
+- slice goal:
+  - new init/update path が `.meta.json` only contract と矛盾しない状態にする
+
+###### Red
+- failing test:
+  - template/init-update で legacy `deps.json` 再seed を観測する regression
+- expected failure:
+  - new scaffold や update coverage が cutover 後も `deps.json` を要求・生成する
+
+###### Green
+- minimum implementation:
+  - provider templates と init/update coverage を `.meta.json` only 契約へそろえる
+- pass condition:
+  - relevant scaffold/update coverage が pass
+
+###### Refactor
+- 目的:
+  - Green を維持したまま、必要な範囲で構造や可読性を整える
+- guardrail:
+  - 振る舞いを変えない
+  - この step の範囲を超えて広げない
+  - 必要がなければスキップしてよい
+
+#### B3 — report fixed-key schema lock
 - purpose:
   - T3 issue report が cutover evidence の primary owner として機能する形を固定する
 - files:
@@ -402,12 +448,13 @@ ID: "iss-00062"
 
 #### step gate
 - review:
-  - docs / report schema が cutover entry 条件と owner split を明示している
+  - docs / scaffold / report schema が cutover entry 条件と owner split を明示している
 - expected tests:
   - docs diff review
+  - `python -m unittest tests.test_init_update -v` の relevant scaffold/update coverage
   - report schema review
 - report update:
-  - reviewer verdict / docs差分 / fixed key 一覧 / no-op 理由を `./spec-dock/active/issue/report.md` に残す
+  - reviewer verdict / docs差分 / scaffold差分 / fixed key 一覧 / no-op 理由を `./spec-dock/active/issue/report.md` に残す
   - `report.md` には `cutover_entry.docs_update.paths`、`cutover_entry.docs_update.pass`、`cutover_entry.manual_fix.paths`、`cutover_entry.manual_fix.pass`、`cutover_entry.boundary_tests`、`cutover_entry.validate.command`、`cutover_entry.validate.exit_code`、`cutover_entry.validate.pass`、`cutover_entry.sync.command`、`cutover_entry.sync.exit_code`、`cutover_entry.sync.pass`、`cutover_entry.targeted_regression_summary.scope`、`cutover_entry.targeted_regression_summary.results`、`cutover_entry.targeted_regression_summary.pass`、`cutover_entry.entry_conditions_pass`、`cutover_judgment.owner_issue_id`、`cutover_judgment.owner_role`、`cutover_judgment.verdict`、`cutover_judgment.fixed_at`、`cutover_judgment.follow_up_issue_id`、`cutover_judgment.notes` を固定キーで残す
 - commit:
   - report 更新後に差分確認し、この stage の差分とまとめてコミットする
@@ -416,7 +463,6 @@ ID: "iss-00062"
 - target:
   - `spec-dock/initiatives/**/.meta.json`
   - `spec-dock/initiatives/**/deps.json`
-  - `tests/test_init_update.py` の relevant coverage
   - `spec-dock/active/issue/report.md`
 - design refs:
   - `spec-dock/active/issue/design.md`

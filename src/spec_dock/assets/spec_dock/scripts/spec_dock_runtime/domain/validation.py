@@ -365,6 +365,25 @@ def validate_graph_and_deps(
     return report
 
 
+def ensure_current_graph_and_deps_valid(
+    graph: SpecGraph,
+    issue_depends_on_map: dict[str, list[str]],
+    repo_root: Path | None = None,
+    *,
+    current_repo_slug: str | None = None,
+    enforce_github_mandatory_linkage: bool = True,
+) -> None:
+    report = validate_graph_and_deps(
+        graph,
+        issue_depends_on_map=issue_depends_on_map,
+        repo_root=repo_root,
+        current_repo_slug=current_repo_slug,
+        enforce_github_mandatory_linkage=enforce_github_mandatory_linkage,
+    )
+    if report.errors:
+        raise RuntimeError(f"preflight validate failed: {report.errors[0]}")
+
+
 def _validate_graph_or_raise(
     graph: SpecGraph,
     *,

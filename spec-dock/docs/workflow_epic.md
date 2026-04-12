@@ -35,6 +35,7 @@ Epic は設計の背骨です。
 - `import epic` で `--initiative` を省略した場合は current active から親 initiative を解決する
 - naming 制約と GitHub 振る舞いは [reference_naming.md](reference_naming.md), [reference_github.md](reference_github.md) を参照する
 - Epic 配下の Issue 作成は runtime command `./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."` を使う。生成される `issues/rules.md` は `spec-dock/docs/rules/epic/issues.md` への入口で、作成ルールの正本は後者にある。GitHub linkage は [reference_github.md](reference_github.md) を参照する
+- Issue 間依存の追加/削除/確認は `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、反映は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` で確認する
 
 ## 記述
 

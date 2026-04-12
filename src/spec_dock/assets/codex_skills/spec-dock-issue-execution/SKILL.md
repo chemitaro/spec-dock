@@ -28,3 +28,14 @@ description: Leaf skill for issue execution tasks in spec-dock.
 - `spec-dock/docs/reference_sync.md`
 - `spec-dock/docs/reference_github.md`
 - `spec-dock/docs/reference_naming.md`
+
+## Runtime command reminders
+
+- Use runtime command path only: `./spec-dock/scripts/spec-dock ...`
+- Dependency mutation is command-first:
+  - `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>`
+  - `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>`
+  - `./spec-dock/scripts/spec-dock deps check <target> --github`
+- Keep report evidence aligned with workflow checks:
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync --github`

@@ -18,7 +18,8 @@ ID: "iss-00061"
 ## 背景・現状
 - 現状の挙動:
   - runtime には `deps check` は存在するが、依存関係を更新する `deps add/remove` は未提供である。
-  - 依存整合性の検査は read path 側に寄っており、mutation 実行前に current graph 自体を fail-closed に止める command contract が未定義である。
+  - `iss-00060` により read path は `.meta.json` SoT へ整列済みで、dependency 整合性の検査は read path 側に寄っている一方、mutation 実行前に current graph 自体を fail-closed に止める command contract は未定義である。
+  - 現行 test には `deps check` 実行で `.meta.json` が変化しない baseline（`test_deps_commands_do_not_mutate_meta_json`）があり、mutation command 導入後も fail-closed / no-write 境界を明示的に更新する必要がある。
 - 現状の課題:
   - command 不在のままでは、依存変更が JSON 直編集や ad-hoc 修正に寄りやすく、duplicate edge や not-found remove の扱いが実装者依存になる。
   - current graph が既に壊れている場合でも、duplicate add を no-op 扱いしてしまうと corruption を見逃す。
@@ -49,12 +50,15 @@ ID: "iss-00061"
 ## スコープ
 - MUST:
   - `deps add --from <node-id> --to <node-id>` と `deps remove --from <node-id> --to <node-id>` を追加する。
-  - mutation 対象は existing issue node から existing issue node への edge に限定し、`from` / `to` に non-issue node を受けた場合は error に固定する。
+  - mutation 対象は existing issue node から existing issue node への direct edge に限定し、`from` / `to` に non-issue node を受けた場合は error に固定する。
+  - duplicate add / remove existence 判定は compiled/inherited dependency ではなく、`from` node 直下 `.meta.json.depends_on` に保持された raw direct ref 基準で行う。
   - parser / handler / application / domain / infra write path / presentation に mutation contract を通す。
   - mutation 前に current graph validation を実行し、不整合時は fail-closed error で終了する。
+  - mutation preflight の current graph validation は local dogfooding / import/sync と同じく dependency graph 整合性を対象とし、GitHub mandatory linkage は強制しない。
   - current graph が正常な場合だけ duplicate add を success/no-op（`result=unchanged`）とし、dependency 配列の non-dup invariant を維持する。
   - remove not-found を success/no-op に丸めず error に固定する。
   - integration test で CLI response/error contract と no-write guarantee を固定する。
+  - command surface が変わるため、provider-side の dependency/operator docs 更新要否を本 issue で解決し、`src/spec_dock/assets/spec_dock/docs/reference_deps.md` を正本、`spec-dock/docs/reference_deps.md` を secondary verification として扱う。
 - MUST NOT:
   - `deps.json` fallback read/write や temporary compatibility path を追加しない。
   - delete/sync/active/validate の全面的な parity work をこの issue に混ぜ込まない。
@@ -84,6 +88,9 @@ ID: "iss-00061"
 
 ## 前提
 - `iss-00060-meta-json-dependency-schema-and-reader-alignment` により `.meta.json` dependency schema と reader contract が先に固まっている。
+- `iss-00060` で provider-side `reference_deps.md` 正本、dogfooding copy、`deps` / `sync` / `active` の read-side regression が `.meta.json` 契約へ追従済みである。
+- upstream prerequisite の authoritative source は `iss-00060/report.md` とし、`S99 verdict: final diff review pass` と close-ready evidence をもって T1 foundation 完了とみなす。
+- この issue の実装正本は provider-side shipped runtime（`src/spec_dock/assets/spec_dock/...`）であり、dogfooding runtime copy は update/sync 前に一時的に遅れていても本 issue の前提不成立とはみなさない。
 - issue 対象は mutation contract に集中し、downstream parity / validate evidence / hard cutover judgment は `iss-00062` へ渡す。
 
 ## 受け入れ条件
@@ -103,7 +110,7 @@ ID: "iss-00061"
   - Actor:
     - runtime 利用者
   - Given:
-    - current graph が valid で、`from` / `to` が既存 issue node を指し、指定 edge が既に存在する。
+    - current graph が valid で、`from` / `to` が既存 issue node を指し、指定 direct edge が `from` node 直下 `.meta.json.depends_on` に既に存在する。
   - When:
     - 同一 `deps add` を再実行する。
   - Then:
@@ -115,7 +122,7 @@ ID: "iss-00061"
   - Actor:
     - runtime 利用者
   - Given:
-    - current graph が valid で、`from` / `to` が既存 issue node を指し、指定 edge が存在する。
+    - current graph が valid で、`from` / `to` が既存 issue node を指し、指定 direct edge が `from` node 直下 `.meta.json.depends_on` に存在する。
   - When:
     - `./spec-dock/scripts/spec-dock deps remove --from <from-id> --to <to-id>` を実行する。
   - Then:
@@ -146,9 +153,9 @@ ID: "iss-00061"
     - stderr に preflight/current graph validation failure、保存前後 diff。
 - EC-002 remove not-found:
   - 条件:
-    - `deps remove` 対象 edge が存在しない。
+    - `deps remove` 対象 direct edge が `from` node 直下 `.meta.json.depends_on` に存在しない。
   - 期待:
-    - error で終了し、success/no-op にしない。
+    - inherited/compiled dependency によって target issue へ到達できる場合でも、direct ref が無ければ error で終了し、success/no-op にしない。
   - 観測点:
     - exit code 非 0、stderr の error code/message、保存前後 diff。
 - EC-003 non-issue node input:
@@ -173,6 +180,13 @@ ID: "iss-00061"
     - argparse error と usage を返し、application まで進まない。
   - 観測点:
     - exit code `2`、stderr、no-write。
+- EC-006 write failure atomicity:
+  - 条件:
+    - current graph は valid だが、`.meta.json` 更新の最終書き込みまたは置換で I/O failure が発生する。
+  - 期待:
+    - CLI は write failure を識別できる non-zero error で終了し、partial write や壊れた `.meta.json` を残さない。
+  - 観測点:
+    - 失敗注入 test、stderr の error code/message、保存前後 diff。
 
 ## 入力→出力例（必要時）
 - EX-001:
@@ -193,7 +207,8 @@ ID: "iss-00061"
 
 ## 用語（ドメイン語彙）
 - TERM-001 current graph validation:
-  - mutation 対象 edge の判定前に、現在保存済み graph 全体の整合性を検証する preflight。
+  - mutation 対象 edge の判定前に、現在保存済み graph 全体の dependency 整合性を検証する preflight。
+  - 本 issue の mutation preflight では `enforce_github_mandatory_linkage=False` を取り、GitHub linkage mandatory check はスコープ外とする。
 - TERM-002 duplicate-edge non-dup invariant:
   - 同一 `from -> to` edge は current graph が正常な場合に限り `unchanged` success に収束し、storage 上で重複保存されない制約。
 - TERM-003 issue-node-only mutation target:

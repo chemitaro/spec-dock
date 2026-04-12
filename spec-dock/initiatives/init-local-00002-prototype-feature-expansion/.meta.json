@@ -9,6 +9,7 @@
   "parent_id": null,
   "initiative_id": null,
   "epic_id": null,
+  "depends_on": [],
   "github": {
     "issue_number": 39,
     "repo_owner": "chemitaro",

@@ -3,6 +3,7 @@
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
 まず `guide.md` で全体像を掴み、その後は対象 scope の `workflow_*.md` を入口にしてください。
 plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の scope-specific playbook を合わせて参照します。
+runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
 
 ## エージェント起点
 
@@ -39,22 +40,25 @@ plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の 
 ## 最短コマンド
 
 ```bash
-./spec new initiative --title "..."
-./spec new epic --initiative <initiative-id> --title "..."
-./spec new issue --epic <epic-id> --title "..."
-./spec new issue --create-github-issue --epic <epic-id> --title "..."
+./spec-dock/scripts/spec-dock new initiative --title "..."
+./spec-dock/scripts/spec-dock new epic --initiative <initiative-id> --title "..."
+./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."
+./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."
 
-./spec import epic <num-or-canonical-url> --title "..." [--initiative <id>] [--allow-foreign-url]
-./spec import issue <num-or-canonical-url> --title "..." [--epic <id>] [--allow-foreign-url]
+./spec-dock/scripts/spec-dock import epic <num-or-canonical-url> --title "..." [--initiative <id>] [--allow-foreign-url]
+./spec-dock/scripts/spec-dock import issue <num-or-canonical-url> --title "..." [--epic <id>] [--allow-foreign-url]
 
-./spec active set <id|#num|url>
-./spec active set --id <node-id>
-./spec active set --github-issue <n>
-./spec active set <id|#num|url> --checkout
-./spec active show
+./spec-dock/scripts/spec-dock active set <id|#num|url>
+./spec-dock/scripts/spec-dock active set --id <node-id>
+./spec-dock/scripts/spec-dock active set --github-issue <n>
+./spec-dock/scripts/spec-dock active set <id|#num|url> --checkout
+./spec-dock/scripts/spec-dock active show
 
-./spec validate
-./spec sync
+./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync --github
 ```
 
 ## 高頻度ルール
@@ -66,7 +70,8 @@ plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の 
 - `--no-github` / `--allow-foreign-url` は compatibility flag として残るが、current contract mismatch を auto-migrate せず reject/fail-fast しうる
 - `import` は読み取り確認のみで、GitHub を更新しない。canonical URL は current repo と照合し、cross-repo node import は reject される
 - `active set` / `deps check` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
+- 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` で整合を確認する
 - legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
-- `spec-dock update` は managed files/docs/templates/scripts/skills の更新であり、old workspace の in-place migration ツールではない。legacy `meta.json` や linkage mismatch は手動 normalize / rebuild が必要な場合がある
+- `spec-dock update` は managed files/docs/templates/scripts/skills の更新であり、old workspace の in-place migration ツールではない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
 - Issue plan は TDD ベースの execution contract を持つが、cadence policy の正本は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

@@ -9,6 +9,7 @@
 - create 系では spec-dock は owner/repo を自前で解決しません。
   - `gh` を導入先リポジトリの root で実行し、対象リポジトリの解決は **`gh` に委譲**します。
 - `--github-issue <n>` は既存 current-repo Issue にリンクするだけで、GitHub Issue は新規作成しません。
+- 新規ノード作成時は、spec-dock が対応する issue docs と `.meta.json` を管理対象として書き込みます。
 - `--no-github` は compatibility option として残っていますが、`initiative / epic / issue` では contract error で reject されます。
 - `--slug` は **安全な文字のみ**許可します（空白や `!` などは禁止）
   - 許可: Unicode の英数字 + `-` `_` `.`
@@ -109,7 +110,7 @@ else --no-github
   Script -> Script: contract error\n(local-only create unsupported)
 end
 
-Script -> FS: write docs + meta.json
+Script -> FS: write issue docs + .meta.json
 deactivate Script
 @enduml
 ```

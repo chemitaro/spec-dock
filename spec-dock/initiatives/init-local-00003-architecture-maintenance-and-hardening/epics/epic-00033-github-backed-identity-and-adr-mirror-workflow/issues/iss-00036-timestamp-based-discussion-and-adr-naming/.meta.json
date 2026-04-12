@@ -9,6 +9,9 @@
   "parent_id": "epic-00033",
   "initiative_id": "init-local-00003",
   "epic_id": "epic-00033",
+  "depends_on": [
+    "iss-00034"
+  ],
   "_spec_dock": {
     "managed": true,
     "do_not_edit": true,

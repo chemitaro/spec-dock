@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 
-from ..application.contracts import CheckDepsRequest, TargetRef, UseCases
-from ..presentation.cli_text import render_deps_check_text
+from ..application.contracts import CheckDepsRequest, MutateDepsError, MutateDepsRequest, TargetRef, UseCases
+from ..domain.ids import format_id, parse_id
+from ..presentation.cli_text import (
+    render_deps_check_text,
+    render_deps_mutation_error_text,
+    render_deps_mutation_text,
+)
 from ..presentation.contracts import CliText
 from ..presentation.json_state import render_deps_check_json
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
@@ -19,13 +24,29 @@ class DepsCheckArgs(CommandArgs):
     json_output: bool
 
 
+@dataclass(frozen=True)
+class DepsMutationArgs(CommandArgs):
+    from_id: str
+    to_id: str
+
+
 def command_specs() -> dict[str, CommandSpec]:
     return {
         "deps_check": CommandSpec(
             add_arguments=_add_deps_check_arguments,
             args_factory=_deps_check_args,
             run=_run_deps_check,
-        )
+        ),
+        "deps_add": CommandSpec(
+            add_arguments=_add_deps_add_arguments,
+            args_factory=_deps_mutation_args,
+            run=_run_deps_add,
+        ),
+        "deps_remove": CommandSpec(
+            add_arguments=_add_deps_add_arguments,
+            args_factory=_deps_mutation_args,
+            run=_run_deps_remove,
+        ),
     }
 
 
@@ -42,6 +63,21 @@ def _add_deps_check_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--json", action="store_true", help="Output JSON to stdout only")
 
 
+def _add_deps_add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--from",
+        dest="from_id",
+        required=True,
+        help="Issue node id for dependency source (e.g. iss-00123 or iss-local-00001)",
+    )
+    parser.add_argument(
+        "--to",
+        dest="to_id",
+        required=True,
+        help="Issue node id for dependency target (e.g. iss-00124 or iss-local-00002)",
+    )
+
+
 def _deps_check_args(ns: argparse.Namespace) -> CommandArgs:
     target_ref, _ = parse_explicit_target_flags(
         positional_target=getattr(ns, "target", None),
@@ -55,6 +91,12 @@ def _deps_check_args(ns: argparse.Namespace) -> CommandArgs:
         gh_limit=int(getattr(ns, "gh_limit", 10000)),
         json_output=bool(getattr(ns, "json", False)),
     )
+
+
+def _deps_mutation_args(ns: argparse.Namespace) -> CommandArgs:
+    from_id = _normalize_node_id(str(getattr(ns, "from_id", "")), field="--from")
+    to_id = _normalize_node_id(str(getattr(ns, "to_id", "")), field="--to")
+    return DepsMutationArgs(from_id=from_id, to_id=to_id)
 
 
 def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
@@ -78,7 +120,44 @@ def _run_deps_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     return CommandOutcome(exit_code=exit_code, text=text)
 
 
+def _run_deps_add(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    return _run_deps_mutation(action="add", args=args, use_cases=use_cases)
+
+
+def _run_deps_remove(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    return _run_deps_mutation(action="remove", args=args, use_cases=use_cases)
+
+
+def _run_deps_mutation(*, action: str, args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    typed = _expect_deps_mutation_args(args)
+    try:
+        result = use_cases.mutate_deps(
+            MutateDepsRequest(
+                action=action,
+                from_id=typed.from_id,
+                to_id=typed.to_id,
+            )
+        )
+    except MutateDepsError as error:
+        return CommandOutcome(exit_code=1, text=render_deps_mutation_error_text(error))
+    return CommandOutcome(exit_code=0, text=render_deps_mutation_text(result))
+
+
+def _normalize_node_id(value: str, *, field: str) -> str:
+    raw = value.strip().lower()
+    if not raw:
+        raise RuntimeError(f"{field} is required")
+    prefix, is_local, num = parse_id(raw)
+    return format_id(prefix, num, local=is_local)
+
+
 def _expect_deps_check_args(args: CommandArgs) -> DepsCheckArgs:
     if not isinstance(args, DepsCheckArgs):
         raise RuntimeError("Invalid command args for deps check")
+    return args
+
+
+def _expect_deps_mutation_args(args: CommandArgs) -> DepsMutationArgs:
+    if not isinstance(args, DepsMutationArgs):
+        raise RuntimeError("Invalid command args for deps mutation")
     return args
