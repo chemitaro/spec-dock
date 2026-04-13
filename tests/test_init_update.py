@@ -304,6 +304,148 @@ class TestInitUpdate(CliRuntimeHarness):
             ".github/workflows/ci.yml",
         ),
     }
+    _ISSUE_68_DECLARED_LEGACY_PAIR_RELATIVE_PATHS = (
+        (
+            ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
+        ),
+        (
+            ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md",
+        ),
+        (
+            ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md",
+        ),
+        (
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md",
+        ),
+        (
+            ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md",
+        ),
+        (
+            ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md",
+        ),
+        (
+            ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+            "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md",
+        ),
+        (
+            ".agents/host-adapters/meta.json",
+            "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
+        ),
+        (
+            ".codex/agents/spec-dock.toml",
+            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
+        ),
+        (
+            ".github/agents/spec-dock.agent.md",
+            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md",
+        ),
+    )
+    _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY = {
+        "spec-driven-tdd-workflow skill": {
+            "search_globs": (
+                "**/spec-driven-tdd-workflow/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
+            ),
+        },
+        "spec-dock-adr-facilitation skill": {
+            "search_globs": (
+                "**/spec-dock-adr-facilitation/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-adr-facilitation/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md",
+            ),
+        },
+        "spec-dock-epic-planning skill": {
+            "search_globs": (
+                "**/spec-dock-epic-planning/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-initiative-planning skill": {
+            "search_globs": (
+                "**/spec-dock-initiative-planning/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-issue-execution skill": {
+            "search_globs": (
+                "**/spec-dock-issue-execution/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md",
+            ),
+        },
+        "spec-dock-codex-adapter skill": {
+            "search_globs": (
+                "**/spec-dock-codex-adapter/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md",
+            ),
+        },
+        "spec-dock-copilot-adapter skill": {
+            "search_globs": (
+                "**/spec-dock-copilot-adapter/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md",
+            ),
+        },
+        "host adapter metadata": {
+            "search_globs": (
+                "**/host-adapters/meta.json",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+                "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
+            ),
+        },
+        "codex native shim": {
+            "search_globs": (
+                "**/spec-dock.toml",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+                "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
+            ),
+        },
+        "github agent file": {
+            "search_globs": (
+                "**/spec-dock.agent.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+                "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md",
+            ),
+        },
+        "github workflow asset": {
+            "search_globs": (
+                "**/.github/workflows/ci.yml",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
+            ),
+        },
+    }
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -6069,6 +6211,43 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             repo_root_workflow.read_bytes(),
             "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml",
         )
+
+    def test_issue_68_declared_legacy_pairs_remain_byte_equivalent(self) -> None:
+        for authoritative_relative_path, legacy_provider_path in self._ISSUE_68_DECLARED_LEGACY_PAIR_RELATIVE_PATHS:
+            authoritative_path = self._ISSUE_68_INSTALL_ROOT / authoritative_relative_path
+            legacy_path = Path(legacy_provider_path)
+            self.assertTrue(
+                authoritative_path.is_file(),
+                f"missing issue-68 authoritative asset for legacy pair parity: {authoritative_path}",
+            )
+            self.assertTrue(
+                legacy_path.is_file(),
+                f"missing issue-68 declared legacy duplicate for parity: {legacy_path}",
+            )
+            self.assertEqual(
+                authoritative_path.read_bytes(),
+                legacy_path.read_bytes(),
+                "issue-68 declared legacy duplicate must stay byte-equivalent to authoritative install_root asset: "
+                f"{authoritative_relative_path}",
+            )
+
+    def test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        provider_assets_root = repo_root / "src/spec_dock/assets"
+
+        for asset_label, duplicate_boundary in self._ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY.items():
+            observed_provider_paths: set[str] = set()
+            for search_glob in duplicate_boundary["search_globs"]:
+                observed_provider_paths.update(
+                    candidate.relative_to(repo_root).as_posix()
+                    for candidate in provider_assets_root.rglob(search_glob)
+                    if candidate.is_file()
+                )
+            self.assertEqual(
+                sorted(observed_provider_paths),
+                sorted(duplicate_boundary["allowed_provider_paths"]),
+                f"issue-68 authority inventory boundary mismatch for {asset_label}",
+            )
 
     def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
         import spec_dock.cli as cli
