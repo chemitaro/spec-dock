@@ -1,9 +1,10 @@
-import json
 import io
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from contextlib import contextmanager, redirect_stderr
@@ -446,6 +447,35 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
         },
     }
+    _ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        "spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
+        "spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
+        "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+        "spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+        "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+        "spec_dock/assets/install_root/.github/workflows/ci.yml",
+    )
+    _ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS = (
+        "assets/install_root/.agents/**",
+        "assets/install_root/.codex/**",
+        "assets/install_root/.github/**",
+    )
+    _ISSUE_69_WHEELHOUSE_RELATIVE = Path("tests/fixtures/wheelhouse")
+    _ISSUE_69_BUILD_BACKEND_REQUIREMENTS = (
+        "build==1.2.2",
+        "packaging==24.2",
+        "pyproject_hooks==1.2.0",
+        "setuptools==75.8.0",
+        "wheel==0.45.1",
+    )
+    _ISSUE_69_WHEELHOUSE_FILENAMES = (
+        "build-1.2.2-py3-none-any.whl",
+        "packaging-24.2-py3-none-any.whl",
+        "pyproject_hooks-1.2.0-py3-none-any.whl",
+        "setuptools-75.8.0-py3-none-any.whl",
+        "wheel-0.45.1-py3-none-any.whl",
+    )
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -827,6 +857,224 @@ class TestInitUpdate(CliRuntimeHarness):
             self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
             f"codex native shim still uses legacy instructions key ({shim_label})",
         )
+
+    def _issue_69_run_subprocess(
+        self,
+        args: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        result = subprocess.run(
+            args,
+            cwd=str(cwd) if cwd is not None else None,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "issue-69 command failed:\n"
+            f"command: {' '.join(args)}\n"
+            f"cwd: {cwd}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}",
+        )
+
+    def _issue_69_resolve_wheelhouse(self, repo_root: Path) -> Path:
+        wheelhouse = repo_root / self._ISSUE_69_WHEELHOUSE_RELATIVE
+        self.assertTrue(
+            wheelhouse.is_dir(),
+            f"issue-69 local wheelhouse is missing: {wheelhouse}",
+        )
+        missing_wheels = [
+            wheel_name
+            for wheel_name in self._ISSUE_69_WHEELHOUSE_FILENAMES
+            if not (wheelhouse / wheel_name).is_file()
+        ]
+        self.assertEqual(
+            missing_wheels,
+            [],
+            f"issue-69 local wheelhouse is missing pinned backend wheels: {missing_wheels}",
+        )
+        return wheelhouse
+
+    def _issue_69_venv_python(self, venv_dir: Path) -> Path:
+        if os.name == "nt":
+            return venv_dir / "Scripts" / "python.exe"
+        return venv_dir / "bin" / "python"
+
+    def _issue_69_build_artifacts_with_local_wheelhouse(
+        self,
+        *,
+        repo_root: Path,
+        build_context: Path,
+        wheel_dir: Path,
+        sdist_dir: Path,
+    ) -> tuple[Path, Path, Path]:
+        wheelhouse = self._issue_69_resolve_wheelhouse(repo_root)
+        venv_dir = build_context.parent / "build-venv"
+        dist_dir = build_context.parent / "dist"
+
+        self._issue_69_run_subprocess([sys.executable, "-m", "venv", str(venv_dir)])
+        venv_python = self._issue_69_venv_python(venv_dir)
+        self.assertTrue(
+            venv_python.is_file(),
+            f"issue-69 expected venv python executable at: {venv_python}",
+        )
+
+        self._issue_69_run_subprocess(
+            [
+                str(venv_python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-cache-dir",
+                "--find-links",
+                str(wheelhouse),
+                *self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS,
+            ]
+        )
+
+        self._issue_69_run_subprocess(
+            [
+                str(venv_python),
+                "-m",
+                "build",
+                "--wheel",
+                "--sdist",
+                "--no-isolation",
+                "--outdir",
+                str(dist_dir),
+            ],
+            cwd=build_context,
+        )
+
+        wheel_paths = sorted(dist_dir.glob("*.whl"))
+        sdist_paths = sorted(dist_dir.glob("*.tar.gz"))
+        self.assertEqual(len(wheel_paths), 1, f"issue-69 expected one wheel artifact, got: {wheel_paths}")
+        self.assertEqual(len(sdist_paths), 1, f"issue-69 expected one sdist artifact, got: {sdist_paths}")
+
+        wheel_dir.mkdir(parents=True, exist_ok=True)
+        sdist_dir.mkdir(parents=True, exist_ok=True)
+        wheel_path = wheel_dir / wheel_paths[0].name
+        sdist_path = sdist_dir / sdist_paths[0].name
+        shutil.copy2(wheel_paths[0], wheel_path)
+        shutil.copy2(sdist_paths[0], sdist_path)
+        return wheel_path, sdist_path, venv_python
+
+    def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
+        build_context.mkdir(parents=True, exist_ok=True)
+        for filename in ("pyproject.toml", "README.md", "setup.py"):
+            shutil.copy2(repo_root / filename, build_context / filename)
+        shutil.copytree(
+            repo_root / "src",
+            build_context / "src",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+
+    def _issue_69_collect_source_install_root_inventory(self, repo_root: Path) -> set[str]:
+        source_root = repo_root / "src"
+        install_root = source_root / "spec_dock" / "assets" / "install_root"
+        return {
+            candidate.relative_to(source_root).as_posix()
+            for candidate in install_root.rglob("*")
+            if candidate.is_file()
+        }
+
+    def _issue_69_collect_wheel_install_root_inventory(self, wheel_path: Path) -> set[str]:
+        with zipfile.ZipFile(wheel_path) as wheel_zip:
+            return {
+                member
+                for member in wheel_zip.namelist()
+                if member.startswith("spec_dock/assets/install_root/") and not member.endswith("/")
+            }
+
+    def _issue_69_collect_sdist_install_root_inventory(self, sdist_path: Path) -> set[str]:
+        sdist_inventory: set[str] = set()
+        with tarfile.open(sdist_path, "r:gz") as sdist_tar:
+            for member in sdist_tar.getmembers():
+                if not member.isfile():
+                    continue
+                _, sep, relative_member = member.name.partition("/")
+                if not sep:
+                    continue
+                if not relative_member.startswith("src/"):
+                    continue
+                artifact_relative = relative_member.removeprefix("src/")
+                if artifact_relative.startswith("spec_dock/assets/install_root/"):
+                    sdist_inventory.add(artifact_relative)
+        return sdist_inventory
+
+    def _issue_69_collect_installed_install_root_inventory(self, installed_root: Path) -> set[str]:
+        package_root = installed_root / "spec_dock"
+        install_root = package_root / "assets" / "install_root"
+        self.assertTrue(
+            install_root.is_dir(),
+            f"issue-69 installed package is missing install_root assets: {install_root}",
+        )
+        return {
+            f"spec_dock/{candidate.relative_to(package_root).as_posix()}"
+            for candidate in install_root.rglob("*")
+            if candidate.is_file()
+        }
+
+    def _issue_69_collect_install_root_artifact_surfaces(self) -> dict[str, set[str]]:
+        repo_root = Path(__file__).resolve().parents[1]
+        source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            installed_dir = temp_root / "installed-package"
+            wheelhouse = self._issue_69_resolve_wheelhouse(repo_root)
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            installed_dir.mkdir(parents=True, exist_ok=True)
+
+            wheel_path, sdist_path, venv_python = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+            wheel_name_part, wheel_version_part, _ = wheel_path.name.split("-", 2)
+            wheel_requirement = f"{wheel_name_part.replace('_', '-')}=={wheel_version_part}"
+
+            self._issue_69_run_subprocess(
+                [
+                    str(venv_python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-index",
+                    "--no-cache-dir",
+                    "--no-deps",
+                    "--find-links",
+                    str(wheel_dir),
+                    "--find-links",
+                    str(wheelhouse),
+                    "--target",
+                    str(installed_dir),
+                    wheel_requirement,
+                ]
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_install_root_inventory(wheel_path)
+            sdist_inventory = self._issue_69_collect_sdist_install_root_inventory(sdist_path)
+            installed_inventory = self._issue_69_collect_installed_install_root_inventory(installed_dir)
+
+        return {
+            "source": source_inventory,
+            "wheel": wheel_inventory,
+            "sdist": sdist_inventory,
+            "installed": installed_inventory,
+        }
 
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1372,6 +1620,57 @@ class TestInitUpdate(CliRuntimeHarness):
                     wheel_entries,
                     f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}",
                 )
+
+    def test_issue_69_package_data_includes_hidden_install_root_subtrees(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+        section_header = "[tool.setuptools.package-data]"
+        next_section_header = "[tool.setuptools.exclude-package-data]"
+        self.assertIn(section_header, pyproject_text, "missing setuptools package-data section")
+        self.assertIn(next_section_header, pyproject_text, "missing setuptools exclude-package-data section")
+
+        package_data_section = pyproject_text.split(section_header, 1)[1].split(next_section_header, 1)[0]
+        for pattern in self._ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS:
+            self.assertIn(
+                f'"{pattern}"',
+                package_data_section,
+                f"missing issue-69 hidden install_root package-data inclusion: {pattern}",
+            )
+
+    def test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces(self) -> None:
+        surfaces = self._issue_69_collect_install_root_artifact_surfaces()
+        for surface_name in ("source", "wheel", "sdist", "installed"):
+            self.assertTrue(
+                surfaces[surface_name],
+                f"issue-69 expected non-empty install_root inventory for artifact surface: {surface_name}",
+            )
+            for artifact_relative_path in self._ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS:
+                self.assertIn(
+                    artifact_relative_path,
+                    surfaces[surface_name],
+                    (
+                        f"missing issue-69 representative install_root asset in {surface_name}: "
+                        f"{artifact_relative_path}"
+                    ),
+                )
+
+    def test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources(self) -> None:
+        surfaces = self._issue_69_collect_install_root_artifact_surfaces()
+        source_inventory = surfaces["source"]
+        self.assertTrue(source_inventory, "issue-69 source install_root inventory must be non-empty")
+
+        for surface_name in ("wheel", "sdist", "installed"):
+            observed_inventory = surfaces[surface_name]
+            missing = sorted(source_inventory - observed_inventory)
+            unexpected = sorted(observed_inventory - source_inventory)
+            self.assertEqual(
+                observed_inventory,
+                source_inventory,
+                (
+                    f"issue-69 full install_root inventory parity failed for {surface_name}; "
+                    f"missing={missing[:10]} unexpected={unexpected[:10]}"
+                ),
+            )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
