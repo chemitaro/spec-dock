@@ -180,6 +180,8 @@ report --> i72 : final verification input
       - issue-69 `package-parity-evidence` には最低でも `full inventory parity`、`representative asset set`、`stale exclusion guard`、`isolated install smoke` の 4 項目に、参照した test / command output summary / result を埋めていること
     - consumption rule:
       - issue-71 report の `upstream-handoff-consumed` section には、issue-69 package parity evidence と issue-70 handoff evidence の参照先、消費した subchecks、final verification で再確認した箇所を列挙する
+      - issue-70 handoff evidence に含まれる current managed / obsolete managed boundary assertions を、AC-002 の unmanaged-path preservation prerequisite として明示的に採用する
+      - issue-71 自身では `spec-dock update` 後の diff が parity-managed surfaces と fixture-surface managed stale docs に閉じることを再確認し、unmanaged path を新たに prune していないことを補助証跡として残す
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:
