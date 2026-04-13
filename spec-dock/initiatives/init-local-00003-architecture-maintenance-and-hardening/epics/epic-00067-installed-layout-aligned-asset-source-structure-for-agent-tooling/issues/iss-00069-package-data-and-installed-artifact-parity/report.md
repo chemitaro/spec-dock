@@ -68,5 +68,35 @@ ID: "iss-00069"
 - ...
 - ...
 
+## package-parity-evidence (必須)
+- full inventory parity:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+- representative asset set:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+- stale exclusion guard:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+- isolated install smoke:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+
 ## 省略/例外メモ (必須)
 - 該当なし
