@@ -44,11 +44,69 @@ review_status: pass
 - `report.md`
 
 #### コミット
-- pending:
-  - prep docs commit
+- `2933f3e` `docs(issue): iss-00072の実装準備を確定`
 
 #### メモ
 - issue-72 prep docs は implementation-ready。次の step は S01 current authority assumptions retirement。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, EC-001
+
+#### 実施内容
+- `tests/test_init_update.py` の current authority assertions を `install_root` 基準へ整理し、dogfooding mirror map と bundled asset assertions が `codex_skills` を current source/path として扱わないようにした。
+- issue-68 / issue-70 / issue-71 由来の historical regression coverage や legacy duplicate / inert artifact 検証は維持し、current authority assertion だけを retire した。
+- `AGENTS.md` の provider-side directory map と repo guidance を更新し、`src/spec_dock/assets/install_root/` を current authority、`src/spec_dock/assets/codex_skills/` を historical artifact として明示した。
+- scoped search により、`AGENTS.md` の `codex_skills` hit は historical artifact 説明だけになり、`tests/test_init_update.py` の残存 hit も prior-issue coverage / legacy duplicate classification に閉じていることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest \
+  tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract
+
+Ran 4 tests ... OK
+```
+
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates
+
+Ran 1 test ... OK
+```
+
+```bash
+rg -n "codex_skills" AGENTS.md tests/test_init_update.py tests/test_cli.py tests/cli_runtime tests/domain_runtime tests/presentation_runtime
+
+AGENTS.md: historical artifact explanation only
+tests/test_init_update.py: historical regression coverage / legacy duplicate classification only
+tests/test_cli.py, tests/cli_runtime, tests/domain_runtime, tests/presentation_runtime: no hits
+```
+
+#### 変更したファイル
+- `/srv/mount/spec-dock/tests/test_init_update.py`
+  - dogfooding mirror map と bundled asset assertions を `install_root` current authority 基準へ更新
+- `/srv/mount/spec-dock/AGENTS.md`
+  - provider-side directory map / guidance を current authority model に更新
+
+#### コミット
+- pending:
+  - S01 cleanup commit
+
+#### メモ
+- S01 code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d86fd-0ea2-7021-b0a0-74c83bc3d657`
+  - note:
+    - P0/P1 findings はなし
+    - `requirement.md` の forbidden residual list indentation は P2 として修正した
 
 ---
 
