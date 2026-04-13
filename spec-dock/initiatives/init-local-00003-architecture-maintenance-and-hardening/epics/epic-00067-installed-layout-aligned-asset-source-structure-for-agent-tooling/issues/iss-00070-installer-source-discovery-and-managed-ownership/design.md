@@ -3,7 +3,7 @@
 ID: "iss-00070"
 タイトル: "Installer source discovery and managed ownership"
 関連GitHub: ["#70"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md"]
