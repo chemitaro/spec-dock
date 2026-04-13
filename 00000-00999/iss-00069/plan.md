@@ -331,7 +331,7 @@ ID: "iss-00069"
 - expected tests:
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface`
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback`
-  - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_install_root_inventories_match`
+  - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_handoff_surface_inventories_match`
 - report update:
   - installed smoke、site-packages inventory、handoff surface evidence、review verdict を `report.md` に追記する
 - commit:
@@ -357,7 +357,7 @@ ID: "iss-00069"
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup`
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface`
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback`
-  - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_install_root_inventories_match`
+  - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_handoff_surface_inventories_match`
   - `./spec-dock/scripts/spec-dock validate`
   - `python -m unittest discover -v` は informational sweep として実施する
   - full suite が issue-69 scope 外の既存 failure を返した場合、targeted scope と `validate` が通っており、report に failing tests と out-of-scope 理由が記録されていれば `final validation pass` を阻害しない
