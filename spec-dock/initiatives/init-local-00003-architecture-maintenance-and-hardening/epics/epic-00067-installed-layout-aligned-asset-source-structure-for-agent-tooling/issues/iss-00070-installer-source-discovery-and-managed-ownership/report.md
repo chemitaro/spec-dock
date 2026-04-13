@@ -100,14 +100,53 @@ OK
     - `8d3e0e8` を基準にした未コミット S02 diff に対して、high-impact blockers なし
 
 #### コミット
-- pending:
-  - S02 stage commit を次に作成する
+- `936e5fd` `feat(installer): current同期とobsolete cleanupを切替`
 
 #### メモ
 - workflow obsolete cleanup は manifest override fixture で contract を担保しており、default manifest 値そのものはこの step では増やしていない。
 - legacy `codex_skills` duplicate は source discovery から外れたが、physical deletion や final cleanup は issue-72 へ残している。
 
 ---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-007
+
+#### 実施内容
+- issue-69 の isolated non-editable wheel install harness を再利用し、package-installed `spec-dock init/update` が issue-70 cutover contract を満たす regression を追加した。
+- installed package の `site-packages` assets から plan snapshot を取得し、current managed source がすべて `install_root/...` であり、legacy `codex_skills` が source discovery に含まれないことを検証した。
+- package-installed runtime で `.agents`、`.codex`、`.github`、`.github/workflows` の current managed files が canonical relative path のまま反映されることを確認した。
+- package-installed update で obsolete exact paths だけが削除され、managed 外 custom skill / codex agent / workflow は保持されることを検証した。
+- installed assets 配下の legacy `codex_skills` duplicate を stale content / invalid JSON に変えても、target repo には installed `install_root` content だけが反映されることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback
+
+----------------------------------------------------------------------
+Ran 2 tests in 9.165s
+
+OK
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py` - installed plan snapshot helper と package-installed issue-70 cutover regression を追加
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - note:
+    - new helper / new test の scope は S03 意図と一致し、P0/P1 指摘なし
+
+#### コミット
+- pending:
+  - S03 stage commit を次に作成する
+
+#### メモ
+- test は local wheelhouse と temp venv を使うため、issue-69 の hermetic build/install contract を前提にしている。
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
@@ -148,11 +187,13 @@ OK
     - pass
 - installed-package cutover evidence:
   - test_or_command:
-    - pending_until_execution
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback`
   - assertion_summary:
-    - pending_until_execution
+    - package-installed runtime でも current managed source は installed `install_root` 由来であり、`.agents/.codex/.github/.github/workflows` が canonical relative path のまま反映される
+    - obsolete exact paths だけが削除され、managed 外 custom files は保持される
+    - checkout fallback と legacy `codex_skills` source discovery に依存しない
   - result:
-    - pending_until_execution
+    - pass
 
 ## 省略/例外メモ (必須)
 - S01 では `_apply_managed_skill_install_plan` の sync/verify/cleanup ordering は未変更。
