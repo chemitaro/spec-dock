@@ -3,7 +3,7 @@
 ID: "iss-00069"
 タイトル: "Package data and installed artifact parity"
 関連GitHub: ["#69"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -225,8 +225,7 @@ OK
     - handoff surface 3 件だけを見る形へ絞った後、P0/P1 指摘なし
 
 #### コミット
-- pending:
-  - S03 stage commit を次に作成する
+- `be2e813` `test(packaging): install済み配布面の検証を追加`
 
 #### メモ
 - checkout fallback 未使用の判定は、isolated runtime snapshot で `spec_dock.__file__` / `assets_dir` が `site-packages` 配下にあり、repo root が `sys.path` に含まれていないことを根拠にした。
@@ -236,10 +235,6 @@ OK
   - `setuptools` が実行環境に標準導入されておらず、`pip wheel` / cached-wheel bootstrap に頼った helper は network / ambient cache 依存になって code review `fail` となった。
   - 解決:
     - ユーザー判断で repo 管理 wheelhouse を採用し、actual build backend を temp venv + `--no-index --find-links` だけで実行するように切り替えた。
-
-## 今後の推奨事項
-- S02 では requirement の exact stale fixture set を使い、wheel build staging area と sdist archive listing の両方で exclusion guard を閉じる。
-- S03 ではこの wheelhouse を再利用し、isolated install smoke と 3 件の handoff surface discovery を閉じる。
 
 ## package-parity-evidence
 - full inventory parity:
@@ -280,3 +275,65 @@ OK
 
 ## 省略/例外メモ
 - S01 では `python -m unittest discover -v` は未実行。plan 上の informational sweep は S99 で実施する。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S99
+- AC/EC: final quality gate
+
+#### 実施内容
+- issue-69 の targeted 9 tests を一括再実行し、S01-S03 の package parity / stale exclusion / isolated install smoke が branch 全体で再現することを確認した。
+- `./spec-dock/scripts/spec-dock validate` を実行し、spec-dock graph / docs workspace の整合性が維持されていることを確認した。
+- `python -m unittest discover -v` を informational sweep として実行し、issue-69 由来ではない既知 failure 3 件だけが残っていることを確認した。
+- final code review は回収済みで、final spec review はこの更新後の report を対象に確定させる。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_package_data_includes_hidden_install_root_subtrees tests.test_init_update.TestInitUpdate.test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces tests.test_init_update.TestInitUpdate.test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources tests.test_init_update.TestInitUpdate.test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs tests.test_init_update.TestInitUpdate.test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs tests.test_init_update.TestInitUpdate.test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_handoff_surface_inventories_match
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 17.818s
+
+OK
+
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=29
+
+python -m unittest discover -v
+...
+FAILED (failures=3)
+```
+
+#### informational sweep failures（scope外）
+- `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` にある `domain.ids` import が既存 architecture rule に抵触している
+- `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`
+  - checked-in dogfooding `.meta.json` snapshot が current cutover snapshot とずれている
+- `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot`
+  - current dogfooding dependency graph が issue-68..72 の新規 deps を含み、cutover snapshot と一致しない
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - note:
+    - branch diff（`c1782040cb88ce437a4ef6a14759789c6203670a..be2e813084046be3ba83a2208735a8af17b60b81`）と current working tree を確認し、issue-69 scope では P0/P1 指摘なし
+- spec review:
+  - verdict:
+    - `pass`
+  - note:
+    - requirement / design / plan / report の整合、S99 証跡、scope外 failure の扱い、remaining gate 記述が workflow contract と一致していることを確認
+
+#### close-ready judgment
+- status:
+  - `approved`
+- rationale:
+  - targeted 9 tests と `./spec-dock/scripts/spec-dock validate` が通過し、informational full-suite failure 3 件は issue-69 scope 外として report に明示済みで、final code review / final spec review ともに `pass`
+
+#### コミット
+- no-op rationale:
+  - `S99` は closeout-evidence-only の品質ゲートであり、product diff は `S01`-`S03` の stage commits（`2fe79aa`, `b6c2ba0`, `be2e813`）で閉じている
+  - この report 更新自体は監査証跡の確定のみを目的とし、追加の product-surface implementation commit は不要
