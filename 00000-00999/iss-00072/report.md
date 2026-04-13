@@ -3,7 +3,7 @@
 ID: "iss-00072"
 タイトル: "Legacy authority retirement and final spec close"
 関連GitHub: ["#72"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -95,8 +95,7 @@ tests/test_cli.py, tests/cli_runtime, tests/domain_runtime, tests/presentation_r
   - provider-side directory map / guidance を current authority model に更新
 
 #### コミット
-- pending:
-  - S01 cleanup commit
+- `68f2a08` `test(authority): issue-72のcurrent authority前提を整理`
 
 #### メモ
 - S01 code review:
@@ -141,8 +140,7 @@ issue-72 report:
   - final evidence commit pending を実 commit へ更新
 
 #### コミット
-- pending:
-  - S02 closeout docs commit
+- `3968323` `docs(closeout): issue-72のcurrent close chainを整備`
 
 #### メモ
 - S02 code review:
@@ -171,75 +169,118 @@ issue-72 report:
 
 ## authority-uniqueness (必須)
 - provider_authority_artifacts:
-  - pending_until_execution
+  - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` を provider-side authoritative manifest として確認した。
+  - historical artifact として残る `src/spec_dock/assets/codex_skills/host-adapters/meta.json` も確認し、`source_of_truth_asset` は legacy root ではなく `install_root/.codex/agents/spec-dock.toml` と `install_root/.github/agents/spec-dock.agent.md` を指していることを再確認した。
 - retired_legacy_surfaces:
-  - pending_until_execution
+  - `AGENTS.md` は `install_root` を current authority、`codex_skills` を historical artifact としてだけ記述している。
+  - `tests/test_init_update.py` の current authority assertions は `install_root` 基準へ揃っており、残存する `codex_skills` hit は historical regression coverage / legacy duplicate classification / inert duplicate path explanation に限定される。
+  - `tests/test_cli.py`、`tests/cli_runtime`、`tests/domain_runtime`、`tests/presentation_runtime` に current authority assertion としての `codex_skills` hit はない。
 - dogfooding_convergence_evidence:
-  - pending_until_execution
+  - `uv run python -m spec_dock.cli update .` -> `spec-dock: ok (update) -> /srv/mount/spec-dock`
+  - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=29`
+  - `./spec-dock/scripts/spec-dock sync --github` -> `spec-dock: ok (sync)` / active unchanged
+  - `git status --short` は空で、issue-72 closeout evidence 取得後の dogfooding mirror / tracked files に drift が残っていない。
 - result:
-  - pending_until_execution
+  - `install_root` が唯一の current authority であり、legacy `codex_skills` は historical artifact としてのみ残る状態を issue-72 current surfaces で再確認した。
 
 ## historical-boundary (必須)
 - current_docs_corpus:
-  - pending_until_execution
+  - current docs corpus は issue-72 requirement/design/plan/report、epic-00067 requirement/design/plan/report、`AGENTS.md`、provider-side/dogfooding-side current docs の契約に従って確認した。
+  - issue-72 S02 で epic current report を template から evidence-bearing closeout report へ更新し、issue-70 current report の pending commit 記述も解消した。
 - out_of_scope_historical_records:
-  - pending_until_execution
+  - `spec-dock/initiatives/init-local-00002-*` 配下の closed issue/discussion、issue-68/69 requirement 上の historical `codex_skills` 文脈、`src/spec_dock/assets/codex_skills/**` の physical tree は historical record / artifact として scope 外に据え置いた。
+  - current surface search で検出される historical mention は、authority source-of-truth ではなく legacy reference と明示された説明に限定される。
 - result:
-  - pending_until_execution
+  - current docs だけを authority-close 対象に絞り、historical records は rewrite せず boundary を明示する closeout contract が維持されている。
 
 ## future-host-extension (必須)
 - current_model_statement:
-  - pending_until_execution
+  - current host model は `.agents` shared + sibling host roots であり、現行実装では `.codex/` と `.github/` を `src/spec_dock/assets/install_root/` 配下に並置して管理する。
+  - host adapter manifest (`install_root/.agents/host-adapters/meta.json`) もこの sibling-root model を前提に current source_of_truth_asset を指している。
 - claude_code_scope_statement:
-  - pending_until_execution
+  - Claude Code は本 issue / epic では未導入で out-of-scope のままとする。
+  - ただし future host extension point は legacy root 再利用ではなく、`.agents` shared surface を保ったまま新しい sibling host root を `install_root` 配下へ追加する設計として固定済みである。
 - result:
-  - pending_until_execution
+  - `E-RQ-008` / `E-AC-005` に対して、現行 host model と将来拡張の境界が current docs と manifest evidence の両方で説明可能になった。
 
 ## upstream-prerequisites (必須)
 - epic_requirement_refs:
-  - pending_until_execution
+  - `../requirement.md`
+  - 特に `E-RQ-006`、`E-RQ-008`、`E-AC-004`、`E-AC-005`、`E-AC-007`
 - epic_design_refs:
-  - pending_until_execution
+  - `../design.md`
+  - 特に `Directory contract`、`Installer contract`、`Packaging contract`、`Legacy authority retirement`、`Flow-D future host extension`
 - epic_plan_refs:
-  - pending_until_execution
+  - `../plan.md`
+  - issue-68 から issue-72 の sequencing と epic close gate
 - epic_report_refs:
-  - pending_until_execution
+  - `../report.md`
+  - issue-72 S02/S99 により current evidence sink / final closeout report として整備
 - epic_report_status:
-  - pending_until_execution
+  - final closeout update 後に `approved` へ引き上げる対象
 - issue68_refs:
-  - pending_until_execution
+  - `../issues/iss-00068-install-root-tree-and-asset-classification/{requirement.md,design.md,report.md}`
 - issue68_evidence_status:
-  - pending_until_execution
+  - report front matter は `draft` のままだが、foundation tranche の evidence と representative commits は揃っている
 - issue69_refs:
-  - pending_until_execution
+  - `../issues/iss-00069-package-data-and-installed-artifact-parity/{requirement.md,design.md,report.md}`
 - issue69_evidence_status:
-  - pending_until_execution
+  - `approved`
 - issue70_refs:
-  - pending_until_execution
+  - `../issues/iss-00070-installer-source-discovery-and-managed-ownership/{requirement.md,design.md,report.md}`
 - issue70_evidence_status:
-  - pending_until_execution
+  - `approved`
+  - issue-72 S02 で final evidence commit `4007144` まで current report に反映済み
 - issue71_refs:
-  - pending_until_execution
+  - `../issues/iss-00071-verification-dogfooding-and-update-parity/{requirement.md,design.md,report.md}`
 - issue71_evidence_status:
-  - pending_until_execution
+  - `approved`
+  - full-suite residual 1 件は issue-71 report で scope-out 済み
 - issue72_requirement_refs:
-  - pending_until_execution
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
 - issue72_design_refs:
-  - pending_until_execution
+  - `design.md` の `既存実装 / 規約の理解`、`legacy reference verification contract`、`Closeout evidence model`
 - contradiction_summary:
-  - pending_until_execution
+  - issue-70 までに authority cutover は完了していた一方、current tests / AGENTS / closeout docs に residual legacy authority assumption が残っていた。
+  - issue-72 S01 で current authority assertion を整理し、S02 で current closeout docs を evidence-bearing に更新し、S90/S99 で fresh convergence evidence と final reviews を接続する。
 - result:
-  - pending_until_execution
+  - issue-68 から issue-71 までの upstream evidence chain は issue-72 closeout report から再現可能に参照できる。
 
 ## final-close-gate (必須)
 - gate_checks:
-  - pending_until_execution
+  - targeted current-authority tests:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates`
+    - `Ran 5 tests in 0.048s` / `OK`
+  - current-surface scoped search:
+    - `rg -n "codex_skills" AGENTS.md tests/test_init_update.py tests/test_cli.py tests/cli_runtime tests/domain_runtime tests/presentation_runtime`
+    - classification は authority-uniqueness 節のとおり
+  - provider-side manifest review:
+    - `install_root/.agents/host-adapters/meta.json` と legacy `codex_skills/host-adapters/meta.json` を比較確認
+  - dogfooding convergence:
+    - `uv run python -m spec_dock.cli update .` -> `ok`
+    - `./spec-dock/scripts/spec-dock validate` -> `ok`
+    - `./spec-dock/scripts/spec-dock sync --github` -> `ok`
+  - final reviews:
+    - final code review cycle:
+      - initial review: `fail`
+      - finding: unresolved `pending_until_review` placeholders and premature epic approval while issue report was still `draft`
+      - corrective action: S99 report update resolved the final gate placeholders and aligned issue report status with the epic closeout verdict
+      - final re-review: `pass`
+    - final spec review:
+      - `pass`
 - result:
-  - pending_until_execution
+  - final close gate evidence is complete after code re-review and final spec review pass.
 
 ## post-review-audit (任意)
 - spec_review_reference:
   - issue-72 prep review pass recorded in prep session
+- final_code_review_reference:
+  - initial final code review identified unresolved closeout placeholders and issue/epic status mismatch.
+  - S99 corrective revision resolved both findings before final re-review.
+- final_spec_review_reference:
+  - final spec review pass recorded for issue-72 requirement/design/plan/report and epic closeout report.
 
 ## 省略/例外メモ (必須)
 - 該当なし
