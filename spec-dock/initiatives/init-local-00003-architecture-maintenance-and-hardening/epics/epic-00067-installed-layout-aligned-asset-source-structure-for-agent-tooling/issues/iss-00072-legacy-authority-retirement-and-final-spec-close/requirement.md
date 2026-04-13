@@ -111,8 +111,8 @@ ID: "iss-00072"
       - current docs の historical boundary / legacy artifact と明示された説明
       - `src/spec_dock/assets/codex_skills/**` 自体の physical existence
     - forbidden residual matches:
-  - current code/tests/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱う記述
-  - current assets が `codex_skills` を current metadata source として要求する記述
+      - current code/tests/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱う記述
+      - current assets が `codex_skills` を current metadata source として要求する記述
 - Ask:
   - historical record を修正しないと current reader が誤読する場合のみ、例外的に current scope へ昇格する。
 - Never:

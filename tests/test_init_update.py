@@ -85,21 +85,21 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
         ),
         ".agents/skills/spec-driven-tdd-workflow/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
         ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
         ".agents/skills/spec-dock-codex-adapter/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md"
         ),
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md"
         ),
-        ".agents/host-adapters/meta.json": "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
-        ".codex/agents/spec-dock.toml": "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
+        ".agents/host-adapters/meta.json": "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+        ".codex/agents/spec-dock.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
         ".github/agents/spec-dock.agent.md": (
-            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md"
+            "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md"
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
@@ -7172,18 +7172,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertEqual(cli._managed_skill_names(), _EXPECTED_MANAGED_SKILL_NAMES)
         with cli._assets_dir() as assets_dir:
             for skill_name in cli._managed_skill_names():
-                skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+                skill_path = assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
                 self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
             self.assertTrue(
-                (assets_dir / "codex_skills" / "host-adapters" / "meta.json").is_file(),
+                (assets_dir / "install_root" / ".agents" / "host-adapters" / "meta.json").is_file(),
                 "missing bundled host adapter metadata asset",
             )
             self.assertTrue(
-                (assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml").is_file(),
+                (assets_dir / "install_root" / ".codex" / "agents" / "spec-dock.toml").is_file(),
                 "missing bundled codex native shim asset",
             )
             self.assertTrue(
-                (assets_dir / "codex_skills" / "native-shims" / "spec-dock.agent.md").is_file(),
+                (assets_dir / "install_root" / ".github" / "agents" / "spec-dock.agent.md").is_file(),
                 "missing bundled copilot native shim asset",
             )
 
@@ -7191,8 +7191,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         with cli._assets_dir() as assets_dir:
-            codex_path = assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml"
-            copilot_path = assets_dir / "codex_skills" / "native-shims" / "spec-dock.agent.md"
+            codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-dock.toml"
+            copilot_path = assets_dir / "install_root" / ".github" / "agents" / "spec-dock.agent.md"
             self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
             self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
             codex_text = codex_path.read_text(encoding="utf-8")
@@ -7217,7 +7217,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         with cli._assets_dir() as assets_dir:
-            skills_dir = assets_dir / "codex_skills"
+            skills_dir = assets_dir / "install_root" / ".agents" / "skills"
             hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
