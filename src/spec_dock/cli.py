@@ -1085,9 +1085,62 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
     )
 
 
-def _preflight_managed_skill_install_plan() -> _ManagedSkillInstallPlan:
+def _preflight_target_path_conflicts(
+    target_root: Path,
+    *,
+    current_target_rel_paths: tuple[Path, ...],
+    obsolete_target_rel_paths: tuple[Path, ...],
+) -> None:
+    def _assert_exact_file_path_safe(target_rel: Path, *, path_kind: str) -> None:
+        target_path = target_root / target_rel
+        rel_posix = target_rel.as_posix()
+
+        for parent in target_path.parents:
+            if parent == target_root:
+                break
+            if parent.exists() and not parent.is_dir():
+                parent_rel = parent.relative_to(target_root).as_posix()
+                raise RuntimeError(
+                    "target directory/container conflict for "
+                    f"{path_kind} '{rel_posix}' (non-directory container: '{parent_rel}')"
+                )
+
+        if target_path.exists() and target_path.is_dir():
+            raise RuntimeError(
+                "target directory/container conflict for "
+                f"{path_kind} '{rel_posix}' (existing directory at exact file path)"
+            )
+
+    for current_rel in current_target_rel_paths:
+        _assert_exact_file_path_safe(current_rel, path_kind="current managed path")
+    for obsolete_rel in obsolete_target_rel_paths:
+        _assert_exact_file_path_safe(obsolete_rel, path_kind="obsolete managed path")
+
+
+def _preflight_managed_skill_install_plan(target_root: Path | None = None) -> _ManagedSkillInstallPlan:
     with _assets_dir() as assets_dir:
-        return _build_managed_skill_install_plan(assets_dir)
+        plan = _build_managed_skill_install_plan(assets_dir)
+
+    if target_root is not None:
+        current_target_rel_paths = tuple(
+            sorted(
+                {mapping.target_rel for mapping in plan.current_file_mappings},
+                key=lambda path: path.as_posix(),
+            )
+        )
+        obsolete_target_rel_paths = tuple(
+            sorted(
+                set(plan.obsolete_exact_rel_paths),
+                key=lambda path: path.as_posix(),
+            )
+        )
+        _preflight_target_path_conflicts(
+            target_root,
+            current_target_rel_paths=current_target_rel_paths,
+            obsolete_target_rel_paths=obsolete_target_rel_paths,
+        )
+
+    return plan
 
 
 def _apply_managed_skill_install_plan(
@@ -1096,87 +1149,64 @@ def _apply_managed_skill_install_plan(
     assets_dir: Path,
     plan: _ManagedSkillInstallPlan,
 ) -> None:
-    skills_root = target_root / ".agents" / "skills"
-    host_adapter_meta_src = assets_dir / _HOST_ADAPTER_META_ASSET_REL
-    host_adapter_meta_dest = target_root / ".agents" / "host-adapters" / "meta.json"
-    managed_skill_names = plan.managed_skill_names
-    managed_skill_sync_plan: list[tuple[Path, Path]] = []
-    native_shim_specs: list[tuple[str, Path, Path]] = []
+    current_sync_plan: list[tuple[Path, Path, Path]] = []
+    current_target_rel_paths = tuple(
+        sorted(
+            {mapping.target_rel for mapping in plan.current_file_mappings},
+            key=lambda path: path.as_posix(),
+        )
+    )
+    obsolete_target_rel_paths = tuple(
+        sorted(
+            set(plan.obsolete_exact_rel_paths),
+            key=lambda path: path.as_posix(),
+        )
+    )
 
-    for skill_name in managed_skill_names:
-        src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
-        if not src_skill.exists():
-            raise RuntimeError(f"Missing asset file: {src_skill}")
-        dest_skill = skills_root / skill_name / "SKILL.md"
-        managed_skill_sync_plan.append((src_skill, dest_skill))
+    _preflight_target_path_conflicts(
+        target_root,
+        current_target_rel_paths=current_target_rel_paths,
+        obsolete_target_rel_paths=obsolete_target_rel_paths,
+    )
 
-    if not host_adapter_meta_src.exists():
-        raise RuntimeError(f"Missing asset file: {host_adapter_meta_src}")
-
-    for native_spec in plan.native_shim_specs:
-        source_path = assets_dir / native_spec.source_asset_rel
+    for mapping in plan.current_file_mappings:
+        source_path = assets_dir / mapping.source_asset_rel
         if not source_path.is_file():
             raise RuntimeError(f"Missing asset file: {source_path}")
-        target_path = target_root / native_spec.target_rel
-        native_shim_specs.append((native_spec.host_name, source_path, target_path))
+        target_path = target_root / mapping.target_rel
+        current_sync_plan.append((mapping.target_rel, source_path, target_path))
 
-    managed_ownership = set(_managed_skill_ownership_names())
-    target_managed = set(managed_skill_names)
-    managed_current_targets = {
-        target_root / mapping.target_rel for mapping in plan.current_file_mappings
-    }
-    obsolete_native_paths = {
-        target_root / obsolete_rel
-        for obsolete_rel in plan.obsolete_exact_rel_paths
-        if _is_within_managed_native_shim_prefixes(obsolete_rel)
-    }
-
-    for source_path, target_path in managed_skill_sync_plan:
-        _copy_file(source_path, target_path)
-    _copy_file(host_adapter_meta_src, host_adapter_meta_dest)
-    for _host_name, source_path, target_path in native_shim_specs:
+    for _target_rel, source_path, target_path in current_sync_plan:
         _copy_file(source_path, target_path)
 
-    missing_skills = [
-        skill_name
-        for skill_name in managed_skill_names
-        if not (skills_root / skill_name / "SKILL.md").is_file()
-    ]
-    if missing_skills:
-        joined = ", ".join(sorted(missing_skills))
-        raise RuntimeError(f"managed skill sync incomplete (missing SKILL.md): {joined}")
-
-    if not host_adapter_meta_dest.is_file():
-        raise RuntimeError(
-            f"managed host adapter sync incomplete (missing meta.json): {host_adapter_meta_dest}"
-        )
-
-    missing_native_shims = [
-        target_path
-        for _host, _src, target_path in native_shim_specs
+    missing_current_targets = [
+        target_rel.as_posix()
+        for target_rel, _source_path, target_path in current_sync_plan
         if not target_path.is_file()
     ]
-    if missing_native_shims:
-        joined = ", ".join(sorted(path.as_posix() for path in missing_native_shims))
-        raise RuntimeError(f"managed host native shim sync incomplete (missing target): {joined}")
+    if missing_current_targets:
+        joined = ", ".join(sorted(missing_current_targets))
+        raise RuntimeError(f"managed current sync incomplete (missing target): {joined}")
 
-    for skill_dir in skills_root.iterdir():
-        if not skill_dir.is_dir():
+    current_target_rel_path_set = {target_rel for target_rel, _src, _dest in current_sync_plan}
+    for obsolete_rel in obsolete_target_rel_paths:
+        if obsolete_rel in current_target_rel_path_set:
             continue
-        if skill_dir.name not in managed_ownership:
+        obsolete_path = target_root / obsolete_rel
+        if not obsolete_path.exists() and not obsolete_path.is_symlink():
             continue
-        if skill_dir.name in target_managed:
-            continue
-        shutil.rmtree(skill_dir, ignore_errors=True)
-
-    for obsolete_path in obsolete_native_paths:
-        if obsolete_path in managed_current_targets:
-            continue
+        if obsolete_path.is_dir():
+            raise RuntimeError(
+                "target directory/container conflict for obsolete managed path "
+                f"'{obsolete_rel.as_posix()}' (existing directory at exact file path)"
+            )
         if obsolete_path.is_symlink() or obsolete_path.is_file():
             obsolete_path.unlink(missing_ok=True)
             continue
-        if obsolete_path.is_dir():
-            shutil.rmtree(obsolete_path, ignore_errors=True)
+        raise RuntimeError(
+            "target directory/container conflict for obsolete managed path "
+            f"'{obsolete_rel.as_posix()}' (non-file entry at exact file path)"
+        )
 
 
 def _install_skill(target_root: Path, *, plan: _ManagedSkillInstallPlan | None = None) -> None:
@@ -1224,12 +1254,12 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if ns.command == "init":
-            skill_install_plan = _preflight_managed_skill_install_plan()
+            skill_install_plan = _preflight_managed_skill_install_plan(target_root)
             _install_spec_dock(target_root, force=bool(ns.force))
             _install_skill(target_root, plan=skill_install_plan)
         elif ns.command == "update":
             _require_specdock(target_root)
-            skill_install_plan = _preflight_managed_skill_install_plan()
+            skill_install_plan = _preflight_managed_skill_install_plan(target_root)
             _install_spec_dock(target_root, force=True)
             _install_skill(target_root, plan=skill_install_plan)
         else:

@@ -57,8 +57,7 @@ OK
     - non-blocking 指摘として、validated obsolete exact path 全 namespace への cleanup 適用はまだ `_apply_managed_skill_install_plan` 側で未実装のため S02 で閉じる
 
 #### コミット
-- pending:
-  - S01 stage commit を次に作成する
+- `8d3e0e8` `feat(installer): install_root正本の事前検証を導入`
 
 #### メモ
 - directory-like obsolete path は `.codex/agents/legacy` のような extensionless path を fail-closed で拒否するよう補強した。
@@ -69,11 +68,44 @@ OK
 ### 2026-04-13 00:00 - 00:00
 
 #### 対象
-- Step: S02, S03, S90, S99
-- AC/EC: pending
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-004, AC-005(target-conflict branch), AC-006, EC-001, EC-002, EC-003
 
 #### 実施内容
-- pending
+- target repo に対する current/obsolete exact file path の directory/container conflict preflight を追加し、`init/update` ともに `_install_spec_dock` 前で fail-closed になるようにした。
+- current sync source を `plan.current_file_mappings` に統一し、workflow を含む `install_root` inventory から actual copy されるようにした。
+- apply pipeline を `current sync -> post-sync verify -> obsolete exact cleanup` の順に揃え、verify failure 時は cleanup を実行しないようにした。
+- obsolete cleanup の適用範囲を top-level `managed_assets.obsolete_exact_file_paths` 全体へ拡張し、native shim prefix 限定を撤廃した。
+- current managed path replacement、custom unmanaged path preservation、legacy `codex_skills` duplicate 非参照、source-side transition coverage を regression として追加した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only tests.test_init_update.TestInitUpdate.test_issue_70_update_skips_obsolete_cleanup_when_post_sync_verify_fails tests.test_init_update.TestInitUpdate.test_update_manages_native_shims_with_gate_2_five_subchecks tests.test_init_update.TestInitUpdate.test_issue_70_update_reflection_ignores_legacy_codex_skills_duplicates tests.test_init_update.TestInitUpdate.test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage tests.test_init_update.TestInitUpdate.test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract tests.test_init_update.TestInitUpdate.test_update_copies_legacy_codex_native_shim_instructions_key_as_is tests.test_init_update.TestInitUpdate.test_init_copies_legacy_codex_native_shim_instructions_key_as_is tests.test_init_update.TestInitUpdate.test_update_copies_codex_native_shim_without_instruction_keys_as_is tests.test_init_update.TestInitUpdate.test_issue_70_build_plan_uses_install_root_recursive_inventory_including_workflow tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_obsolete_overlap_before_writes tests.test_init_update.TestInitUpdate.test_init_preflight_rejects_invalid_host_manifest_before_scaffold_write
+
+----------------------------------------------------------------------
+Ran 18 tests in 1.045s
+
+OK
+```
+
+#### 変更したファイル
+- `src/spec_dock/cli.py` - target conflict preflight、current sync、post-sync verify、obsolete exact cleanup を issue-70 contract に合わせて再構成
+- `tests/test_init_update.py` - S02 の conflict / workflow / cleanup / legacy divergence / transition regression を追加
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - note:
+    - `8d3e0e8` を基準にした未コミット S02 diff に対して、high-impact blockers なし
+
+#### コミット
+- pending:
+  - S02 stage commit を次に作成する
+
+#### メモ
+- workflow obsolete cleanup は manifest override fixture で contract を担保しており、default manifest 値そのものはこの step では増やしていない。
+- legacy `codex_skills` duplicate は source discovery から外れたが、physical deletion や final cleanup は issue-72 へ残している。
 
 ---
 
@@ -106,11 +138,14 @@ OK
     - pass
 - current managed / obsolete managed boundary assertions:
   - test_or_command:
-    - pending_until_execution
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only tests.test_init_update.TestInitUpdate.test_issue_70_update_skips_obsolete_cleanup_when_post_sync_verify_fails tests.test_init_update.TestInitUpdate.test_issue_70_update_reflection_ignores_legacy_codex_skills_duplicates tests.test_init_update.TestInitUpdate.test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage tests.test_init_update.TestInitUpdate.test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage`
   - assertion_summary:
-    - pending_until_execution
+    - current managed / obsolete exact path の directory/container conflict は write 前に fail-closed で拒否される
+    - workflow を含む current managed files は canonical asset で sync され、obsolete exact path だけが cleanup される
+    - verify failure 時は obsolete cleanup がスキップされ、custom unmanaged path は保持される
+    - legacy `codex_skills` duplicate は reflection authority を持たず、removed current path は obsolete-or-transfer coverage が必要
   - result:
-    - pending_until_execution
+    - pass
 - installed-package cutover evidence:
   - test_or_command:
     - pending_until_execution
