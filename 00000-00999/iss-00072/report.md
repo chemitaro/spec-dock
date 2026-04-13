@@ -110,6 +110,52 @@ tests/test_cli.py, tests/cli_runtime, tests/domain_runtime, tests/presentation_r
 
 ---
 
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S02
+- AC/EC: AC-002, AC-003, AC-004, EC-002
+
+#### 実施内容
+- template 状態だった epic-00067 current report を evidence-bearing な closeout report へ更新し、`iss-00068` から `iss-00071` の完了状況、E-AC 達成状況、残件、follow-up を current committed state に合わせて整理した。
+- issue-70 current report に残っていた final evidence commit pending 記述を、実際の commit `4007144` へ更新した。
+- issue-72 closeout chain に必要な current docs として、epic current report と issue-70 current report が placeholder / pending に依存しない状態になったことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "\\.\\.\\.|iss-xxxx|Pass / Fail|pending_until_execution|draft \\| approved|<YOUR_NAME>" \
+  spec-dock/active/epic/report.md \
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/report.md \
+  spec-dock/active/issue/report.md
+
+epic current report / issue-70 current report:
+- template placeholders は解消済み
+issue-72 report:
+- final closeout sections は pending_until_execution のまま（意図どおり）
+```
+
+#### 変更したファイル
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/report.md`
+  - epic current report を evidence-bearing な closeout report に更新
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/report.md`
+  - final evidence commit pending を実 commit へ更新
+
+#### コミット
+- pending:
+  - S02 closeout docs commit
+
+#### メモ
+- S02 code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d8712-f1f7-7303-b5a8-9f8981fa1efa`
+  - note:
+    - P0/P1 findings はなし
+    - epic current report と issue-70 current report は current committed state と整合
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - issue-72 prep docs で epic current report と CLI/runtime test targeting の契約が揺れやすかった。
