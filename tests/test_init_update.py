@@ -267,6 +267,43 @@ class TestInitUpdate(CliRuntimeHarness):
         "generated_by": "spec-dock update",
         "updated_at": "2026-04-06T00:00:00Z",
     }
+    _ISSUE_68_INSTALL_ROOT = Path("src/spec_dock/assets/install_root")
+    _ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS = (
+        ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+        ".agents/skills/spec-dock-epic-planning/SKILL.md",
+        ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+        ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+        ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+        ".agents/host-adapters/meta.json",
+        ".codex/agents/spec-dock.toml",
+        ".github/agents/spec-dock.agent.md",
+        ".github/workflows/ci.yml",
+    )
+    _ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS = {
+        ".agents/skills/": (
+            ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+            ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+            ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+        ),
+        ".agents/host-adapters/": (
+            ".agents/host-adapters/meta.json",
+        ),
+        ".codex/agents/": (
+            ".codex/agents/spec-dock.toml",
+        ),
+        ".github/agents/": (
+            ".github/agents/spec-dock.agent.md",
+        ),
+        ".github/workflows/": (
+            ".github/workflows/ci.yml",
+        ),
+    }
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -5982,6 +6019,56 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertTrue(failed_once)
             self.assertEqual(main(["update", str(target)]), 0)
             self._assert_managed_skills_installed(target)
+
+    def test_issue_68_install_root_tree_exists(self) -> None:
+        install_root = self._ISSUE_68_INSTALL_ROOT
+        self.assertTrue(install_root.is_dir(), f"missing install_root: {install_root}")
+        for subtree in (".agents", ".codex", ".github"):
+            subtree_path = install_root / subtree
+            self.assertTrue(subtree_path.is_dir(), f"missing install_root subtree: {subtree_path}")
+        for relative_path in self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS:
+            asset_path = install_root / relative_path
+            self.assertTrue(asset_path.is_file(), f"missing issue-68 authoritative asset: {asset_path}")
+
+    def test_issue_68_authoritative_inventory_paths_are_classified_under_install_root(self) -> None:
+        install_root = self._ISSUE_68_INSTALL_ROOT
+        classified_paths: set[str] = set()
+
+        for prefix, relative_paths in self._ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS.items():
+            for relative_path in relative_paths:
+                self.assertTrue(
+                    relative_path.startswith(prefix),
+                    f"issue-68 classification mismatch for {relative_path}; expected prefix {prefix}",
+                )
+                self.assertTrue(
+                    (install_root / relative_path).is_file(),
+                    f"missing issue-68 classified authoritative asset: {install_root / relative_path}",
+                )
+                classified_paths.add(relative_path)
+
+        self.assertEqual(
+            classified_paths,
+            set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS),
+            "issue-68 authoritative inventory should be fully classified under install_root",
+        )
+
+    def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
+        install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
+        repo_root_workflow = Path(".github/workflows/ci.yml")
+
+        self.assertTrue(
+            repo_root_workflow.is_file(),
+            f"missing repo-root workflow seed source: {repo_root_workflow}",
+        )
+        self.assertTrue(
+            install_root_workflow.is_file(),
+            f"missing issue-68 install_root workflow seed: {install_root_workflow}",
+        )
+        self.assertEqual(
+            install_root_workflow.read_bytes(),
+            repo_root_workflow.read_bytes(),
+            "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml",
+        )
 
     def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
         import spec_dock.cli as cli
