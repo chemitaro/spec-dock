@@ -81,12 +81,73 @@ find src/spec_dock/assets/install_root -print | rg '[A-Z]' | grep -v 'SKILL\.md$
   - `SKILL.md` 例外を issue docs に反映した後、S01 diff は blocking finding なしで pass
 
 #### コミット
-- pending:
-  - S01 stage commit 実行前
+- `ff6a997` `feat(assets): install_root正本ツリーを追加`
 
 #### メモ
 - `cli.py` / package data / installer cutover は issue-68 の範囲外のため未変更。
 - `codex_skills` mirror は compatibility のため残している。parity / duplicate boundary は S02 で追加検証する。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S02
+- AC/EC: AC-003
+
+#### 実施内容
+- `tests/test_init_update.py` に declared legacy pair parity と provider-side duplicate boundary を検証する issue-68 専用テストを追加した。
+- S02 scope は test 追加のみに閉じ、installer behavior 変更は行っていない。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_68_declared_legacy_pairs_remain_byte_equivalent
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.052s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py` - declared mirror parity と inventory 外 duplicate 不在の S02 テストを追加
+- `spec-dock/active/issue/report.md` - S02 証跡を記録
+
+#### コードレビュー
+- reviewer:
+  - `code_reviewer`
+- verdict:
+  - `pass`
+- note:
+  - S02 diff は tests のみで、no installer behavior changes を維持したまま parity / duplicate boundary を検証できている
+
+#### コミット
+- pending:
+  - S02 stage commit 実行前
+
+#### メモ
+- duplicate boundary テストは inventory に未記載の provider-side duplicate が増えた時点で fail する。
 
 ## 遭遇した問題と解決
 - 問題:
