@@ -68,5 +68,71 @@ ID: "iss-00072"
 - ...
 - ...
 
+## authority-uniqueness (必須)
+- provider_authority_artifacts:
+  - pending_until_execution
+- retired_legacy_surfaces:
+  - pending_until_execution
+- dogfooding_convergence_evidence:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## historical-boundary (必須)
+- current_docs_corpus:
+  - pending_until_execution
+- out_of_scope_historical_records:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## future-host-extension (必須)
+- current_model_statement:
+  - pending_until_execution
+- claude_code_scope_statement:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## upstream-prerequisites (必須)
+- epic_requirement_refs:
+  - pending_until_execution
+- epic_design_refs:
+  - pending_until_execution
+- epic_plan_refs:
+  - pending_until_execution
+- issue68_refs:
+  - pending_until_execution
+- issue69_refs:
+  - pending_until_execution
+- issue69_evidence_status:
+  - pending_until_execution
+- issue70_refs:
+  - pending_until_execution
+- issue70_evidence_status:
+  - pending_until_execution
+- issue71_refs:
+  - pending_until_execution
+- issue71_evidence_status:
+  - pending_until_execution
+- issue72_requirement_refs:
+  - pending_until_execution
+- issue72_design_refs:
+  - pending_until_execution
+- contradiction_summary:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## final-close-gate (必須)
+- gate_checks:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## post-review-audit (任意)
+- spec_review_reference:
+  - pending_until_execution
+
 ## 省略/例外メモ (必須)
 - 該当なし

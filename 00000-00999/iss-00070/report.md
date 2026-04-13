@@ -68,5 +68,35 @@ ID: "iss-00070"
 - ...
 - ...
 
+## handoff-validation-evidence (必須)
+- source inventory / manifest assertions:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+- invalid manifest negative test coverage:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+- current managed / obsolete managed boundary assertions:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+- installed-package cutover evidence:
+  - test_or_command:
+    - pending_until_execution
+  - assertion_summary:
+    - pending_until_execution
+  - result:
+    - pending_until_execution
+
 ## 省略/例外メモ (必須)
 - 該当なし

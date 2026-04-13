@@ -68,5 +68,47 @@ ID: "iss-00071"
 - ...
 - ...
 
+## checkout-verification (必須)
+- suite_or_command:
+  - pending_until_execution
+- target_surface:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## runtime-command-verification (必須)
+- command_family:
+  - pending_until_execution
+- fixture_or_test:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## installed-package-verification (必須)
+- isolated_env_contract:
+  - pending_until_execution
+- no_fallback_confirmation:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## dogfooding-parity (必須)
+- surface:
+  - pending_until_execution
+- before_after_summary:
+  - pending_until_execution
+- result:
+  - pending_until_execution
+
+## upstream-handoff-consumed (必須)
+- issue69_refs:
+  - pending_until_execution
+- issue70_refs:
+  - pending_until_execution
+- consumed_subchecks:
+  - pending_until_execution
+- reverified_in_issue71:
+  - pending_until_execution
+
 ## 省略/例外メモ (必須)
 - 該当なし
