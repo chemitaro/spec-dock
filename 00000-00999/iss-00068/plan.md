@@ -278,7 +278,8 @@ ID: "iss-00068"
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates`
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest`
   - `python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract`
-  - `python -m unittest discover -v` が現実的であれば実施、重すぎる場合は targeted scope + 理由を report に残す
+  - `python -m unittest discover -v` が現実的であれば informational sweep として実施する
+  - full suite が issue-68 scope 外の既存 failure を返した場合、targeted scope、`validate`、`sync --github` が通っており、report に failing tests と out-of-scope 理由が記録されていれば `final validation pass` を阻害しない
   - `./spec-dock/scripts/spec-dock validate`
   - `find src/spec_dock/assets/install_root -print | rg '[A-Z]' | rg -v '/SKILL\\.md$'` が no match
 - workflow closeout evidence:
@@ -291,8 +292,9 @@ ID: "iss-00068"
 - report update:
   - final diff review verdict、validation summary、spec review verdict、close-ready 判断を `report.md` に残す
 - commit expectation:
-  - report 更新後に final commit を作成する
-  - 追加修正がなければ report-only commit でもよい
+  - report 更新後に closeout commit expectation を満たす
+  - product diff が S01 / S02 の既存 implementation commits で閉じており、S99 が closeout-evidence-only 更新に留まる場合は、追加の product commit を必須にしない
+  - report-only closeout commit を作成する場合は、その hash を report に残す
 
 ## 未確定事項
 - なし:
