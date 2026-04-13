@@ -911,6 +911,33 @@ class TestInitUpdate(CliRuntimeHarness):
         removed_targets = previous_targets.difference(current_targets)
         return removed_targets.difference(current_obsolete)
 
+    def _issue_71_extract_markdown_section_by_heading_prefix(
+        self,
+        *,
+        markdown_text: str,
+        heading_prefix: str,
+        source_label: str,
+    ) -> str:
+        lines = markdown_text.splitlines()
+        start_index = None
+        heading_marker = f"## {heading_prefix}"
+        for index, line in enumerate(lines):
+            if line.startswith(heading_marker):
+                start_index = index
+                break
+        self.assertIsNotNone(
+            start_index,
+            f"issue-71 expected heading prefix missing in {source_label}: {heading_prefix}",
+        )
+
+        assert start_index is not None
+        end_index = len(lines)
+        for index in range(start_index + 1, len(lines)):
+            if lines[index].startswith("## "):
+                end_index = index
+                break
+        return "\n".join(lines[start_index:end_index]) + "\n"
+
     def _assert_native_shim_static_delegation_only_contract(
         self,
         *,
@@ -7849,6 +7876,152 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     expected_text,
                     f"isolated update mutated custom managed-outside file: {rel_path}",
                 )
+
+    def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        parity_pairs = (
+            (
+                ".agents/host-adapters/meta.json",
+                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+            ),
+            (
+                ".codex/agents/spec-dock.toml",
+                "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+            ),
+            (
+                ".github/agents/spec-dock.agent.md",
+                "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+            ),
+            (
+                ".github/workflows/ci.yml",
+                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
+            ),
+        )
+
+        for checked_in_rel, provider_asset_rel in parity_pairs:
+            with self.subTest(checked_in=checked_in_rel, provider_asset=provider_asset_rel):
+                checked_in_path = repo_root / checked_in_rel
+                provider_asset_path = repo_root / provider_asset_rel
+                self.assertTrue(
+                    checked_in_path.is_file(),
+                    f"issue-71 missing checked-in parity target: {checked_in_path}",
+                )
+                self.assertTrue(
+                    provider_asset_path.is_file(),
+                    f"issue-71 missing provider parity source: {provider_asset_path}",
+                )
+                self.assertEqual(
+                    checked_in_path.read_bytes(),
+                    provider_asset_path.read_bytes(),
+                    (
+                        "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
+                        f"{checked_in_rel}"
+                    ),
+                )
+
+    def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        issue_69_report = (
+            repo_root
+            / "spec-dock"
+            / "initiatives"
+            / "init-local-00003-architecture-maintenance-and-hardening"
+            / "epics"
+            / "epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling"
+            / "issues"
+            / "iss-00069-package-data-and-installed-artifact-parity"
+            / "report.md"
+        )
+        issue_70_report = (
+            repo_root
+            / "spec-dock"
+            / "initiatives"
+            / "init-local-00003-architecture-maintenance-and-hardening"
+            / "epics"
+            / "epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling"
+            / "issues"
+            / "iss-00070-installer-source-discovery-and-managed-ownership"
+            / "report.md"
+        )
+        self.assertTrue(issue_69_report.is_file(), f"issue-71 missing issue-69 report: {issue_69_report}")
+        self.assertTrue(issue_70_report.is_file(), f"issue-71 missing issue-70 report: {issue_70_report}")
+
+        issue_69_text = issue_69_report.read_text(encoding="utf-8")
+        issue_70_text = issue_70_report.read_text(encoding="utf-8")
+
+        package_parity_section = self._issue_71_extract_markdown_section_by_heading_prefix(
+            markdown_text=issue_69_text,
+            heading_prefix="package-parity-evidence",
+            source_label="issue-69 report",
+        )
+        for required_phrase in (
+            "full inventory parity:",
+            "representative asset set:",
+            "stale exclusion guard:",
+            "isolated install smoke:",
+        ):
+            self.assertIn(
+                required_phrase,
+                package_parity_section,
+                f"issue-71 missing package parity subcheck phrase: {required_phrase}",
+            )
+        self.assertGreaterEqual(
+            package_parity_section.count("- result:"),
+            4,
+            "issue-71 package parity evidence should include result lines for required subchecks",
+        )
+        self.assertGreaterEqual(
+            package_parity_section.count("- pass"),
+            4,
+            "issue-71 package parity evidence should include pass results for required subchecks",
+        )
+        self.assertNotIn(
+            "pending",
+            package_parity_section.lower(),
+            "issue-71 package parity evidence should not be pending-only",
+        )
+        self.assertNotIn(
+            "placeholder",
+            package_parity_section.lower(),
+            "issue-71 package parity evidence should not be placeholder-only",
+        )
+
+        handoff_section = self._issue_71_extract_markdown_section_by_heading_prefix(
+            markdown_text=issue_70_text,
+            heading_prefix="handoff-validation-evidence",
+            source_label="issue-70 report",
+        )
+        for required_phrase in (
+            "source inventory / manifest assertions:",
+            "invalid manifest negative test coverage:",
+            "current managed / obsolete managed boundary assertions:",
+            "installed-package cutover evidence:",
+        ):
+            self.assertIn(
+                required_phrase,
+                handoff_section,
+                f"issue-71 missing issue-70 handoff subcheck phrase: {required_phrase}",
+            )
+        self.assertGreaterEqual(
+            handoff_section.count("- result:"),
+            4,
+            "issue-71 handoff evidence should include result lines for required subchecks",
+        )
+        self.assertGreaterEqual(
+            handoff_section.count("- pass"),
+            4,
+            "issue-71 handoff evidence should include pass results for required subchecks",
+        )
+        self.assertNotIn(
+            "pending",
+            handoff_section.lower(),
+            "issue-71 handoff evidence should not be pending-only",
+        )
+        self.assertNotIn(
+            "placeholder",
+            handoff_section.lower(),
+            "issue-71 handoff evidence should not be placeholder-only",
+        )
 
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
