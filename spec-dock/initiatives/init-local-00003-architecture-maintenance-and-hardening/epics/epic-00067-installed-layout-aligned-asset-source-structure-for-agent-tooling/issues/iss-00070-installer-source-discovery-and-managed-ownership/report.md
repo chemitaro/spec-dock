@@ -257,10 +257,7 @@ FAILED (failures=1)
 
 #### コミット
 - final evidence / baseline update commit:
-  - status:
-    - final spec re-review `pass` 後に作成する
-  - rationale:
-    - S99 では code/test/asset baseline と issue docs/report の実変更があるため no-op ではなく final commit が必要
+  - `4007144` `test(installer): issue-70のcutover baselineを確定`
 
 ## 遭遇した問題と解決 (任意)
 - 問題:
