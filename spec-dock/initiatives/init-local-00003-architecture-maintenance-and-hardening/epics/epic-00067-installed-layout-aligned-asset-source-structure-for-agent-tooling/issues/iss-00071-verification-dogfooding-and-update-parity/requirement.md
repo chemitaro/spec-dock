@@ -105,6 +105,9 @@ ID: "iss-00071"
 - evidence は最終的に issue-71 report に集約し、少なくとも `tests/test_init_update.py`、runtime command tests、installed package smoke、`validate` / `sync` command execution の結果を辿れること。
 - isolated installed package verification は `iss-00069` と同じく non-editable isolated install を使い、checkout fallback / `PYTHONPATH` / current working directory からの source tree fallback を禁止する。
 - `sync --github` の closure evidence は hermetic runtime subprocess tests と fixture-driven stdout/stderr assertions を primary とし、手動コマンド実行は補助証跡に留める。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` に残る `domain.ids` forbidden import failure は、この issue では structural cleanup の対象外とする。
+- ただし上記 failure が `validate` / `sync` / `sync --github`、checked-in dogfooding parity、isolated installed package smoke のいずれかへ波及した場合は scope-out できず blocker として扱う。
+- full-suite sweep に上記 failure だけが残る場合は、issue-71 report に residual risk として記録したうえで close 判定を行ってよい。
 
 ## 前提
 - `iss-00069` が package parity を pass している。
