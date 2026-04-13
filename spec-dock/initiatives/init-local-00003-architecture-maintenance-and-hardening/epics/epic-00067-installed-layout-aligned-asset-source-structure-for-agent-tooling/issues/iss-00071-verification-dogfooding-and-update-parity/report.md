@@ -100,11 +100,59 @@ OK
     - residual risk として、report wording 依存の phrase/count assertion と heading prefix extraction の軽微な brittleness を記録
 
 #### コミット
-- pending:
-  - S01 verification tests commit
+- `9a225d2` `test(verification): dogfooding parityとhandoff消費を固定`
 
 #### メモ
 - issue-71 の `upstream-handoff-consumed` は issue-69 / issue-70 report の placeholder 不在と `result/pass` presence を confirmation source にしている。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S02
+- AC/EC: AC-003, AC-004, EC-002
+
+#### 実施内容
+- `validate` / `sync --no-update-active` / `sync --github --no-update-active` を issue-71 観点で束ねる薄い runtime bundle test を追加した。
+- required artifact 欠落時の `validate` / `sync` fail-fast を issue-71 名前空間で固定した。
+- `sync --force` degraded path は既存 detailed regression を issue-71 bundle test から再利用する形で closure evidence に接続した。
+- production code は変更せず、runtime test files のみを更新した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_sync.TestCliSync.test_issue_71_runtime_bundle_validate_sync_and_sync_github_surface tests.cli_runtime.test_validate.TestCliValidate.test_issue_71_runtime_bundle_missing_required_artifact_fail_fast tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_issue_71_runtime_bundle_sync_force_degraded_path
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.943s
+
+OK
+```
+
+#### 変更したファイル
+- `tests/cli_runtime/test_sync.py`
+  - issue-71 runtime bundle test を追加
+- `tests/cli_runtime/test_validate.py`
+  - issue-71 missing required artifact fail-fast test を追加
+- `tests/presentation_runtime/test_runtime_sync_s07.py`
+  - issue-71 sync-force degraded bundle test を追加
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d8680-99ec-78c1-9555-9d5031a29ae9`
+  - note:
+    - P0/P1 findings はなし
+    - residual risk として、presentation runtime 側 bundle test は既存 test method 直接呼び出しに依存するため、参照先 rename 時の追随修正が必要
+
+#### コミット
+- pending:
+  - S02 runtime bundle tests commit
+
+#### メモ
+- S02 の薄い bundle tests は詳細回帰の代替ではなく、issue-71 report へ runtime-command-verification evidence を束ねる入口として追加した。
 
 ---
 
