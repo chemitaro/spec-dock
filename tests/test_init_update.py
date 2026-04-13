@@ -860,6 +860,31 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"managed file changed despite manifest contract failure: {rel_path}",
             )
 
+    def _build_managed_skill_install_plan_from_assets_root(self, assets_root: Path):
+        import spec_dock.cli as cli
+
+        return cli._build_managed_skill_install_plan(assets_root)
+
+    def _issue_70_missing_transition_coverage(
+        self,
+        *,
+        previous_plan: object,
+        current_plan: object,
+    ) -> set[str]:
+        previous_targets = {
+            mapping.target_rel.as_posix()
+            for mapping in previous_plan.current_file_mappings
+        }
+        current_targets = {
+            mapping.target_rel.as_posix()
+            for mapping in current_plan.current_file_mappings
+        }
+        current_obsolete = {
+            rel_path.as_posix() for rel_path in current_plan.obsolete_exact_rel_paths
+        }
+        removed_targets = previous_targets.difference(current_targets)
+        return removed_targets.difference(current_obsolete)
+
     def _assert_native_shim_static_delegation_only_contract(
         self,
         *,
@@ -7309,6 +7334,291 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
             self._assert_managed_contract_guard_unchanged(target, before)
 
+    def test_issue_70_init_rejects_current_managed_directory_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            conflicting_path = target / ".github" / "workflows" / "ci.yml"
+            conflicting_path.mkdir(parents=True, exist_ok=True)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual(
+                (target / "README.md").read_text(encoding="utf-8"),
+                "preflight-marker\n",
+            )
+
+    def test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".github").write_text("container-file-conflict\n", encoding="utf-8")
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/agents/spec-dock.agent.md'",
+                stderr,
+            )
+            self.assertIn("non-directory container: '.github'", stderr)
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+
+    def test_issue_70_update_rejects_current_managed_directory_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
+            managed_workflow_path.unlink(missing_ok=True)
+            managed_workflow_path.mkdir(parents=True, exist_ok=True)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+
+            obsolete_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
+            obsolete_workflow.mkdir(parents=True, exist_ok=True)
+
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                *malformed_manifest["managed_assets"]["obsolete_exact_file_paths"],
+                ".github/workflows/spec-dock-close.yml",
+            ]
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for obsolete managed path '.github/workflows/spec-dock-close.yml'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            expected_workflow = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".github"
+                / "workflows"
+                / "ci.yml"
+            ).read_bytes()
+            managed_workflow = target / ".github" / "workflows" / "ci.yml"
+            obsolete_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
+            custom_workflow = target / ".github" / "workflows" / "custom-review.yml"
+
+            stale_workflow = b"name: stale managed workflow\n"
+            custom_workflow_text = "name: custom workflow\n"
+            self._write_text_force(managed_workflow, stale_workflow.decode("utf-8"))
+            self._write_text_force(obsolete_workflow, "name: obsolete workflow\n")
+            self._write_text_force(custom_workflow, custom_workflow_text)
+
+            manifest_override = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            manifest_override["managed_assets"]["obsolete_exact_file_paths"] = [
+                *manifest_override["managed_assets"]["obsolete_exact_file_paths"],
+                ".github/workflows/spec-dock-close.yml",
+            ]
+            exit_code, _stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                manifest_override,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(managed_workflow.is_file(), f"missing managed workflow after update: {managed_workflow}")
+            self.assertEqual(managed_workflow.read_bytes(), expected_workflow)
+            self.assertNotEqual(managed_workflow.read_bytes(), stale_workflow)
+            self.assertFalse(obsolete_workflow.exists(), "obsolete exact workflow path must be pruned")
+            self.assertTrue(custom_workflow.is_file(), f"missing custom workflow after update: {custom_workflow}")
+            self.assertEqual(custom_workflow.read_text(encoding="utf-8"), custom_workflow_text)
+
+    def test_issue_70_update_skips_obsolete_cleanup_when_post_sync_verify_fails(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            workflow_path = target / ".github" / "workflows" / "ci.yml"
+            workflow_path.unlink(missing_ok=True)
+            obsolete_codex_path = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            self._write_text_force(obsolete_codex_path, "obsolete should survive verify failure\n")
+
+            original_copy_file = cli._copy_file
+
+            def _copy_file_without_workflow(src: Path, dest: Path) -> None:
+                if src.as_posix().endswith("install_root/.github/workflows/ci.yml"):
+                    return
+                original_copy_file(src, dest)
+
+            err = io.StringIO()
+            with patch("spec_dock.cli._copy_file", side_effect=_copy_file_without_workflow), redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("managed current sync incomplete (missing target): .github/workflows/ci.yml", stderr)
+            self.assertTrue(
+                obsolete_codex_path.is_file(),
+                "obsolete cleanup must be skipped when current sync verification fails",
+            )
+
+    def test_issue_70_update_reflection_ignores_legacy_codex_skills_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            expected_adapter_skill = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".agents"
+                / "skills"
+                / "spec-dock-codex-adapter"
+                / "SKILL.md"
+            ).read_bytes()
+            expected_codex_shim = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-dock.toml"
+            ).read_bytes()
+
+            def _mutate_assets(patched_assets_root: Path) -> None:
+                (patched_assets_root / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md").write_text(
+                    "# legacy stale adapter duplicate\n",
+                    encoding="utf-8",
+                )
+                (patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml").write_text(
+                    "name = \"legacy-stale-codex\"\n",
+                    encoding="utf-8",
+                )
+                (patched_assets_root / "codex_skills" / "host-adapters" / "meta.json").write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "owner": "legacy-owner",
+                            "targets": {},
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            exit_code, _stderr = self._run_command_with_assets_override(
+                "update",
+                target,
+                _mutate_assets,
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_bytes(),
+                expected_adapter_skill,
+            )
+            self.assertEqual(
+                (target / ".codex" / "agents" / "spec-dock.toml").read_bytes(),
+                expected_codex_shim,
+            )
+            self.assertEqual(
+                json.loads((target / ".agents" / "host-adapters" / "meta.json").read_text(encoding="utf-8")),
+                self._EXPECTED_HOST_ADAPTER_META,
+            )
+
+    def test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage(self) -> None:
+        repo_assets_root = Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets"
+        previous_plan = self._build_managed_skill_install_plan_from_assets_root(repo_assets_root)
+
+        with tempfile.TemporaryDirectory() as tmp_assets:
+            patched_assets_root = Path(tmp_assets) / "assets"
+            shutil.copytree(repo_assets_root, patched_assets_root)
+            removed_workflow_rel = Path(".github") / "workflows" / "ci.yml"
+            (patched_assets_root / "install_root" / removed_workflow_rel).unlink()
+
+            current_plan = self._build_managed_skill_install_plan_from_assets_root(patched_assets_root)
+
+        missing_coverage = self._issue_70_missing_transition_coverage(
+            previous_plan=previous_plan,
+            current_plan=current_plan,
+        )
+        self.assertEqual(
+            missing_coverage,
+            {removed_workflow_rel.as_posix()},
+            "removed current managed paths must be covered by obsolete manifest or ownership transfer",
+        )
+
+    def test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage(self) -> None:
+        repo_assets_root = Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets"
+        previous_plan = self._build_managed_skill_install_plan_from_assets_root(repo_assets_root)
+
+        with tempfile.TemporaryDirectory() as tmp_assets:
+            patched_assets_root = Path(tmp_assets) / "assets"
+            shutil.copytree(repo_assets_root, patched_assets_root)
+            removed_workflow_rel = Path(".github") / "workflows" / "ci.yml"
+            (patched_assets_root / "install_root" / removed_workflow_rel).unlink()
+            patched_manifest_path = (
+                patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
+            )
+            patched_manifest = json.loads(patched_manifest_path.read_text(encoding="utf-8"))
+            patched_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                *patched_manifest["managed_assets"]["obsolete_exact_file_paths"],
+                removed_workflow_rel.as_posix(),
+            ]
+            patched_manifest_path.write_text(
+                json.dumps(patched_manifest, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            current_plan = self._build_managed_skill_install_plan_from_assets_root(patched_assets_root)
+
+        missing_coverage = self._issue_70_missing_transition_coverage(
+            previous_plan=previous_plan,
+            current_plan=current_plan,
+        )
+        self.assertEqual(missing_coverage, set())
+
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -7320,8 +7630,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "src"
                 / "spec_dock"
                 / "assets"
-                / "codex_skills"
-                / "native-shims"
+                / "install_root"
+                / ".codex"
+                / "agents"
                 / "spec-dock.toml"
             ).read_bytes()
             expected_copilot_bytes = (
@@ -7329,8 +7640,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "src"
                 / "spec_dock"
                 / "assets"
-                / "codex_skills"
-                / "native-shims"
+                / "install_root"
+                / ".github"
+                / "agents"
                 / "spec-dock.agent.md"
             ).read_bytes()
 
@@ -7378,7 +7690,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
@@ -7416,7 +7728,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
@@ -7454,7 +7766,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 self.assertNotRegex(codex_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
@@ -7502,15 +7814,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             repo_root = Path(__file__).resolve().parents[1]
             codex_shim_asset = (
-                repo_root / "src" / "spec_dock" / "assets" / "codex_skills" / "native-shims" / "spec-dock.toml"
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "agents" / "spec-dock.toml"
             )
             copilot_shim_asset = (
                 repo_root
                 / "src"
                 / "spec_dock"
                 / "assets"
-                / "codex_skills"
-                / "native-shims"
+                / "install_root"
+                / ".github"
+                / "agents"
                 / "spec-dock.agent.md"
             )
             expected_codex_shim = codex_shim_asset.read_bytes()
