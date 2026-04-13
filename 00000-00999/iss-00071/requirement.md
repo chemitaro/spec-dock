@@ -3,7 +3,7 @@
 ID: "iss-00071"
 タイトル: "Verification dogfooding and update parity"
 関連GitHub: ["#71"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 親: ["epic-00067", "init-local-00003"]
