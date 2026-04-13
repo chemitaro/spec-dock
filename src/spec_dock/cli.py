@@ -45,8 +45,15 @@ _DEFAULT_SPEC_DOCK_GITIGNORE = (
     "active/\n"
 )
 _MANAGED_NATIVE_SHIM_PREFIXES = (".codex/agents/", ".github/agents/")
+_MANAGED_OBSOLETE_EXACT_PATH_PREFIXES = (
+    ".agents/skills/",
+    ".agents/host-adapters/",
+    ".codex/agents/",
+    ".github/agents/",
+    ".github/workflows/",
+)
 _REQUIRED_MANAGED_NATIVE_SHIM_HOSTS = ("codex", "copilot")
-_HOST_ADAPTER_META_ASSET_REL = Path("codex_skills") / "host-adapters" / "meta.json"
+_HOST_ADAPTER_META_ASSET_REL = Path("install_root") / ".agents" / "host-adapters" / "meta.json"
 _REQUIRED_MANAGED_NATIVE_SHIM_OWNER = "spec-dock"
 _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_ENTRY_FILES = {
     "codex": Path(".agents/skills/spec-dock-codex-adapter/SKILL.md"),
@@ -758,30 +765,178 @@ def _is_within_managed_native_shim_prefixes(path: Path) -> bool:
     return any(rel_posix.startswith(prefix) for prefix in _MANAGED_NATIVE_SHIM_PREFIXES)
 
 
+def _is_within_managed_obsolete_exact_path_prefixes(path: Path) -> bool:
+    rel_posix = path.as_posix()
+    return any(rel_posix.startswith(prefix) for prefix in _MANAGED_OBSOLETE_EXACT_PATH_PREFIXES)
+
+
+def _is_path_prefix(prefix: Path, candidate: Path) -> bool:
+    prefix_parts = prefix.parts
+    candidate_parts = candidate.parts
+    return len(prefix_parts) < len(candidate_parts) and candidate_parts[: len(prefix_parts)] == prefix_parts
+
+
+class _ManagedCurrentFileMapping(NamedTuple):
+    source_asset_rel: Path
+    target_rel: Path
+
+
 class _ManagedNativeShimSpec(NamedTuple):
     host_name: str
     source_asset_rel: Path
     target_rel: Path
-    obsolete_rel_paths: tuple[Path, ...]
 
 
 class _ManagedSkillInstallPlan(NamedTuple):
     managed_skill_names: tuple[str, ...]
+    current_file_mappings: tuple[_ManagedCurrentFileMapping, ...]
     native_shim_specs: tuple[_ManagedNativeShimSpec, ...]
+    obsolete_exact_rel_paths: tuple[Path, ...]
+
+
+def _iter_install_root_files(assets_dir: Path) -> tuple[Path, ...]:
+    install_root = assets_dir / "install_root"
+    if not install_root.is_dir():
+        raise RuntimeError(f"Missing asset directory: {install_root}")
+    return tuple(
+        sorted(
+            (candidate for candidate in install_root.rglob("*") if candidate.is_file()),
+            key=lambda candidate: candidate.relative_to(install_root).as_posix(),
+        )
+    )
+
+
+def _build_current_managed_file_mappings(
+    assets_dir: Path,
+) -> tuple[tuple[_ManagedCurrentFileMapping, ...], dict[Path, Path]]:
+    install_root = assets_dir / "install_root"
+    mappings: list[_ManagedCurrentFileMapping] = []
+    source_by_target: dict[Path, Path] = {}
+    for source_path in _iter_install_root_files(assets_dir):
+        target_rel = source_path.relative_to(install_root)
+        source_asset_rel = Path("install_root") / target_rel
+        existing_source = source_by_target.get(target_rel)
+        if existing_source is not None and existing_source != source_asset_rel:
+            raise RuntimeError(
+                "duplicate current managed file mapping for target "
+                f"'{target_rel.as_posix()}' from '{existing_source.as_posix()}' and "
+                f"'{source_asset_rel.as_posix()}'"
+            )
+        source_by_target[target_rel] = source_asset_rel
+        mappings.append(
+            _ManagedCurrentFileMapping(
+                source_asset_rel=source_asset_rel,
+                target_rel=target_rel,
+            )
+        )
+    return tuple(mappings), source_by_target
+
+
+def _build_obsolete_exact_rel_paths(
+    *,
+    manifest: dict[str, Any],
+    host_adapter_meta_src: Path,
+    current_target_paths: set[Path],
+) -> tuple[Path, ...]:
+    managed_assets = manifest.get("managed_assets")
+    if not isinstance(managed_assets, dict):
+        raise RuntimeError(f"invalid managed_assets contract: {host_adapter_meta_src}")
+
+    obsolete_raw = managed_assets.get("obsolete_exact_file_paths")
+    if not isinstance(obsolete_raw, list):
+        raise RuntimeError(
+            "invalid managed_assets.obsolete_exact_file_paths: "
+            f"{host_adapter_meta_src}"
+        )
+
+    obsolete_rel_paths: list[Path] = []
+    for obsolete in obsolete_raw:
+        if not isinstance(obsolete, str) or not obsolete.strip():
+            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
+
+        obsolete_norm = obsolete.strip()
+        obsolete_rel = Path(obsolete_norm)
+        if re.match(r"^[A-Za-z]:", obsolete_norm) or obsolete_norm.startswith(("/", "\\")):
+            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
+        if "\\" in obsolete_norm:
+            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
+        if obsolete_rel.is_absolute() or ".." in obsolete_rel.parts:
+            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
+        if obsolete_norm.endswith("/"):
+            raise RuntimeError(
+                "invalid managed_assets.obsolete_exact_file_paths item "
+                f"(must be exact file path): '{obsolete_norm}'"
+            )
+        if any(token in obsolete_norm for token in ("*", "?", "[", "]", "{", "}")):
+            raise RuntimeError(
+                "invalid managed_assets.obsolete_exact_file_paths item "
+                f"(must be exact file path): '{obsolete_norm}'"
+            )
+
+        normalized_parts = tuple(part for part in obsolete_rel.parts if part not in ("", "."))
+        if not normalized_parts:
+            raise RuntimeError(
+                "invalid managed_assets.obsolete_exact_file_paths item "
+                f"(must be exact file path): '{obsolete_norm}'"
+            )
+        normalized_rel = Path(*normalized_parts)
+        if normalized_rel.as_posix() != obsolete_norm:
+            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
+        if normalized_rel.suffix == "":
+            raise RuntimeError(
+                "invalid managed_assets.obsolete_exact_file_paths item "
+                f"(must be exact file path): '{normalized_rel.as_posix()}'"
+            )
+        if not _is_within_managed_obsolete_exact_path_prefixes(normalized_rel):
+            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
+        if normalized_rel in current_target_paths:
+            raise RuntimeError(
+                "managed_assets.obsolete_exact_file_paths overlaps current managed path "
+                f"'{normalized_rel.as_posix()}'"
+            )
+        if any(_is_path_prefix(normalized_rel, current_path) for current_path in current_target_paths):
+            raise RuntimeError(
+                "invalid managed_assets.obsolete_exact_file_paths item "
+                f"(must be exact file path): '{normalized_rel.as_posix()}'"
+            )
+        if any(normalized_rel == existing for existing in obsolete_rel_paths):
+            raise RuntimeError(
+                "duplicate managed_assets.obsolete_exact_file_paths item "
+                f"'{normalized_rel.as_posix()}'"
+            )
+        for existing in obsolete_rel_paths:
+            if _is_path_prefix(existing, normalized_rel) or _is_path_prefix(normalized_rel, existing):
+                raise RuntimeError(
+                    "overlapping managed_assets.obsolete_exact_file_paths items "
+                    f"'{existing.as_posix()}' and '{normalized_rel.as_posix()}'"
+                )
+        obsolete_rel_paths.append(normalized_rel)
+
+    return tuple(obsolete_rel_paths)
 
 
 def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallPlan:
     managed_skill_names = _managed_skill_names()
     required_hosts = set(_REQUIRED_MANAGED_NATIVE_SHIM_HOSTS)
+    current_file_mappings, source_by_target = _build_current_managed_file_mappings(assets_dir)
+    current_target_paths = set(source_by_target.keys())
 
     for skill_name in managed_skill_names:
-        src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
-        if not src_skill.exists():
+        target_rel = Path(".agents") / "skills" / skill_name / "SKILL.md"
+        source_rel = source_by_target.get(target_rel)
+        if source_rel is None:
+            raise RuntimeError(f"Missing asset file: {assets_dir / 'install_root' / target_rel}")
+        src_skill = assets_dir / source_rel
+        if not src_skill.is_file():
             raise RuntimeError(f"Missing asset file: {src_skill}")
 
     host_adapter_meta_src = assets_dir / _HOST_ADAPTER_META_ASSET_REL
     if not host_adapter_meta_src.exists():
         raise RuntimeError(f"Missing asset file: {host_adapter_meta_src}")
+    if host_adapter_meta_src.relative_to(assets_dir) not in {
+        mapping.source_asset_rel for mapping in current_file_mappings
+    }:
+        raise RuntimeError(f"missing host adapter metadata from install_root inventory: {host_adapter_meta_src}")
 
     manifest = json.loads(host_adapter_meta_src.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
@@ -789,6 +944,11 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
     targets = manifest.get("targets")
     if not isinstance(targets, dict):
         raise RuntimeError(f"invalid host adapter targets: {host_adapter_meta_src}")
+    obsolete_exact_rel_paths = _build_obsolete_exact_rel_paths(
+        manifest=manifest,
+        host_adapter_meta_src=host_adapter_meta_src,
+        current_target_paths=current_target_paths,
+    )
 
     missing_required_hosts = sorted(required_hosts.difference(targets.keys()))
     if missing_required_hosts:
@@ -867,6 +1027,8 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
             raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
         if source_asset_rel.is_absolute() or ".." in source_asset_rel.parts:
             raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
+        if source_asset_rel.parts[:1] != ("install_root",):
+            raise RuntimeError(f"invalid native_shim.source_of_truth_asset path for host '{host_name}'")
         source_path = assets_dir / source_asset_rel
         if not source_path.is_file():
             raise RuntimeError(f"Missing asset file: {source_path}")
@@ -896,49 +1058,30 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
             )
         native_target_file_owners[target_rel] = host_name
 
-        obsolete_raw = native_shim.get("obsolete_managed_paths", [])
-        if not isinstance(obsolete_raw, list):
-            raise RuntimeError(f"invalid native_shim.obsolete_managed_paths for host '{host_name}'")
-        obsolete_rel_paths: list[Path] = []
-        for obsolete in obsolete_raw:
-            if not isinstance(obsolete, str) or not obsolete.strip():
-                raise RuntimeError(
-                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
-                )
-            obsolete_norm = obsolete.strip()
-            obsolete_rel = Path(obsolete_norm)
-            if re.match(r"^[A-Za-z]:", obsolete_norm) or obsolete_norm.startswith(("/", "\\")):
-                raise RuntimeError(
-                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
-                )
-            if obsolete_rel.is_absolute() or ".." in obsolete_rel.parts:
-                raise RuntimeError(
-                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
-                )
-            normalized_parts = tuple(part for part in obsolete_rel.parts if part not in ("", "."))
-            if not normalized_parts:
-                raise RuntimeError(
-                    "invalid native_shim.obsolete_managed_paths item (current directory path) "
-                    f"for host '{host_name}'"
-                )
-            if not _is_within_managed_native_shim_prefixes(obsolete_rel):
-                raise RuntimeError(
-                    f"invalid native_shim.obsolete_managed_paths item for host '{host_name}'"
-                )
-            obsolete_rel_paths.append(obsolete_rel)
+        inventory_source = source_by_target.get(target_rel)
+        if inventory_source is None:
+            raise RuntimeError(
+                f"native_shim.target_file path for host '{host_name}' is not present in install_root inventory"
+            )
+        if inventory_source != source_asset_rel:
+            raise RuntimeError(
+                "native_shim.source_of_truth_asset does not match install_root inventory "
+                f"for host '{host_name}'"
+            )
 
         native_shim_specs.append(
             _ManagedNativeShimSpec(
                 host_name=host_name,
                 source_asset_rel=source_asset_rel,
                 target_rel=target_rel,
-                obsolete_rel_paths=tuple(obsolete_rel_paths),
             )
         )
 
     return _ManagedSkillInstallPlan(
         managed_skill_names=managed_skill_names,
+        current_file_mappings=current_file_mappings,
         native_shim_specs=tuple(native_shim_specs),
+        obsolete_exact_rel_paths=obsolete_exact_rel_paths,
     )
 
 
@@ -958,7 +1101,7 @@ def _apply_managed_skill_install_plan(
     host_adapter_meta_dest = target_root / ".agents" / "host-adapters" / "meta.json"
     managed_skill_names = plan.managed_skill_names
     managed_skill_sync_plan: list[tuple[Path, Path]] = []
-    native_shim_specs: list[tuple[str, Path, Path, tuple[Path, ...]]] = []
+    native_shim_specs: list[tuple[str, Path, Path]] = []
 
     for skill_name in managed_skill_names:
         src_skill = assets_dir / "codex_skills" / skill_name / "SKILL.md"
@@ -975,24 +1118,23 @@ def _apply_managed_skill_install_plan(
         if not source_path.is_file():
             raise RuntimeError(f"Missing asset file: {source_path}")
         target_path = target_root / native_spec.target_rel
-        obsolete_paths = tuple(target_root / obsolete_rel for obsolete_rel in native_spec.obsolete_rel_paths)
-        native_shim_specs.append((native_spec.host_name, source_path, target_path, obsolete_paths))
+        native_shim_specs.append((native_spec.host_name, source_path, target_path))
 
     managed_ownership = set(_managed_skill_ownership_names())
     target_managed = set(managed_skill_names)
-    managed_native_targets = {
-        target_path for _host, _src, target_path, _obsolete in native_shim_specs
+    managed_current_targets = {
+        target_root / mapping.target_rel for mapping in plan.current_file_mappings
     }
     obsolete_native_paths = {
-        obsolete_path
-        for _host, _src, _target, obsolete_paths in native_shim_specs
-        for obsolete_path in obsolete_paths
+        target_root / obsolete_rel
+        for obsolete_rel in plan.obsolete_exact_rel_paths
+        if _is_within_managed_native_shim_prefixes(obsolete_rel)
     }
 
     for source_path, target_path in managed_skill_sync_plan:
         _copy_file(source_path, target_path)
     _copy_file(host_adapter_meta_src, host_adapter_meta_dest)
-    for _host_name, source_path, target_path, _obsolete_paths in native_shim_specs:
+    for _host_name, source_path, target_path in native_shim_specs:
         _copy_file(source_path, target_path)
 
     missing_skills = [
@@ -1011,7 +1153,7 @@ def _apply_managed_skill_install_plan(
 
     missing_native_shims = [
         target_path
-        for _host, _src, target_path, _obsolete in native_shim_specs
+        for _host, _src, target_path in native_shim_specs
         if not target_path.is_file()
     ]
     if missing_native_shims:
@@ -1028,7 +1170,7 @@ def _apply_managed_skill_install_plan(
         shutil.rmtree(skill_dir, ignore_errors=True)
 
     for obsolete_path in obsolete_native_paths:
-        if obsolete_path in managed_native_targets:
+        if obsolete_path in managed_current_targets:
             continue
         if obsolete_path.is_symlink() or obsolete_path.is_file():
             obsolete_path.unlink(missing_ok=True)

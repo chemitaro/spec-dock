@@ -244,11 +244,8 @@ class TestInitUpdate(CliRuntimeHarness):
                     "managed": True,
                     "owner": "spec-dock",
                     "target_file": ".codex/agents/spec-dock.toml",
-                    "source_of_truth_asset": "codex_skills/native-shims/spec-dock.toml",
+                    "source_of_truth_asset": "install_root/.codex/agents/spec-dock.toml",
                     "delegates_to": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
-                    "obsolete_managed_paths": [
-                        ".codex/agents/spec-dock-codex-adapter.toml",
-                    ],
                 },
             },
             "copilot": {
@@ -258,13 +255,16 @@ class TestInitUpdate(CliRuntimeHarness):
                     "managed": True,
                     "owner": "spec-dock",
                     "target_file": ".github/agents/spec-dock.agent.md",
-                    "source_of_truth_asset": "codex_skills/native-shims/spec-dock.agent.md",
+                    "source_of_truth_asset": "install_root/.github/agents/spec-dock.agent.md",
                     "delegates_to": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
-                    "obsolete_managed_paths": [
-                        ".github/agents/spec-dock-copilot-adapter.agent.md",
-                    ],
                 },
             },
+        },
+        "managed_assets": {
+            "obsolete_exact_file_paths": [
+                ".codex/agents/spec-dock-codex-adapter.toml",
+                ".github/agents/spec-dock-copilot-adapter.agent.md",
+            ]
         },
         "generated_by": "spec-dock update",
         "updated_at": "2026-04-06T00:00:00Z",
@@ -758,7 +758,9 @@ class TestInitUpdate(CliRuntimeHarness):
         manifest_override: dict[str, object],
     ) -> tuple[int, str]:
         def _mutate_assets(patched_assets_root: Path) -> None:
-            patched_meta = patched_assets_root / "codex_skills" / "host-adapters" / "meta.json"
+            patched_meta = (
+                patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
+            )
             patched_meta.write_text(
                 json.dumps(manifest_override, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
@@ -7219,6 +7221,94 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             self.assertEqual(meta, self._EXPECTED_HOST_ADAPTER_META)
 
+    def test_issue_70_build_plan_uses_install_root_recursive_inventory_including_workflow(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            plan = cli._build_managed_skill_install_plan(Path(assets_dir))
+            install_root = Path(assets_dir) / "install_root"
+            expected_inventory = {
+                candidate.relative_to(install_root).as_posix()
+                for candidate in install_root.rglob("*")
+                if candidate.is_file()
+            }
+
+        managed_targets = {
+            mapping.target_rel.as_posix() for mapping in plan.current_file_mappings
+        }
+        self.assertEqual(managed_targets, expected_inventory)
+        self.assertIn(".github/workflows/ci.yml", managed_targets)
+        self.assertEqual(
+            {
+                mapping.source_asset_rel.as_posix()
+                for mapping in plan.current_file_mappings
+            },
+            {f"install_root/{rel_path}" for rel_path in expected_inventory},
+        )
+
+    def test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest(self) -> None:
+        cases = (
+            ("missing_managed_assets", "invalid managed_assets contract"),
+            ("null_managed_assets", "invalid managed_assets contract"),
+            ("missing_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
+            ("null_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
+            ("non_list_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
+        )
+        for case_name, expected_error in cases:
+            with self.subTest(case_name=case_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+
+                    if case_name == "missing_managed_assets":
+                        malformed_manifest.pop("managed_assets")
+                    elif case_name == "null_managed_assets":
+                        malformed_manifest["managed_assets"] = None
+                    elif case_name == "missing_obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"].pop("obsolete_exact_file_paths")
+                    elif case_name == "null_obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = None
+                    elif case_name == "non_list_obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = (
+                            ".codex/agents/spec-dock-codex-adapter.toml"
+                        )
+                    else:
+                        raise AssertionError(f"unknown case_name: {case_name}")
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn(expected_error, stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_current_obsolete_overlap_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                ".agents/host-adapters/meta.json"
+            ]
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "managed_assets.obsolete_exact_file_paths overlaps current managed path "
+                "'.agents/host-adapters/meta.json'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -7785,7 +7875,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn("invalid host adapter target contract for host 'codex'", stderr)
             self._assert_managed_contract_guard_unchanged(target, before)
 
-    def test_update_rejects_current_dir_native_shim_obsolete_paths(self) -> None:
+    def test_update_rejects_current_dir_obsolete_exact_file_paths(self) -> None:
         for invalid_obsolete_path in (".", "./"):
             with self.subTest(invalid_obsolete_path=invalid_obsolete_path):
                 with tempfile.TemporaryDirectory() as tmp:
@@ -7793,7 +7883,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertEqual(main(["init", str(target)]), 0)
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["targets"]["codex"]["native_shim"]["obsolete_managed_paths"] = [
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
                         invalid_obsolete_path,
                     ]
 
@@ -7803,8 +7893,31 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     )
 
                     self.assertEqual(exit_code, 1)
-                    self.assertIn("native_shim.obsolete_managed_paths item (current directory path)", stderr)
+                    self.assertIn("invalid managed_assets.obsolete_exact_file_paths item", stderr)
                     self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_directory_like_obsolete_exact_file_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                ".codex/agents/legacy",
+            ]
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): "
+                "'.codex/agents/legacy'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_parent_traversal_native_shim_paths(self) -> None:
         cases: tuple[tuple[str, str, str], ...] = (
@@ -7819,9 +7932,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "invalid native_shim.target_file path for host 'codex'",
             ),
             (
-                "obsolete_managed_paths",
+                "obsolete_exact_file_paths",
                 "../.codex/agents/spec-dock-codex-adapter.toml",
-                "invalid native_shim.obsolete_managed_paths item for host 'codex'",
+                "invalid managed_assets.obsolete_exact_file_paths item",
             ),
         )
         for field, invalid_path, expected_error in cases:
@@ -7831,8 +7944,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertEqual(main(["init", str(target)]), 0)
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    if field == "obsolete_managed_paths":
-                        malformed_manifest["targets"]["codex"]["native_shim"][field] = [invalid_path]
+                    if field == "obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_path]
                     else:
                         malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
 
@@ -7849,7 +7962,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         cases: tuple[tuple[str, str], ...] = (
             ("source_of_truth_asset", "invalid native_shim.source_of_truth_asset path for host 'codex'"),
             ("target_file", "invalid native_shim.target_file path for host 'codex'"),
-            ("obsolete_managed_paths", "invalid native_shim.obsolete_managed_paths item for host 'codex'"),
+            ("obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths item"),
         )
         invalid_paths = ("C:foo", "/foo", "\\foo")
         for field, expected_error in cases:
@@ -7860,8 +7973,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         self.assertEqual(main(["init", str(target)]), 0)
                         before = self._seed_managed_contract_guard_snapshot(target)
                         malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                        if field == "obsolete_managed_paths":
-                            malformed_manifest["targets"]["codex"]["native_shim"][field] = [invalid_path]
+                        if field == "obsolete_exact_file_paths":
+                            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_path]
                         else:
                             malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
 
@@ -7893,15 +8006,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertIn("invalid native_shim.target_file path for host 'codex'", stderr)
                     self._assert_managed_contract_guard_unchanged(target, before)
 
-    def test_update_rejects_obsolete_native_shim_paths_outside_managed_prefixes(self) -> None:
-        for invalid_obsolete in ("README.md", ".agents/skills/spec-dock-codex-adapter/SKILL.md"):
+    def test_update_rejects_obsolete_exact_file_paths_outside_managed_prefixes(self) -> None:
+        for invalid_obsolete in ("README.md", ".agents/spec-dock-codex-adapter/SKILL.md"):
             with self.subTest(invalid_obsolete=invalid_obsolete):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
                     self.assertEqual(main(["init", str(target)]), 0)
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["targets"]["codex"]["native_shim"]["obsolete_managed_paths"] = [
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
                         invalid_obsolete
                     ]
 
@@ -7911,7 +8024,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     )
 
                     self.assertEqual(exit_code, 1)
-                    self.assertIn("invalid native_shim.obsolete_managed_paths item for host 'codex'", stderr)
+                    self.assertIn("invalid managed_assets.obsolete_exact_file_paths item", stderr)
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_reference_sync_doc_matches_bundled_asset(self) -> None:
