@@ -784,6 +784,29 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("[missing_artifact]", p_doctor.stderr)
             self.assertIn(missing_rel_path.as_posix(), p_doctor.stderr)
 
+    def test_issue_71_runtime_bundle_missing_required_artifact_fail_fast(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            missing_rel_path = Path(
+                "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/plan.md"
+            )
+            (target / missing_rel_path).unlink(missing_ok=False)
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+            self.assertIn("Missing required artifact", p_validate.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+            self.assertIn("preflight validate failed", p_sync.stderr)
+            self.assertIn("Missing required artifact", p_sync.stderr)
+            self.assertIn(missing_rel_path.as_posix(), p_sync.stderr)
+
     def test_sync_force_continues_when_required_plan_artifact_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

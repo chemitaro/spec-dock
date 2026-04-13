@@ -1707,6 +1707,9 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 self.assertIn("DEPS_DISABLED", text)
                 self.assertIn("sync --force", text)
 
+    def test_issue_71_runtime_bundle_sync_force_degraded_path(self) -> None:
+        self.test_sync_force_placeholder_and_deps_error_regression()
+
     def test_sync_prefers_foreign_repo_snapshot_for_foreign_linked_issue(self) -> None:
         (
             _runtime_app,
