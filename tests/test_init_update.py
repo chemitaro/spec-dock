@@ -1,3 +1,4 @@
+import ast
 import io
 import json
 import os
@@ -476,6 +477,40 @@ class TestInitUpdate(CliRuntimeHarness):
         "setuptools-75.8.0-py3-none-any.whl",
         "wheel-0.45.1-py3-none-any.whl",
     )
+    _ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS = (
+        "spec_dock/assets/spec_dock/scripts/spec-dock-close*.sh",
+        "spec_dock/assets/github/workflows/spec-dock-close.yml",
+        "spec_dock/assets/spec_dock/templates/**/current/**",
+        "spec_dock/assets/spec_dock/templates/**/completed/**",
+        "spec_dock/assets/spec_dock/templates/adr.md",
+        "spec_dock/assets/spec_dock/templates/**/discussions/rules.md",
+        "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
+        "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
+        "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
+        "spec_dock/assets/spec_dock/templates/*/**/README.md",
+        "spec_dock/assets/spec_dock/templates/design.md",
+        "spec_dock/assets/spec_dock/templates/plan.md",
+        "spec_dock/assets/spec_dock/templates/report.md",
+        "spec_dock/assets/spec_dock/templates/requirement.md",
+    )
+    _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
+        "spec_dock/assets/github/workflows/spec-dock-close.yml",
+        "spec_dock/assets/spec_dock/templates/initiative/current/stale.md",
+        "spec_dock/assets/spec_dock/templates/initiative/completed/stale.md",
+        "spec_dock/assets/spec_dock/templates/adr.md",
+        "spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
+        "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
+        "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
+        "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
+        "spec_dock/assets/spec_dock/templates/issue/legacy/README.md",
+        "spec_dock/assets/spec_dock/templates/design.md",
+        "spec_dock/assets/spec_dock/templates/plan.md",
+        "spec_dock/assets/spec_dock/templates/report.md",
+        "spec_dock/assets/spec_dock/templates/requirement.md",
+    )
+    _ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV = "SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES"
+    _ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV = "SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT"
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -913,6 +948,7 @@ class TestInitUpdate(CliRuntimeHarness):
         build_context: Path,
         wheel_dir: Path,
         sdist_dir: Path,
+        build_env: dict[str, str] | None = None,
     ) -> tuple[Path, Path, Path]:
         wheelhouse = self._issue_69_resolve_wheelhouse(repo_root)
         venv_dir = build_context.parent / "build-venv"
@@ -951,6 +987,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 str(dist_dir),
             ],
             cwd=build_context,
+            env=build_env,
         )
 
         wheel_paths = sorted(dist_dir.glob("*.whl"))
@@ -965,6 +1002,62 @@ class TestInitUpdate(CliRuntimeHarness):
         shutil.copy2(wheel_paths[0], wheel_path)
         shutil.copy2(sdist_paths[0], sdist_path)
         return wheel_path, sdist_path, venv_python
+
+    def _issue_69_seed_stale_fixtures_in_sdist_source_context(self, build_context: Path) -> set[str]:
+        source_root = build_context / "src"
+        present_seeded_fixtures: set[str] = set()
+        for fixture_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+            fixture_source_path = source_root / fixture_artifact_path
+            fixture_source_path.parent.mkdir(parents=True, exist_ok=True)
+            fixture_source_path.write_text("issue-69 stale fixture in source context\n", encoding="utf-8")
+            if fixture_source_path.is_file():
+                present_seeded_fixtures.add(fixture_artifact_path)
+        return present_seeded_fixtures
+
+    def _issue_69_collect_wheel_file_inventory(self, wheel_path: Path) -> set[str]:
+        with zipfile.ZipFile(wheel_path) as wheel_zip:
+            return {member for member in wheel_zip.namelist() if not member.endswith("/")}
+
+    def _issue_69_collect_sdist_source_file_inventory(self, sdist_path: Path) -> set[str]:
+        inventory: set[str] = set()
+        with tarfile.open(sdist_path, "r:gz") as sdist_tar:
+            for member in sdist_tar.getmembers():
+                if not member.isfile():
+                    continue
+                _, sep, relative_member = member.name.partition("/")
+                if not sep or not relative_member.startswith("src/"):
+                    continue
+                inventory.add(relative_member.removeprefix("src/"))
+        return inventory
+
+    def _issue_69_extract_pyproject_stale_exclusion_patterns(self, pyproject_text: str) -> tuple[str, ...]:
+        section_header = "[tool.setuptools.exclude-package-data]"
+        self.assertIn(section_header, pyproject_text, "missing setuptools exclude-package-data section")
+        exclude_section = pyproject_text.split(section_header, 1)[1]
+        list_header = "spec_dock = ["
+        self.assertIn(list_header, exclude_section, "missing spec_dock exclude-package-data list")
+        list_block = exclude_section.split(list_header, 1)[1].split("]", 1)[0]
+        patterns: list[str] = []
+        for line in list_block.splitlines():
+            if '"' not in line:
+                continue
+            _, _, remainder = line.partition('"')
+            pattern, _, _ = remainder.partition('"')
+            if pattern:
+                patterns.append(pattern)
+        return tuple(patterns)
+
+    def _issue_69_extract_setup_stale_exclusion_patterns(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_STALE_BUILD_OUTPUT_PATTERNS":
+                    extracted = ast.literal_eval(statement.value)
+                    self.assertIsInstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        self.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
 
     def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
         build_context.mkdir(parents=True, exist_ok=True)
@@ -1671,6 +1764,116 @@ class TestInitUpdate(CliRuntimeHarness):
                     f"missing={missing[:10]} unexpected={unexpected[:10]}"
                 ),
             )
+
+    def test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            pre_prune_snapshot = temp_root / "wheel-pre-prune-snapshot.json"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            build_env = os.environ.copy()
+            build_env[self._ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV] = "1"
+            build_env[self._ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV] = str(pre_prune_snapshot)
+
+            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+                build_env=build_env,
+            )
+
+            self.assertTrue(
+                pre_prune_snapshot.is_file(),
+                f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}",
+            )
+            snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
+            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            self.assertEqual(
+                set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])),
+                expected_seeded_fixtures,
+                "issue-69 setup.py snapshot did not report the approved seeded fixture set",
+            )
+            self.assertEqual(
+                set(snapshot_payload.get("present_before_prune", [])),
+                expected_seeded_fixtures,
+                "issue-69 seeded stale fixture set must exist in wheel build staging before prune",
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
+            for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+                self.assertNotIn(
+                    stale_artifact_path,
+                    wheel_inventory,
+                    (
+                        "issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: "
+                        f"{stale_artifact_path}"
+                    ),
+                )
+
+    def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            present_before_build = self._issue_69_seed_stale_fixtures_in_sdist_source_context(build_context)
+            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            self.assertEqual(
+                present_before_build,
+                expected_seeded_fixtures,
+                "issue-69 seeded stale fixture set must exist in sdist source context before build",
+            )
+
+            _, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+
+            sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
+            for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+                self.assertNotIn(
+                    stale_artifact_path,
+                    sdist_inventory,
+                    (
+                        "issue-69 sdist build unexpectedly shipped seeded stale wrapper-era output: "
+                        f"{stale_artifact_path}"
+                    ),
+                )
+
+    def test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+        setup_text = (repo_root / "setup.py").read_text(encoding="utf-8")
+
+        pyproject_patterns = self._issue_69_extract_pyproject_stale_exclusion_patterns(pyproject_text)
+        setup_patterns = self._issue_69_extract_setup_stale_exclusion_patterns(setup_text)
+
+        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_patterns}
+        setup_pattern_set = set(setup_patterns)
+        expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
+
+        self.assertEqual(
+            pyproject_normalized_patterns,
+            setup_pattern_set,
+            "issue-69 stale exclusion patterns diverged between pyproject.toml and setup.py",
+        )
+        self.assertEqual(
+            setup_pattern_set,
+            expected_pattern_set,
+            "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set",
+        )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

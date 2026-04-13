@@ -104,12 +104,70 @@ tests/fixtures/wheelhouse/wheel-0.45.1-py3-none-any.whl
     - repo 管理 wheelhouse + actual build semantics に切り替えた後、P0/P1 指摘なし
 
 #### コミット
-- pending:
-  - S01 stage commit を次に作成する
+- `2fe79aa` `feat(packaging): install_root配布面の収録契約を固定`
 
 #### メモ
 - `src/spec_dock/cli.py` と `src/spec_dock/assets/codex_skills/**` は S01 の範囲外として未変更。
 - `setup.py` stale prune と `exclude-package-data` を使う S02 は未着手。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S02
+- AC/EC: AC-004, EC-002
+
+#### 実施内容
+- `setup.py` に S02 専用の観測フックを追加し、`build_py.run` の `super().run()` 後から prune 前までの build staging area に exact stale fixture set を seed / snapshot できるようにした。
+- 上記フックは環境変数指定時のみ有効にし、通常 build semantics は変えないようにした。
+- `tests/test_init_update.py` に次の S02 回帰を追加した。
+  - wheel build staging area で fixture 14 件の pre-prune presence と wheel artifact absence を同時に検証
+  - sdist temp source context で fixture 14 件の pre-build presence と sdist archive absence を同時に検証
+  - `pyproject.toml` と `setup.py` の stale exclusion pattern set が approved exact set と一致することを検証
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs
+.
+----------------------------------------------------------------------
+Ran 1 test in 2.932s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs
+.
+----------------------------------------------------------------------
+Ran 1 test in 2.890s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK
+```
+
+#### 変更したファイル
+- `setup.py` - env-gated stale fixture seed / pre-prune snapshot hook を追加
+- `tests/test_init_update.py` - wheel/sdist stale exclusion regression と pattern alignment regression を追加
+- `spec-dock/active/issue/report.md` - S02 証跡を記録
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - note:
+    - env 未指定時の通常 build semantics を変えずに、approved exact stale fixture/pattern set を検証できている
+
+#### コミット
+- pending:
+  - S02 stage commit を次に作成する
+
+#### メモ
+- S02 は stale exclusion contract のみを扱い、isolated install smoke と handoff surface discovery は S03 へ残している。
 
 ## 遭遇した問題と解決
 - 問題:
@@ -138,11 +196,14 @@ tests/fixtures/wheelhouse/wheel-0.45.1-py3-none-any.whl
     - pass
 - stale exclusion guard:
   - test_or_command:
-    - pending_for_s02
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup`
   - assertion_summary:
-    - pending_for_s02
+    - wheel build staging area と sdist temp source context に seeded stale fixture set が事前存在し、wheel / sdist artifact には approved stale paths が 0 件である
+    - `pyproject.toml` と `setup.py` の stale exclusion pattern set が approved exact set と一致する
   - result:
-    - pending_for_s02
+    - pass
 - isolated install smoke:
   - test_or_command:
     - pending_for_s03
