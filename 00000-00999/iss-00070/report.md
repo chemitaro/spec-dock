@@ -3,7 +3,7 @@
 ID: "iss-00070"
 タイトル: "Installer source discovery and managed ownership"
 関連GitHub: ["#70"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -15,6 +15,7 @@ ID: "iss-00070"
 ## 実装サマリー
 - `S01` で installer の canonical input を `install_root` authority へ切り替え、host-adapters manifest の top-level obsolete exact path schema を固定した。
 - current managed inventory は `install_root` recursive file inventory から構築されるようになり、workflow を含む current managed set と top-level obsolete set の overlap / invalid manifest は fail-closed で拒否される。
+- `S99` で checked-in dogfooding snapshot / legacy duplicate parity の cutover baseline を現行構造へ更新し、issue-70 targeted suite、`validate`、`sync --github` を通した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -54,7 +55,7 @@ OK
   - verdict:
     - `pass`
   - note:
-    - non-blocking 指摘として、validated obsolete exact path 全 namespace への cleanup 適用はまだ `_apply_managed_skill_install_plan` 側で未実装のため S02 で閉じる
+    - non-blocking 指摘として、validated obsolete exact path 全 namespace への cleanup 適用はまだ `_apply_managed_skill_install_plan` 側で未実装のため S02 で閉じる。S02 で top-level obsolete exact paths 全体へ適用済み。
 
 #### コミット
 - `8d3e0e8` `feat(installer): install_root正本の事前検証を導入`
@@ -142,23 +143,141 @@ OK
     - new helper / new test の scope は S03 意図と一致し、P0/P1 指摘なし
 
 #### コミット
-- pending:
-  - S03 stage commit を次に作成する
+- `9a91f3e` `test(installer): install済みcutover検証を追加`
 
 #### メモ
 - test は local wheelhouse と temp venv を使うため、issue-69 の hermetic build/install contract を前提にしている。
 
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S90 / S99
+- AC/EC: report evidence contract, final exit contract
+
+#### 実施内容
+- `design.md` / `plan.md` の final `validate` / `sync --github` を issue-local quality gate として明確化し、dogfooding checked-in state の最終 refresh、authority retirement、epic 全体の closeout は `iss-00071` / `iss-00072` に残した。
+- checked-in dogfooding snapshot の baseline を現行の `epic-00067` / `iss-00068` から `iss-00072` を含む構造へ更新した。
+- `issue_depends_on_map` baseline に `iss-00069` / `iss-00070` / `iss-00071` / `iss-00072` の依存関係を反映した。
+- legacy duplicate parity regression を維持するため、non-authoritative duplicate `codex_skills/host-adapters/meta.json` と repo-root `.agents/host-adapters/meta.json` を `install_root` 契約と同一 schema へ同期した。
+- `handoff-validation-evidence` に AC-005 の invalid manifest / conflict class coverage を追記した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot tests.test_init_update.TestInitUpdate.test_issue_68_declared_legacy_pairs_remain_byte_equivalent
+
+----------------------------------------------------------------------
+Ran 4 tests
+
+OK
+```
+
+```bash
+python -m unittest -v $(rg -o 'def (test_issue_70_[a-zA-Z0-9_]+)' -r 'tests.test_init_update.TestInitUpdate.$1' tests/test_init_update.py)
+
+----------------------------------------------------------------------
+Ran 13 tests in 6.529s
+
+OK
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=29
+```
+
+```bash
+./spec-dock/scripts/spec-dock sync --github
+
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+spec-dock: sync: active unchanged (matched id in branch: iss-00070)
+```
+
+```bash
+python -m unittest discover -v
+
+----------------------------------------------------------------------
+Ran 714 tests in 211.915s
+
+FAILED (failures=4)
+```
+
+```bash
+python -m unittest discover -v
+
+----------------------------------------------------------------------
+Ran 714 tests
+
+FAILED (failures=1)
+```
+
+#### full-suite scope 判定
+- 1回目の full-suite failure:
+  - `test_final_api_call_site_and_structural_regression`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py: domain.ids` の forbidden import
+    - issue-70 の installer source discovery / managed ownership contract 外の既存 runtime layering regression と判定し、本 issue では未修正
+  - `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`
+    - checked-in dogfooding snapshot baseline が `epic-00067` の現行 tree / dependencies を含んでいなかったため、issue-70 final gate 内で修正
+  - `test_checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot`
+    - runtime cutover snapshot の expected dependency map が `iss-00069` から `iss-00072` の依存関係を含んでいなかったため、issue-70 final gate 内で修正
+  - `test_issue_68_declared_legacy_pairs_remain_byte_equivalent`
+    - `install_root` cutover 後も issue-72 まで残る inert duplicate parity check が現行 schema と不一致だったため、duplicate asset を non-authoritative mirror として同期
+- 2回目の full-suite failure:
+  - `test_final_api_call_site_and_structural_regression` の 1 件のみ残存
+  - issue-70 の code/test/asset 差分ではなく runtime shell layering contract の既存 issue として scope-out
+
+#### レビュー
+- final code review:
+  - status:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d860e-2e44-71e3-b5f0-e4113c5aa5c4`
+  - note:
+    - P0/P1 correctness / reliability findings はなし
+    - installer authority は `install_root` 固定のままで、legacy `codex_skills` duplicate は inert mirror に留まり、checked-in dogfooding baseline 更新も現行 tree / dependency 反映として妥当
+- final spec review:
+  - first pass:
+    - `fail`
+  - first reviewer:
+    - spec_reviewer `019d860e-54ce-7b20-8480-e260342b16d1`
+  - first findings:
+    - final review / final commit evidence が pending と記録されたまま
+    - report front matter が `draft` のまま
+  - resolution:
+    - 本 section で final code review verdict、spec review 指摘、修正結果、final commit plan を反映し、front matter を `approved` に更新した
+  - final re-review:
+    - `pass`
+  - final reviewer:
+    - spec_reviewer `019d8612-636d-74e0-8e63-ecee9f95682e`
+  - final note:
+    - 前回 P1/P2 は解消済み
+    - requirement/design/plan/report の scope 境界は一貫し、issue-local `validate` / `sync --github` gate と後続 issue handoff は矛盾なし
+
+#### コミット
+- final evidence / baseline update commit:
+  - status:
+    - final spec re-review `pass` 後に作成する
+  - rationale:
+    - S99 では code/test/asset baseline と issue docs/report の実変更があるため no-op ではなく final commit が必要
+
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題:
+  - full-suite の checked-in dogfooding snapshot tests が、`epic-00067` の現行 checked-in metadata と dependency map を baseline に含んでいなかった。
+  - 解決:
+    - snapshot constants と non-empty dependency baseline を現行 checked-in tree に同期した。
+- 問題:
+  - `install_root` の host-adapters manifest cutover により、issue-68 の legacy duplicate byte-equivalence regression が不一致になった。
+  - 解決:
+    - legacy duplicate は installer authority に戻さず、issue-72 まで残る inert mirror として `install_root` contract と byte-equivalent に同期した。
 
 ## 学んだこと (任意)
-- ...
-- ...
+- checked-in dogfooding snapshot tests は、active graph に新しい epic / issue dependency が追加された時点で current checked-in baseline と一緒に更新する必要がある。
+- issue-70 cutover 後の legacy duplicate は runtime authority を持たないが、issue-72 の physical cleanup までは parity regression のため inert mirror として同期しておく必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
-- ...
+- `test_final_api_call_site_and_structural_regression` の `commands/deps.py` forbidden import は、issue-70 の installer cutover とは独立した runtime layering regression として別 issue で解消する。
 
 ## handoff-validation-evidence (必須)
 - source inventory / manifest assertions:
@@ -173,6 +292,11 @@ OK
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_obsolete_overlap_before_writes tests.test_init_update.TestInitUpdate.test_update_rejects_current_dir_obsolete_exact_file_paths tests.test_init_update.TestInitUpdate.test_update_rejects_directory_like_obsolete_exact_file_paths tests.test_init_update.TestInitUpdate.test_update_rejects_parent_traversal_native_shim_paths tests.test_init_update.TestInitUpdate.test_update_rejects_windows_drive_relative_native_shim_paths tests.test_init_update.TestInitUpdate.test_update_rejects_obsolete_exact_file_paths_outside_managed_prefixes`
   - assertion_summary:
     - missing / null / wrong-type `managed_assets`、overlap、current-directory、directory-like、outside-prefix、windows-drive、parent-traversal の obsolete exact path はすべて write 前に fail-closed で拒否される
+    - `test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest` は source-of-truth manifest file missing、`managed_assets` missing / null / wrong-type、`obsolete_exact_file_paths` missing / null / wrong-type、blank / non-string path、absolute path、glob pattern、required host `source_of_truth_asset` missing / wrong-type / non-install_root path / provider-side non-file target を網羅する
+    - `test_issue_70_update_rejects_current_obsolete_overlap_before_writes` は current managed set と obsolete exact path の overlap を write 前に拒否する
+    - `test_update_rejects_current_dir_obsolete_exact_file_paths` と `test_update_rejects_directory_like_obsolete_exact_file_paths` は current-directory / directory-like path を cleanup 対象にしない
+    - `test_update_rejects_parent_traversal_native_shim_paths`、`test_update_rejects_windows_drive_relative_native_shim_paths`、`test_update_rejects_obsolete_exact_file_paths_outside_managed_prefixes` は parent traversal、windows drive / backslash class、managed namespace 外 path を拒否する
+    - `test_issue_70_init_rejects_current_managed_directory_conflict_before_writes`、`test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes`、`test_issue_70_update_rejects_current_managed_directory_conflict_before_writes`、`test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes` は current / obsolete target directory-container conflict を write 前に拒否する
   - result:
     - pass
 - current managed / obsolete managed boundary assertions:
@@ -197,4 +321,5 @@ OK
 
 ## 省略/例外メモ (必須)
 - S01 では `_apply_managed_skill_install_plan` の sync/verify/cleanup ordering は未変更。
-- validated obsolete exact path 全 namespace への cleanup 適用は code review P2 として S02 に持ち越した。
+- validated obsolete exact path 全 namespace への cleanup 適用は code review P2 として S02 に持ち越し、S02 で top-level obsolete exact path 全体へ適用済み。
+- issue-70 の `validate` / `sync --github` は issue-local quality gate として実行する。dogfooding checked-in state の最終 refresh、authority retirement、epic 全体の final closeout は `iss-00071` / `iss-00072` に残す。

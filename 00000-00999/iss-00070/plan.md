@@ -166,7 +166,8 @@ ID: "iss-00070"
 - `report.md` には command evidence、review verdict、修正内容、commit hash、no-op 理由を残す
 - source-of-truth docs の恒久更新は issue docs 以外は実装 step の範囲に含めない
 - `python -m unittest discover -v` は informational sweep とし、scope外 failure は report に明記する
-- `S99` では `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` を必須とする
+- `S99` では issue-local quality gate として `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` を必須とする
+- `S99` の `validate` / `sync --github` は issue-70 branch diff の graph / docs consistency check であり、dogfooding checked-in state の最終 refresh、authority retirement、epic 全体の final closeout は `iss-00071` / `iss-00072` の責務として残す
 
 ## 実装ステップ
 
@@ -570,6 +571,8 @@ ID: "iss-00070"
   - `./spec-dock/scripts/spec-dock validate`
   - `./spec-dock/scripts/spec-dock sync --github`
   - `python -m unittest discover -v` informational sweep
+  - note:
+    - `validate` / `sync --github` は issue-local close-ready gate として実行し、後続 issue の final dogfooding / authority-retirement closeout を代替しない
 - reviewer approvals:
   - final code review `pass`
   - final spec review `pass`
