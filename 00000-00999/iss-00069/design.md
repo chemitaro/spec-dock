@@ -3,9 +3,9 @@
 ID: "iss-00069"
 タイトル: "Package data and installed artifact parity"
 関連GitHub: ["#69"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-12"
+最終更新: "2026-04-13"
 依存: ["requirement.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
@@ -19,19 +19,20 @@ ID: "iss-00069"
 - MUST / MUST NOT:
   - MUST:
     - `install_root` full inventory を artifact-relative namespace で検証できること。
-    - native shim canonical handoff surface である `install_root/.codex/agents/spec-dock.toml` と `install_root/.github/agents/spec-dock.agent.md` を installed discovery で確認できること。
+    - issue-70 handoff の重点 installed-discovery surface である `install_root/.agents/host-adapters/meta.json`、`install_root/.codex/agents/spec-dock.toml`、`install_root/.github/agents/spec-dock.agent.md` を installed discovery で確認できること。
     - stale build output exclusion guard が seeded fixture に対して実証されること。
   - MUST NOT:
     - installer canonical source discovery を切り替えない。
     - consumer repo reflection contract をこの issue で閉じない。
+    - `codex_skills` authoritative runtime path を削除・縮退・切替しない。
 - 非交渉制約:
   - `iss-00068` の `install_root` authority contract を前提にする。
   - package parity 比較は canonical artifact-relative strings で行う。
   - `local package install` は non-editable wheel install の isolated environment に限定する。
-- 前提:
-  - `pyproject.toml` と `setup.py` が package data inclusion / exclusion の主契約面である。
-  - `_assets_dir()` は installed package から package data root を得る観測面として使える。
-  - 現行 installer は legacy root を読みうるため、issue-2 は package inclusion / installed discovery の prerequisite のみを閉じる。
+  - 前提:
+    - `pyproject.toml` と `setup.py` が package data inclusion / exclusion の主契約面である。
+    - `_assets_dir()` は installed package から package data root を得る観測面として使える。
+    - 現行 installer は legacy root を読みうるため、`iss-00069` は package inclusion / installed discovery の prerequisite のみを閉じる。
 
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
@@ -121,6 +122,8 @@ Tests --> Cutover : prerequisite evidence
 - API / function / protocol / data boundary:
   - Packaging inclusion contract:
     - `spec_dock/assets/install_root/...` を package artifact に含める。
+    - `tool.setuptools.package-data.spec_dock` では hidden subtree を明示列挙し、`assets/**/*` に加えて `assets/install_root/.agents/**`、`assets/install_root/.codex/**`、`assets/install_root/.github/**` を exact inclusion rule として持つ。
+    - inclusion rule は dot-directory 自体の探索漏れを避けるため、`install_root` hidden subtree ごとの明示 pattern を package-data 正本とし、`setup.py` 側に第二の include source-of-truth を持たない。
   - Artifact comparison contract:
     - source tree file は `src/spec_dock/...` から先頭の `src/` を除いた path を canonical artifact-relative string に正規化する。
     - wheel member は archive member 中の先頭 `spec_dock/` から始まる部分を canonical artifact-relative string に正規化する。
@@ -133,12 +136,15 @@ Tests --> Cutover : prerequisite evidence
     - `spec_dock/assets/github/...` namespace は source / wheel / sdist / installed の正の parity inventory には含めない。
   - Installed smoke contract:
     - isolated non-editable wheel install から `spec-dock init` / `update` を実行し、checkout fallback を使わずに package data を観測する。
+    - `init/update` smoke の成功だけでは pass とせず、同一 isolated env で `install_root` handoff surface の installed discovery assertion も同時に成功しなければならない。
     - consumer repo reflection 成果物そのものは acceptance から外す。
+    - hermetic build/install 実行に必要な `build` / `setuptools` / `wheel` / `packaging` / `pyproject_hooks` は、repo 管理の test wheelhouse から `--no-index --find-links` で供給する。
   - Stale exclusion contract:
     - seeded stale-output fixture set は `build_py.run` 後、`_prune_stale_build_outputs()` 実行前の build staging area (`build_lib/spec_dock/assets/...`) に存在することを確認する。
     - fixture inventory は requirement に定義した 14 個の exact stale paths をそのまま使う。
     - wheel については build staging area へ注入した fixture inventory が prune 後 artifact listing で 0 件になることを確認する。
-    - sdist については temporary source build context に同じ fixture inventory を source-tree relative path で注入し、build 前 source context に fixture inventory が 14 件存在することを確認したうえで、sdist source set / archive listing で 0 件になることを確認する。
+    - sdist については `tool.setuptools.exclude-package-data.spec_dock` を archive-level exclusion mechanism の正本とし、temporary source build context に同じ fixture inventory を source-tree relative path で注入したうえで、build 前 source context に fixture inventory が 14 件存在すること、かつ `python -m build --sdist --no-isolation` が生成する archive listing では 0 件になることを確認する。
+    - `setup.py build_py` hook は wheel/build-lib stale prune の責務だけを持ち、sdist exclusion の責務は `pyproject.toml` の exclude-package-data contract が持つ。
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:
@@ -175,21 +181,21 @@ Inventory --> Stale
   - `pyproject.toml`
   - `setup.py`
   - `tests/test_init_update.py`
-  - issue `requirement.md`
   - issue `design.md`
 - Delete:
   - なし
 - Move/Rename:
   - なし:
     - path basis を正規化して比較するだけで、asset path 自体は rename しない
-- Read only:
-  - `src/spec_dock/cli.py`
-  - `iss-00068` docs
-  - `iss-00070` source discovery logic
+  - Read only:
+    - `src/spec_dock/cli.py`
+    - `src/spec_dock/assets/codex_skills/**`
+    - `iss-00068` docs
+    - `iss-00070` source discovery logic
 
 ## 要件 → 設計マッピング
 - AC-001 -> wheel / sdist / installed wheel の 3 系統で full install_root inventory を artifact-relative listing 比較する。
-- AC-002 -> isolated env で `init/update` smoke と canonical native shim handoff surface discovery を確認する。
+- AC-002 -> isolated env で `init/update` smoke を補助観測としつつ、`meta.json` を含む issue-70 handoff surface の installed discovery を主 assertion として確認する。
 - AC-003 -> full inventory parity を `iss-00070` handoff prerequisite として artifact-level に固定する。
 - AC-004 -> seeded stale-output fixture を build staging area に注入し、exclusion guard を実証する。
 - EC-001 -> hidden path inclusion を explicit package-data / listing check で担保する。
@@ -205,6 +211,7 @@ Inventory --> Stale
   - installed resource recursive inventory parity test
   - isolated wheel-install `init/update` smoke
   - seeded stale-output fixture exclusion test
+  - build invocation は repo 管理の test wheelhouse を入力にした temp venv から `python -m build --wheel --sdist --no-isolation` を使い、wheel / sdist parity を同じ dependency surface で観測する
 - E2E / manual:
   - `uvx --from . spec-dock` に近い package-installed 経路での manual smoke
 - migration / rollback / feature flag if needed:
@@ -213,7 +220,7 @@ Inventory --> Stale
 
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> canonical artifact-relative full inventory の equality across source / wheel / sdist / installed package
-- AC-002 -> isolated env での `init/update` 実行と `install_root/.codex` / `.github/agents` discovery assertion
+- AC-002 -> isolated env での `init/update` 実行と `install_root/.agents/host-adapters/meta.json` / `.codex/agents` / `.github/agents` discovery assertion
 - AC-003 -> full inventory parity evidence を handoff artifact として保存
 - AC-004 -> seeded stale fixture paths の staging-presence と artifact-absence を同一 regression で確認
 - legacy namespace stale assets -> `spec_dock/assets/github/...` を含む wrapper-era fixture inventory が wheel / sdist の両方で除外されること
@@ -233,6 +240,10 @@ Inventory --> Stale
   - installed smoke が checkout fallback で偽陽性になる
   - mitigation:
     - isolated non-editable wheel install と site-packages-only discovery contract
+- risk-4:
+  - build backend dependency が ambient cache / network に依存して回帰テストが不安定になる
+  - mitigation:
+    - repo 管理の test wheelhouse を固定入力にし、`--no-index --find-links` だけで temp venv を bootstrap する
 - risk-3:
   - stale exclusion guard が source tree の不在だけで vacuous pass する
   - mitigation:
