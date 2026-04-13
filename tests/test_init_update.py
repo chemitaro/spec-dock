@@ -457,6 +457,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
         "spec_dock/assets/install_root/.github/workflows/ci.yml",
     )
+    _ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+        "spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+        "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+    )
     _ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS = (
         "assets/install_root/.agents/**",
         "assets/install_root/.codex/**",
@@ -918,6 +923,32 @@ class TestInitUpdate(CliRuntimeHarness):
             f"stderr:\n{result.stderr}",
         )
 
+    def _issue_69_run_subprocess_capture(
+        self,
+        args: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess:
+        result = subprocess.run(
+            args,
+            cwd=str(cwd) if cwd is not None else None,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "issue-69 command failed:\n"
+            f"command: {' '.join(args)}\n"
+            f"cwd: {cwd}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}",
+        )
+        return result
+
     def _issue_69_resolve_wheelhouse(self, repo_root: Path) -> Path:
         wheelhouse = repo_root / self._ISSUE_69_WHEELHOUSE_RELATIVE
         self.assertTrue(
@@ -940,6 +971,17 @@ class TestInitUpdate(CliRuntimeHarness):
         if os.name == "nt":
             return venv_dir / "Scripts" / "python.exe"
         return venv_dir / "bin" / "python"
+
+    def _issue_69_venv_spec_dock(self, venv_python: Path) -> Path:
+        if os.name == "nt":
+            return venv_python.parent / "spec-dock.exe"
+        return venv_python.parent / "spec-dock"
+
+    def _issue_69_runtime_env_without_checkout_fallback(self) -> dict[str, str]:
+        env = os.environ.copy()
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
+        return env
 
     def _issue_69_build_artifacts_with_local_wheelhouse(
         self,
@@ -1002,6 +1044,125 @@ class TestInitUpdate(CliRuntimeHarness):
         shutil.copy2(wheel_paths[0], wheel_path)
         shutil.copy2(sdist_paths[0], sdist_path)
         return wheel_path, sdist_path, venv_python
+
+    def _issue_69_prepare_isolated_installed_wheel_runtime(
+        self,
+        *,
+        repo_root: Path,
+        temp_root: Path,
+    ) -> Path:
+        build_context = temp_root / "build-context"
+        wheel_dir = temp_root / "wheelhouse"
+        sdist_dir = temp_root / "sdist"
+        self._issue_69_prepare_build_context(repo_root, build_context)
+        wheel_path, _, venv_python = self._issue_69_build_artifacts_with_local_wheelhouse(
+            repo_root=repo_root,
+            build_context=build_context,
+            wheel_dir=wheel_dir,
+            sdist_dir=sdist_dir,
+        )
+        self._issue_69_run_subprocess(
+            [
+                str(venv_python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-cache-dir",
+                "--no-deps",
+                str(wheel_path),
+            ],
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        return venv_python
+
+    def _issue_69_path_is_within(self, path: Path, root: Path) -> bool:
+        try:
+            path.resolve().relative_to(root.resolve())
+        except ValueError:
+            return False
+        return True
+
+    def _issue_69_collect_isolated_installed_runtime_snapshot(
+        self,
+        *,
+        venv_python: Path,
+        repo_root: Path,
+        cwd: Path,
+    ) -> dict[str, object]:
+        repo_root_literal = json.dumps(str(repo_root.resolve()))
+        script = (
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "import spec_dock\n"
+            "import spec_dock.cli as cli\n"
+            f"repo_root = Path({repo_root_literal})\n"
+            "def _is_under_repo(path_text: str) -> bool:\n"
+            "    if not path_text:\n"
+            "        return False\n"
+            "    try:\n"
+            "        Path(path_text).resolve().relative_to(repo_root)\n"
+            "        return True\n"
+            "    except Exception:\n"
+            "        return False\n"
+            "with cli._assets_dir() as assets_dir:\n"
+            "    resolved_assets_dir = Path(assets_dir).resolve()\n"
+            "    install_root = resolved_assets_dir / 'install_root'\n"
+            "    inventory = sorted(\n"
+            "        f\"spec_dock/assets/{candidate.relative_to(resolved_assets_dir).as_posix()}\"\n"
+            "        for candidate in install_root.rglob('*')\n"
+            "        if candidate.is_file()\n"
+            "    )\n"
+            "payload = {\n"
+            "    'spec_dock_file': str(Path(spec_dock.__file__).resolve()),\n"
+            "    'assets_dir': str(resolved_assets_dir),\n"
+            "    'sys_path_has_repo_root': any(_is_under_repo(path_text) for path_text in sys.path if path_text),\n"
+            "    'inventory': inventory,\n"
+            "}\n"
+            "print(json.dumps(payload))\n"
+        )
+        result = self._issue_69_run_subprocess_capture(
+            [str(venv_python), "-c", script],
+            cwd=cwd,
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        output_lines = [line for line in result.stdout.splitlines() if line.strip()]
+        self.assertTrue(output_lines, "issue-69 runtime snapshot command produced no JSON output")
+        payload = json.loads(output_lines[-1])
+        self.assertIsInstance(payload, dict, "issue-69 runtime snapshot must be a JSON object")
+        return payload
+
+    def _issue_69_assert_runtime_snapshot_uses_installed_package(
+        self,
+        *,
+        snapshot: dict[str, object],
+        repo_root: Path,
+    ) -> None:
+        spec_dock_file = Path(str(snapshot.get("spec_dock_file", ""))).resolve()
+        assets_dir = Path(str(snapshot.get("assets_dir", ""))).resolve()
+        self.assertIn(
+            "site-packages",
+            spec_dock_file.as_posix(),
+            f"issue-69 expected installed package module path, got: {spec_dock_file}",
+        )
+        self.assertIn(
+            "site-packages",
+            assets_dir.as_posix(),
+            f"issue-69 expected installed package assets path, got: {assets_dir}",
+        )
+        self.assertFalse(
+            self._issue_69_path_is_within(spec_dock_file, repo_root),
+            f"issue-69 runtime imported spec_dock from checkout path: {spec_dock_file}",
+        )
+        self.assertFalse(
+            self._issue_69_path_is_within(assets_dir, repo_root),
+            f"issue-69 runtime loaded assets from checkout path: {assets_dir}",
+        )
+        self.assertFalse(
+            bool(snapshot.get("sys_path_has_repo_root")),
+            "issue-69 runtime sys.path unexpectedly includes repository checkout path",
+        )
 
     def _issue_69_seed_stale_fixtures_in_sdist_source_context(self, build_context: Path) -> set[str]:
         source_root = build_context / "src"
@@ -1761,6 +1922,148 @@ class TestInitUpdate(CliRuntimeHarness):
                 source_inventory,
                 (
                     f"issue-69 full install_root inventory parity failed for {surface_name}; "
+                    f"missing={missing[:10]} unexpected={unexpected[:10]}"
+                ),
+            )
+
+    def test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+            installed_inventory = {str(path) for path in snapshot.get("inventory", [])}
+            expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
+            scope_prefixes = (
+                "spec_dock/assets/install_root/.agents/host-adapters/",
+                "spec_dock/assets/install_root/.codex/agents/",
+                "spec_dock/assets/install_root/.github/agents/",
+            )
+            discovered_handoff_scope = {
+                artifact_relative_path
+                for artifact_relative_path in installed_inventory
+                if any(artifact_relative_path.startswith(prefix) for prefix in scope_prefixes)
+            }
+            self.assertEqual(
+                discovered_handoff_scope,
+                expected_handoff_surface,
+                (
+                    "issue-69 isolated installed package handoff surface mismatch; "
+                    f"expected={sorted(expected_handoff_surface)} observed={sorted(discovered_handoff_scope)}"
+                ),
+            )
+
+    def test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            self.assertTrue(
+                spec_dock_command.is_file(),
+                f"issue-69 expected installed spec-dock command in isolated venv: {spec_dock_command}",
+            )
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+            init_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            update_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            self.assertTrue(
+                (target_repo / "spec-dock").is_dir(),
+                "issue-69 isolated installed package smoke should create target spec-dock directory",
+            )
+            combined_output = (
+                f"{init_result.stdout}\n{init_result.stderr}\n{update_result.stdout}\n{update_result.stderr}"
+            ).lower()
+            for error_fragment in ("missing asset", "missing install_root", "missing bundled"):
+                self.assertNotIn(
+                    error_fragment,
+                    combined_output,
+                    (
+                        "issue-69 isolated installed package smoke emitted missing-asset diagnostics: "
+                        f"{error_fragment}"
+                    ),
+                )
+
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+
+    def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
+        expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
+        source_handoff_surface = source_inventory & expected_handoff_surface
+        self.assertEqual(
+            source_handoff_surface,
+            expected_handoff_surface,
+            (
+                "issue-69 source handoff surface mismatch; "
+                f"expected={sorted(expected_handoff_surface)} observed={sorted(source_handoff_surface)}"
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+            installed_inventory = {str(path) for path in snapshot.get("inventory", [])}
+            installed_handoff_surface = installed_inventory & expected_handoff_surface
+            missing = sorted(source_handoff_surface - installed_handoff_surface)
+            unexpected = sorted(installed_handoff_surface - source_handoff_surface)
+            self.assertEqual(
+                installed_handoff_surface,
+                source_handoff_surface,
+                (
+                    "issue-69 local and isolated installed handoff surface inventory mismatch; "
                     f"missing={missing[:10]} unexpected={unexpected[:10]}"
                 ),
             )
