@@ -27,7 +27,7 @@ ID: "iss-00068"
 - 非交渉制約:
   - `epic-00067` の closure target は E-RQ-001、E-RQ-002、E-AC-001 のみ。
   - consumer repo 側 installed relative paths は変更しない。
-  - uppercase を含む新規 path を作らない。
+  - uppercase を含む新規 path は原則導入しない。ただし shared skill asset の既存 filename convention である `SKILL.md` は明示例外として許容する。
 - 前提:
   - 現行 installer は `src/spec_dock/assets/codex_skills/` と `host-adapters/meta.json` を前提にしている。
   - checked-in `.agents/`、`.codex/`、`.github/`、`.github/workflows/` は install 後 layout の実例として利用できる。
@@ -180,6 +180,7 @@ Inventory --> Workflow
 - Modify:
   - issue `requirement.md`
   - issue `design.md`
+  - `tests/test_init_update.py`
   - in-scope asset inventory に対応する legacy source files
 - Delete:
   - なし:
@@ -192,7 +193,6 @@ Inventory --> Workflow
   - `pyproject.toml`
   - `setup.py`
   - `tests/test_cli.py`
-  - `tests/test_init_update.py`
 
 ## 要件 → 設計マッピング
 - AC-001 -> `install_root/` top-level subtree を新設し、`.agents`、`.codex`、`.github`、`.github/workflows` の path existence を source tree で確認可能にする。

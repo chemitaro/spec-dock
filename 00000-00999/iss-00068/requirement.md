@@ -81,7 +81,7 @@ ID: "iss-00068"
 - `.agents` は shared、`.codex` は Codex 固有、`.github` は GitHub 固有という責務分離を崩さない。
 - GitHub workflow assets の配置先は `.github/workflows/` としてこの issue で固定するが、同期契約・managed ownership・packaged-install 保証は後続 issue に委ねる。
 - 新しい source root 名は `src/spec_dock/assets/install_root/` とする。
-- 新規 path は lowercase のみとし、uppercase を導入しない。
+- 新規 path は lowercase を原則とし、skill asset の既存 filename convention である `SKILL.md` だけを明示例外として許容する。
 
 ## 前提
 - consumer repo 側の install target path contract は既存の `.agents/`、`.codex/`、`.github/`、`.github/workflows/` を維持する。
