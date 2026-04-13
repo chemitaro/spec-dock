@@ -163,11 +163,73 @@ OK
     - env 未指定時の通常 build semantics を変えずに、approved exact stale fixture/pattern set を検証できている
 
 #### コミット
-- pending:
-  - S02 stage commit を次に作成する
+- `b6c2ba0` `test(packaging): stale除外回帰を追加`
 
 #### メモ
 - S02 は stale exclusion contract のみを扱い、isolated install smoke と handoff surface discovery は S03 へ残している。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-002, EC-003
+
+#### 実施内容
+- `tests/test_init_update.py` に S03 向けの isolated installed-package helper を追加し、S01 で導入した hermetic wheelhouse + temp venv build 経路を再利用できるようにした。
+- 追加した S03 回帰:
+  - isolated installed package が approved handoff surface 3 paths をちょうど公開していること
+  - isolated cwd + `PYTHONPATH` 除去 env で `spec-dock init` / `spec-dock update` が missing-asset diagnostics なしで通ること
+  - local と installed の handoff surface inventory が一致すること
+- 途中で full `install_root` equality を見る 3 本目テストは scope 逸脱として code review `fail` になったため、approved handoff surface 3 件だけを比較する形へ縮小し、テスト名も `...handoff_surface_inventories_match` に揃えた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface
+.
+----------------------------------------------------------------------
+Ran 1 test in 4.036s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback
+.
+----------------------------------------------------------------------
+Ran 1 test in 3.911s
+
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_handoff_surface_inventories_match
+.
+----------------------------------------------------------------------
+Ran 1 test in 4.025s
+
+OK
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py` - isolated installed runtime snapshot helper、harness surface assertion、S03 regression を追加
+- `spec-dock/active/issue/plan.md` - S03 3 本目テスト名を handoff-surface scope に合わせて更新
+- `spec-dock/active/issue/report.md` - S03 証跡を記録
+
+#### レビュー
+- code review:
+  - 初回 verdict:
+    - `fail`
+  - fail reason:
+    - full `install_root` inventory equality を見る 3 本目テストが approved S03 scope を超えていた
+  - 最終 verdict:
+    - `pass`
+  - note:
+    - handoff surface 3 件だけを見る形へ絞った後、P0/P1 指摘なし
+
+#### コミット
+- pending:
+  - S03 stage commit を次に作成する
+
+#### メモ
+- checkout fallback 未使用の判定は、isolated runtime snapshot で `spec_dock.__file__` / `assets_dir` が `site-packages` 配下にあり、repo root が `sys.path` に含まれていないことを根拠にした。
 
 ## 遭遇した問題と解決
 - 問題:
@@ -206,11 +268,15 @@ OK
     - pass
 - isolated install smoke:
   - test_or_command:
-    - pending_for_s03
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback`
+    - `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_handoff_surface_inventories_match`
   - assertion_summary:
-    - pending_for_s03
+    - isolated installed package が approved handoff surface 3 paths を site-packages 由来で公開する
+    - isolated cwd + `PYTHONPATH` 除去 env で `spec-dock init` / `update` が missing-asset diagnostics なしで通る
+    - local と installed の handoff surface inventory が一致する
   - result:
-    - pending_for_s03
+    - pass
 
 ## 省略/例外メモ
 - S01 では `python -m unittest discover -v` は未実行。plan 上の informational sweep は S99 で実施する。
