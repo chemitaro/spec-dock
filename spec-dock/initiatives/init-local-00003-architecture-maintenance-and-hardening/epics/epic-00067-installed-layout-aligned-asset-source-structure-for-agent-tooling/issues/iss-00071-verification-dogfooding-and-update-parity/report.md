@@ -148,11 +148,54 @@ OK
     - residual risk として、presentation runtime 側 bundle test は既存 test method 直接呼び出しに依存するため、参照先 rename 時の追随修正が必要
 
 #### コミット
-- pending:
-  - S02 runtime bundle tests commit
+- `dab7519` `test(runtime): issue-71のcommand bundleを追加`
 
 #### メモ
 - S02 の薄い bundle tests は詳細回帰の代替ではなく、issue-71 report へ runtime-command-verification evidence を束ねる入口として追加した。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-005
+
+#### 実施内容
+- issue-69 / issue-70 の isolated installed package helper を再利用し、issue-71 名前空間の installed package final smoke を追加した。
+- non-editable isolated install、no `PYTHONPATH` / no `PYTHONHOME`、repo-root fallback 非使用、`install_root` current managed reflection、obsolete managed prune、custom unmanaged path preservation を 1 本の smoke test で確認した。
+- production code は変更せず、`tests/test_init_update.py` のみ更新した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback tests.test_init_update.TestInitUpdate.test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback
+
+----------------------------------------------------------------------
+Ran 3 tests in 9.449s
+
+OK
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py`
+  - issue-71 installed package final smoke test を追加
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d8685-c916-7702-90b4-a07abcb30d3f`
+  - note:
+    - P0/P1 findings はなし
+    - residual risk として、managed inventory 全件網羅は S01/S02 parity evidence に依存し、issue-69/70 helper 契約変更時の追随が必要
+
+#### コミット
+- pending:
+  - S03 installed package smoke commit
+
+#### メモ
+- S03 は closure matrix 上の installed-package-verification を閉じる代表 smoke であり、detailed package parity は issue-69 / issue-70 handoff evidence を前提にする。
 
 ---
 

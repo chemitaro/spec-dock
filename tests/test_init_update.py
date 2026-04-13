@@ -8023,6 +8023,114 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "issue-71 handoff evidence should not be placeholder-only",
         )
 
+    def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            self.assertTrue(
+                spec_dock_command.is_file(),
+                f"issue-71 expected installed spec-dock command in isolated venv: {spec_dock_command}",
+            )
+
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+            self.assertNotIn("PYTHONPATH", runtime_env, "issue-71 runtime env must not rely on PYTHONPATH fallback")
+            self.assertNotIn("PYTHONHOME", runtime_env, "issue-71 runtime env must not rely on PYTHONHOME fallback")
+
+            runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=runtime_snapshot,
+                repo_root=repo_root,
+            )
+            self.assertFalse(
+                bool(runtime_snapshot.get("sys_path_has_repo_root")),
+                "issue-71 isolated installed runtime unexpectedly resolved repo-root fallback in sys.path",
+            )
+
+            plan_snapshot = self._issue_70_collect_isolated_installed_plan_snapshot(
+                venv_python=venv_python,
+                cwd=isolated_cwd,
+            )
+            current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
+            self.assertTrue(current_sources, "issue-71 installed plan must expose current managed sources")
+            self.assertTrue(
+                all(source.startswith("install_root/") for source in current_sources),
+                "issue-71 installed plan should source current managed files from install_root only",
+            )
+            self.assertFalse(
+                any(source.startswith("codex_skills/") for source in current_sources),
+                "issue-71 installed plan must not source current managed files from legacy codex_skills",
+            )
+
+            installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
+            managed_rel_path = ".codex/agents/spec-dock.toml"
+            expected_managed_bytes = (installed_assets_dir / "install_root" / managed_rel_path).read_bytes()
+
+            self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            managed_target = target_repo / managed_rel_path
+            self.assertTrue(managed_target.is_file(), f"issue-71 missing managed file after isolated init: {managed_target}")
+            self.assertEqual(
+                managed_target.read_bytes(),
+                expected_managed_bytes,
+                "issue-71 isolated init did not reflect install_root managed asset bytes",
+            )
+
+            obsolete_rel_path = ".codex/agents/spec-dock-codex-adapter.toml"
+            obsolete_target = target_repo / obsolete_rel_path
+            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
+            self._write_text_force(obsolete_target, "issue-71 obsolete managed payload\n")
+
+            custom_rel_path = ".github/workflows/custom-review.yml"
+            custom_target = target_repo / custom_rel_path
+            custom_target.parent.mkdir(parents=True, exist_ok=True)
+            custom_text = "name: issue-71 custom unmanaged workflow\n"
+            self._write_text_force(custom_target, custom_text)
+
+            self._write_text_force(managed_target, "issue-71 stale managed payload\n")
+            self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            self.assertEqual(
+                managed_target.read_bytes(),
+                expected_managed_bytes,
+                "issue-71 isolated update did not restore managed file from install_root",
+            )
+            self.assertFalse(
+                obsolete_target.exists(),
+                f"issue-71 isolated update should prune obsolete managed path: {obsolete_rel_path}",
+            )
+            self.assertTrue(
+                custom_target.is_file(),
+                f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}",
+            )
+            self.assertEqual(
+                custom_target.read_text(encoding="utf-8"),
+                custom_text,
+                f"issue-71 isolated update mutated custom unmanaged file: {custom_rel_path}",
+            )
+
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
