@@ -3,7 +3,7 @@
 ID: "iss-00072"
 タイトル: "Legacy authority retirement and final spec close"
 関連GitHub: ["#72"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md"]
@@ -20,7 +20,7 @@ ID: "iss-00072"
   - MUST:
     - provider-side authoritative manifest を final review corpus に含めること。
     - current docs corpus と historical records を明示ルールで分離すること。
-    - final close report で authority uniqueness / historical boundary / future host extension / upstream verification prerequisite の 4 項目を明示すること。
+    - final close report で authority uniqueness / historical boundary / future host extension / upstream verification prerequisite / dogfooding convergence の 5 項目を明示すること。
   - MUST NOT:
     - historical closed records を全面 rewrite しないこと。
     - issue-71 で閉じた verification 実行を再定義しないこと。
@@ -44,11 +44,12 @@ ID: "iss-00072"
   - issue-68 docs and report
   - issue-69 / issue-70 / issue-71 docs and reports
 - 現状理解:
-  - issue-70 で runtime authority は `install_root` に寄せる設計だが、legacy root とその参照は closeout tranche まで残る。
+  - issue-70 で runtime authority は `install_root` に寄せる設計で、`cli.py` の current execution path と provider-side authoritative manifest はすでに `install_root` を正本としている。
+  - 残っている主な矛盾は `tests/test_init_update.py` の legacy duplicate / parity assumptions、`AGENTS.md` の provider-side directory map、issue-72 / epic closeout docs の未充足である。
   - issue-71 で verification owner は閉じるが、authority uniqueness の final statement と docs/test cleanup owner はまだ残る。
   - historical issue/report/discussion を巻き込み始めると current authority cleanup の scope が不定になる。
 - 採用するパターン:
-  - final close を「authority surfaces の retire + docs corpus の deterministic review + final report aggregation」の 3 部構成で閉じる。
+  - final close を「current tests/guidance の authority retire + docs corpus の deterministic review + final report aggregation」の 3 部構成で閉じる。
   - historical records は rewrite せず、current docs corpus を列挙してそこだけを authoritative review 対象にする。
   - final report を non-circular close gate の一次証跡にする。
 - 採用しないもの:
@@ -56,11 +57,12 @@ ID: "iss-00072"
   - review verdict だけを acceptance criteria にすること
   - checked-in mirror のみを見て provider-side authority を確認したとみなすこと
 - 影響範囲:
-  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+  - `AGENTS.md`
   - authoritative / legacy manifest assets
-  - current tests
   - epic-00067 current docs
   - issue reports 69-72
+  - epic report / current closeout docs
 
 ## 採用方針 / トレードオフ
 - 論点:
@@ -105,7 +107,8 @@ ID: "iss-00072"
   - 最後に final close gate を issue-72 report に集約する。
 - sequencing implications:
   - issue-72 は issue-71 pass 後にしか実行しない。
-  - final epic spec review は issue-72 report が埋まってから行う。
+  - 最初に requirement/design/plan/report contract を固め、その後 tests/guidance cleanup を入れ、最後に epic/issue closeout docs を揃える。
+  - final epic spec review は issue-72 report と current closeout docs が埋まってから行う。
 
 ### UML（必須: module / dependency）
 ```plantuml
@@ -135,6 +138,7 @@ i72 --> final : close gate
   - current docs corpus contract
     - review corpus は次に固定する。
       - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/{requirement.md,design.md,plan.md}`
+      - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/report.md`
       - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-*/{requirement.md,design.md,report.md}`
       - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00069-*/{requirement.md,design.md,report.md}`
       - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-*/{requirement.md,design.md,report.md}`
@@ -156,10 +160,12 @@ i72 --> final : close gate
       - current docs corpus
     - allowed residual matches は次に限定する。
       - `src/spec_dock/assets/codex_skills/**`
+      - `tests/**` 内の historical regression coverage / inert duplicate classification / prior-issue evidence としての `codex_skills` mention
       - historical closed issue/report/discussion
       - current docs の historical boundary / legacy artifact と明示された節
     - forbidden residual matches は次に固定する。
-      - current code/tests/assets/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱うこと
+      - current code/tests/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱うこと
+      - current assets review で `codex_skills` が current metadata source として必要だと判定されること
   - final report contract
     - artifact path:
       - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/report.md`
@@ -187,7 +193,10 @@ i72 --> final : close gate
         - `epic_requirement_refs`
         - `epic_design_refs`
         - `epic_plan_refs`
+        - `epic_report_refs`
+        - `epic_report_status`
         - `issue68_refs`
+        - `issue68_evidence_status`
         - `issue69_refs`
         - `issue69_evidence_status`
         - `issue70_refs`
@@ -203,6 +212,9 @@ i72 --> final : close gate
         - `result`
     - optional post-review audit:
       - `spec_review_reference`
+    - pre-execution note:
+      - issue-72 prep phase では `issue-72 report` と `epic current report` が template / pending 状態で残っていてよい
+      - ただし S02 と S99 の gate を通るまでに、`epic current report` は evidence-bearing content へ更新されなければならない
   - final close gate
     - non-circular checks は次に固定する。
       - provider-side authority artifact が `install_root` に一致する
@@ -211,9 +223,11 @@ i72 --> final : close gate
       - issue-71 parity evidence は issue-72 で未変更の surface に対する補助参照としてのみ使われる
       - historical records は out-of-scope と current docs で区別されている
       - future host extension point が current model で説明されている
-      - epic-00067 `requirement.md` / `design.md` / `plan.md` と、issue-68 から issue-72 の `requirement.md` / `design.md` / `report.md` に限定した evidence chain に contradiction がない
+      - epic-00067 `requirement.md` / `design.md` / `plan.md` / `report.md` と、issue-68 から issue-72 の `requirement.md` / `design.md` / `report.md` に限定した evidence chain に contradiction がない
+      - epic current report refs が issue-72 report から辿れ、placeholder ではなく evidence-bearing content を持つ
       - issue-68 / issue-69 / issue-70 / issue-71 prerequisite refs が issue-72 report から辿れ、かつ upstream report section が placeholder ではなく evidence-bearing content と passing result を持つ
       - issue-71 verification prerequisite が report refs で辿れ、placeholder-only evidence ではない
+      - prep phase の spec review では epic current report の placeholder 状態を許容するが、S02 で status/evidence を埋める concrete implementation gate が plan に存在しなければならない
   - issue-68 traceability anchors
     - `issue68_refs` は少なくとも次の見出しを参照する
       - `iss-00068/requirement.md`:
@@ -263,9 +277,10 @@ Report --> Review
   - final-close gate mapping
 - Modify:
   - current docs under epic-00067 / issue-68..72 as needed
-  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+  - `AGENTS.md`
   - authoritative / checked-in manifest references if still legacy
-  - relevant tests asserting bundled authority paths
+  - epic / issue closeout reports if issue-72 acceptance traceability requires them
 - Delete:
   - legacy authority references from current code/tests/docs/assets
 - Move/Rename:
@@ -290,7 +305,7 @@ Report --> Review
   - 必要なら legacy authority path search helper / report completeness helper を補助実装として検証する。
 - Integration:
   - `tests/test_init_update.py` の authority path assertions 更新
-  - relevant CLI/runtime tests の current authority assertions 更新
+  - relevant CLI/runtime tests に current authority assertions が残る場合だけ、その更新
   - current docs corpus review
   - final report completeness check
 - E2E / manual:
