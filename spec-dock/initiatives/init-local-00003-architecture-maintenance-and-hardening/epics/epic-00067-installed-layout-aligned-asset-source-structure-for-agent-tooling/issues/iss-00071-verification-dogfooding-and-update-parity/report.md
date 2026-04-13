@@ -55,11 +55,56 @@ findings: []
 - `report.md` - 実装準備 evidence を初期化
 
 #### コミット
-- pending:
-  - docs readiness commit
+- `c076d43` `docs(issue): iss-00071の実装準備を確定`
 
 #### メモ
 - plan review は `pass`。plan front matter を `approved` に更新済み。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, EC-001
+
+#### 実施内容
+- checked-in `.agents/.codex/.github/.github/workflows` と provider-side `install_root` authoritative assets の parity を issue-71 名前空間の test で固定した。
+- issue-69 report の `package-parity-evidence` と issue-70 report の `handoff-validation-evidence` が evidence-bearing content を持ち、issue-71 final verification input として消費可能であることを test で確認した。
+- production code は変更せず、`tests/test_init_update.py` の verification surface 追加に閉じた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.027s
+
+OK
+```
+
+#### 変更したファイル
+- `tests/test_init_update.py`
+  - issue-71 checked-in agent-tooling parity test を追加
+  - issue-69 / issue-70 handoff evidence consumption test を追加
+  - markdown heading section extraction helper を test-local に追加
+
+#### レビュー
+- code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d867a-e4b8-7d30-b14f-1fbd8e3441d7`
+  - note:
+    - P0/P1 findings はなし
+    - residual risk として、report wording 依存の phrase/count assertion と heading prefix extraction の軽微な brittleness を記録
+
+#### コミット
+- pending:
+  - S01 verification tests commit
+
+#### メモ
+- issue-71 の `upstream-handoff-consumed` は issue-69 / issue-70 report の placeholder 不在と `result/pass` presence を confirmation source にしている。
 
 ---
 
