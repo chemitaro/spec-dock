@@ -3,7 +3,7 @@
 ID: "iss-00071"
 タイトル: "Verification dogfooding and update parity"
 関連GitHub: ["#71"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -279,13 +279,26 @@ tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_cal
   - note:
     - P0/P1 findings はなし
     - issue-71 closure evidence、convergence accounting、residual risk handling は current requirement/design boundary と整合
+- final spec review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - spec_reviewer `019d86bc-652b-7991-b25c-ee3b9348038e`
+  - note:
+    - residual risk boundary、update convergence evidence、issue-70 unmanaged-path prerequisite consumption、close-ready judgment が S99 gate で揃っていることを確認して承認
 
 #### コミット
-- pending:
-  - final evidence / convergence commit
+- `9870f17` `docs(verification): issue-71の収束証跡を更新`
 
 #### メモ
-- final spec review はこの S99 gate で継続中。pass 後に report front matter と final gate verdict を確定する。
+- S99 close-ready judgment:
+  - yes
+  - rationale:
+    - targeted verification suite pass
+    - `validate` / `sync` / `sync --github` pass
+    - `spec-dock update` 後の parity-managed surfaces に tracked drift が残らない
+    - unmanaged path preservation は issue-70 handoff evidence を prerequisite として明示消費済み
+    - full-suite failure は `commands/deps.py: domain.ids` の既知 residual risk 1 件に閉じる
 
 ---
 
@@ -382,6 +395,7 @@ tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_cal
   - S01 で handoff reports が evidence-bearing sections を持つことを再検証
   - S02 で runtime command surface を current bundle と manual command で再検証
   - S03 で installed package final smoke を isolated wheel install で再検証
+  - AC-002 の unmanaged-path preservation は issue-70 `handoff-validation-evidence` の current managed / obsolete managed boundary assertions を prerequisite として再接続し、issue-71 update diff では managed surfaces 以外の tracked prune が発生していないことを確認
 
 ## 省略/例外メモ (必須)
 - `python -m unittest discover -v` は `Ran 720 tests in 164.914s` のうち 1 件失敗した

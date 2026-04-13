@@ -143,9 +143,11 @@ ID: "iss-00071"
     - checked-in `spec-dock/` scaffold は runtime command verification を行う fixture surface として update 後に整合した状態へ収束する
     - checked-in dogfooding parity tests は pass する
     - user-authored unmanaged path が parity recovery の中で誤って prune されない
+    - 上記 unmanaged path preservation は `iss-00070` report の `handoff-validation-evidence` に含まれる current managed / obsolete managed boundary assertions を prerequisite evidence として消費し、issue-71 では `spec-dock update` 後の diff が managed surfaces に閉じることを再確認する
   - 観測点:
     - `tests/test_init_update.py`
     - checked-in filesystem assertions
+    - `iss-00070` report の `handoff-validation-evidence`
 
 - AC-003:
   - Actor:
