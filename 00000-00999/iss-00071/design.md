@@ -286,6 +286,11 @@ Installed --> Report
   - checked-in dogfooding parity と runtime fixture parity が混ざって scope が崩れる
   - mitigation:
     - `.agents/.codex/.github/.github/workflows` を parity-managed surface、`spec-dock/` を runtime fixture surfaceとして分離する
+- risk-5:
+  - full-suite sweep に `commands/deps.py` の `domain.ids` forbidden import が残り、issue-71 closure surface failure と誤認される
+  - mitigation:
+    - `validate` / `sync` / `sync --github`、checked-in dogfooding parity、isolated installed package smoke への波及有無を closure boundary として明文化する
+    - 上記 4 面に影響しない場合は issue-71 report に residual risk として記録し、structural cleanup は別 issue へ切り出す
 - rollback:
   - issue-71 の rollback は verification docs/tests/report wiring のみ
   - upstream installer/package contracts は rollback 対象外

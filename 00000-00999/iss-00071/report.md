@@ -191,11 +191,101 @@ OK
     - residual risk として、managed inventory 全件網羅は S01/S02 parity evidence に依存し、issue-69/70 helper 契約変更時の追随が必要
 
 #### コミット
-- pending:
-  - S03 installed package smoke commit
+- `7324dd4` `test(installer): issue-71のinstalled smokeを追加`
 
 #### メモ
 - S03 は closure matrix 上の installed-package-verification を閉じる代表 smoke であり、detailed package parity は issue-69 / issue-70 handoff evidence を前提にする。
+
+---
+
+### 2026-04-13 00:00 - 00:00
+
+#### 対象
+- Step: S90/S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002
+
+#### 実施内容
+- issue-71 targeted verification suite 6 件を通し、checkout parity / runtime bundle / installed package smoke を一括で再確認した。
+- checked-in dogfooding runtime に対して `validate` / `sync` / `sync --github` を手動実行し、runtime command surface が install-shaped layout と矛盾しないことを確認した。
+- `uv run python -m spec_dock.cli update .` を実行し、checked-in dogfooding workspace の収束差分を観測した。
+- full-suite informational sweep を走らせ、既知の `commands/deps.py: domain.ids` forbidden import failure 1 件のみが残ることを確認した。
+- final code review を再実施し、closure evidence / convergence accounting / residual risk handling が issue-71 の境界条件と整合することを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections tests.test_init_update.TestInitUpdate.test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback tests.cli_runtime.test_sync.TestCliSync.test_issue_71_runtime_bundle_validate_sync_and_sync_github_surface tests.cli_runtime.test_validate.TestCliValidate.test_issue_71_runtime_bundle_missing_required_artifact_fail_fast tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_issue_71_runtime_bundle_sync_force_degraded_path
+
+----------------------------------------------------------------------
+Ran 6 tests in 4.279s
+
+OK
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock sync
+./spec-dock/scripts/spec-dock sync --github
+
+spec-dock: ok (validate) nodes=29
+spec-dock: ok (sync)
+spec-dock: ok (sync)
+```
+
+```bash
+uv run python -m spec_dock.cli update .
+git diff --name-status HEAD -- spec-dock/docs
+
+spec-dock: ok (update) -> /srv/mount/spec-dock
+D  spec-dock/docs/spec-dock-guide-old.md
+D  spec-dock/docs/spec-dock-guide.md
+D  spec-dock/docs/sync.md
+D  spec-dock/docs/workflow-adr.md
+D  spec-dock/docs/workflow-issue.md
+```
+
+```bash
+python -m unittest discover -v
+
+----------------------------------------------------------------------
+Ran 720 tests in 164.914s
+
+FAILED (failures=1)
+
+only failure:
+tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression
+-> forbidden import in src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py: domain.ids
+```
+
+#### 変更したファイル
+- `requirement.md`
+  - scope-out residual risk boundary を明文化
+- `design.md`
+  - `commands/deps.py` structural regression の扱いを risk / mitigation として固定
+- `report.md`
+  - final verification evidence、update convergence before/after、residual risk、review gate 記録を追加
+- `spec-dock/docs/spec-dock-guide-old.md`
+- `spec-dock/docs/spec-dock-guide.md`
+- `spec-dock/docs/sync.md`
+- `spec-dock/docs/workflow-adr.md`
+- `spec-dock/docs/workflow-issue.md`
+  - `spec-dock update .` により deprecated / historical alias docs が checked-in dogfooding workspace から prune された
+
+#### レビュー
+- final code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d86a9-5e54-79d2-b40e-ee0120126e89`
+  - note:
+    - P0/P1 findings はなし
+    - issue-71 closure evidence、convergence accounting、residual risk handling は current requirement/design boundary と整合
+
+#### コミット
+- pending:
+  - final evidence / convergence commit
+
+#### メモ
+- final spec review はこの S99 gate で継続中。pass 後に report front matter と final gate verdict を確定する。
 
 ---
 
@@ -206,54 +296,115 @@ OK
     - requirement/design/plan で scope-out 条件を限定し、final report に residual risk として記録する運用へ整理した。
 
 ## 学んだこと (任意)
-- ...
-- ...
+- closure issue を verification 専用に切り分けることで、production code を増やさずに contract closure と残存リスクの分離を明確にできた。
+- installed package / checked-in dogfooding / runtime command の 3 面をそれぞれ独立した evidence として残すと、full-suite 側の非対象 failure が混ざっても close 判定を安定化できる。
 
 ## 今後の推奨事項 (任意)
-- ...
-- ...
+- full-suite を green に揃える次の work item では、`commands/deps.py` の `domain.ids` import を commands/application boundary に戻す structural repair を別 issue で扱うとよい。
+- issue 連鎖で handoff evidence を使う場合は、今回のような evidence-bearing section contract を継続し、placeholder を残さない運用を維持すると downstream issue が閉じやすい。
 
 ## checkout-verification (必須)
 - suite_or_command:
-  - pending_until_execution
+  - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections`
 - target_surface:
-  - pending_until_execution
+  - checked-in `.agents/`, `.codex/`, `.github/`, `.github/workflows/` と provider-side `src/spec_dock/assets/install_root/` authoritative asset parity
+  - issue-69 / issue-70 report の handoff evidence-bearing sections 消費可能性
 - result:
-  - pending_until_execution
+  - pass
 
 ## runtime-command-verification (必須)
 - command_family:
-  - pending_until_execution
+  - `validate`
+  - `sync`
+  - `sync --github`
+  - required artifact 欠落時 fail-fast
+  - `sync --force` degraded path
 - fixture_or_test:
-  - pending_until_execution
+  - `python -m unittest -v tests.cli_runtime.test_sync.TestCliSync.test_issue_71_runtime_bundle_validate_sync_and_sync_github_surface tests.cli_runtime.test_validate.TestCliValidate.test_issue_71_runtime_bundle_missing_required_artifact_fail_fast tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_issue_71_runtime_bundle_sync_force_degraded_path`
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock sync --github`
 - result:
-  - pending_until_execution
+  - pass
 
 ## installed-package-verification (必須)
 - isolated_env_contract:
-  - pending_until_execution
+  - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback`
+  - non-editable isolated install
+  - `PYTHONPATH` / `PYTHONHOME` なし
 - no_fallback_confirmation:
-  - pending_until_execution
+  - `sys_path_has_repo_root == False`
+  - current sources は `install_root/` 配下のみ
+  - `codex_skills/` fallback 不使用
+  - current managed reflection / obsolete managed prune / custom unmanaged path preservation を確認
 - result:
-  - pending_until_execution
+  - pass
 
 ## dogfooding-parity (必須)
 - surface:
-  - pending_until_execution
+  - parity-managed surface:
+    - checked-in `.agents/`
+    - checked-in `.codex/`
+    - checked-in `.github/`
+    - checked-in `.github/workflows/`
+  - fixture surface:
+    - checked-in `spec-dock/`
 - before_after_summary:
-  - pending_until_execution
+  - before: issue-71 docs 更新後の `git status --short -- .agents .codex .github .github/workflows spec-dock` では issue docs 3 files 以外の tracked drift は観測されなかった
+  - command: `uv run python -m spec_dock.cli update .`
+  - after: `spec-dock: ok (update) -> /srv/mount/spec-dock`
+  - after parity-managed surface: `git diff --name-status HEAD -- .agents .codex .github .github/workflows` は空で、agent-tooling / workflow managed surface に tracked drift は残らなかった
+  - after fixture surface: `git diff --name-status HEAD -- spec-dock` では issue docs 3 files 更新に加えて `spec-dock/docs/` の deprecated / historical alias files 5 件の `D` のみが観測された
+  - after: `git diff --name-status HEAD -- spec-dock/docs` では次の 5 files の `D` のみが観測され、tracked managed additions は発生しなかった
+  - after: checked-in `spec-dock/docs/` の deprecated / historical alias files だけが prune され、current provider-side authoritative assets に存在しない stale managed docs が収束した
+  - converged removals:
+    - `spec-dock/docs/spec-dock-guide-old.md`
+    - `spec-dock/docs/spec-dock-guide.md`
+    - `spec-dock/docs/sync.md`
+    - `spec-dock/docs/workflow-adr.md`
+    - `spec-dock/docs/workflow-issue.md`
 - result:
-  - pending_until_execution
+  - pass
 
 ## upstream-handoff-consumed (必須)
 - issue69_refs:
-  - pending_until_execution
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00069-package-data-and-installed-artifact-parity/report.md`
+  - section: `package-parity-evidence`
 - issue70_refs:
-  - pending_until_execution
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/report.md`
+  - section: `handoff-validation-evidence`
 - consumed_subchecks:
-  - pending_until_execution
+  - issue-69 installed artifact parity evidence
+  - issue-69 isolated package smoke evidence
+  - issue-70 install_root discovery / managed ownership evidence
+  - issue-70 cutover / obsolete cleanup evidence
 - reverified_in_issue71:
-  - pending_until_execution
+  - S01 で handoff reports が evidence-bearing sections を持つことを再検証
+  - S02 で runtime command surface を current bundle と manual command で再検証
+  - S03 で installed package final smoke を isolated wheel install で再検証
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- `python -m unittest discover -v` は `Ran 720 tests in 164.914s` のうち 1 件失敗した
+- 失敗: `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
+- 原因: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` の `domain.ids` forbidden import
+- requirement / design / plan の契約どおり、この failure は `validate` / `sync` / `sync --github`、checked-in dogfooding parity、installed package smoke を壊さない限り issue-71 closure blocker ではなく、full-suite residual risk として scope-out する
+
+## 最終検証 (必須)
+- targeted issue-71 verification suite:
+  - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections tests.test_init_update.TestInitUpdate.test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback tests.cli_runtime.test_sync.TestCliSync.test_issue_71_runtime_bundle_validate_sync_and_sync_github_surface tests.cli_runtime.test_validate.TestCliValidate.test_issue_71_runtime_bundle_missing_required_artifact_fail_fast tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_issue_71_runtime_bundle_sync_force_degraded_path`
+  - result: `Ran 6 tests in 4.279s` / `OK`
+- manual runtime verification:
+  - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=29`
+  - `./spec-dock/scripts/spec-dock sync` -> `spec-dock: ok (sync)`
+  - `./spec-dock/scripts/spec-dock sync --github` -> `spec-dock: ok (sync)`
+- dogfooding update convergence:
+  - `uv run python -m spec_dock.cli update .` -> `spec-dock: ok (update) -> /srv/mount/spec-dock`
+  - `git diff --name-status HEAD -- .agents .codex .github .github/workflows` -> empty
+  - parity-managed surfaces には tracked drift が残らなかった
+  - `git diff --name-status HEAD -- spec-dock` -> issue docs 3 files update + `spec-dock/docs` 5 deletions
+  - `git diff --name-status HEAD -- spec-dock/docs` -> 5 deletions only
+  - stale checked-in deprecated docs only were pruned; no tracked managed drift was introduced outside that convergence set
+- full-suite informational sweep:
+  - `python -m unittest discover -v`
+  - result: `Ran 720 tests in 164.914s` / `FAILED (failures=1)`
+  - only failure: `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
