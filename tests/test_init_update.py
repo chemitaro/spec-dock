@@ -1048,6 +1048,11 @@ class TestInitUpdate(CliRuntimeHarness):
     def _assert_copilot_orchestrator_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("name: orchestrator", text, f"copilot orchestrator name missing ({shim_label})")
         self.assertIn("user-invocable: true", text, f"copilot orchestrator must be user-invocable ({shim_label})")
+        self.assertNotIn(
+            "disable-model-invocation: true",
+            text,
+            f"copilot orchestrator must keep model invocation enabled ({shim_label})",
+        )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
@@ -8033,6 +8038,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for required_target in (
                 ".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 ".agents/host-adapters/meta.json",
+                ".codex/config.toml",
                 ".codex/agents/spec-manager.toml",
                 ".github/agents/orchestrator.agent.md",
                 ".github/workflows/ci.yml",
@@ -8042,6 +8048,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     current_targets,
                     f"issue-70 installed plan is missing required managed target: {required_target}",
                 )
+            self.assertNotIn(
+                ".codex/agents/orchestrator.toml",
+                current_targets,
+                "issue-70 installed plan should not generate codex direct orchestrator target",
+            )
             self.assertIn(
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 obsolete_targets,
@@ -8061,9 +8072,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 ".github/agents/orchestrator.agent.md",
                 ".github/workflows/ci.yml",
             )
+            bootstrap_only_rel_path = ".codex/config.toml"
             expected_managed_bytes = {
                 rel_path: (install_root / rel_path).read_bytes() for rel_path in managed_rel_paths
             }
+            expected_bootstrap_only_bytes = (install_root / bootstrap_only_rel_path).read_bytes()
 
             legacy_skill_duplicate = (
                 installed_assets_dir / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
@@ -8094,11 +8107,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     expected_bytes,
                     f"isolated init did not reflect installed install_root asset for: {rel_path}",
                 )
+            bootstrap_only_target = target_repo / bootstrap_only_rel_path
+            self.assertTrue(
+                bootstrap_only_target.is_file(),
+                f"missing bootstrap-only file after isolated init: {bootstrap_only_target}",
+            )
+            self.assertEqual(
+                bootstrap_only_target.read_bytes(),
+                expected_bootstrap_only_bytes,
+                "isolated init did not copy bootstrap-only codex config from install_root",
+            )
 
             for rel_path in managed_rel_paths:
                 self._write_text_force(target_repo / rel_path, f"issue-70 stale managed payload: {rel_path}\n")
+            bootstrap_only_custom_text = "# issue-70 user edited codex config must survive update\n"
+            self._write_text_force(bootstrap_only_target, bootstrap_only_custom_text)
 
             obsolete_paths = (
+                ".codex/agents/spec-dock.toml",
+                ".github/agents/spec-dock.agent.md",
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 ".github/agents/spec-dock-copilot-adapter.agent.md",
             )
@@ -8131,6 +8158,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     expected_bytes,
                     f"isolated update did not reflect installed install_root asset for: {rel_path}",
                 )
+            self.assertEqual(
+                bootstrap_only_target.read_text(encoding="utf-8"),
+                bootstrap_only_custom_text,
+                "isolated update should preserve user-edited bootstrap-only codex config",
+            )
+            self.assertFalse(
+                (target_repo / ".codex/agents/orchestrator.toml").exists(),
+                "isolated update should not generate codex direct orchestrator",
+            )
 
             for rel_path in obsolete_paths:
                 self.assertFalse(
@@ -8152,43 +8188,63 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
     def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        parity_pairs = (
-            (
-                ".agents/host-adapters/meta.json",
-                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-            ),
-            (
-                ".codex/agents/spec-manager.toml",
-                "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
-            ),
-            (
-                ".github/agents/orchestrator.agent.md",
-                "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",
-            ),
-            (
-                ".github/workflows/ci.yml",
-                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
-            ),
+        install_root = repo_root / "src" / "spec_dock" / "assets" / "install_root"
+        mirrored_prefixes = (
+            Path(".agents/host-adapters/meta.json"),
+            Path(".agents/skills"),
+            Path(".codex"),
+            Path(".github/agents"),
+            Path(".github/workflows/ci.yml"),
+        )
+        provider_rel_paths: set[str] = set()
+        checked_in_rel_paths: set[str] = set()
+
+        for rel_prefix in mirrored_prefixes:
+            provider_prefix_path = install_root / rel_prefix
+            checked_in_prefix_path = repo_root / rel_prefix
+
+            if provider_prefix_path.is_file():
+                provider_rel_paths.add(rel_prefix.as_posix())
+            else:
+                self.assertTrue(
+                    provider_prefix_path.is_dir(),
+                    f"issue-71 missing provider parity directory: {provider_prefix_path}",
+                )
+                provider_rel_paths.update(
+                    path.relative_to(install_root).as_posix()
+                    for path in provider_prefix_path.rglob("*")
+                    if path.is_file()
+                )
+
+            if checked_in_prefix_path.is_file():
+                checked_in_rel_paths.add(rel_prefix.as_posix())
+            else:
+                self.assertTrue(
+                    checked_in_prefix_path.is_dir(),
+                    f"issue-71 missing checked-in parity directory: {checked_in_prefix_path}",
+                )
+                checked_in_rel_paths.update(
+                    path.relative_to(repo_root).as_posix()
+                    for path in checked_in_prefix_path.rglob("*")
+                    if path.is_file()
+                )
+
+        self.assertEqual(
+            checked_in_rel_paths,
+            provider_rel_paths,
+            "issue-71 checked-in host-pack parity file inventory diverged from install_root",
         )
 
-        for checked_in_rel, provider_asset_rel in parity_pairs:
-            with self.subTest(checked_in=checked_in_rel, provider_asset=provider_asset_rel):
-                checked_in_path = repo_root / checked_in_rel
-                provider_asset_path = repo_root / provider_asset_rel
-                self.assertTrue(
-                    checked_in_path.is_file(),
-                    f"issue-71 missing checked-in parity target: {checked_in_path}",
-                )
-                self.assertTrue(
-                    provider_asset_path.is_file(),
-                    f"issue-71 missing provider parity source: {provider_asset_path}",
-                )
+        for rel_path in sorted(provider_rel_paths):
+            with self.subTest(rel_path=rel_path):
+                checked_in_path = repo_root / rel_path
+                provider_asset_path = install_root / rel_path
                 self.assertEqual(
                     checked_in_path.read_bytes(),
                     provider_asset_path.read_bytes(),
                     (
                         "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
-                        f"{checked_in_rel}"
+                        f"{rel_path}"
                     ),
                 )
 
@@ -8433,8 +8489,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             codex_path = target / ".codex" / "agents" / "spec-manager.toml"
             copilot_path = target / ".github" / "agents" / "orchestrator.agent.md"
+            codex_orchestrator_path = target / ".codex" / "agents" / "orchestrator.toml"
             self.assertTrue(codex_path.is_file(), f"missing generated codex native shim: {codex_path}")
             self.assertTrue(copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}")
+            self.assertFalse(
+                codex_orchestrator_path.exists(),
+                f"codex direct orchestrator should not be generated: {codex_orchestrator_path}",
+            )
             self.assertEqual(
                 codex_path.read_bytes(),
                 expected_codex_bytes,
@@ -8622,8 +8683,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             managed_codex_path = target / ".codex" / "agents" / "spec-manager.toml"
             managed_copilot_path = target / ".github" / "agents" / "orchestrator.agent.md"
+            managed_codex_config_path = target / ".codex" / "config.toml"
+            expected_codex_config = (
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "config.toml"
+            ).read_bytes()
             obsolete_codex_path = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
             obsolete_copilot_path = target / ".github" / "agents" / "spec-dock-copilot-adapter.agent.md"
+            obsolete_old_codex_path = target / ".codex" / "agents" / "spec-dock.toml"
+            obsolete_old_copilot_path = target / ".github" / "agents" / "spec-dock.agent.md"
             custom_codex_path = target / ".codex" / "agents" / "custom-reviewer.toml"
             custom_copilot_path = target / ".github" / "agents" / "custom-reviewer.agent.md"
             custom_skill_path = target / ".agents" / "skills" / "custom-reviewer" / "SKILL.md"
@@ -8631,14 +8698,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             stale_managed_codex = b"name = \"stale-managed\"\n"
             stale_managed_copilot = b"# stale managed copilot shim\n"
+            bootstrap_only_codex_config = "# user custom codex config should survive update\n"
             custom_codex_content = "name = \"custom-reviewer\"\n"
             custom_copilot_content = "# custom reviewer copilot agent\n"
             custom_skill_content = "# custom skill that must be preserved\n"
 
             self._write_text_force(managed_codex_path, stale_managed_codex.decode("utf-8"))
             self._write_text_force(managed_copilot_path, stale_managed_copilot.decode("utf-8"))
+            self._write_text_force(managed_codex_config_path, bootstrap_only_codex_config)
             self._write_text_force(obsolete_codex_path, "obsolete managed codex shim\n")
             self._write_text_force(obsolete_copilot_path, "obsolete managed copilot shim\n")
+            self._write_text_force(obsolete_old_codex_path, "obsolete old canonical codex shim\n")
+            self._write_text_force(obsolete_old_copilot_path, "obsolete old canonical copilot shim\n")
             self._write_text_force(custom_codex_path, custom_codex_content)
             self._write_text_force(custom_copilot_path, custom_copilot_content)
             custom_skill_path.parent.mkdir(parents=True, exist_ok=True)
@@ -8676,8 +8747,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 },
                 "obsolete_managed_fixture_pruned": {
                     "expected": "obsolete managed fixtures are removed",
-                    "observed": f"codex_exists={obsolete_codex_path.exists()}, copilot_exists={obsolete_copilot_path.exists()}",
-                    "pass": (not obsolete_codex_path.exists()) and (not obsolete_copilot_path.exists()),
+                    "observed": (
+                        f"codex_exists={obsolete_codex_path.exists()}, "
+                        f"copilot_exists={obsolete_copilot_path.exists()}, "
+                        f"old_codex_exists={obsolete_old_codex_path.exists()}, "
+                        f"old_copilot_exists={obsolete_old_copilot_path.exists()}"
+                    ),
+                    "pass": (not obsolete_codex_path.exists())
+                    and (not obsolete_copilot_path.exists())
+                    and (not obsolete_old_codex_path.exists())
+                    and (not obsolete_old_copilot_path.exists()),
+                },
+                "bootstrap_only_codex_config_preserved": {
+                    "expected": "bootstrap-only codex config should keep user-edited content",
+                    "observed": (
+                        managed_codex_config_path.read_text(encoding="utf-8")
+                        if managed_codex_config_path.is_file()
+                        else None
+                    ),
+                    "pass": managed_codex_config_path.is_file()
+                    and managed_codex_config_path.read_text(encoding="utf-8") == bootstrap_only_codex_config
+                    and managed_codex_config_path.read_bytes() != expected_codex_config,
                 },
                 "unknown_custom_fixture_preserved": {
                     "expected": "unknown custom native shims and custom skill are preserved",
@@ -8714,6 +8804,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     "managed_codex_shim_generated_or_updated",
                     "managed_copilot_shim_generated_or_updated",
                     "obsolete_managed_fixture_pruned",
+                    "bootstrap_only_codex_config_preserved",
                     "unknown_custom_fixture_preserved",
                     "baseline_skill_and_metadata_untouched",
                 )

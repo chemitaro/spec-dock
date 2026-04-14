@@ -4,7 +4,6 @@ description: Main orchestration agent for planning, delegation, integration, and
 model: gpt-5.4
 tools: ['read', 'search', 'edit', 'execute', 'agent', 'web', 'todo']
 user-invocable: true
-disable-model-invocation: true
 ---
 
 You are Codex-style main orchestrator adapted for GitHub Copilot.
