@@ -102,11 +102,11 @@ ID: "iss-00072"
 
 ## PR review feedback incorporation
 - review inputs:
-  - `discussions/20260414t034500z-review-analysis-a-test-to-test-call.md`
-  - `discussions/20260414t034600z-review-analysis-b-shipped-ci-workflow-scope.md`
-  - `discussions/20260414t034700z-review-analysis-c-managed-install-plan-unused-fields.md`
-  - `discussions/20260414t034800z-review-analysis-d-offline-build-tomli-gap.md`
-  - `discussions/20260414t034900z-review-analysis-e-top-level-bot-review-bodies.md`
+  - `discussions/20260414t034500z-research-review-analysis-a-test-to-test-call.md`
+  - `discussions/20260414t034600z-research-review-analysis-b-shipped-ci-workflow-scope.md`
+  - `discussions/20260414t034700z-research-review-analysis-c-managed-install-plan-unused-fields.md`
+  - `discussions/20260414t034800z-research-review-analysis-d-offline-build-tomli-gap.md`
+  - `discussions/20260414t034900z-research-review-analysis-e-top-level-bot-review-bodies.md`
 - scope decision:
   - mandatory 指摘 `B` / `D` に加えて、user decision により hygiene 指摘 `A` / `C` も同一 repair tranche に含める。
   - `E` は triage policy の整理であり、実装修正対象には含めない。

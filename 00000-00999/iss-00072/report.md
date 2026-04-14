@@ -290,6 +290,97 @@ informational sweep:
 ## 今後の推奨事項 (任意)
 - issue-72 実装では、historical artifact の physical existence と current authority assertion の禁止を混同しないこと。
 
+### 2026-04-14 00:00 - 00:00
+
+#### 対象
+- Step: S03
+- AC/EC: AC-001, AC-004
+
+#### 実施内容
+- PR review analyses A-D に基づく remediation を実装した。
+- `tests/presentation_runtime/test_runtime_sync_s07.py` では、test-to-test call を private helper へ抽出し、public test 名と issue traceability を維持したまま `A` を解消した。
+- `src/spec_dock/assets/install_root/.github/workflows/ci.yml` では、provider repo 固有の `pip install .` / `tests/test_cli.py` 前提を除去し、managed repo 一般で自己完結する runtime command ベースの local validation へ置換した。さらに code review で指摘された execute-bit 依存も外し、`python3 ./spec-dock/scripts/spec-dock ...` 形式へ修正した。
+- dogfooding mirror `.github/workflows/ci.yml` を provider source と同期し、byte parity を維持した。
+- provider repo 側の CI coverage regression を避けるため、shipped workflow と分離した root-only workflow `.github/workflows/provider-ci.yml` を追加した。
+- `src/spec_dock/cli.py` では `_ManagedSkillInstallPlan` から apply path で未使用の field を除去し、builder 内 local validation data と plan shape を分離して `C` を解消した。
+- `tests/test_init_update.py` と wheelhouse fixtures では、issue-69 hermetic backend contract に `tomli==2.2.1` と `tomli-2.2.1-py3-none-any.whl` を追加し、Python 3.10 fresh venv + `--no-index` backend install を成立させて `D` を解消した。
+- review analysis discussion filename は命名規約に従う `*-research-*` 形式へ正規化し、`spec-dock validate` が通る状態へ収束させた。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_sync_force_placeholder_and_deps_error_regression \
+  tests.presentation_runtime.test_runtime_sync_s07.TestRuntimeSyncS07.test_issue_71_runtime_bundle_sync_force_degraded_path
+
+Ran 2 tests ... OK
+```
+
+```bash
+python -m unittest -v \
+  tests.test_init_update.TestInitUpdate.test_issue_68_workflow_seed_matches_repo_root_ci_workflow \
+  tests.test_init_update.TestInitUpdate.test_issue_68_provider_only_workflow_is_not_shipped_via_install_root \
+  tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets \
+  tests.test_init_update.TestInitUpdate.test_issue_68_authoritative_inventory_paths_are_classified_under_install_root \
+  tests.test_init_update.TestInitUpdate.test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates \
+  tests.test_init_update.TestInitUpdate.test_issue_70_build_plan_uses_install_root_recursive_inventory_including_workflow \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only \
+  tests.test_init_update.TestInitUpdate.test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback
+
+Ran 8 tests ... OK
+```
+
+```bash
+uv venv --python 3.10 --seed <tmp>/py310
+<tmp>/py310/bin/python -m pip install --no-index --no-cache-dir --find-links tests/fixtures/wheelhouse \
+  build==1.2.2 packaging==24.2 pyproject_hooks==1.2.0 setuptools==75.8.0 tomli==2.2.1 wheel==0.45.1
+
+Python 3.10 fresh venv + --no-index backend install: OK
+```
+
+```bash
+python -m unittest discover -v
+Ran 726 tests in 138.572s
+OK
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=29
+```
+
+#### 変更したファイル
+- `/srv/mount/spec-dock/tests/presentation_runtime/test_runtime_sync_s07.py`
+- `/srv/mount/spec-dock/src/spec_dock/assets/install_root/.github/workflows/ci.yml`
+- `/srv/mount/spec-dock/.github/workflows/ci.yml`
+- `/srv/mount/spec-dock/.github/workflows/provider-ci.yml`
+- `/srv/mount/spec-dock/src/spec_dock/cli.py`
+- `/srv/mount/spec-dock/tests/test_init_update.py`
+- `/srv/mount/spec-dock/tests/fixtures/wheelhouse/tomli-2.2.1-py3-none-any.whl`
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/design.md`
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/discussions/*`
+
+#### コミット
+- docs commit:
+  - `76bd2853e3772bc89ff57f61578498673d07d7d1`
+  - `docs(issue-72): review 指摘を仕様書へ反映`
+- implementation commit:
+  - 未実施
+
+#### メモ
+- S03 code review:
+  - initial verdict:
+    - `fail`
+  - corrective action:
+    - managed workflow を `python3` invocation へ変更
+    - provider-only workflow を root `.github/workflows/provider-ci.yml` として追加
+  - fresh verdict:
+    - `pass`
+- fresh spec review:
+  - verdict:
+    - `pass`
+  - note:
+    - S03 sequencing と residual scope-gate の blocking 指摘解消後、実装可能な spec として承認された
+
 ## authority-uniqueness (必須)
 - provider_authority_artifacts:
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` を provider-side authoritative manifest として確認した。
@@ -421,7 +512,9 @@ informational sweep:
     - `python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_deps_s04`
     - `Ran 106 tests in 32.476s` / `OK`
     - `python -m unittest discover -v`
-    - `Ran 725 tests in 153.918s` / `OK`
+    - `Ran 726 tests in 138.572s` / `OK`
+    - `./spec-dock/scripts/spec-dock validate`
+    - `spec-dock: ok (validate) nodes=29`
 - result:
   - final close gate evidence は current metadata drift 修正、current / obsolete managed symlink safety fix、guidance authority cleanup、full-suite residual repair、full suite green 確認、fresh final code review / spec review pass まで更新済みであり、issue-72 は close-ready である。
 
