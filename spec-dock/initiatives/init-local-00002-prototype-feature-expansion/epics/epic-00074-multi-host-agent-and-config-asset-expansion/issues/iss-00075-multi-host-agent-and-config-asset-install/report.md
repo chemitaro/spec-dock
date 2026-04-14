@@ -13,8 +13,11 @@ ID: "iss-00075"
 # iss-00075 Multi host agent and config asset install — 実装報告（LOG）
 
 ## 実装サマリー
-- issue を作成し、active 化の前提となる issue docs を approved 状態へ整えた。
-- 実装本体は未着手で、現在は issue creation / readiness の段階である。
+- `install_root` を正本として、Codex/Copilot の multi-host agent/config inventory を追加した。
+- `spec-manager` canonical specialist を導入し、Copilot primary を `orchestrator.agent.md` に固定した。
+- installer に `bootstrap_only_exact_file_paths` を追加し、`.codex/config.toml` を init 生成 / update preserve へ変更した。
+- obsolete managed paths（旧 `spec-dock` canonical など）の prune 契約を metadata と tests で固定した。
+- dogfooding parity のため repo root `.agents/.codex/.github` を install_root と整合する状態に更新した。
 
 ## 実装記録（セッションログ）
 
@@ -52,3 +55,57 @@ ID: "iss-00075"
 
 #### メモ
 - この report は issue creation の readiness evidence を残すための初期記録であり、実装実績はまだない。
+
+### 2026-04-15 00:00 - 00:00
+
+#### 対象
+- Step: S01 / S90 / S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002, EC-003
+
+#### 実施内容
+- `src/spec_dock/assets/install_root/` に Codex managed inventory、Copilot managed inventory、shared skills（`git-commit-conventional-ja` / `github-codex-pr-review-comments` / `github-pr-creator`）を追加。
+- `spec-manager` canonical specialist を新規配置し、旧 `spec-dock` specialist assets を install_root から除去。
+- `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` を最小拡張し、`bootstrap_only_exact_file_paths` と obsolete list を更新。
+- `src/spec_dock/cli.py` に bootstrap-only path 解釈と copy preserve を追加し、canonical target constants を更新。
+- `tests/test_init_update.py` と `tests/cli_runtime/harness.py` を新 inventory/canonical/bootstrap 契約に整合させた。
+- repo root `.agents/.codex/.github` を install_root mirror に同期し、dogfooding parity を維持。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update -f
+# OK (151 tests)
+
+python -m unittest tests.test_cli tests.cli_runtime.test_active tests.cli_runtime.test_deps tests.cli_runtime.test_import tests.cli_runtime.test_new tests.cli_runtime.test_sync tests.cli_runtime.test_validate
+# OK (248 tests)
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=31
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
+- `src/spec_dock/assets/install_root/.agents/skills/git-commit-conventional-ja/**`
+- `src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/**`
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/**`
+- `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+- `src/spec_dock/assets/install_root/.codex/config.toml`
+- `src/spec_dock/assets/install_root/.codex/agents/*.toml`（`spec-manager.toml` 含む）
+- `src/spec_dock/assets/install_root/.github/agents/*.agent.md`（`orchestrator.agent.md`, `spec-manager.agent.md` 含む）
+- `src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml`（削除）
+- `src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md`（削除）
+- `src/spec_dock/cli.py`
+- `tests/cli_runtime/harness.py`
+- `tests/test_init_update.py`
+- `.agents/**`, `.codex/**`, `.github/agents/**`, `.agents/host-adapters/meta.json`（dogfooding parity mirror）
+
+#### レビュー
+- spec review:
+  - pass（issue docs）
+- code/test review:
+  - targeted test suite pass
+
+#### コミット
+- pending
+
+#### メモ
+- Copilot orchestrator は static delegation shim ではないため、テストを orchestrator contract 検証へ更新した。

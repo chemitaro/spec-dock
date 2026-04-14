@@ -34,6 +34,9 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",
     "spec-dock-copilot-adapter",
+    "git-commit-conventional-ja",
+    "github-codex-pr-review-comments",
+    "github-pr-creator",
 )
 _LEGACY_MANAGED_SKILL_NAMES = ("spec-driven-tdd-workflow",)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (
@@ -60,8 +63,8 @@ _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_ENTRY_FILES = {
     "copilot": Path(".agents/skills/spec-dock-copilot-adapter/SKILL.md"),
 }
 _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_TARGET_FILES = {
-    "codex": Path(".codex/agents/spec-dock.toml"),
-    "copilot": Path(".github/agents/spec-dock.agent.md"),
+    "codex": Path(".codex/agents/spec-manager.toml"),
+    "copilot": Path(".github/agents/orchestrator.agent.md"),
 }
 _REQUIRED_MANAGED_NATIVE_SHIM_CANONICAL_DELEGATES_TO = {
     "codex": Path(".agents/skills/spec-dock-codex-adapter/SKILL.md"),
@@ -783,6 +786,7 @@ class _ManagedCurrentFileMapping(NamedTuple):
 
 class _ManagedSkillInstallPlan(NamedTuple):
     current_file_mappings: tuple[_ManagedCurrentFileMapping, ...]
+    bootstrap_only_rel_paths: tuple[Path, ...]
     obsolete_exact_rel_paths: tuple[Path, ...]
 
 
@@ -843,42 +847,10 @@ def _build_obsolete_exact_rel_paths(
 
     obsolete_rel_paths: list[Path] = []
     for obsolete in obsolete_raw:
-        if not isinstance(obsolete, str) or not obsolete.strip():
-            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
-
-        obsolete_norm = obsolete.strip()
-        obsolete_rel = Path(obsolete_norm)
-        if re.match(r"^[A-Za-z]:", obsolete_norm) or obsolete_norm.startswith(("/", "\\")):
-            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
-        if "\\" in obsolete_norm:
-            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
-        if obsolete_rel.is_absolute() or ".." in obsolete_rel.parts:
-            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
-        if obsolete_norm.endswith("/"):
-            raise RuntimeError(
-                "invalid managed_assets.obsolete_exact_file_paths item "
-                f"(must be exact file path): '{obsolete_norm}'"
-            )
-        if any(token in obsolete_norm for token in ("*", "?", "[", "]", "{", "}")):
-            raise RuntimeError(
-                "invalid managed_assets.obsolete_exact_file_paths item "
-                f"(must be exact file path): '{obsolete_norm}'"
-            )
-
-        normalized_parts = tuple(part for part in obsolete_rel.parts if part not in ("", "."))
-        if not normalized_parts:
-            raise RuntimeError(
-                "invalid managed_assets.obsolete_exact_file_paths item "
-                f"(must be exact file path): '{obsolete_norm}'"
-            )
-        normalized_rel = Path(*normalized_parts)
-        if normalized_rel.as_posix() != obsolete_norm:
-            raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
-        if normalized_rel.suffix == "":
-            raise RuntimeError(
-                "invalid managed_assets.obsolete_exact_file_paths item "
-                f"(must be exact file path): '{normalized_rel.as_posix()}'"
-            )
+        normalized_rel = _normalize_exact_file_path_from_manifest(
+            obsolete,
+            field_name="managed_assets.obsolete_exact_file_paths",
+        )
         if not _is_within_managed_obsolete_exact_path_prefixes(normalized_rel):
             raise RuntimeError("invalid managed_assets.obsolete_exact_file_paths item")
         if normalized_rel in current_target_paths:
@@ -905,6 +877,79 @@ def _build_obsolete_exact_rel_paths(
         obsolete_rel_paths.append(normalized_rel)
 
     return tuple(obsolete_rel_paths)
+
+
+def _normalize_exact_file_path_from_manifest(value: object, *, field_name: str) -> Path:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(f"invalid {field_name} item")
+    value_norm = value.strip()
+    value_rel = Path(value_norm)
+    if re.match(r"^[A-Za-z]:", value_norm) or value_norm.startswith(("/", "\\")):
+        raise RuntimeError(f"invalid {field_name} item")
+    if "\\" in value_norm:
+        raise RuntimeError(f"invalid {field_name} item")
+    if value_rel.is_absolute() or ".." in value_rel.parts:
+        raise RuntimeError(f"invalid {field_name} item")
+    if value_norm.endswith("/"):
+        raise RuntimeError(f"invalid {field_name} item (must be exact file path): '{value_norm}'")
+    if any(token in value_norm for token in ("*", "?", "[", "]", "{", "}")):
+        raise RuntimeError(f"invalid {field_name} item (must be exact file path): '{value_norm}'")
+
+    normalized_parts = tuple(part for part in value_rel.parts if part not in ("", "."))
+    if not normalized_parts:
+        raise RuntimeError(f"invalid {field_name} item (must be exact file path): '{value_norm}'")
+    normalized_rel = Path(*normalized_parts)
+    if normalized_rel.as_posix() != value_norm:
+        raise RuntimeError(f"invalid {field_name} item")
+    if normalized_rel.suffix == "":
+        raise RuntimeError(
+            f"invalid {field_name} item (must be exact file path): '{normalized_rel.as_posix()}'"
+        )
+    return normalized_rel
+
+
+def _build_bootstrap_only_rel_paths(
+    *,
+    manifest: dict[str, Any],
+    host_adapter_meta_src: Path,
+    current_target_paths: set[Path],
+) -> tuple[Path, ...]:
+    managed_assets = manifest.get("managed_assets")
+    if not isinstance(managed_assets, dict):
+        raise RuntimeError(f"invalid managed_assets contract: {host_adapter_meta_src}")
+
+    bootstrap_raw = managed_assets.get("bootstrap_only_exact_file_paths")
+    if not isinstance(bootstrap_raw, list):
+        raise RuntimeError(
+            "invalid managed_assets.bootstrap_only_exact_file_paths: "
+            f"{host_adapter_meta_src}"
+        )
+
+    bootstrap_rel_paths: list[Path] = []
+    for bootstrap in bootstrap_raw:
+        normalized_rel = _normalize_exact_file_path_from_manifest(
+            bootstrap,
+            field_name="managed_assets.bootstrap_only_exact_file_paths",
+        )
+        if normalized_rel not in current_target_paths:
+            raise RuntimeError(
+                "managed_assets.bootstrap_only_exact_file_paths must reference current managed path "
+                f"'{normalized_rel.as_posix()}'"
+            )
+        if any(normalized_rel == existing for existing in bootstrap_rel_paths):
+            raise RuntimeError(
+                "duplicate managed_assets.bootstrap_only_exact_file_paths item "
+                f"'{normalized_rel.as_posix()}'"
+            )
+        for existing in bootstrap_rel_paths:
+            if _is_path_prefix(existing, normalized_rel) or _is_path_prefix(normalized_rel, existing):
+                raise RuntimeError(
+                    "overlapping managed_assets.bootstrap_only_exact_file_paths items "
+                    f"'{existing.as_posix()}' and '{normalized_rel.as_posix()}'"
+                )
+        bootstrap_rel_paths.append(normalized_rel)
+
+    return tuple(bootstrap_rel_paths)
 
 
 def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallPlan:
@@ -936,6 +981,11 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
     targets = manifest.get("targets")
     if not isinstance(targets, dict):
         raise RuntimeError(f"invalid host adapter targets: {host_adapter_meta_src}")
+    bootstrap_only_rel_paths = _build_bootstrap_only_rel_paths(
+        manifest=manifest,
+        host_adapter_meta_src=host_adapter_meta_src,
+        current_target_paths=current_target_paths,
+    )
     obsolete_exact_rel_paths = _build_obsolete_exact_rel_paths(
         manifest=manifest,
         host_adapter_meta_src=host_adapter_meta_src,
@@ -1062,6 +1112,7 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
 
     return _ManagedSkillInstallPlan(
         current_file_mappings=current_file_mappings,
+        bootstrap_only_rel_paths=bootstrap_only_rel_paths,
         obsolete_exact_rel_paths=obsolete_exact_rel_paths,
     )
 
@@ -1158,6 +1209,7 @@ def _apply_managed_skill_install_plan(
     plan: _ManagedSkillInstallPlan,
 ) -> None:
     current_sync_plan: list[tuple[Path, Path, Path]] = []
+    bootstrap_only_target_rel_paths = set(plan.bootstrap_only_rel_paths)
     current_target_rel_paths = tuple(
         sorted(
             {mapping.target_rel for mapping in plan.current_file_mappings},
@@ -1184,7 +1236,14 @@ def _apply_managed_skill_install_plan(
         target_path = target_root / mapping.target_rel
         current_sync_plan.append((mapping.target_rel, source_path, target_path))
 
-    for _target_rel, source_path, target_path in current_sync_plan:
+    for target_rel, source_path, target_path in current_sync_plan:
+        if target_rel in bootstrap_only_target_rel_paths and target_path.exists():
+            if target_path.is_file():
+                continue
+            raise RuntimeError(
+                "target directory/container conflict for current managed path "
+                f"'{target_rel.as_posix()}' (non-file entry at exact file path)"
+            )
         _copy_file(source_path, target_path)
 
     missing_current_targets = [
