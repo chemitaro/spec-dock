@@ -3,7 +3,7 @@
 ID: "iss-00075"
 タイトル: "Multi host agent and config asset install"
 関連GitHub: ["#75"]
-状態: "approved"
+状態: "draft"
 作成者: "Codex CLI"
 最終更新: "2026-04-15"
 依存: ["requirement.md", "design.md"]
@@ -56,7 +56,7 @@ ID: "iss-00075"
   - 次に installer mapping と prune behavior を固定する
   - 最後に tests と docs / report をまとめて閉じる
 - step ordering notes:
-  - `S01` で Codex / Copilot / shared skills の placement と mapping を閉じる
+  - `S01` で clean install inventory と update safety を分けて閉じる
   - `S90` で docs / report を整える
   - `S99` は branch 全体の close-ready 判断を行う
 
@@ -163,29 +163,52 @@ ID: "iss-00075"
   - `src/spec_dock/assets/install_root/`
   - `tests/`
 
-##### I1 — single TDD cycle
+##### I1 — clean install inventory regression
 - slice goal:
-  - Codex / Copilot host pack を 1 つの inventory regression で観測できるようにする
+  - Codex / Copilot / shared skills の exact inventory と path mapping を赤テスト化して通す
 
 ###### Red
 - failing test:
-  - 期待する host-specific asset がまだ配置されていないことを示すテスト
+  - clean init/update で expected inventory がまだ揃わないことを示すテスト
 - expected failure:
   - asset inventory mismatch
 
 ###### Green
 - minimum implementation:
-  - provider-side asset placement と installer mapping を更新する
+  - provider-side asset placement と canonical filename rename を反映する
 - pass condition:
-  - expected path が install/update で見える
+  - expected path が install/update で見え、Codex に direct orchestrator file が存在しない
 
 ###### Refactor
 - 目的:
-  - Green を維持したまま、必要な範囲で構造や可読性を整える
+  - Green を維持したまま、inventory assertion と metadata assertion の重複を減らす
+- guardrail:
+  - 振る舞いを変えない
+  - bootstrap-only preserve の仕様は次 iteration まで広げない
+
+##### I2 — update prune/preserve regression
+- slice goal:
+  - obsolete managed cleanup、unknown custom preserve、edited `.codex/config.toml` preserve を別テストで固定する
+
+###### Red
+- failing test:
+  - update で old managed files だけが掃除されず、または `.codex/config.toml` が保持されないことを示すテスト
+- expected failure:
+  - obsolete cleanup mismatch or preserved content mismatch
+
+###### Green
+- minimum implementation:
+  - `bootstrap_only_exact_file_paths` と obsolete cleanup を installer に実装する
+  - touchpoints は canonical host constants、metadata load、current managed inventory、copy policy、obsolete prune に限定する
+- pass condition:
+  - old managed files だけが削除され、unknown custom files と edited `.codex/config.toml` が保持される
+
+###### Refactor
+- 目的:
+  - Green を維持したまま、bootstrap-only 判定と current managed 計算の責務境界を整える
 - guardrail:
   - 振る舞いを変えない
   - この step の範囲を超えて広げない
-  - 必要がなければスキップしてよい
 
 #### step gate
 - review:
@@ -199,9 +222,10 @@ ID: "iss-00075"
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
-  - docs / assets / workflow / skill / none
+  - issue report / validate evidence
 - 対応:
-  - issue report、必要なら provider docs と dogfooding docs を更新する
+  - issue report に review・test・validate evidence を記録する
+  - 常設 docs 更新は current issue の必須 deliverable には含めない
 
 ### S99 — final diff review quality gate
 - branch diff scope:
