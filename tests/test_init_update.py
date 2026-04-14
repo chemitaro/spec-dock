@@ -424,6 +424,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "packaging==24.2",
         "pyproject_hooks==1.2.0",
         "setuptools==75.8.0",
+        "tomli==2.2.1",
         "wheel==0.45.1",
     )
     _ISSUE_69_WHEELHOUSE_FILENAMES = (
@@ -431,6 +432,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "packaging-24.2-py3-none-any.whl",
         "pyproject_hooks-1.2.0-py3-none-any.whl",
         "setuptools-75.8.0-py3-none-any.whl",
+        "tomli-2.2.1-py3-none-any.whl",
         "wheel-0.45.1-py3-none-any.whl",
     )
     _ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS = (
@@ -7079,6 +7081,30 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             repo_root_workflow.read_bytes(),
             "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml",
         )
+        workflow_text = install_root_workflow.read_text(encoding="utf-8")
+        self.assertIn("test -f ./spec-dock/scripts/spec-dock", workflow_text)
+        self.assertNotIn("test -x ./spec-dock/scripts/spec-dock", workflow_text)
+        self.assertIn("python3 ./spec-dock/scripts/spec-dock sync", workflow_text)
+        self.assertIn("python3 ./spec-dock/scripts/spec-dock validate", workflow_text)
+
+    def test_issue_68_provider_only_workflow_is_not_shipped_via_install_root(self) -> None:
+        repo_root_provider_workflow = Path(".github/workflows/provider-ci.yml")
+        install_root_provider_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/provider-ci.yml"
+
+        self.assertTrue(
+            repo_root_provider_workflow.is_file(),
+            f"missing repo-root provider-only workflow: {repo_root_provider_workflow}",
+        )
+        self.assertFalse(
+            install_root_provider_workflow.exists(),
+            (
+                "provider-only workflow must not be shipped in install_root managed assets: "
+                f"{install_root_provider_workflow}"
+            ),
+        )
+        workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
+        self.assertIn("python -m pip install -e .", workflow_text)
+        self.assertIn("python -m unittest discover -v", workflow_text)
 
     def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
         legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
