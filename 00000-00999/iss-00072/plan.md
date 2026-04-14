@@ -40,6 +40,11 @@ ID: "iss-00072"
     - `tests/test_init_update.py` と `AGENTS.md` から legacy authority assumption が retire され、`src/spec_dock/assets/codex_skills/` が削除される
 - M3:
   - 対象:
+    - PR review remediation
+  - exit:
+    - review analyses A-D に対応する修正方針が実装可能な step と validation に落ち、spec review で矛盾なく説明できる
+- M4:
+  - 対象:
     - closeout evidence and final spec close docs
   - exit:
     - issue-72 report と必要な current closeout docs が evidence-bearing で揃い、final quality gates を pass する
@@ -53,7 +58,9 @@ ID: "iss-00072"
 - step ordering notes:
   - S01 は current tests/guidance の authority cleanup
   - S02 は mirror-affecting docs / closeout docs の current statement を揃える
+  - S03 は PR review remediation を S90 / S99 の前に差し込み、mandatory の `B` / `D` と ancillary の `A` / `C` を処理する
   - S90/S99 で update convergence、final reviews、epic close evidence を固める
+  - detailed section の記載順は編集都合で前後しうるが、実行順序の正本はこの step ordering notes と `## ステップ一覧` とする
 
 ## ステップ一覧
 - S01:
@@ -74,6 +81,14 @@ ID: "iss-00072"
     - EC-002
   - review gate:
     - code review pass
+- S03:
+  - 観測可能な振る舞い:
+    - PR review で出た `B` / `D` の mandatory remediation と `A` / `C` の ancillary remediation が、既存 closeout contract を壊さずに実装・検証できる状態で固定される
+  - closes:
+    - AC-001
+    - AC-004
+  - review gate:
+    - spec review pass
 - S90:
   - 観測可能な振る舞い:
     - issue-72 で変更した docs / mirror-affecting surfaces が `spec-dock update` 後に dogfooding mirror へ収束する
@@ -92,20 +107,21 @@ ID: "iss-00072"
     - final code review pass
     - final spec review pass
   - supplemental repair loop:
-    - full-suite residual が issue-72 実行中に再現した場合は、failing test を単体再現し、failure / root cause / options / recommended fix を独立 analysis report に記録してから修正に進む
-    - layering contract 違反は test 緩和よりも実装修正を優先し、commands/application/domain/presentation の境界を維持する
+    - full-suite residual が issue-72 実行中に再現した場合は、まずそれが issue-72 変更により導入・顕在化した回帰かを切り分ける
+    - issue-72 起因の回帰だと証明できた場合のみ、failing test を単体再現し、failure / root cause / options / recommended fix を独立 analysis report に記録してから修正に進む
+    - issue-72 起因だと証明できない residual は report に informational risk として記録し、別 issue / follow-up へ切り出す
+    - layering contract 違反が issue-72 起因で再現した場合は、test 緩和よりも実装修正を優先し、commands/application/domain/presentation の境界を維持する
     - current residual target:
       - `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
     - preferred fix:
       - commands 層から `domain.ids` 直 import を除去する局所修正
     - analysis source of truth:
       - `discussions/20260414t012350z-research-runtime-shell-structural-regression-analysis.md`
-
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01, S90
+- AC-001 -> S01, S03, S90
 - AC-002 -> S02, S99
 - AC-003 -> S02
-- AC-004 -> S02, S90, S99
+- AC-004 -> S02, S03, S90, S99
 - EC-001 -> S01
 - EC-002 -> S02
 
@@ -130,7 +146,7 @@ ID: "iss-00072"
     - pass まで review loop を回す
 - QG1 validation gate:
   - timing:
-    - S01 / S02 / S90 / S99
+    - S01 / S02 / S03 / S90 / S99
   - scope:
     - targeted unittest:
       - current authority assertion hit がある場合のみ実行
@@ -362,6 +378,9 @@ ID: "iss-00072"
   - S02 差分をコミットする
 
 ### S90 — docs refresh / dogfooding convergence
+- execution-order note:
+  - 実行順序は section placement ではなく `## ステップ一覧` と `step ordering notes` に従う
+  - したがって S90 は S03 完了後に実施する
 - 対象:
   - docs / mirror-affecting surfaces
 - 対応:
@@ -372,6 +391,133 @@ ID: "iss-00072"
 - gate:
   - issue-72 で変更した provider-side docs / guidance が dogfooding mirror へ収束する fresh evidence を report に残す
   - parity-managed / fixture surfaces の before/after diff を整理する
+
+### S03 — PR review remediation tranche
+- target:
+  - `tests/presentation_runtime/test_runtime_sync_s07.py`
+  - `src/spec_dock/assets/install_root/.github/workflows/ci.yml`
+  - `src/spec_dock/cli.py`
+  - `tests/test_init_update.py`
+  - `tests/fixtures/wheelhouse/*`
+- design refs:
+  - `design.md`:
+    - `PR review feedback incorporation`
+    - `review repair contract`
+    - `要件 → 設計マッピング`
+- step boundary:
+  - mandatory 指摘 `B` / `D` と user-decision scope の `A` / `C` を同一 tranche で処理する
+  - AC を直接閉じる根拠は `B` / `D` に限定し、`A` / `C` は closeout 非阻害の ancillary remediation として扱う
+  - top-level review body `E` は triage policy として記録のみ行い、実装修正対象に含めない
+
+#### B1 — test hygiene repair
+- purpose:
+  - `A` に対応し、test-to-test call を private helper 抽出へ置換する
+- files:
+  - `tests/presentation_runtime/test_runtime_sync_s07.py`
+
+##### I1 — shared assertion helper extraction
+- slice goal:
+  - issue traceability を維持しつつ、public test 間直接呼び出しをなくす
+
+###### Red
+- failing test:
+  - current review finding `A`
+- expected failure:
+  - test method から別 test method を直接呼ぶ構造が残る
+
+###### Green
+- minimum implementation:
+  - shared assertion 群を private helper へ抽出する
+  - 既存 2 test から helper を呼ぶ
+- pass condition:
+  - public test 名は維持され、test-to-test call が消える
+
+#### B2 — shipped workflow scope repair
+- purpose:
+  - `B` に対応し、managed repo 一般で壊れない generic CI workflow へ修正する
+- files:
+  - `src/spec_dock/assets/install_root/.github/workflows/ci.yml`
+
+##### I1 — provider-specific CI assumptions removal
+- slice goal:
+  - `pip install .` と `tests/test_cli.py` 前提を shipped workflow から除去する
+
+###### Red
+- failing test:
+  - current review finding `B`
+- expected failure:
+  - managed repo に配布された workflow が repo 固有構造を仮定する
+
+###### Green
+- minimum implementation:
+  - local managed repo で自己完結する validation command に置換する
+  - auth/network 依存の強い step は baseline workflow に入れない
+- pass condition:
+  - shipped workflow が managed repo generality contract を満たす
+
+#### B3 — install plan shape repair
+- purpose:
+  - `C` に対応し、plan shape と apply consumer を一致させる
+- files:
+  - `src/spec_dock/cli.py`
+
+##### I1 — unused field removal
+- slice goal:
+  - `_ManagedSkillInstallPlan` から未使用 field を外す
+
+###### Red
+- failing test:
+  - current review finding `C`
+- expected failure:
+  - plan が apply path の実消費者とずれた field を保持する
+
+###### Green
+- minimum implementation:
+  - unused field を return type から除去する
+  - validation に必要な補助データは builder 内 local へ留める
+- pass condition:
+  - plan shape が current consumer に一致し、周辺 tests が通る
+
+#### B4 — hermetic wheelhouse repair
+- purpose:
+  - `D` に対応し、Python 3.10 offline build backend dependency gap を塞ぐ
+- files:
+  - `tests/test_init_update.py`
+  - `tests/fixtures/wheelhouse/*`
+
+##### I1 — tomli fixture addition
+- slice goal:
+  - issue-69 wheelhouse contract に `tomli` を追加する
+
+###### Red
+- failing test:
+  - current review finding `D`
+- expected failure:
+  - Python 3.10 fresh venv + `--no-index` backend install が `build==1.2.2` の条件付き依存不足で崩れる
+
+###### Green
+- minimum implementation:
+  - requirements fixture と wheel filenames contract に `tomli` を追加する
+  - corresponding wheel fixture を vendor する
+  - fresh venv backend install を再検証する
+- pass condition:
+  - Python 3.10 で hermetic backend install が通る
+
+#### step gate
+- review:
+  - code_reviewer で S03 diff を review
+- expected tests:
+  - `A` の対象 test file targeted run
+  - managed repo 相当の local workspace を使った shipped workflow 再現:
+    - `./spec-dock/scripts/spec-dock validate`
+    - workflow に採用する他の baseline command があれば同列に実行
+  - shipped workflow contract の scoped inspection
+  - installer / packaging / wheelhouse targeted tests
+  - Python 3.10 fresh venv + `--no-index` backend install confirmation
+- report update:
+  - review analyses A-D と実装修正の対応、validation 結果、review verdict を `report.md` に残す
+- commit:
+  - S03 差分をコミットする
 
 ### S99 — final diff review quality gate
 - branch diff scope:
