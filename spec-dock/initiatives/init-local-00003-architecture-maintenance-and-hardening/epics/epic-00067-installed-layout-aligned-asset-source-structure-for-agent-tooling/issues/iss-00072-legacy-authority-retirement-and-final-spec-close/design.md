@@ -97,8 +97,31 @@ ID: "iss-00072"
   - `discussions/20260414t012350z-research-runtime-shell-structural-regression-analysis.md`
 - この設計書では issue-72 の設計判断だけを保持し、failure list / root cause options / comparison の詳細は analysis report へ分離する。
 - この追加分析から採用する設計判断は次の 2 点である。
-  - `RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression` の failure は test 過剰制約ではなく commands 層の layering regression とみなす。
-  - 修正は test 緩和ではなく、`commands/deps.py` から `domain.ids` 直 import を除去する局所修正で行う。
+  - `RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression` のような residual failure は、まず issue-72 変更により導入・顕在化した回帰かを切り分ける。
+  - issue-72 起因だと証明できた場合に限り、test 緩和ではなく `commands/deps.py` から `domain.ids` 直 import を除去するような局所実装修正を採用候補とする。issue-72 起因でない residual は informational risk / follow-up issue として扱う。
+
+## PR review feedback incorporation
+- review inputs:
+  - `discussions/20260414t034500z-review-analysis-a-test-to-test-call.md`
+  - `discussions/20260414t034600z-review-analysis-b-shipped-ci-workflow-scope.md`
+  - `discussions/20260414t034700z-review-analysis-c-managed-install-plan-unused-fields.md`
+  - `discussions/20260414t034800z-review-analysis-d-offline-build-tomli-gap.md`
+  - `discussions/20260414t034900z-review-analysis-e-top-level-bot-review-bodies.md`
+- scope decision:
+  - mandatory 指摘 `B` / `D` に加えて、user decision により hygiene 指摘 `A` / `C` も同一 repair tranche に含める。
+  - `E` は triage policy の整理であり、実装修正対象には含めない。
+- adopted repair set:
+  - `A`:
+    - `tests/presentation_runtime/test_runtime_sync_s07.py` の test-to-test call を private helper 抽出へ置換する。
+  - `B`:
+    - `src/spec_dock/assets/install_root/.github/workflows/ci.yml` を managed repo generic workflow へ修正し、provider repo 固有の `pip install .` / `tests/test_cli.py` 前提を除去する。
+  - `C`:
+    - `src/spec_dock/cli.py` の `_ManagedSkillInstallPlan` から apply path で未使用の field を外し、builder 内 local validation data と plan shape を分離する。
+  - `D`:
+    - issue-69 hermetic wheelhouse contract に `tomli` を追加し、Python 3.10 の fresh venv + `--no-index` backend install を成立させる。
+ - acceptance linkage rule:
+  - `B` / `D` は shipped contract と hermetic contract の不足を是正する mandatory remediation として issue-72 closeout evidence に結び付ける。
+  - `A` / `C` は同一 tranche で実施する付随 remediation だが、独立に AC を閉じる根拠としては扱わない。
 
 ## 依存関係分析
 - upstream / prerequisite:
@@ -120,6 +143,7 @@ ID: "iss-00072"
   - issue-72 は issue-71 pass 後にしか実行しない。
   - 最初に requirement/design/plan/report contract を固め、その後 tests/guidance cleanup を入れ、最後に epic/issue closeout docs を揃える。
   - final epic spec review は issue-72 report と current closeout docs が埋まってから行う。
+  - PR review repair tranche は S02 の後、S90 / S99 の前に差し込み、closeout contract を崩さずに `B` / `D` を mandatory remediation、`A` / `C` を ancillary remediation として局所実装する。
 
 ### UML（必須: module / dependency）
 ```plantuml
@@ -245,6 +269,21 @@ i72 --> final : close gate
       - issue-68 / issue-69 / issue-70 / issue-71 prerequisite refs が issue-72 report から辿れ、かつ upstream report section が placeholder ではなく evidence-bearing content と passing result を持つ
       - issue-71 verification prerequisite が report refs で辿れ、placeholder-only evidence ではない
       - prep phase の spec review では epic current report の placeholder 状態を許容するが、S02 で status/evidence を埋める concrete implementation gate が plan に存在しなければならない
+  - review repair contract
+    - `A` helper extraction:
+      - public test 名と issue traceability は維持しつつ、shared assertion 群は private helper に抽出する
+      - test method から別 test method を直接呼ばない
+    - `B` shipped CI workflow scope:
+      - `install_root` 配布 workflow は managed repo 一般で成立する command だけを使う
+      - provider repo 固有の package install / provider test suite 実行は shipped workflow に含めない
+      - baseline は local managed repo で自己完結する validation command を優先する
+    - `C` managed install plan shape:
+      - `_ManagedSkillInstallPlan` は apply path の実消費者が必要とする field だけを持つ
+      - manifest validation や inventory derivation の補助データは builder 内 local 変数へ留める
+    - `D` hermetic wheelhouse:
+      - issue-69 offline build backend requirement set は Python 3.10 条件付き依存まで含めて self-contained でなければならない
+      - wheelhouse filenames contract と requirement contract は同時更新する
+      - fresh venv + `pip install --no-index --find-links <wheelhouse>` で backend install が通ることを検証する
   - issue-68 traceability anchors
     - `issue68_refs` は少なくとも次の見出しを参照する
       - `iss-00068/requirement.md`:
@@ -309,6 +348,7 @@ Report --> Review
 
 ## 要件 → 設計マッピング
 - AC-001 -> source search + authoritative manifest review + current docs corpus review で uniqueness を確認する。
+- AC-001 -> PR review repair tranche では `B` と `D` を shipped contract / hermetic contract の具体修正として追加する。
 - AC-002 -> issue-72 report に legacy retirement / uniqueness evidence を集約する。
 - AC-003 -> epic / issue current docs で future host extension statement を確認する。
 - AC-004 -> final close gate を concrete artifact checks に分解し、issue-72 report に記録する。
