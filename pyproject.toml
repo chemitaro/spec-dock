@@ -27,6 +27,10 @@ spec_dock = [
   "assets/**/*",
   # `assets/**/*` does not match dotfiles like `.gitignore` in Python's glob semantics.
   "assets/**/.gitignore",
+  # Hidden subtrees under install_root must be included explicitly.
+  "assets/install_root/.agents/**",
+  "assets/install_root/.codex/**",
+  "assets/install_root/.github/**",
 ]
 
 [tool.setuptools.exclude-package-data]
