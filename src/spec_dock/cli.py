@@ -781,16 +781,8 @@ class _ManagedCurrentFileMapping(NamedTuple):
     target_rel: Path
 
 
-class _ManagedNativeShimSpec(NamedTuple):
-    host_name: str
-    source_asset_rel: Path
-    target_rel: Path
-
-
 class _ManagedSkillInstallPlan(NamedTuple):
-    managed_skill_names: tuple[str, ...]
     current_file_mappings: tuple[_ManagedCurrentFileMapping, ...]
-    native_shim_specs: tuple[_ManagedNativeShimSpec, ...]
     obsolete_exact_rel_paths: tuple[Path, ...]
 
 
@@ -955,7 +947,6 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
         joined = ", ".join(missing_required_hosts)
         raise RuntimeError(f"missing required managed native shim hosts: {joined}")
 
-    native_shim_specs: list[_ManagedNativeShimSpec] = []
     native_target_file_owners: dict[Path, str] = {}
     for host_name, host_entry in targets.items():
         if not isinstance(host_entry, dict):
@@ -1069,18 +1060,8 @@ def _build_managed_skill_install_plan(assets_dir: Path) -> _ManagedSkillInstallP
                 f"for host '{host_name}'"
             )
 
-        native_shim_specs.append(
-            _ManagedNativeShimSpec(
-                host_name=host_name,
-                source_asset_rel=source_asset_rel,
-                target_rel=target_rel,
-            )
-        )
-
     return _ManagedSkillInstallPlan(
-        managed_skill_names=managed_skill_names,
         current_file_mappings=current_file_mappings,
-        native_shim_specs=tuple(native_shim_specs),
         obsolete_exact_rel_paths=obsolete_exact_rel_paths,
     )
 
