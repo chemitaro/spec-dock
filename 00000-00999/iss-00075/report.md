@@ -109,3 +109,45 @@ python -m unittest tests.test_cli tests.cli_runtime.test_active tests.cli_runtim
 
 #### メモ
 - Copilot orchestrator は static delegation shim ではないため、テストを orchestrator contract 検証へ更新した。
+
+### 2026-04-15 00:00 - 00:00（follow-up fix）
+
+#### 対象
+- Step: follow-up quality fix after reviewer findings
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-001, EC-002
+
+#### 実施内容
+- Copilot primary orchestrator の frontmatter から `disable-model-invocation: true` を除去し、provider asset と repo root mirror の parity を維持した。
+- QA 指摘に対応して `tests/test_init_update.py` を最小拡張した。
+  - bootstrap-only `.codex/config.toml` の update preserve を直接検証
+  - obsolete prune に旧 canonical（`.codex/agents/spec-dock.toml`, `.github/agents/spec-dock.agent.md`）の削除検証を追加
+  - Codex direct orchestrator（`.codex/agents/orchestrator.toml`）非生成の否定検証を追加
+  - dogfooding parity を host-pack 全量比較（inventory + bytes）に強化
+- Copilot orchestrator contract assertion に `disable-model-invocation: true` 不可を追加し、再発防止を明文化した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract tests.test_init_update.TestInitUpdate.test_update_manages_native_shims_with_gate_2_five_subchecks
+# OK (4 tests)
+
+python -m unittest tests.test_init_update -f
+# OK (151 tests)
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=31
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md`
+- `.github/agents/orchestrator.agent.md`
+- `tests/test_init_update.py`
+- `spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/report.md`
+
+#### レビュー
+- code review finding:
+  - resolved（orchestrator frontmatter 契約）
+- qa findings:
+  - resolved（4件）
+
+#### コミット
+- pending
