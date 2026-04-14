@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-00074",
+  "title": "Multi host agent and config asset expansion",
+  "slug": "multi-host-agent-and-config-asset-expansion",
+  "created_at": "2026-04-14T17:33:05+09:00",
+  "updated_at": "2026-04-14T17:33:05+09:00",
+  "parent_id": "init-local-00002",
+  "initiative_id": "init-local-00002",
+  "epic_id": null,
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 74,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
