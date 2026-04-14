@@ -154,6 +154,100 @@ issue-72 report:
 
 ---
 
+### 2026-04-14 00:00 - 00:00
+
+#### 対象
+- Step: S99 re-review loop
+- AC/EC: AC-001, AC-002, AC-003, AC-004
+
+#### 実施内容
+- fresh spec review で発見された closeout metadata drift に対応し、epic-00067 `requirement.md` / `design.md` / `plan.md` の front matter を `approved` へ揃え、`iss-00068` current docs も `approved` へ更新した。
+- `epic-00067` report の進捗記述と `iss-00072` report の `upstream-prerequisites` を同期し、current evidence chain が「未更新の draft を前提に close 済みと見なしている」状態を解消した。
+- fresh code review で発見された managed exact file path sync の symlink 境界逸脱リスクに対応し、`src/spec_dock/cli.py` の preflight で symlink 親 / symlink exact file path を fail-closed にした。
+- `tests/test_init_update.py` に init/update の symlink parent conflict / symlink exact-file conflict を追加し、managed path sync が symlink 越しに書き込まないことを regression として固定した。
+- informational full-suite sweep を開始し、既知 residual として issue-71 / epic report で scope-out 済みの `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression` を再現した。epic acceptance blocker ではなく、current review cycle では residual risk の再確認として扱った。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_directory_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_symlink_parent_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_symlink_exact_file_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_directory_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_symlink_parent_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_symlink_exact_file_conflict_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes
+
+Ran 8 tests ... OK
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=29
+```
+
+```bash
+./spec-dock/scripts/spec-dock sync --github
+spec-dock: ok (sync)
+spec-dock: sync: active unchanged (matched id in branch: iss-00072)
+```
+
+```bash
+python -m unittest discover -v
+informational sweep:
+- known residual reproduced:
+  - tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression
+- issue-71 / epic report の scope-out 記録と一致
+```
+
+#### 変更したファイル
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/requirement.md`
+  - epic current spec state を `approved` へ同期
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/design.md`
+  - epic current spec state を `approved` へ同期
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/plan.md`
+  - epic current spec state を `approved` へ同期
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/report.md`
+  - current progress summary を approved chain に同期
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/requirement.md`
+  - issue-68 current spec state を `approved` へ同期
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/design.md`
+  - issue-68 current spec state を `approved` へ同期
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/report.md`
+  - issue-68 report state を `approved` へ同期
+- `/srv/mount/spec-dock/src/spec_dock/cli.py`
+  - managed path preflight で symlink container / exact-file conflict を fail-closed
+- `/srv/mount/spec-dock/tests/test_init_update.py`
+  - symlink parent / exact-file conflict regression tests を追加
+- `/srv/mount/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/report.md`
+  - upstream prerequisite status と final close gate evidence を更新
+
+#### コミット
+- 未実施
+
+#### メモ
+- fresh spec review:
+  - initial verdict:
+    - `fail`
+  - finding:
+    - epic current spec と issue-68 current docs の state drift
+  - corrective action:
+    - `draft` -> `approved` の同期と prerequisite record 更新
+  - final re-review:
+    - `pass`
+- fresh code review:
+  - initial verdict:
+    - `fail`
+  - finding:
+    - managed path sync が symlink parent / exact-file を preflight で拒否しない
+  - corrective action:
+    - CLI preflight hardening、obsolete managed symlink prune 補正、symlink / guidance regression tests を追加
+  - final re-review:
+    - `pass`
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - issue-72 prep docs で epic current report と CLI/runtime test targeting の契約が揺れやすかった。
@@ -217,11 +311,11 @@ issue-72 report:
   - `../report.md`
   - issue-72 S02/S99 により current evidence sink / final closeout report として整備
 - epic_report_status:
-  - final closeout update 後に `approved` へ引き上げる対象
+  - `approved`
 - issue68_refs:
   - `../issues/iss-00068-install-root-tree-and-asset-classification/{requirement.md,design.md,report.md}`
 - issue68_evidence_status:
-  - report front matter は `draft` のままだが、foundation tranche の evidence と representative commits は揃っている
+  - `approved`
 - issue69_refs:
   - `../issues/iss-00069-package-data-and-installed-artifact-parity/{requirement.md,design.md,report.md}`
 - issue69_evidence_status:
@@ -253,6 +347,12 @@ issue-72 report:
   - targeted current-authority tests:
     - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates`
     - `Ran 5 tests in 0.048s` / `OK`
+- targeted symlink-safety regression tests:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_symlink_parent_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_init_rejects_current_managed_symlink_exact_file_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_symlink_parent_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_symlink_exact_file_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes`
+    - `Ran 8 tests ... OK`
+  - targeted obsolete-symlink / guidance regression tests:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_current_managed_symlink_exact_file_conflict_before_writes tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes tests.test_init_update.TestInitUpdate.test_current_guidance_documents_match_discussion_numbering_contract`
+    - `Ran 4 tests ... OK`
   - current-surface scoped search:
     - `rg -n "codex_skills" AGENTS.md tests/test_init_update.py tests/test_cli.py tests/cli_runtime tests/domain_runtime tests/presentation_runtime`
     - classification は authority-uniqueness 節のとおり
@@ -267,18 +367,28 @@ issue-72 report:
       - initial review: `fail`
       - finding: unresolved `pending_until_review` placeholders and premature epic approval while issue report was still `draft`
       - corrective action: S99 report update resolved the final gate placeholders and aligned issue report status with the epic closeout verdict
+      - second review: `fail`
+      - finding: managed path sync did not reject symlink parent / exact-file conflicts before writes
+      - corrective action: preflight hardening in `src/spec_dock/cli.py`、obsolete managed symlink prune 補正、guidance authority path cleanup、symlink / guidance regression testsを反映
       - final re-review: `pass`
     - final spec review:
       - `pass`
+  - informational full-suite sweep:
+    - `python -m unittest discover -v`
+    - known residual reproduced:
+      - `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
+    - issue-71 / epic report の scope-out 記録と一致し、epic acceptance blocker ではないことを再確認した
 - result:
-  - final close gate evidence is complete after code re-review and final spec review pass.
+  - final close gate evidence は current metadata drift 修正、current / obsolete managed symlink safety fix、guidance authority cleanup、known residual の scope-out 再確認まで含めて更新済みであり、fresh final code review / final spec review ともに `pass` した。
 
 ## post-review-audit (任意)
 - spec_review_reference:
   - issue-72 prep review pass recorded in prep session
 - final_code_review_reference:
   - initial final code review identified unresolved closeout placeholders and issue/epic status mismatch.
-  - S99 corrective revision resolved both findings before final re-review.
+  - S99 corrective revision resolved the closeout placeholder / state drift finding.
+  - follow-up fresh code review identified symlink preflight gap and required CLI/test fix.
+  - final focused code review pass confirmed current/obsolete symlink handlingと guidance authority test が current contract と整合している。
 - final_spec_review_reference:
   - final spec review pass recorded for issue-72 requirement/design/plan/report and epic closeout report.
 

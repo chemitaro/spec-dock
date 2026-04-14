@@ -1906,7 +1906,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/README.md",
             "src/spec_dock/assets/spec_dock/docs/guide.md",
             "src/spec_dock/assets/spec_dock/scripts/README.md",
-            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
+            "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
         ]
         text_map = self._read_text_map(repo_root, guidance_paths)
         self._assert_canonical_rules_files_contract(text_map)
@@ -7460,6 +7460,62 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn("non-directory container: '.github'", stderr)
             self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
 
+    def test_issue_70_init_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            workflows_parent = target / ".github" / "workflows"
+            workflows_parent.parent.mkdir(parents=True, exist_ok=True)
+            (target / "symlink-workflows-container").mkdir(parents=True, exist_ok=True)
+            os.symlink("../symlink-workflows-container", workflows_parent)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink container: '.github/workflows'", stderr)
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+
+    def test_issue_70_init_rejects_current_managed_symlink_exact_file_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
+            managed_workflow_path.parent.mkdir(parents=True, exist_ok=True)
+
+            symlink_target = target / "symlink-ci-target.yml"
+            symlink_target.write_text("managed-workflow-symlink-target\n", encoding="utf-8")
+            os.symlink("../../symlink-ci-target.yml", managed_workflow_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(managed_workflow_path.is_symlink())
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+            self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
+
     def test_issue_70_update_rejects_current_managed_directory_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -7479,6 +7535,66 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
                 stderr,
             )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+
+            workflows_parent = target / ".github" / "workflows"
+            if workflows_parent.is_symlink() or workflows_parent.is_file():
+                workflows_parent.unlink(missing_ok=True)
+            elif workflows_parent.exists():
+                shutil.rmtree(workflows_parent)
+            (target / "symlink-workflows-container").mkdir(parents=True, exist_ok=True)
+            os.symlink("../symlink-workflows-container", workflows_parent)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink container: '.github/workflows'", stderr)
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_current_managed_symlink_exact_file_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+
+            managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
+            managed_workflow_path.unlink(missing_ok=True)
+            symlink_target = target / "symlink-ci-target.yml"
+            symlink_target.write_text("managed-workflow-symlink-target\n", encoding="utf-8")
+            os.symlink("../../symlink-ci-target.yml", managed_workflow_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(managed_workflow_path.is_symlink())
+            self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
             self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes(self) -> None:
@@ -7506,6 +7622,34 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 stderr,
             )
             self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            obsolete_target = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target = target / "obsolete-managed-symlink-target.toml"
+            symlink_target.write_text("obsolete symlink target\n", encoding="utf-8")
+            os.symlink("../../obsolete-managed-symlink-target.toml", obsolete_target)
+            self.assertTrue(obsolete_target.is_symlink())
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 0, stderr)
+            self.assertFalse(obsolete_target.exists())
+            self.assertFalse(obsolete_target.is_symlink())
+            self.assertEqual(
+                symlink_target.read_text(encoding="utf-8"),
+                "obsolete symlink target\n",
+            )
 
     def test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

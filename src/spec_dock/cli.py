@@ -1091,19 +1091,36 @@ def _preflight_target_path_conflicts(
     current_target_rel_paths: tuple[Path, ...],
     obsolete_target_rel_paths: tuple[Path, ...],
 ) -> None:
-    def _assert_exact_file_path_safe(target_rel: Path, *, path_kind: str) -> None:
+    def _assert_exact_file_path_safe(
+        target_rel: Path,
+        *,
+        path_kind: str,
+        reject_exact_symlink: bool,
+    ) -> None:
         target_path = target_root / target_rel
         rel_posix = target_rel.as_posix()
 
         for parent in target_path.parents:
             if parent == target_root:
                 break
+            if parent.is_symlink():
+                parent_rel = parent.relative_to(target_root).as_posix()
+                raise RuntimeError(
+                    "target directory/container conflict for "
+                    f"{path_kind} '{rel_posix}' (symlink container: '{parent_rel}')"
+                )
             if parent.exists() and not parent.is_dir():
                 parent_rel = parent.relative_to(target_root).as_posix()
                 raise RuntimeError(
                     "target directory/container conflict for "
                     f"{path_kind} '{rel_posix}' (non-directory container: '{parent_rel}')"
                 )
+
+        if reject_exact_symlink and target_path.is_symlink():
+            raise RuntimeError(
+                "target directory/container conflict for "
+                f"{path_kind} '{rel_posix}' (symlink at exact file path)"
+            )
 
         if target_path.exists() and target_path.is_dir():
             raise RuntimeError(
@@ -1112,9 +1129,17 @@ def _preflight_target_path_conflicts(
             )
 
     for current_rel in current_target_rel_paths:
-        _assert_exact_file_path_safe(current_rel, path_kind="current managed path")
+        _assert_exact_file_path_safe(
+            current_rel,
+            path_kind="current managed path",
+            reject_exact_symlink=True,
+        )
     for obsolete_rel in obsolete_target_rel_paths:
-        _assert_exact_file_path_safe(obsolete_rel, path_kind="obsolete managed path")
+        _assert_exact_file_path_safe(
+            obsolete_rel,
+            path_kind="obsolete managed path",
+            reject_exact_symlink=False,
+        )
 
 
 def _preflight_managed_skill_install_plan(target_root: Path | None = None) -> _ManagedSkillInstallPlan:

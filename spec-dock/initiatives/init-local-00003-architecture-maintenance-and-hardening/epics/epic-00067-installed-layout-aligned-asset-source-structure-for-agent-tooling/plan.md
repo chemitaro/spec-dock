@@ -3,7 +3,7 @@
 ID: "epic-00067"
 タイトル: "Installed layout aligned asset source structure for agent tooling"
 関連GitHub: ["#67"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-12"
 依存: ["requirement.md", "design.md"]
