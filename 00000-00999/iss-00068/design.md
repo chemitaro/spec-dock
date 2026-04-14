@@ -3,7 +3,7 @@
 ID: "iss-00068"
 タイトル: "Install root tree and asset classification"
 関連GitHub: ["#68"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-12"
 依存: ["requirement.md"]
