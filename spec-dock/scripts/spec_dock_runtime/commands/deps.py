@@ -4,7 +4,6 @@ import argparse
 from dataclasses import dataclass
 
 from ..application.contracts import CheckDepsRequest, MutateDepsError, MutateDepsRequest, TargetRef, UseCases
-from ..domain.ids import format_id, parse_id
 from ..presentation.cli_text import (
     render_deps_check_text,
     render_deps_mutation_error_text,
@@ -13,6 +12,7 @@ from ..presentation.cli_text import (
 from ..presentation.contracts import CliText
 from ..presentation.json_state import render_deps_check_json
 from .contracts import CommandArgs, CommandOutcome, CommandSpec
+from .node_id_normalizer import normalize_node_id
 from .targets import parse_explicit_target_flags
 
 
@@ -94,8 +94,8 @@ def _deps_check_args(ns: argparse.Namespace) -> CommandArgs:
 
 
 def _deps_mutation_args(ns: argparse.Namespace) -> CommandArgs:
-    from_id = _normalize_node_id(str(getattr(ns, "from_id", "")), field="--from")
-    to_id = _normalize_node_id(str(getattr(ns, "to_id", "")), field="--to")
+    from_id = normalize_node_id(str(getattr(ns, "from_id", "")), field="--from")
+    to_id = normalize_node_id(str(getattr(ns, "to_id", "")), field="--to")
     return DepsMutationArgs(from_id=from_id, to_id=to_id)
 
 
@@ -141,14 +141,6 @@ def _run_deps_mutation(*, action: str, args: CommandArgs, use_cases: UseCases) -
     except MutateDepsError as error:
         return CommandOutcome(exit_code=1, text=render_deps_mutation_error_text(error))
     return CommandOutcome(exit_code=0, text=render_deps_mutation_text(result))
-
-
-def _normalize_node_id(value: str, *, field: str) -> str:
-    raw = value.strip().lower()
-    if not raw:
-        raise RuntimeError(f"{field} is required")
-    prefix, is_local, num = parse_id(raw)
-    return format_id(prefix, num, local=is_local)
 
 
 def _expect_deps_check_args(args: CommandArgs) -> DepsCheckArgs:
