@@ -1638,7 +1638,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Dependency cycle detected"):
                 app_sync_state.collect_sync_state(self._request(app_contracts), ports)
 
-    def test_sync_force_placeholder_and_deps_error_regression(self) -> None:
+    def _assert_sync_force_placeholder_and_deps_error_regression(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -1706,6 +1706,12 @@ class TestRuntimeSyncS07(unittest.TestCase):
             for text in (tree_puml, deps_puml, dashboard):
                 self.assertIn("DEPS_DISABLED", text)
                 self.assertIn("sync --force", text)
+
+    def test_sync_force_placeholder_and_deps_error_regression(self) -> None:
+        self._assert_sync_force_placeholder_and_deps_error_regression()
+
+    def test_issue_71_runtime_bundle_sync_force_degraded_path(self) -> None:
+        self._assert_sync_force_placeholder_and_deps_error_regression()
 
     def test_sync_prefers_foreign_repo_snapshot_for_foreign_linked_issue(self) -> None:
         (

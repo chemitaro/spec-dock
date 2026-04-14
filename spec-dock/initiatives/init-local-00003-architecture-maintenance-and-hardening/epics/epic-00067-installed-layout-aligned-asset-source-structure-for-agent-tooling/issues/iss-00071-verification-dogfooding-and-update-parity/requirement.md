@@ -3,7 +3,7 @@
 ID: "iss-00071"
 タイトル: "Verification dogfooding and update parity"
 関連GitHub: ["#71"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 親: ["epic-00067", "init-local-00003"]
@@ -105,6 +105,9 @@ ID: "iss-00071"
 - evidence は最終的に issue-71 report に集約し、少なくとも `tests/test_init_update.py`、runtime command tests、installed package smoke、`validate` / `sync` command execution の結果を辿れること。
 - isolated installed package verification は `iss-00069` と同じく non-editable isolated install を使い、checkout fallback / `PYTHONPATH` / current working directory からの source tree fallback を禁止する。
 - `sync --github` の closure evidence は hermetic runtime subprocess tests と fixture-driven stdout/stderr assertions を primary とし、手動コマンド実行は補助証跡に留める。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` に残る `domain.ids` forbidden import failure は、この issue では structural cleanup の対象外とする。
+- ただし上記 failure が `validate` / `sync` / `sync --github`、checked-in dogfooding parity、isolated installed package smoke のいずれかへ波及した場合は scope-out できず blocker として扱う。
+- full-suite sweep に上記 failure だけが残る場合は、issue-71 report に residual risk として記録したうえで close 判定を行ってよい。
 
 ## 前提
 - `iss-00069` が package parity を pass している。
@@ -140,9 +143,11 @@ ID: "iss-00071"
     - checked-in `spec-dock/` scaffold は runtime command verification を行う fixture surface として update 後に整合した状態へ収束する
     - checked-in dogfooding parity tests は pass する
     - user-authored unmanaged path が parity recovery の中で誤って prune されない
+    - 上記 unmanaged path preservation は `iss-00070` report の `handoff-validation-evidence` に含まれる current managed / obsolete managed boundary assertions を prerequisite evidence として消費し、issue-71 では `spec-dock update` 後の diff が managed surfaces に閉じることを再確認する
   - 観測点:
     - `tests/test_init_update.py`
     - checked-in filesystem assertions
+    - `iss-00070` report の `handoff-validation-evidence`
 
 - AC-003:
   - Actor:

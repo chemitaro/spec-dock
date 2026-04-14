@@ -3,9 +3,9 @@
 ID: "iss-00069"
 タイトル: "Package data and installed artifact parity"
 関連GitHub: ["#69"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-12"
+最終更新: "2026-04-13"
 親: ["epic-00067", "init-local-00003"]
 ---
 
@@ -104,10 +104,11 @@ ID: "iss-00069"
   - `spec_dock/assets/install_root/.codex/agents/spec-dock.toml`
   - `spec_dock/assets/install_root/.github/agents/spec-dock.agent.md`
   - `spec_dock/assets/install_root/.github/workflows/ci.yml`
-- native shim representative paths は次の 2 件とする。
+- issue-70 handoff の重点 installed-discovery surface は次の 3 件とする。
+  - `spec_dock/assets/install_root/.agents/host-adapters/meta.json`
   - `spec_dock/assets/install_root/.codex/agents/spec-dock.toml`
   - `spec_dock/assets/install_root/.github/agents/spec-dock.agent.md`
-- native shim coverage は issue-70 handoff に必要な canonical install_root surface を検証対象とする。`codex_skills/native-shims/*` の legacy packaged source はこの issue の representative coverage 対象ではなく、issue-70 cutover 前の transitional compatibility surface として別扱いにする。
+- handoff representative coverage は issue-70 handoff に必要な canonical install_root surface を検証対象とする。`codex_skills/native-shims/*` の legacy packaged source はこの issue の representative coverage 対象ではなく、issue-70 cutover 前の transitional compatibility surface として別扱いにする。
 - local checkout と installed package で asset discovery の結果がずれたら fail とする。
 - full install_root inventory は `src/spec_dock/assets/install_root/` 配下の全 file を `spec_dock/assets/install_root/...` へ正規化した artifact-relative inventory とする。
 - wrapper-era stale exclusion set は次の exact artifact-relative patterns とする。
@@ -140,6 +141,8 @@ ID: "iss-00069"
   - `spec_dock/assets/spec_dock/templates/plan.md`
   - `spec_dock/assets/spec_dock/templates/report.md`
   - `spec_dock/assets/spec_dock/templates/requirement.md`
+- wheel stale-fixture precondition は `build_py.run` 後かつ `_prune_stale_build_outputs()` 実行前の `build_lib/spec_dock/assets/...` staging area に、seeded stale-output fixture set の exact paths が存在することとする。
+- sdist stale-fixture precondition は temporary source build context の `src/spec_dock/assets/...` namespace に、seeded stale-output fixture set と同じ relative stale paths を source-tree relative path で注入し、sdist build 開始前にその全件が存在することとする。
 
 ## 前提
 - `iss-00068` により `install_root/` と in-scope asset inventory が定義済みである。
@@ -174,11 +177,14 @@ ID: "iss-00069"
     - isolated non-editable wheel install から `spec-dock init <tmp-repo>` と `spec-dock update <tmp-repo>` を実行しても missing asset error が発生しない
     - installed smoke / parity 実行時に checkout fallback を使わず、site-packages 由来の installed resources だけで観測できる
     - 上記 isolated env では package-installed command が参照できる provider-side assets は site-packages 内 package data だけであり、`init/update` の asset resolution は installed package 由来である
-    - canonical native shim handoff surface として `spec_dock/assets/install_root/.codex/agents/spec-dock.toml` と `spec_dock/assets/install_root/.github/agents/spec-dock.agent.md` の installed discovery が確認できる
+    - package-installed `init/update` smoke の成功だけでは AC-002 を満たしたことにしない。pass には、同じ isolated env で `install_root` representative/handoff surface の installed discovery assertion が併せて成功することが必要である
+    - issue-70 handoff の重点 installed-discovery surface として `spec_dock/assets/install_root/.agents/host-adapters/meta.json`、`spec_dock/assets/install_root/.codex/agents/spec-dock.toml`、`spec_dock/assets/install_root/.github/agents/spec-dock.agent.md` の installed discovery が確認できる
+    - legacy `codex_skills` package data だけで `init/update` が起動できても、上記 `install_root` installed discovery assertion が欠ける場合は fail とする
     - consumer repo への authoritative reflection 成否はこの issue の acceptance 対象外である
   - 観測点:
     - local vs installed discovery parity check
     - package-installed `init/update` smoke
+    - installed handoff-surface assertion
 
 - AC-003:
   - Actor:
@@ -208,6 +214,7 @@ ID: "iss-00069"
     - representative artifact set は built artifacts に含まれる
     - wrapper-era stale exclusion set の paths は built artifacts に含まれない
     - seeded stale-output fixture set の各 path は build staging area では存在し、wheel / sdist listing では 0 件である
+    - wheel は `build_lib/spec_dock/assets/...` staging area、sdist は temporary source build context の `src/spec_dock/assets/...` namespace で seeded stale-output fixture set の事前存在が確認できる
     - stale build output fixture によって exclusion guard が実際に効いていることを pass/fail 判定できる
     - inclusion と exclusion の両方が同じ regression suite で pass/fail 判定できる
   - 観測点:

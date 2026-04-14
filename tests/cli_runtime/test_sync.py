@@ -1125,6 +1125,49 @@ class TestCliSync(CliRuntimeHarness):
             self.assertEqual(active["epic"]["id"], "epic-00002")
             self.assertEqual(active["issue"]["id"], "iss-00003")
 
+    def test_issue_71_runtime_bundle_validate_sync_and_sync_github_surface(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=101,
+                epic_issue_number=201,
+                issue_issue_number=301,
+            )
+
+            p_validate = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
+
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Issue", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+            )
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            p_sync_github = self._run_runtime_capture(
+                target,
+                ["sync", "--github", "--no-update-active"],
+                env=test_env,
+            )
+            self.assertEqual(p_sync_github.returncode, 0, p_sync_github.stdout + p_sync_github.stderr)
+
+            index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            self.assertIn("iss-00301", index["nodes"])
+
     def test_sync_github_populates_issue_statuses(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")

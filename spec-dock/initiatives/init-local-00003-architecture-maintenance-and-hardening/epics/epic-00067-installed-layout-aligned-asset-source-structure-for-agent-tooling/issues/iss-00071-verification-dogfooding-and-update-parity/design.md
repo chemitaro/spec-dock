@@ -3,7 +3,7 @@
 ID: "iss-00071"
 タイトル: "Verification dogfooding and update parity"
 関連GitHub: ["#71"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md"]
@@ -180,6 +180,8 @@ report --> i72 : final verification input
       - issue-69 `package-parity-evidence` には最低でも `full inventory parity`、`representative asset set`、`stale exclusion guard`、`isolated install smoke` の 4 項目に、参照した test / command output summary / result を埋めていること
     - consumption rule:
       - issue-71 report の `upstream-handoff-consumed` section には、issue-69 package parity evidence と issue-70 handoff evidence の参照先、消費した subchecks、final verification で再確認した箇所を列挙する
+      - issue-70 handoff evidence に含まれる current managed / obsolete managed boundary assertions を、AC-002 の unmanaged-path preservation prerequisite として明示的に採用する
+      - issue-71 自身では `spec-dock update` 後の diff が parity-managed surfaces と fixture-surface managed stale docs に閉じることを再確認し、unmanaged path を新たに prune していないことを補助証跡として残す
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:
@@ -286,6 +288,11 @@ Installed --> Report
   - checked-in dogfooding parity と runtime fixture parity が混ざって scope が崩れる
   - mitigation:
     - `.agents/.codex/.github/.github/workflows` を parity-managed surface、`spec-dock/` を runtime fixture surfaceとして分離する
+- risk-5:
+  - full-suite sweep に `commands/deps.py` の `domain.ids` forbidden import が残り、issue-71 closure surface failure と誤認される
+  - mitigation:
+    - `validate` / `sync` / `sync --github`、checked-in dogfooding parity、isolated installed package smoke への波及有無を closure boundary として明文化する
+    - 上記 4 面に影響しない場合は issue-71 report に residual risk として記録し、structural cleanup は別 issue へ切り出す
 - rollback:
   - issue-71 の rollback は verification docs/tests/report wiring のみ
   - upstream installer/package contracts は rollback 対象外

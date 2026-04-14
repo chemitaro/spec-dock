@@ -3,26 +3,29 @@
 ID: "iss-00072"
 タイトル: "Legacy authority retirement and final spec close"
 関連GitHub: ["#72"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-13"
+最終更新: "2026-04-14"
 親: ["epic-00067", "init-local-00003"]
 ---
 
 # iss-00072 Legacy authority retirement and final spec close — 要件定義（WHAT / WHY）
 
 ## 目的
-- `install_root` への authority 一本化を最終確定し、`codex_skills` を agent-tooling authority として参照する code/tests/assets/current docs を retire する。
+- `install_root` への authority 一本化を最終確定し、`codex_skills` を agent-tooling authority として参照する code/tests/assets/current docs を retire したうえで、legacy tree 自体も安全に repo から削除する。
 - `E-RQ-006`、`E-RQ-008`、`E-AC-004`、`E-AC-005`、`E-AC-007` を閉じ、epic-00067 を final spec close 可能な状態にする。
 
 ## 背景・現状
 - 現状の挙動:
-  - issue-70 までで installer/runtime authority は `install_root` へ切替済みになる前提だが、legacy `codex_skills` 実体とその参照は source tree / tests / checked-in metadata / current docs に残りうる。
+  - issue-70 までで installer/runtime authority は `install_root` へ切替済みであり、production code の current execution path は `codex_skills` を authority として参照しない。
+  - 一方で legacy `codex_skills` 実体とその参照は source tree / tests / current docs に残っており、「historical artifact を残す設計」が current repo cleanup の完了条件を曖昧にしている。
   - issue-71 で verification は閉じるが、authority retirement 自体の cleanup owner はまだ残る。
 - 現状の課題:
   - legacy root 実体や `codex_skills` authority 文脈が code/tests/current docs に残ると、install_root が唯一の authority であるという final claim と矛盾する。
+  - user 方針として後方互換は不要であり、historical artifact を repo に残し続ける合理性が失われている。
   - future host extension point を示したい一方で、旧 authority を温存すると tree の読みやすさと境界が再び曖昧になる。
   - historical spec records まで一括書換えを始めると scope が膨らみ、closeout tranche が終わらない。
+  - 実 repo では特に `tests/test_init_update.py` の parity / duplicate assumptions と `AGENTS.md` の provider-side directory map に legacy authority 前提が残っている。
 - 再現手順:
   1. code/tests/assets/current docs で `codex_skills` 参照を検索する。
   2. `install_root` authority と矛盾する current docs / metadata / tests が残っていないか確認する。
@@ -35,7 +38,7 @@ ID: "iss-00072"
     - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
   - Tests:
     - `tests/test_init_update.py`
-    - relevant CLI/runtime tests
+    - relevant CLI/runtime tests（scoped search で current authority assertion hit がある場合のみ）
   - Current docs/spec:
     - epic-00067 docs
     - issue-68/69/70/71/72 current docs
@@ -48,7 +51,6 @@ ID: "iss-00072"
   - `src/spec_dock/cli.py`
   - `tests/test_init_update.py`
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
-  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json`
   - checked-in `.agents/host-adapters/meta.json`
   - epic-00067 docs
   - issue-71 docs
@@ -64,10 +66,14 @@ ID: "iss-00072"
 
 ## スコープ
 - MUST:
-  - `codex_skills` authority を code/tests/current docs/assets から retire する。
+  - `codex_skills` authority を current code/tests/current docs から retire する。
+  - `src/spec_dock/assets/codex_skills/` を repo から削除する。
+  - assets については `install_root` authoritative manifest を review し、current metadata source が `codex_skills` に戻っていないことを確認する。
+  - 削除前に、current code / package install contract / tests / current docs が `codex_skills` physical tree を current dependency として持っていないことを確認する。
   - `install_root` が唯一の current authority であることを current docs と tests で確認できるようにする。
   - future host extension point を sibling-root model として final review で確認する。
   - final spec review / closeout evidence を issue-72 report に集約する。
+  - issue-72 で変更した provider-side docs / repo guidance / mirror-affecting docs については、`spec-dock update` 後の dogfooding mirror 収束を fresh evidence として残す。
 - MUST NOT:
   - historical closed records まで全面書換えしない。
   - Claude Code 実装を追加しない。
@@ -76,12 +82,14 @@ ID: "iss-00072"
   - historical issue/report/discussion の記述統一
   - new host implementation
   - workflow 個別機能の拡張
+  - `src/spec_dock/cli.py` の authority model 自体の再設計
 
 ## 境界
 - Always:
   - authority retirement 対象は current code / tests / assets / current docs に限定する。
   - current docs corpus は次に固定する。
     - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/{requirement.md,design.md,plan.md}`
+    - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/report.md`
     - 同 epic 配下の issues `iss-00068` から `iss-00072` の `requirement.md` / `design.md` / `report.md`
     - `AGENTS.md`
     - `src/spec_dock/assets/spec_dock/docs/**`
@@ -94,16 +102,17 @@ ID: "iss-00072"
   - final close は `install_root` uniqueness と future host extension point の両方を確認して閉じる。
   - `codex_skills` retirement verification は current surface に限定した search contract で判定する。
     - must inspect:
-      - `src/spec_dock/cli.py`
-      - `src/spec_dock/assets/install_root/**`
-      - `tests/**`
-      - current docs corpus
+    - `src/spec_dock/cli.py`
+    - `src/spec_dock/assets/install_root/**`
+    - `tests/**`
+    - `AGENTS.md`
+    - current docs corpus
     - allowed residual matches:
-      - `src/spec_dock/assets/codex_skills/**` に残る historical artifact
       - historical closed issue/report/discussion
-      - current docs の historical boundary / legacy artifact と明示された説明
+      - current docs の historical boundary / deleted legacy tree と明示された説明
     - forbidden residual matches:
-      - current code/tests/assets/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱う記述
+      - current code/tests/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱う記述
+      - current assets が `codex_skills` を current metadata source として要求する記述
 - Ask:
   - historical record を修正しないと current reader が誤読する場合のみ、例外的に current scope へ昇格する。
 - Never:
@@ -113,17 +122,21 @@ ID: "iss-00072"
 
 ## 非交渉制約
 - `install_root` が唯一の current authority であることを code/tests/current docs/report evidence の 4 面で説明できなければならない。
-- `codex_skills` は historical artifact として残る場合でも、current authority として参照されてはならない。
+- `codex_skills` は current repo に物理残置しない。残るのは historical records 上の言及だけとする。
   - retirement 対象は少なくとも次の 4 面を含む。
   - code:
     - installer source discovery / metadata authority references
   - tests:
-    - expected bundled asset paths / authority assumptions
+    - current authority assertions / expected bundled asset paths / authority assumptions
   - assets:
-    - source-of-truth metadata that still points at `codex_skills`
+    - provider-side authoritative manifest review と legacy artifact classification
   - current docs:
     - epic-00067 と current issue docs、および repo-facing current guidance
 - authority retirement review は provider-side authoritative manifest として `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` を必ず含める。
+- issue-72 の authority retirement 実装では、production code の authority rewrite よりも `tests/test_init_update.py`、`AGENTS.md`、current closeout docs の residual authority assumptions 除去を主対象として扱う。
+- tests corpus のうち、過去 issue の historical regression coverage や cutover evidence を説明する参照は、それ自体を current authority assertion や expected current file inventory にしていない限り許容する。
+- issue-72 で禁止するのは、tests が `codex_skills` physical tree の存在や current authority source/path を期待する assertion である。
+- relevant CLI/runtime tests は scoped search で current authority assertion hit がある場合にのみ update / targeted validation の対象とし、hit が無い場合は `該当なし` を report に記録する。
 - historical closed issue/report/discussion は final close の必須 cleanup 対象にしない。ただし current reader が誤読する導線になる場合は current docs で明示的に上書きする。
   - future host extension point は「`.agents` shared + sibling host roots」という current model で説明されなければならない。
   - final spec close は issue-71 final verification が pass していることを前提にする。
@@ -157,7 +170,7 @@ ID: "iss-00072"
   - Then:
     - `install_root` が唯一の current authority と説明できる
     - `codex_skills` を current authority として参照する current surface が残っていない
-    - legacy root が残る場合も historical artifact としてだけ扱われる
+    - `src/spec_dock/assets/codex_skills/` が削除されている
     - issue-72 で変更した provider-side docs / mirror-affecting surfaces について、`spec-dock update` 後の dogfooding mirror 収束が fresh evidence で確認できる
     - issue-71 parity evidence は issue-72 で未変更の surface に対する補助参照としてのみ使われる
   - 観測点:
@@ -207,8 +220,9 @@ ID: "iss-00072"
     - final spec review を行う
   - Then:
     - `E-AC-004` / `E-AC-005` を閉じる evidence が issue-72 report から辿れる
-    - epic-00067 `requirement.md` / `design.md` / `plan.md` と、issue-68 から issue-72 の `requirement.md` / `design.md` / `report.md` に限定した evidence chain に矛盾がない
+    - epic-00067 `requirement.md` / `design.md` / `plan.md` / `report.md` と、issue-68 から issue-72 の `requirement.md` / `design.md` / `report.md` に限定した evidence chain に矛盾がない
     - authority uniqueness、historical boundary、future host extension point、issue-71 verification prerequisite、dogfooding mirror convergence の 5 項目が issue-72 report から確認できる
+    - epic current report は placeholder ではなく evidence-bearing content を持ち、issue-72 report からその section を参照できる
   - 観測点:
     - epic docs
     - issue docs/reports
@@ -217,10 +231,11 @@ ID: "iss-00072"
 ## 例外・エッジケース
 - EC-001:
   - 条件:
-    - legacy `codex_skills` 実体を historical artifact として repo に残す
+    - historical records 内に `codex_skills` 文言が残る
   - 期待:
     - current code/tests/docs はそれを authority として参照しない
     - current docs に authority は `install_root` と明記される
+    - physical tree 不在でも historical discussion/report の説明整合は壊れない
   - 観測点:
     - source search
     - current docs review

@@ -3,7 +3,7 @@
 ID: "iss-00070"
 タイトル: "Installer source discovery and managed ownership"
 関連GitHub: ["#70"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-13"
 依存: ["requirement.md"]
@@ -30,7 +30,7 @@ ID: "iss-00070"
 - 非交渉制約:
   - user 方針どおり one-shot cutover を採用し、過剰な backward compatibility や多段 migration は持たない。
   - package parity 自体の owner は `iss-00069` に残し、本 issue は installed package surface 上での authoritative reflection だけを追加で証明する。
-  - final dogfooding / validate / sync closeout は `iss-00071` / `iss-00072` に handoff する。
+  - issue-local quality gate として `validate` / `sync --github` は本 issue の `S99` で実行する。ただし、dogfooding checked-in state の最終 refresh、authority retirement、epic 全体の final closeout は `iss-00071` / `iss-00072` に handoff する。
 - 前提:
   - `iss-00068` で `install_root` tree と asset classification が確定済み。
   - `iss-00069` で wheel / sdist / isolated installed package に `install_root` assets が入ることが確定済み。

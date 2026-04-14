@@ -1,9 +1,11 @@
-import json
+import ast
 import io
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from contextlib import contextmanager, redirect_stderr
@@ -83,21 +85,21 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"
         ),
         ".agents/skills/spec-driven-tdd-workflow/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
         ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
         ".agents/skills/spec-dock-codex-adapter/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md"
         ),
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md": (
-            "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md"
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md"
         ),
-        ".agents/host-adapters/meta.json": "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
-        ".codex/agents/spec-dock.toml": "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
+        ".agents/host-adapters/meta.json": "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+        ".codex/agents/spec-dock.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
         ".github/agents/spec-dock.agent.md": (
-            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md"
+            "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md"
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
@@ -242,11 +244,8 @@ class TestInitUpdate(CliRuntimeHarness):
                     "managed": True,
                     "owner": "spec-dock",
                     "target_file": ".codex/agents/spec-dock.toml",
-                    "source_of_truth_asset": "codex_skills/native-shims/spec-dock.toml",
+                    "source_of_truth_asset": "install_root/.codex/agents/spec-dock.toml",
                     "delegates_to": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
-                    "obsolete_managed_paths": [
-                        ".codex/agents/spec-dock-codex-adapter.toml",
-                    ],
                 },
             },
             "copilot": {
@@ -256,17 +255,220 @@ class TestInitUpdate(CliRuntimeHarness):
                     "managed": True,
                     "owner": "spec-dock",
                     "target_file": ".github/agents/spec-dock.agent.md",
-                    "source_of_truth_asset": "codex_skills/native-shims/spec-dock.agent.md",
+                    "source_of_truth_asset": "install_root/.github/agents/spec-dock.agent.md",
                     "delegates_to": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
-                    "obsolete_managed_paths": [
-                        ".github/agents/spec-dock-copilot-adapter.agent.md",
-                    ],
                 },
             },
+        },
+        "managed_assets": {
+            "obsolete_exact_file_paths": [
+                ".codex/agents/spec-dock-codex-adapter.toml",
+                ".github/agents/spec-dock-copilot-adapter.agent.md",
+            ]
         },
         "generated_by": "spec-dock update",
         "updated_at": "2026-04-06T00:00:00Z",
     }
+    _ISSUE_68_INSTALL_ROOT = Path("src/spec_dock/assets/install_root")
+    _ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS = (
+        ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+        ".agents/skills/spec-dock-epic-planning/SKILL.md",
+        ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+        ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+        ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+        ".agents/host-adapters/meta.json",
+        ".codex/agents/spec-dock.toml",
+        ".github/agents/spec-dock.agent.md",
+        ".github/workflows/ci.yml",
+    )
+    _ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS = {
+        ".agents/skills/": (
+            ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
+            ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+            ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+        ),
+        ".agents/host-adapters/": (
+            ".agents/host-adapters/meta.json",
+        ),
+        ".codex/agents/": (
+            ".codex/agents/spec-dock.toml",
+        ),
+        ".github/agents/": (
+            ".github/agents/spec-dock.agent.md",
+        ),
+        ".github/workflows/": (
+            ".github/workflows/ci.yml",
+        ),
+    }
+    _ISSUE_68_RETIRED_LEGACY_ROOT = (
+        Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets" / "codex_skills"
+    )
+    _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY = {
+        "spec-driven-tdd-workflow skill": {
+            "search_globs": (
+                "**/spec-driven-tdd-workflow/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+            ),
+        },
+        "spec-dock-adr-facilitation skill": {
+            "search_globs": (
+                "**/spec-dock-adr-facilitation/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-adr-facilitation/SKILL.md",
+            ),
+        },
+        "spec-dock-epic-planning skill": {
+            "search_globs": (
+                "**/spec-dock-epic-planning/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-initiative-planning skill": {
+            "search_globs": (
+                "**/spec-dock-initiative-planning/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-issue-execution skill": {
+            "search_globs": (
+                "**/spec-dock-issue-execution/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
+            ),
+        },
+        "spec-dock-codex-adapter skill": {
+            "search_globs": (
+                "**/spec-dock-codex-adapter/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
+            ),
+        },
+        "spec-dock-copilot-adapter skill": {
+            "search_globs": (
+                "**/spec-dock-copilot-adapter/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
+            ),
+        },
+        "host adapter metadata": {
+            "search_globs": (
+                "**/host-adapters/meta.json",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+            ),
+        },
+        "codex native shim": {
+            "search_globs": (
+                "**/spec-dock.toml",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+            ),
+        },
+        "github agent file": {
+            "search_globs": (
+                "**/spec-dock.agent.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+            ),
+        },
+        "github workflow asset": {
+            "search_globs": (
+                "**/.github/workflows/ci.yml",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
+            ),
+        },
+    }
+    _ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
+        "spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
+        "spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
+        "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+        "spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+        "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+        "spec_dock/assets/install_root/.github/workflows/ci.yml",
+    )
+    _ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+        "spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+        "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+    )
+    _ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS = (
+        "assets/install_root/.agents/**",
+        "assets/install_root/.codex/**",
+        "assets/install_root/.github/**",
+    )
+    _ISSUE_69_WHEELHOUSE_RELATIVE = Path("tests/fixtures/wheelhouse")
+    _ISSUE_69_BUILD_BACKEND_REQUIREMENTS = (
+        "build==1.2.2",
+        "packaging==24.2",
+        "pyproject_hooks==1.2.0",
+        "setuptools==75.8.0",
+        "tomli==2.2.1",
+        "wheel==0.45.1",
+    )
+    _ISSUE_69_WHEELHOUSE_FILENAMES = (
+        "build-1.2.2-py3-none-any.whl",
+        "packaging-24.2-py3-none-any.whl",
+        "pyproject_hooks-1.2.0-py3-none-any.whl",
+        "setuptools-75.8.0-py3-none-any.whl",
+        "tomli-2.2.1-py3-none-any.whl",
+        "wheel-0.45.1-py3-none-any.whl",
+    )
+    _ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS = (
+        "spec_dock/assets/spec_dock/scripts/spec-dock-close*.sh",
+        "spec_dock/assets/github/workflows/spec-dock-close.yml",
+        "spec_dock/assets/spec_dock/templates/**/current/**",
+        "spec_dock/assets/spec_dock/templates/**/completed/**",
+        "spec_dock/assets/spec_dock/templates/adr.md",
+        "spec_dock/assets/spec_dock/templates/**/discussions/rules.md",
+        "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
+        "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
+        "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
+        "spec_dock/assets/spec_dock/templates/*/**/README.md",
+        "spec_dock/assets/spec_dock/templates/design.md",
+        "spec_dock/assets/spec_dock/templates/plan.md",
+        "spec_dock/assets/spec_dock/templates/report.md",
+        "spec_dock/assets/spec_dock/templates/requirement.md",
+    )
+    _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
+        "spec_dock/assets/github/workflows/spec-dock-close.yml",
+        "spec_dock/assets/spec_dock/templates/initiative/current/stale.md",
+        "spec_dock/assets/spec_dock/templates/initiative/completed/stale.md",
+        "spec_dock/assets/spec_dock/templates/adr.md",
+        "spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
+        "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
+        "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
+        "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
+        "spec_dock/assets/spec_dock/templates/issue/legacy/README.md",
+        "spec_dock/assets/spec_dock/templates/design.md",
+        "spec_dock/assets/spec_dock/templates/plan.md",
+        "spec_dock/assets/spec_dock/templates/report.md",
+        "spec_dock/assets/spec_dock/templates/requirement.md",
+    )
+    _ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV = "SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES"
+    _ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV = "SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT"
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -291,6 +493,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00064-update-user-facing-docs-help/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00069-package-data-and-installed-artifact-parity/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
@@ -332,6 +540,22 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00062-downstream-parity-and-cutover-readiness/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00063-final-regression-parity-and-cutover-closure/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00059-dependency-metadata-unification-and-command-mutation/issues/iss-00064-update-user-facing-docs-help/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00068-install-root-tree-and-asset-classification/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00069-package-data-and-installed-artifact-parity/.meta.json": [
+            "iss-00068"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/.meta.json": [
+            "iss-00068",
+            "iss-00069",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json": [
+            "iss-00069",
+            "iss-00070",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json": [
+            "iss-00071"
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -339,6 +563,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00037": ["iss-00034", "iss-00035", "iss-00036"],
         "iss-00038": ["iss-00034", "iss-00035", "iss-00036", "iss-00037", "iss-00040"],
         "iss-00050": ["iss-00049"],
+        "iss-00069": ["iss-00068"],
+        "iss-00070": ["iss-00068", "iss-00069"],
+        "iss-00071": ["iss-00069", "iss-00070"],
+        "iss-00072": ["iss-00071"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -509,7 +737,9 @@ class TestInitUpdate(CliRuntimeHarness):
         manifest_override: dict[str, object],
     ) -> tuple[int, str]:
         def _mutate_assets(patched_assets_root: Path) -> None:
-            patched_meta = patched_assets_root / "codex_skills" / "host-adapters" / "meta.json"
+            patched_meta = (
+                patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
+            )
             patched_meta.write_text(
                 json.dumps(manifest_override, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
@@ -609,6 +839,58 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"managed file changed despite manifest contract failure: {rel_path}",
             )
 
+    def _build_managed_skill_install_plan_from_assets_root(self, assets_root: Path):
+        import spec_dock.cli as cli
+
+        return cli._build_managed_skill_install_plan(assets_root)
+
+    def _issue_70_missing_transition_coverage(
+        self,
+        *,
+        previous_plan: object,
+        current_plan: object,
+    ) -> set[str]:
+        previous_targets = {
+            mapping.target_rel.as_posix()
+            for mapping in previous_plan.current_file_mappings
+        }
+        current_targets = {
+            mapping.target_rel.as_posix()
+            for mapping in current_plan.current_file_mappings
+        }
+        current_obsolete = {
+            rel_path.as_posix() for rel_path in current_plan.obsolete_exact_rel_paths
+        }
+        removed_targets = previous_targets.difference(current_targets)
+        return removed_targets.difference(current_obsolete)
+
+    def _issue_71_extract_markdown_section_by_heading_prefix(
+        self,
+        *,
+        markdown_text: str,
+        heading_prefix: str,
+        source_label: str,
+    ) -> str:
+        lines = markdown_text.splitlines()
+        start_index = None
+        heading_marker = f"## {heading_prefix}"
+        for index, line in enumerate(lines):
+            if line.startswith(heading_marker):
+                start_index = index
+                break
+        self.assertIsNotNone(
+            start_index,
+            f"issue-71 expected heading prefix missing in {source_label}: {heading_prefix}",
+        )
+
+        assert start_index is not None
+        end_index = len(lines)
+        for index in range(start_index + 1, len(lines)):
+            if lines[index].startswith("## "):
+                end_index = index
+                break
+        return "\n".join(lines[start_index:end_index]) + "\n"
+
     def _assert_native_shim_static_delegation_only_contract(
         self,
         *,
@@ -648,6 +930,470 @@ class TestInitUpdate(CliRuntimeHarness):
             self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
             f"codex native shim still uses legacy instructions key ({shim_label})",
         )
+
+    def _issue_69_run_subprocess(
+        self,
+        args: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        result = subprocess.run(
+            args,
+            cwd=str(cwd) if cwd is not None else None,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "issue-69 command failed:\n"
+            f"command: {' '.join(args)}\n"
+            f"cwd: {cwd}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}",
+        )
+
+    def _issue_69_run_subprocess_capture(
+        self,
+        args: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess:
+        result = subprocess.run(
+            args,
+            cwd=str(cwd) if cwd is not None else None,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "issue-69 command failed:\n"
+            f"command: {' '.join(args)}\n"
+            f"cwd: {cwd}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}",
+        )
+        return result
+
+    def _issue_69_resolve_wheelhouse(self, repo_root: Path) -> Path:
+        wheelhouse = repo_root / self._ISSUE_69_WHEELHOUSE_RELATIVE
+        self.assertTrue(
+            wheelhouse.is_dir(),
+            f"issue-69 local wheelhouse is missing: {wheelhouse}",
+        )
+        missing_wheels = [
+            wheel_name
+            for wheel_name in self._ISSUE_69_WHEELHOUSE_FILENAMES
+            if not (wheelhouse / wheel_name).is_file()
+        ]
+        self.assertEqual(
+            missing_wheels,
+            [],
+            f"issue-69 local wheelhouse is missing pinned backend wheels: {missing_wheels}",
+        )
+        return wheelhouse
+
+    def _issue_69_venv_python(self, venv_dir: Path) -> Path:
+        if os.name == "nt":
+            return venv_dir / "Scripts" / "python.exe"
+        return venv_dir / "bin" / "python"
+
+    def _issue_69_venv_spec_dock(self, venv_python: Path) -> Path:
+        if os.name == "nt":
+            return venv_python.parent / "spec-dock.exe"
+        return venv_python.parent / "spec-dock"
+
+    def _issue_69_runtime_env_without_checkout_fallback(self) -> dict[str, str]:
+        env = os.environ.copy()
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
+        return env
+
+    def _issue_69_build_artifacts_with_local_wheelhouse(
+        self,
+        *,
+        repo_root: Path,
+        build_context: Path,
+        wheel_dir: Path,
+        sdist_dir: Path,
+        build_env: dict[str, str] | None = None,
+    ) -> tuple[Path, Path, Path]:
+        wheelhouse = self._issue_69_resolve_wheelhouse(repo_root)
+        venv_dir = build_context.parent / "build-venv"
+        dist_dir = build_context.parent / "dist"
+
+        self._issue_69_run_subprocess([sys.executable, "-m", "venv", str(venv_dir)])
+        venv_python = self._issue_69_venv_python(venv_dir)
+        self.assertTrue(
+            venv_python.is_file(),
+            f"issue-69 expected venv python executable at: {venv_python}",
+        )
+
+        self._issue_69_run_subprocess(
+            [
+                str(venv_python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-cache-dir",
+                "--find-links",
+                str(wheelhouse),
+                *self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS,
+            ]
+        )
+
+        self._issue_69_run_subprocess(
+            [
+                str(venv_python),
+                "-m",
+                "build",
+                "--wheel",
+                "--sdist",
+                "--no-isolation",
+                "--outdir",
+                str(dist_dir),
+            ],
+            cwd=build_context,
+            env=build_env,
+        )
+
+        wheel_paths = sorted(dist_dir.glob("*.whl"))
+        sdist_paths = sorted(dist_dir.glob("*.tar.gz"))
+        self.assertEqual(len(wheel_paths), 1, f"issue-69 expected one wheel artifact, got: {wheel_paths}")
+        self.assertEqual(len(sdist_paths), 1, f"issue-69 expected one sdist artifact, got: {sdist_paths}")
+
+        wheel_dir.mkdir(parents=True, exist_ok=True)
+        sdist_dir.mkdir(parents=True, exist_ok=True)
+        wheel_path = wheel_dir / wheel_paths[0].name
+        sdist_path = sdist_dir / sdist_paths[0].name
+        shutil.copy2(wheel_paths[0], wheel_path)
+        shutil.copy2(sdist_paths[0], sdist_path)
+        return wheel_path, sdist_path, venv_python
+
+    def _issue_69_prepare_isolated_installed_wheel_runtime(
+        self,
+        *,
+        repo_root: Path,
+        temp_root: Path,
+    ) -> Path:
+        build_context = temp_root / "build-context"
+        wheel_dir = temp_root / "wheelhouse"
+        sdist_dir = temp_root / "sdist"
+        self._issue_69_prepare_build_context(repo_root, build_context)
+        wheel_path, _, venv_python = self._issue_69_build_artifacts_with_local_wheelhouse(
+            repo_root=repo_root,
+            build_context=build_context,
+            wheel_dir=wheel_dir,
+            sdist_dir=sdist_dir,
+        )
+        self._issue_69_run_subprocess(
+            [
+                str(venv_python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-cache-dir",
+                "--no-deps",
+                str(wheel_path),
+            ],
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        return venv_python
+
+    def _issue_69_path_is_within(self, path: Path, root: Path) -> bool:
+        try:
+            path.resolve().relative_to(root.resolve())
+        except ValueError:
+            return False
+        return True
+
+    def _issue_69_collect_isolated_installed_runtime_snapshot(
+        self,
+        *,
+        venv_python: Path,
+        repo_root: Path,
+        cwd: Path,
+    ) -> dict[str, object]:
+        repo_root_literal = json.dumps(str(repo_root.resolve()))
+        script = (
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "import spec_dock\n"
+            "import spec_dock.cli as cli\n"
+            f"repo_root = Path({repo_root_literal})\n"
+            "def _is_under_repo(path_text: str) -> bool:\n"
+            "    if not path_text:\n"
+            "        return False\n"
+            "    try:\n"
+            "        Path(path_text).resolve().relative_to(repo_root)\n"
+            "        return True\n"
+            "    except Exception:\n"
+            "        return False\n"
+            "with cli._assets_dir() as assets_dir:\n"
+            "    resolved_assets_dir = Path(assets_dir).resolve()\n"
+            "    install_root = resolved_assets_dir / 'install_root'\n"
+            "    inventory = sorted(\n"
+            "        f\"spec_dock/assets/{candidate.relative_to(resolved_assets_dir).as_posix()}\"\n"
+            "        for candidate in install_root.rglob('*')\n"
+            "        if candidate.is_file()\n"
+            "    )\n"
+            "payload = {\n"
+            "    'spec_dock_file': str(Path(spec_dock.__file__).resolve()),\n"
+            "    'assets_dir': str(resolved_assets_dir),\n"
+            "    'sys_path_has_repo_root': any(_is_under_repo(path_text) for path_text in sys.path if path_text),\n"
+            "    'inventory': inventory,\n"
+            "}\n"
+            "print(json.dumps(payload))\n"
+        )
+        result = self._issue_69_run_subprocess_capture(
+            [str(venv_python), "-c", script],
+            cwd=cwd,
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        output_lines = [line for line in result.stdout.splitlines() if line.strip()]
+        self.assertTrue(output_lines, "issue-69 runtime snapshot command produced no JSON output")
+        payload = json.loads(output_lines[-1])
+        self.assertIsInstance(payload, dict, "issue-69 runtime snapshot must be a JSON object")
+        return payload
+
+    def _issue_70_collect_isolated_installed_plan_snapshot(
+        self,
+        *,
+        venv_python: Path,
+        cwd: Path,
+    ) -> dict[str, object]:
+        script = (
+            "import json\n"
+            "from pathlib import Path\n"
+            "import spec_dock.cli as cli\n"
+            "with cli._assets_dir() as assets_dir:\n"
+            "    resolved_assets_dir = Path(assets_dir).resolve()\n"
+            "    plan = cli._build_managed_skill_install_plan(resolved_assets_dir)\n"
+            "payload = {\n"
+            "    'assets_dir': str(resolved_assets_dir),\n"
+            "    'current_targets': sorted(mapping.target_rel.as_posix() for mapping in plan.current_file_mappings),\n"
+            "    'current_sources': sorted(mapping.source_asset_rel.as_posix() for mapping in plan.current_file_mappings),\n"
+            "    'obsolete_targets': sorted(path.as_posix() for path in plan.obsolete_exact_rel_paths),\n"
+            "}\n"
+            "print(json.dumps(payload))\n"
+        )
+        result = self._issue_69_run_subprocess_capture(
+            [str(venv_python), "-c", script],
+            cwd=cwd,
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        output_lines = [line for line in result.stdout.splitlines() if line.strip()]
+        self.assertTrue(output_lines, "issue-70 plan snapshot command produced no JSON output")
+        payload = json.loads(output_lines[-1])
+        self.assertIsInstance(payload, dict, "issue-70 plan snapshot must be a JSON object")
+        return payload
+
+    def _issue_69_assert_runtime_snapshot_uses_installed_package(
+        self,
+        *,
+        snapshot: dict[str, object],
+        repo_root: Path,
+    ) -> None:
+        spec_dock_file = Path(str(snapshot.get("spec_dock_file", ""))).resolve()
+        assets_dir = Path(str(snapshot.get("assets_dir", ""))).resolve()
+        self.assertIn(
+            "site-packages",
+            spec_dock_file.as_posix(),
+            f"issue-69 expected installed package module path, got: {spec_dock_file}",
+        )
+        self.assertIn(
+            "site-packages",
+            assets_dir.as_posix(),
+            f"issue-69 expected installed package assets path, got: {assets_dir}",
+        )
+        self.assertFalse(
+            self._issue_69_path_is_within(spec_dock_file, repo_root),
+            f"issue-69 runtime imported spec_dock from checkout path: {spec_dock_file}",
+        )
+        self.assertFalse(
+            self._issue_69_path_is_within(assets_dir, repo_root),
+            f"issue-69 runtime loaded assets from checkout path: {assets_dir}",
+        )
+        self.assertFalse(
+            bool(snapshot.get("sys_path_has_repo_root")),
+            "issue-69 runtime sys.path unexpectedly includes repository checkout path",
+        )
+
+    def _issue_69_seed_stale_fixtures_in_sdist_source_context(self, build_context: Path) -> set[str]:
+        source_root = build_context / "src"
+        present_seeded_fixtures: set[str] = set()
+        for fixture_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+            fixture_source_path = source_root / fixture_artifact_path
+            fixture_source_path.parent.mkdir(parents=True, exist_ok=True)
+            fixture_source_path.write_text("issue-69 stale fixture in source context\n", encoding="utf-8")
+            if fixture_source_path.is_file():
+                present_seeded_fixtures.add(fixture_artifact_path)
+        return present_seeded_fixtures
+
+    def _issue_69_collect_wheel_file_inventory(self, wheel_path: Path) -> set[str]:
+        with zipfile.ZipFile(wheel_path) as wheel_zip:
+            return {member for member in wheel_zip.namelist() if not member.endswith("/")}
+
+    def _issue_69_collect_sdist_source_file_inventory(self, sdist_path: Path) -> set[str]:
+        inventory: set[str] = set()
+        with tarfile.open(sdist_path, "r:gz") as sdist_tar:
+            for member in sdist_tar.getmembers():
+                if not member.isfile():
+                    continue
+                _, sep, relative_member = member.name.partition("/")
+                if not sep or not relative_member.startswith("src/"):
+                    continue
+                inventory.add(relative_member.removeprefix("src/"))
+        return inventory
+
+    def _issue_69_extract_pyproject_stale_exclusion_patterns(self, pyproject_text: str) -> tuple[str, ...]:
+        section_header = "[tool.setuptools.exclude-package-data]"
+        self.assertIn(section_header, pyproject_text, "missing setuptools exclude-package-data section")
+        exclude_section = pyproject_text.split(section_header, 1)[1]
+        list_header = "spec_dock = ["
+        self.assertIn(list_header, exclude_section, "missing spec_dock exclude-package-data list")
+        list_block = exclude_section.split(list_header, 1)[1].split("]", 1)[0]
+        patterns: list[str] = []
+        for line in list_block.splitlines():
+            if '"' not in line:
+                continue
+            _, _, remainder = line.partition('"')
+            pattern, _, _ = remainder.partition('"')
+            if pattern:
+                patterns.append(pattern)
+        return tuple(patterns)
+
+    def _issue_69_extract_setup_stale_exclusion_patterns(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_STALE_BUILD_OUTPUT_PATTERNS":
+                    extracted = ast.literal_eval(statement.value)
+                    self.assertIsInstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        self.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
+
+    def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
+        build_context.mkdir(parents=True, exist_ok=True)
+        for filename in ("pyproject.toml", "README.md", "setup.py"):
+            shutil.copy2(repo_root / filename, build_context / filename)
+        shutil.copytree(
+            repo_root / "src",
+            build_context / "src",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+
+    def _issue_69_collect_source_install_root_inventory(self, repo_root: Path) -> set[str]:
+        source_root = repo_root / "src"
+        install_root = source_root / "spec_dock" / "assets" / "install_root"
+        return {
+            candidate.relative_to(source_root).as_posix()
+            for candidate in install_root.rglob("*")
+            if candidate.is_file()
+        }
+
+    def _issue_69_collect_wheel_install_root_inventory(self, wheel_path: Path) -> set[str]:
+        with zipfile.ZipFile(wheel_path) as wheel_zip:
+            return {
+                member
+                for member in wheel_zip.namelist()
+                if member.startswith("spec_dock/assets/install_root/") and not member.endswith("/")
+            }
+
+    def _issue_69_collect_sdist_install_root_inventory(self, sdist_path: Path) -> set[str]:
+        sdist_inventory: set[str] = set()
+        with tarfile.open(sdist_path, "r:gz") as sdist_tar:
+            for member in sdist_tar.getmembers():
+                if not member.isfile():
+                    continue
+                _, sep, relative_member = member.name.partition("/")
+                if not sep:
+                    continue
+                if not relative_member.startswith("src/"):
+                    continue
+                artifact_relative = relative_member.removeprefix("src/")
+                if artifact_relative.startswith("spec_dock/assets/install_root/"):
+                    sdist_inventory.add(artifact_relative)
+        return sdist_inventory
+
+    def _issue_69_collect_installed_install_root_inventory(self, installed_root: Path) -> set[str]:
+        package_root = installed_root / "spec_dock"
+        install_root = package_root / "assets" / "install_root"
+        self.assertTrue(
+            install_root.is_dir(),
+            f"issue-69 installed package is missing install_root assets: {install_root}",
+        )
+        return {
+            f"spec_dock/{candidate.relative_to(package_root).as_posix()}"
+            for candidate in install_root.rglob("*")
+            if candidate.is_file()
+        }
+
+    def _issue_69_collect_install_root_artifact_surfaces(self) -> dict[str, set[str]]:
+        repo_root = Path(__file__).resolve().parents[1]
+        source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            installed_dir = temp_root / "installed-package"
+            wheelhouse = self._issue_69_resolve_wheelhouse(repo_root)
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            installed_dir.mkdir(parents=True, exist_ok=True)
+
+            wheel_path, sdist_path, venv_python = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+            wheel_name_part, wheel_version_part, _ = wheel_path.name.split("-", 2)
+            wheel_requirement = f"{wheel_name_part.replace('_', '-')}=={wheel_version_part}"
+
+            self._issue_69_run_subprocess(
+                [
+                    str(venv_python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-index",
+                    "--no-cache-dir",
+                    "--no-deps",
+                    "--find-links",
+                    str(wheel_dir),
+                    "--find-links",
+                    str(wheelhouse),
+                    "--target",
+                    str(installed_dir),
+                    wheel_requirement,
+                ]
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_install_root_inventory(wheel_path)
+            sdist_inventory = self._issue_69_collect_sdist_install_root_inventory(sdist_path)
+            installed_inventory = self._issue_69_collect_installed_install_root_inventory(installed_dir)
+
+        return {
+            "source": source_inventory,
+            "wheel": wheel_inventory,
+            "sdist": sdist_inventory,
+            "installed": installed_inventory,
+        }
 
     def test_init_creates_expected_structure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1113,7 +1859,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/docs/README.md",
             "src/spec_dock/assets/spec_dock/docs/guide.md",
             "src/spec_dock/assets/spec_dock/scripts/README.md",
-            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
+            "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
         ]
         text_map = self._read_text_map(repo_root, guidance_paths)
         self._assert_canonical_rules_files_contract(text_map)
@@ -1193,6 +1939,309 @@ class TestInitUpdate(CliRuntimeHarness):
                     wheel_entries,
                     f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}",
                 )
+
+    def test_issue_69_package_data_includes_hidden_install_root_subtrees(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+        section_header = "[tool.setuptools.package-data]"
+        next_section_header = "[tool.setuptools.exclude-package-data]"
+        self.assertIn(section_header, pyproject_text, "missing setuptools package-data section")
+        self.assertIn(next_section_header, pyproject_text, "missing setuptools exclude-package-data section")
+
+        package_data_section = pyproject_text.split(section_header, 1)[1].split(next_section_header, 1)[0]
+        for pattern in self._ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS:
+            self.assertIn(
+                f'"{pattern}"',
+                package_data_section,
+                f"missing issue-69 hidden install_root package-data inclusion: {pattern}",
+            )
+
+    def test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces(self) -> None:
+        surfaces = self._issue_69_collect_install_root_artifact_surfaces()
+        for surface_name in ("source", "wheel", "sdist", "installed"):
+            self.assertTrue(
+                surfaces[surface_name],
+                f"issue-69 expected non-empty install_root inventory for artifact surface: {surface_name}",
+            )
+            for artifact_relative_path in self._ISSUE_69_REPRESENTATIVE_ARTIFACT_RELATIVE_PATHS:
+                self.assertIn(
+                    artifact_relative_path,
+                    surfaces[surface_name],
+                    (
+                        f"missing issue-69 representative install_root asset in {surface_name}: "
+                        f"{artifact_relative_path}"
+                    ),
+                )
+
+    def test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources(self) -> None:
+        surfaces = self._issue_69_collect_install_root_artifact_surfaces()
+        source_inventory = surfaces["source"]
+        self.assertTrue(source_inventory, "issue-69 source install_root inventory must be non-empty")
+
+        for surface_name in ("wheel", "sdist", "installed"):
+            observed_inventory = surfaces[surface_name]
+            missing = sorted(source_inventory - observed_inventory)
+            unexpected = sorted(observed_inventory - source_inventory)
+            self.assertEqual(
+                observed_inventory,
+                source_inventory,
+                (
+                    f"issue-69 full install_root inventory parity failed for {surface_name}; "
+                    f"missing={missing[:10]} unexpected={unexpected[:10]}"
+                ),
+            )
+
+    def test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+            installed_inventory = {str(path) for path in snapshot.get("inventory", [])}
+            expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
+            scope_prefixes = (
+                "spec_dock/assets/install_root/.agents/host-adapters/",
+                "spec_dock/assets/install_root/.codex/agents/",
+                "spec_dock/assets/install_root/.github/agents/",
+            )
+            discovered_handoff_scope = {
+                artifact_relative_path
+                for artifact_relative_path in installed_inventory
+                if any(artifact_relative_path.startswith(prefix) for prefix in scope_prefixes)
+            }
+            self.assertEqual(
+                discovered_handoff_scope,
+                expected_handoff_surface,
+                (
+                    "issue-69 isolated installed package handoff surface mismatch; "
+                    f"expected={sorted(expected_handoff_surface)} observed={sorted(discovered_handoff_scope)}"
+                ),
+            )
+
+    def test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            self.assertTrue(
+                spec_dock_command.is_file(),
+                f"issue-69 expected installed spec-dock command in isolated venv: {spec_dock_command}",
+            )
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+            init_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            update_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            self.assertTrue(
+                (target_repo / "spec-dock").is_dir(),
+                "issue-69 isolated installed package smoke should create target spec-dock directory",
+            )
+            combined_output = (
+                f"{init_result.stdout}\n{init_result.stderr}\n{update_result.stdout}\n{update_result.stderr}"
+            ).lower()
+            for error_fragment in ("missing asset", "missing install_root", "missing bundled"):
+                self.assertNotIn(
+                    error_fragment,
+                    combined_output,
+                    (
+                        "issue-69 isolated installed package smoke emitted missing-asset diagnostics: "
+                        f"{error_fragment}"
+                    ),
+                )
+
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+
+    def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        source_inventory = self._issue_69_collect_source_install_root_inventory(repo_root)
+        expected_handoff_surface = set(self._ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS)
+        source_handoff_surface = source_inventory & expected_handoff_surface
+        self.assertEqual(
+            source_handoff_surface,
+            expected_handoff_surface,
+            (
+                "issue-69 source handoff surface mismatch; "
+                f"expected={sorted(expected_handoff_surface)} observed={sorted(source_handoff_surface)}"
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+            installed_inventory = {str(path) for path in snapshot.get("inventory", [])}
+            installed_handoff_surface = installed_inventory & expected_handoff_surface
+            missing = sorted(source_handoff_surface - installed_handoff_surface)
+            unexpected = sorted(installed_handoff_surface - source_handoff_surface)
+            self.assertEqual(
+                installed_handoff_surface,
+                source_handoff_surface,
+                (
+                    "issue-69 local and isolated installed handoff surface inventory mismatch; "
+                    f"missing={missing[:10]} unexpected={unexpected[:10]}"
+                ),
+            )
+
+    def test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            pre_prune_snapshot = temp_root / "wheel-pre-prune-snapshot.json"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            build_env = os.environ.copy()
+            build_env[self._ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV] = "1"
+            build_env[self._ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV] = str(pre_prune_snapshot)
+
+            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+                build_env=build_env,
+            )
+
+            self.assertTrue(
+                pre_prune_snapshot.is_file(),
+                f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}",
+            )
+            snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
+            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            self.assertEqual(
+                set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])),
+                expected_seeded_fixtures,
+                "issue-69 setup.py snapshot did not report the approved seeded fixture set",
+            )
+            self.assertEqual(
+                set(snapshot_payload.get("present_before_prune", [])),
+                expected_seeded_fixtures,
+                "issue-69 seeded stale fixture set must exist in wheel build staging before prune",
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
+            for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+                self.assertNotIn(
+                    stale_artifact_path,
+                    wheel_inventory,
+                    (
+                        "issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: "
+                        f"{stale_artifact_path}"
+                    ),
+                )
+
+    def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            present_before_build = self._issue_69_seed_stale_fixtures_in_sdist_source_context(build_context)
+            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            self.assertEqual(
+                present_before_build,
+                expected_seeded_fixtures,
+                "issue-69 seeded stale fixture set must exist in sdist source context before build",
+            )
+
+            _, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+
+            sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
+            for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+                self.assertNotIn(
+                    stale_artifact_path,
+                    sdist_inventory,
+                    (
+                        "issue-69 sdist build unexpectedly shipped seeded stale wrapper-era output: "
+                        f"{stale_artifact_path}"
+                    ),
+                )
+
+    def test_issue_69_stale_exclusion_patterns_are_aligned_between_pyproject_and_setup(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+        setup_text = (repo_root / "setup.py").read_text(encoding="utf-8")
+
+        pyproject_patterns = self._issue_69_extract_pyproject_stale_exclusion_patterns(pyproject_text)
+        setup_patterns = self._issue_69_extract_setup_stale_exclusion_patterns(setup_text)
+
+        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_patterns}
+        setup_pattern_set = set(setup_patterns)
+        expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
+
+        self.assertEqual(
+            pyproject_normalized_patterns,
+            setup_pattern_set,
+            "issue-69 stale exclusion patterns diverged between pyproject.toml and setup.py",
+        )
+        self.assertEqual(
+            setup_pattern_set,
+            expected_pattern_set,
+            "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set",
+        )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -5983,24 +7032,123 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(main(["update", str(target)]), 0)
             self._assert_managed_skills_installed(target)
 
+    def test_issue_68_install_root_tree_exists(self) -> None:
+        install_root = self._ISSUE_68_INSTALL_ROOT
+        self.assertTrue(install_root.is_dir(), f"missing install_root: {install_root}")
+        for subtree in (".agents", ".codex", ".github"):
+            subtree_path = install_root / subtree
+            self.assertTrue(subtree_path.is_dir(), f"missing install_root subtree: {subtree_path}")
+        for relative_path in self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS:
+            asset_path = install_root / relative_path
+            self.assertTrue(asset_path.is_file(), f"missing issue-68 authoritative asset: {asset_path}")
+
+    def test_issue_68_authoritative_inventory_paths_are_classified_under_install_root(self) -> None:
+        install_root = self._ISSUE_68_INSTALL_ROOT
+        classified_paths: set[str] = set()
+
+        for prefix, relative_paths in self._ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS.items():
+            for relative_path in relative_paths:
+                self.assertTrue(
+                    relative_path.startswith(prefix),
+                    f"issue-68 classification mismatch for {relative_path}; expected prefix {prefix}",
+                )
+                self.assertTrue(
+                    (install_root / relative_path).is_file(),
+                    f"missing issue-68 classified authoritative asset: {install_root / relative_path}",
+                )
+                classified_paths.add(relative_path)
+
+        self.assertEqual(
+            classified_paths,
+            set(self._ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS),
+            "issue-68 authoritative inventory should be fully classified under install_root",
+        )
+
+    def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
+        install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
+        repo_root_workflow = Path(".github/workflows/ci.yml")
+
+        self.assertTrue(
+            repo_root_workflow.is_file(),
+            f"missing repo-root workflow seed source: {repo_root_workflow}",
+        )
+        self.assertTrue(
+            install_root_workflow.is_file(),
+            f"missing issue-68 install_root workflow seed: {install_root_workflow}",
+        )
+        self.assertEqual(
+            install_root_workflow.read_bytes(),
+            repo_root_workflow.read_bytes(),
+            "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml",
+        )
+        workflow_text = install_root_workflow.read_text(encoding="utf-8")
+        self.assertIn("test -f ./spec-dock/scripts/spec-dock", workflow_text)
+        self.assertNotIn("test -x ./spec-dock/scripts/spec-dock", workflow_text)
+        self.assertIn("python3 ./spec-dock/scripts/spec-dock sync", workflow_text)
+        self.assertIn("python3 ./spec-dock/scripts/spec-dock validate", workflow_text)
+
+    def test_issue_68_provider_only_workflow_is_not_shipped_via_install_root(self) -> None:
+        repo_root_provider_workflow = Path(".github/workflows/provider-ci.yml")
+        install_root_provider_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/provider-ci.yml"
+
+        self.assertTrue(
+            repo_root_provider_workflow.is_file(),
+            f"missing repo-root provider-only workflow: {repo_root_provider_workflow}",
+        )
+        self.assertFalse(
+            install_root_provider_workflow.exists(),
+            (
+                "provider-only workflow must not be shipped in install_root managed assets: "
+                f"{install_root_provider_workflow}"
+            ),
+        )
+        workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
+        self.assertIn("python -m pip install -e .", workflow_text)
+        self.assertIn("python -m unittest discover -v", workflow_text)
+
+    def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
+        legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
+        self.assertFalse(
+            legacy_root.exists(),
+            f"issue-68 legacy provider tree must be retired from current repo: {legacy_root}",
+        )
+
+    def test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        provider_assets_root = repo_root / "src/spec_dock/assets"
+
+        for asset_label, duplicate_boundary in self._ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY.items():
+            observed_provider_paths: set[str] = set()
+            for search_glob in duplicate_boundary["search_globs"]:
+                observed_provider_paths.update(
+                    candidate.relative_to(repo_root).as_posix()
+                    for candidate in provider_assets_root.rglob(search_glob)
+                    if candidate.is_file()
+                )
+            self.assertEqual(
+                sorted(observed_provider_paths),
+                sorted(duplicate_boundary["allowed_provider_paths"]),
+                f"issue-68 authority inventory boundary mismatch for {asset_label}",
+            )
+
     def test_bundled_skill_assets_cover_managed_manifest(self) -> None:
         import spec_dock.cli as cli
 
         self.assertEqual(cli._managed_skill_names(), _EXPECTED_MANAGED_SKILL_NAMES)
         with cli._assets_dir() as assets_dir:
             for skill_name in cli._managed_skill_names():
-                skill_path = assets_dir / "codex_skills" / skill_name / "SKILL.md"
+                skill_path = assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
                 self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
             self.assertTrue(
-                (assets_dir / "codex_skills" / "host-adapters" / "meta.json").is_file(),
+                (assets_dir / "install_root" / ".agents" / "host-adapters" / "meta.json").is_file(),
                 "missing bundled host adapter metadata asset",
             )
             self.assertTrue(
-                (assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml").is_file(),
+                (assets_dir / "install_root" / ".codex" / "agents" / "spec-dock.toml").is_file(),
                 "missing bundled codex native shim asset",
             )
             self.assertTrue(
-                (assets_dir / "codex_skills" / "native-shims" / "spec-dock.agent.md").is_file(),
+                (assets_dir / "install_root" / ".github" / "agents" / "spec-dock.agent.md").is_file(),
                 "missing bundled copilot native shim asset",
             )
 
@@ -6008,8 +7156,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         with cli._assets_dir() as assets_dir:
-            codex_path = assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml"
-            copilot_path = assets_dir / "codex_skills" / "native-shims" / "spec-dock.agent.md"
+            codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-dock.toml"
+            copilot_path = assets_dir / "install_root" / ".github" / "agents" / "spec-dock.agent.md"
             self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
             self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
             codex_text = codex_path.read_text(encoding="utf-8")
@@ -6034,7 +7182,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         with cli._assets_dir() as assets_dir:
-            skills_dir = assets_dir / "codex_skills"
+            skills_dir = assets_dir / "install_root" / ".agents" / "skills"
             hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
@@ -6148,6 +7296,987 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             self.assertEqual(meta, self._EXPECTED_HOST_ADAPTER_META)
 
+    def test_issue_70_build_plan_uses_install_root_recursive_inventory_including_workflow(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            plan = cli._build_managed_skill_install_plan(Path(assets_dir))
+            install_root = Path(assets_dir) / "install_root"
+            expected_inventory = {
+                candidate.relative_to(install_root).as_posix()
+                for candidate in install_root.rglob("*")
+                if candidate.is_file()
+            }
+
+        managed_targets = {
+            mapping.target_rel.as_posix() for mapping in plan.current_file_mappings
+        }
+        self.assertEqual(managed_targets, expected_inventory)
+        self.assertIn(".github/workflows/ci.yml", managed_targets)
+        self.assertEqual(
+            {
+                mapping.source_asset_rel.as_posix()
+                for mapping in plan.current_file_mappings
+            },
+            {f"install_root/{rel_path}" for rel_path in expected_inventory},
+        )
+
+    def test_issue_70_update_rejects_missing_or_invalid_managed_assets_obsolete_manifest(self) -> None:
+        cases = (
+            ("missing_managed_assets", "invalid managed_assets contract"),
+            ("null_managed_assets", "invalid managed_assets contract"),
+            ("missing_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
+            ("null_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
+            ("non_list_obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths"),
+        )
+        for case_name, expected_error in cases:
+            with self.subTest(case_name=case_name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    before = self._seed_managed_contract_guard_snapshot(target)
+                    malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+
+                    if case_name == "missing_managed_assets":
+                        malformed_manifest.pop("managed_assets")
+                    elif case_name == "null_managed_assets":
+                        malformed_manifest["managed_assets"] = None
+                    elif case_name == "missing_obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"].pop("obsolete_exact_file_paths")
+                    elif case_name == "null_obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = None
+                    elif case_name == "non_list_obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = (
+                            ".codex/agents/spec-dock-codex-adapter.toml"
+                        )
+                    else:
+                        raise AssertionError(f"unknown case_name: {case_name}")
+
+                    exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                        target,
+                        malformed_manifest,
+                    )
+
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn(expected_error, stderr)
+                    self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_current_obsolete_overlap_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                ".agents/host-adapters/meta.json"
+            ]
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "managed_assets.obsolete_exact_file_paths overlaps current managed path "
+                "'.agents/host-adapters/meta.json'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_init_rejects_current_managed_directory_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            conflicting_path = target / ".github" / "workflows" / "ci.yml"
+            conflicting_path.mkdir(parents=True, exist_ok=True)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual(
+                (target / "README.md").read_text(encoding="utf-8"),
+                "preflight-marker\n",
+            )
+
+    def test_issue_70_init_rejects_current_managed_container_file_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".github").write_text("container-file-conflict\n", encoding="utf-8")
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/agents/spec-dock.agent.md'",
+                stderr,
+            )
+            self.assertIn("non-directory container: '.github'", stderr)
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+
+    def test_issue_70_init_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            workflows_parent = target / ".github" / "workflows"
+            workflows_parent.parent.mkdir(parents=True, exist_ok=True)
+            (target / "symlink-workflows-container").mkdir(parents=True, exist_ok=True)
+            os.symlink("../symlink-workflows-container", workflows_parent)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink container: '.github/workflows'", stderr)
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+
+    def test_issue_70_init_rejects_current_managed_symlink_exact_file_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
+            managed_workflow_path.parent.mkdir(parents=True, exist_ok=True)
+
+            symlink_target = target / "symlink-ci-target.yml"
+            symlink_target.write_text("managed-workflow-symlink-target\n", encoding="utf-8")
+            os.symlink("../../symlink-ci-target.yml", managed_workflow_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(managed_workflow_path.is_symlink())
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+            self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
+
+    def test_issue_70_update_rejects_current_managed_directory_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
+            managed_workflow_path.unlink(missing_ok=True)
+            managed_workflow_path.mkdir(parents=True, exist_ok=True)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_current_managed_symlink_parent_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+
+            workflows_parent = target / ".github" / "workflows"
+            if workflows_parent.is_symlink() or workflows_parent.is_file():
+                workflows_parent.unlink(missing_ok=True)
+            elif workflows_parent.exists():
+                shutil.rmtree(workflows_parent)
+            (target / "symlink-workflows-container").mkdir(parents=True, exist_ok=True)
+            os.symlink("../symlink-workflows-container", workflows_parent)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink container: '.github/workflows'", stderr)
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_current_managed_symlink_exact_file_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+
+            managed_workflow_path = target / ".github" / "workflows" / "ci.yml"
+            managed_workflow_path.unlink(missing_ok=True)
+            symlink_target = target / "symlink-ci-target.yml"
+            symlink_target.write_text("managed-workflow-symlink-target\n", encoding="utf-8")
+            os.symlink("../../symlink-ci-target.yml", managed_workflow_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.github/workflows/ci.yml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(managed_workflow_path.is_symlink())
+            self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+
+            obsolete_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
+            obsolete_workflow.mkdir(parents=True, exist_ok=True)
+
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                *malformed_manifest["managed_assets"]["obsolete_exact_file_paths"],
+                ".github/workflows/spec-dock-close.yml",
+            ]
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for obsolete managed path '.github/workflows/spec-dock-close.yml'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            obsolete_target = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target = target / "obsolete-managed-symlink-target.toml"
+            symlink_target.write_text("obsolete symlink target\n", encoding="utf-8")
+            os.symlink("../../obsolete-managed-symlink-target.toml", obsolete_target)
+            self.assertTrue(obsolete_target.is_symlink())
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 0, stderr)
+            self.assertFalse(obsolete_target.exists())
+            self.assertFalse(obsolete_target.is_symlink())
+            self.assertEqual(
+                symlink_target.read_text(encoding="utf-8"),
+                "obsolete symlink target\n",
+            )
+
+    def test_issue_70_update_prunes_obsolete_managed_symlink_to_directory_exact_file_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            obsolete_target = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target_dir = target / "obsolete-managed-symlink-dir"
+            symlink_target_dir.mkdir(parents=True, exist_ok=True)
+            symlink_target_file = symlink_target_dir / "keep.txt"
+            symlink_target_file.write_text("keep me\n", encoding="utf-8")
+            os.symlink("../../obsolete-managed-symlink-dir", obsolete_target)
+            self.assertTrue(obsolete_target.is_symlink())
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 0, stderr)
+            self.assertFalse(obsolete_target.exists())
+            self.assertFalse(obsolete_target.is_symlink())
+            self.assertEqual(
+                symlink_target_file.read_text(encoding="utf-8"),
+                "keep me\n",
+            )
+
+    def test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            expected_workflow = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".github"
+                / "workflows"
+                / "ci.yml"
+            ).read_bytes()
+            managed_workflow = target / ".github" / "workflows" / "ci.yml"
+            obsolete_workflow = target / ".github" / "workflows" / "spec-dock-close.yml"
+            custom_workflow = target / ".github" / "workflows" / "custom-review.yml"
+
+            stale_workflow = b"name: stale managed workflow\n"
+            custom_workflow_text = "name: custom workflow\n"
+            self._write_text_force(managed_workflow, stale_workflow.decode("utf-8"))
+            self._write_text_force(obsolete_workflow, "name: obsolete workflow\n")
+            self._write_text_force(custom_workflow, custom_workflow_text)
+
+            manifest_override = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            manifest_override["managed_assets"]["obsolete_exact_file_paths"] = [
+                *manifest_override["managed_assets"]["obsolete_exact_file_paths"],
+                ".github/workflows/spec-dock-close.yml",
+            ]
+            exit_code, _stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                manifest_override,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(managed_workflow.is_file(), f"missing managed workflow after update: {managed_workflow}")
+            self.assertEqual(managed_workflow.read_bytes(), expected_workflow)
+            self.assertNotEqual(managed_workflow.read_bytes(), stale_workflow)
+            self.assertFalse(obsolete_workflow.exists(), "obsolete exact workflow path must be pruned")
+            self.assertTrue(custom_workflow.is_file(), f"missing custom workflow after update: {custom_workflow}")
+            self.assertEqual(custom_workflow.read_text(encoding="utf-8"), custom_workflow_text)
+
+    def test_issue_70_update_skips_obsolete_cleanup_when_post_sync_verify_fails(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            workflow_path = target / ".github" / "workflows" / "ci.yml"
+            workflow_path.unlink(missing_ok=True)
+            obsolete_codex_path = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            self._write_text_force(obsolete_codex_path, "obsolete should survive verify failure\n")
+
+            original_copy_file = cli._copy_file
+
+            def _copy_file_without_workflow(src: Path, dest: Path) -> None:
+                if src.as_posix().endswith("install_root/.github/workflows/ci.yml"):
+                    return
+                original_copy_file(src, dest)
+
+            err = io.StringIO()
+            with patch("spec_dock.cli._copy_file", side_effect=_copy_file_without_workflow), redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("managed current sync incomplete (missing target): .github/workflows/ci.yml", stderr)
+            self.assertTrue(
+                obsolete_codex_path.is_file(),
+                "obsolete cleanup must be skipped when current sync verification fails",
+            )
+
+    def test_issue_70_update_reflection_ignores_legacy_codex_skills_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            repo_root = Path(__file__).resolve().parents[1]
+            expected_adapter_skill = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".agents"
+                / "skills"
+                / "spec-dock-codex-adapter"
+                / "SKILL.md"
+            ).read_bytes()
+            expected_codex_shim = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-dock.toml"
+            ).read_bytes()
+
+            def _mutate_assets(patched_assets_root: Path) -> None:
+                legacy_skill = patched_assets_root / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
+                legacy_shim = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                legacy_meta = patched_assets_root / "codex_skills" / "host-adapters" / "meta.json"
+                legacy_skill.parent.mkdir(parents=True, exist_ok=True)
+                legacy_shim.parent.mkdir(parents=True, exist_ok=True)
+                legacy_meta.parent.mkdir(parents=True, exist_ok=True)
+
+                legacy_skill.write_text(
+                    "# legacy stale adapter duplicate\n",
+                    encoding="utf-8",
+                )
+                legacy_shim.write_text(
+                    "name = \"legacy-stale-codex\"\n",
+                    encoding="utf-8",
+                )
+                legacy_meta.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "owner": "legacy-owner",
+                            "targets": {},
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            exit_code, _stderr = self._run_command_with_assets_override(
+                "update",
+                target,
+                _mutate_assets,
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_bytes(),
+                expected_adapter_skill,
+            )
+            self.assertEqual(
+                (target / ".codex" / "agents" / "spec-dock.toml").read_bytes(),
+                expected_codex_shim,
+            )
+            self.assertEqual(
+                json.loads((target / ".agents" / "host-adapters" / "meta.json").read_text(encoding="utf-8")),
+                self._EXPECTED_HOST_ADAPTER_META,
+            )
+
+    def test_issue_70_provider_transition_detects_removed_current_paths_without_obsolete_coverage(self) -> None:
+        repo_assets_root = Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets"
+        previous_plan = self._build_managed_skill_install_plan_from_assets_root(repo_assets_root)
+
+        with tempfile.TemporaryDirectory() as tmp_assets:
+            patched_assets_root = Path(tmp_assets) / "assets"
+            shutil.copytree(repo_assets_root, patched_assets_root)
+            removed_workflow_rel = Path(".github") / "workflows" / "ci.yml"
+            (patched_assets_root / "install_root" / removed_workflow_rel).unlink()
+
+            current_plan = self._build_managed_skill_install_plan_from_assets_root(patched_assets_root)
+
+        missing_coverage = self._issue_70_missing_transition_coverage(
+            previous_plan=previous_plan,
+            current_plan=current_plan,
+        )
+        self.assertEqual(
+            missing_coverage,
+            {removed_workflow_rel.as_posix()},
+            "removed current managed paths must be covered by obsolete manifest or ownership transfer",
+        )
+
+    def test_issue_70_provider_transition_accepts_removed_current_paths_with_obsolete_coverage(self) -> None:
+        repo_assets_root = Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets"
+        previous_plan = self._build_managed_skill_install_plan_from_assets_root(repo_assets_root)
+
+        with tempfile.TemporaryDirectory() as tmp_assets:
+            patched_assets_root = Path(tmp_assets) / "assets"
+            shutil.copytree(repo_assets_root, patched_assets_root)
+            removed_workflow_rel = Path(".github") / "workflows" / "ci.yml"
+            (patched_assets_root / "install_root" / removed_workflow_rel).unlink()
+            patched_manifest_path = (
+                patched_assets_root / "install_root" / ".agents" / "host-adapters" / "meta.json"
+            )
+            patched_manifest = json.loads(patched_manifest_path.read_text(encoding="utf-8"))
+            patched_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                *patched_manifest["managed_assets"]["obsolete_exact_file_paths"],
+                removed_workflow_rel.as_posix(),
+            ]
+            patched_manifest_path.write_text(
+                json.dumps(patched_manifest, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            current_plan = self._build_managed_skill_install_plan_from_assets_root(patched_assets_root)
+
+        missing_coverage = self._issue_70_missing_transition_coverage(
+            previous_plan=previous_plan,
+            current_plan=current_plan,
+        )
+        self.assertEqual(missing_coverage, set())
+
+    def test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            self.assertTrue(
+                spec_dock_command.is_file(),
+                f"issue-70 expected installed spec-dock command in isolated venv: {spec_dock_command}",
+            )
+
+            runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=runtime_snapshot,
+                repo_root=repo_root,
+            )
+            plan_snapshot = self._issue_70_collect_isolated_installed_plan_snapshot(
+                venv_python=venv_python,
+                cwd=isolated_cwd,
+            )
+
+            installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
+            self.assertEqual(
+                Path(str(plan_snapshot.get("assets_dir", ""))).resolve(),
+                installed_assets_dir,
+                "issue-70 installed plan snapshot should resolve from the same installed assets root",
+            )
+
+            current_targets = {str(path) for path in plan_snapshot.get("current_targets", [])}
+            current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
+            obsolete_targets = {str(path) for path in plan_snapshot.get("obsolete_targets", [])}
+            self.assertTrue(current_sources, "issue-70 installed plan must expose current managed sources")
+            self.assertTrue(
+                all(source.startswith("install_root/") for source in current_sources),
+                "issue-70 installed plan should source current managed files from install_root only",
+            )
+            self.assertFalse(
+                any("codex_skills" in source for source in current_sources),
+                "issue-70 installed plan should not source current managed files from legacy codex_skills",
+            )
+            for required_target in (
+                ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                ".agents/host-adapters/meta.json",
+                ".codex/agents/spec-dock.toml",
+                ".github/agents/spec-dock.agent.md",
+                ".github/workflows/ci.yml",
+            ):
+                self.assertIn(
+                    required_target,
+                    current_targets,
+                    f"issue-70 installed plan is missing required managed target: {required_target}",
+                )
+            self.assertIn(
+                ".codex/agents/spec-dock-codex-adapter.toml",
+                obsolete_targets,
+                "issue-70 installed plan missing obsolete managed codex shim target",
+            )
+            self.assertIn(
+                ".github/agents/spec-dock-copilot-adapter.agent.md",
+                obsolete_targets,
+                "issue-70 installed plan missing obsolete managed copilot shim target",
+            )
+
+            install_root = installed_assets_dir / "install_root"
+            managed_rel_paths = (
+                ".agents/skills/spec-dock-codex-adapter/SKILL.md",
+                ".agents/host-adapters/meta.json",
+                ".codex/agents/spec-dock.toml",
+                ".github/agents/spec-dock.agent.md",
+                ".github/workflows/ci.yml",
+            )
+            expected_managed_bytes = {
+                rel_path: (install_root / rel_path).read_bytes() for rel_path in managed_rel_paths
+            }
+
+            legacy_skill_duplicate = (
+                installed_assets_dir / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
+            )
+            legacy_native_shim_duplicate = (
+                installed_assets_dir / "codex_skills" / "native-shims" / "spec-dock.toml"
+            )
+            legacy_meta_duplicate = installed_assets_dir / "codex_skills" / "host-adapters" / "meta.json"
+            legacy_skill_duplicate.parent.mkdir(parents=True, exist_ok=True)
+            legacy_native_shim_duplicate.parent.mkdir(parents=True, exist_ok=True)
+            legacy_meta_duplicate.parent.mkdir(parents=True, exist_ok=True)
+            legacy_skill_duplicate.write_text("# issue-70 stale legacy skill duplicate\n", encoding="utf-8")
+            legacy_native_shim_duplicate.write_text("name = \"issue-70-legacy-stale\"\n", encoding="utf-8")
+            legacy_meta_duplicate.write_text("{ invalid legacy duplicate json\n", encoding="utf-8")
+
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+            self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            for rel_path, expected_bytes in expected_managed_bytes.items():
+                target_path = target_repo / rel_path
+                self.assertTrue(target_path.is_file(), f"missing managed file after isolated init: {target_path}")
+                self.assertEqual(
+                    target_path.read_bytes(),
+                    expected_bytes,
+                    f"isolated init did not reflect installed install_root asset for: {rel_path}",
+                )
+
+            for rel_path in managed_rel_paths:
+                self._write_text_force(target_repo / rel_path, f"issue-70 stale managed payload: {rel_path}\n")
+
+            obsolete_paths = (
+                ".codex/agents/spec-dock-codex-adapter.toml",
+                ".github/agents/spec-dock-copilot-adapter.agent.md",
+            )
+            for rel_path in obsolete_paths:
+                obsolete_path = target_repo / rel_path
+                obsolete_path.parent.mkdir(parents=True, exist_ok=True)
+                self._write_text_force(obsolete_path, f"issue-70 obsolete payload: {rel_path}\n")
+
+            custom_paths = {
+                ".agents/skills/custom-reviewer/SKILL.md": "# custom skill must survive update\n",
+                ".codex/agents/custom-reviewer.toml": "name = \"custom-reviewer\"\n",
+                ".github/workflows/custom-review.yml": "name: custom workflow must survive update\n",
+            }
+            for rel_path, text in custom_paths.items():
+                custom_path = target_repo / rel_path
+                custom_path.parent.mkdir(parents=True, exist_ok=True)
+                self._write_text_force(custom_path, text)
+
+            self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            for rel_path, expected_bytes in expected_managed_bytes.items():
+                target_path = target_repo / rel_path
+                self.assertTrue(target_path.is_file(), f"missing managed file after isolated update: {target_path}")
+                self.assertEqual(
+                    target_path.read_bytes(),
+                    expected_bytes,
+                    f"isolated update did not reflect installed install_root asset for: {rel_path}",
+                )
+
+            for rel_path in obsolete_paths:
+                self.assertFalse(
+                    (target_repo / rel_path).exists(),
+                    f"isolated update should prune obsolete managed path: {rel_path}",
+                )
+
+            for rel_path, expected_text in custom_paths.items():
+                custom_path = target_repo / rel_path
+                self.assertTrue(
+                    custom_path.is_file(),
+                    f"isolated update removed custom managed-outside file: {rel_path}",
+                )
+                self.assertEqual(
+                    custom_path.read_text(encoding="utf-8"),
+                    expected_text,
+                    f"isolated update mutated custom managed-outside file: {rel_path}",
+                )
+
+    def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        parity_pairs = (
+            (
+                ".agents/host-adapters/meta.json",
+                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
+            ),
+            (
+                ".codex/agents/spec-dock.toml",
+                "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+            ),
+            (
+                ".github/agents/spec-dock.agent.md",
+                "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+            ),
+            (
+                ".github/workflows/ci.yml",
+                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
+            ),
+        )
+
+        for checked_in_rel, provider_asset_rel in parity_pairs:
+            with self.subTest(checked_in=checked_in_rel, provider_asset=provider_asset_rel):
+                checked_in_path = repo_root / checked_in_rel
+                provider_asset_path = repo_root / provider_asset_rel
+                self.assertTrue(
+                    checked_in_path.is_file(),
+                    f"issue-71 missing checked-in parity target: {checked_in_path}",
+                )
+                self.assertTrue(
+                    provider_asset_path.is_file(),
+                    f"issue-71 missing provider parity source: {provider_asset_path}",
+                )
+                self.assertEqual(
+                    checked_in_path.read_bytes(),
+                    provider_asset_path.read_bytes(),
+                    (
+                        "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
+                        f"{checked_in_rel}"
+                    ),
+                )
+
+    def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        issue_69_report = (
+            repo_root
+            / "spec-dock"
+            / "initiatives"
+            / "init-local-00003-architecture-maintenance-and-hardening"
+            / "epics"
+            / "epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling"
+            / "issues"
+            / "iss-00069-package-data-and-installed-artifact-parity"
+            / "report.md"
+        )
+        issue_70_report = (
+            repo_root
+            / "spec-dock"
+            / "initiatives"
+            / "init-local-00003-architecture-maintenance-and-hardening"
+            / "epics"
+            / "epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling"
+            / "issues"
+            / "iss-00070-installer-source-discovery-and-managed-ownership"
+            / "report.md"
+        )
+        self.assertTrue(issue_69_report.is_file(), f"issue-71 missing issue-69 report: {issue_69_report}")
+        self.assertTrue(issue_70_report.is_file(), f"issue-71 missing issue-70 report: {issue_70_report}")
+
+        issue_69_text = issue_69_report.read_text(encoding="utf-8")
+        issue_70_text = issue_70_report.read_text(encoding="utf-8")
+
+        package_parity_section = self._issue_71_extract_markdown_section_by_heading_prefix(
+            markdown_text=issue_69_text,
+            heading_prefix="package-parity-evidence",
+            source_label="issue-69 report",
+        )
+        for required_phrase in (
+            "full inventory parity:",
+            "representative asset set:",
+            "stale exclusion guard:",
+            "isolated install smoke:",
+        ):
+            self.assertIn(
+                required_phrase,
+                package_parity_section,
+                f"issue-71 missing package parity subcheck phrase: {required_phrase}",
+            )
+        self.assertGreaterEqual(
+            package_parity_section.count("- result:"),
+            4,
+            "issue-71 package parity evidence should include result lines for required subchecks",
+        )
+        self.assertGreaterEqual(
+            package_parity_section.count("- pass"),
+            4,
+            "issue-71 package parity evidence should include pass results for required subchecks",
+        )
+        self.assertNotIn(
+            "pending",
+            package_parity_section.lower(),
+            "issue-71 package parity evidence should not be pending-only",
+        )
+        self.assertNotIn(
+            "placeholder",
+            package_parity_section.lower(),
+            "issue-71 package parity evidence should not be placeholder-only",
+        )
+
+        handoff_section = self._issue_71_extract_markdown_section_by_heading_prefix(
+            markdown_text=issue_70_text,
+            heading_prefix="handoff-validation-evidence",
+            source_label="issue-70 report",
+        )
+        for required_phrase in (
+            "source inventory / manifest assertions:",
+            "invalid manifest negative test coverage:",
+            "current managed / obsolete managed boundary assertions:",
+            "installed-package cutover evidence:",
+        ):
+            self.assertIn(
+                required_phrase,
+                handoff_section,
+                f"issue-71 missing issue-70 handoff subcheck phrase: {required_phrase}",
+            )
+        self.assertGreaterEqual(
+            handoff_section.count("- result:"),
+            4,
+            "issue-71 handoff evidence should include result lines for required subchecks",
+        )
+        self.assertGreaterEqual(
+            handoff_section.count("- pass"),
+            4,
+            "issue-71 handoff evidence should include pass results for required subchecks",
+        )
+        self.assertNotIn(
+            "pending",
+            handoff_section.lower(),
+            "issue-71 handoff evidence should not be pending-only",
+        )
+        self.assertNotIn(
+            "placeholder",
+            handoff_section.lower(),
+            "issue-71 handoff evidence should not be placeholder-only",
+        )
+
+    def test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            self.assertTrue(
+                spec_dock_command.is_file(),
+                f"issue-71 expected installed spec-dock command in isolated venv: {spec_dock_command}",
+            )
+
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+            self.assertNotIn("PYTHONPATH", runtime_env, "issue-71 runtime env must not rely on PYTHONPATH fallback")
+            self.assertNotIn("PYTHONHOME", runtime_env, "issue-71 runtime env must not rely on PYTHONHOME fallback")
+
+            runtime_snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=runtime_snapshot,
+                repo_root=repo_root,
+            )
+            self.assertFalse(
+                bool(runtime_snapshot.get("sys_path_has_repo_root")),
+                "issue-71 isolated installed runtime unexpectedly resolved repo-root fallback in sys.path",
+            )
+
+            plan_snapshot = self._issue_70_collect_isolated_installed_plan_snapshot(
+                venv_python=venv_python,
+                cwd=isolated_cwd,
+            )
+            current_sources = {str(path) for path in plan_snapshot.get("current_sources", [])}
+            self.assertTrue(current_sources, "issue-71 installed plan must expose current managed sources")
+            self.assertTrue(
+                all(source.startswith("install_root/") for source in current_sources),
+                "issue-71 installed plan should source current managed files from install_root only",
+            )
+            self.assertFalse(
+                any(source.startswith("codex_skills/") for source in current_sources),
+                "issue-71 installed plan must not source current managed files from legacy codex_skills",
+            )
+
+            installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
+            managed_rel_path = ".codex/agents/spec-dock.toml"
+            expected_managed_bytes = (installed_assets_dir / "install_root" / managed_rel_path).read_bytes()
+
+            self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            managed_target = target_repo / managed_rel_path
+            self.assertTrue(managed_target.is_file(), f"issue-71 missing managed file after isolated init: {managed_target}")
+            self.assertEqual(
+                managed_target.read_bytes(),
+                expected_managed_bytes,
+                "issue-71 isolated init did not reflect install_root managed asset bytes",
+            )
+
+            obsolete_rel_path = ".codex/agents/spec-dock-codex-adapter.toml"
+            obsolete_target = target_repo / obsolete_rel_path
+            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
+            self._write_text_force(obsolete_target, "issue-71 obsolete managed payload\n")
+
+            custom_rel_path = ".github/workflows/custom-review.yml"
+            custom_target = target_repo / custom_rel_path
+            custom_target.parent.mkdir(parents=True, exist_ok=True)
+            custom_text = "name: issue-71 custom unmanaged workflow\n"
+            self._write_text_force(custom_target, custom_text)
+
+            self._write_text_force(managed_target, "issue-71 stale managed payload\n")
+            self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            self.assertEqual(
+                managed_target.read_bytes(),
+                expected_managed_bytes,
+                "issue-71 isolated update did not restore managed file from install_root",
+            )
+            self.assertFalse(
+                obsolete_target.exists(),
+                f"issue-71 isolated update should prune obsolete managed path: {obsolete_rel_path}",
+            )
+            self.assertTrue(
+                custom_target.is_file(),
+                f"issue-71 isolated update removed custom unmanaged file: {custom_rel_path}",
+            )
+            self.assertEqual(
+                custom_target.read_text(encoding="utf-8"),
+                custom_text,
+                f"issue-71 isolated update mutated custom unmanaged file: {custom_rel_path}",
+            )
+
     def test_init_generated_native_shims_satisfy_static_delegation_only_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -6159,8 +8288,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "src"
                 / "spec_dock"
                 / "assets"
-                / "codex_skills"
-                / "native-shims"
+                / "install_root"
+                / ".codex"
+                / "agents"
                 / "spec-dock.toml"
             ).read_bytes()
             expected_copilot_bytes = (
@@ -6168,8 +8298,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "src"
                 / "spec_dock"
                 / "assets"
-                / "codex_skills"
-                / "native-shims"
+                / "install_root"
+                / ".github"
+                / "agents"
                 / "spec-dock.agent.md"
             ).read_bytes()
 
@@ -6217,7 +8348,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
@@ -6255,7 +8386,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
@@ -6293,7 +8424,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 self.assertNotRegex(codex_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
@@ -6341,15 +8472,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             repo_root = Path(__file__).resolve().parents[1]
             codex_shim_asset = (
-                repo_root / "src" / "spec_dock" / "assets" / "codex_skills" / "native-shims" / "spec-dock.toml"
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "agents" / "spec-dock.toml"
             )
             copilot_shim_asset = (
                 repo_root
                 / "src"
                 / "spec_dock"
                 / "assets"
-                / "codex_skills"
-                / "native-shims"
+                / "install_root"
+                / ".github"
+                / "agents"
                 / "spec-dock.agent.md"
             )
             expected_codex_shim = codex_shim_asset.read_bytes()
@@ -6714,7 +8846,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn("invalid host adapter target contract for host 'codex'", stderr)
             self._assert_managed_contract_guard_unchanged(target, before)
 
-    def test_update_rejects_current_dir_native_shim_obsolete_paths(self) -> None:
+    def test_update_rejects_current_dir_obsolete_exact_file_paths(self) -> None:
         for invalid_obsolete_path in (".", "./"):
             with self.subTest(invalid_obsolete_path=invalid_obsolete_path):
                 with tempfile.TemporaryDirectory() as tmp:
@@ -6722,7 +8854,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertEqual(main(["init", str(target)]), 0)
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["targets"]["codex"]["native_shim"]["obsolete_managed_paths"] = [
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
                         invalid_obsolete_path,
                     ]
 
@@ -6732,8 +8864,31 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     )
 
                     self.assertEqual(exit_code, 1)
-                    self.assertIn("native_shim.obsolete_managed_paths item (current directory path)", stderr)
+                    self.assertIn("invalid managed_assets.obsolete_exact_file_paths item", stderr)
                     self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_update_rejects_directory_like_obsolete_exact_file_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            before = self._seed_managed_contract_guard_snapshot(target)
+            malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
+            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
+                ".codex/agents/legacy",
+            ]
+
+            exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
+                target,
+                malformed_manifest,
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "invalid managed_assets.obsolete_exact_file_paths item (must be exact file path): "
+                "'.codex/agents/legacy'",
+                stderr,
+            )
+            self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_update_rejects_parent_traversal_native_shim_paths(self) -> None:
         cases: tuple[tuple[str, str, str], ...] = (
@@ -6748,9 +8903,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "invalid native_shim.target_file path for host 'codex'",
             ),
             (
-                "obsolete_managed_paths",
+                "obsolete_exact_file_paths",
                 "../.codex/agents/spec-dock-codex-adapter.toml",
-                "invalid native_shim.obsolete_managed_paths item for host 'codex'",
+                "invalid managed_assets.obsolete_exact_file_paths item",
             ),
         )
         for field, invalid_path, expected_error in cases:
@@ -6760,8 +8915,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertEqual(main(["init", str(target)]), 0)
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    if field == "obsolete_managed_paths":
-                        malformed_manifest["targets"]["codex"]["native_shim"][field] = [invalid_path]
+                    if field == "obsolete_exact_file_paths":
+                        malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_path]
                     else:
                         malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
 
@@ -6778,7 +8933,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         cases: tuple[tuple[str, str], ...] = (
             ("source_of_truth_asset", "invalid native_shim.source_of_truth_asset path for host 'codex'"),
             ("target_file", "invalid native_shim.target_file path for host 'codex'"),
-            ("obsolete_managed_paths", "invalid native_shim.obsolete_managed_paths item for host 'codex'"),
+            ("obsolete_exact_file_paths", "invalid managed_assets.obsolete_exact_file_paths item"),
         )
         invalid_paths = ("C:foo", "/foo", "\\foo")
         for field, expected_error in cases:
@@ -6789,8 +8944,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         self.assertEqual(main(["init", str(target)]), 0)
                         before = self._seed_managed_contract_guard_snapshot(target)
                         malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                        if field == "obsolete_managed_paths":
-                            malformed_manifest["targets"]["codex"]["native_shim"][field] = [invalid_path]
+                        if field == "obsolete_exact_file_paths":
+                            malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [invalid_path]
                         else:
                             malformed_manifest["targets"]["codex"]["native_shim"][field] = invalid_path
 
@@ -6822,15 +8977,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     self.assertIn("invalid native_shim.target_file path for host 'codex'", stderr)
                     self._assert_managed_contract_guard_unchanged(target, before)
 
-    def test_update_rejects_obsolete_native_shim_paths_outside_managed_prefixes(self) -> None:
-        for invalid_obsolete in ("README.md", ".agents/skills/spec-dock-codex-adapter/SKILL.md"):
+    def test_update_rejects_obsolete_exact_file_paths_outside_managed_prefixes(self) -> None:
+        for invalid_obsolete in ("README.md", ".agents/spec-dock-codex-adapter/SKILL.md"):
             with self.subTest(invalid_obsolete=invalid_obsolete):
                 with tempfile.TemporaryDirectory() as tmp:
                     target = Path(tmp)
                     self.assertEqual(main(["init", str(target)]), 0)
                     before = self._seed_managed_contract_guard_snapshot(target)
                     malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
-                    malformed_manifest["targets"]["codex"]["native_shim"]["obsolete_managed_paths"] = [
+                    malformed_manifest["managed_assets"]["obsolete_exact_file_paths"] = [
                         invalid_obsolete
                     ]
 
@@ -6840,7 +8995,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     )
 
                     self.assertEqual(exit_code, 1)
-                    self.assertIn("invalid native_shim.obsolete_managed_paths item for host 'codex'", stderr)
+                    self.assertIn("invalid managed_assets.obsolete_exact_file_paths item", stderr)
                     self._assert_managed_contract_guard_unchanged(target, before)
 
     def test_reference_sync_doc_matches_bundled_asset(self) -> None:
