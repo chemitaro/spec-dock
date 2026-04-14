@@ -63,7 +63,7 @@ ID: "epic-00067"
   - 証拠: `iss-00069` report の `## package-parity-evidence`、`iss-00071` report の `## installed-package-verification`
 - `E-AC-007`: Pass
   - 証拠: `iss-00070` で installer/manifest authority を `install_root` へ切替済み、`src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` が current authoritative manifest、`iss-00072` S01 で `AGENTS.md` と `tests/test_init_update.py` の current authority assumptions を整理済み
-  - 追加証拠: `iss-00072` report の `## authority-uniqueness` と `## final-close-gate` により `install_root` が唯一の current authority で、legacy `codex_skills` は historical artifact としてのみ残ることを確認済み
+  - 追加証拠: `iss-00072` report の `## authority-uniqueness` と `## final-close-gate` により `install_root` が唯一の current authority で、legacy `codex_skills` は physical tree が削除済みで historical records 上の言及だけが残ることを確認済み
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
@@ -78,6 +78,6 @@ ID: "epic-00067"
 - historical full-suite residual 1 件は known residual として残るが、本 epic の acceptance / closeout を妨げない。必要な場合は runtime layering 側の別文脈で扱う。
 
 ## 省略/例外メモ (必須)
-- `src/spec_dock/assets/codex_skills/` は current authority ではなく historical artifact として repo に残っている。
+- `src/spec_dock/assets/codex_skills/` は current repo から退役済みであり、physical legacy tree は削除された。
 - `src/spec_dock/assets/install_root/` が唯一の current authority であり、legacy `codex_skills` は source-of-truth として参照しない。
 - issue-72 完了により epic closeout verdict は `approved` とする。
