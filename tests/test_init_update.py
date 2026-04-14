@@ -7616,6 +7616,36 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "obsolete symlink target\n",
             )
 
+    def test_issue_70_update_prunes_obsolete_managed_symlink_to_directory_exact_file_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            obsolete_target = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
+            obsolete_target.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target_dir = target / "obsolete-managed-symlink-dir"
+            symlink_target_dir.mkdir(parents=True, exist_ok=True)
+            symlink_target_file = symlink_target_dir / "keep.txt"
+            symlink_target_file.write_text("keep me\n", encoding="utf-8")
+            os.symlink("../../obsolete-managed-symlink-dir", obsolete_target)
+            self.assertTrue(obsolete_target.is_symlink())
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["update", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 0, stderr)
+            self.assertFalse(obsolete_target.exists())
+            self.assertFalse(obsolete_target.is_symlink())
+            self.assertEqual(
+                symlink_target_file.read_text(encoding="utf-8"),
+                "keep me\n",
+            )
+
     def test_issue_70_update_syncs_workflow_and_prunes_obsolete_exact_workflow_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

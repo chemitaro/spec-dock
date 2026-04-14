@@ -1097,11 +1097,13 @@ def _preflight_target_path_conflicts(
                     f"{path_kind} '{rel_posix}' (non-directory container: '{parent_rel}')"
                 )
 
-        if reject_exact_symlink and target_path.is_symlink():
-            raise RuntimeError(
-                "target directory/container conflict for "
-                f"{path_kind} '{rel_posix}' (symlink at exact file path)"
-            )
+        if target_path.is_symlink():
+            if reject_exact_symlink:
+                raise RuntimeError(
+                    "target directory/container conflict for "
+                    f"{path_kind} '{rel_posix}' (symlink at exact file path)"
+                )
+            return
 
         if target_path.exists() and target_path.is_dir():
             raise RuntimeError(
@@ -1201,14 +1203,14 @@ def _apply_managed_skill_install_plan(
         obsolete_path = target_root / obsolete_rel
         if not obsolete_path.exists() and not obsolete_path.is_symlink():
             continue
+        if obsolete_path.is_symlink() or obsolete_path.is_file():
+            obsolete_path.unlink(missing_ok=True)
+            continue
         if obsolete_path.is_dir():
             raise RuntimeError(
                 "target directory/container conflict for obsolete managed path "
                 f"'{obsolete_rel.as_posix()}' (existing directory at exact file path)"
             )
-        if obsolete_path.is_symlink() or obsolete_path.is_file():
-            obsolete_path.unlink(missing_ok=True)
-            continue
         raise RuntimeError(
             "target directory/container conflict for obsolete managed path "
             f"'{obsolete_rel.as_posix()}' (non-file entry at exact file path)"
