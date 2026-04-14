@@ -5,7 +5,7 @@ ID: "iss-00072"
 関連GitHub: ["#72"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-13"
+最終更新: "2026-04-14"
 依存: ["requirement.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
@@ -88,6 +88,14 @@ ID: "iss-00072"
     - user 方針どおり compact な一括切替 closeout を維持できる。
     - fixed report sections がないと final close review が circular になりやすい。
     - authority uniqueness は checked-in mirror ではなく provider-side authority を見ないと誤判定しうる。
+
+## 追加分析の正本
+- full-suite residual repair の詳細分析は次の独立 report を正本とする。
+  - `discussions/20260414t012350z-research-runtime-shell-structural-regression-analysis.md`
+- この設計書では issue-72 の設計判断だけを保持し、failure list / root cause options / comparison の詳細は analysis report へ分離する。
+- この追加分析から採用する設計判断は次の 2 点である。
+  - `RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression` の failure は test 過剰制約ではなく commands 層の layering regression とみなす。
+  - 修正は test 緩和ではなく、`commands/deps.py` から `domain.ids` 直 import を除去する局所修正で行う。
 
 ## 依存関係分析
 - upstream / prerequisite:
