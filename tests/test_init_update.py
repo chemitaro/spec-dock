@@ -306,47 +306,8 @@ class TestInitUpdate(CliRuntimeHarness):
             ".github/workflows/ci.yml",
         ),
     }
-    _ISSUE_68_DECLARED_LEGACY_PAIR_RELATIVE_PATHS = (
-        (
-            ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
-        ),
-        (
-            ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md",
-        ),
-        (
-            ".agents/skills/spec-dock-epic-planning/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md",
-        ),
-        (
-            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md",
-        ),
-        (
-            ".agents/skills/spec-dock-issue-execution/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md",
-        ),
-        (
-            ".agents/skills/spec-dock-codex-adapter/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md",
-        ),
-        (
-            ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
-            "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md",
-        ),
-        (
-            ".agents/host-adapters/meta.json",
-            "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
-        ),
-        (
-            ".codex/agents/spec-dock.toml",
-            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
-        ),
-        (
-            ".github/agents/spec-dock.agent.md",
-            "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md",
-        ),
+    _ISSUE_68_RETIRED_LEGACY_ROOT = (
+        Path(__file__).resolve().parents[1] / "src" / "spec_dock" / "assets" / "codex_skills"
     )
     _ISSUE_68_PROVIDER_DUPLICATE_BOUNDARY = {
         "spec-driven-tdd-workflow skill": {
@@ -355,7 +316,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-driven-tdd-workflow/SKILL.md",
             ),
         },
         "spec-dock-adr-facilitation skill": {
@@ -364,7 +324,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-adr-facilitation/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-dock-adr-facilitation/SKILL.md",
             ),
         },
         "spec-dock-epic-planning skill": {
@@ -373,7 +332,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-dock-epic-planning/SKILL.md",
             ),
         },
         "spec-dock-initiative-planning skill": {
@@ -382,7 +340,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-dock-initiative-planning/SKILL.md",
             ),
         },
         "spec-dock-issue-execution skill": {
@@ -391,7 +348,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-dock-issue-execution/SKILL.md",
             ),
         },
         "spec-dock-codex-adapter skill": {
@@ -400,7 +356,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-dock-codex-adapter/SKILL.md",
             ),
         },
         "spec-dock-copilot-adapter skill": {
@@ -409,7 +364,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
-                "src/spec_dock/assets/codex_skills/spec-dock-copilot-adapter/SKILL.md",
             ),
         },
         "host adapter metadata": {
@@ -418,7 +372,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-                "src/spec_dock/assets/codex_skills/host-adapters/meta.json",
             ),
         },
         "codex native shim": {
@@ -427,7 +380,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
-                "src/spec_dock/assets/codex_skills/native-shims/spec-dock.toml",
             ),
         },
         "github agent file": {
@@ -436,7 +388,6 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
-                "src/spec_dock/assets/codex_skills/native-shims/spec-dock.agent.md",
             ),
         },
         "github workflow asset": {
@@ -7129,24 +7080,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml",
         )
 
-    def test_issue_68_declared_legacy_pairs_remain_byte_equivalent(self) -> None:
-        for authoritative_relative_path, legacy_provider_path in self._ISSUE_68_DECLARED_LEGACY_PAIR_RELATIVE_PATHS:
-            authoritative_path = self._ISSUE_68_INSTALL_ROOT / authoritative_relative_path
-            legacy_path = Path(legacy_provider_path)
-            self.assertTrue(
-                authoritative_path.is_file(),
-                f"missing issue-68 authoritative asset for legacy pair parity: {authoritative_path}",
-            )
-            self.assertTrue(
-                legacy_path.is_file(),
-                f"missing issue-68 declared legacy duplicate for parity: {legacy_path}",
-            )
-            self.assertEqual(
-                authoritative_path.read_bytes(),
-                legacy_path.read_bytes(),
-                "issue-68 declared legacy duplicate must stay byte-equivalent to authoritative install_root asset: "
-                f"{authoritative_relative_path}",
-            )
+    def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
+        legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
+        self.assertFalse(
+            legacy_root.exists(),
+            f"issue-68 legacy provider tree must be retired from current repo: {legacy_root}",
+        )
 
     def test_issue_68_authority_inventory_disallows_unlisted_provider_duplicates(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -7755,15 +7694,22 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ).read_bytes()
 
             def _mutate_assets(patched_assets_root: Path) -> None:
-                (patched_assets_root / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md").write_text(
+                legacy_skill = patched_assets_root / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
+                legacy_shim = patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml"
+                legacy_meta = patched_assets_root / "codex_skills" / "host-adapters" / "meta.json"
+                legacy_skill.parent.mkdir(parents=True, exist_ok=True)
+                legacy_shim.parent.mkdir(parents=True, exist_ok=True)
+                legacy_meta.parent.mkdir(parents=True, exist_ok=True)
+
+                legacy_skill.write_text(
                     "# legacy stale adapter duplicate\n",
                     encoding="utf-8",
                 )
-                (patched_assets_root / "codex_skills" / "native-shims" / "spec-dock.toml").write_text(
+                legacy_shim.write_text(
                     "name = \"legacy-stale-codex\"\n",
                     encoding="utf-8",
                 )
-                (patched_assets_root / "codex_skills" / "host-adapters" / "meta.json").write_text(
+                legacy_meta.write_text(
                     json.dumps(
                         {
                             "schema_version": 1,

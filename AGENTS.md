@@ -36,7 +36,7 @@ Read these first before changing code or tests:
 - `src/spec_dock/cli.py`: installer entrypoint for `init` / `update`.
 - `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
 - `src/spec_dock/assets/install_root/`: current provider-side authority for installed agent-tooling assets such as `.agents/`, `.codex/`, and `.github/`.
-- `src/spec_dock/assets/codex_skills/`: historical artifact tree kept for legacy reference; do not treat it as the current authority for agent-tooling assets.
+- Legacy `src/spec_dock/assets/codex_skills/` tree was retired and removed from the current repo; use historical issue records under `spec-dock/initiatives/**` when legacy context is needed.
 - `src/spec_dock/assets/spec_dock/`: provider-side scaffold source of truth for files that are generated into managed repos.
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`: provider-side runtime CLI shipped into managed repos.
 - `spec-dock/`: local dogfooding workspace scaffolded into this repository. Use it for validation, dogfooding, and active docs, not as the primary implementation source.
@@ -52,7 +52,6 @@ src/spec_dock/
 |   |   |-- .agents/
 |   |   |-- .codex/
 |   |   `-- .github/
-|   |-- codex_skills/
 |   `-- spec_dock/
 |       |-- docs/
 |       |-- templates/
@@ -80,7 +79,7 @@ Read it like this:
 
 - Change installer behavior: start at `src/spec_dock/cli.py`.
 - Change installed agent-tooling assets or host adapter handoff files: start at `src/spec_dock/assets/install_root/`.
-- Treat `src/spec_dock/assets/codex_skills/` as a historical artifact tree for legacy reference only, not as the current source of truth for agent-tooling assets.
+- Treat `src/spec_dock/assets/install_root/` as the only current authority for agent-tooling assets.
 - Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
 - Change runtime command entrypoints: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{cli,commands}/`.
 - Change orchestration or use cases: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`.
@@ -116,7 +115,7 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 1. Read the relevant docs under `spec-dock/active/`, or `spec-dock/system/active-none/` if no active context is set.
 2. Identify the layer or surface you are changing:
    - installer: `src/spec_dock/cli.py`, asset sync/update behavior
-   - installed agent-tooling assets / host adapters: `src/spec_dock/assets/install_root/` is the current authority; inspect `src/spec_dock/assets/codex_skills/` only for historical or legacy-artifact context
+   - installed agent-tooling assets / host adapters: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for legacy-artifact context
    - runtime command surface: `.../spec_dock_runtime/cli/` and `.../commands/`
    - orchestration or business logic: `.../application/` and `.../domain/`
    - external adapters or persistence: `.../infra/`
@@ -157,7 +156,7 @@ python -m spec_dock.cli init /tmp/target-repo
 - Prefer small helpers and explicit contracts over clever abstractions.
 - Keep edits aligned with the accepted layered architecture.
 - The implementation source of truth is under `src/spec_dock/`, especially `src/spec_dock/assets/spec_dock/...` for shipped scaffold behavior.
-- For agent-tooling assets, `src/spec_dock/assets/install_root/` is the current authority; `src/spec_dock/assets/codex_skills/` is historical and should not be treated as the current source of truth.
+- For agent-tooling assets, `src/spec_dock/assets/install_root/` is the single current authority.
 - `spec-dock/` is for dogfooding confirmation and consumer-side inspection.
 - However, do inspect `spec-dock/` after scaffold-affecting changes because it is now part of dogfooding validation.
 

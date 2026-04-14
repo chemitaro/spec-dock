@@ -35,9 +35,9 @@ ID: "iss-00072"
     - requirement / design / plan が spec review pass で固定される
 - M2:
   - 対象:
-    - authority retirement in current tests and repo guidance
+    - authority retirement and legacy tree deletion
   - exit:
-    - `tests/test_init_update.py` と `AGENTS.md` から legacy authority assumption が retire される
+    - `tests/test_init_update.py` と `AGENTS.md` から legacy authority assumption が retire され、`src/spec_dock/assets/codex_skills/` が削除される
 - M3:
   - 対象:
     - closeout evidence and final spec close docs
@@ -48,7 +48,7 @@ ID: "iss-00072"
 - 依存関係の正本:
   - `design.md` の `依存関係分析` と module/dependency UML を参照する
 - sequencing rule:
-  - 先に issue-72 docs contract を固定し、次に current tests/guidance の authority retirement を行い、最後に closeout docs/report を揃える
+  - 先に issue-72 docs contract を固定し、次に current tests/guidance の authority retirement と legacy tree deletion を行い、最後に closeout docs/report を揃える
   - final close gate は upstream issue-69/70/71 evidence と issue-72 自身の変更結果の両方を必要とするため、report 集約は最終段に置く
 - step ordering notes:
   - S01 は current tests/guidance の authority cleanup
@@ -58,7 +58,7 @@ ID: "iss-00072"
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
-    - current tests と repo guidance が `install_root` を current authority として扱い、`codex_skills` を authority source/path として期待しない
+    - current tests と repo guidance が `install_root` を current authority として扱い、`codex_skills` を authority source/path や surviving physical tree として期待しない
   - closes:
     - AC-001
     - EC-001
@@ -157,16 +157,16 @@ ID: "iss-00072"
   - `tests/test_init_update.py`
   - `AGENTS.md`
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
-  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json`
+  - `src/spec_dock/assets/codex_skills/`
 - design refs:
   - `design.md`:
     - `既存実装 / 規約の理解`
     - `legacy reference verification contract`
     - `要件 → 設計マッピング`
 - step boundary:
-  - current tests / repo guidance から `codex_skills` を expected source/path/current authority とみなす記述だけを retire する
-  - `src/spec_dock/assets/codex_skills/**` の physical artifact 自体は削除しない
-  - provider-side authoritative manifest と legacy manifest を review し、current metadata source が legacy authority に戻っていないことを execution evidence に含める
+  - current tests / repo guidance から `codex_skills` を expected source/path/current authority とみなす記述を retire する
+  - deletion readiness contract を満たしたうえで `src/spec_dock/assets/codex_skills/**` を削除する
+  - provider-side authoritative manifest を review し、current metadata source が legacy authority に戻っていないことを execution evidence に含める
   - CLI/runtime tests は scoped search で current authority assertion が見つかった場合だけ対象化し、hit がなければ `該当なし` を report に記録する
 
 #### B1 — authority search and contract cleanup
@@ -176,7 +176,7 @@ ID: "iss-00072"
   - `tests/test_init_update.py`
   - `AGENTS.md`
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
-  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json`
+  - `src/spec_dock/assets/codex_skills/`
 
 ##### I0 — provider-side manifest verification
 - slice goal:
@@ -191,8 +191,8 @@ ID: "iss-00072"
 ###### Green
 - minimum implementation:
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` を authoritative manifest として inspect する
-  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json` を legacy artifact classification として inspect する
   - current metadata source が `codex_skills` に戻っていないことを report に残す
+  - package install contract と current inventory contract が `codex_skills` deletion に耐えることを確認する
 - pass condition:
   - asset-manifest verification result が S01 report / S99 final gate の両方から辿れる
 
@@ -213,7 +213,7 @@ ID: "iss-00072"
 ###### Green
 - minimum implementation:
   - parity / duplicate / bundled-asset assertions を `install_root` 基準へ更新する
-  - legacy duplicate existence は historical artifact として必要な場合だけ明示的に格下げする
+  - legacy duplicate existence や physical tree presence を期待する assertion は cutover evidence ベースへ置換する
 - pass condition:
   - issue-72 targeted tests と scoped search が pass
 
@@ -236,7 +236,7 @@ ID: "iss-00072"
 ###### Green
 - minimum implementation:
   - provider-side directory map を `install_root` / `spec_dock` current model に更新
-  - `codex_skills` は historical artifact としてだけ位置づける
+  - `codex_skills` は deleted legacy tree として説明し、現 repo に存在しないことを current guidance で明示する
 - pass condition:
   - `AGENTS.md` が issue-72 requirement/design と整合する
 
@@ -245,6 +245,28 @@ ID: "iss-00072"
   - wording を current docs corpus と揃える
 - guardrail:
   - repo guideline の意図を崩さない
+
+##### I3 — legacy tree physical deletion
+- slice goal:
+  - deletion readiness contract を満たした状態で `src/spec_dock/assets/codex_skills/` を削除し、current repo surface から legacy tree を除去する
+
+###### Red
+- failing test:
+  - `codex_skills` physical tree を expected inventory に含める current tests / docs / packaging assumptions
+- expected failure:
+  - deletion 後に targeted tests または current docs assertions が崩れる
+
+###### Green
+- minimum implementation:
+  - `src/spec_dock/assets/codex_skills/` を削除する
+  - current docs と tests を deletion-aware contract へ更新する
+  - current surface search で `src/spec_dock/assets/codex_skills/` path が historical records 外に残らないことを確認する
+- pass condition:
+  - targeted tests、scoped search、必要な package/install smoke が pass
+
+###### Refactor
+- 目的:
+  - residual historical mention と current contract mention の境界を report から再現できるようにする
 
 #### step gate
 - review:
@@ -357,7 +379,8 @@ ID: "iss-00072"
 - required validation:
   - targeted authority retirement tests
   - scoped search classification
-  - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` / `src/spec_dock/assets/codex_skills/host-adapters/meta.json` manifest review result
+  - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` authoritative manifest review result
+  - `src/spec_dock/assets/codex_skills/` deleted confirmation
   - relevant CLI/runtime tests:
     - current authority assertion hit があれば targeted 実行
     - hit が無ければ `該当なし`
@@ -378,7 +401,7 @@ ID: "iss-00072"
 
 ## 未確定事項
 - なし:
-  - legacy `codex_skills` は historical artifact として物理保持してよいが、current tests/docs で authority source/path として扱わない方針で進める
+  - legacy `codex_skills` は physical tree を削除し、historical references は records にだけ残す方針で進める
 
 ## final exit contract
 - AC/EC 達成:

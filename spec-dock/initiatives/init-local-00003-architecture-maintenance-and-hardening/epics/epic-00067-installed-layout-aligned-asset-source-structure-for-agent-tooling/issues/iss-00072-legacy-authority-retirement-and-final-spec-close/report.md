@@ -55,7 +55,7 @@ ID: "iss-00072"
 
 #### 実施内容
 - issue-69/70/71 完了後の repo reality を調査し、production code の authority はすでに `install_root` に切替済みで、主な残課題が `tests/test_init_update.py`、`AGENTS.md`、issue-72 / epic closeout docs であることを確認した。
-- issue-72 requirement / design を、legacy `codex_skills` を historical artifact として残しつつ current authority assertion だけを retire する契約へ補正した。
+- issue-72 requirement / design を、当初の「legacy `codex_skills` を historical artifact として残す」前提から、後段の user 方針に合わせて physical tree 削除前提へ契約補正する準備として整理した。
 - issue-72 plan をテンプレートから具体化し、S01 = tests/guidance cleanup、S02 = closeout docs reconciliation、S90/S99 = convergence / final gates として固定した。
 - epic current report は prep phase では placeholder のままでよいが、S02/S99 で evidence-bearing content に更新する implementation target であることを明文化した。
 
@@ -293,10 +293,10 @@ informational sweep:
 ## authority-uniqueness (必須)
 - provider_authority_artifacts:
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` を provider-side authoritative manifest として確認した。
-  - historical artifact として残る `src/spec_dock/assets/codex_skills/host-adapters/meta.json` も確認し、`source_of_truth_asset` は legacy root ではなく `install_root/.codex/agents/spec-dock.toml` と `install_root/.github/agents/spec-dock.agent.md` を指していることを再確認した。
+  - `src/spec_dock/assets/codex_skills/` は current repo から削除済みであり、provider-side authority を表す checked-in asset tree は `install_root` だけになっていることを確認した。
 - retired_legacy_surfaces:
-  - `AGENTS.md` は `install_root` を current authority、`codex_skills` を historical artifact としてだけ記述している。
-  - `tests/test_init_update.py` の current authority assertions は `install_root` 基準へ揃っており、残存する `codex_skills` hit は historical regression coverage / legacy duplicate classification / inert duplicate path explanation に限定される。
+  - `AGENTS.md` は `install_root` を single current authority として記述し、`codex_skills` は retired / removed legacy tree としてだけ説明している。
+  - `tests/test_init_update.py` の current authority assertions は `install_root` 基準へ揃っており、残存する `codex_skills` hit は legacy tree 退役確認テスト、synthetic duplicate 注入、legacy fallback 非使用の否定 assertions に限定される。
   - `tests/test_cli.py`、`tests/cli_runtime`、`tests/domain_runtime`、`tests/presentation_runtime` に current authority assertion としての `codex_skills` hit はない。
 - dogfooding_convergence_evidence:
   - `uv run python -m spec_dock.cli update .` -> `spec-dock: ok (update) -> /srv/mount/spec-dock`
@@ -304,14 +304,14 @@ informational sweep:
   - `./spec-dock/scripts/spec-dock sync --github` -> `spec-dock: ok (sync)` / active unchanged
   - `git status --short` は空で、issue-72 closeout evidence 取得後の dogfooding mirror / tracked files に drift が残っていない。
 - result:
-  - `install_root` が唯一の current authority であり、legacy `codex_skills` は historical artifact としてのみ残る状態を issue-72 current surfaces で再確認した。
+  - `install_root` が唯一の current authority であり、legacy `codex_skills` physical tree は repo から削除済み、残存するのは historical records と negative/synthetic test context だけであることを issue-72 current surfaces で再確認した。
 
 ## historical-boundary (必須)
 - current_docs_corpus:
   - current docs corpus は issue-72 requirement/design/plan/report、epic-00067 requirement/design/plan/report、`AGENTS.md`、provider-side/dogfooding-side current docs の契約に従って確認した。
   - issue-72 S02 で epic current report を template から evidence-bearing closeout report へ更新し、issue-70 current report の pending commit 記述も解消した。
 - out_of_scope_historical_records:
-  - `spec-dock/initiatives/init-local-00002-*` 配下の closed issue/discussion、issue-68/69 requirement 上の historical `codex_skills` 文脈、`src/spec_dock/assets/codex_skills/**` の physical tree は historical record / artifact として scope 外に据え置いた。
+  - `spec-dock/initiatives/init-local-00002-*` 配下の closed issue/discussion、issue-68/69 requirement 上の historical `codex_skills` 文脈は historical record として scope 外に据え置いた。
   - current surface search で検出される historical mention は、authority source-of-truth ではなく legacy reference と明示された説明に限定される。
 - result:
   - current docs だけを authority-close 対象に絞り、historical records は rewrite せず boundary を明示する closeout contract が維持されている。
@@ -386,7 +386,8 @@ informational sweep:
     - `rg -n "codex_skills" AGENTS.md tests/test_init_update.py tests/test_cli.py tests/cli_runtime tests/domain_runtime tests/presentation_runtime`
     - classification は authority-uniqueness 節のとおり
   - provider-side manifest review:
-    - `install_root/.agents/host-adapters/meta.json` と legacy `codex_skills/host-adapters/meta.json` を比較確認
+    - `install_root/.agents/host-adapters/meta.json` を authoritative manifest として確認
+    - `src/spec_dock/assets/codex_skills/` deleted confirmation を current inventory search と file tree listing で確認
   - dogfooding convergence:
     - `uv run python -m spec_dock.cli update .` -> `ok`
     - `./spec-dock/scripts/spec-dock validate` -> `ok`
