@@ -3,7 +3,7 @@
 ID: "iss-00075"
 タイトル: "Multi host agent and config asset install"
 関連GitHub: ["#75"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex CLI"
 最終更新: "2026-04-15"
 親: ["epic-00074", "init-local-00002"]
