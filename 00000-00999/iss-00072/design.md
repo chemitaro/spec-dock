@@ -14,7 +14,7 @@ ID: "iss-00072"
 
 ## 目的・制約
 - 目的:
-  - `install_root` を唯一の current authority として最終固定し、legacy `codex_skills` authority 文脈を current code/tests/assets/current docs から退役させる。
+  - `install_root` を唯一の current authority として最終固定し、legacy `codex_skills` authority 文脈を current code/tests/assets/current docs から退役させたうえで、legacy tree 自体も削除する。
   - issue-71 までの evidence chain を final closeout review へ接続し、epic-00067 の closeout verdict を reviewer が再現可能に判断できるようにする。
 - MUST / MUST NOT:
   - MUST:
@@ -38,18 +38,17 @@ ID: "iss-00072"
 - 参照した実装 / docs:
   - `src/spec_dock/cli.py`
   - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
-  - `src/spec_dock/assets/codex_skills/host-adapters/meta.json`
   - `tests/test_init_update.py`
   - epic-00067 docs
   - issue-68 docs and report
   - issue-69 / issue-70 / issue-71 docs and reports
 - 現状理解:
   - issue-70 で runtime authority は `install_root` に寄せる設計で、`cli.py` の current execution path と provider-side authoritative manifest はすでに `install_root` を正本としている。
-  - 残っている主な矛盾は `tests/test_init_update.py` の legacy duplicate / parity assumptions、`AGENTS.md` の provider-side directory map、issue-72 / epic closeout docs の未充足である。
+  - 残っている主な矛盾は `tests/test_init_update.py` の legacy duplicate / parity assumptions、`AGENTS.md` の provider-side directory map、issue-72 / epic closeout docs の未充足、そして `src/spec_dock/assets/codex_skills/` 実体の残置である。
   - issue-71 で verification owner は閉じるが、authority uniqueness の final statement と docs/test cleanup owner はまだ残る。
   - historical issue/report/discussion を巻き込み始めると current authority cleanup の scope が不定になる。
 - 採用するパターン:
-  - final close を「current tests/guidance の authority retire + docs corpus の deterministic review + final report aggregation」の 3 部構成で閉じる。
+  - final close を「current tests/guidance の authority retire + legacy tree deletion readiness review + docs corpus の deterministic review + final report aggregation」の 4 部構成で閉じる。
   - historical records は rewrite せず、current docs corpus を列挙してそこだけを authoritative review 対象にする。
   - final report を non-circular close gate の一次証跡にする。
 - 採用しないもの:
@@ -59,7 +58,8 @@ ID: "iss-00072"
 - 影響範囲:
   - `tests/test_init_update.py`
   - `AGENTS.md`
-  - authoritative / legacy manifest assets
+  - `src/spec_dock/assets/install_root/**`
+  - `src/spec_dock/assets/codex_skills/**`
   - epic-00067 current docs
   - issue reports 69-72
   - epic report / current closeout docs
@@ -75,17 +75,20 @@ ID: "iss-00072"
   - Option B:
     - current docs corpus を固定し、historical records は out-of-scope にする
   - Option C:
-    - final report は generic session log のままにする
+    - legacy tree を物理削除し、historical reference は records にだけ残す
   - Option D:
-    - final report に fixed closeout sections を持たせる
+    - final report は generic session log のままにする
   - Option E:
-    - checked-in mirror だけで authority retirement を判断する
+    - final report に fixed closeout sections を持たせる
   - Option F:
+    - checked-in mirror だけで authority retirement を判断する
+  - Option G:
     - provider-side authoritative manifest と current code/tests/docs を主証拠にする
 - 決定:
-  - Option B + D + F を採用する。
+  - Option B + C + E + G を採用する。
   - 理由:
     - user 方針どおり compact な一括切替 closeout を維持できる。
+    - backward compatibility 不要のため、legacy tree を残す benefit よりも current repo clarity の benefit が大きい。
     - fixed report sections がないと final close review が circular になりやすい。
     - authority uniqueness は checked-in mirror ではなく provider-side authority を見ないと誤判定しうる。
 
@@ -143,6 +146,13 @@ i72 --> final : close gate
 
 ## インターフェース契約
 - API / function / protocol / data boundary:
+  - deletion readiness contract
+    - `src/spec_dock/assets/codex_skills/**` を削除できる条件は次に固定する。
+      - current code が `codex_skills` を runtime path / authority path として参照しない
+      - package install contract が `codex_skills` physical inventory を required artifact として期待しない
+      - current tests が `codex_skills` physical tree の存在を expected inventory として要求しない
+      - current docs が `codex_skills` を surviving artifact として案内しない
+    - deletion 実施後は、historical records に残る mention を除き、current repo surface search で `src/spec_dock/assets/codex_skills/` path がゼロ件になることを pass 条件とする。
   - current docs corpus contract
     - review corpus は次に固定する。
       - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/{requirement.md,design.md,plan.md}`
@@ -167,10 +177,9 @@ i72 --> final : close gate
       - `tests/**`
       - current docs corpus
     - allowed residual matches は次に限定する。
-      - `src/spec_dock/assets/codex_skills/**`
       - `tests/**` 内の historical regression coverage / inert duplicate classification / prior-issue evidence としての `codex_skills` mention
       - historical closed issue/report/discussion
-      - current docs の historical boundary / legacy artifact と明示された節
+      - current docs の historical boundary / deleted legacy tree と明示された節
     - forbidden residual matches は次に固定する。
       - current code/tests/current docs が `codex_skills` を source-of-truth、runtime authority、current metadata source、expected bundled path として扱うこと
       - current assets review で `codex_skills` が current metadata source として必要だと判定されること
@@ -248,7 +257,7 @@ i72 --> final : close gate
     - forbidden:
       - current code/tests/assets/current docs が `codex_skills` を source-of-truth、runtime authority、expected bundled path、current metadata source として扱うこと
     - allowed:
-      - current docs/report の historical boundary section で、`codex_skills` を legacy/historical artifact と明示した説明
+      - current docs/report の historical boundary section で、`codex_skills` を deleted legacy tree / historical reference と明示した説明
       - historical closed issue/report/discussion に残る履歴記述
       - closeout review のための scoped search result 引用
 
@@ -303,7 +312,7 @@ Report --> Review
 - AC-002 -> issue-72 report に legacy retirement / uniqueness evidence を集約する。
 - AC-003 -> epic / issue current docs で future host extension statement を確認する。
 - AC-004 -> final close gate を concrete artifact checks に分解し、issue-72 report に記録する。
-- EC-001 -> legacy root を残しても authority reference が current surfaces に残らないことを確認する。
+- EC-001 -> physical tree 削除後も authority reference が current surfaces に残らず、historical references が records に隔離されていることを確認する。
 - EC-002 -> historical records は out-of-scope として残し、current docs で current authority statement を上書きする。
 - constraint -> current docs corpus を固定して review sprawl を防ぐ。
 
@@ -331,7 +340,7 @@ Report --> Review
 - AC-002 -> issue-72 report `authority-uniqueness` / `upstream-prerequisites`
 - AC-003 -> current docs corpus review for extension model
 - AC-004 -> issue-72 report `final-close-gate` + final spec review reference
-- EC-001 -> historical artifact retained but authority references retired
+- EC-001 -> physical tree deleted and historical references isolated to records
 - EC-002 -> current docs overwrite statement + historical docs untouched list
 - non-circular constraint -> explicit gate checks listed in report before review verdict
 
@@ -358,4 +367,4 @@ Report --> Review
 
 ## 未確定事項
 - なし:
-  - current docs corpus、authoritative manifest primary review、final report sections、non-circular final close gate をこの issue の設計契約として固定する。
+  - current docs corpus、authoritative manifest primary review、legacy tree deletion、final report sections、non-circular final close gate をこの issue の設計契約として固定する。
