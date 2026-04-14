@@ -13,7 +13,7 @@ ID: "epic-00067"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
-  - `iss-00068` は report front matter こそ `draft` のままだが、foundation tranche の実装記録と証跡は揃っている。`iss-00069` から `iss-00071` は `approved` で、packaging / installer cutover / verification parity の証跡が各 issue report に揃っている。
+  - `iss-00068` から `iss-00072` までの current issue docs は `approved` で揃っており、foundation / packaging / installer cutover / verification parity / final closeout の証跡が各 issue report に揃っている。
   - `iss-00072` は prep / S01 / S02 / S90-S99 の closeout chain を完了し、current authority assumptions retirement、current closeout docs reconciliation、fresh dogfooding convergence、final close gate の証跡を issue report に固定した。
   - 本 epic の requirement / design / plan と issue evidence chain は整合済みで、`E-AC-001` から `E-AC-007` まで Pass として close できる。
 - 次のマイルストーン:
