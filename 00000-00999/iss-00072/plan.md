@@ -5,7 +5,7 @@ ID: "iss-00072"
 関連GitHub: ["#72"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-13"
+最終更新: "2026-04-14"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
@@ -91,6 +91,15 @@ ID: "iss-00072"
   - review gate:
     - final code review pass
     - final spec review pass
+  - supplemental repair loop:
+    - full-suite residual が issue-72 実行中に再現した場合は、failing test を単体再現し、failure / root cause / options / recommended fix を独立 analysis report に記録してから修正に進む
+    - layering contract 違反は test 緩和よりも実装修正を優先し、commands/application/domain/presentation の境界を維持する
+    - current residual target:
+      - `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
+    - preferred fix:
+      - commands 層から `domain.ids` 直 import を除去する局所修正
+    - analysis source of truth:
+      - `discussions/20260414t012350z-research-runtime-shell-structural-regression-analysis.md`
 
 ## 要件 ↔ ステップ対応
 - AC-001 -> S01, S90

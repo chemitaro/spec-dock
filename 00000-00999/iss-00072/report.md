@@ -5,7 +5,7 @@ ID: "iss-00072"
 関連GitHub: ["#72"]
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-13"
+最終更新: "2026-04-14"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
@@ -15,6 +15,35 @@ ID: "iss-00072"
 ## 実装サマリー
 - issue-72 は `install_root` authority 一本化の最終 closeout tranche として、current tests / repo guidance / current closeout docs の residual legacy authority assumptions を retire する。
 - prep phase では requirement / design / plan を現 repo 状態に合わせて更新し、spec review pass まで fix した。
+
+## failing-tests analysis (必須)
+- full-suite execution:
+  - `python -m unittest discover -v`
+- analysis source of truth:
+  - `discussions/20260414t012350z-research-runtime-shell-structural-regression-analysis.md`
+- failing tests:
+  - `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
+    - failure:
+      - `forbidden import in .../commands/deps.py: domain.ids`
+    - observed cause:
+      - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/deps.py` が `from ..domain.ids import format_id, parse_id` を行っており、S11 structural regression contract の「commands 層は `domain` / `infra` / `app` を直接 import しない」に違反している
+    - options:
+      - Option A:
+        - S11 test を緩めて `commands/deps.py` の `domain.ids` import を許容する
+      - Option B:
+        - commands-safe helper へ id normalization を移し、`commands/deps.py` から `domain.ids` 直 import を除去する
+      - Option C:
+        - mutation request に raw string を渡し、application 層で canonicalization する
+    - evaluation:
+      - Option A は architecture contract を弱めるため不採用
+      - Option C は request/error contract の変更範囲が広く、closeout tranche の修正として過大
+      - Option B は振る舞いを保ったまま layering violation を局所除去できるため最適
+    - chosen action:
+      - Option B を採用し、commands layer 内の safe helper へ寄せる
+- known residual handling:
+  - 上記 failing test は issue-71 / epic report では scope-out residual として記録されていたが、今回ユーザー指示により full-suite green まで解消対象へ昇格した
+- current status:
+  - 上記 failing test は commands 層の局所修正後に targeted rerun / deps 周辺 targeted tests / full suite rerun のすべてで pass した
 
 ## 実装記録（セッションログ） (必須)
 
@@ -363,23 +392,37 @@ informational sweep:
     - `./spec-dock/scripts/spec-dock validate` -> `ok`
     - `./spec-dock/scripts/spec-dock sync --github` -> `ok`
   - final reviews:
-    - final code review cycle:
+    - prior final code review cycle:
       - initial review: `fail`
       - finding: unresolved `pending_until_review` placeholders and premature epic approval while issue report was still `draft`
       - corrective action: S99 report update resolved the final gate placeholders and aligned issue report status with the epic closeout verdict
       - second review: `fail`
       - finding: managed path sync did not reject symlink parent / exact-file conflicts before writes
       - corrective action: preflight hardening in `src/spec_dock/cli.py`、obsolete managed symlink prune 補正、guidance authority path cleanup、symlink / guidance regression testsを反映
-      - final re-review: `pass`
-    - final spec review:
-      - `pass`
+      - prior re-review: `pass`
+    - fresh final reviews after full-suite repair:
+      - code review:
+        - `pass`
+        - note:
+          - `deps.py` は commands-safe helper `node_id_normalizer.py` を参照し、duplicate normalization logic は除去済み
+      - spec review:
+        - `pass`
+        - note:
+          - review gate の循環解消、metadata drift 解消、analysis report 正本化の整合を確認済み
   - informational full-suite sweep:
     - `python -m unittest discover -v`
     - known residual reproduced:
       - `tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
     - issue-71 / epic report の scope-out 記録と一致し、epic acceptance blocker ではないことを再確認した
+  - full-suite repair rerun:
+    - `python -m unittest -v tests.cli_runtime.test_runtime_shell_s11.RuntimeShellS11Tests.test_final_api_call_site_and_structural_regression`
+    - `Ran 1 test in 0.161s` / `OK`
+    - `python -m unittest -v tests.cli_runtime.test_deps tests.cli_runtime.test_runtime_deps_s04`
+    - `Ran 106 tests in 32.476s` / `OK`
+    - `python -m unittest discover -v`
+    - `Ran 725 tests in 153.918s` / `OK`
 - result:
-  - final close gate evidence は current metadata drift 修正、current / obsolete managed symlink safety fix、guidance authority cleanup、known residual の scope-out 再確認まで含めて更新済みであり、fresh final code review / final spec review ともに `pass` した。
+  - final close gate evidence は current metadata drift 修正、current / obsolete managed symlink safety fix、guidance authority cleanup、full-suite residual repair、full suite green 確認、fresh final code review / spec review pass まで更新済みであり、issue-72 は close-ready である。
 
 ## post-review-audit (任意)
 - spec_review_reference:
@@ -388,9 +431,10 @@ informational sweep:
   - initial final code review identified unresolved closeout placeholders and issue/epic status mismatch.
   - S99 corrective revision resolved the closeout placeholder / state drift finding.
   - follow-up fresh code review identified symlink preflight gap and required CLI/test fix.
-  - final focused code review pass confirmed current/obsolete symlink handlingと guidance authority test が current contract と整合している。
+  - prior focused code review pass confirmed current/obsolete symlink handlingと guidance authority test が current contract と整合している。
+  - fresh final code review after full-suite repair passed after duplicate normalization removal and helper unification.
 - final_spec_review_reference:
-  - final spec review pass recorded for issue-72 requirement/design/plan/report and epic closeout report.
+  - prep / prior closeout cycles の spec review pass に加え、full-suite repair と独立 analysis report 追加後の fresh final spec review も pass.
 
 ## 省略/例外メモ (必須)
 - 該当なし
