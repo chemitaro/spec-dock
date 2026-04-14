@@ -277,6 +277,66 @@ informational sweep:
 
 ---
 
+### 2026-04-14 00:00 - 00:00
+
+#### 対象
+- Step: S03 PR review remediation follow-up
+- AC/EC: AC-001, AC-004
+
+#### 実施内容
+- PR #73 の残レビューを精査し、`tomli` 指摘は既存 remediation 済みの stale comment と判断した。
+- `src/spec_dock/cli.py` の obsolete exact path cleanup を補正し、`is_dir()` より先に `is_symlink()` を扱うことで symlink -> directory の obsolete managed path も prune できるようにした。
+- current managed path 側の exact symlink fail-closed guard は維持し、obsolete exact path のみ prune 許可となるよう preflight / apply の分岐を揃えた。
+- `tests/test_init_update.py` に symlink -> directory の obsolete exact path regression test を追加し、参照先 directory を保持したまま symlink だけが削除されることを固定した。
+- full suite と fresh code review を再実行し、PR 再監視へ進められる state を確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_prunes_obsolete_managed_symlink_to_directory_exact_file_path \
+  tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes
+
+Ran 3 tests ... OK
+```
+
+```bash
+python -m unittest -v tests.test_init_update
+
+Ran 151 tests ... OK
+```
+
+```bash
+python -m unittest discover -v
+
+Ran 727 tests in 139.190s ... OK
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=29
+```
+
+#### 変更したファイル
+- `/srv/mount/spec-dock/src/spec_dock/cli.py`
+  - obsolete exact path cleanup で symlink -> directory を prune できるよう順序を補正
+- `/srv/mount/spec-dock/tests/test_init_update.py`
+  - obsolete managed symlink -> directory regression test を追加
+
+#### コミット
+- `78b60a6` `fix(cli): obsolete symlink dir の prune 回帰を修正`
+
+#### メモ
+- fresh code review:
+  - verdict:
+    - `pass`
+  - reviewer:
+    - code_reviewer `019d8aae-7f2d-7d11-8268-95f075f598dc`
+  - note:
+    - current managed path の symlink guard 維持と obsolete exact symlink prune の両立を確認
+
+---
+
 ## 遭遇した問題と解決 (任意)
 - 問題:
   - issue-72 prep docs で epic current report と CLI/runtime test targeting の契約が揺れやすかった。
@@ -515,8 +575,17 @@ spec-dock: ok (validate) nodes=29
     - `Ran 726 tests in 138.572s` / `OK`
     - `./spec-dock/scripts/spec-dock validate`
     - `spec-dock: ok (validate) nodes=29`
+  - PR review remediation follow-up:
+    - `python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path tests.test_init_update.TestInitUpdate.test_issue_70_update_prunes_obsolete_managed_symlink_to_directory_exact_file_path tests.test_init_update.TestInitUpdate.test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes`
+    - `Ran 3 tests ... OK`
+    - `python -m unittest -v tests.test_init_update`
+    - `Ran 151 tests ... OK`
+    - `python -m unittest discover -v`
+    - `Ran 727 tests in 139.190s` / `OK`
+    - `./spec-dock/scripts/spec-dock validate`
+    - `spec-dock: ok (validate) nodes=29`
 - result:
-  - final close gate evidence は current metadata drift 修正、current / obsolete managed symlink safety fix、guidance authority cleanup、full-suite residual repair、full suite green 確認、fresh final code review / spec review pass まで更新済みであり、issue-72 は close-ready である。
+  - final close gate evidence は current metadata drift 修正、current / obsolete managed symlink safety fix、obsolete symlink-to-directory prune 補正、guidance authority cleanup、full-suite residual repair、full suite green 確認、fresh final code review / spec review pass まで更新済みであり、issue-72 は close-ready である。
 
 ## post-review-audit (任意)
 - spec_review_reference:
@@ -527,6 +596,7 @@ spec-dock: ok (validate) nodes=29
   - follow-up fresh code review identified symlink preflight gap and required CLI/test fix.
   - prior focused code review pass confirmed current/obsolete symlink handlingと guidance authority test が current contract と整合している。
   - fresh final code review after full-suite repair passed after duplicate normalization removal and helper unification.
+  - PR review remediation follow-up code review passed after obsolete symlink-to-directory prune regression fix.
 - final_spec_review_reference:
   - prep / prior closeout cycles の spec review pass に加え、full-suite repair と独立 analysis report 追加後の fresh final spec review も pass.
 
