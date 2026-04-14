@@ -14,7 +14,7 @@ ID: "epic-00074"
 
 ## 全体像
 - target boundary:
-  - existing `install_root` mechanism の上で、Codex main-agent bootstrap config、host-native orchestrator/specialist assets、shared skills を managed host pack として扱う
+  - existing `install_root` mechanism の上で、Codex main-agent bootstrap config、Codex specialist assets、GitHub Copilot orchestrator/specialist assets、shared skills を managed host pack として扱う
   - Codex pack と GitHub Copilot pack を first implementation として追加する
   - future host / future pack を追加可能な metadata と sync-prune contract を定義する
 - impacted area:
@@ -27,7 +27,7 @@ ID: "epic-00074"
   - `epic-00067` が authority / install-shaped layout / cleanup safety を固定済みであるため、本 epic は layout cleanup を再設計しない
   - `epic-00048` が protocol / thin adapter / native shim の baseline を固定済みであるため、本 epic は「native config と subagent/custom agent をどう managed deployment するか」に限定する
   - host pack の中身は host-native discovery 用 asset だが、runtime protocol の実体は既存 shared guidance と runtime に残す
-  - Codex は `orchestrator` を primary custom agent として露出できないため、main agent config が orchestrator responsibility を担い、`.codex/agents/spec-manager.toml` を sibling specialist として扱う
+  - Codex は `orchestrator` を primary custom agent として露出できないため、main agent config が orchestrator responsibility を担う。direct `.codex/agents/orchestrator.toml` は配布せず、`.codex/agents/` には `.codex/agents/spec-manager.toml` を含む sibling specialist だけを置く
   - GitHub Copilot は `orchestrator` を primary custom agent として露出できるため、`.github/agents/orchestrator.agent.md` を primary entrypoint、`.github/agents/spec-manager.agent.md` を sibling specialist として扱う
 
 ### UML（推奨: module / context）
@@ -75,6 +75,7 @@ installer --> consumer
   - runtime protocol semantics の正本は既存 runtime / docs に残し、host config / subagent file へ再実装しない
 - consistency model:
   - Codex では bootstrap-only `config.toml` と `.codex/agents/*.toml` が同じ host pack に属するが、bootstrap-only と managed の ownership 差を metadata で明示する
+  - Codex `.codex/agents/` は sibling specialist のみを保持し、orchestrator responsibility は main `config.toml` の developer instructions のみに載せる
   - GitHub Copilot では `.github/agents/*.agent.md` のみを host pack 配置対象にし、`config` / `mcp-config` は install target に含めない
   - sync は current managed file set を生成・更新し、prune は explicit obsolete managed file set に限定する
   - unknown custom file は preserve が既定であり、managed ownership が定義されていない file を cleanup しない
@@ -82,7 +83,7 @@ installer --> consumer
 
 ## データモデル
 - model / table changes:
-  - managed asset metadata は、Codex main-agent bootstrap config、host ごとの orchestrator/specialist assets、shared skill assets を pack 単位で参照できる必要がある
+  - managed asset metadata は、Codex main-agent bootstrap config、Codex specialist assets、GitHub Copilot orchestrator/specialist assets、shared skill assets を pack 単位で参照できる必要がある
   - pack definition には少なくとも `host`, `asset_group`, `managed_paths`, `bootstrap_only_paths`, `obsolete_managed_paths`, `delegation_boundary`, `host_behavior_note` に相当する情報が必要である
 - invariants:
   - `install_root` が唯一の source-of-truth である
@@ -117,7 +118,7 @@ ManagedHostPack --> InstallRootTree : resolves from
 
 ## 主要フロー
 - Flow-A: managed host pack authoring
-  1. maintainer が `install_root` 配下へ Codex main-agent bootstrap config、host-specific orchestrator/specialist assets、shared skills を追加する
+  1. maintainer が `install_root` 配下へ Codex main-agent bootstrap config、Codex specialist assets、GitHub Copilot primary orchestrator asset、GitHub Copilot specialist assets、shared skills を追加する
   2. managed metadata に host pack definition、bootstrap-only path、obsolete managed path を追記する
   3. docs / tests に host pack ownership と host behavior note を反映する
 - Flow-B: clean install
@@ -172,6 +173,7 @@ Installer -> Repo: preserve unknown custom files
 - partial failure:
   - config assets だけ同期され、custom agent assets が漏れるような半端な host pack state を acceptance しない
   - cross-host parity は同一 implementation issue の close-out で確認し、片側だけ docs/tests が揃った状態で epic を閉じない
+  - prompt asset は current implementation deliverable ではないため、未提供状態を failure と扱わない
 
 ## 移行戦略
 - migration strategy:
@@ -212,7 +214,7 @@ Installer -> Repo: preserve unknown custom files
 - E-AC mapping:
   - E-AC-001 -> Codex host pack integration tests + docs parity
   - E-AC-002 -> GitHub Copilot host pack integration tests + prune evidence
-  - E-AC-003 -> metadata/design review + extension-path assertions
+  - E-AC-003 -> metadata/design review + extension-path assertions + prompt out-of-scope note
   - E-AC-004 -> final rollout checklist + dogfooding validation + spec review
 
 ## 関連 ADR

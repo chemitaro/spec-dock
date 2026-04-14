@@ -19,9 +19,10 @@ ID: "epic-00074"
   - E-RQ-003
   - E-RQ-004
   - E-RQ-005
-  - E-RQ-006
   - E-RQ-007
   - E-RQ-008
+  - E-RQ-009
+  - E-RQ-010
 - E-AC:
   - E-AC-001
   - E-AC-002
@@ -42,7 +43,7 @@ ID: "epic-00074"
     - 既存 installer foundation の上で Codex bootstrap `config.toml`、Codex agents、GitHub Copilot agents、shared skills を追加し、multi-host managed asset delivery を一度に成立させる
   - deliverable:
     - Codex main-agent bootstrap `config.toml`
-    - Codex `.codex/agents/*.toml`
+    - Codex `.codex/agents/*.toml`（direct `orchestrator.toml` は含めない）
     - GitHub Copilot `.github/agents/*.agent.md`
     - shared `.agents/skills/**`
     - 必要な metadata / docs / tests / temp repo validation evidence
@@ -52,9 +53,10 @@ ID: "epic-00074"
     - E-RQ-003
     - E-RQ-004
     - E-RQ-005
-    - E-RQ-006
     - E-RQ-007
     - E-RQ-008
+    - E-RQ-009
+    - E-RQ-010
     - E-AC-001
     - E-AC-002
     - E-AC-003
@@ -79,6 +81,8 @@ ID: "epic-00074"
 - test / observability / migration / docs:
   - 単一 issue 内で managed ownership / prune safety の unit/integration evidence を持つ
   - 同一実装内で Codex と GitHub Copilot の clean install / update を確認する
+  - E-RQ-009 / E-RQ-010 を close list だけでなく validation evidence でも回収する
+  - prompt asset は current issue deliverable に含めず、future extensibility note としてのみ docs に残す
   - final close-out 前に provider docs / dogfooding docs / tests / managed metadata の整合を確認する
 
 ## ロールアウト / docs impact
@@ -96,7 +100,8 @@ ID: "epic-00074"
   - 既存 installer foundation のまま実装でき、mechanism 追加が不要であることを確認する
 - checkpoint-02:
   - metadata / asset placement validation
-  - Codex bootstrap `config.toml`、Codex agents、GitHub Copilot agents、shared skills の配置先と ownership が矛盾していない
+  - Codex bootstrap `config.toml`、Codex specialist agents、GitHub Copilot agents、shared skills の配置先と ownership が矛盾していない
+  - direct `.codex/agents/orchestrator.toml` を配布しない契約が metadata / docs / tests に反映されている
 - checkpoint-03:
   - Codex and Copilot clean install / update validation
   - Codex は main config で orchestrator responsibility を担い、GitHub Copilot は `.github/agents/orchestrator.agent.md` を primary にした構成で正しく配置される
@@ -105,12 +110,13 @@ ID: "epic-00074"
   - obsolete managed files だけが prune され、unknown custom files は保持される
 - checkpoint-05:
   - final docs parity / dogfooding verification
-  - future host extensibility note と compatibility boundary が close-out evidence に残る
+  - future host extensibility note、prompt out-of-scope note、compatibility boundary が close-out evidence に残る
 
 ## Issue readiness contract
 - Issue に要求する最低条件:
   - `epic-00067` prerequisite と `epic-00048` baseline の扱いが明文化されている
   - managed/unmanaged boundary と prune safety の確認方法が書かれている
+  - E-RQ-009 / E-RQ-010 を含む close list と evidence 回収方法が書かれている
   - docs/tests/dogfooding evidence を issue 自身で回収する計画がある
   - asset 追加で閉じる範囲と、mechanism 追加が必要になった場合の再分割条件が書かれている
 
@@ -121,7 +127,8 @@ ID: "epic-00074"
   - E-AC-003 は single issue 内の managed asset contract と future host extensibility review で閉じる
   - E-AC-004 は final docs parity / dogfooding / rollout checklist で閉じる
 - integration / rollout complete:
-  - Codex では main agent bootstrap config と subagent/custom agent assets、GitHub Copilot では `.github/agents/` 配下の subagent/custom agent assets が managed deployment 可能である
+  - Codex では main agent bootstrap config と sibling specialist assets、GitHub Copilot では `.github/agents/` 配下の `orchestrator` + specialist assets が managed deployment 可能である
+  - Codex では direct `.codex/agents/orchestrator.toml` を配布せず、orchestrator responsibility が main `config.toml` にのみ載ることが確認済みである
   - update path の obsolete managed cleanup と unknown custom preserve が確認済みである
 - docs impact resolved:
   - provider docs、dogfooding docs、initiative portfolio、tests が同じ epic boundary を表現している
