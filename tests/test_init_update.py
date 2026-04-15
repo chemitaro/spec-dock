@@ -97,9 +97,14 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md"
         ),
         ".agents/host-adapters/meta.json": "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-        ".codex/agents/spec-dock.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
-        ".github/agents/spec-dock.agent.md": (
-            "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md"
+        ".codex/AGENTS.md": "src/spec_dock/assets/install_root/.codex/AGENTS.md",
+        ".codex/config.toml": "src/spec_dock/assets/install_root/.codex/config.toml",
+        ".codex/agents/spec-manager.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
+        ".github/agents/orchestrator.agent.md": (
+            "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md"
+        ),
+        ".github/agents/spec-manager.agent.md": (
+            "src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md"
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
@@ -243,8 +248,8 @@ class TestInitUpdate(CliRuntimeHarness):
                 "native_shim": {
                     "managed": True,
                     "owner": "spec-dock",
-                    "target_file": ".codex/agents/spec-dock.toml",
-                    "source_of_truth_asset": "install_root/.codex/agents/spec-dock.toml",
+                    "target_file": ".codex/agents/spec-manager.toml",
+                    "source_of_truth_asset": "install_root/.codex/agents/spec-manager.toml",
                     "delegates_to": ".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 },
             },
@@ -254,16 +259,38 @@ class TestInitUpdate(CliRuntimeHarness):
                 "native_shim": {
                     "managed": True,
                     "owner": "spec-dock",
-                    "target_file": ".github/agents/spec-dock.agent.md",
-                    "source_of_truth_asset": "install_root/.github/agents/spec-dock.agent.md",
+                    "target_file": ".github/agents/orchestrator.agent.md",
+                    "source_of_truth_asset": "install_root/.github/agents/orchestrator.agent.md",
                     "delegates_to": ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
                 },
             },
         },
         "managed_assets": {
+            "bootstrap_only_exact_file_paths": [
+                ".codex/config.toml",
+            ],
             "obsolete_exact_file_paths": [
+                ".codex/agents/spec-dock.toml",
+                ".github/agents/spec-dock.agent.md",
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 ".github/agents/spec-dock-copilot-adapter.agent.md",
+                ".codex/agents/code_reviewer.toml",
+                ".codex/agents/dev_coder.toml",
+                ".codex/agents/doc_writer.toml",
+                ".codex/agents/pr_monitor.toml",
+                ".codex/agents/qa_reviewer.toml",
+                ".codex/agents/repo_analyst.toml",
+                ".codex/agents/spark_worker.toml",
+                ".codex/agents/spec_reviewer.toml",
+                ".codex/agents/utility_worker.toml",
+                ".github/agents/code_reviewer.agent.md",
+                ".github/agents/dev_coder.agent.md",
+                ".github/agents/doc_writer.agent.md",
+                ".github/agents/pr_monitor.agent.md",
+                ".github/agents/qa_reviewer.agent.md",
+                ".github/agents/repo_analyst.agent.md",
+                ".github/agents/spec_reviewer.agent.md",
+                ".github/agents/utility_worker.agent.md",
             ]
         },
         "generated_by": "spec-dock update",
@@ -271,6 +298,15 @@ class TestInitUpdate(CliRuntimeHarness):
     }
     _ISSUE_68_INSTALL_ROOT = Path("src/spec_dock/assets/install_root")
     _ISSUE_68_AUTHORITATIVE_RELATIVE_PATHS = (
+        ".agents/host-adapters/meta.json",
+        ".agents/skills/git-commit-conventional-ja/SKILL.md",
+        ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
+        ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
+        ".agents/skills/github-codex-pr-review-comments/SKILL.md",
+        ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+        ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+        ".agents/skills/github-pr-creator/SKILL.md",
+        ".agents/skills/github-pr-creator/agents/openai.yaml",
         ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
         ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
@@ -278,13 +314,47 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
-        ".agents/host-adapters/meta.json",
-        ".codex/agents/spec-dock.toml",
-        ".github/agents/spec-dock.agent.md",
+        ".codex/AGENTS.md",
+        ".codex/config.toml",
+        ".codex/agents/code-reviewer.toml",
+        ".codex/agents/consultant.toml",
+        ".codex/agents/default.toml",
+        ".codex/agents/dev-coder.toml",
+        ".codex/agents/doc-writer.toml",
+        ".codex/agents/explorer.toml",
+        ".codex/agents/pr-monitor.toml",
+        ".codex/agents/qa-reviewer.toml",
+        ".codex/agents/repo-analyst.toml",
+        ".codex/agents/researcher.toml",
+        ".codex/agents/spark-worker.toml",
+        ".codex/agents/spec-manager.toml",
+        ".codex/agents/spec-reviewer.toml",
+        ".codex/agents/utility-worker.toml",
+        ".codex/agents/worker.toml",
+        ".github/agents/code-reviewer.agent.md",
+        ".github/agents/consultant.agent.md",
+        ".github/agents/dev-coder.agent.md",
+        ".github/agents/doc-writer.agent.md",
+        ".github/agents/orchestrator.agent.md",
+        ".github/agents/pr-monitor.agent.md",
+        ".github/agents/qa-reviewer.agent.md",
+        ".github/agents/repo-analyst.agent.md",
+        ".github/agents/researcher.agent.md",
+        ".github/agents/spec-manager.agent.md",
+        ".github/agents/spec-reviewer.agent.md",
+        ".github/agents/utility-worker.agent.md",
         ".github/workflows/ci.yml",
     )
     _ISSUE_68_CLASSIFICATION_PREFIX_TO_RELATIVE_PATHS = {
         ".agents/skills/": (
+            ".agents/skills/git-commit-conventional-ja/SKILL.md",
+            ".agents/skills/git-commit-conventional-ja/agents/openai.yaml",
+            ".agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md",
+            ".agents/skills/github-codex-pr-review-comments/SKILL.md",
+            ".agents/skills/github-codex-pr-review-comments/agents/openai.yaml",
+            ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
+            ".agents/skills/github-pr-creator/SKILL.md",
+            ".agents/skills/github-pr-creator/agents/openai.yaml",
             ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
             ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
@@ -297,10 +367,39 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/host-adapters/meta.json",
         ),
         ".codex/agents/": (
-            ".codex/agents/spec-dock.toml",
+            ".codex/agents/code-reviewer.toml",
+            ".codex/agents/consultant.toml",
+            ".codex/agents/default.toml",
+            ".codex/agents/dev-coder.toml",
+            ".codex/agents/doc-writer.toml",
+            ".codex/agents/explorer.toml",
+            ".codex/agents/pr-monitor.toml",
+            ".codex/agents/qa-reviewer.toml",
+            ".codex/agents/repo-analyst.toml",
+            ".codex/agents/researcher.toml",
+            ".codex/agents/spark-worker.toml",
+            ".codex/agents/spec-manager.toml",
+            ".codex/agents/spec-reviewer.toml",
+            ".codex/agents/utility-worker.toml",
+            ".codex/agents/worker.toml",
         ),
         ".github/agents/": (
-            ".github/agents/spec-dock.agent.md",
+            ".github/agents/code-reviewer.agent.md",
+            ".github/agents/consultant.agent.md",
+            ".github/agents/dev-coder.agent.md",
+            ".github/agents/doc-writer.agent.md",
+            ".github/agents/orchestrator.agent.md",
+            ".github/agents/pr-monitor.agent.md",
+            ".github/agents/qa-reviewer.agent.md",
+            ".github/agents/repo-analyst.agent.md",
+            ".github/agents/researcher.agent.md",
+            ".github/agents/spec-manager.agent.md",
+            ".github/agents/spec-reviewer.agent.md",
+            ".github/agents/utility-worker.agent.md",
+        ),
+        ".codex/": (
+            ".codex/AGENTS.md",
+            ".codex/config.toml",
         ),
         ".github/workflows/": (
             ".github/workflows/ci.yml",
@@ -376,18 +475,18 @@ class TestInitUpdate(CliRuntimeHarness):
         },
         "codex native shim": {
             "search_globs": (
-                "**/spec-dock.toml",
+                "**/spec-manager.toml",
             ),
             "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
+                "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
             ),
         },
         "github agent file": {
             "search_globs": (
-                "**/spec-dock.agent.md",
+                "**/orchestrator.agent.md",
             ),
             "allowed_provider_paths": (
-                "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+                "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",
             ),
         },
         "github workflow asset": {
@@ -404,14 +503,42 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md",
         "spec_dock/assets/install_root/.agents/skills/spec-dock-copilot-adapter/SKILL.md",
         "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-        "spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
-        "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+        "spec_dock/assets/install_root/.codex/AGENTS.md",
+        "spec_dock/assets/install_root/.codex/config.toml",
+        "spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
+        "spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",
+        "spec_dock/assets/install_root/.github/agents/spec-manager.agent.md",
         "spec_dock/assets/install_root/.github/workflows/ci.yml",
     )
     _ISSUE_69_HANDOFF_SURFACE_ARTIFACT_RELATIVE_PATHS = (
         "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-        "spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
-        "spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
+        "spec_dock/assets/install_root/.codex/agents/code-reviewer.toml",
+        "spec_dock/assets/install_root/.codex/agents/consultant.toml",
+        "spec_dock/assets/install_root/.codex/agents/default.toml",
+        "spec_dock/assets/install_root/.codex/agents/dev-coder.toml",
+        "spec_dock/assets/install_root/.codex/agents/doc-writer.toml",
+        "spec_dock/assets/install_root/.codex/agents/explorer.toml",
+        "spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
+        "spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml",
+        "spec_dock/assets/install_root/.codex/agents/repo-analyst.toml",
+        "spec_dock/assets/install_root/.codex/agents/researcher.toml",
+        "spec_dock/assets/install_root/.codex/agents/spark-worker.toml",
+        "spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
+        "spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml",
+        "spec_dock/assets/install_root/.codex/agents/utility-worker.toml",
+        "spec_dock/assets/install_root/.codex/agents/worker.toml",
+        "spec_dock/assets/install_root/.github/agents/code-reviewer.agent.md",
+        "spec_dock/assets/install_root/.github/agents/consultant.agent.md",
+        "spec_dock/assets/install_root/.github/agents/dev-coder.agent.md",
+        "spec_dock/assets/install_root/.github/agents/doc-writer.agent.md",
+        "spec_dock/assets/install_root/.github/agents/orchestrator.agent.md",
+        "spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md",
+        "spec_dock/assets/install_root/.github/agents/qa-reviewer.agent.md",
+        "spec_dock/assets/install_root/.github/agents/repo-analyst.agent.md",
+        "spec_dock/assets/install_root/.github/agents/researcher.agent.md",
+        "spec_dock/assets/install_root/.github/agents/spec-manager.agent.md",
+        "spec_dock/assets/install_root/.github/agents/spec-reviewer.agent.md",
+        "spec_dock/assets/install_root/.github/agents/utility-worker.agent.md",
     )
     _ISSUE_69_INSTALL_ROOT_PACKAGE_DATA_PATTERNS = (
         "assets/install_root/.agents/**",
@@ -479,6 +606,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00055-close-linked-github-issues-from-specdock-command/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json",
@@ -512,6 +641,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00055-close-linked-github-issues-from-specdock-command/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json": [],
@@ -573,9 +704,7 @@ class TestInitUpdate(CliRuntimeHarness):
         r"|^\s*(schema_version|projection|nodes|issues|deps|source|updated_at)\s*="
     )
     _NATIVE_SHIM_CONTEXT_INLINE_PATTERN = r"\.agent/.*\.json|context-pack\.md"
-    _NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN = (
-        r"active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order"
-    )
+    _NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN = r"active\.json|index\.json|deps-issues\.json|index-all\.json"
     _CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN = r"(?m)^\s*developer_instructions\s*="
     _CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN = r"(?m)^\s*instructions\s*="
 
@@ -804,8 +933,8 @@ class TestInitUpdate(CliRuntimeHarness):
         return (
             *managed_skill_paths,
             ".agents/host-adapters/meta.json",
-            ".codex/agents/spec-dock.toml",
-            ".github/agents/spec-dock.agent.md",
+            ".codex/agents/spec-manager.toml",
+            ".github/agents/orchestrator.agent.md",
             ".codex/agents/spec-dock-codex-adapter.toml",
             ".github/agents/spec-dock-copilot-adapter.agent.md",
             "spec-dock/docs/guide.md",
@@ -891,7 +1020,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 break
         return "\n".join(lines[start_index:end_index]) + "\n"
 
-    def _assert_native_shim_static_delegation_only_contract(
+    def _assert_spec_manager_contract(
         self,
         *,
         text: str,
@@ -901,22 +1030,40 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn(
             delegation_expected,
             text,
-            f"native shim missing delegation reference ({shim_label}): {delegation_expected}",
+            f"spec-manager missing delegation reference ({shim_label}): {delegation_expected}",
+        )
+        for fragment in (
+            "command operator",
+            "./spec-dock/scripts/spec-dock active {set,show,clear}",
+            "./spec-dock/scripts/spec-dock validate",
+            "requirement/design/plan/report",
+            "manual",
+            "Read order",
+        ):
+            self.assertIn(
+                fragment,
+                text,
+                f"spec-manager missing command-operator fragment ({shim_label}): {fragment}",
+            )
+        self.assertRegex(
+            text,
+            r"(?i)(must not manually edit|manual file edit|manual file editing)",
+            f"spec-manager missing manual-edit prohibition ({shim_label})",
         )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
-            f"native shim includes structured state payload keys ({shim_label})",
+            f"spec-manager includes structured state payload keys ({shim_label})",
         )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
-            f"native shim includes .agent/*.json or context-pack inline reference ({shim_label})",
+            f"spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})",
         )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN,
-            f"native shim includes direct protocol read reference ({shim_label})",
+            f"spec-manager includes direct protocol read reference ({shim_label})",
         )
 
     def _assert_codex_native_shim_loader_contract(self, *, text: str, shim_label: str) -> None:
@@ -929,6 +1076,91 @@ class TestInitUpdate(CliRuntimeHarness):
             text,
             self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
             f"codex native shim still uses legacy instructions key ({shim_label})",
+        )
+        self.assertIn('model = "gpt-5.4-mini"', text, f"codex spec-manager missing model ({shim_label})")
+        self.assertIn(
+            'model_reasoning_effort = "high"',
+            text,
+            f"codex spec-manager missing reasoning effort ({shim_label})",
+        )
+        self.assertIn('approval_policy = "never"', text, f"codex spec-manager missing approval policy ({shim_label})")
+        self.assertIn('sandbox_mode = "workspace-write"', text, f"codex spec-manager missing sandbox mode ({shim_label})")
+        self.assertIn("notify = []", text, f"codex spec-manager missing notify disable ({shim_label})")
+        self.assertIn("[features]", text, f"codex spec-manager missing features table ({shim_label})")
+        self.assertIn("shell_tool = true", text, f"codex spec-manager missing shell tool enable ({shim_label})")
+
+    def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
+        self.assertIn("model: gpt-5.4-mini", text, f"copilot spec-manager model missing ({shim_label})")
+        self.assertIn("tools: ['read', 'search', 'execute', 'todo']", text, f"copilot spec-manager tools mismatch ({shim_label})")
+        self.assertIn("user-invocable: false", text, f"copilot spec-manager must be subagent-only ({shim_label})")
+        self.assertNotIn("mcp-servers:", text, f"copilot spec-manager must not add mcp-servers ({shim_label})")
+        self.assertNotIn("'edit'", text, f"copilot spec-manager must not allow edit tool ({shim_label})")
+        self.assertNotIn("'agent'", text, f"copilot spec-manager must not allow agent tool ({shim_label})")
+        self.assertNotIn("'web'", text, f"copilot spec-manager must not allow web tool ({shim_label})")
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
+            f"copilot spec-manager includes structured state payload keys ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
+            f"copilot spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})",
+        )
+
+    def _assert_copilot_orchestrator_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn("name: orchestrator", text, f"copilot orchestrator name missing ({shim_label})")
+        self.assertIn("user-invocable: true", text, f"copilot orchestrator must be user-invocable ({shim_label})")
+        self.assertIn(
+            "delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default",
+            text,
+            f"copilot orchestrator missing spec-manager routing guidance ({shim_label})",
+        )
+        self.assertIn(
+            "Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator.",
+            text,
+            f"copilot orchestrator missing docs-owner boundary ({shim_label})",
+        )
+        self.assertNotIn(
+            "disable-model-invocation: true",
+            text,
+            f"copilot orchestrator must keep model invocation enabled ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
+            f"copilot orchestrator includes structured state payload keys ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
+            f"copilot orchestrator includes .agent/*.json or context-pack inline reference ({shim_label})",
+        )
+
+    def _assert_codex_bootstrap_routing_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn("Treat `spec-manager` as the default specialist for SpecDock operations.", text)
+        self.assertIn(
+            "Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc.",
+            text,
+            f"codex bootstrap missing command routing guidance ({shim_label})",
+        )
+        self.assertIn(
+            "Keep requirement/design/plan/report authoring with the main orchestrator.",
+            text,
+            f"codex bootstrap missing docs-owner boundary ({shim_label})",
+        )
+        self.assertIn(
+            "delegate only the command portion to `spec-manager`",
+            text,
+            f"codex bootstrap missing mixed-task delegation guidance ({shim_label})",
+        )
+
+    def _assert_codex_main_config_routing_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn(
+            "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。",
+            text,
+            f"codex main config missing spec-manager routing guidance ({shim_label})",
         )
 
     def _issue_69_run_subprocess(
@@ -1581,8 +1813,8 @@ class TestInitUpdate(CliRuntimeHarness):
 
             skills_root = target / ".agents" / "skills"
             self._assert_managed_skills_installed(target)
-            self.assertTrue((target / ".codex" / "agents" / "spec-dock.toml").is_file())
-            self.assertTrue((target / ".github" / "agents" / "spec-dock.agent.md").is_file())
+            self.assertTrue((target / ".codex" / "agents" / "spec-manager.toml").is_file())
+            self.assertTrue((target / ".github" / "agents" / "orchestrator.agent.md").is_file())
 
             skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("`discussions/`", skill_text)
@@ -7144,11 +7376,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "missing bundled host adapter metadata asset",
             )
             self.assertTrue(
-                (assets_dir / "install_root" / ".codex" / "agents" / "spec-dock.toml").is_file(),
+                (assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml").is_file(),
                 "missing bundled codex native shim asset",
             )
             self.assertTrue(
-                (assets_dir / "install_root" / ".github" / "agents" / "spec-dock.agent.md").is_file(),
+                (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(),
                 "missing bundled copilot native shim asset",
             )
 
@@ -7156,14 +7388,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         with cli._assets_dir() as assets_dir:
-            codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-dock.toml"
-            copilot_path = assets_dir / "install_root" / ".github" / "agents" / "spec-dock.agent.md"
+            codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml"
+            codex_bootstrap_path = assets_dir / "install_root" / ".codex" / "AGENTS.md"
+            codex_config_path = assets_dir / "install_root" / ".codex" / "config.toml"
+            copilot_spec_manager_path = assets_dir / "install_root" / ".github" / "agents" / "spec-manager.agent.md"
+            copilot_path = assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md"
             self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
+            self.assertTrue(codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}")
+            self.assertTrue(codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}")
+            self.assertTrue(
+                copilot_spec_manager_path.is_file(),
+                f"missing bundled copilot spec-manager: {copilot_spec_manager_path}",
+            )
             self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
             codex_text = codex_path.read_text(encoding="utf-8")
+            codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
+            codex_config_text = codex_config_path.read_text(encoding="utf-8")
+            copilot_spec_manager_text = copilot_spec_manager_path.read_text(encoding="utf-8")
             copilot_text = copilot_path.read_text(encoding="utf-8")
 
-        self._assert_native_shim_static_delegation_only_contract(
+        self._assert_spec_manager_contract(
             text=codex_text,
             delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
             shim_label="bundled codex native shim",
@@ -7172,10 +7416,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             text=codex_text,
             shim_label="bundled codex native shim",
         )
-        self._assert_native_shim_static_delegation_only_contract(
-            text=copilot_text,
+        self._assert_codex_bootstrap_routing_contract(
+            text=codex_bootstrap_text,
+            shim_label="bundled codex bootstrap guide",
+        )
+        self._assert_codex_main_config_routing_contract(
+            text=codex_config_text,
+            shim_label="bundled codex main config",
+        )
+        self._assert_spec_manager_contract(
+            text=copilot_spec_manager_text,
             delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
-            shim_label="bundled copilot native shim",
+            shim_label="bundled copilot spec-manager",
+        )
+        self._assert_copilot_spec_manager_contract(
+            text=copilot_spec_manager_text,
+            shim_label="bundled copilot spec-manager",
+        )
+        self._assert_copilot_orchestrator_contract(
+            text=copilot_text,
+            shim_label="bundled copilot orchestrator",
         )
 
     def test_bundled_skill_routing_contract(self) -> None:
@@ -7419,7 +7679,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             self.assertEqual(exit_code, 1)
             self.assertIn(
-                "target directory/container conflict for current managed path '.github/agents/spec-dock.agent.md'",
+                "target directory/container conflict for current managed path '.github/agents/",
                 stderr,
             )
             self.assertIn("non-directory container: '.github'", stderr)
@@ -7561,6 +7821,106 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertTrue(managed_workflow_path.is_symlink())
             self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
             self._assert_managed_contract_guard_unchanged(target, before)
+
+    def test_issue_75_init_allows_bootstrap_only_exact_file_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target = target / "bootstrap-config-target.toml"
+            symlink_target.write_text("# bootstrap symlink target\n", encoding="utf-8")
+            os.symlink("../bootstrap-config-target.toml", bootstrap_path)
+
+            exit_code = main(["init", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "spec-dock").is_dir(), "init should complete when bootstrap-only symlink points to file")
+            self.assertTrue(bootstrap_path.is_symlink(), "bootstrap-only path should remain a symlink")
+            self.assertEqual(
+                symlink_target.read_text(encoding="utf-8"),
+                "# bootstrap symlink target\n",
+                "init must preserve existing bootstrap-only symlink target content",
+            )
+
+    def test_issue_75_update_allows_bootstrap_only_exact_file_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.unlink(missing_ok=True)
+            symlink_target = target / "bootstrap-config-update-target.toml"
+            symlink_target.write_text("# bootstrap update symlink target\n", encoding="utf-8")
+            os.symlink("../bootstrap-config-update-target.toml", bootstrap_path)
+
+            exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(bootstrap_path.is_symlink(), "update should keep bootstrap-only path as symlink")
+            self.assertEqual(
+                symlink_target.read_text(encoding="utf-8"),
+                "# bootstrap update symlink target\n",
+                "update must preserve existing bootstrap-only symlink target content",
+            )
+
+    def test_issue_75_init_rejects_bootstrap_only_broken_symlink_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink("../missing-bootstrap-config.toml", bootstrap_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.codex/config.toml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(bootstrap_path.is_symlink())
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+
+    def test_issue_75_init_rejects_bootstrap_only_non_file_symlink_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target_dir = target / "bootstrap-config-dir"
+            symlink_target_dir.mkdir(parents=True, exist_ok=True)
+            os.symlink("../bootstrap-config-dir", bootstrap_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.codex/config.toml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(bootstrap_path.is_symlink())
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
 
     def test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -7746,7 +8106,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "install_root"
                 / ".codex"
                 / "agents"
-                / "spec-dock.toml"
+                / "spec-manager.toml"
             ).read_bytes()
 
             def _mutate_assets(patched_assets_root: Path) -> None:
@@ -7790,7 +8150,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 expected_adapter_skill,
             )
             self.assertEqual(
-                (target / ".codex" / "agents" / "spec-dock.toml").read_bytes(),
+                (target / ".codex" / "agents" / "spec-manager.toml").read_bytes(),
                 expected_codex_shim,
             )
             self.assertEqual(
@@ -7906,8 +8266,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for required_target in (
                 ".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 ".agents/host-adapters/meta.json",
-                ".codex/agents/spec-dock.toml",
-                ".github/agents/spec-dock.agent.md",
+                ".codex/config.toml",
+                ".codex/agents/spec-manager.toml",
+                ".github/agents/orchestrator.agent.md",
                 ".github/workflows/ci.yml",
             ):
                 self.assertIn(
@@ -7915,6 +8276,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     current_targets,
                     f"issue-70 installed plan is missing required managed target: {required_target}",
                 )
+            self.assertNotIn(
+                ".codex/agents/orchestrator.toml",
+                current_targets,
+                "issue-70 installed plan should not generate codex direct orchestrator target",
+            )
             self.assertIn(
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 obsolete_targets,
@@ -7930,13 +8296,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             managed_rel_paths = (
                 ".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 ".agents/host-adapters/meta.json",
-                ".codex/agents/spec-dock.toml",
-                ".github/agents/spec-dock.agent.md",
+                ".codex/agents/spec-manager.toml",
+                ".github/agents/orchestrator.agent.md",
                 ".github/workflows/ci.yml",
             )
+            bootstrap_only_rel_path = ".codex/config.toml"
             expected_managed_bytes = {
                 rel_path: (install_root / rel_path).read_bytes() for rel_path in managed_rel_paths
             }
+            expected_bootstrap_only_bytes = (install_root / bootstrap_only_rel_path).read_bytes()
 
             legacy_skill_duplicate = (
                 installed_assets_dir / "codex_skills" / "spec-dock-codex-adapter" / "SKILL.md"
@@ -7967,11 +8335,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     expected_bytes,
                     f"isolated init did not reflect installed install_root asset for: {rel_path}",
                 )
+            bootstrap_only_target = target_repo / bootstrap_only_rel_path
+            self.assertTrue(
+                bootstrap_only_target.is_file(),
+                f"missing bootstrap-only file after isolated init: {bootstrap_only_target}",
+            )
+            self.assertEqual(
+                bootstrap_only_target.read_bytes(),
+                expected_bootstrap_only_bytes,
+                "isolated init did not copy bootstrap-only codex config from install_root",
+            )
 
             for rel_path in managed_rel_paths:
                 self._write_text_force(target_repo / rel_path, f"issue-70 stale managed payload: {rel_path}\n")
+            bootstrap_only_custom_text = "# issue-70 user edited codex config must survive update\n"
+            self._write_text_force(bootstrap_only_target, bootstrap_only_custom_text)
 
             obsolete_paths = (
+                ".codex/agents/spec-dock.toml",
+                ".github/agents/spec-dock.agent.md",
                 ".codex/agents/spec-dock-codex-adapter.toml",
                 ".github/agents/spec-dock-copilot-adapter.agent.md",
             )
@@ -8004,6 +8386,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     expected_bytes,
                     f"isolated update did not reflect installed install_root asset for: {rel_path}",
                 )
+            self.assertEqual(
+                bootstrap_only_target.read_text(encoding="utf-8"),
+                bootstrap_only_custom_text,
+                "isolated update should preserve user-edited bootstrap-only codex config",
+            )
+            self.assertFalse(
+                (target_repo / ".codex/agents/orchestrator.toml").exists(),
+                "isolated update should not generate codex direct orchestrator",
+            )
 
             for rel_path in obsolete_paths:
                 self.assertFalse(
@@ -8025,44 +8416,93 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
     def test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        parity_pairs = (
-            (
-                ".agents/host-adapters/meta.json",
-                "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
-            ),
-            (
-                ".codex/agents/spec-dock.toml",
-                "src/spec_dock/assets/install_root/.codex/agents/spec-dock.toml",
-            ),
-            (
-                ".github/agents/spec-dock.agent.md",
-                "src/spec_dock/assets/install_root/.github/agents/spec-dock.agent.md",
-            ),
-            (
-                ".github/workflows/ci.yml",
-                "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
-            ),
+        install_root = repo_root / "src" / "spec_dock" / "assets" / "install_root"
+        mirrored_prefixes = (
+            Path(".agents/host-adapters/meta.json"),
+            Path(".agents/skills"),
+            Path(".codex"),
+            Path(".github/agents"),
+            Path(".github/workflows/ci.yml"),
+        )
+        provider_rel_paths: set[str] = set()
+        checked_in_rel_paths: set[str] = set()
+
+        for rel_prefix in mirrored_prefixes:
+            provider_prefix_path = install_root / rel_prefix
+            checked_in_prefix_path = repo_root / rel_prefix
+
+            if provider_prefix_path.is_file():
+                provider_rel_paths.add(rel_prefix.as_posix())
+            else:
+                self.assertTrue(
+                    provider_prefix_path.is_dir(),
+                    f"issue-71 missing provider parity directory: {provider_prefix_path}",
+                )
+                provider_rel_paths.update(
+                    path.relative_to(install_root).as_posix()
+                    for path in provider_prefix_path.rglob("*")
+                    if path.is_file()
+                )
+
+            if checked_in_prefix_path.is_file():
+                checked_in_rel_paths.add(rel_prefix.as_posix())
+            else:
+                self.assertTrue(
+                    checked_in_prefix_path.is_dir(),
+                    f"issue-71 missing checked-in parity directory: {checked_in_prefix_path}",
+                )
+                checked_in_rel_paths.update(
+                    path.relative_to(repo_root).as_posix()
+                    for path in checked_in_prefix_path.rglob("*")
+                    if path.is_file()
+                )
+
+        self.assertEqual(
+            checked_in_rel_paths,
+            provider_rel_paths,
+            "issue-71 checked-in host-pack parity file inventory diverged from install_root",
         )
 
-        for checked_in_rel, provider_asset_rel in parity_pairs:
-            with self.subTest(checked_in=checked_in_rel, provider_asset=provider_asset_rel):
-                checked_in_path = repo_root / checked_in_rel
-                provider_asset_path = repo_root / provider_asset_rel
-                self.assertTrue(
-                    checked_in_path.is_file(),
-                    f"issue-71 missing checked-in parity target: {checked_in_path}",
-                )
-                self.assertTrue(
-                    provider_asset_path.is_file(),
-                    f"issue-71 missing provider parity source: {provider_asset_path}",
-                )
+        for rel_path in sorted(provider_rel_paths):
+            with self.subTest(rel_path=rel_path):
+                checked_in_path = repo_root / rel_path
+                provider_asset_path = install_root / rel_path
                 self.assertEqual(
                     checked_in_path.read_bytes(),
                     provider_asset_path.read_bytes(),
                     (
                         "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
-                        f"{checked_in_rel}"
+                        f"{rel_path}"
                     ),
+                )
+
+    def test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        expected_helper_path = (
+            "./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+        )
+        legacy_helper_path = (
+            "/srv/mount/.codex/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+        )
+        guidance_files = (
+            "src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
+            "src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md",
+            ".codex/agents/pr-monitor.toml",
+            ".github/agents/pr-monitor.agent.md",
+        )
+
+        for rel_path in guidance_files:
+            with self.subTest(rel_path=rel_path):
+                content = (repo_root / rel_path).read_text(encoding="utf-8")
+                self.assertIn(
+                    expected_helper_path,
+                    content,
+                    f"issue-75 guidance missing repo-relative helper path in: {rel_path}",
+                )
+                self.assertNotIn(
+                    legacy_helper_path,
+                    content,
+                    f"issue-75 guidance still contains legacy absolute helper path in: {rel_path}",
                 )
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
@@ -8223,7 +8663,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
 
             installed_assets_dir = Path(str(runtime_snapshot.get("assets_dir", ""))).resolve()
-            managed_rel_path = ".codex/agents/spec-dock.toml"
+            managed_rel_path = ".codex/agents/spec-manager.toml"
             expected_managed_bytes = (installed_assets_dir / "install_root" / managed_rel_path).read_bytes()
 
             self._issue_69_run_subprocess_capture(
@@ -8291,7 +8731,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "install_root"
                 / ".codex"
                 / "agents"
-                / "spec-dock.toml"
+                / "spec-manager.toml"
             ).read_bytes()
             expected_copilot_bytes = (
                 repo_root
@@ -8301,13 +8741,37 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "install_root"
                 / ".github"
                 / "agents"
-                / "spec-dock.agent.md"
+                / "orchestrator.agent.md"
+            ).read_bytes()
+            expected_copilot_spec_manager_bytes = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".github"
+                / "agents"
+                / "spec-manager.agent.md"
             ).read_bytes()
 
-            codex_path = target / ".codex" / "agents" / "spec-dock.toml"
-            copilot_path = target / ".github" / "agents" / "spec-dock.agent.md"
+            codex_path = target / ".codex" / "agents" / "spec-manager.toml"
+            codex_bootstrap_path = target / ".codex" / "AGENTS.md"
+            codex_config_path = target / ".codex" / "config.toml"
+            copilot_spec_manager_path = target / ".github" / "agents" / "spec-manager.agent.md"
+            copilot_path = target / ".github" / "agents" / "orchestrator.agent.md"
+            codex_orchestrator_path = target / ".codex" / "agents" / "orchestrator.toml"
             self.assertTrue(codex_path.is_file(), f"missing generated codex native shim: {codex_path}")
+            self.assertTrue(codex_bootstrap_path.is_file(), f"missing generated codex bootstrap guide: {codex_bootstrap_path}")
+            self.assertTrue(codex_config_path.is_file(), f"missing generated codex main config: {codex_config_path}")
+            self.assertTrue(
+                copilot_spec_manager_path.is_file(),
+                f"missing generated copilot spec-manager: {copilot_spec_manager_path}",
+            )
             self.assertTrue(copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}")
+            self.assertFalse(
+                codex_orchestrator_path.exists(),
+                f"codex direct orchestrator should not be generated: {codex_orchestrator_path}",
+            )
             self.assertEqual(
                 codex_path.read_bytes(),
                 expected_codex_bytes,
@@ -8318,10 +8782,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 expected_copilot_bytes,
                 "generated copilot native shim diverged from provider asset bytes",
             )
+            self.assertEqual(
+                copilot_spec_manager_path.read_bytes(),
+                expected_copilot_spec_manager_bytes,
+                "generated copilot spec-manager diverged from provider asset bytes",
+            )
             codex_text = codex_path.read_text(encoding="utf-8")
+            codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
+            codex_config_text = codex_config_path.read_text(encoding="utf-8")
+            copilot_spec_manager_text = copilot_spec_manager_path.read_text(encoding="utf-8")
             copilot_text = copilot_path.read_text(encoding="utf-8")
 
-            self._assert_native_shim_static_delegation_only_contract(
+            self._assert_spec_manager_contract(
                 text=codex_text,
                 delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 shim_label="generated codex native shim",
@@ -8330,10 +8802,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 text=codex_text,
                 shim_label="generated codex native shim",
             )
-            self._assert_native_shim_static_delegation_only_contract(
-                text=copilot_text,
+            self._assert_codex_bootstrap_routing_contract(
+                text=codex_bootstrap_text,
+                shim_label="generated codex bootstrap guide",
+            )
+            self._assert_codex_main_config_routing_contract(
+                text=codex_config_text,
+                shim_label="generated codex main config",
+            )
+            self._assert_spec_manager_contract(
+                text=copilot_spec_manager_text,
                 delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
-                shim_label="generated copilot native shim",
+                shim_label="generated copilot spec-manager",
+            )
+            self._assert_copilot_spec_manager_contract(
+                text=copilot_spec_manager_text,
+                shim_label="generated copilot spec-manager",
+            )
+            self._assert_copilot_orchestrator_contract(
+                text=copilot_text,
+                shim_label="generated copilot orchestrator",
             )
 
     def test_update_copies_legacy_codex_native_shim_instructions_key_as_is(self) -> None:
@@ -8348,7 +8836,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
@@ -8364,7 +8852,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
                     self.assertEqual(main(["update", str(target)]), 0)
 
-            generated_path = target / ".codex" / "agents" / "spec-dock.toml"
+            generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
             self.assertEqual(
                 generated_path.read_bytes(),
@@ -8386,7 +8874,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 patched_text = codex_text.replace("developer_instructions =", "instructions =", 1)
@@ -8402,7 +8890,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
                     self.assertEqual(main(["init", str(target)]), 0)
 
-            generated_path = target / ".codex" / "agents" / "spec-dock.toml"
+            generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
             self.assertEqual(
                 generated_path.read_bytes(),
@@ -8424,7 +8912,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 patched_assets_root = Path(tmp_assets) / "assets"
                 shutil.copytree(source_assets_root, patched_assets_root)
 
-                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-dock.toml"
+                codex_shim_path = patched_assets_root / "install_root" / ".codex" / "agents" / "spec-manager.toml"
                 codex_text = codex_shim_path.read_text(encoding="utf-8")
                 self.assertRegex(codex_text, self._CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN)
                 self.assertNotRegex(codex_text, self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN)
@@ -8455,7 +8943,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with patch("spec_dock.cli._assets_dir", _patched_assets_dir):
                     self.assertEqual(main(["update", str(target)]), 0)
 
-            generated_path = target / ".codex" / "agents" / "spec-dock.toml"
+            generated_path = target / ".codex" / "agents" / "spec-manager.toml"
             generated_text = generated_path.read_text(encoding="utf-8")
             self.assertEqual(
                 generated_path.read_bytes(),
@@ -8472,7 +8960,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             repo_root = Path(__file__).resolve().parents[1]
             codex_shim_asset = (
-                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "agents" / "spec-dock.toml"
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-manager.toml"
             )
             copilot_shim_asset = (
                 repo_root
@@ -8482,15 +8977,21 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "install_root"
                 / ".github"
                 / "agents"
-                / "spec-dock.agent.md"
+                / "orchestrator.agent.md"
             )
             expected_codex_shim = codex_shim_asset.read_bytes()
             expected_copilot_shim = copilot_shim_asset.read_bytes()
 
-            managed_codex_path = target / ".codex" / "agents" / "spec-dock.toml"
-            managed_copilot_path = target / ".github" / "agents" / "spec-dock.agent.md"
+            managed_codex_path = target / ".codex" / "agents" / "spec-manager.toml"
+            managed_copilot_path = target / ".github" / "agents" / "orchestrator.agent.md"
+            managed_codex_config_path = target / ".codex" / "config.toml"
+            expected_codex_config = (
+                repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex" / "config.toml"
+            ).read_bytes()
             obsolete_codex_path = target / ".codex" / "agents" / "spec-dock-codex-adapter.toml"
             obsolete_copilot_path = target / ".github" / "agents" / "spec-dock-copilot-adapter.agent.md"
+            obsolete_old_codex_path = target / ".codex" / "agents" / "spec-dock.toml"
+            obsolete_old_copilot_path = target / ".github" / "agents" / "spec-dock.agent.md"
             custom_codex_path = target / ".codex" / "agents" / "custom-reviewer.toml"
             custom_copilot_path = target / ".github" / "agents" / "custom-reviewer.agent.md"
             custom_skill_path = target / ".agents" / "skills" / "custom-reviewer" / "SKILL.md"
@@ -8498,14 +8999,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             stale_managed_codex = b"name = \"stale-managed\"\n"
             stale_managed_copilot = b"# stale managed copilot shim\n"
+            bootstrap_only_codex_config = "# user custom codex config should survive update\n"
             custom_codex_content = "name = \"custom-reviewer\"\n"
             custom_copilot_content = "# custom reviewer copilot agent\n"
             custom_skill_content = "# custom skill that must be preserved\n"
 
             self._write_text_force(managed_codex_path, stale_managed_codex.decode("utf-8"))
             self._write_text_force(managed_copilot_path, stale_managed_copilot.decode("utf-8"))
+            self._write_text_force(managed_codex_config_path, bootstrap_only_codex_config)
             self._write_text_force(obsolete_codex_path, "obsolete managed codex shim\n")
             self._write_text_force(obsolete_copilot_path, "obsolete managed copilot shim\n")
+            self._write_text_force(obsolete_old_codex_path, "obsolete old canonical codex shim\n")
+            self._write_text_force(obsolete_old_copilot_path, "obsolete old canonical copilot shim\n")
             self._write_text_force(custom_codex_path, custom_codex_content)
             self._write_text_force(custom_copilot_path, custom_copilot_content)
             custom_skill_path.parent.mkdir(parents=True, exist_ok=True)
@@ -8543,8 +9048,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 },
                 "obsolete_managed_fixture_pruned": {
                     "expected": "obsolete managed fixtures are removed",
-                    "observed": f"codex_exists={obsolete_codex_path.exists()}, copilot_exists={obsolete_copilot_path.exists()}",
-                    "pass": (not obsolete_codex_path.exists()) and (not obsolete_copilot_path.exists()),
+                    "observed": (
+                        f"codex_exists={obsolete_codex_path.exists()}, "
+                        f"copilot_exists={obsolete_copilot_path.exists()}, "
+                        f"old_codex_exists={obsolete_old_codex_path.exists()}, "
+                        f"old_copilot_exists={obsolete_old_copilot_path.exists()}"
+                    ),
+                    "pass": (not obsolete_codex_path.exists())
+                    and (not obsolete_copilot_path.exists())
+                    and (not obsolete_old_codex_path.exists())
+                    and (not obsolete_old_copilot_path.exists()),
+                },
+                "bootstrap_only_codex_config_preserved": {
+                    "expected": "bootstrap-only codex config should keep user-edited content",
+                    "observed": (
+                        managed_codex_config_path.read_text(encoding="utf-8")
+                        if managed_codex_config_path.is_file()
+                        else None
+                    ),
+                    "pass": managed_codex_config_path.is_file()
+                    and managed_codex_config_path.read_text(encoding="utf-8") == bootstrap_only_codex_config
+                    and managed_codex_config_path.read_bytes() != expected_codex_config,
                 },
                 "unknown_custom_fixture_preserved": {
                     "expected": "unknown custom native shims and custom skill are preserved",
@@ -8581,6 +9105,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     "managed_codex_shim_generated_or_updated",
                     "managed_copilot_shim_generated_or_updated",
                     "obsolete_managed_fixture_pruned",
+                    "bootstrap_only_codex_config_preserved",
                     "unknown_custom_fixture_preserved",
                     "baseline_skill_and_metadata_untouched",
                 )
@@ -8672,10 +9197,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = (
-                ".github/agents/spec-dock.agent.md"
+                ".github/agents/orchestrator.agent.md"
             )
             malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
-                ".codex/agents/spec-dock.toml"
+                ".codex/agents/spec-manager.toml"
             )
 
             exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
@@ -8685,7 +9210,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             self.assertEqual(exit_code, 1)
             self.assertIn(
-                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-dock.toml'",
+                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'",
                 stderr,
             )
             self._assert_managed_contract_guard_unchanged(target, before)
@@ -8697,7 +9222,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             before = self._seed_managed_contract_guard_snapshot(target)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["copilot"]["native_shim"]["target_file"] = (
-                ".codex/agents/spec-dock.toml"
+                ".codex/agents/spec-manager.toml"
             )
 
             exit_code, stderr = self._run_update_with_host_adapter_manifest_override(
@@ -8707,7 +9232,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             self.assertEqual(exit_code, 1)
             self.assertIn(
-                "duplicate native_shim.target_file '.codex/agents/spec-dock.toml'",
+                "duplicate native_shim.target_file '.codex/agents/spec-manager.toml'",
                 stderr,
             )
             self.assertIn("for hosts 'codex' and 'copilot'", stderr)
@@ -8719,7 +9244,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             target.mkdir(parents=True, exist_ok=True)
             malformed_manifest = json.loads(json.dumps(self._EXPECTED_HOST_ADAPTER_META))
             malformed_manifest["targets"]["codex"]["native_shim"]["target_file"] = (
-                ".github/agents/spec-dock.agent.md"
+                ".github/agents/orchestrator.agent.md"
             )
 
             exit_code, stderr = self._run_init_with_host_adapter_manifest_override(
@@ -8729,7 +9254,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
             self.assertEqual(exit_code, 1)
             self.assertIn(
-                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-dock.toml'",
+                "required host 'codex' must use canonical native_shim.target_file '.codex/agents/spec-manager.toml'",
                 stderr,
             )
             self.assertEqual(list(target.iterdir()), [], "preflight failure should not write managed scaffold files")
@@ -8899,7 +9424,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             (
                 "target_file",
-                "../.codex/agents/spec-dock.toml",
+                "../.codex/agents/spec-manager.toml",
                 "invalid native_shim.target_file path for host 'codex'",
             ),
             (
