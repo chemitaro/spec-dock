@@ -79,11 +79,82 @@ reviews:
 - `tests.test_init_update` 全体は、この issue 差分外の network / venv / 既存 active pathfile 系 failure が残るため full green ではない。
 - issue-78 で直接変更した contract と mirror parity に関する targeted validation はすべて pass した。
 
+---
+
+### 2026-04-16 00:00 - 00:30
+
+#### 対象
+- Step: S99 follow-up analysis
+- AC/EC: 回帰検証の全体把握
+
+#### 実施内容
+- `python -m unittest discover -v` を実行し、repo 全体の現時点ベースラインを確認した。
+- 失敗を environment 依存、既知の active pathfile 系、単独の runtime error に分類した。
+- issue-78 の変更で追加した targeted tests は引き続き pass していることを別途確認済みと照合した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+python -m unittest tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13.test_target_local_metadata_load_failure_uses_error_path_when_directory_match_is_ambiguous -v
+
+full suite summary:
+- Ran 741 tests in 198.398s
+- FAILED (failures=22, errors=1)
+
+failure buckets:
+1. build / isolated wheel / venv bootstrap failures
+   - representative tests:
+     - test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs
+     - test_issue_69_full_install_root_inventory_is_packaged_in_wheel_sdist_and_installed_resources
+     - test_issue_69_isolated_wheel_install_exposes_install_root_handoff_surface
+     - test_issue_69_isolated_wheel_install_runs_init_update_without_checkout_fallback
+     - test_issue_69_local_and_installed_handoff_surface_inventories_match
+     - test_issue_69_representative_install_root_assets_are_packaged_in_all_artifact_surfaces
+     - test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs
+     - test_issue_69_wheel_build_prunes_seeded_stale_wrapper_era_outputs
+     - test_issue_70_isolated_wheel_install_reflects_cutover_contract_without_legacy_fallback
+     - test_issue_71_isolated_wheel_install_final_smoke_closure_surface_without_fallback
+   - representative error:
+     - ensurepip / setuptools bootstrap failure
+     - `No matching distribution found for setuptools>=69`
+     - `ensurepip --upgrade --default-pip returned non-zero exit status 1`
+
+2. active pathfile / symlink fallback failures
+   - representative tests:
+     - test_update_bootstraps_active_path_files_when_active_symlink_creation_fails
+     - test_update_rebuilds_active_path_files_from_persisted_manifest_when_symlink_creation_fails
+     - test_update_repairs_stale_active_path_files_to_persisted_targets_when_symlink_creation_fails
+     - test_update_repairs_stale_active_path_files_to_placeholder_when_persisted_manifest_broken_and_symlink_creation_fails
+   - failure shape:
+     - `AssertionError: True is not false`
+     - `AssertionError: False is not true`
+
+3. standalone runtime error
+   - test:
+     - test_target_local_metadata_load_failure_uses_error_path_when_directory_match_is_ambiguous
+   - error:
+     - `RuntimeError: Invalid JSON: .../.meta.json: broken payload`
+   - classification:
+     - expected structured error path を assertion する前に `delete_node()` が RuntimeError を送出している
+```
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - 全件テスト分析の追記
+
+#### コミット
+- 未実施
+
+#### メモ
+- 全件失敗の大半は issue-78 変更に直接起因するものではなく、既知の環境依存または既存失敗群に見える。
+- ただし `tests.cli_runtime.test_runtime_delete_s13...ambiguous` の 1 error は runtime delete path の期待契約ずれとして、別 issue で再現・修正優先度を判断できる。
+
 ## 遭遇した問題と解決 (任意)
 - 問題: 初回 review で update coexistence regression の不足、dogfooding runtime mirror の未同期、単体実行での import 順序依存が指摘された。
   - 解決: `tests/test_init_update.py` に coexistence update regression を追加し、mirror `contracts.py` / `doctor.py` / `cli_text.py` を provider と同期し、`tests/cli_runtime/test_runtime_validate_s02.py` を `_runtime_modules()` 系の import seam に揃えた。
 - 問題: `tests.test_init_update` full run に network / ensurepip / 既存 active pathfile 系の unrelated failure が含まれていた。
   - 解決: issue-78 契約に直接対応する targeted validation を切り出して実施し、review でも non-blocking residual risk として扱った。
+- 問題: repo 全件実行では `22 failures / 1 error` が残り、`delete_node` の 1 件は環境要因ではなく runtime 契約ずれの可能性がある。
+  - 解決: environment 起因の build/venv 系、既知の active pathfile 系、runtime delete error を分離して記録し、follow-up の切り分け材料を report に残した。
 
 ## 学んだこと (任意)
 - checked-in dogfooding mirror を含む repo では、provider 側の runtime contract 変更だけでは不十分で、mirror parity まで同時に閉じないと review と dogfooding がずれる。
@@ -91,6 +162,7 @@ reviews:
 
 ## 今後の推奨事項 (任意)
 - `tests.test_init_update` の network / ensurepip / active pathfile 系 failure は別 issue で baseline 安定化すると、今後の full validation gate が扱いやすくなる。
+- `tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13.test_target_local_metadata_load_failure_uses_error_path_when_directory_match_is_ambiguous` は単独で再現するため、delete path の error handling 契約として個別 issue 化を検討するとよい。
 
 ## 省略/例外メモ (必須)
 - `tests.test_init_update` full suite の unresolved failures は issue-78 の変更範囲外として今回の close criteria から除外し、targeted validation + reviewer pass を最終 gate とした。
