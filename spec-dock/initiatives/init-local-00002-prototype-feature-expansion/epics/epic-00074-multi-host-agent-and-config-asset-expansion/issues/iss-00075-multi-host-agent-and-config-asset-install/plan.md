@@ -29,6 +29,16 @@ ID: "iss-00075"
   - secret / token / personal config は managed asset として配布しない
   - unknown custom files は prune safety で保持する
 
+## 今回の実装スライス（2026-04-15 セッション）
+- 先行実装は kebab-case naming unification のみとする。
+- 完了条件:
+  - rename 対象 agent files と internal role names が Codex / GitHub Copilot で kebab-case に統一される
+  - installer metadata / canonical references / tests が新 naming contract と一致する
+  - 旧 snake_case managed filenames が obsolete path として prune 対象になる
+- defer:
+  - `spec-manager` の本文整理
+  - `spec-manager` の model / reasoning / notify / MCP / skill guidance 変更
+
 ## マイルストーン一覧
 - M1:
   - 対象:
