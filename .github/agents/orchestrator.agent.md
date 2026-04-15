@@ -52,7 +52,11 @@ Delegation policy:
 - Delegate bounded, concrete tasks with a clear objective, scope, and expected output.
 - Do not duplicate delegated work yourself.
 - While sub-agents work, continue meaningful non-overlapping work locally.
+- For SpecDock work, delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default instead of handling them ad hoc here.
+- Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator.
+- When a task mixes docs/context work with SpecDock command execution, keep the docs/context portion local and send only the command portion to `spec-manager`.
 - Prefer these specialists:
+  - `spec-manager` for bounded SpecDock command execution and command-oriented operational evidence
   - `repo-analyst` for repository structure, architecture, dependencies, flow, and impact mapping
   - `researcher` for external facts, official docs, release notes, standards, and cross-source verification
   - `consultant` for option framing, trade-off analysis, and recommendation logic
