@@ -704,9 +704,7 @@ class TestInitUpdate(CliRuntimeHarness):
         r"|^\s*(schema_version|projection|nodes|issues|deps|source|updated_at)\s*="
     )
     _NATIVE_SHIM_CONTEXT_INLINE_PATTERN = r"\.agent/.*\.json|context-pack\.md"
-    _NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN = (
-        r"active\.json|index\.json|deps-issues\.json|index-all\.json|read[ -]order"
-    )
+    _NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN = r"active\.json|index\.json|deps-issues\.json|index-all\.json"
     _CODEX_NATIVE_SHIM_DEVELOPER_INSTRUCTIONS_PATTERN = r"(?m)^\s*developer_instructions\s*="
     _CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN = r"(?m)^\s*instructions\s*="
 
@@ -1022,7 +1020,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 break
         return "\n".join(lines[start_index:end_index]) + "\n"
 
-    def _assert_native_shim_static_delegation_only_contract(
+    def _assert_spec_manager_contract(
         self,
         *,
         text: str,
@@ -1032,22 +1030,40 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn(
             delegation_expected,
             text,
-            f"native shim missing delegation reference ({shim_label}): {delegation_expected}",
+            f"spec-manager missing delegation reference ({shim_label}): {delegation_expected}",
+        )
+        for fragment in (
+            "command operator",
+            "./spec-dock/scripts/spec-dock active {set,show,clear}",
+            "./spec-dock/scripts/spec-dock validate",
+            "requirement/design/plan/report",
+            "manual",
+            "Read order",
+        ):
+            self.assertIn(
+                fragment,
+                text,
+                f"spec-manager missing command-operator fragment ({shim_label}): {fragment}",
+            )
+        self.assertRegex(
+            text,
+            r"(?i)(must not manually edit|manual file edit|manual file editing)",
+            f"spec-manager missing manual-edit prohibition ({shim_label})",
         )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
-            f"native shim includes structured state payload keys ({shim_label})",
+            f"spec-manager includes structured state payload keys ({shim_label})",
         )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
-            f"native shim includes .agent/*.json or context-pack inline reference ({shim_label})",
+            f"spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})",
         )
         self.assertNotRegex(
             text,
             self._NATIVE_SHIM_DIRECT_PROTOCOL_PATTERN,
-            f"native shim includes direct protocol read reference ({shim_label})",
+            f"spec-manager includes direct protocol read reference ({shim_label})",
         )
 
     def _assert_codex_native_shim_loader_contract(self, *, text: str, shim_label: str) -> None:
@@ -1061,10 +1077,51 @@ class TestInitUpdate(CliRuntimeHarness):
             self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN,
             f"codex native shim still uses legacy instructions key ({shim_label})",
         )
+        self.assertIn('model = "gpt-5.4-mini"', text, f"codex spec-manager missing model ({shim_label})")
+        self.assertIn(
+            'model_reasoning_effort = "high"',
+            text,
+            f"codex spec-manager missing reasoning effort ({shim_label})",
+        )
+        self.assertIn('approval_policy = "never"', text, f"codex spec-manager missing approval policy ({shim_label})")
+        self.assertIn('sandbox_mode = "workspace-write"', text, f"codex spec-manager missing sandbox mode ({shim_label})")
+        self.assertIn("notify = []", text, f"codex spec-manager missing notify disable ({shim_label})")
+        self.assertIn("[features]", text, f"codex spec-manager missing features table ({shim_label})")
+        self.assertIn("shell_tool = true", text, f"codex spec-manager missing shell tool enable ({shim_label})")
+
+    def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
+        self.assertIn("model: gpt-5.4-mini", text, f"copilot spec-manager model missing ({shim_label})")
+        self.assertIn("tools: ['read', 'search', 'execute', 'todo']", text, f"copilot spec-manager tools mismatch ({shim_label})")
+        self.assertIn("user-invocable: false", text, f"copilot spec-manager must be subagent-only ({shim_label})")
+        self.assertNotIn("mcp-servers:", text, f"copilot spec-manager must not add mcp-servers ({shim_label})")
+        self.assertNotIn("'edit'", text, f"copilot spec-manager must not allow edit tool ({shim_label})")
+        self.assertNotIn("'agent'", text, f"copilot spec-manager must not allow agent tool ({shim_label})")
+        self.assertNotIn("'web'", text, f"copilot spec-manager must not allow web tool ({shim_label})")
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_STATE_PAYLOAD_PATTERN,
+            f"copilot spec-manager includes structured state payload keys ({shim_label})",
+        )
+        self.assertNotRegex(
+            text,
+            self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
+            f"copilot spec-manager includes .agent/*.json or context-pack inline reference ({shim_label})",
+        )
 
     def _assert_copilot_orchestrator_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("name: orchestrator", text, f"copilot orchestrator name missing ({shim_label})")
         self.assertIn("user-invocable: true", text, f"copilot orchestrator must be user-invocable ({shim_label})")
+        self.assertIn(
+            "delegate bounded `./spec-dock/scripts/spec-dock ...` command operations to `spec-manager` by default",
+            text,
+            f"copilot orchestrator missing spec-manager routing guidance ({shim_label})",
+        )
+        self.assertIn(
+            "Keep requirement/design/plan/report authoring, context synthesis, and user-facing judgment in the main orchestrator.",
+            text,
+            f"copilot orchestrator missing docs-owner boundary ({shim_label})",
+        )
         self.assertNotIn(
             "disable-model-invocation: true",
             text,
@@ -1079,6 +1136,31 @@ class TestInitUpdate(CliRuntimeHarness):
             text,
             self._NATIVE_SHIM_CONTEXT_INLINE_PATTERN,
             f"copilot orchestrator includes .agent/*.json or context-pack inline reference ({shim_label})",
+        )
+
+    def _assert_codex_bootstrap_routing_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn("Treat `spec-manager` as the default specialist for SpecDock operations.", text)
+        self.assertIn(
+            "Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc.",
+            text,
+            f"codex bootstrap missing command routing guidance ({shim_label})",
+        )
+        self.assertIn(
+            "Keep requirement/design/plan/report authoring with the main orchestrator.",
+            text,
+            f"codex bootstrap missing docs-owner boundary ({shim_label})",
+        )
+        self.assertIn(
+            "delegate only the command portion to `spec-manager`",
+            text,
+            f"codex bootstrap missing mixed-task delegation guidance ({shim_label})",
+        )
+
+    def _assert_codex_main_config_routing_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn(
+            "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。",
+            text,
+            f"codex main config missing spec-manager routing guidance ({shim_label})",
         )
 
     def _issue_69_run_subprocess(
@@ -7307,13 +7389,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with cli._assets_dir() as assets_dir:
             codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml"
+            codex_bootstrap_path = assets_dir / "install_root" / ".codex" / "AGENTS.md"
+            codex_config_path = assets_dir / "install_root" / ".codex" / "config.toml"
+            copilot_spec_manager_path = assets_dir / "install_root" / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md"
             self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
+            self.assertTrue(codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}")
+            self.assertTrue(codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}")
+            self.assertTrue(
+                copilot_spec_manager_path.is_file(),
+                f"missing bundled copilot spec-manager: {copilot_spec_manager_path}",
+            )
             self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
             codex_text = codex_path.read_text(encoding="utf-8")
+            codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
+            codex_config_text = codex_config_path.read_text(encoding="utf-8")
+            copilot_spec_manager_text = copilot_spec_manager_path.read_text(encoding="utf-8")
             copilot_text = copilot_path.read_text(encoding="utf-8")
 
-        self._assert_native_shim_static_delegation_only_contract(
+        self._assert_spec_manager_contract(
             text=codex_text,
             delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
             shim_label="bundled codex native shim",
@@ -7321,6 +7415,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self._assert_codex_native_shim_loader_contract(
             text=codex_text,
             shim_label="bundled codex native shim",
+        )
+        self._assert_codex_bootstrap_routing_contract(
+            text=codex_bootstrap_text,
+            shim_label="bundled codex bootstrap guide",
+        )
+        self._assert_codex_main_config_routing_contract(
+            text=codex_config_text,
+            shim_label="bundled codex main config",
+        )
+        self._assert_spec_manager_contract(
+            text=copilot_spec_manager_text,
+            delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+            shim_label="bundled copilot spec-manager",
+        )
+        self._assert_copilot_spec_manager_contract(
+            text=copilot_spec_manager_text,
+            shim_label="bundled copilot spec-manager",
         )
         self._assert_copilot_orchestrator_contract(
             text=copilot_text,
@@ -8503,11 +8614,30 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 / "agents"
                 / "orchestrator.agent.md"
             ).read_bytes()
+            expected_copilot_spec_manager_bytes = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "install_root"
+                / ".github"
+                / "agents"
+                / "spec-manager.agent.md"
+            ).read_bytes()
 
             codex_path = target / ".codex" / "agents" / "spec-manager.toml"
+            codex_bootstrap_path = target / ".codex" / "AGENTS.md"
+            codex_config_path = target / ".codex" / "config.toml"
+            copilot_spec_manager_path = target / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = target / ".github" / "agents" / "orchestrator.agent.md"
             codex_orchestrator_path = target / ".codex" / "agents" / "orchestrator.toml"
             self.assertTrue(codex_path.is_file(), f"missing generated codex native shim: {codex_path}")
+            self.assertTrue(codex_bootstrap_path.is_file(), f"missing generated codex bootstrap guide: {codex_bootstrap_path}")
+            self.assertTrue(codex_config_path.is_file(), f"missing generated codex main config: {codex_config_path}")
+            self.assertTrue(
+                copilot_spec_manager_path.is_file(),
+                f"missing generated copilot spec-manager: {copilot_spec_manager_path}",
+            )
             self.assertTrue(copilot_path.is_file(), f"missing generated copilot native shim: {copilot_path}")
             self.assertFalse(
                 codex_orchestrator_path.exists(),
@@ -8523,10 +8653,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 expected_copilot_bytes,
                 "generated copilot native shim diverged from provider asset bytes",
             )
+            self.assertEqual(
+                copilot_spec_manager_path.read_bytes(),
+                expected_copilot_spec_manager_bytes,
+                "generated copilot spec-manager diverged from provider asset bytes",
+            )
             codex_text = codex_path.read_text(encoding="utf-8")
+            codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
+            codex_config_text = codex_config_path.read_text(encoding="utf-8")
+            copilot_spec_manager_text = copilot_spec_manager_path.read_text(encoding="utf-8")
             copilot_text = copilot_path.read_text(encoding="utf-8")
 
-            self._assert_native_shim_static_delegation_only_contract(
+            self._assert_spec_manager_contract(
                 text=codex_text,
                 delegation_expected=".agents/skills/spec-dock-codex-adapter/SKILL.md",
                 shim_label="generated codex native shim",
@@ -8534,6 +8672,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self._assert_codex_native_shim_loader_contract(
                 text=codex_text,
                 shim_label="generated codex native shim",
+            )
+            self._assert_codex_bootstrap_routing_contract(
+                text=codex_bootstrap_text,
+                shim_label="generated codex bootstrap guide",
+            )
+            self._assert_codex_main_config_routing_contract(
+                text=codex_config_text,
+                shim_label="generated codex main config",
+            )
+            self._assert_spec_manager_contract(
+                text=copilot_spec_manager_text,
+                delegation_expected=".agents/skills/spec-dock-copilot-adapter/SKILL.md",
+                shim_label="generated copilot spec-manager",
+            )
+            self._assert_copilot_spec_manager_contract(
+                text=copilot_spec_manager_text,
+                shim_label="generated copilot spec-manager",
             )
             self._assert_copilot_orchestrator_contract(
                 text=copilot_text,

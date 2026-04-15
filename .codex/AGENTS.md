@@ -15,7 +15,11 @@ If the repository root `AGENTS.md` exists, treat it as authoritative for repo, p
 
 Treat `spec-manager` as the default specialist for SpecDock operations.
 
-Use `spec-manager` by default for SpecDock workflows instead of operating the tool ad hoc. If `spec-manager` delegates to other specialists, the authoritative task contract still comes from `spec-dock/active/*` and the current issue docs.
+Use `spec-manager` by default for SpecDock command workflows instead of operating the tool ad hoc. If `spec-manager` delegates to other specialists, the authoritative task contract still comes from `spec-dock/active/*` and the current issue docs.
+
+Keep requirement/design/plan/report authoring with the main orchestrator. Use `spec-manager` for bounded command execution, command lookup, and operational evidence only.
+
+For mixed tasks, keep docs/context ownership in the main orchestrator and delegate only the command portion to `spec-manager`.
 
 ## What SpecDock Can Do
 

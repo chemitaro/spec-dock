@@ -12,199 +12,143 @@ ID: "iss-00075"
 # iss-00075 Multi host agent and config asset install — 要件定義（WHAT / WHY）
 
 ## 目的
-- 既存 installer foundation の additive change として、Codex pack、GitHub Copilot pack、shared skills を `install_root` から install/update/prune できる状態にする。
-- exact inventory、ownership、metadata delta、prune/preserve behavior を固定し、1 issue で実装から validation まで閉じる。
+- `spec-manager` を requirement/design/plan/report specialist ではなく、SpecDock command operator として再定義する。
+- SpecDock 操作の調査と実行をメインオーケストレーターから分離し、command execution を `spec-manager` へ集約する。
+- 一方で issue docs の本文作成、文脈統合、要件判断は引き続きメインオーケストレーター側に残す。
 
-## 今回の実行スコープ（2026-04-15 セッション）
-- このセッションでは agent pack の naming contract を kebab-case に統一する変更だけを実装対象とする。
-- `spec-manager` の文言整理、モデル設定、通知設定、MCP 方針、コマンド知識・スキル知識の拡充は follow-up とし、このセッションでは実施しない。
-- 変更対象は provider-side assets、installer metadata / canonical path references、tests、dogfooding parity に限定する。
+## 今回の実行スコープ（2026-04-15 follow-up セッション）
+- このセッションでは `spec-manager` の設定ファイルと、それを呼び出す main 側 guidance だけを更新対象とする。
+- 対象 host は Codex CLI と GitHub Copilot の両方とする。
+- 変更対象は provider-side assets、メイン agent guidance、関連 installer tests、dogfooding parity に限定する。
 
 ## 背景・現状
-- 現状の挙動:
-  - `src/spec_dock/assets/install_root/` は shared skills と host native shim だけを正本として持ち、`spec-dock update` は `install_root` 再帰列挙を current managed file set として同期する。
-  - canonical host file は Codex が `.codex/agents/spec-dock.toml`、Copilot が `.github/agents/spec-dock.agent.md` に固定されている。
-  - obsolete cleanup は `.agents/host-adapters/meta.json` の `managed_assets.obsolete_exact_file_paths` だけを使う。
-- 現状の課題:
-  - epic で確定した `spec-manager` rename、Copilot `orchestrator` primary、Codex bootstrap-only `config.toml`、shared skills 追加を current installer contract がまだ表現できていない。
-  - `config.toml` をそのまま current managed として扱うと update ごとに user edit を潰してしまう。
-  - discussion 側 reference input はあるが、provider-side source of truth と install target mapping が issue 契約として未固定である。
-- 情報源:
-  - `spec-dock/active/epic/{requirement.md,design.md,plan.md}`
-  - `src/spec_dock/cli.py`
-  - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
-  - `spec-dock/.../discussions/add-codex/.codex/**`
-  - `spec-dock/.../discussions/add-githobcopilot/agents/**`
+- 現状の `spec-manager` は thin adapter への静的委譲だけを持つ薄い shim であり、SpecDock command surface を十分に知らない。
+- dogfooding では、本来 `spec-manager` が担うべき SpecDock command operation を main オーケストレーターが直接扱う場面があった。
+- requirement/design/plan/report などの docs 本文は、active issue docs と会話文脈を踏まえた main 側作業のほうが効率的であり、これを `spec-manager` へ毎回 handoff するのは非効率である。
 
 ## 対象ユーザー / 利用シナリオ
 - 主な利用者:
-  - provider-side maintainer
-  - `spec-dock init/update` を実行する consumer repo maintainer
+  - main orchestrator
+  - SpecDock command operation を delegated execution したい maintainer
 - 代表シナリオ:
-  1. maintainer が provider-side `install_root` に host pack assets を追加する。
-  2. consumer repo で `spec-dock init` または `spec-dock update` を実行する。
-  3. Codex/Copilot/shared skills が正しい project path に配置される。
-  4. update 時は obsolete managed path だけが prune され、unknown custom files と編集済み `.codex/config.toml` は保持される。
+  1. main orchestrator が active issue docs とユーザー意図から command task を切り出す。
+  2. SpecDock 操作が必要になったら `spec-manager` を default operator として使う。
+  3. `spec-manager` は `./spec-dock/scripts/spec-dock ...` と必要最小限の `gh` 連携を使って command execution を行う。
+  4. requirement/design/plan/report の本文作成や編集は main 側が継続して担う。
 
 ## スコープ
 - MUST:
-  - `src/spec_dock/assets/install_root/` を provider-side source of truth として更新する。
-  - Codex pack の exact inventory を install/update 対象として追加する。
-  - GitHub Copilot pack の exact inventory を install/update 対象として追加する。
-  - shared skills の exact inventory を `.agents/skills/` に追加する。
-  - `spec-manager` を canonical specialist 名として導入し、旧 `spec-dock` specialist 名を置き換える。
-  - `.codex/config.toml` を bootstrap-only asset として扱い、init では生成し、update では既存 user edit を保持する。
-  - obsolete managed path と preserve path の境界を metadata と tests で固定する。
-  - Codex / GitHub Copilot の agent pack 内で snake_case の role filenames / role names を kebab-case に統一する。
+  - `spec-manager` の role を command-first operator へ変更する。
+  - Codex / Copilot 両方の `spec-manager` に SpecDock command surface、read order、関連 docs 参照、completion boundary を埋め込む。
+  - main 側 guidance に「SpecDock command operation は原則 `spec-manager` へ委任する」を明記する。
+  - `spec-manager` が docs 本文作成や manual file edit を担当しないことを明記する。
+  - GitHub Copilot `spec-manager` は `user-invocable: false` を維持する。
+  - GitHub Copilot `spec-manager` の tools を `read/search/execute/todo` に限定する。
+  - Codex `spec-manager` に mini model、notification 無効化、shell 実行許可、manual edit 禁止 guidance を与える。
 - MUST NOT:
   - new installer mechanism を作らない。
-  - runtime protocol を再定義しない。
-  - Copilot `config` / `mcp-config` を ship しない。
-  - direct `.codex/agents/orchestrator.toml` を ship しない。
-  - prompt assets を current issue scope に入れない。
-  - `spec-manager` の本文・model・reasoning・notify・MCP・skill guidance の内容強化はこのセッションで行わない。
+  - runtime protocol や generated state contract を再定義しない。
+  - `spec-manager` に requirement/design/plan/report/discussion/ADR の本文作成責務を与えない。
+  - GitHub Copilot `spec-manager` に `edit` / `agent` / `web` tools を与えない。
+  - role-local MCP 設定を追加しない。
 - OUT OF SCOPE:
-  - future host support
-  - prompt file 配布
+  - `spec-manager` 以外の specialist role 再設計
   - workflow/runtime semantics の再設計
-  - Copilot config 系 asset の project install
+  - Copilot config 系 asset の配布拡張
+  - prompt asset 配布
 
 ## 境界
 - Always:
   - source of truth は `src/spec_dock/assets/install_root/` とする。
-  - discussion 配下の `add-codex` / `add-githobcopilot` は reference input としてのみ扱う。
-  - shared skills は `.agents/skills/` に集約する。
-  - bootstrap-only preserve は `.codex/config.toml` だけに適用する。
-- Ask:
-  - なし。host split、rename、backward compatibility 不要、prompt out-of-scope は epic で固定済み。
+  - issue docs 本文の正本は `spec-dock/active/issue/*` とする。
+  - `spec-manager` は command execution と command evidence 収集に集中する。
 - Never:
-  - unknown custom file を prune しない。
-  - `config.toml` に secret / token / personal identity を含めない。
+  - `spec-manager` に docs 本文を書かせない。
+  - `spec-manager` に `apply_patch` や手編集を前提とした役割を与えない。
+  - main 側 guidance から `spec-manager` への routing を曖昧なまま放置しない。
 
 ## 非交渉制約
-- backward compatibility は要求しない。
 - `spec-manager` canonical filename は Codex が `.codex/agents/spec-manager.toml`、Copilot が `.github/agents/spec-manager.agent.md` とする。
-- GitHub Copilot primary entrypoint は `.github/agents/orchestrator.agent.md` とする。
-- Codex orchestrator responsibility は `.codex/config.toml` developer instructions だけが担う。
+- GitHub Copilot primary entrypoint は `.github/agents/orchestrator.agent.md` のままとする。
+- GitHub Copilot `spec-manager` は subagent 専用であり、`user-invocable: false` とする。
+- `spec-manager` は `./spec-dock/scripts/spec-dock ...` と必要最小限の `gh` 連携を扱う operator であり、issue docs 本文は作成しない。
+- requirement/design/plan/report の本文作成、文脈統合、ユーザーとの擦り合わせは main オーケストレーターの責務とする。
 
-## 前提
-- existing `install_root` 再帰列挙 + `meta.json` obsolete list の基盤を継続利用できる。
-- shared skills と host packs の provider-side asset 追加で機能を拡張できる。
-- issue-71 系 parity test により、`src/spec_dock/assets/install_root/` と dogfooding root の一致が求められる。
-
-## Exact inventory
-- Codex managed files:
-  - `.codex/AGENTS.md`
-  - `.codex/agents/code_reviewer.toml`
-  - `.codex/agents/consultant.toml`
-  - `.codex/agents/default.toml`
-  - `.codex/agents/dev_coder.toml`
-  - `.codex/agents/doc_writer.toml`
-  - `.codex/agents/explorer.toml`
-  - `.codex/agents/pr_monitor.toml`
-  - `.codex/agents/qa_reviewer.toml`
-  - `.codex/agents/repo_analyst.toml`
-  - `.codex/agents/researcher.toml`
-  - `.codex/agents/spark_worker.toml`
-  - `.codex/agents/spec_reviewer.toml`
-  - `.codex/agents/spec-manager.toml`
-  - `.codex/agents/utility_worker.toml`
-  - `.codex/agents/worker.toml`
-- Codex bootstrap-only files:
-  - `.codex/config.toml`
-- Codex managed exclusion:
-  - `.codex/agents/orchestrator.toml` は生成しない。
-- Copilot managed files:
-  - `.github/agents/code_reviewer.agent.md`
-  - `.github/agents/consultant.agent.md`
-  - `.github/agents/dev_coder.agent.md`
-  - `.github/agents/doc_writer.agent.md`
-  - `.github/agents/orchestrator.agent.md`
-  - `.github/agents/pr_monitor.agent.md`
-  - `.github/agents/qa_reviewer.agent.md`
-  - `.github/agents/repo_analyst.agent.md`
-  - `.github/agents/researcher.agent.md`
-  - `.github/agents/spec_reviewer.agent.md`
-  - `.github/agents/spec-manager.agent.md`
-  - `.github/agents/utility_worker.agent.md`
-- Copilot managed exclusion:
-  - `.github/copilot-instructions.md`
-  - `.github/mcp-config.json`
-  - `.github/config.json`
-- Shared skills managed files:
-  - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
-  - `.agents/skills/spec-dock-initiative-planning/SKILL.md`
-  - `.agents/skills/spec-dock-epic-planning/SKILL.md`
-  - `.agents/skills/spec-dock-issue-execution/SKILL.md`
-  - `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
+## 変更境界
+- primary touchpoints:
+  - `src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md`
+  - `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+  - `src/spec_dock/assets/install_root/.codex/config.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md`
+  - `tests/test_init_update.py`
+- thin adapter skills:
   - `.agents/skills/spec-dock-codex-adapter/SKILL.md`
   - `.agents/skills/spec-dock-copilot-adapter/SKILL.md`
-  - `.agents/skills/git-commit-conventional-ja/SKILL.md`
-  - `.agents/skills/git-commit-conventional-ja/agents/openai.yaml`
-  - `.agents/skills/git-commit-conventional-ja/references/conventional-commits-v1.0.0.md`
-  - `.agents/skills/github-codex-pr-review-comments/SKILL.md`
-  - `.agents/skills/github-codex-pr-review-comments/agents/openai.yaml`
-  - `.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh`
-  - `.agents/skills/github-pr-creator/SKILL.md`
-  - `.agents/skills/github-pr-creator/agents/openai.yaml`
-
-## Metadata delta
-- `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json` は current schema を最小拡張し、少なくとも次を持つ:
-  - rename 後 canonical target file
-  - `managed_assets.bootstrap_only_exact_file_paths` に `.codex/config.toml`
-  - `managed_assets.obsolete_exact_file_paths` に旧 canonical / rename 前 managed path
-- current managed inventory 自体は、引き続き `install_root` 再帰列挙を正本とする。
+  - これらは thin adapter contract を維持し、今回の主変更対象にはしない。
 
 ## 受け入れ条件
 - AC-001:
   - Actor:
-    - maintainer
+    - main orchestrator
   - Given:
-    - clean repo に対して `spec-dock init` または `spec-dock update` を実行する
+    - SpecDock command operation を含む task を扱う
   - When:
-    - Codex pack を同期する
+    - main agent guidance を読む
   - Then:
-    - `Exact inventory` に列挙した Codex managed files が生成される
-    - `.codex/config.toml` は生成される
-    - `.codex/agents/orchestrator.toml` は存在しない
+    - SpecDock command execution は原則 `spec-manager` に委任することが明記されている
+    - docs 本文作成は main 側責務として残っている
   - 観測点:
-    - installer tests
-    - installed file inventory assertion
+    - `.codex/AGENTS.md`
+    - `.codex/config.toml`
+    - `.github/agents/orchestrator.agent.md`
 - AC-002:
   - Actor:
-    - maintainer
+    - `spec-manager`
   - Given:
-    - clean repo に対して `spec-dock init` または `spec-dock update` を実行する
+    - SpecDock command execution task を受ける
   - When:
-    - Copilot pack を同期する
+    - host-native agent instructions を読む
   - Then:
-    - `Exact inventory` に列挙した Copilot managed files が生成される
-    - `.github/agents/orchestrator.agent.md` が primary entrypoint として存在する
-    - Copilot config 系 files は存在しない
+    - command surface、read order、reference docs、manual edit prohibition、completion boundary を自前 knowledge として持てる
+    - thin host adapter への delegation path は維持される
   - 観測点:
-    - installer tests
-    - installed file inventory assertion
+    - `.codex/agents/spec-manager.toml`
+    - `.github/agents/spec-manager.agent.md`
 - AC-003:
   - Actor:
-    - maintainer
+    - GitHub Copilot host
   - Given:
-    - update 対象 repo に old managed files、unknown custom files、編集済み `.codex/config.toml` が存在する
+    - `spec-manager` custom agent をロードする
   - When:
-    - `spec-dock update` を実行する
+    - tool frontmatter を解釈する
   - Then:
-    - obsolete managed files だけが prune される
-    - unknown custom files は保持される
-    - `.codex/config.toml` の編集内容は保持される
+    - `spec-manager` は `user-invocable: false` のままである
+    - `tools` は `read/search/execute/todo` に限定され、`edit` / `agent` / `web` は含まれない
+    - `mcp-servers` は追加されない
   - 観測点:
-    - update/prune tests
-    - file content preservation assertion
+    - `.github/agents/spec-manager.agent.md`
 - AC-004:
+  - Actor:
+    - Codex host
+  - Given:
+    - `spec-manager` native shim をロードする
+  - When:
+    - agent config を解釈する
+  - Then:
+    - `model = "gpt-5.4-mini"` と `model_reasoning_effort = "high"` が明示される
+    - `notify = []` が設定される
+    - shell 実行は許可される
+    - manual edit 禁止と command-first mutation が instructions で明記される
+  - 観測点:
+    - `.codex/agents/spec-manager.toml`
+- AC-005:
   - Actor:
     - maintainer
   - Given:
     - 実装差分一式
   - When:
-    - tests と validate を実行し、issue report を確認する
+    - relevant tests と validate を実行する
   - Then:
     - relevant installer tests が pass する
     - `./spec-dock/scripts/spec-dock validate` が pass する
@@ -217,37 +161,16 @@ ID: "iss-00075"
 ## 例外・エッジケース
 - EC-001:
   - 条件:
-    - Codex で orchestrator file を追加したくなる
+    - `spec-manager` が requirement/design/plan/report を自分で編集し始める
   - 期待:
-    - `.codex/agents/orchestrator.toml` は ship しない
-  - 観測点:
-    - inventory assertion
+    - instructions と tools の両方で command-only boundary に戻す
 - EC-002:
   - 条件:
-    - update 前に `.codex/config.toml` を編集済み
+    - Codex 側で manual file edit を hard に禁止できない
   - 期待:
-    - update 後も同じ編集内容が残る
-  - 観測点:
-    - file content diff
+    - model / notify / shell を設定しつつ、instructions で manual edit 禁止と command-first mutation を明示する
 - EC-003:
   - 条件:
-    - repo に unknown custom agent/skill file が混在する
+    - main orchestrator が SpecDock 操作を直接処理したくなる
   - 期待:
-    - managed obsolete 以外は削除されない
-  - 観測点:
-    - update/prune assertion
-
-## 用語
-- TERM-001:
-  - host pack:
-    - host-specific install target へ展開される file set
-- TERM-002:
-  - bootstrap-only:
-    - init で生成するが update で既存内容を上書きしない asset
-- TERM-003:
-  - obsolete managed path:
-    - 過去の managed file として明示 prune 対象にする exact path
-
-## 未確定事項
-- なし:
-  - issue 実装に必要な inventory、ownership、metadata delta、prune/preserve boundary は本書で固定する
+    - routing guidance により `spec-manager` へ送る
