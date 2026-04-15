@@ -21,6 +21,15 @@ from ..application.contracts import (
 from .contracts import CliText
 
 
+def _doctor_warning_message(code: str) -> str:
+    if code == "legacy_cleanup_pending":
+        return (
+            "legacy '.spec-dock/' is still present. Continue with current 'spec-dock/' "
+            "and remove legacy manually after migration is confirmed."
+        )
+    return code
+
+
 def render_validate_text(result: ValidationResult) -> CliText:
     if result.report.errors:
         return CliText(
@@ -36,11 +45,12 @@ def render_validate_text(result: ValidationResult) -> CliText:
 
 
 def render_doctor_text(result: DoctorResult) -> CliText:
+    warnings = [_doctor_warning_message(warning) for warning in result.warnings]
     if result.ok:
         return CliText(
             stdout_lines=["spec-dock: ok (doctor) findings=0"],
             stderr_lines=[],
-            warnings=list(result.warnings),
+            warnings=warnings,
         )
 
     stderr_lines = [f"spec-dock: doctor: findings={len(result.findings)}"]
@@ -52,7 +62,7 @@ def render_doctor_text(result: DoctorResult) -> CliText:
     return CliText(
         stdout_lines=[],
         stderr_lines=stderr_lines,
-        warnings=list(result.warnings),
+        warnings=warnings,
     )
 
 

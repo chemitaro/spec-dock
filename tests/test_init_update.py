@@ -628,6 +628,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
@@ -687,6 +689,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json": [
             "iss-00071"
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1832,6 +1836,64 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertFalse(
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
+
+    def test_issue_78_init_allows_install_when_legacy_hidden_workspace_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            legacy_dir = target / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            marker_path = legacy_dir / "legacy-marker.txt"
+            marker_path.write_text("legacy data\n", encoding="utf-8")
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(["init", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "spec-dock").is_dir())
+            self.assertTrue(legacy_dir.is_dir())
+            self.assertEqual(marker_path.read_text(encoding="utf-8"), "legacy data\n")
+            self.assertNotIn("Please rename it before installing", stderr.getvalue())
+
+    def test_issue_78_update_reports_manual_migration_guidance_without_rename(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".spec-dock").mkdir(parents=True, exist_ok=True)
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 1)
+            error_text = stderr.getvalue()
+            self.assertIn("'spec-dock' not found.", error_text)
+            self.assertIn("legacy '.spec-dock' exists with an incompatible format.", error_text)
+            self.assertIn("Run 'spec-dock init'", error_text)
+            self.assertIn("migrate manually", error_text)
+            self.assertNotIn("Please rename it", error_text)
+            self.assertNotIn("mv .spec-dock spec-dock", error_text)
+
+    def test_issue_78_update_keeps_legacy_hidden_workspace_untouched_during_coexistence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            current_dir = target / "spec-dock"
+            legacy_dir = target / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            marker_path = legacy_dir / "legacy-marker.txt"
+            marker_path.write_text("legacy data\n", encoding="utf-8")
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(current_dir.is_dir())
+            self.assertTrue(legacy_dir.is_dir())
+            self.assertEqual(marker_path.read_text(encoding="utf-8"), "legacy data\n")
+            self.assertNotIn("Please rename it", stderr.getvalue())
+            self.assertNotIn("mv .spec-dock spec-dock", stderr.getvalue())
 
     def test_init_does_not_seed_legacy_node_deps_json_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

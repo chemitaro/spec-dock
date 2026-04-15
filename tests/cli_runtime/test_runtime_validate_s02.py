@@ -40,6 +40,23 @@ def _runtime_modules():
     )
 
 
+def _runtime_cli_bootstrap_module():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
+    finally:
+        sys.path.pop(0)
+    return cli_bootstrap
+
+
 class _StubReader:
     def __init__(self, records):
         self.records = records
@@ -392,3 +409,31 @@ class TestRuntimeValidateS02(unittest.TestCase):
         self.assertIsNotNone(ports)
         self.assertEqual(getattr(ports, "repo_root"), Path("/repo"))
         self.assertEqual(getattr(ports, "specdock_dir"), Path("/repo/spec-dock"))
+
+    def test_issue_78_validate_uses_current_specdock_even_when_legacy_hidden_workspace_exists(self) -> None:
+        cli_bootstrap = _runtime_cli_bootstrap_module()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp) / "repo"
+            current_specdock = repo_root / "spec-dock"
+            legacy_specdock = repo_root / ".spec-dock"
+            current_specdock.mkdir(parents=True, exist_ok=True)
+            legacy_specdock.mkdir(parents=True, exist_ok=True)
+
+            calls: dict[str, object] = {}
+            original_load_node_records = cli_bootstrap.infra_fs_repo.load_node_records
+
+            def _fake_load_node_records(specdock_dir):
+                calls["specdock_dir"] = specdock_dir
+                return []
+
+            cli_bootstrap.infra_fs_repo.load_node_records = _fake_load_node_records
+            try:
+                reader = cli_bootstrap._NodeReader(specdock_dir=current_specdock)
+                records = reader.load_node_records()
+            finally:
+                cli_bootstrap.infra_fs_repo.load_node_records = original_load_node_records
+
+        self.assertEqual(records, [])
+        self.assertEqual(calls.get("specdock_dir"), current_specdock)
+        self.assertNotEqual(calls.get("specdock_dir"), legacy_specdock)

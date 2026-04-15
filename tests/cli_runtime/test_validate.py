@@ -1394,7 +1394,50 @@ class TestCliValidate(CliRuntimeHarness):
                 self.assertFalse(agent_active_path.exists(), agent_active_path.as_posix())
                 for generated_path in generated_agent_paths:
                     self.assertFalse(generated_path.exists(), generated_path.as_posix())
-                for generated_path in generated_top_level_paths:
-                    self.assertFalse(generated_path.exists(), generated_path.as_posix())
+            for generated_path in generated_top_level_paths:
+                self.assertFalse(generated_path.exists(), generated_path.as_posix())
 
             self.assertTrue(legacy_meta_path.is_file())
+
+    def test_issue_78_validate_ignores_legacy_hidden_workspace_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target)
+
+            legacy_dir = target / ".spec-dock" / "initiatives"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            (legacy_dir / "legacy-only.txt").write_text("legacy fixture\n", encoding="utf-8")
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+            self.assertIn("spec-dock: ok", validate_result.stdout)
+
+    def test_issue_78_validate_does_not_fallback_to_legacy_when_current_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_meta = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / ".meta.json"
+            )
+            issue_data = json.loads(issue_meta.read_text(encoding="utf-8"))
+            issue_data["parent_id"] = "epic-99999-invalid"
+            self._write_json_force(issue_meta, issue_data)
+
+            legacy_dir = target / ".spec-dock" / "initiatives"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            (legacy_dir / "valid-looking.txt").write_text("legacy should be ignored\n", encoding="utf-8")
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+            self.assertIn("issue parent_id mismatch", validate_result.stderr)

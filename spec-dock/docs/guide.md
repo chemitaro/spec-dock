@@ -47,6 +47,7 @@ Initiative
 - issue dependency metadata の canonical storage は node 直下 `.meta.json` の top-level `depends_on` です
 - 依存変更は `./spec-dock/scripts/spec-dock deps add/remove/check` の command-first mutation で行います
 - legacy `deps.json` / `meta.json` は current storage や fallback read/write ではありません（no dual-read / manual migration）
+- legacy hidden workspace `.spec-dock/` は current `spec-dock/` と非互換です。rename せず `spec-dock init` -> manual migration -> manual delete で扱います
 - 主な生成物: `spec-dock/active/**`, `spec-dock/.agent/{active,index,tree}*.json`, `spec-dock/{tree,deps-issues}*.puml`, `spec-dock/dashboard.md`
 - `spec-dock/adrs/` は generated ADR mirror です（`sync` で rebuild / gitignore 対象）
 - GitHub は入口として連携できるが、仕様ツリーの正はローカル metadata
