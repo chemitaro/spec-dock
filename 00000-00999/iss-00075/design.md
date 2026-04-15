@@ -153,3 +153,15 @@ Spec ..> Docs : no manual authoring
 ## 未確定事項
 - なし:
   - `spec-manager` は command operator、main は docs owner という split で固定する。
+
+## 2026-04-15 review follow-up slice
+- actionable review findings は次の 2 件に限定する。
+  - `pr-monitor` guidance がインストール先 repo に存在しない固定絶対パス `/srv/mount/.codex/skills/...` を参照している。
+  - `bootstrap_only_exact_file_paths` に追加した `.codex/config.toml` が preflight exact symlink rejection に先に遮られ、preserve semantics に到達できない。
+- `pr-monitor` guidance repair:
+  - helper path は repo-root relative の `./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh` に統一する。
+  - provider asset と dogfooding mirror の `pr-monitor` だけを更新し、historical discussion artifacts は scope 外とする。
+- bootstrap-only symlink repair:
+  - preflight は bootstrap-only current managed path の exact symlink を narrow exemption として扱う。
+  - 許可対象は「bootstrap-only path かつ exact symlink が file として存在する場合」のみとする。
+  - symlink parent / broken symlink / non-file symlink は従来どおり reject し、fail-before-writes を維持する。
