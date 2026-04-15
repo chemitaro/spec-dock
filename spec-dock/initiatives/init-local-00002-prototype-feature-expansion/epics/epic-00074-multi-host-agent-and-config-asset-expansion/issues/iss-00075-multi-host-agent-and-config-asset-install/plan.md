@@ -29,6 +29,11 @@ ID: "iss-00075"
 - main orchestrator から `spec-manager` への routing guidance を強化する。
 - related installer/content tests と dogfooding validate までを current session で閉じる。
 
+## 今回の review follow-up スライス（2026-04-15 追加）
+- `pr-monitor` の helper script path を fixed absolute path から repo-root relative path へ修正する。
+- `.codex/config.toml` bootstrap-only preserve と両立するよう、preflight の exact symlink policy を narrow exemption で修正する。
+- provider asset / dogfooding mirror / installer regression tests / report evidence のみを更新対象とする。
+
 ## マイルストーン
 - M1:
   - issue docs を command-operator split に更新する
@@ -117,6 +122,21 @@ ID: "iss-00075"
 - expected change:
   - old thin-shim assertion を新 contract に合わせて更新する
   - provider/generated parity checks は維持する
+
+### S06 — review follow-up repair
+- delegate:
+  - `dev-coder`
+- target:
+  - `src/spec_dock/cli.py`
+  - `src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md`
+  - repo root mirror の同名 `pr-monitor` files
+  - `tests/test_init_update.py`
+- expected change:
+  - `pr-monitor` helper path を `./.agents/.../fetch_codex_pr_review_comments.sh` へ統一する
+  - bootstrap-only `.codex/config.toml` exact symlink を preserve できるよう preflight exemption を追加する
+  - invalid bootstrap-only symlink は引き続き reject-before-writes とする
+  - provider/generated contract tests に上記 2 挙動を追加する
   - Copilot tools restriction と Codex config surface を確認する
 
 ### S05 — review and validation

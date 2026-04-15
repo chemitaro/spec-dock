@@ -7822,6 +7822,106 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertEqual(symlink_target.read_text(encoding="utf-8"), "managed-workflow-symlink-target\n")
             self._assert_managed_contract_guard_unchanged(target, before)
 
+    def test_issue_75_init_allows_bootstrap_only_exact_file_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target = target / "bootstrap-config-target.toml"
+            symlink_target.write_text("# bootstrap symlink target\n", encoding="utf-8")
+            os.symlink("../bootstrap-config-target.toml", bootstrap_path)
+
+            exit_code = main(["init", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "spec-dock").is_dir(), "init should complete when bootstrap-only symlink points to file")
+            self.assertTrue(bootstrap_path.is_symlink(), "bootstrap-only path should remain a symlink")
+            self.assertEqual(
+                symlink_target.read_text(encoding="utf-8"),
+                "# bootstrap symlink target\n",
+                "init must preserve existing bootstrap-only symlink target content",
+            )
+
+    def test_issue_75_update_allows_bootstrap_only_exact_file_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            self.assertEqual(main(["init", str(target)]), 0)
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.unlink(missing_ok=True)
+            symlink_target = target / "bootstrap-config-update-target.toml"
+            symlink_target.write_text("# bootstrap update symlink target\n", encoding="utf-8")
+            os.symlink("../bootstrap-config-update-target.toml", bootstrap_path)
+
+            exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(bootstrap_path.is_symlink(), "update should keep bootstrap-only path as symlink")
+            self.assertEqual(
+                symlink_target.read_text(encoding="utf-8"),
+                "# bootstrap update symlink target\n",
+                "update must preserve existing bootstrap-only symlink target content",
+            )
+
+    def test_issue_75_init_rejects_bootstrap_only_broken_symlink_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink("../missing-bootstrap-config.toml", bootstrap_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.codex/config.toml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(bootstrap_path.is_symlink())
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+
+    def test_issue_75_init_rejects_bootstrap_only_non_file_symlink_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                self.skipTest("symlink is not supported in this environment")
+
+            (target / "README.md").write_text("preflight-marker\n", encoding="utf-8")
+            bootstrap_path = target / ".codex" / "config.toml"
+            bootstrap_path.parent.mkdir(parents=True, exist_ok=True)
+            symlink_target_dir = target / "bootstrap-config-dir"
+            symlink_target_dir.mkdir(parents=True, exist_ok=True)
+            os.symlink("../bootstrap-config-dir", bootstrap_path)
+
+            err = io.StringIO()
+            with redirect_stderr(err):
+                exit_code = main(["init", str(target)])
+            stderr = err.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "target directory/container conflict for current managed path '.codex/config.toml'",
+                stderr,
+            )
+            self.assertIn("symlink at exact file path", stderr)
+            self.assertTrue(bootstrap_path.is_symlink())
+            self.assertFalse((target / "spec-dock").exists(), "conflict preflight must fail before scaffold writes")
+            self.assertEqual((target / "README.md").read_text(encoding="utf-8"), "preflight-marker\n")
+
     def test_issue_70_update_rejects_obsolete_managed_directory_conflict_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -8374,6 +8474,35 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         "issue-71 checked-in agent-tooling parity diverged from install_root asset: "
                         f"{rel_path}"
                     ),
+                )
+
+    def test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        expected_helper_path = (
+            "./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+        )
+        legacy_helper_path = (
+            "/srv/mount/.codex/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+        )
+        guidance_files = (
+            "src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
+            "src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md",
+            ".codex/agents/pr-monitor.toml",
+            ".github/agents/pr-monitor.agent.md",
+        )
+
+        for rel_path in guidance_files:
+            with self.subTest(rel_path=rel_path):
+                content = (repo_root / rel_path).read_text(encoding="utf-8")
+                self.assertIn(
+                    expected_helper_path,
+                    content,
+                    f"issue-75 guidance missing repo-relative helper path in: {rel_path}",
+                )
+                self.assertNotIn(
+                    legacy_helper_path,
+                    content,
+                    f"issue-75 guidance still contains legacy absolute helper path in: {rel_path}",
                 )
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:

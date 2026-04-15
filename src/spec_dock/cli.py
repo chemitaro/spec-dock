@@ -1122,12 +1122,16 @@ def _preflight_target_path_conflicts(
     *,
     current_target_rel_paths: tuple[Path, ...],
     obsolete_target_rel_paths: tuple[Path, ...],
+    bootstrap_only_target_rel_paths: tuple[Path, ...] = (),
 ) -> None:
+    bootstrap_only_target_rel_path_set = set(bootstrap_only_target_rel_paths)
+
     def _assert_exact_file_path_safe(
         target_rel: Path,
         *,
         path_kind: str,
         reject_exact_symlink: bool,
+        allow_exact_file_symlink: bool = False,
     ) -> None:
         target_path = target_root / target_rel
         rel_posix = target_rel.as_posix()
@@ -1150,6 +1154,8 @@ def _preflight_target_path_conflicts(
 
         if target_path.is_symlink():
             if reject_exact_symlink:
+                if allow_exact_file_symlink and target_path.exists() and target_path.is_file():
+                    return
                 raise RuntimeError(
                     "target directory/container conflict for "
                     f"{path_kind} '{rel_posix}' (symlink at exact file path)"
@@ -1167,6 +1173,7 @@ def _preflight_target_path_conflicts(
             current_rel,
             path_kind="current managed path",
             reject_exact_symlink=True,
+            allow_exact_file_symlink=current_rel in bootstrap_only_target_rel_path_set,
         )
     for obsolete_rel in obsolete_target_rel_paths:
         _assert_exact_file_path_safe(
@@ -1197,6 +1204,7 @@ def _preflight_managed_skill_install_plan(target_root: Path | None = None) -> _M
             target_root,
             current_target_rel_paths=current_target_rel_paths,
             obsolete_target_rel_paths=obsolete_target_rel_paths,
+            bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
         )
 
     return plan
@@ -1227,6 +1235,7 @@ def _apply_managed_skill_install_plan(
         target_root,
         current_target_rel_paths=current_target_rel_paths,
         obsolete_target_rel_paths=obsolete_target_rel_paths,
+        bootstrap_only_target_rel_paths=plan.bootstrap_only_rel_paths,
     )
 
     for mapping in plan.current_file_mappings:
