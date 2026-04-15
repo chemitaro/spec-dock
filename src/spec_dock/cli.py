@@ -108,8 +108,10 @@ def _require_specdock(target_root: Path) -> Path:
         legacy = target_root / _LEGACY_SPEC_DOCK_DIRNAME
         if legacy.exists():
             raise RuntimeError(
-                f"'{_SPEC_DOCK_DIRNAME}' not found, but legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists. "
-                f"Please rename it: mv {_LEGACY_SPEC_DOCK_DIRNAME} {_SPEC_DOCK_DIRNAME}"
+                f"'{_SPEC_DOCK_DIRNAME}' not found. "
+                f"legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists with an incompatible format. "
+                f"Run 'spec-dock init' to install a new '{_SPEC_DOCK_DIRNAME}' workspace, migrate manually, "
+                f"and remove '{_LEGACY_SPEC_DOCK_DIRNAME}' manually when ready."
             )
         raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' not found. Run 'spec-dock init' first.")
     return specdock_dir
@@ -687,12 +689,6 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 def _install_spec_dock(target_root: Path, *, force: bool) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
-    legacy_specdock_dir = target_root / _LEGACY_SPEC_DOCK_DIRNAME
-    if legacy_specdock_dir.exists() and legacy_specdock_dir.is_dir() and not specdock_dir.exists():
-        raise RuntimeError(
-            f"legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists. Please rename it before installing: "
-            f"mv {_LEGACY_SPEC_DOCK_DIRNAME} {_SPEC_DOCK_DIRNAME}"
-        )
     if specdock_dir.exists() and not force:
         raise RuntimeError(
             f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'."

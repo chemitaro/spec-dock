@@ -831,6 +831,77 @@ class TestRuntimeDoctorS04(unittest.TestCase):
             self.assertTrue(any("create 実行中" in line for line in finding.guidance))
             self.assertTrue(any("削除" in line for line in finding.guidance))
 
+    def test_issue_78_doctor_reports_legacy_only_workspace_as_finding(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, _infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            legacy_dir = repo_root / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader([]),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+            )
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+            self.assertFalse(result.ok)
+            self.assertEqual(len(result.findings), 1)
+            finding = result.findings[0]
+            self.assertEqual(finding.code, "legacy_only_workspace")
+            self.assertIn(str(legacy_dir), finding.message)
+            self.assertTrue(any("Do not rename '.spec-dock'" in line for line in finding.guidance))
+            self.assertTrue(any("spec-dock init" in line for line in finding.guidance))
+            self.assertTrue(any("migrate" in line.lower() for line in finding.guidance))
+
+    def test_issue_78_doctor_reports_cleanup_pending_warning_for_valid_coexistence(self) -> None:
+        _runtime_app, app_contracts, app_doctor, app_ports, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            records, _issue_dir = _build_valid_records(infra_contracts, specdock_dir=specdock_dir)
+            legacy_dir = repo_root / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+            )
+            result = app_doctor.doctor(app_contracts.DoctorRequest(), ports)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.findings, [])
+            self.assertIn("legacy_cleanup_pending", result.warnings)
+
+    def test_issue_78_main_doctor_renders_cleanup_pending_warning_message(self) -> None:
+        runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
+        from spec_dock_runtime.cli import bootstrap as cli_bootstrap
+
+        original_find_specdock_dir = runtime_app._find_specdock_dir
+        original_application_doctor = cli_bootstrap.application_doctor
+        runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
+        cli_bootstrap.application_doctor = lambda _req, _ports: app_contracts.DoctorResult(
+            ok=True,
+            findings=[],
+            warnings=["legacy_cleanup_pending"],
+        )
+        try:
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exit_code = runtime_app.main(["doctor"])
+        finally:
+            runtime_app._find_specdock_dir = original_find_specdock_dir
+            cli_bootstrap.application_doctor = original_application_doctor
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue(), "spec-dock: ok (doctor) findings=0\n")
+        stderr_text = stderr.getvalue()
+        self.assertIn("spec-dock: (warn) legacy '.spec-dock/' is still present.", stderr_text)
+        self.assertNotIn("legacy_cleanup_pending", stderr_text)
+
     def test_main_doctor_delegates_to_use_case(self) -> None:
         runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
         from spec_dock_runtime.cli import bootstrap as cli_bootstrap

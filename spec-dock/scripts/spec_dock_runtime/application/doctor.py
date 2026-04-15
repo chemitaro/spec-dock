@@ -44,6 +44,21 @@ def _append_unique(values: list[str], value: str) -> None:
         values.append(value)
 
 
+def _legacy_only_workspace_finding(*, legacy_dir: Path) -> DoctorFinding:
+    return DoctorFinding(
+        code="legacy_only_workspace",
+        message=(
+            "legacy workspace is present but current workspace is missing: "
+            f"path={legacy_dir}"
+        ),
+        guidance=[
+            "Do not rename '.spec-dock' to 'spec-dock' (formats are incompatible).",
+            "Run `spec-dock init` to install a new `spec-dock/` workspace.",
+            "Migrate required data manually and remove `.spec-dock/` manually when ready.",
+        ],
+    )
+
+
 def _finding_from_error(error_message: str) -> DoctorFinding:
     if "Duplicate id detected" in error_message or "Duplicate numeric id detected" in error_message:
         return DoctorFinding(
@@ -313,6 +328,14 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
     findings: list[DoctorFinding] = []
     graph: SpecGraph | None = None
     specdock_dir = _resolve_specdock_dir(ports)
+    repo_root = ports.repo_root if ports.repo_root is not None else specdock_dir.parent
+    legacy_dir = repo_root / ".spec-dock"
+    has_current_workspace = specdock_dir.is_dir()
+    has_legacy_workspace = legacy_dir.is_dir()
+
+    if has_legacy_workspace and not has_current_workspace:
+        findings.append(_legacy_only_workspace_finding(legacy_dir=legacy_dir))
+        return DoctorResult(ok=False, findings=findings, warnings=warnings)
 
     try:
         records = ports.node_reader.load_node_records()
@@ -353,5 +376,8 @@ def doctor(req: DoctorRequest, ports: Ports) -> DoctorResult:
         stale_create_lock = _stale_create_lock_finding(specdock_dir)
         if stale_create_lock is not None:
             findings.append(stale_create_lock)
+
+    if has_current_workspace and has_legacy_workspace and not findings:
+        _append_unique(warnings, "legacy_cleanup_pending")
 
     return DoctorResult(ok=(len(findings) == 0), findings=findings, warnings=warnings)
