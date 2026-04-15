@@ -21,6 +21,100 @@ ID: "iss-00075"
 
 ## 実装記録（セッションログ）
 
+### 2026-04-15 12:30 - spec-manager command-operator enrichment
+
+#### 対象
+- Step: follow-up contract enrichment
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003
+
+#### 実施内容
+- issue docs を follow-up scope に切り替え、`spec-manager = command operator`、`main orchestrator = docs/context owner` の split を正本化した。
+- Codex / Copilot の `spec-manager` を、thin adapter 委譲を維持したまま command-only operator として rich 化した。
+  - command surface
+  - read order
+  - docs authoring / manual edit prohibition
+  - completion boundary
+- Codex 側には `gpt-5.4-mini`、`high` reasoning、`notify = []`、`shell_tool = true` を追加した。
+- Copilot 側には `model: gpt-5.4-mini`、`tools: ['read', 'search', 'execute', 'todo']`、`user-invocable: false` を固定した。
+- main guidance（Codex bootstrap / Codex main config / Copilot orchestrator）に、SpecDock command operation は原則 `spec-manager` へ送ることと、docs authoring は main 側責務であることを追加した。
+- `tests/test_init_update.py` の helper と contract assertions を更新し、thin shim 前提ではなく richer operator contract を guard する形へ切り替えた。
+- `PYTHONPATH=src python -m spec_dock.cli update .` 実行時に scope 外の旧 docs deletion が発生したため、該当 files は `HEAD` 内容で復元し、最終差分を current scope に戻した。
+
+#### 実行コマンド / 結果
+```bash
+PYTHONPATH=src python -m spec_dock.cli update .
+# spec-dock: ok (update) -> /srv/mount/spec-dock
+
+PYTHONPATH=src python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_update_manages_native_shims_with_gate_2_five_subchecks
+# OK (3 tests)
+
+PYTHONPATH=src python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_update_manages_native_shims_with_gate_2_five_subchecks
+# OK (4 tests)
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=31
+```
+
+#### 変更したファイル
+- provider assets:
+  - `src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md`
+  - `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+  - `src/spec_dock/assets/install_root/.codex/config.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md`
+- tests:
+  - `tests/test_init_update.py`
+- issue docs:
+  - `spec-dock/active/issue/requirement.md`
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+- dogfooding mirror:
+  - `.codex/AGENTS.md`
+  - `.codex/config.toml`
+  - `.codex/agents/spec-manager.toml`
+  - `.github/agents/orchestrator.agent.md`
+  - `.github/agents/spec-manager.agent.md`
+
+#### レビュー
+- manual diff review:
+  - pass
+  - `spec-manager` が command operator に限定され、main guidance に docs-owner split が入っていることを確認した。
+- targeted regression:
+  - pass
+- validate:
+  - pass
+
+#### コミット
+- なし
+
+### 2026-04-15 12:45 - codex main config wording trim
+
+#### 対象
+- Step: follow-up wording refinement
+
+#### 実施内容
+- `.codex/config.toml` のオーケストレーター責務に追加していた 3 行を、`spec-manager` への command delegation だけを残す 1 行へ圧縮した。
+- docs-owner split の説明は `.codex/AGENTS.md` と Copilot orchestrator 側に残し、Codex main config からは重複説明を削除した。
+- `tests/test_init_update.py` の Codex main config assertion と issue design wording を新しい簡潔版へ合わせた。
+
+#### 実行コマンド / 結果
+```bash
+PYTHONPATH=src python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract
+# OK (2 tests)
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=31
+```
+
 ### 2026-04-15 11:00 - naming scope reset
 
 #### 対象
