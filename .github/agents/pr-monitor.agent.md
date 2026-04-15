@@ -50,7 +50,7 @@ Command guidance:
   - gh pr view <pr> --repo <repo> --json number,url,headRefOid,reviewDecision,statusCheckRollup
   - gh pr checks <pr> --repo <repo>
 - When `gh pr view --comments` is insufficient or unreliable, reuse the existing helper:
-  - /srv/mount/.codex/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh
+  - ./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh
 - Use `date -u +"%Y-%m-%dT%H:%M:%SZ"` to track current time.
 - Use `sleep <seconds>` for waiting.
 

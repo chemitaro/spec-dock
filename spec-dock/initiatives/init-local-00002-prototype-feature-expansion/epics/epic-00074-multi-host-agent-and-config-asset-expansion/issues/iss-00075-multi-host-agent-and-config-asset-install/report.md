@@ -21,6 +21,47 @@ ID: "iss-00075"
 
 ## 実装記録（セッションログ）
 
+### 2026-04-15 13:20 - review follow-up repair
+
+#### 対象
+- Step: PR #76 review follow-up
+- Findings:
+  - `pr-monitor` helper path がインストール先 repo に存在しない固定絶対パスを参照していた
+  - bootstrap-only `.codex/config.toml` が preflight exact symlink rejection に先に遮られ、preserve semantics に到達できなかった
+
+#### 実施内容
+- `pr-monitor` guidance の helper path を provider asset / dogfooding mirror の両方で `./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh` に統一した。
+- `src/spec_dock/cli.py` の preflight に bootstrap-only current managed path を渡し、`.codex/config.toml` の exact symlink が file を指す場合だけ narrow exemption で許可するようにした。
+- broken symlink / non-file symlink / symlink parent は従来どおり reject-before-writes を維持するよう、installer tests を追加した。
+- `tests/test_init_update.py` に `pr-monitor` helper path contract と bootstrap-only symlink contract の回帰 test を追加した。
+
+#### 実行コマンド / 結果
+```bash
+PYTHONPATH=src python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_bundled_native_shim_assets_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_init_generated_native_shims_satisfy_static_delegation_only_contract \
+  tests.test_init_update.TestInitUpdate.test_issue_75_init_allows_bootstrap_only_exact_file_symlink \
+  tests.test_init_update.TestInitUpdate.test_issue_75_update_allows_bootstrap_only_exact_file_symlink \
+  tests.test_init_update.TestInitUpdate.test_issue_75_init_rejects_bootstrap_only_broken_symlink_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_75_init_rejects_bootstrap_only_non_file_symlink_before_writes \
+  tests.test_init_update.TestInitUpdate.test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path
+# OK (7 tests)
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=31
+```
+
+#### レビュー分析
+- Copilot review:
+  - 妥当
+  - 4 comments は同一論点であり、`pr-monitor` guidance の broken absolute path を指摘していた
+- Codex review:
+  - 妥当
+  - bootstrap-only `.codex/config.toml` の symlink repo で `init/update` が失敗する regression を指摘していた
+- verdict:
+  - どちらも修正対象
+  - scope は上記 2 論点のみに限定した
+
 ### 2026-04-15 12:30 - spec-manager command-operator enrichment
 
 #### 対象
