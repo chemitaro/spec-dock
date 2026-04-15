@@ -10,7 +10,7 @@ Inspect the actual commit target before writing anything. Read `references/conve
 ## Delegation Guidance
 
 - Prefer delegating commit work to an appropriate sub-agent instead of spending main-session context on routine git operations.
-- `spark_worker` or `utility_worker` are usually good fits for this kind of bounded git task. Choose whichever best matches the task size and complexity.
+- `spark-worker` or `utility-worker` are usually good fits for this kind of bounded git task. Choose whichever best matches the task size and complexity.
 - When delegating, pass the intended commit scope, any staging constraints, whether hook failures may be investigated, and the required return values: commit hash, exact committed message, or a clear blocker.
 
 ## Workflow

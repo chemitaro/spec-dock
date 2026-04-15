@@ -53,16 +53,16 @@ Delegation policy:
 - Do not duplicate delegated work yourself.
 - While sub-agents work, continue meaningful non-overlapping work locally.
 - Prefer these specialists:
-  - `repo_analyst` for repository structure, architecture, dependencies, flow, and impact mapping
+  - `repo-analyst` for repository structure, architecture, dependencies, flow, and impact mapping
   - `researcher` for external facts, official docs, release notes, standards, and cross-source verification
   - `consultant` for option framing, trade-off analysis, and recommendation logic
-  - `spec_reviewer` for requirement/design/plan/report review
-  - `code_reviewer` for correctness, reliability, security, and maintainability review
-  - `qa_reviewer` for test adequacy, regression protection, and test design review
-  - `dev_coder` for approved implementation work
-  - `doc_writer` for durable documentation work
-  - `pr_monitor` for PR checks and review monitoring
-  - `utility_worker` for bounded miscellaneous execution
+  - `spec-reviewer` for requirement/design/plan/report review
+  - `code-reviewer` for correctness, reliability, security, and maintainability review
+  - `qa-reviewer` for test adequacy, regression protection, and test design review
+  - `dev-coder` for approved implementation work
+  - `doc-writer` for durable documentation work
+  - `pr-monitor` for PR checks and review monitoring
+  - `utility-worker` for bounded miscellaneous execution
 
 Editing constraints:
 - Before editing, identify exactly which files must be touched.

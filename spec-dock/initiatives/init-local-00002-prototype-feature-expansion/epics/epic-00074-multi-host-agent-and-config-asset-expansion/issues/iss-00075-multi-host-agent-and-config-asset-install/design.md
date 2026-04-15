@@ -34,6 +34,19 @@ ID: "iss-00075"
   - 既存 installer は `install_root` を canonical authority として扱える。
   - issue-70 以降の package / install discovery contract は壊さない。
 
+## 今回の設計スライス（2026-04-15 セッション）
+- 今回は naming contract のみを変更する。
+- touchpoints:
+  - `src/spec_dock/assets/install_root/.codex/agents/*.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/*.agent.md`
+  - `src/spec_dock/cli.py`
+  - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
+  - role 名参照を持つ shipped assets と tests
+- non-goals:
+  - `spec-manager` の instructions rich化
+  - host capability / model / notify / MCP contract の変更
+  - workflow semantics や delegation boundary の再設計
+
 ## 既存実装 / 規約の理解
 - 参照した実装 / docs:
   - `src/spec_dock/assets/install_root/`
