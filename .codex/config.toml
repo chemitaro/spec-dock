@@ -87,6 +87,7 @@ developer_instructions = """
 """
 
 approvals_reviewer = "user"
+project_doc_fallback_filenames = [".codex/AGENTS.md"]
 
 
 [agents]
@@ -100,5 +101,4 @@ args = ["-y", "@upstash/context7-mcp"]
 [mcp_servers.serena]
 command = "uvx"
 args = ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "codex"]
-
 
