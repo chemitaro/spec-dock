@@ -5,7 +5,7 @@ ID: "init-local-00002"
 関連GitHub: []
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-03-26"
+最終更新: "2026-04-15"
 依存: ["requirement.md", "design.md"]
 ---
 
@@ -61,6 +61,29 @@ ID: "init-local-00002"
     - 2 issue 構成で進める。
     - 第1 issue で close command を実装し、その issue 自身の docs/tests/review/success verification まで閉じる。
     - 第2 issue で local delete を実装し、その issue 自身の docs/tests/review/success verification に加えて epic 全体の final review / final validation まで閉じる。
+- epic-00074-multi-host-agent-and-config-asset-expansion:
+  - 目的:
+    - Codex main agent bootstrap config と host-native orchestrator/specialist assets、GitHub Copilot の host-native orchestrator/specialist assets を installer 管理下で追加し、Harness Engineering のような multi-host 運用に耐える feature value を広げる。
+  - deliverable:
+    - Codex bootstrap `config.toml`
+    - Codex subagents/custom agents
+    - GitHub Copilot `orchestrator` primary agent
+    - GitHub Copilot subagents/custom agents
+    - future host / future pack を見据えた extensible managed asset model
+  - metric link:
+    - Metric-001
+    - Metric-002
+  - depends on:
+    - `epic-00048` completed baseline
+    - `init-local-00003` の prerequisite groundwork（特に `epic-00067`）
+  - 背景:
+    - `epic-00048` で thin adapter / native shim baseline は整ったが、Codex main agent の orchestrator responsibility、`spec-manager` への rename、GitHub Copilot `orchestrator` primary agent を含む複数 subagent/custom agent を managed deployment する contract は未整備である。
+    - `epic-00067` で install_root authority と sync/prune safety は固定済みのため、本 initiative では architecture cleanup を再実施せず、その上に feature value を追加する。
+    - Harness Engineering の中核利用では、install 後に host config や subagent を手作業で足さずに済むことが重要であり、managed asset model の拡張が直接の利用価値になる。
+  - 実行方針:
+    - 既存 installer foundation 上の asset 追加として 1 implementation issue で進める。
+    - 同一 issue の中で metadata / file placement / tests / docs / cross-host validation を完了させる。
+    - 新しい installer mechanism が必要と判明した場合だけ再分割する。
 - epic-0003-operator-value-expansion:
   - 目的:
     - operator が日常運用で得られる feature value を広げる。
@@ -87,9 +110,12 @@ ID: "init-local-00002"
   - そのうえで collaboration/lifecycle と operator value を拡張する。
   - `epic-00054` はその最初の具体化であり、create 後に Web UI へ戻っている lifecycle gap と、手作業 directory cleanup を command contract へ戻す役割を持つ。
   - `epic-00054` は review-only issue を別建てせず、各 implementation issue に review と成功性確認を内包する。
+  - `epic-00074` は `epic-00048` の completed baseline を拡張し、host-native config / subagent managed deployment を concrete feature epic として進める。
+  - `epic-00074` は `epic-00067` の authority cleanup を再所有せず、feature initiative 側では利用価値としての multi-host setup 拡張に限定する。
   - post-prototype 候補は current initiative の出口を曖昧にしないよう最後に整理する。
 - parallelizable:
   - `epic-00054` と epic-0003 は並行検討できる。
+  - `epic-00074` は prerequisite groundwork が閉じている前提で `epic-00054` と並行検討できるが、installer / docs / dogfooding の重なりは調整が必要。
 
 ## 意思決定ゲート
 - G1 strategy review:
@@ -98,6 +124,7 @@ ID: "init-local-00002"
   - 最初に足す feature が prototype value に直結しているか確認する
 - G3 governance/docs impact:
   - architecture initiative 側の guardrail を破っていないか確認する
+  - `epic-00074` が architecture cleanup ではなく feature expansion として閉じているか確認する
 - G9 final initiative plan review:
   - current initiative と post-prototype candidate の境界を確認する
 

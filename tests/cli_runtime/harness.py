@@ -37,6 +37,9 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",
     "spec-dock-copilot-adapter",
+    "git-commit-conventional-ja",
+    "github-codex-pr-review-comments",
+    "github-pr-creator",
 )
 
 
