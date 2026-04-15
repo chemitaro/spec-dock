@@ -15,6 +15,11 @@ ID: "iss-00075"
 - 既存 installer foundation の additive change として、Codex pack、GitHub Copilot pack、shared skills を `install_root` から install/update/prune できる状態にする。
 - exact inventory、ownership、metadata delta、prune/preserve behavior を固定し、1 issue で実装から validation まで閉じる。
 
+## 今回の実行スコープ（2026-04-15 セッション）
+- このセッションでは agent pack の naming contract を kebab-case に統一する変更だけを実装対象とする。
+- `spec-manager` の文言整理、モデル設定、通知設定、MCP 方針、コマンド知識・スキル知識の拡充は follow-up とし、このセッションでは実施しない。
+- 変更対象は provider-side assets、installer metadata / canonical path references、tests、dogfooding parity に限定する。
+
 ## 背景・現状
 - 現状の挙動:
   - `src/spec_dock/assets/install_root/` は shared skills と host native shim だけを正本として持ち、`spec-dock update` は `install_root` 再帰列挙を current managed file set として同期する。
@@ -50,12 +55,14 @@ ID: "iss-00075"
   - `spec-manager` を canonical specialist 名として導入し、旧 `spec-dock` specialist 名を置き換える。
   - `.codex/config.toml` を bootstrap-only asset として扱い、init では生成し、update では既存 user edit を保持する。
   - obsolete managed path と preserve path の境界を metadata と tests で固定する。
+  - Codex / GitHub Copilot の agent pack 内で snake_case の role filenames / role names を kebab-case に統一する。
 - MUST NOT:
   - new installer mechanism を作らない。
   - runtime protocol を再定義しない。
   - Copilot `config` / `mcp-config` を ship しない。
   - direct `.codex/agents/orchestrator.toml` を ship しない。
   - prompt assets を current issue scope に入れない。
+  - `spec-manager` の本文・model・reasoning・notify・MCP・skill guidance の内容強化はこのセッションで行わない。
 - OUT OF SCOPE:
   - future host support
   - prompt file 配布

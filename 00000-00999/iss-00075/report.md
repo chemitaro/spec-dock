@@ -21,6 +21,98 @@ ID: "iss-00075"
 
 ## 実装記録（セッションログ）
 
+### 2026-04-15 11:00 - naming scope reset
+
+#### 対象
+- Step: current-session scope alignment
+- AC/EC: AC-001, AC-002, AC-003
+
+#### 実施内容
+- 現セッションの実装対象を agent pack の kebab-case naming unification のみに限定する方針で issue docs を更新した。
+- `spec-manager` の文言整理や host-specific config 強化は follow-up として切り離した。
+
+#### 実行コマンド / 結果
+```bash
+# docs-only alignment; no runtime command executed
+```
+
+#### 変更したファイル
+- `spec-dock/active/issue/requirement.md`
+- `spec-dock/active/issue/design.md`
+- `spec-dock/active/issue/plan.md`
+- `spec-dock/active/issue/report.md`
+
+#### レビュー
+- pending
+
+#### コミット
+- なし
+
+### 2026-04-15 11:00 - kebab-case naming unification
+
+#### 対象
+- Step: S01 naming-only execution slice
+- AC/EC: AC-001, AC-002, AC-003
+
+#### 実施内容
+- Codex / GitHub Copilot の agent pack で snake_case role filenames / internal names を kebab-case に統一した。
+- `spec-manager` は名前維持とし、本文・model・notify・MCP などの rich化は未着手のまま切り分けた。
+- provider-side assets、repo root dogfooding mirror、installer metadata、role 名参照、`tests/test_init_update.py` の inventory / prune expectations を rename 契約へ揃えた。
+- `meta.json` の obsolete list に旧 snake_case managed paths を追加し、update 時 prune 対象にした。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.test_init_update.TestInitUpdate.test_issue_68_install_root_tree_exists tests.test_init_update.TestInitUpdate.test_issue_68_authoritative_inventory_paths_are_classified_under_install_root tests.test_init_update.TestInitUpdate.test_issue_69_local_and_installed_handoff_surface_inventories_match tests.test_init_update.TestInitUpdate.test_init_installs_host_adapter_metadata_with_fixed_contract tests.test_init_update.TestInitUpdate.test_issue_70_update_prunes_obsolete_managed_symlink_exact_file_path
+# OK
+
+PYTHONPATH=src python -m spec_dock.cli update .
+# spec-dock: ok (update) -> /srv/mount/spec-dock
+
+python -m unittest tests.test_init_update -f
+# OK (151 tests)
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=31
+```
+
+#### 変更したファイル
+- provider assets:
+  - `src/spec_dock/assets/install_root/.codex/agents/*.toml` の rename 対象 9 files
+  - `src/spec_dock/assets/install_root/.github/agents/*.agent.md` の rename 対象 8 files
+  - `src/spec_dock/assets/install_root/.agents/host-adapters/meta.json`
+  - `src/spec_dock/assets/install_root/.codex/config.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md`
+  - `src/spec_dock/assets/install_root/.codex/agents/researcher.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/researcher.agent.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/git-commit-conventional-ja/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md`
+- dogfooding mirror:
+  - `.codex/agents/*.toml` の同名 rename 対象
+  - `.github/agents/*.agent.md` の同名 rename 対象
+  - `.agents/host-adapters/meta.json`
+  - `.codex/config.toml`
+  - `.github/agents/orchestrator.agent.md`
+  - `.codex/agents/researcher.toml`
+  - `.github/agents/researcher.agent.md`
+  - `.agents/skills/git-commit-conventional-ja/SKILL.md`
+  - `.agents/skills/github-pr-creator/SKILL.md`
+- tests:
+  - `tests/test_init_update.py`
+
+#### レビュー
+- manual diff review:
+  - pass
+  - rename 対象の残存 snake_case は `meta.json` の obsolete paths とそれを検証する test fixture のみであることを確認した。
+- automated validation:
+  - pass
+
+#### コミット
+- なし
+
+#### メモ
+- `spec-dock update .` は shell PATH 上の `spec-dock` が無かったため、`PYTHONPATH=src python -m spec_dock.cli update .` を使用した。
+- update に巻き込まれた scope 外 docs 削除は restore 済みで、最終差分は naming unification に閉じている。
+
 ### 2026-04-15 00:00 - 00:00
 
 #### 対象
