@@ -303,23 +303,22 @@ def _target_node_dir_from_error_message(
     canonical_id: str,
     kind: SpecNodeKind,
 ) -> Path | None:
-    normalized_root = specdock_dir.resolve().as_posix().rstrip("/")
-    match = re.search(re.escape(normalized_root) + r"[^:\n]*?/\.meta\.json", message)
-    if match is None:
-        return None
-    meta_path = Path(match.group(0))
-    try:
-        node_dir = meta_path.parent.resolve()
-        node_dir.relative_to(specdock_dir.resolve())
-    except Exception:
-        return None
-    name = node_dir.name.lower()
-    expected_prefix = f"{canonical_id}-"
-    if name != canonical_id and not name.startswith(expected_prefix):
-        return None
-    if not _is_canonical_managed_node_dir(specdock_dir=specdock_dir, node_dir=node_dir, kind=kind):
-        return None
-    return node_dir
+    specdock_root = specdock_dir.resolve()
+    for raw_meta_path in re.findall(r"/[^\n]*?\.meta\.json", message):
+        meta_path = Path(raw_meta_path)
+        try:
+            node_dir = meta_path.parent.resolve()
+            node_dir.relative_to(specdock_root)
+        except Exception:
+            continue
+        name = node_dir.name.lower()
+        expected_prefix = f"{canonical_id}-"
+        if name != canonical_id and not name.startswith(expected_prefix):
+            continue
+        if not _is_canonical_managed_node_dir(specdock_dir=specdock_dir, node_dir=node_dir, kind=kind):
+            continue
+        return node_dir
+    return None
 
 
 def _target_local_metadata_failure_result(
