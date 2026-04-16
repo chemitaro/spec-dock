@@ -1248,7 +1248,13 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _issue_69_venv_spec_dock(self, venv_python: Path) -> Path:
         if os.name == "nt":
-            return venv_python.parent / "spec-dock.exe"
+            spec_dock_exe = venv_python.parent / "spec-dock.exe"
+            if spec_dock_exe.is_file():
+                return spec_dock_exe
+            spec_dock_cmd = venv_python.parent / "spec-dock.cmd"
+            if spec_dock_cmd.is_file():
+                return spec_dock_cmd
+            return spec_dock_exe
         return venv_python.parent / "spec-dock"
 
     def _issue_69_env_root(self, venv_python: Path) -> Path:
@@ -1317,6 +1323,25 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         spec_dock_wrapper.chmod(0o755)
         return python_wrapper
+
+    def _issue_69_ensure_spec_dock_wrapper(self, venv_python: Path) -> Path:
+        spec_dock_wrapper = self._issue_69_venv_spec_dock(venv_python)
+        if spec_dock_wrapper.is_file():
+            return spec_dock_wrapper
+        if os.name == "nt":
+            spec_dock_wrapper.write_text(
+                "@echo off\r\n"
+                f"\"{venv_python}\" -m spec_dock.cli %*\r\n",
+                encoding="utf-8",
+            )
+        else:
+            spec_dock_wrapper.write_text(
+                "#!/bin/sh\n"
+                f"exec {shlex.quote(str(venv_python))} -m spec_dock.cli \"$@\"\n",
+                encoding="utf-8",
+            )
+            spec_dock_wrapper.chmod(0o755)
+        return spec_dock_wrapper
 
     def _issue_69_build_artifacts_with_local_wheelhouse(
         self,
@@ -1400,6 +1425,7 @@ class TestInitUpdate(CliRuntimeHarness):
             target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
             requirements=[str(wheel_path)],
         )
+        self._issue_69_ensure_spec_dock_wrapper(venv_python)
         return venv_python
 
     def _issue_69_path_is_within(self, path: Path, root: Path) -> bool:
