@@ -597,6 +597,8 @@ class TestInitUpdate(CliRuntimeHarness):
     _ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV = "SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES"
     _ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV = "SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT"
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -632,6 +634,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],

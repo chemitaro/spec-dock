@@ -3,7 +3,7 @@
 ID: "epic-00080"
 タイトル: "minor bug fixes"
 関連GitHub: ["#80"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-04-16"
 親: ["init-00079"]

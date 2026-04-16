@@ -109,7 +109,7 @@ def _require_specdock(target_root: Path) -> Path:
         if legacy.exists():
             raise RuntimeError(
                 f"'{_SPEC_DOCK_DIRNAME}' not found. "
-                f"legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists with an incompatible format. "
+                f"Legacy '{_LEGACY_SPEC_DOCK_DIRNAME}' exists with an incompatible format. "
                 f"Run 'spec-dock init' to install a new '{_SPEC_DOCK_DIRNAME}' workspace, migrate manually, "
                 f"and remove '{_LEGACY_SPEC_DOCK_DIRNAME}' manually when ready."
             )
