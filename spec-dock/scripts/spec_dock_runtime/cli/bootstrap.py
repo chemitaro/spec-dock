@@ -210,10 +210,10 @@ class _ArtifactWriter:
         return infra_artifact_writer.write(specdock_dir, bundle)
 
 
-def build_runtime(specdock_dir: Path) -> BootstrapContext:
+def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> BootstrapContext:
     ports = Ports(
         node_reader=_NodeReader(specdock_dir=specdock_dir),
-        repo_root=specdock_dir.parent,
+        repo_root=repo_root if repo_root is not None else specdock_dir.parent,
         specdock_dir=specdock_dir,
         node_repo=_NodeRepository(),
         template_scaffolder=_TemplateScaffolder(),

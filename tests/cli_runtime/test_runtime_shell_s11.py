@@ -422,7 +422,7 @@ class RuntimeShellS11Tests(unittest.TestCase):
         runtime_app._find_specdock_dir = lambda: Path("/tmp/repo/spec-dock")
         runtime_app._cli_build_registry = lambda: "registry"
         runtime_app._cli_build_parser = lambda registry: _ParserStub()
-        runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(use_cases="use_cases")
+        runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(use_cases="use_cases")
         runtime_app._cli_dispatch = lambda ns, registry, use_cases: (
             calls.append(("dispatch", ns.command_key, registry, use_cases)) or 17
         )
