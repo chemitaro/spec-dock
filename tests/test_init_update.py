@@ -1254,7 +1254,7 @@ class TestInitUpdate(CliRuntimeHarness):
             spec_dock_cmd = venv_python.parent / "spec-dock.cmd"
             if spec_dock_cmd.is_file():
                 return spec_dock_cmd
-            return spec_dock_exe
+            return spec_dock_cmd
         return venv_python.parent / "spec-dock"
 
     def _issue_69_env_root(self, venv_python: Path) -> Path:
@@ -2448,6 +2448,70 @@ class TestInitUpdate(CliRuntimeHarness):
                 snapshot=snapshot,
                 repo_root=repo_root,
             )
+
+    def test_issue_69_windows_helper_prefers_existing_exe_launcher(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = Path(tmp)
+            scripts_dir = venv_dir / "Scripts"
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            venv_python = scripts_dir / "python.exe"
+            venv_python.write_text("", encoding="utf-8")
+            spec_dock_exe = scripts_dir / "spec-dock.exe"
+            spec_dock_exe.write_text("", encoding="utf-8")
+            spec_dock_cmd = scripts_dir / "spec-dock.cmd"
+            spec_dock_cmd.write_text("@echo off\r\n", encoding="utf-8")
+
+            with patch("tests.test_init_update.os.name", "nt"):
+                resolved = self._issue_69_venv_spec_dock(venv_python)
+                ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+            self.assertEqual(resolved, spec_dock_exe)
+            self.assertEqual(ensured, spec_dock_exe)
+            self.assertEqual(spec_dock_exe.read_text(encoding="utf-8"), "")
+
+    def test_issue_69_windows_helper_prefers_existing_cmd_launcher_when_exe_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = Path(tmp)
+            scripts_dir = venv_dir / "Scripts"
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            venv_python = scripts_dir / "python.exe"
+            venv_python.write_text("", encoding="utf-8")
+            spec_dock_cmd = scripts_dir / "spec-dock.cmd"
+            spec_dock_cmd.write_text("@echo off\r\nrem existing\r\n", encoding="utf-8")
+
+            with patch("tests.test_init_update.os.name", "nt"):
+                resolved = self._issue_69_venv_spec_dock(venv_python)
+                ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+            self.assertEqual(resolved, spec_dock_cmd)
+            self.assertEqual(ensured, spec_dock_cmd)
+            self.assertEqual(
+                spec_dock_cmd.read_text(encoding="utf-8").splitlines(),
+                ["@echo off", "rem existing"],
+            )
+            self.assertFalse((scripts_dir / "spec-dock.exe").exists())
+
+    def test_issue_69_windows_helper_synthesizes_cmd_wrapper_when_launcher_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = Path(tmp)
+            scripts_dir = venv_dir / "Scripts"
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            venv_python = scripts_dir / "python.exe"
+            venv_python.write_text("", encoding="utf-8")
+            expected_wrapper = scripts_dir / "spec-dock.cmd"
+
+            with patch("tests.test_init_update.os.name", "nt"):
+                resolved = self._issue_69_venv_spec_dock(venv_python)
+                ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+            self.assertEqual(resolved, expected_wrapper)
+            self.assertEqual(ensured, expected_wrapper)
+            self.assertTrue(expected_wrapper.is_file())
+            self.assertEqual(
+                expected_wrapper.read_text(encoding="utf-8").splitlines(),
+                ["@echo off", f"\"{venv_python}\" -m spec_dock.cli %*"],
+            )
+            self.assertFalse((scripts_dir / "spec-dock.exe").exists())
 
     def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
