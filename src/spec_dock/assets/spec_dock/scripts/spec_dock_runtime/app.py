@@ -185,6 +185,20 @@ def _find_specdock_dir() -> Path:
     raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' not found. Run 'uvx ... spec-dock init' first.")
 
 
+def _find_repo_root_for_legacy_doctor() -> Path:
+    """Locate a repo root that still contains only the legacy hidden workspace."""
+    cur = Path.cwd().resolve()
+    for _ in range(50):
+        legacy_dir = cur / ".spec-dock"
+        specdock_dir = cur / _SPEC_DOCK_DIRNAME
+        if legacy_dir.is_dir() and not specdock_dir.exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' not found. Run 'uvx ... spec-dock init' first.")
+
+
 def _initiatives_root(specdock_dir: Path) -> Path:
     """Return the spec tree root directory (`spec-dock/initiatives/`)."""
     return specdock_dir / _INITIATIVES_DIRNAME
@@ -2410,7 +2424,6 @@ def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns a process exit code (0=success)."""
     parsed_argv = sys.argv[1:] if argv is None else argv
     try:
-        specdock_dir = _find_specdock_dir()
         registry = _cli_build_registry()
         parser = _cli_build_parser(registry)
         try:
@@ -2418,7 +2431,15 @@ def main(argv: list[str] | None = None) -> int:
         except SystemExit as error:
             code = getattr(error, "code", 1)
             return int(code) if isinstance(code, int) else 1
-        runtime = _cli_build_runtime(specdock_dir)
+        try:
+            specdock_dir = _find_specdock_dir()
+            repo_root = specdock_dir.parent
+        except RuntimeError:
+            if getattr(ns, "command", None) != "doctor":
+                raise
+            repo_root = _find_repo_root_for_legacy_doctor()
+            specdock_dir = repo_root / _SPEC_DOCK_DIRNAME
+        runtime = _cli_build_runtime(specdock_dir, repo_root=repo_root)
         return _cli_dispatch(ns, registry, runtime.use_cases)
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)

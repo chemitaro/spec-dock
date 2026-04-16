@@ -2,6 +2,7 @@ import ast
 import io
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -597,6 +598,8 @@ class TestInitUpdate(CliRuntimeHarness):
     _ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV = "SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES"
     _ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV = "SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT"
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -628,8 +631,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
@@ -687,6 +694,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json": [
             "iss-00071"
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1239,14 +1248,100 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _issue_69_venv_spec_dock(self, venv_python: Path) -> Path:
         if os.name == "nt":
-            return venv_python.parent / "spec-dock.exe"
+            spec_dock_exe = venv_python.parent / "spec-dock.exe"
+            if spec_dock_exe.is_file():
+                return spec_dock_exe
+            spec_dock_cmd = venv_python.parent / "spec-dock.cmd"
+            if spec_dock_cmd.is_file():
+                return spec_dock_cmd
+            return spec_dock_cmd
         return venv_python.parent / "spec-dock"
+
+    def _issue_69_env_root(self, venv_python: Path) -> Path:
+        return venv_python.parent.parent
+
+    def _issue_69_site_packages_dir(self, env_root: Path) -> Path:
+        if os.name == "nt":
+            return env_root / "Lib" / "site-packages"
+        return env_root / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
 
     def _issue_69_runtime_env_without_checkout_fallback(self) -> dict[str, str]:
         env = os.environ.copy()
         env.pop("PYTHONPATH", None)
         env.pop("PYTHONHOME", None)
         return env
+
+    def _issue_69_install_target_packages(
+        self,
+        *,
+        target_dir: Path,
+        requirements: list[str],
+        wheelhouse: Path | None = None,
+    ) -> None:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        command = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-cache-dir",
+            "--target",
+            str(target_dir),
+        ]
+        if wheelhouse is not None:
+            command.extend(
+                [
+                    "--no-index",
+                    "--find-links",
+                    str(wheelhouse),
+                ]
+            )
+        command.extend(requirements)
+        self._issue_69_run_subprocess(command)
+
+    def _issue_69_create_fallback_runtime_env(self, env_root: Path) -> Path:
+        self.assertNotEqual(os.name, "nt", "issue-69 fallback runtime env is only implemented for POSIX")
+        bin_dir = env_root / "bin"
+        site_packages_dir = self._issue_69_site_packages_dir(env_root)
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        site_packages_dir.mkdir(parents=True, exist_ok=True)
+
+        python_wrapper = self._issue_69_venv_python(env_root)
+        python_wrapper.write_text(
+            "#!/bin/sh\n"
+            f"PYTHONPATH={shlex.quote(str(site_packages_dir))}${{PYTHONPATH:+:${{PYTHONPATH}}}} "
+            f"exec {shlex.quote(sys.executable)} \"$@\"\n",
+            encoding="utf-8",
+        )
+        python_wrapper.chmod(0o755)
+
+        spec_dock_wrapper = self._issue_69_venv_spec_dock(python_wrapper)
+        spec_dock_wrapper.write_text(
+            "#!/bin/sh\n"
+            f"exec {shlex.quote(str(python_wrapper))} -m spec_dock.cli \"$@\"\n",
+            encoding="utf-8",
+        )
+        spec_dock_wrapper.chmod(0o755)
+        return python_wrapper
+
+    def _issue_69_ensure_spec_dock_wrapper(self, venv_python: Path) -> Path:
+        spec_dock_wrapper = self._issue_69_venv_spec_dock(venv_python)
+        if spec_dock_wrapper.is_file():
+            return spec_dock_wrapper
+        if os.name == "nt":
+            spec_dock_wrapper.write_text(
+                "@echo off\r\n"
+                f"\"{venv_python}\" -m spec_dock.cli %*\r\n",
+                encoding="utf-8",
+            )
+        else:
+            spec_dock_wrapper.write_text(
+                "#!/bin/sh\n"
+                f"exec {shlex.quote(str(venv_python))} -m spec_dock.cli \"$@\"\n",
+                encoding="utf-8",
+            )
+            spec_dock_wrapper.chmod(0o755)
+        return spec_dock_wrapper
 
     def _issue_69_build_artifacts_with_local_wheelhouse(
         self,
@@ -1259,27 +1354,27 @@ class TestInitUpdate(CliRuntimeHarness):
     ) -> tuple[Path, Path, Path]:
         wheelhouse = self._issue_69_resolve_wheelhouse(repo_root)
         venv_dir = build_context.parent / "build-venv"
+        fallback_env_dir = build_context.parent / "build-wrapper-env"
         dist_dir = build_context.parent / "dist"
-
-        self._issue_69_run_subprocess([sys.executable, "-m", "venv", str(venv_dir)])
-        venv_python = self._issue_69_venv_python(venv_dir)
-        self.assertTrue(
-            venv_python.is_file(),
-            f"issue-69 expected venv python executable at: {venv_python}",
+        venv_result = subprocess.run(
+            [sys.executable, "-m", "venv", str(venv_dir)],
+            capture_output=True,
+            text=True,
+            check=False,
         )
+        if venv_result.returncode == 0:
+            venv_python = self._issue_69_venv_python(venv_dir)
+            self.assertTrue(
+                venv_python.is_file(),
+                f"issue-69 expected venv python executable at: {venv_python}",
+            )
+        else:
+            venv_python = self._issue_69_create_fallback_runtime_env(fallback_env_dir)
 
-        self._issue_69_run_subprocess(
-            [
-                str(venv_python),
-                "-m",
-                "pip",
-                "install",
-                "--no-index",
-                "--no-cache-dir",
-                "--find-links",
-                str(wheelhouse),
-                *self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS,
-            ]
+        self._issue_69_install_target_packages(
+            target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
+            requirements=list(self._ISSUE_69_BUILD_BACKEND_REQUIREMENTS),
+            wheelhouse=wheelhouse,
         )
 
         self._issue_69_run_subprocess(
@@ -1326,19 +1421,11 @@ class TestInitUpdate(CliRuntimeHarness):
             wheel_dir=wheel_dir,
             sdist_dir=sdist_dir,
         )
-        self._issue_69_run_subprocess(
-            [
-                str(venv_python),
-                "-m",
-                "pip",
-                "install",
-                "--no-index",
-                "--no-cache-dir",
-                "--no-deps",
-                str(wheel_path),
-            ],
-            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        self._issue_69_install_target_packages(
+            target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
+            requirements=[str(wheel_path)],
         )
+        self._issue_69_ensure_spec_dock_wrapper(venv_python)
         return venv_python
 
     def _issue_69_path_is_within(self, path: Path, root: Path) -> bool:
@@ -1833,6 +1920,64 @@ class TestInitUpdate(CliRuntimeHarness):
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
 
+    def test_issue_78_init_allows_install_when_legacy_hidden_workspace_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            legacy_dir = target / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            marker_path = legacy_dir / "legacy-marker.txt"
+            marker_path.write_text("legacy data\n", encoding="utf-8")
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(["init", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "spec-dock").is_dir())
+            self.assertTrue(legacy_dir.is_dir())
+            self.assertEqual(marker_path.read_text(encoding="utf-8"), "legacy data\n")
+            self.assertNotIn("Please rename it before installing", stderr.getvalue())
+
+    def test_issue_78_update_reports_manual_migration_guidance_without_rename(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".spec-dock").mkdir(parents=True, exist_ok=True)
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 1)
+            error_text = stderr.getvalue()
+            self.assertIn("'spec-dock' not found.", error_text)
+            self.assertIn("Legacy '.spec-dock' exists with an incompatible format.", error_text)
+            self.assertIn("Run 'spec-dock init'", error_text)
+            self.assertIn("migrate manually", error_text)
+            self.assertNotIn("Please rename it", error_text)
+            self.assertNotIn("mv .spec-dock spec-dock", error_text)
+
+    def test_issue_78_update_keeps_legacy_hidden_workspace_untouched_during_coexistence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            current_dir = target / "spec-dock"
+            legacy_dir = target / ".spec-dock"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            marker_path = legacy_dir / "legacy-marker.txt"
+            marker_path.write_text("legacy data\n", encoding="utf-8")
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(["update", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(current_dir.is_dir())
+            self.assertTrue(legacy_dir.is_dir())
+            self.assertEqual(marker_path.read_text(encoding="utf-8"), "legacy data\n")
+            self.assertNotIn("Please rename it", stderr.getvalue())
+            self.assertNotIn("mv .spec-dock spec-dock", stderr.getvalue())
+
     def test_init_does_not_seed_legacy_node_deps_json_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -2115,6 +2260,7 @@ class TestInitUpdate(CliRuntimeHarness):
             temp_root = Path(tmp)
             build_context = temp_root / "build-context"
             wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
 
             build_context.mkdir()
             shutil.copy2(repo_root / "pyproject.toml", build_context / "pyproject.toml")
@@ -2132,32 +2278,14 @@ class TestInitUpdate(CliRuntimeHarness):
                 stale_path.parent.mkdir(parents=True, exist_ok=True)
                 stale_path.write_text("stale wrapper-era artifact\n", encoding="utf-8")
 
-            build_result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "wheel",
-                    "--no-deps",
-                    "--wheel-dir",
-                    str(wheel_dir),
-                    str(build_context),
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(
-                build_result.returncode,
-                0,
-                "expected local wheel build to succeed:\n"
-                f"STDOUT:\n{build_result.stdout}\nSTDERR:\n{build_result.stderr}",
+            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
             )
 
-            wheel_paths = list(wheel_dir.glob("*.whl"))
-            self.assertEqual(len(wheel_paths), 1, f"expected one wheel, got: {wheel_paths}")
-
-            with zipfile.ZipFile(wheel_paths[0]) as wheel_zip:
+            with zipfile.ZipFile(wheel_path) as wheel_zip:
                 wheel_entries = set(wheel_zip.namelist())
 
             self.assertIn(
@@ -2320,6 +2448,70 @@ class TestInitUpdate(CliRuntimeHarness):
                 snapshot=snapshot,
                 repo_root=repo_root,
             )
+
+    def test_issue_69_windows_helper_prefers_existing_exe_launcher(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = Path(tmp)
+            scripts_dir = venv_dir / "Scripts"
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            venv_python = scripts_dir / "python.exe"
+            venv_python.write_text("", encoding="utf-8")
+            spec_dock_exe = scripts_dir / "spec-dock.exe"
+            spec_dock_exe.write_text("", encoding="utf-8")
+            spec_dock_cmd = scripts_dir / "spec-dock.cmd"
+            spec_dock_cmd.write_text("@echo off\r\n", encoding="utf-8")
+
+            with patch("tests.test_init_update.os.name", "nt"):
+                resolved = self._issue_69_venv_spec_dock(venv_python)
+                ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+            self.assertEqual(resolved, spec_dock_exe)
+            self.assertEqual(ensured, spec_dock_exe)
+            self.assertEqual(spec_dock_exe.read_text(encoding="utf-8"), "")
+
+    def test_issue_69_windows_helper_prefers_existing_cmd_launcher_when_exe_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = Path(tmp)
+            scripts_dir = venv_dir / "Scripts"
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            venv_python = scripts_dir / "python.exe"
+            venv_python.write_text("", encoding="utf-8")
+            spec_dock_cmd = scripts_dir / "spec-dock.cmd"
+            spec_dock_cmd.write_text("@echo off\r\nrem existing\r\n", encoding="utf-8")
+
+            with patch("tests.test_init_update.os.name", "nt"):
+                resolved = self._issue_69_venv_spec_dock(venv_python)
+                ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+            self.assertEqual(resolved, spec_dock_cmd)
+            self.assertEqual(ensured, spec_dock_cmd)
+            self.assertEqual(
+                spec_dock_cmd.read_text(encoding="utf-8").splitlines(),
+                ["@echo off", "rem existing"],
+            )
+            self.assertFalse((scripts_dir / "spec-dock.exe").exists())
+
+    def test_issue_69_windows_helper_synthesizes_cmd_wrapper_when_launcher_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = Path(tmp)
+            scripts_dir = venv_dir / "Scripts"
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            venv_python = scripts_dir / "python.exe"
+            venv_python.write_text("", encoding="utf-8")
+            expected_wrapper = scripts_dir / "spec-dock.cmd"
+
+            with patch("tests.test_init_update.os.name", "nt"):
+                resolved = self._issue_69_venv_spec_dock(venv_python)
+                ensured = self._issue_69_ensure_spec_dock_wrapper(venv_python)
+
+            self.assertEqual(resolved, expected_wrapper)
+            self.assertEqual(ensured, expected_wrapper)
+            self.assertTrue(expected_wrapper.is_file())
+            self.assertEqual(
+                expected_wrapper.read_text(encoding="utf-8").splitlines(),
+                ["@echo off", f"\"{venv_python}\" -m spec_dock.cli %*"],
+            )
+            self.assertFalse((scripts_dir / "spec-dock.exe").exists())
 
     def test_issue_69_local_and_installed_handoff_surface_inventories_match(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -11446,7 +11638,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
                 dst_path = Path(dst)
-                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
                 original_symlink(src, dst, *args, **kwargs)
 
@@ -11503,7 +11695,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
                 dst_path = Path(dst)
-                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
                 original_symlink(src, dst, *args, **kwargs)
 
@@ -11583,7 +11775,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
                 dst_path = Path(dst)
-                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
                 original_symlink(src, dst, *args, **kwargs)
 
@@ -11658,7 +11850,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
 
             def _fail_active_symlink(src: str | bytes, dst: str | bytes, *args, **kwargs) -> None:
                 dst_path = Path(dst)
-                if dst_path.parent == active_dir and dst_path.name in {"initiative", "epic", "issue"}:
+                if dst_path.parent.resolve() == active_dir.resolve() and dst_path.name in {"initiative", "epic", "issue"}:
                     raise OSError("simulated active symlink failure")
                 original_symlink(src, dst, *args, **kwargs)
 
