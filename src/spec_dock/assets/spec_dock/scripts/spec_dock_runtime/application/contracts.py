@@ -45,6 +45,7 @@ class DoctorFinding:
         "broken_meta",
         "stale_active_pointer",
         "stale_create_lock",
+        "legacy_only_workspace",
         "validation_error",
     ]
     message: str
