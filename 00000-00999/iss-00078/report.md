@@ -164,5 +164,83 @@ failure buckets:
 - `tests.test_init_update` の network / ensurepip / active pathfile 系 failure は別 issue で baseline 安定化すると、今後の full validation gate が扱いやすくなる。
 - `tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13.test_target_local_metadata_load_failure_uses_error_path_when_directory_match_is_ambiguous` は単独で再現するため、delete path の error handling 契約として個別 issue 化を検討するとよい。
 
+---
+
+### 2026-04-16 00:30 - 01:30
+
+#### 対象
+- Step: PR-81 investigation
+- AC/EC: PR review 指摘と GitHub Actions failure の事実確認
+
+#### 実施内容
+- PR `#81 feat(spec-dock): legacy hidden workspaceの共存移行を実装` の review 状況、status checks、Actions failure log を取得した。
+- review 指摘は `copilot-pull-request-reviewer` の inline comments 10 件に集約されていることを確認した。
+- CI/CD failure は `validate` ではなく `provider-tests` のみで、GitHub Actions 上では full suite 全体が崩れているのではなく 1 failure のみで落ちていることを確認した。
+- 失敗 1 件は `tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` で、checked-in dogfooding snapshot expectation と実際の `.meta.json` path 集合の不整合に起因していた。
+
+#### 実行コマンド / 結果
+```bash
+gh pr view 81 --repo chemitaro/spec-dock \
+  --json number,title,state,mergeStateStatus,headRefOid,reviews,statusCheckRollup
+gh pr view 81 --repo chemitaro/spec-dock --comments
+gh api repos/chemitaro/spec-dock/pulls/81/comments
+gh run list --repo chemitaro/spec-dock --limit 10 \
+  --json databaseId,workflowName,event,status,conclusion,headSha,displayTitle
+gh run view 24484241847 --repo chemitaro/spec-dock --log-failed
+
+PR summary:
+- state: OPEN
+- mergeStateStatus: UNSTABLE
+- head SHA: 5eb330a5eee6199277d8f102c4afeac5b9cf26c3
+
+status checks:
+- CI / validate: SUCCESS
+- Provider CI / provider-tests: FAILURE
+
+review summary:
+- reviewer: copilot-pull-request-reviewer
+- verdict: COMMENTED
+- generated comments: 10
+
+Provider CI failure summary:
+- workflow: Provider CI
+- run id: 24484241847
+- suite result: Ran 741 tests in 345.414s / FAILED (failures=1)
+- failing test:
+  - tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+- failure cause:
+  - `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` の snapshot 期待値と、
+    checked-in initiatives 配下に実在する `.meta.json` paths の集合が一致していない
+  - 新規追加した `init-00079` / `epic-00080` 系 path が snapshot expectation に正しく反映されていない可能性が高い
+```
+
+#### レビュー指摘の整理
+- A. front matter 正規化指摘
+  - initiative / epic の新規 doc 群に対して、`状態: "draft | approved"` のような union placeholder を残している点が繰り返し指摘された。
+  - 主な対象:
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/requirement.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/design.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/plan.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/report.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/requirement.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/design.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/plan.md`
+    - `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/report.md`
+    - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/report.md`
+- B. wording / readability 指摘
+  - `src/spec_dock/cli.py` の manual migration guidance message で、文中の sentence 開始が `Legacy` ではなく小文字 `legacy` になっているため、可読性観点の軽微指摘が 1 件入っている。
+
+#### 分析
+- PR review の大半は実装ロジックの欠陥ではなく、checked-in docs の front matter hygiene に関する反復指摘だった。
+- GitHub Actions で実際に failing なのは `provider-tests` の 1 件だけで、以前ローカル環境で観測した `22 failures / 1 error` とは状況が異なる。
+- したがって PR #81 の blocking items は、現時点では次の 2 点に要約できる。
+- 1. doc front matter の正規化不足
+- 2. `tests/test_init_update.py` の checked-in dogfooding snapshot expectation と repo 実体の不整合
+
+#### 推奨アクション
+- `init-00079` / `epic-00080` と関連 report の front matter `状態` を placeholder から単一値へ正規化する。
+- `tests/test_init_update.py` の `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` を現行 checked-in nodes と再同期し、CI の failing snapshot test を green に戻す。
+- その後に PR #81 の `provider-tests` を再実行し、残る review comments の解消有無を再確認する。
+
 ## 省略/例外メモ (必須)
 - `tests.test_init_update` full suite の unresolved failures は issue-78 の変更範囲外として今回の close criteria から除外し、targeted validation + reviewer pass を最終 gate とした。

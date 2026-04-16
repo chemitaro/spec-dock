@@ -2,7 +2,7 @@
 種別: レポート（Initiative）
 ID: "init-00079"
 タイトル: "minor bugfix maintenance"
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-04-16"
 依存: ["requirement.md", "design.md", "plan.md"]

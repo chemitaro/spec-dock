@@ -2,7 +2,7 @@
 種別: レポート（Epic）
 ID: "epic-00077"
 タイトル: "Legacy hidden workspace coexistence and migration"
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-04-15"
 依存: ["requirement.md", "design.md", "plan.md"]
