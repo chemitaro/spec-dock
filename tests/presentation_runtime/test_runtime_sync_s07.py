@@ -3169,7 +3169,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
         runtime_app._find_specdock_dir = lambda: Path("/repo/spec-dock")
         self.assertFalse(hasattr(runtime_app, "_sync"))
         try:
-            runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
+            runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(
                 use_cases=_build_use_cases(
                     lambda _req: app_contracts.SyncCommandResult(
                         state=delegated_state,
@@ -3185,7 +3185,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
                 exit_code_ok = runtime_app.main(["sync"])
             self.assertEqual(exit_code_ok, 0)
 
-            runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
+            runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(
                 use_cases=_build_use_cases(
                     lambda _req: app_contracts.SyncCommandResult(
                         state=app_contracts.SyncStateResult(
@@ -3212,7 +3212,7 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertEqual(exit_code_warn, 0)
             self.assertIn("adr_mirror_symlink_unsupported", err.getvalue())
 
-            runtime_app._cli_build_runtime = lambda _specdock_dir: SimpleNamespace(
+            runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(
                 use_cases=_build_use_cases(lambda _req: (_ for _ in ()).throw(RuntimeError("sync failed")))
             )
             out = io.StringIO()

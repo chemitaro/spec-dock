@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import time
@@ -902,6 +903,29 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         self.assertIn("spec-dock: (warn) legacy '.spec-dock/' is still present.", stderr_text)
         self.assertNotIn("legacy_cleanup_pending", stderr_text)
 
+    def test_issue_78_main_doctor_reaches_legacy_only_workspace_guidance(self) -> None:
+        runtime_app, _app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
+        original_cwd = Path.cwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                (repo_root / ".spec-dock").mkdir(parents=True, exist_ok=True)
+                os.chdir(repo_root)
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    exit_code = runtime_app.main(["doctor"])
+        finally:
+            os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        stderr_text = stderr.getvalue()
+        self.assertIn("spec-dock: doctor: findings=1", stderr_text)
+        self.assertIn("[legacy_only_workspace]", stderr_text)
+        self.assertIn("Do not rename '.spec-dock'", stderr_text)
+        self.assertIn("spec-dock init", stderr_text)
+
     def test_main_doctor_delegates_to_use_case(self) -> None:
         runtime_app, app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
         from spec_dock_runtime.cli import bootstrap as cli_bootstrap
@@ -935,6 +959,24 @@ class TestRuntimeDoctorS04(unittest.TestCase):
         self.assertIn("spec-dock: doctor: findings=1", stderr_text)
         self.assertIn("[missing_artifact]", stderr_text)
         self.assertIn("  -> 復元してください。", stderr_text)
+
+    def test_issue_78_main_doctor_keeps_not_found_when_no_workspace_exists(self) -> None:
+        runtime_app, _app_contracts, _app_doctor, _app_ports, _infra_contracts = _runtime_modules()
+        original_cwd = Path.cwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                os.chdir(repo_root)
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    exit_code = runtime_app.main(["doctor"])
+        finally:
+            os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("'spec-dock' not found. Run 'uvx ... spec-dock init' first.", stderr.getvalue())
 
 
 if __name__ == "__main__":
