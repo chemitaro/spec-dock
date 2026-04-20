@@ -205,3 +205,40 @@ focus:
 
 #### メモ
 - SG1 final re-review の `review_status=pass` をもって、issue docs は実装着手可能な spec と判断する
+
+### 2026-04-20 16:00 - 16:20
+
+#### 対象
+- Step: S02/S03 implementation and targeted verification
+- AC/EC: AC-001, AC-002, AC-003, EC-001, EC-002
+
+#### 実施内容
+- `load_node_records()` の silent skip を廃止し、`.meta.json` の `type` / `id` が `missing / blank / whitespace-only / non-string` の場合は RuntimeError で fail-fast するよう変更した。
+- provider-side source of truth と checked-in dogfooding mirror の `fs_repo.py` を同一 contract に揃えた。
+- CLI validate の回帰テストを追加し、required identity fields の異常値 8 ケースで `Invalid .meta.json` と `meta_path` が stderr に出ることを固定した。
+- 既存の invalid-object validate ケースと、doctor の `broken_meta` 分類回帰も再実行して壊していないことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest -v tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_missing_or_invalid_required_meta_identity_fields
+ok
+
+python -m unittest -v tests.cli_runtime.test_validate.TestCliValidate.test_validate_reports_invalid_meta_json_shape
+ok
+
+python -m unittest -v tests.cli_runtime.test_runtime_doctor_s04.TestRuntimeDoctorS04.test_doctor_detects_broken_meta_when_reader_fails
+ok
+```
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` - required `type` / `id` を non-empty string contract として fail-fast 化
+- `spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py` - dogfooding mirror を parity 更新
+- `tests/cli_runtime/test_validate.py` - malformed identity field の targeted CLI regression を追加
+- `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/report.md` - 実装と verification evidence を追記
+
+#### コミット
+- なし
+
+#### メモ
+- error wording は `Invalid .meta.json` を維持しつつ `field=<name>` と `meta_path` を含める形にした
+- doctor 側は `.meta.json` を含む RuntimeError を `broken_meta` として既存どおり分類できている
