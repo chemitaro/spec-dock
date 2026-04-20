@@ -600,6 +600,7 @@ class TestInitUpdate(CliRuntimeHarness):
     _CHECKED_IN_DOGFOODING_META_JSON_PATHS = (
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -637,6 +638,7 @@ class TestInitUpdate(CliRuntimeHarness):
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
