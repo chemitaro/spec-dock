@@ -242,3 +242,63 @@ ok
 #### メモ
 - error wording は `Invalid .meta.json` を維持しつつ `field=<name>` と `meta_path` を含める形にした
 - doctor 側は `.meta.json` を含む RuntimeError を `broken_meta` として既存どおり分類できている
+
+### 2026-04-20 16:20 - 16:55
+
+#### 対象
+- Step: S99 final validation and review closure
+- AC/EC: AC-001, AC-002, AC-003, AC-004, EC-002, EC-003
+
+#### 実施内容
+- `python -m unittest discover -v` をフルで実行し、suite 全体が `exit code 0` で完走することを確認した。
+- code reviewer と QA reviewer を実行し、どちらも `pass` を確認した。
+- QA reviewer からは、`infra/fs_repo.py` mirror parity を将来的に自動ガードするとより安全、という P2 提案が 1 件あったが、blocking finding はなかった。
+- `manual-tests/workspaces/2026-04-20-iss-00082-fail-fast-manual/trial-local/repo` に real manual workspace を作成し、baseline `validate` / `doctor` pass、`type` 欠落時の fail-fast、修復後の green 復帰まで手動で確認した。
+- manual workspace が親 Git repo の scope を拾って temporary GitHub issue `#84` を作成したため、manual validation 後に close して後始末した。
+- closure evidence を揃えた上で commit `91d5d36b26a70a3c5e49cd1217c9cee01bc83e3b` を作成した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+exit code 0
+
+code-reviewer
+review_status=pass
+findings=[]
+
+qa-reviewer
+review_status=pass
+findings=[P2 non-blocking parity guard suggestion]
+
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=1
+
+# remove "type" from the manual workspace .meta.json
+./spec-dock/scripts/spec-dock validate
+error: Invalid .meta.json (required non-empty string field=type): .../.meta.json
+
+./spec-dock/scripts/spec-dock doctor
+spec-dock: doctor: findings=1
+- [broken_meta] Invalid .meta.json (required non-empty string field=type): .../.meta.json
+
+# restore the file
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=1
+
+./spec-dock/scripts/spec-dock doctor
+spec-dock: ok (doctor) findings=0
+
+gh issue close 84 --comment 'manual test workspace for iss-00082; closing temporary validation issue'
+✓ Closed issue chemitaro/spec-dock#84 (Manual fail fast initiative)
+```
+
+#### 変更したファイル
+- `spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00082-fail-fast-on-malformed-node-metadata/report.md` - final validation / review / manual test closure evidence を追記
+
+#### コミット
+- `91d5d36b26a70a3c5e49cd1217c9cee01bc83e3b` - `fix(runtime): malformed node metadata を fail-fast 化`
+
+#### メモ
+- manual test docs は ignore 配下のため repo commit には含めていないが、以下へ保存した
+- `manual-tests/reports/2026-04-20-iss-00082-fail-fast-manual/{plan,checklist,execution-log,summary}.md`
+- `manual-tests/workspaces/2026-04-20-iss-00082-fail-fast-manual/trial-local/repo`
