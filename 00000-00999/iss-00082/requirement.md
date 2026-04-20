@@ -22,7 +22,7 @@ ID: "iss-00082"
   - malformed node が fail せず読み飛ばされるため、maintainer は metadata corruption に気づけないまま partial graph を扱ってしまう。
   - PR review では、この silent skip が node integrity contract を壊す P1 として指摘されている。
 - 再現手順:
-  1. node directory の `.meta.json` の `type` または `id` を欠落、空文字、空白のみ、または非文字列値にする。
+  1. node directory の `.meta.json` の `type` または `id` を欠落、空文字、または空白のみの文字列にする。
   2. graph load / repo read path から `load_node_records()` を通す。
   3. 現状は RuntimeError にならず、その node だけ読み飛ばされる。
 - 観測点:
