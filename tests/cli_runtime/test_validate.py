@@ -17,6 +17,50 @@ from tests.cli_runtime.harness import (
 
 
 class TestCliValidate(CliRuntimeHarness):
+    def test_validate_rejects_missing_or_invalid_required_meta_identity_fields(self) -> None:
+        cases = (
+            ("type", None, "field=type"),
+            ("type", "", "field=type"),
+            ("type", "   ", "field=type"),
+            ("type", 123, "field=type"),
+            ("id", None, "field=id"),
+            ("id", "", "field=id"),
+            ("id", "   ", "field=id"),
+            ("id", 123, "field=id"),
+        )
+
+        for field, value, expected in cases:
+            with self.subTest(field=field, value=value):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+
+                    self._create_same_repo_linked_hierarchy(target)
+
+                    issue_meta = (
+                        target
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001-auth-platform"
+                        / "epics"
+                        / "epic-00002-jwt-auth"
+                        / "issues"
+                        / "iss-00003-add-refresh-token"
+                        / ".meta.json"
+                    )
+                    meta = json.loads(issue_meta.read_text(encoding="utf-8"))
+                    if value is None:
+                        meta.pop(field, None)
+                    else:
+                        meta[field] = value
+                    self._write_json_force(issue_meta, meta)
+
+                    p = self._run_runtime_capture(target, ["validate"])
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Invalid .meta.json", p.stderr)
+                    self.assertIn(expected, p.stderr)
+                    self.assertIn(str(issue_meta), p.stderr)
+
     def test_validate_detects_broken_parent_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
