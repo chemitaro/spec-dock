@@ -319,6 +319,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/config.toml",
         ".codex/agents/code-reviewer.toml",
         ".codex/agents/consultant.toml",
+        ".codex/agents/deep-consultant.toml",
         ".codex/agents/default.toml",
         ".codex/agents/dev-coder.toml",
         ".codex/agents/doc-writer.toml",
@@ -370,6 +371,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/agents/": (
             ".codex/agents/code-reviewer.toml",
             ".codex/agents/consultant.toml",
+            ".codex/agents/deep-consultant.toml",
             ".codex/agents/default.toml",
             ".codex/agents/dev-coder.toml",
             ".codex/agents/doc-writer.toml",
@@ -515,6 +517,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.agents/host-adapters/meta.json",
         "spec_dock/assets/install_root/.codex/agents/code-reviewer.toml",
         "spec_dock/assets/install_root/.codex/agents/consultant.toml",
+        "spec_dock/assets/install_root/.codex/agents/deep-consultant.toml",
         "spec_dock/assets/install_root/.codex/agents/default.toml",
         "spec_dock/assets/install_root/.codex/agents/dev-coder.toml",
         "spec_dock/assets/install_root/.codex/agents/doc-writer.toml",
