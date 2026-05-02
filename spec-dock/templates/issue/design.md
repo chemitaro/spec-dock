@@ -12,6 +12,14 @@ ID: "<ISS_ID>"
 
 # <ISS_ID> <ISS_TITLE> — 設計（HOW）
 
+## Parent Diagram References
+- Epic diagrams:
+  - ...
+- Initiative diagrams:
+  - ...
+- reused decisions:
+  - ...
+
 ## 目的・制約
 - 目的:
   - ...
@@ -52,12 +60,24 @@ ID: "<ISS_ID>"
 - sequencing implications:
   - plan では upstream / prerequisite から順に step を組む
 
-### UML（必須: module / dependency）
+## Local Diagram Delta
+- Question answered:
+  - ...
+- Scope:
+  - ...
+- Excluded details:
+  - ...
+- Update trigger:
+  - ...
+- Diagram:
+  - N/A: reason
+
+### UML（必要時: local diagram delta / package delta）
 ```plantuml
 @startuml
 top to bottom direction
-' overwrite this placeholder with the actual module/dependency diagram
-' place prerequisite / lower-dependency modules above, and dependent modules below
+' show only the changed boundary, responsibility, dependency, or interaction
+' do not copy Initiative/Epic diagrams
 
 rectangle "replace-with-module-a" as A
 rectangle "replace-with-module-b" as B
@@ -68,6 +88,36 @@ A --> B : depends_on
 ## インターフェース契約
 - API / function / protocol / data boundary:
   - ...
+
+## Sequence Delta（必要時）
+- changed interaction:
+  - N/A: reason
+- retry / transaction / external API / queue:
+  - ...
+
+### UML（任意: sequence delta）
+```plantuml
+@startuml
+' sequence delta diagram
+@enduml
+```
+
+## Domain Model Delta（必要時）
+- parent model refs:
+  - ...
+- aggregate / entity / value object changes:
+  - N/A: reason
+- domain event / policy / specification changes:
+  - ...
+- invariant changes:
+  - ...
+
+### UML（任意: domain model delta）
+```plantuml
+@startuml
+' domain model delta diagram
+@enduml
+```
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:

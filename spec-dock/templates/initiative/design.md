@@ -20,6 +20,16 @@ ID: "<INIT_ID>"
 - To-Be:
   - ...
 
+## System Context
+- Question answered:
+  - ...
+- Scope:
+  - ...
+- Excluded details:
+  - ...
+- Update trigger:
+  - ...
+
 ### UML（推奨: system context / target-state overview）
 ```plantuml
 @startuml
@@ -37,6 +47,28 @@ Rel(user, system, "Uses")
 Rel(system, external, "Depends on")
 @enduml
 ```
+
+## ドメイン境界 / ユビキタス言語（必要時）
+- bounded context / domain area:
+  - ...
+- core / supporting / generic domain:
+  - ...
+- key domain terms:
+  - ...
+- cross-epic actor-goal overview:
+  - N/A: reason
+
+## Container Overview（必要時）
+- Question answered:
+  - ...
+- Scope:
+  - ...
+- Excluded details:
+  - ...
+- Update trigger:
+  - ...
+- UML:
+  - N/A: reason
 
 ## 対象境界 / 依存
 - in scope:

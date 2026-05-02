@@ -19,11 +19,59 @@ ID: "<EPIC_ID>"
   - ...
 - existing relation:
   - ...
+- parent diagrams referenced:
+  - ...
 
-### UML（推奨: module / context）
+## Component / Module View
+- Question answered:
+  - ...
+- Scope:
+  - ...
+- Excluded details:
+  - ...
+- Update trigger:
+  - ...
+
+### UML（推奨: component / module）
 ```plantuml
 @startuml
-' module / context diagram
+' component / module diagram
+@enduml
+```
+
+## Package Dependency
+- Question answered:
+  - ...
+- Scope:
+  - ...
+- Excluded details:
+  - ...
+- Update trigger:
+  - ...
+
+### UML（推奨: package dependency）
+```plantuml
+@startuml
+' package dependency diagram
+@enduml
+```
+
+## Domain Model（DDD 必要時）
+- ubiquitous language refs:
+  - ...
+- aggregate root:
+  - ...
+- entity / value object:
+  - ...
+- domain event / policy / specification:
+  - ...
+- invariants:
+  - ...
+
+### UML（任意: domain model / aggregate）
+```plantuml
+@startuml
+' domain model / aggregate diagram
 @enduml
 ```
 
@@ -67,10 +115,23 @@ ID: "<EPIC_ID>"
 - Flow-B:
   - ...
 
-### UML（任意: sequence / flow）
+### UML（推奨: main sequence）
 ```plantuml
 @startuml
-' sequence / flow diagram
+' main sequence diagram
+@enduml
+```
+
+## State / Activity（必要時）
+- State:
+  - N/A: reason
+- Activity:
+  - N/A: reason
+
+### UML（任意: state / activity）
+```plantuml
+@startuml
+' state or activity diagram
 @enduml
 ```
 

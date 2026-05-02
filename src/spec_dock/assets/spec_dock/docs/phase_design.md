@@ -22,19 +22,19 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 
 - Initiative design:
   - 所有する判断:
-    - system context、architecture policy、cross-cutting constraint、target-state、Epic が守る guardrail
+    - system context、architecture policy、cross-cutting constraint、target-state、bounded context / ubiquitous language、Epic が守る guardrail
   - 所有しない判断:
-    - Issue-level class / function / file design、実装順序
+    - Issue-level class / function / file design、局所 sequence、実装順序
 - Epic design:
   - 所有する判断:
-    - 複数 Issue が共有する boundary、responsibility、data flow、failure / migration strategy、ADR 分離基準
+    - 複数 Issue が共有する boundary、responsibility、data flow、domain model / aggregate、failure / migration strategy、ADR 分離基準
   - 所有しない判断:
     - Issue 内だけで閉じる細かな実装手順や局所 refactor
 - Issue design:
   - 所有する判断:
-    - 局所構造、既存 pattern の採否、interface contract、dependency direction、test strategy、rollback / compatibility
+    - 局所構造、既存 pattern の採否、interface contract、dependency direction、domain model delta、test strategy、rollback / compatibility
   - 所有しない判断:
-    - Red / Green / Refactor の作業手順、commit / review の運用順序
+    - 親 design の再定義、Red / Green / Refactor の作業手順、commit / review の運用順序
 - ADR rule:
   - 長寿命・横断的・不可逆寄りの判断は ADR / decision log に分離する
   - 局所的で可逆な判断は対象 scope の design に置く
@@ -71,18 +71,133 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 既存の責務分割
   - 現在の入出力契約
   - データ境界と SoR
+  - domain vocabulary / bounded context / invariant
   - upstream / downstream / prerequisite の依存関係
   - 依存の少ない実装起点
   - 既存テストの守備範囲
   - 移行 / 運用 / 監視で壊しうる点
 - 本文には採用結論と guardrails を残し、長い比較や生の調査ログは `discussions/` へ逃がす
-- UML は用途付き placeholder だけを残す
-- initiative では高レベル図を 1 箇所まで、epic / issue では module / context や class / interface の置き場を明示する
-- issue design では module / dependency UML を省略せず、依存方向と実装起点が読めるようにする
+- UML / PlantUML は、人間が誤読しやすい構造・境界・責務・流れ・状態・依存を可視化する用途で使う
+- 図は本文の代替ではなく、本文で固定した設計判断を視覚的に検証する補助資料にする
+- 図を置かない場合も、期待される図が不要な理由を `N/A: reason` として残す
 - 先に埋める節:
-  - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
-  - Epic: `全体像`, `契約`, `データモデル`, `主要フロー`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
-  - Issue: `既存実装 / 規約の理解`, `依存関係分析`, `インターフェース契約`, `採用方針 / トレードオフ`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
+  - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `System Context`, `ドメイン境界 / ユビキタス言語`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
+  - Epic: `全体像`, `Component / Module View`, `Package Dependency`, `Domain Model（DDD 必要時）`, `契約`, `データモデル`, `主要フロー`, `State / Activity（必要時）`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
+  - Issue: `Parent Diagram References`, `既存実装 / 規約の理解`, `依存関係分析`, `Local Diagram Delta`, `インターフェース契約`, `Sequence Delta（必要時）`, `Domain Model Delta（必要時）`, `採用方針 / トレードオフ`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
+
+## PlantUML / UML usage policy
+
+- Markdown preview compatibility:
+  - PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う
+  - C4 Context が必要な場合は `!include C4_Context.puml` を明示する
+  - `c4plantuml` fence は VS Code Markdown preview 互換性のため使わない
+  - remote include は原則避け、利用する場合は理由と render 環境を明記する
+- Diagram metadata:
+  - すべての図は `Question answered`, `Scope`, `Excluded details`, `Update trigger` を持つ
+  - 図の直後か直前に、その図で固定する設計判断を本文で説明する
+  - 図だけにしか存在しない設計判断を残さない
+- Relationship rules:
+  - arrow は意味ラベルを持つ
+  - `dependency`, `data flow`, `runtime call`, `ownership`, `publishes`, `implements` を曖昧にしない
+  - 外部 actor / external system / out of scope component は境界外として分かるようにする
+- Diagram budget:
+  - Initiative / Epic は 1-3 図を目安にする
+  - Issue は 0-2 図を目安にし、親 design の図を再掲しない
+  - 図が増えすぎる場合は、親 scope への昇格、`discussions/` への分離、または低価値図の削除を検討する
+- Avoid:
+  - exhaustive class / file / method diagram
+  - 実装作業順序だけを表す plan 相当の図
+  - requirement の価値説明だけを表す図
+  - すぐ古くなる generated call graph
+
+## diagram selection rules
+
+- Initiative:
+  - 標準:
+    - C4 System Context
+  - DDD 採用時:
+    - Bounded Context Map
+    - Ubiquitous Language table
+  - 必要時:
+    - C4 Container
+    - C4 Deployment
+    - Activity / State for central lifecycle or business process
+    - Use Case for actor-goal clarification
+  - 避ける:
+    - detailed class diagram
+    - object diagram
+    - issue-level sequence diagram
+    - exhaustive component diagram
+- Epic:
+  - 主戦場:
+    - Component / Module View
+    - Package Dependency
+    - Domain Model / Aggregate
+    - Main Sequence
+  - required when applicable:
+    - State diagram if lifecycle exists
+    - Activity diagram if workflow has complex branching
+    - C4 Dynamic / sequence if multiple C4 elements collaborate in a non-trivial runtime flow
+  - 必要時:
+    - Object diagram for concrete invariant examples
+    - Deployment diagram for infra-impacting epics
+  - 避ける:
+    - 親 System Context の再掲
+    - 変更のない full Container architecture
+    - exhaustive generated-code class diagram
+- Issue:
+  - default:
+    - 図は必須ではない
+  - required when applicable:
+    - Sequence Delta if crossing components, transactions, queues, external APIs, or retries
+    - State Delta if changing lifecycle
+    - Domain Model Delta if changing aggregate, entity, value object, domain event, policy, or specification
+    - Package Delta if changing dependency direction
+  - 避ける:
+    - System Context
+    - full Container diagram
+    - full Domain Model
+    - full Deployment diagram
+
+## DDD diagram guidance
+
+- Initiative:
+  - bounded context、core / supporting / generic domain、ubiquitous language の境界を扱う
+  - 同じ語が context によって異なる意味を持つ場合は、context map と用語表で分ける
+  - aggregate / entity / value object の詳細は原則 Epic へ降ろす
+- Epic:
+  - aggregate root、entity、value object、domain event、policy / specification、invariant の共有モデルを固定する
+  - domain event は過去形の名前にし、internal domain event と integration event を必要時に区別する
+  - repository は domain behavior ではなく port / contract として扱う
+- Issue:
+  - 親 Epic の domain model を参照し、変える aggregate / entity / value object / event / policy の差分だけを書く
+  - full domain model を再掲しない
+  - invariant や ownership を誤解しやすい場合だけ object diagram で具体例を補う
+
+## UML review gate
+
+- Diagram necessity:
+  - 図が named design question に答えている
+  - 図の owner level が Initiative / Epic / Issue のどれか明確
+  - 図数が budget 内にある
+  - 親文書が所有する情報を重複していない
+  - 期待される図を省略した場合は `N/A: reason` がある
+- Diagram correctness:
+  - `plantuml` block が `@startuml` / `@enduml` を持つ
+  - 図種が目的に合っている
+  - title / scope / update trigger がある
+  - stereotype、色、線種、icon を使う場合は凡例がある
+  - element は名前と責務を持つ
+  - relationship arrow は意味ラベルを持つ
+  - 本文の用語、責務、依存方向と矛盾していない
+- UML-specific gate:
+  - Use Case は actor-goal を表し、内部実装を表さない
+  - Class / Domain Model は概念・責務・関係を表し、生成コード inventory にしない
+  - Package は compile-time / source dependency を表し、runtime call と混ぜない
+  - Sequence は meaningful participants と messages を持つ
+  - Activity は decision-heavy / parallel workflow に限定する
+  - State は event、guard、terminal state を必要時に含む
+  - ER / DB schema は永続化設計であり、domain model の代替にしない
 
 ## diagram guidance
 
