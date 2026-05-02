@@ -7,6 +7,7 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 - Use this as the entry/routing skill for spec-dock work.
 - Keep `spec-dock/docs/` as the source of truth; skills stay concise.
+- Keep templates as authoring scaffolds; put spec authoring rules and workflow explanations in `spec-dock/docs/` and route through these skills.
 - Route once the main output is clear; leaf skills own the workflow details.
 
 ## Route to leaf skills
@@ -22,6 +23,8 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 - `spec-dock/docs/reference_deps.md`
 - `spec-dock/docs/reference_sync.md`
 - `spec-dock/docs/reference_naming.md`
+- `spec-dock/docs/phase_design.md`
+- `spec-dock/docs/phase_plan_issue.md`
 
 ## Quick reminders
 

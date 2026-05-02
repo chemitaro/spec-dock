@@ -27,18 +27,28 @@ ID: "<ISS_ID>"
 - M2:
   - ...
 
-## 実装順序の根拠
+## 依存関係から導く実装順序
 - 依存関係の正本:
-  - `design.md` の `依存関係分析` と module/dependency UML を参照する
+  - `design.md` の `依存関係分析`
+  - `design.md` の `Module Dependency Diagram`
+  - `design.md` の `ディレクトリ / ファイル変更計画`
 - sequencing rule:
   - upstream / prerequisite / lower-dependency slice から先に step を組む
   - downstream / dependent slice は前提が固まってから置く
 - step ordering notes:
   - どの step が何に依存するかを短く書く
+- step dependency summary:
+  - S01:
+    - depends on:
+    - unblocks:
+    - target files:
 
 ## ステップ一覧
 - S01:
   - 観測可能な振る舞い:
+  - depends on:
+  - unblocks:
+  - target files:
   - closes:
   - review gate:
 - S02:
@@ -88,6 +98,12 @@ ID: "<ISS_ID>"
 - target:
   - ...
 - design refs:
+  - ...
+- depends on:
+  - ...
+- unblocks:
+  - ...
+- target files:
   - ...
 - step boundary:
   - ...

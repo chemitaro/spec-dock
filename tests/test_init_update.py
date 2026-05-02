@@ -2,6 +2,7 @@ import ast
 import io
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -2782,21 +2783,47 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("UML（推奨: main sequence）", epic_design)
         self.assertIn("## State / Activity（必要時）", epic_design)
         self.assertIn("## Parent Diagram References", issue_design)
-        self.assertIn("## Local Diagram Delta", issue_design)
-        self.assertIn("UML（必要時: local diagram delta / package delta）", issue_design)
+        self.assertIn("module dependency:", issue_design)
+        self.assertIn("class dependency（必要時）:", issue_design)
+        self.assertIn("function dependency（必要時）:", issue_design)
+        self.assertIn("file dependency:", issue_design)
+        self.assertIn("## Module Dependency Diagram", issue_design)
+        self.assertIn("UML（原則: module dependency / package delta）", issue_design)
+        self.assertIn("## Local Diagram Delta（必要時）", issue_design)
         self.assertIn("## Sequence Delta（必要時）", issue_design)
         self.assertIn("## Domain Model Delta（必要時）", issue_design)
+        self.assertIn("## ディレクトリ / ファイル変更計画", issue_design)
+        self.assertRegex(issue_design, r"```text\n\.\n\|-- src/\n\|   \|-- package/")
+        for operation in ("Add", "Modify", "Move/Rename", "Read only", "Delete"):
+            self.assertRegex(issue_design, rf"# .*{re.escape(operation)}")
+        self.assertIn("depends on:", issue_design)
+        self.assertNotIn("\n- Add:\n", issue_design)
+        self.assertNotIn("\n- Modify:\n", issue_design)
+        self.assertNotIn("\n- Delete:\n", issue_design)
+        self.assertNotIn("\n- Move/Rename:\n", issue_design)
+        self.assertNotIn("\n- Read only:\n", issue_design)
+        self.assertNotIn("unknown path handling", issue_design)
+        self.assertNotIn("user confirmation points", issue_design)
         self.assertIn("## 要件 → 設計マッピング", issue_design)
         self.assertIn("## 要件 / 例外 -> verification mapping", issue_design)
+        self.assertIn("## 依存関係から導く実装順序", issue_plan)
+        self.assertIn("`Module Dependency Diagram`", issue_plan)
+        self.assertIn("`ディレクトリ / ファイル変更計画`", issue_plan)
+        self.assertIn("depends on:", issue_plan)
+        self.assertIn("unblocks:", issue_plan)
+        self.assertIn("target files:", issue_plan)
         self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
 
         phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("Markdown preview compatibility", phase_design)
-        self.assertIn("`c4plantuml` fence ではなく `plantuml` fence", phase_design)
+        self.assertIn("`c4plantuml` fence は VS Code Markdown preview 互換性のため使わない", phase_design)
         self.assertIn("`!include C4_Context.puml`", phase_design)
         self.assertIn("## PlantUML / UML usage policy", phase_design)
+        self.assertIn("人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書", phase_design)
+        self.assertIn("視覚的・構造的に把握しやすくするために使う", phase_design)
+        self.assertIn("目的は「図を増やすこと」ではなく", phase_design)
         self.assertIn("## diagram selection rules", phase_design)
         self.assertIn("## DDD diagram guidance", phase_design)
         self.assertIn("## UML review gate", phase_design)
@@ -2806,6 +2833,34 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("N/A: reason", phase_design)
         self.assertIn("Domain Model Delta", phase_design)
         self.assertIn("PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う", phase_design)
+        self.assertIn("## Issue dependency and file-change planning", phase_design)
+        self.assertIn("Module Dependency Diagram", phase_design)
+        self.assertIn("ディレクトリ / ファイル変更計画", phase_design)
+        self.assertIn("Linux `tree` style", phase_design)
+        self.assertIn("tree の下に同じ path 一覧を重複して置かない", phase_design)
+        self.assertIn("この節は後方互換の入口です", phase_design)
+
+        phase_plan_issue = (
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("`Module Dependency Diagram`", phase_plan_issue)
+        self.assertIn("`ディレクトリ / ファイル変更計画`", phase_plan_issue)
+        self.assertIn("`depends on`", phase_plan_issue)
+        self.assertIn("`unblocks`", phase_plan_issue)
+        self.assertIn("`target files`", phase_plan_issue)
+
+        workflow_issue = (
+            repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("templates は書き始めるための scaffold", workflow_issue)
+        self.assertIn("Linux `tree` style の `ディレクトリ / ファイル変更計画`", workflow_issue)
+
+        issue_execution_skill = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("spec-dock/docs/phase_plan_issue.md", issue_execution_skill)
+        self.assertIn("Keep templates as scaffolds", issue_execution_skill)
 
         for root in (
             repo_root / "src/spec_dock/assets/spec_dock/templates",

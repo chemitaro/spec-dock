@@ -72,8 +72,10 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 現在の入出力契約
   - データ境界と SoR
   - domain vocabulary / bounded context / invariant
+  - module / class / function / file の依存方向
   - upstream / downstream / prerequisite の依存関係
   - 依存の少ない実装起点
+  - 追加 / 変更 / 削除 / 移動する directory / file と目的
   - 既存テストの守備範囲
   - 移行 / 運用 / 監視で壊しうる点
 - 本文には採用結論と guardrails を残し、長い比較や生の調査ログは `discussions/` へ逃がす
@@ -83,10 +85,15 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - 先に埋める節:
   - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `System Context`, `ドメイン境界 / ユビキタス言語`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
   - Epic: `全体像`, `Component / Module View`, `Package Dependency`, `Domain Model（DDD 必要時）`, `契約`, `データモデル`, `主要フロー`, `State / Activity（必要時）`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
-  - Issue: `Parent Diagram References`, `既存実装 / 規約の理解`, `依存関係分析`, `Local Diagram Delta`, `インターフェース契約`, `Sequence Delta（必要時）`, `Domain Model Delta（必要時）`, `採用方針 / トレードオフ`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
+  - Issue: `Parent Diagram References`, `既存実装 / 規約の理解`, `依存関係分析`, `Module Dependency Diagram`, `ディレクトリ / ファイル変更計画`, `インターフェース契約`, `Sequence Delta（必要時）`, `Domain Model Delta（必要時）`, `採用方針 / トレードオフ`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
 
 ## PlantUML / UML usage policy
 
+- Purpose:
+  - design.md は、人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書にする
+  - UML / PlantUML は、大量の文章を読む負荷を下げ、設計の全体像と変更点を視覚的・構造的に把握しやすくするために使う
+  - 図で表現できる設計情報は積極的に可視化する。ただし、図は本文の代替ではなく、本文で固定した判断を読みやすく検証する補助資料にする
+  - 目的は「図を増やすこと」ではなく、reviewer / 実装者 / 将来の保守者が誤読しやすい構造を正しく共有すること
 - Markdown preview compatibility:
   - PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う
   - C4 Context が必要な場合は `!include C4_Context.puml` を明示する
@@ -147,7 +154,8 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
     - exhaustive generated-code class diagram
 - Issue:
   - default:
-    - 図は必須ではない
+    - Module Dependency Diagram は原則置く
+    - 非常に小さい修正で不要な場合だけ `N/A: reason` を書く
   - required when applicable:
     - Sequence Delta if crossing components, transactions, queues, external APIs, or retries
     - State Delta if changing lifecycle
@@ -158,6 +166,18 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
     - full Container diagram
     - full Domain Model
     - full Deployment diagram
+
+## Issue dependency and file-change planning
+
+- Issue design は、実装前レビューで人間が確認できる粒度で依存関係と変更対象を固定する
+- `依存関係分析` は module / class / function / file dependency を必要な範囲で分けて書く
+- `Module Dependency Diagram` は、実装順に影響する module / class / file / function の依存方向を可視化する
+- class / function 依存は、責務境界や実装順に影響する場合だけ書き、全 call graph は描かない
+- `ディレクトリ / ファイル変更計画` は Linux `tree` style の複数階層構成図で表す
+- tree には変更後の配置を表し、各 path のコメントで `Add / Modify / Delete / Move/Rename / Read only`、目的、主要 dependency を短く示す
+- tree の下に同じ path 一覧を重複して置かない
+- path が未確定の場合は `TBD` で放置せず、調査 step または `未確定事項` に分離する
+- 実装順そのものは plan の責務だが、plan が参照する依存関係と変更対象は design で固定する
 
 ## DDD diagram guidance
 
@@ -182,6 +202,8 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 図数が budget 内にある
   - 親文書が所有する情報を重複していない
   - 期待される図を省略した場合は `N/A: reason` がある
+  - Issue design の Module Dependency Diagram が実装順の根拠として使える
+  - Issue design の directory / file change plan が Linux `tree` style で実装前確認に使える
 - Diagram correctness:
   - `plantuml` block が `@startuml` / `@enduml` を持つ
   - 図種が目的に合っている
@@ -201,34 +223,11 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 
 ## diagram guidance
 
-- Initiative:
-  - 推奨:
-    - C4 Context
-    - target-state / capability map
-  - Markdown preview compatibility:
-    - C4 図も Markdown 内では `c4plantuml` fence ではなく `plantuml` fence を使う
-    - C4 Context が必要な場合は `!include C4_Context.puml` を明示する
-    - `target-state` は C4 図種ではなく、将来状態の overview として扱う
-  - 原則不要:
-    - detailed sequence / class diagram
-- Epic:
-  - 推奨:
-    - C4 Container / Component
-    - module responsibility map
-    - data flow
-    - sequence / activity / state
-  - review:
-    - Issue slicing と責務境界に対応している
-- Issue:
-  - 推奨:
-    - module / dependency diagram
-    - sequence / activity / state
-    - class / domain model
-  - review:
-    - plan の step order、error handling、test strategy に対応している
-- all scopes:
-  - 図表には目的、配置、更新タイミング、review 観点を添える
-  - 図表だけにしか存在しない設計判断を残さない
+この節は後方互換の入口です。図表の選択は `diagram selection rules`、記法と review 条件は `PlantUML / UML usage policy` と `UML review gate`、DDD 図は `DDD diagram guidance` を正本にします。
+
+- 図表には目的、配置、更新タイミング、review 観点を添える
+- 図表だけにしか存在しない設計判断を残さない
+- Issue の module dependency / file-change planning は `Issue dependency and file-change planning` を参照する
 
 ## 論点の逃がし先
 
