@@ -51,6 +51,14 @@ ID: "<ISS_ID>"
   - ...
 
 ## 依存関係分析
+- module dependency:
+  - ...
+- class dependency（必要時）:
+  - ...
+- function dependency（必要時）:
+  - ...
+- file dependency:
+  - ...
 - upstream / prerequisite:
   - ...
 - downstream / dependent:
@@ -60,23 +68,23 @@ ID: "<ISS_ID>"
 - sequencing implications:
   - plan では upstream / prerequisite から順に step を組む
 
-## Local Diagram Delta
+## Module Dependency Diagram
 - Question answered:
-  - ...
+  - どの module / class / file / function の依存方向を固定し、どこから実装を始めるか
 - Scope:
   - ...
 - Excluded details:
-  - ...
+  - exhaustive call graph / 全 method / 全 import は描かない
 - Update trigger:
-  - ...
+  - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
 - Diagram:
-  - N/A: reason
+  - 原則記載する。非常に小さい修正で不要な場合だけ `N/A: reason` を書く
 
-### UML（必要時: local diagram delta / package delta）
+### UML（原則: module dependency / package delta）
 ```plantuml
 @startuml
 top to bottom direction
-' show only the changed boundary, responsibility, dependency, or interaction
+' show module / class / file / function dependencies that affect implementation order
 ' do not copy Initiative/Epic diagrams
 
 rectangle "replace-with-module-a" as A
@@ -84,6 +92,10 @@ rectangle "replace-with-module-b" as B
 A --> B : depends_on
 @enduml
 ```
+
+## Local Diagram Delta（必要時）
+- changed boundary / responsibility / interaction:
+  - N/A: reason
 
 ## インターフェース契約
 - API / function / protocol / data boundary:
@@ -134,17 +146,21 @@ A --> B : depends_on
 @enduml
 ```
 
-## 変更計画
-- Add:
-  - ...
-- Modify:
-  - ...
-- Delete:
-  - ...
-- Move/Rename:
-  - ...
-- Read only:
-  - ...
+## ディレクトリ / ファイル変更計画
+```text
+.
+|-- src/
+|   |-- package/
+|   |   |-- new_module.py        # Add: purpose; depends on: ...
+|   |   |-- existing_module.py   # Modify: purpose; depends on: ...
+|   |   `-- renamed_module.py    # Move/Rename from: src/package/old_module.py; purpose
+|   `-- tests/
+|       `-- test_new_module.py   # Add/Modify: purpose; depends on: src/package/new_module.py
+|-- docs/
+|   `-- reference.md             # Read only: purpose
+`-- legacy/
+    `-- obsolete_file.py         # Delete: purpose; depends on: replacement ready
+```
 
 ## 要件 → 設計マッピング
 - AC-001 -> ...
