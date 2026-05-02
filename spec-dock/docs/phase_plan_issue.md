@@ -54,6 +54,12 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `S99 final diff review quality gate` を必須で置く
 - `final exit contract` を置く
 
+## diagram / trace guidance
+
+- 必要な場合だけ step dependency graph、test matrix、rollback map を置く
+- 図表は `実装順序の根拠`、`要件 ↔ ステップ対応`、review / QA gate の理解を助ける用途に限定する
+- 新しい設計判断や未承認 requirement を図表で追加しない
+
 ## review gate
 
 - step 粒度で review / test / report / commit 判断を回せる

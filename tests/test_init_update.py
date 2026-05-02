@@ -63,6 +63,20 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
         "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
+        "spec-dock/docs/phase_requirement.md": (
+            "src/spec_dock/assets/spec_dock/docs/phase_requirement.md"
+        ),
+        "spec-dock/docs/phase_design.md": "src/spec_dock/assets/spec_dock/docs/phase_design.md",
+        "spec-dock/docs/phase_plan.md": "src/spec_dock/assets/spec_dock/docs/phase_plan.md",
+        "spec-dock/docs/phase_plan_initiative.md": (
+            "src/spec_dock/assets/spec_dock/docs/phase_plan_initiative.md"
+        ),
+        "spec-dock/docs/phase_plan_epic.md": (
+            "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
+        ),
+        "spec-dock/docs/phase_plan_issue.md": (
+            "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"
+        ),
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
@@ -2711,6 +2725,78 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
+
+    def test_spec_document_templates_keep_policy_out_of_scaffold(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        template_root = repo_root / "src/spec_dock/assets/spec_dock/templates"
+
+        for scope in ("initiative", "epic", "issue"):
+            for filename in ("requirement.md", "design.md", "plan.md"):
+                text = (template_root / scope / filename).read_text(encoding="utf-8")
+                self.assertNotIn("## 文書契約", text)
+                self.assertNotIn("この文書が答える問い", text)
+                self.assertNotIn("この文書に書かないこと", text)
+                self.assertNotIn("trace policy", text)
+                self.assertNotIn("## 図表方針", text)
+                self.assertNotIn("## 図表ポートフォリオ", text)
+                self.assertNotIn("## Traceability matrix", text)
+
+        phase_docs = [
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_requirement.md",
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md",
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md",
+        ]
+        for path in phase_docs:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("## scope ownership", text)
+            self.assertIn("## diagram guidance", text)
+
+        plan_scope_docs = [
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_initiative.md",
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md",
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md",
+        ]
+        for path in plan_scope_docs:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("## diagram / trace guidance", text)
+
+        initiative_design = (template_root / "initiative" / "design.md").read_text(encoding="utf-8")
+        epic_design = (template_root / "epic" / "design.md").read_text(encoding="utf-8")
+        issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
+        issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
+        self.assertIn("UML（推奨: system context / target-state overview）", initiative_design)
+        self.assertIn("```plantuml", initiative_design)
+        self.assertIn("!include C4_Context.puml", initiative_design)
+        self.assertIn("LAYOUT_WITH_LEGEND()", initiative_design)
+        self.assertIn("Person(user", initiative_design)
+        self.assertIn("System(system", initiative_design)
+        self.assertIn("System_Ext(external", initiative_design)
+        self.assertIn("Rel(user, system", initiative_design)
+        self.assertIn("UML（推奨: module / context）", epic_design)
+        self.assertIn("UML（必須: module / dependency）", issue_design)
+        self.assertIn("## 要件 → 設計マッピング", issue_design)
+        self.assertIn("## 要件 / 例外 -> verification mapping", issue_design)
+        self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
+
+        phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Markdown preview compatibility", phase_design)
+        self.assertIn("`c4plantuml` fence ではなく `plantuml` fence", phase_design)
+        self.assertIn("`!include C4_Context.puml`", phase_design)
+
+        for root in (
+            repo_root / "src/spec_dock/assets/spec_dock/templates",
+            repo_root / "src/spec_dock/assets/spec_dock/docs",
+            repo_root / "spec-dock/templates",
+            repo_root / "spec-dock/docs",
+        ):
+            for path in root.rglob("*.md"):
+                self.assertNotIn(
+                    "```c4plantuml",
+                    path.read_text(encoding="utf-8"),
+                    f"Markdown preview does not render c4plantuml fences: {path}",
+                )
 
     def test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

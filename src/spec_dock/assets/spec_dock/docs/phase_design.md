@@ -18,6 +18,27 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - 非ゴール: requirement の不足のごまかし、比較表の本文への押し込み、実装手順の plan 化
 - 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有 gate は `workflow_*.md` が additive に定義する
 
+## scope ownership
+
+- Initiative design:
+  - 所有する判断:
+    - system context、architecture policy、cross-cutting constraint、target-state、Epic が守る guardrail
+  - 所有しない判断:
+    - Issue-level class / function / file design、実装順序
+- Epic design:
+  - 所有する判断:
+    - 複数 Issue が共有する boundary、responsibility、data flow、failure / migration strategy、ADR 分離基準
+  - 所有しない判断:
+    - Issue 内だけで閉じる細かな実装手順や局所 refactor
+- Issue design:
+  - 所有する判断:
+    - 局所構造、既存 pattern の採否、interface contract、dependency direction、test strategy、rollback / compatibility
+  - 所有しない判断:
+    - Red / Green / Refactor の作業手順、commit / review の運用順序
+- ADR rule:
+  - 長寿命・横断的・不可逆寄りの判断は ADR / decision log に分離する
+  - 局所的で可逆な判断は対象 scope の design に置く
+
 ## 標準順
 
 1. requirement と対象 scope の workflow を確認する
@@ -62,6 +83,37 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
   - Epic: `全体像`, `契約`, `データモデル`, `主要フロー`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
   - Issue: `既存実装 / 規約の理解`, `依存関係分析`, `インターフェース契約`, `採用方針 / トレードオフ`, `変更計画`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
+
+## diagram guidance
+
+- Initiative:
+  - 推奨:
+    - C4 Context
+    - target-state / capability map
+  - Markdown preview compatibility:
+    - C4 図も Markdown 内では `c4plantuml` fence ではなく `plantuml` fence を使う
+    - C4 Context が必要な場合は `!include C4_Context.puml` を明示する
+    - `target-state` は C4 図種ではなく、将来状態の overview として扱う
+  - 原則不要:
+    - detailed sequence / class diagram
+- Epic:
+  - 推奨:
+    - C4 Container / Component
+    - module responsibility map
+    - data flow
+    - sequence / activity / state
+  - review:
+    - Issue slicing と責務境界に対応している
+- Issue:
+  - 推奨:
+    - module / dependency diagram
+    - sequence / activity / state
+    - class / domain model
+  - review:
+    - plan の step order、error handling、test strategy に対応している
+- all scopes:
+  - 図表には目的、配置、更新タイミング、review 観点を添える
+  - 図表だけにしか存在しない設計判断を残さない
 
 ## 論点の逃がし先
 
