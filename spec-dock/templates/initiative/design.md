@@ -20,10 +20,21 @@ ID: "<INIT_ID>"
 - To-Be:
   - ...
 
-### UML（任意: high-level context / target-state）
+### UML（推奨: system context / target-state overview）
 ```plantuml
 @startuml
-' 必要なら high-level context / target-state を記載
+!include C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title System context / target-state overview
+
+Person(user, "User", "Primary actor")
+System(system, "Target system", "System under this initiative")
+System_Ext(external, "External system", "External dependency")
+
+Rel(user, system, "Uses")
+Rel(system, external, "Depends on")
 @enduml
 ```
 
