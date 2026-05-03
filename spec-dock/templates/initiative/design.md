@@ -21,6 +21,8 @@ ID: "<INIT_ID>"
   - ...
 
 ## System Context
+- Title:
+  - System context / target-state overview
 - Question answered:
   - ...
 - Scope:
@@ -59,6 +61,8 @@ Rel(system, external, "Depends on")
   - N/A: reason
 
 ## Container Overview（必要時）
+- Title:
+  - ...
 - Question answered:
   - ...
 - Scope:

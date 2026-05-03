@@ -71,6 +71,8 @@ ID: "<ISS_ID>"
   - plan では upstream / prerequisite から順に step を組む
 
 ## Module Dependency Diagram
+- Title:
+  - ...
 - Question answered:
   - どの module / class / file / function の依存方向を固定し、どこから実装を始めるか
 - Scope:
@@ -80,9 +82,9 @@ ID: "<ISS_ID>"
 - Update trigger:
   - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
 - Diagram:
-  - N/A: reason
+  - 下の `plantuml` block を更新する
 
-### UML（原則: module dependency / package delta）
+### UML（原則: module dependency / package dependency delta）
 ```plantuml
 @startuml
 top to bottom direction
@@ -109,7 +111,7 @@ A --> B : depends_on
 - retry / transaction / external API / queue:
   - ...
 - UML:
-  - 必要な場合だけ追加する。追加時は `phase_design.md` の diagram metadata rule に従う
+  - N/A: reason
 
 ## Domain Model Delta（必要時）
 - parent model refs:
@@ -121,7 +123,7 @@ A --> B : depends_on
 - invariant changes:
   - ...
 - UML:
-  - 必要な場合だけ追加する。追加時は `phase_design.md` の diagram metadata rule に従う
+  - N/A: reason
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:
@@ -131,7 +133,7 @@ A --> B : depends_on
 - collaboration:
   - ...
 - UML:
-  - 必要な場合だけ追加する。追加時は `phase_design.md` の diagram metadata rule に従う
+  - N/A: reason
 
 ## ディレクトリ / ファイル変更計画
 ```text
