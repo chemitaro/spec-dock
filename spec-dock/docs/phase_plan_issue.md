@@ -34,7 +34,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `design.md` の `ディレクトリ / ファイル変更計画` を canonical path inventory とし、plan の `target files` は各 step が触る subset として書く
 - templates は最小 scaffold であり、Issue 固有の実行順・依存・検証に不要な placeholder は削除してよい
 - stage gate は `pass` まで回す
-- stage gate の `pass` 後は `report.md` を更新し、差分確認後に report とまとめてコミットする
+- stage gate の `pass` 後は `report.md` を更新する。commit/no-op は `workflow_issue.md` の実行 contract が所有し、plan には Issue 固有の判断が必要な場合だけ書く
 - cadence や approval policy の正本は `workflow_issue.md` に残し、この文書では plan 本文への埋め込み方だけを扱う
 
 ## entry focus
@@ -53,7 +53,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `レビュー / QA ゲート方針` を置く
 - `実装ステップ` を step / block / iteration で書く
 - `Refactor` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
-- 各 step gate に `report update` と `commit` を置く
+- 各 step gate に `report update` を置く。commit/no-op は `workflow_issue.md` を参照し、Issue 固有の判断が必要な場合だけ明記する
 - `S90 docs impact resolution / docs refresh` を必要時に入れる
 - `S99 final diff review quality gate` を必須で置く
 - `final exit contract` を置く
@@ -67,10 +67,10 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 
 ## review gate
 
-- step 粒度で review / test / report / commit 判断を回せる
+- step 粒度で review / test / report 判断を回せる
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
-- report 更新が commit より前に置かれている
+- report update が stage gate に置かれている。report-before-commit/no-op の実行順は `workflow_issue.md` の実行 contract で確認する
 - AC / EC と step の対応が取れている
 - docs impact と final diff review が計画に埋め込まれている
 - reviewer が「この plan で実装してよい」と判断できる

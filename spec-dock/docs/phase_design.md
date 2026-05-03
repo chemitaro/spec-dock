@@ -104,9 +104,11 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - `c4plantuml` fence は VS Code Markdown preview 互換性のため使わない
   - remote include は原則避け、利用する場合は理由と render 環境を明記する
 - Diagram metadata:
-  - すべての図は `Question answered`, `Scope`, `Excluded details`, `Update trigger` を持つ
+  - すべての図は `Title`, `Question answered`, `Scope`, `Excluded details`, `Update trigger` を持つ
   - 図の直後か直前に、その図で固定する設計判断を本文で説明する
   - 図だけにしか存在しない設計判断を残さない
+  - 図を省略する場合は `N/A: reason` を書き、対応する `plantuml` block は削除する
+  - 図を書く場合は `N/A: reason` を残さない
 - Relationship rules:
   - arrow は意味ラベルを持つ
   - `dependency`, `data flow`, `runtime call`, `ownership`, `publishes`, `implements` を曖昧にしない
@@ -140,7 +142,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
 - Component / Module View:
   - codebase 内の責務分割や component/module 境界を示す
   - Epic design の主戦場。Issue では差分だけを書く
-- Package Dependency:
+- Package Dependency / Package Dependency Delta:
   - source / compile-time dependency direction を示す
   - Epic / Issue で依存方向、循環、layer boundary が重要なときに使う
 - Module Dependency Diagram:
@@ -220,7 +222,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
     - Sequence Delta if crossing components, transactions, queues, external APIs, or retries
     - State Delta if changing lifecycle
     - Domain Model Delta if changing aggregate, entity, value object, domain event, policy, or specification
-    - Package Delta if changing dependency direction
+    - Package Dependency Delta if changing dependency direction
   - 避ける:
     - System Context
     - full Container diagram
@@ -267,7 +269,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
 - Diagram correctness:
   - `plantuml` block が `@startuml` / `@enduml` を持つ
   - 図種が目的に合っている
-  - title / scope / update trigger がある
+  - Title / Question answered / Scope / Excluded details / Update trigger がある
   - stereotype、色、線種、icon を使う場合は凡例がある
   - element は名前と責務を持つ
   - relationship arrow は意味ラベルを持つ
@@ -275,7 +277,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
 - UML-specific gate:
   - Use Case は actor-goal を表し、内部実装を表さない
   - Class / Domain Model は概念・責務・関係を表し、生成コード inventory にしない
-  - Package は compile-time / source dependency を表し、runtime call と混ぜない
+  - Package Dependency / Package Dependency Delta は compile-time / source dependency を表し、runtime call と混ぜない
   - Sequence は meaningful participants と messages を持つ
   - Activity は decision-heavy / parallel workflow に限定する
   - State は event、guard、terminal state を必要時に含む

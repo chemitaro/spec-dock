@@ -2774,14 +2774,53 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("System_Ext(external", initiative_design)
         self.assertIn("Rel(user, system", initiative_design)
         self.assertIn("## System Context", initiative_design)
+        self.assertIn("- Title:\n  - System context / target-state overview", initiative_design)
         self.assertIn("## ドメイン境界 / ユビキタス言語（必要時）", initiative_design)
         self.assertIn("## Container Overview（必要時）", initiative_design)
+        container_overview_section = initiative_design.split("## Container Overview（必要時）", 1)[1].split(
+            "## 対象境界 / 依存", 1
+        )[0]
+        self.assertIn("N/A: reason", container_overview_section)
+        self.assertNotIn("```plantuml", container_overview_section)
         self.assertIn("## Component / Module View", epic_design)
         self.assertIn("## Package Dependency", epic_design)
+        self.assertIn("UML（推奨: package dependency / package dependency delta）", epic_design)
+        self.assertIn("diagram metadata:", epic_design)
         self.assertIn("## Domain Model（DDD 必要時）", epic_design)
         self.assertIn("UML（推奨: component / module）", epic_design)
         self.assertIn("UML（推奨: main sequence）", epic_design)
+        domain_model_section = epic_design.split("## Domain Model（DDD 必要時）", 1)[1].split(
+            "## 契約", 1
+        )[0]
+        data_model_section = epic_design.split("## データモデル", 1)[1].split(
+            "## 主要フロー", 1
+        )[0]
+        self.assertNotIn("```plantuml", domain_model_section)
+        self.assertNotIn("```plantuml", data_model_section)
+        self.assertIn("N/A: reason", domain_model_section)
+        self.assertIn("N/A: reason", data_model_section)
         self.assertIn("## State / Activity（必要時）", epic_design)
+        state_activity_section = epic_design.split("## State / Activity（必要時）", 1)[1].split(
+            "## 失敗設計", 1
+        )[0]
+        self.assertIn("N/A: reason", state_activity_section)
+        self.assertNotIn("```plantuml", state_activity_section)
+        for section in (
+            epic_design.split("## Component / Module View", 1)[1].split("## Package Dependency", 1)[0],
+            epic_design.split("## Package Dependency", 1)[1].split("## Domain Model", 1)[0],
+            domain_model_section,
+            data_model_section,
+            epic_design.split("## 主要フロー", 1)[1].split("## State / Activity", 1)[0],
+            state_activity_section,
+        ):
+            for metadata_field in (
+                "Title:",
+                "Question answered:",
+                "Scope:",
+                "Excluded details:",
+                "Update trigger:",
+            ):
+                self.assertIn(metadata_field, section)
         self.assertIn("このテンプレートは最小 scaffold", issue_design)
         self.assertIn("項目は追加・削除・統合・並べ替えてよい", issue_design)
         self.assertIn("## Parent Diagram References", issue_design)
@@ -2790,16 +2829,35 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("function dependency（必要時）:", issue_design)
         self.assertIn("file dependency:", issue_design)
         self.assertIn("## Module Dependency Diagram", issue_design)
-        self.assertIn("UML（原則: module dependency / package delta）", issue_design)
+        self.assertIn("- Title:", issue_design)
+        self.assertIn("UML（原則: module dependency / package dependency delta）", issue_design)
+        module_dependency_section = issue_design.split("## Module Dependency Diagram", 1)[1].split(
+            "## Local Diagram Delta（必要時）", 1
+        )[0]
+        self.assertIn("```plantuml", module_dependency_section)
+        self.assertNotIn("N/A: reason", module_dependency_section)
         self.assertIn("## Local Diagram Delta（必要時）", issue_design)
         self.assertIn("## Sequence Delta（必要時）", issue_design)
         self.assertIn("## Domain Model Delta（必要時）", issue_design)
+        for optional_issue_section in (
+            issue_design.split("## Sequence Delta（必要時）", 1)[1].split(
+                "## Domain Model Delta（必要時）", 1
+            )[0],
+            issue_design.split("## Domain Model Delta（必要時）", 1)[1].split(
+                "## クラス / インターフェース詳細設計（必要時）", 1
+            )[0],
+            issue_design.split("## クラス / インターフェース詳細設計（必要時）", 1)[1].split(
+                "## ディレクトリ / ファイル変更計画", 1
+            )[0],
+        ):
+            self.assertIn("N/A: reason", optional_issue_section)
+            self.assertNotIn("```plantuml", optional_issue_section)
         self.assertEqual(
             1,
             issue_design.count("```plantuml"),
             "issue design scaffold should only ship the standard module dependency UML placeholder",
         )
-        self.assertIn("必要な場合だけ追加する", issue_design)
+        self.assertNotIn("必要な場合だけ追加する", issue_design)
         self.assertIn("## ディレクトリ / ファイル変更計画", issue_design)
         self.assertRegex(issue_design, r"```text\n\.\n\|-- src/\n\|   \|-- package/")
         for operation in ("Add", "Modify", "Move/Rename", "Read only", "Delete"):
@@ -2849,7 +2907,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "C4 System Context",
             "C4 Container",
             "Component / Module View",
-            "Package Dependency",
+            "Package Dependency / Package Dependency Delta",
             "Module Dependency Diagram",
             "Sequence",
             "Activity",
@@ -2865,10 +2923,13 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn(diagram_name, phase_design)
         self.assertIn("## DDD diagram guidance", phase_design)
         self.assertIn("## UML review gate", phase_design)
+        self.assertIn("Title", phase_design)
         self.assertIn("Question answered", phase_design)
         self.assertIn("Excluded details", phase_design)
         self.assertIn("Update trigger", phase_design)
         self.assertIn("N/A: reason", phase_design)
+        self.assertIn("対応する `plantuml` block は削除する", phase_design)
+        self.assertIn("図を書く場合は `N/A: reason` を残さない", phase_design)
         self.assertIn("Domain Model Delta", phase_design)
         self.assertIn("PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う", phase_design)
         self.assertIn("## Issue dependency and file-change planning", phase_design)
@@ -2888,6 +2949,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("`target files`", phase_plan_issue)
         self.assertIn("canonical path inventory", phase_plan_issue)
         self.assertIn("templates は最小 scaffold", phase_plan_issue)
+        self.assertIn("commit/no-op は `workflow_issue.md` の実行 contract が所有", phase_plan_issue)
+        self.assertIn("Issue 固有の判断が必要な場合だけ明記する", phase_plan_issue)
+        self.assertIn("report-before-commit/no-op の実行順は `workflow_issue.md`", phase_plan_issue)
 
         workflow_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
@@ -2908,8 +2972,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("Spec authoring mode", issue_execution_skill)
         self.assertIn("Execution mode", issue_execution_skill)
         self.assertIn("optional diagram catalog", issue_execution_skill)
-        self.assertIn("Domain Model / Aggregate", issue_execution_skill)
-        self.assertIn("other project-specific sections", issue_execution_skill)
+        self.assertIn("authoritative source for diagram choices", issue_execution_skill)
+        self.assertIn("catalog-listed or project-specific sections", issue_execution_skill)
+        self.assertNotIn("Add Use Case, Sequence", issue_execution_skill)
 
         workflow_skill = (
             repo_root
