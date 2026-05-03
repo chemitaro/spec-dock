@@ -60,6 +60,31 @@ ID: "<ISS_ID>"
 - AC-001 -> S01
 - EC-001 -> S02
 
+## Spec-Locked Closure Index（仕様固定クロージャ索引）
+
+> これは Issue 全体のテストケース一覧ではなく、エージェントが仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の test contract と close 条件は各 step の `step closure contract` に置く。private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
+
+| id | phase / step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | <behavior> | acceptance | AC-001 | ... | ... | spec drift | yes | red-required | report step closure |
+| tc-002 | S01 | <behavior> | negative | EC-001 | ... | ... | silent failure | yes | covered-existing | report step closure |
+
+- optional detail columns when needed:
+  - fixture notes:
+  - golden output:
+  - manual verification:
+  - property domain:
+  - non-goals:
+- evidence level values:
+  - red-required:
+  - covered-existing:
+  - inspect-only:
+  - manual-required:
+- detail policy:
+  - 通常 Issue は step / behavior slice ごとに 1〜3 件程度の検証契約を書く。
+  - 中央 index は重複するテストケース表にせず、仕様ロック、担当 step、required、evidence level、closure evidence だけを追う。
+  - public CLI behavior、shipped scaffold / runtime contract、template / system docs の互換性、installer / update / migration、filesystem / GitHub / active store、negative path、既存 regression、複数 Agent 並列実装の領域では詳細化する。
+
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
   - timing:
@@ -73,7 +98,7 @@ ID: "<ISS_ID>"
 
 ## 実行ルール（全ステップ共通）
 - 実行 policy、approval cadence、completion contract は `workflow_issue.md` を正本にする。
-- step / block / iteration の書き方は `phase_plan_issue.md` を正本にする。
+- step / block / behavior slice の書き方は `phase_plan_issue.md` を正本にする。
 - plan 本文には、この Issue 固有の順序、依存、検証、review / QA gate だけを書く。
 
 ## 実装ステップ
@@ -89,23 +114,51 @@ ID: "<ISS_ID>"
   - ...
 - target files:
   - ...
-- expected tests:
-  - ...
+- test bundle:
+  - test ids:
+    - tc-001
+  - evidence level:
+    - red-required / covered-existing / inspect-only / manual-required
+  - acceptance:
+  - characterization:
+  - property / invariant:
+  - regression:
+  - negative:
+- pre-implementation evidence:
+  - expected red / characterization pass / test sensitivity evidence:
 - report update:
   - ...
 - notes:
   - ...
 
-#### TDD iterations（必要時）
-- I1:
-  - Red:
-  - Green:
-  - Refactor:
+#### step closure contract
+- closure ids:
+  - tc-001
+- close when:
+  - ...
+- verification evidence:
+  - targeted command / manual evidence / inspection evidence:
+- report evidence:
+  - Step Contract Closure:
+  - Test Contract Closure:
+- residual risk:
+  - ...
+
+#### behavior slice execution
+- implementation batch:
+  - allowed scope:
+  - forbidden scope:
+- verification:
+  - targeted command:
+  - related / full command:
+- refactor / tidy:
+  - purpose:
+  - guardrail:
 
 #### step gate
 - review:
   - ...
-- expected tests:
+- expected verification:
   - ...
 - report update:
   - ...

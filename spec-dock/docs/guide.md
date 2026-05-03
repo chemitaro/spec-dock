@@ -30,7 +30,7 @@ phase playbook:
 
 - Initiative: 投資単位。なぜやるか、成功条件、スコープを持つ
 - Epic: 設計の背骨。契約、移行、観測性、Issue 分割を持つ
-- Issue: 実装の最小単位。active issue を起点に TDD で完了する
+- Issue: 実装の最小単位。active issue を起点に behavior-slice based execution contract で完了する
 - ADR: 後続へ残る意思決定。initiative / epic / issue の任意 scope に紐づく
 
 親子関係:
@@ -87,7 +87,7 @@ spec-dock/
 1. 既存ノードに収まるか確認し、必要なら `new` / `import` する
 2. `active set` で作業対象を固定する
 3. 対象 scope の `workflow_*.md` を正本にし、requirement / design は shared playbook、plan は `phase_plan.md` → `phase_plan_<scope>.md` の順で書く
-4. Initiative は Epic 分解、Epic は Issue 分割、Issue は TDD ベースの execution contract を plan に落とす
+4. Initiative は Epic 分解、Epic は Issue 分割、Issue は agent-native / behavior-slice based execution contract を plan に落とす
 5. `validate` / `sync` で整合性と生成物を更新する
 
 ## 代表コマンド（runtime script）

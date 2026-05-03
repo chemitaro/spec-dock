@@ -83,7 +83,7 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - Issue:
   - 推奨:
     - step dependency graph
-    - AC / EC / constraint / expected tests の test matrix
+    - Spec-Locked Closure Index（AC / EC / constraint / step-local closure contract の仕様ロック索引）
     - rollback map
 - review:
   - 図表の依存関係が本文の順序・depends on・gate と一致している

@@ -1,7 +1,7 @@
-# workflow: issue（TDD）
+# workflow: issue（Agent-Native TDD）
 
 Issue は実装の最小単位です。
-この workflow は、active issue を入口にした TDD、step review loop、docs impact、final quality gate を正本として扱います。
+この workflow は、active issue を入口にした仕様固定マイクロバッチTDD（Spec-Locked Micro-Batch TDD）、step review loop、docs impact、final quality gate を正本として扱います。
 この workflow の品質ゲートは scope 固有の additive gate であり、`phase_*.md` の shared minimum gate 通過を前提とします。
 
 対応 leaf skill:
@@ -59,14 +59,22 @@ Issue は実装の最小単位です。
 ## 実行 contract
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
-- 各 step は `Red → Green → Refactor → review → fix → re-review → report → コミット/no-op` の順で進める
-- `Refactor` は Green 後の bounded decision point とし、plan では詳細 task を事前確定しない
+- 各 step は `step closure contract / test bundle / pre-implementation evidence → bounded implementation batch → verification → refactor/tidy → review → fix → re-review → report → コミット/no-op` の順で進める
+- 完成版 `plan.md` には `Spec-Locked Closure Index`（仕様固定クロージャ索引）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
+- `Spec-Locked Closure Index` は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
+- `test bundle` は step closure contract の一部として、step の観測可能な振る舞いに必要な acceptance / characterization / property or invariant / regression / negative を分類する
+- `step closure contract` は closure index の `id` を参照し、どの検証契約をその step で満たせば close してよいかを追えるようにする
+- 実装開始前に required closure id が behavior slice の `closure ids` / `test ids` から参照され、各 required row に step-local close condition と verification command または evidence path があることを確認する
+- required closure row、`locked expectation`、`required`、`spec link` を変更する場合は plan amendment と re-review を先に通す
+- `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを記録し、failing-first を完全要求できない場合もテストが欠陥を検出できる根拠を残す
+- `bounded implementation batch` は step の scope、allowed files、forbidden scope に収まる最小実装単位とする
+- `refactor/tidy` は verification 後の bounded decision point とし、plan では詳細 task を事前確定しない
 - step 順は `design.md` の依存関係分析、module dependency diagram、directory / file change plan を根拠に、upstream / prerequisite から downstream へ組む
-- cleanup が既知で大きい場合は `Green` / design / 別 step へ切り出す
+- cleanup が既知で大きい場合は `bounded implementation batch` / design / 別 step へ切り出す
 - review / QA / spec の各 stage gate は `pass` まで回す
 - 各 stage gate の `pass` 後は、`spec-dock/active/issue/report.md` を更新し、差分確認後に report とまとめてコミットするか no-op とするかを判断する
 - `1 step = 1 つの観測可能な振る舞い` を原則にし、各 step に観測用の 1 本のコマンドを置く
-- `plan.md` では TDD cycle を step / block / iteration に埋め込み、配置ルールは `phase_plan_issue.md` に従う
+- `plan.md` では agent-native TDD cycle を step / block / behavior slice に埋め込み、配置ルールは `phase_plan_issue.md` に従う
 - 各 step は step result approval を得てから次へ進む
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
@@ -83,7 +91,12 @@ Issue は実装の最小単位です。
 ## report
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
+- `Step Contract Closure` に step、closure id、close condition、evidence、result を残す
+- `Test Contract Closure` に required closure id、step、evidence level、pre-implementation evidence、verification command、result を残す
+- `Closure Coverage` に各 required closure id と verification evidence の対応を残す
+- `Closure Delta` に追加・削除・変更・未実装 row と re-review 要否を残す
 - `complete` 判定に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡を残す
+- `complete` 判定に必要な required closure id は、report の `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved no-op として閉じている必要がある
 - required step（`sync` / `validate` / `required review`）を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
 - `blocked` / `未完了` の場合は reason と next action を残し、環境 blocker と product gap を混在させない
 - `blocked` では blocker type と impact を該当する範囲で残す
@@ -133,11 +146,16 @@ Issue は実装の最小単位です。
   - テスト戦略がある
   - 互換 / 移行 / ロールバックが必要なら整理されている
 - plan:
-  - step が TDD と review loop を回せる粒度
+  - step が behavior slice と review loop を回せる粒度
+  - `Spec-Locked Closure Index` が AC / EC / design / bug / risk と behavior slice を結び、詳細なテスト実装指示になっていない
+  - step closure contract / test bundle / pre-implementation evidence / bounded implementation batch が追える
+  - every required closure id が behavior slice、step-local close condition、verification evidence、report closure へ追跡できる
   - docs impact / docs refresh step が必要なら入っている
   - final diff review quality gate が独立している
 - report:
 - `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が残っている
+- required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で閉じている
+- required row の削除、locked expectation 変更、required 変更、spec link 意味変更がある場合は re-review 証跡が残っている
 - required step を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は `blocked` / `未完了` の reason と next action が残っている
   - `blocked` の blocker type / impact が必要な場合に残っている
   - 想定外と対処が追える
