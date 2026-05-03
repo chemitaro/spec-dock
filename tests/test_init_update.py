@@ -1906,14 +1906,14 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("### UML（", design_text)
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
-            self.assertIn("#### update_plan（着手時に登録）", plan_text)
-            self.assertIn("./spec-dock/active/issue/report.md", plan_text)
+            self.assertNotIn("update_plan", plan_text)
+            self.assertIn("このテンプレートは最小 scaffold", plan_text)
             self.assertIn("## 実行ルール（全ステップ共通）", plan_text)
-            self.assertIn("Red → Green → Refactor → review → fix → re-review → report → commit/no-op", plan_text)
+            self.assertIn("workflow_issue.md", plan_text)
+            self.assertIn("phase_plan_issue.md", plan_text)
             self.assertIn("S90 — docs impact resolution / docs refresh", plan_text)
             self.assertIn("S99 — final diff review quality gate", plan_text)
-            self.assertIn("`git diff <base>...HEAD`", plan_text)
-            self.assertIn("reviewer verdict", plan_text)
+            self.assertIn("target files:", plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
@@ -2782,6 +2782,8 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("UML（推奨: component / module）", epic_design)
         self.assertIn("UML（推奨: main sequence）", epic_design)
         self.assertIn("## State / Activity（必要時）", epic_design)
+        self.assertIn("このテンプレートは最小 scaffold", issue_design)
+        self.assertIn("項目は追加・削除・統合・並べ替えてよい", issue_design)
         self.assertIn("## Parent Diagram References", issue_design)
         self.assertIn("module dependency:", issue_design)
         self.assertIn("class dependency（必要時）:", issue_design)
@@ -2792,6 +2794,12 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("## Local Diagram Delta（必要時）", issue_design)
         self.assertIn("## Sequence Delta（必要時）", issue_design)
         self.assertIn("## Domain Model Delta（必要時）", issue_design)
+        self.assertEqual(
+            1,
+            issue_design.count("```plantuml"),
+            "issue design scaffold should only ship the standard module dependency UML placeholder",
+        )
+        self.assertIn("必要な場合だけ追加する", issue_design)
         self.assertIn("## ディレクトリ / ファイル変更計画", issue_design)
         self.assertRegex(issue_design, r"```text\n\.\n\|-- src/\n\|   \|-- package/")
         for operation in ("Add", "Modify", "Move/Rename", "Read only", "Delete"):
@@ -2806,12 +2814,18 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("user confirmation points", issue_design)
         self.assertIn("## 要件 → 設計マッピング", issue_design)
         self.assertIn("## 要件 / 例外 -> verification mapping", issue_design)
+        self.assertIn("このテンプレートは最小 scaffold", issue_plan)
+        self.assertIn("workflow_issue.md", issue_plan)
+        self.assertIn("phase_plan_issue.md", issue_plan)
         self.assertIn("## 依存関係から導く実装順序", issue_plan)
         self.assertIn("`Module Dependency Diagram`", issue_plan)
         self.assertIn("`ディレクトリ / ファイル変更計画`", issue_plan)
         self.assertIn("depends on:", issue_plan)
         self.assertIn("unblocks:", issue_plan)
         self.assertIn("target files:", issue_plan)
+        self.assertNotIn("update_plan", issue_plan)
+        self.assertNotIn("commit gate", issue_plan)
+        self.assertNotIn("commit expectation", issue_plan)
         self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
 
         phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(
@@ -2824,7 +2838,31 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書", phase_design)
         self.assertIn("視覚的・構造的に把握しやすくするために使う", phase_design)
         self.assertIn("目的は「図を増やすこと」ではなく", phase_design)
+        self.assertIn("templates は完成形や準拠規格ではなく", phase_design)
+        self.assertIn("項目を追加・削除・統合・並べ替えてよい", phase_design)
         self.assertIn("## diagram selection rules", phase_design)
+        self.assertIn("## optional diagram catalog", phase_design)
+        self.assertIn("テンプレートから削った図表は「不要になった情報」ではなく", phase_design)
+        self.assertIn("必要ならここにない図表も追加してよい", phase_design)
+        for diagram_name in (
+            "Use Case",
+            "C4 System Context",
+            "C4 Container",
+            "Component / Module View",
+            "Package Dependency",
+            "Module Dependency Diagram",
+            "Sequence",
+            "Activity",
+            "State",
+            "Domain Model / Aggregate",
+            "Bounded Context Map",
+            "Object",
+            "Class / Interface",
+            "ER / DB Schema",
+            "Deployment",
+            "Step Dependency Graph / Test Matrix / Rollback Map",
+        ):
+            self.assertIn(diagram_name, phase_design)
         self.assertIn("## DDD diagram guidance", phase_design)
         self.assertIn("## UML review gate", phase_design)
         self.assertIn("Question answered", phase_design)
@@ -2848,11 +2886,17 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("`depends on`", phase_plan_issue)
         self.assertIn("`unblocks`", phase_plan_issue)
         self.assertIn("`target files`", phase_plan_issue)
+        self.assertIn("canonical path inventory", phase_plan_issue)
+        self.assertIn("templates は最小 scaffold", phase_plan_issue)
 
         workflow_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("templates は書き始めるための scaffold", workflow_issue)
+        self.assertIn("templates は完成形ではなく、書き始めるための最小 scaffold", workflow_issue)
+        self.assertIn("項目を追加・削除・統合・並べ替えてよい", workflow_issue)
+        self.assertIn("正確性、検証可能性、人間の理解、エージェントの実行", workflow_issue)
+        self.assertIn("`optional diagram catalog` から必要なものを選んで追加してよい", workflow_issue)
+        self.assertIn("カタログ外でも、構造・境界・責務・流れ・状態・依存", workflow_issue)
         self.assertIn("Linux `tree` style の `ディレクトリ / ファイル変更計画`", workflow_issue)
 
         issue_execution_skill = (
@@ -2861,6 +2905,20 @@ class TestInitUpdate(CliRuntimeHarness):
         ).read_text(encoding="utf-8")
         self.assertIn("spec-dock/docs/phase_plan_issue.md", issue_execution_skill)
         self.assertIn("Keep templates as scaffolds", issue_execution_skill)
+        self.assertIn("Spec authoring mode", issue_execution_skill)
+        self.assertIn("Execution mode", issue_execution_skill)
+        self.assertIn("optional diagram catalog", issue_execution_skill)
+        self.assertIn("Domain Model / Aggregate", issue_execution_skill)
+        self.assertIn("other project-specific sections", issue_execution_skill)
+
+        workflow_skill = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("minimum authoring scaffolds", workflow_skill)
+        self.assertIn("add, remove, merge, reorder, or rewrite", workflow_skill)
+        self.assertIn("optional diagram choices", workflow_skill)
+        self.assertIn("project-specific sections outside the catalog", workflow_skill)
 
         for root in (
             repo_root / "src/spec_dock/assets/spec_dock/templates",

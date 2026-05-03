@@ -63,6 +63,10 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - Initiative: `spec-dock/templates/initiative/design.md`
   - Epic: `spec-dock/templates/epic/design.md`
   - Issue: `spec-dock/templates/issue/design.md`
+- template flexibility:
+  - templates は完成形や準拠規格ではなく、書き始めるための最小 scaffold として扱う
+  - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
+  - 不要な placeholder や該当しない節は削ってよいが、要件、設計判断、検証可能性、人間の理解に必要な情報は削らない
 
 ## design checklist
 
@@ -117,6 +121,62 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - requirement の価値説明だけを表す図
   - すぐ古くなる generated call graph
 
+## optional diagram catalog
+
+テンプレートから削った図表は「不要になった情報」ではなく、必要時に追加する候補です。
+agent はこの一覧から、設計上の誤読を減らすものだけを選び、必要ならここにない図表も追加してよいです。
+ただし、追加した図表は `PlantUML / UML usage policy`、`diagram selection rules`、`UML review gate` に従います。
+
+- Use Case:
+  - actor と goal の理解をそろえる
+  - Initiative / Epic の requirement-design 境界で、利用者・外部 actor・主要 goal が曖昧なときに使う
+  - 内部実装、class、処理順は描かない
+- C4 System Context:
+  - 対象 system と外部 actor / external system の境界を示す
+  - Initiative design の標準候補
+- C4 Container:
+  - deployable / runnable な container 境界や主要通信を示す
+  - Initiative / Epic で container 構成が変わるときだけ使う
+- Component / Module View:
+  - codebase 内の責務分割や component/module 境界を示す
+  - Epic design の主戦場。Issue では差分だけを書く
+- Package Dependency:
+  - source / compile-time dependency direction を示す
+  - Epic / Issue で依存方向、循環、layer boundary が重要なときに使う
+- Module Dependency Diagram:
+  - module / class / file / function のうち、実装順や責務境界に影響する依存だけを示す
+  - Issue design の標準候補。全 call graph にはしない
+- Sequence:
+  - 時系列の interaction、transaction、retry、queue、external API 呼び出しを示す
+  - Epic は main sequence、Issue は changed sequence delta に限定する
+- Activity:
+  - 分岐や並行を含む workflow / business process を示す
+  - 単純な直列処理には使わない
+- State:
+  - lifecycle、状態遷移、terminal state、guard を示す
+  - status model や retry / failure lifecycle が変わるときに使う
+- Domain Model / Aggregate:
+  - aggregate root、entity、value object、domain event、policy / specification、invariant を示す
+  - DDD 採用時の Epic design で共有モデルを固定し、Issue では delta だけを書く
+- Bounded Context Map:
+  - context 境界、context 間の関係、ubiquitous language の意味差を示す
+  - Initiative design で domain boundary を固定するときに使う
+- Object:
+  - invariant や relationship の具体例を示す
+  - 抽象 domain model だけでは誤読が残る場合に補助的に使う
+- Class / Interface:
+  - 局所的な責務、public contract、collaboration を示す
+  - exhaustive generated-code inventory にはしない
+- ER / DB Schema:
+  - persistence model、table relationship、migration impact を示す
+  - domain model の代替にしない
+- Deployment:
+  - runtime 配置、network boundary、infra dependency を示す
+  - infra-impacting Initiative / Epic で使う
+- Step Dependency Graph / Test Matrix / Rollback Map:
+  - plan の理解補助として、実装順、検証範囲、rollback path を示す
+  - 新しい design decision や未承認 requirement は追加しない
+
 ## diagram selection rules
 
 - Initiative:
@@ -154,8 +214,8 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
     - exhaustive generated-code class diagram
 - Issue:
   - default:
-    - Module Dependency Diagram は原則置く
-    - 非常に小さい修正で不要な場合だけ `N/A: reason` を書く
+    - non-trivial code change、dependency direction 変更、sequencing risk がある場合は Module Dependency Diagram を置く
+    - docs-only、typo、局所 test-only など依存関係が自明な場合は `N/A: reason` で省略できる
   - required when applicable:
     - Sequence Delta if crossing components, transactions, queues, external APIs, or retries
     - State Delta if changing lifecycle

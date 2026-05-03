@@ -7,7 +7,10 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 
 - Use this as the entry/routing skill for spec-dock work.
 - Keep `spec-dock/docs/` as the source of truth; skills stay concise.
-- Keep templates as authoring scaffolds; put spec authoring rules and workflow explanations in `spec-dock/docs/` and route through these skills.
+- Keep templates as minimum authoring scaffolds, not compliance targets.
+- Put spec authoring rules and workflow explanations in `spec-dock/docs/` and route through these skills.
+- Agents may add, remove, merge, reorder, or rewrite template sections when it improves correctness, human understanding, or agent executability for the specific project.
+- Use `spec-dock/docs/phase_design.md` as the source of truth for optional diagram choices. Add useful UML / PlantUML / table sections from the catalog, or project-specific sections outside the catalog, when they clarify structure, boundaries, responsibility, flow, state, or dependency.
 - Route once the main output is clear; leaf skills own the workflow details.
 
 ## Route to leaf skills

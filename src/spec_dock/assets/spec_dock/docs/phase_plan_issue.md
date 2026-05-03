@@ -31,6 +31,8 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - cleanup が最初から明確で大きい場合は、`Green` / design / 別 step で扱う
 - step 順は `design.md` の `依存関係分析`、`Module Dependency Diagram`、`ディレクトリ / ファイル変更計画` から導き、upstream / prerequisite / lower-dependency から先に置く
 - 各 step には `depends on`、`unblocks`、`design refs`、`target files` を置き、依存関係と変更対象を追えるようにする
+- `design.md` の `ディレクトリ / ファイル変更計画` を canonical path inventory とし、plan の `target files` は各 step が触る subset として書く
+- templates は最小 scaffold であり、Issue 固有の実行順・依存・検証に不要な placeholder は削除してよい
 - stage gate は `pass` まで回す
 - stage gate の `pass` 後は `report.md` を更新し、差分確認後に report とまとめてコミットする
 - cadence や approval policy の正本は `workflow_issue.md` に残し、この文書では plan 本文への埋め込み方だけを扱う
