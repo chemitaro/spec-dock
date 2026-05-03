@@ -6,7 +6,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 
 ## scope contract
 
-- plan の単位: milestone / step / block / iteration / quality gate
+- plan の単位: milestone / step / block / behavior slice / quality gate
 - plan の責務: issue requirement / design と `workflow_issue.md` の policy を、依存順に基づく実行順、review / QA / spec gate、docs impact、final diff review を持つ `plan.md` に変換する
 - plan が固定するもの:
   - 満たす要件 ID
@@ -22,13 +22,31 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 
 ## authoring rules
 
-- `workflow_issue.md` が所有する `1 step = 1 observable behavior` invariant を step 設計へ落とす
+- `workflow_issue.md` が所有する `1 step = 1 observable behavior` invariant を behavior slice 設計へ落とす
 - `block` は optional concern group とし、単純な step では最小 wrapper 1 個でよい
-- `iteration` は 1 回の TDD cycle とし、内部に `Red / Green / Refactor` を置く
-- failing test は iteration ごとに 1 本ずつ進める
-- review / QA / docs / final diff は TDD cycle の外に置き、step gate / milestone gate / `S90` / `S99` に配置する
-- `Refactor` は bounded decision point として残し、事前に詳細な cleanup task を書き込まない
-- cleanup が最初から明確で大きい場合は、`Green` / design / 別 step で扱う
+- `behavior slice` は 1 つの観測可能な振る舞いを実装・検証・レビューできる単位とする
+- 完成版 Issue plan には `Spec-Locked Closure Index`（仕様固定クロージャ索引）を必須で置く
+- `Spec-Locked Closure Index` は Issue 全体のテストケース一覧ではなく、behavior slice / step が満たすべき仕様ロックと closure の traceability を固定する coverage ledger とする
+- central index の基本列は `id`、`phase / step`、`slice`、`type`、`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、`closure evidence` とする
+- `evidence level` は `red-required`、`covered-existing`、`inspect-only`、`manual-required` のいずれかを使い、すべての row に failing test を要求しない
+- central index では private method、実装アルゴリズム、mock 構造、assert 細部を原則固定しない
+- 通常 Issue は step / behavior slice ごとに 1〜3 件程度の closure contract を書き、高リスク surface だけ詳細化する
+- public CLI behavior、shipped scaffold / runtime contract、template / system docs の互換性、installer / update / migration、filesystem / GitHub / active store、negative path、既存 regression、複数 Agent 並列実装の領域では step-local closure contract を詳細化する
+- 各 behavior slice には closure index の `id` に対応する `step closure contract`、`test bundle`、`pre-implementation evidence`、`bounded implementation batch`、`verification`、`refactor / tidy` を置く
+- Central index は仕様由来の `spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step を所有する
+- `step closure contract` はその step で満たす closure `id`、close condition、test bundle、pre-implementation evidence、verification command / evidence path、report evidence を所有する
+- `test bundle` は step closure contract の一部として、必要な範囲で acceptance / characterization / property or invariant / regression / negative を分類する
+- `test bundle` は Central index の `locked expectation` / `observable input/state` を再記述しない
+- required row の削除、`locked expectation` の変更、`required` の変更、`spec link` の意味変更は plan amendment と re-review を必須にする
+- typo / link correction は `report.md` の `Closure Delta` に記録してよい。新規 bug による regression 追加は Central index と step closure contract へ追加し、report に記録する
+- `test bundle` は必要な範囲で acceptance / characterization / property or invariant / regression / negative を分類する
+- `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを明記する
+- `test sensitivity evidence` は failing-first を完全要求できない場合に、bug-seed / mutation / contract mismatch / property violation などでテストが欠陥を検出できることを示す
+- 各 step の close 判定は Issue 全体の一覧表ではなく、その step の `step closure contract` を正本にする
+- `step closure contract` は `close when`、`verification evidence`、`report evidence`、`residual risk` を持ち、step result approval の対象にする
+- review / QA / docs / final diff は behavior slice の外に置き、step gate / milestone gate / `S90` / `S99` に配置する
+- `refactor / tidy` は bounded decision point として残し、事前に詳細な cleanup task を書き込まない
+- cleanup が最初から明確で大きい場合は、`bounded implementation batch` / design / 別 step で扱う
 - step 順は `design.md` の `依存関係分析`、`Module Dependency Diagram`、`ディレクトリ / ファイル変更計画` から導き、upstream / prerequisite / lower-dependency から先に置く
 - 各 step には `depends on`、`unblocks`、`design refs`、`target files` を置き、依存関係と変更対象を追えるようにする
 - `design.md` の `ディレクトリ / ファイル変更計画` を canonical path inventory とし、plan の `target files` は各 step が触る subset として書く
@@ -51,8 +69,10 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - 各 step の `depends on` / `unblocks` / `target files` を置く
 - `ステップ一覧` と `要件 ↔ ステップ対応` を置く
 - `レビュー / QA ゲート方針` を置く
-- `実装ステップ` を step / block / iteration で書く
-- `Refactor` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
+- `Spec-Locked Closure Index` を置く
+- `実装ステップ` を step / block / behavior slice で書く
+- 各 behavior slice の `step closure contract` / `test bundle` / `pre-implementation evidence` / `bounded implementation batch` / `verification` を置き、`test bundle` は closure index の `id` を参照できるようにする
+- `refactor / tidy` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
 - 各 step gate に `report update` を置く。commit/no-op は `workflow_issue.md` を参照し、Issue 固有の判断が必要な場合だけ明記する
 - `S90 docs impact resolution / docs refresh` を必要時に入れる
 - `S99 final diff review quality gate` を必須で置く
@@ -60,7 +80,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 
 ## diagram / trace guidance
 
-- 必要な場合だけ step dependency graph、test matrix、rollback map を置く
+- `Spec-Locked Closure Index` は必須で置き、必要な場合だけ step dependency graph、追加の decision table、rollback map を置く
 - 図表は `実装順序の根拠`、`要件 ↔ ステップ対応`、review / QA gate の理解を助ける用途に限定する
 - 新しい設計判断や未承認 requirement を図表で追加しない
 - step dependency graph を置く場合は、design の `Module Dependency Diagram` と矛盾しないようにする
@@ -68,6 +88,13 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 ## review gate
 
 - step 粒度で review / test / report 判断を回せる
+- `Spec-Locked Closure Index` が AC / EC / design / bug / risk と behavior slice の closure contract を固定している
+- central index がテスト実装詳細ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラスを示している
+- every `required=yes` closure row が少なくとも 1 つの behavior slice の `closure ids` / `test ids` から参照されている
+- every bundle `test id` が Central index に存在する
+- every required row が non-placeholder の `spec link`、`observable input/state`、`locked expectation`、`evidence level`、`closure evidence` を持つ
+- every required row に step-local close condition と planned verification evidence path がある
+- behavior slice が step closure contract、test bundle、pre-implementation evidence を持ち、bounded implementation batch として原因局所化できる
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
 - report update が stage gate に置かれている。report-before-commit/no-op の実行順は `workflow_issue.md` の実行 contract で確認する

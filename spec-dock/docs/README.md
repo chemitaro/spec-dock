@@ -73,5 +73,5 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` で整合を確認する
 - legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
 - `spec-dock update` は managed files/docs/templates/scripts/skills の更新であり、old workspace の in-place migration ツールではない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
-- Issue plan は TDD ベースの execution contract を持つが、cadence policy の正本は `workflow_issue.md`
+- Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の正本は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

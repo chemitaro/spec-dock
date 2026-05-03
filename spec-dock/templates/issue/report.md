@@ -33,6 +33,26 @@ ID: "<ISS_ID>"
 <result>
 ```
 
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | tc-001 | ... | ... | pass / fail / blocked | ... |
+
+#### Test Contract Closure
+| test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | red-required | ... | ... | pass / fail / blocked | ... |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|
+| tc-001 | S01 | ... | pass / fail / blocked | ... |
+
+#### Closure Delta
+| change | closure id | reason | re-review required |
+|---|---|---|---|
+| none / added / removed / changed | tc-001 | ... | yes / no |
+
 #### 変更したファイル
 - `path/to/file1` - ...
 - `path/to/file2` - ...
