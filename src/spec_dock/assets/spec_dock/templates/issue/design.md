@@ -12,6 +12,8 @@ ID: "<ISS_ID>"
 
 # <ISS_ID> <ISS_TITLE> — 設計（HOW）
 
+> このテンプレートは最小 scaffold です。プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目は追加・削除・統合・並べ替えてよい。
+
 ## Parent Diagram References
 - Epic diagrams:
   - ...
@@ -78,7 +80,7 @@ ID: "<ISS_ID>"
 - Update trigger:
   - 依存方向、責務境界、実装起点、変更対象 module が変わるとき
 - Diagram:
-  - 原則記載する。非常に小さい修正で不要な場合だけ `N/A: reason` を書く
+  - N/A: reason
 
 ### UML（原則: module dependency / package delta）
 ```plantuml
@@ -106,13 +108,8 @@ A --> B : depends_on
   - N/A: reason
 - retry / transaction / external API / queue:
   - ...
-
-### UML（任意: sequence delta）
-```plantuml
-@startuml
-' sequence delta diagram
-@enduml
-```
+- UML:
+  - 必要な場合だけ追加する。追加時は `phase_design.md` の diagram metadata rule に従う
 
 ## Domain Model Delta（必要時）
 - parent model refs:
@@ -123,13 +120,8 @@ A --> B : depends_on
   - ...
 - invariant changes:
   - ...
-
-### UML（任意: domain model delta）
-```plantuml
-@startuml
-' domain model delta diagram
-@enduml
-```
+- UML:
+  - 必要な場合だけ追加する。追加時は `phase_design.md` の diagram metadata rule に従う
 
 ## クラス / インターフェース詳細設計（必要時）
 - Class / Interface:
@@ -138,13 +130,8 @@ A --> B : depends_on
   - ...
 - collaboration:
   - ...
-
-### UML（任意: class / interface）
-```plantuml
-@startuml
-' class / interface diagram
-@enduml
-```
+- UML:
+  - 必要な場合だけ追加する。追加時は `phase_design.md` の diagram metadata rule に従う
 
 ## ディレクトリ / ファイル変更計画
 ```text
