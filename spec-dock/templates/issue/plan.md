@@ -115,8 +115,10 @@ ID: "<ISS_ID>"
 - target files:
   - ...
 - test bundle:
-  - test ids:
+  - closure ids:
     - tc-001
+  - test ids:
+    - same as closure ids unless a project explicitly documents separate aliases
   - evidence level:
     - red-required / covered-existing / inspect-only / manual-required
   - acceptance:
@@ -141,6 +143,7 @@ ID: "<ISS_ID>"
 - report evidence:
   - Step Contract Closure:
   - Test Contract Closure:
+  - Closure Coverage:
 - residual risk:
   - ...
 
@@ -202,3 +205,7 @@ ID: "<ISS_ID>"
   - ...
 - final diff approved:
   - ...
+- required closure ids closed:
+  - Step Contract Closure:
+  - Test Contract Closure:
+  - Closure Coverage:

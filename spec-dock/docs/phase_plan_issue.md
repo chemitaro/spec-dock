@@ -36,6 +36,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - Central index は仕様由来の `spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step を所有する
 - `step closure contract` はその step で満たす closure `id`、close condition、test bundle、pre-implementation evidence、verification command / evidence path、report evidence を所有する
 - `test bundle` は step closure contract の一部として、必要な範囲で acceptance / characterization / property or invariant / regression / negative を分類する
+- `test ids` と書く場合も Central index の closure `id` の alias として扱い、別 alias を使う場合は report の `Closure Delta` に `test id alias` と `resolves to closure id` を記録する
 - `test bundle` は Central index の `locked expectation` / `observable input/state` を再記述しない
 - required row の削除、`locked expectation` の変更、`required` の変更、`spec link` の意味変更は plan amendment と re-review を必須にする
 - typo / link correction は `report.md` の `Closure Delta` に記録してよい。新規 bug による regression 追加は Central index と step closure contract へ追加し、report に記録する
@@ -91,7 +92,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `Spec-Locked Closure Index` が AC / EC / design / bug / risk と behavior slice の closure contract を固定している
 - central index がテスト実装詳細ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラスを示している
 - every `required=yes` closure row が少なくとも 1 つの behavior slice の `closure ids` / `test ids` から参照されている
-- every bundle `test id` が Central index に存在する
+- every bundle `closure id` が Central index に存在し、別の `test id` alias を使う場合は `Closure Delta` から Central index の closure `id` へ解決できる
 - every required row が non-placeholder の `spec link`、`observable input/state`、`locked expectation`、`evidence level`、`closure evidence` を持つ
 - every required row に step-local close condition と planned verification evidence path がある
 - behavior slice が step closure contract、test bundle、pre-implementation evidence を持ち、bounded implementation batch として原因局所化できる

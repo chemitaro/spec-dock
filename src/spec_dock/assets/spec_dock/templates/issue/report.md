@@ -36,22 +36,24 @@ ID: "<ISS_ID>"
 #### Step Contract Closure
 | step | closure ids | close condition | evidence | result | notes |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / fail / blocked | ... |
+| S01 | tc-001 | ... | ... | pass / approved no-op / fail / blocked | ... |
 
 #### Test Contract Closure
-| test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required | ... | ... | pass / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required | ... | ... | pass / approved no-op / fail / blocked | ... |
+
+- `closure id / test id` は Central index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### Closure Coverage
 | closure id | step | verification evidence | result | notes |
-|---|---|---|---|
-| tc-001 | S01 | ... | pass / fail / blocked | ... |
+|---|---|---|---|---|
+| tc-001 | S01 | ... | pass / approved no-op / fail / blocked | ... |
 
 #### Closure Delta
-| change | closure id | reason | re-review required |
-|---|---|---|---|
-| none / added / removed / changed | tc-001 | ... | yes / no |
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no |
 
 #### 変更したファイル
 - `path/to/file1` - ...
