@@ -79,7 +79,7 @@ Issue は実装の最小単位です。
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
 - route だけ、または `active set` だけでは Issue work は完了しない
-- `complete` と報告してよいのは、active issue が set され、その対象 issue を確認でき、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が記録されている場合のみである
+- `complete` と報告してよいのは、active issue が set され、その対象 issue を確認でき、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved no-op として閉じている証跡が記録されている場合のみである
 - 4 点の issue docs のいずれかが untouched、template、placeholder、または実質未記入の状態で残る場合は `未完了` であり、成功報告をしてはならない
 - required step（`sync` / `validate` / `required review`）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
 - `blocked` は、外部依存、権限不足、サービス停止、その他の環境条件によって次の required action を進められない状態を指す
@@ -153,10 +153,10 @@ Issue は実装の最小単位です。
   - docs impact / docs refresh step が必要なら入っている
   - final diff review quality gate が独立している
 - report:
-- `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が残っている
-- required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で閉じている
-- required row の削除、locked expectation 変更、required 変更、spec link 意味変更がある場合は re-review 証跡が残っている
-- required step を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は `blocked` / `未完了` の reason と next action が残っている
+  - `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が残っている
+  - required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で閉じている
+  - required row の削除、locked expectation 変更、required 変更、spec link 意味変更がある場合は re-review 証跡が残っている
+  - required step を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は `blocked` / `未完了` の reason と next action が残っている
   - `blocked` の blocker type / impact が必要な場合に残っている
   - 想定外と対処が追える
 
