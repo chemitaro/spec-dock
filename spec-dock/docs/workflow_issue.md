@@ -15,13 +15,17 @@ Issue は実装の最小単位です。
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 - Issue plan playbook: [phase_plan_issue.md](phase_plan_issue.md)
 
-## 作成と active set
+## 作成と issue start
 
 ```bash
 ./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."
 ./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."
 
 ./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>]
+
+./spec-dock/scripts/spec-dock issue start <issue-id|github-issue-number|url>
+./spec-dock/scripts/spec-dock issue start <issue-id|github-issue-number|url> -F
+./spec-dock/scripts/spec-dock issue finish
 
 ./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>
 ./spec-dock/scripts/spec-dock active set --id <issue-id>
@@ -38,6 +42,14 @@ Issue は実装の最小単位です。
 - `import issue` の canonical URL は current repo と照合され、current repo を検証できない場合も含めて foreign GitHub issue URL は fail-closed で reject される
 - `--allow-foreign-url` は compatibility flag として残るが、cross-repo node identity import の成功経路にはならない
 - canonical でない URL-like target は受け付けない
+- 通常の issue execution 開始は `./spec-dock/scripts/spec-dock issue start <target>` を primary path とし、active set と checkout を一操作で完了する
+- `issue start` は unfinished active issue branch 上で別 issue を始めようとした場合だけ default で block する。`main` / `master` / `develop` / `staging` や non-issue branch からの start は block しない
+- `./spec-dock/scripts/spec-dock issue start <target> -F` / `--force` は unfinished active issue guard だけを bypass する。依存未解決や他の readiness check は bypass しない
+- 通常の issue 完了は `./spec-dock/scripts/spec-dock issue finish` を primary path とする。active issue の linked GitHub issue を close し、already-closed も success として扱い、その確認後に active state を解除する
+`issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, sync, validate, test, or review completion; delivery completion still requires separate evidence in tests, reviews, reports, and PR/merge workflow.
+- delivery completion の判定と required evidence の記録・確認は、`issue finish` の前に、active issue が set され対象 issue を確認できる状態で `spec-dock/active/issue/report.md` に対して行う
+- `issue finish` 後は active issue が clear されていてよく、active issue が残っていること自体を `complete` condition にしてはならない
+- `active set` は manual / recovery command として維持する。unfinished active issue guard の対象外であり、必要時だけ direct に使う
 - `active set` のデフォルトは no-checkout。ブランチ移動が必要な場合だけ `--checkout`
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存未解決なら `active set` は通常失敗する。確認は `./spec-dock/scripts/spec-dock deps check <target> --github`
@@ -78,8 +90,8 @@ Issue は実装の最小単位です。
 - 各 step は step result approval を得てから次へ進む
 - docs impact が `none` でない場合は、final quality gate の前に docs refresh / docs impact resolution step を置く
 - `git diff <base>...HEAD` を見る final diff review quality gate は独立 step にし、reviewer approval まで終える
-- route だけ、または `active set` だけでは Issue work は完了しない
-- `complete` と報告してよいのは、active issue が set され、その対象 issue を確認でき、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved no-op として閉じている証跡が記録されている場合のみである
+- route だけ、または manual `active set` だけでは Issue work は完了しない。通常の開始/終了は `issue start` / `issue finish` を使う
+- `complete` と報告してよいのは、`issue finish` 前に active issue が set されその対象 issue を確認できる状態で、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved no-op として閉じている証跡が記録され、その evidence を確認している場合のみである
 - 4 点の issue docs のいずれかが untouched、template、placeholder、または実質未記入の状態で残る場合は `未完了` であり、成功報告をしてはならない
 - required step（`sync` / `validate` / `required review`）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
 - `blocked` は、外部依存、権限不足、サービス停止、その他の環境条件によって次の required action を進められない状態を指す
@@ -95,7 +107,8 @@ Issue は実装の最小単位です。
 - `Test Contract Closure` に required closure id、step、evidence level、pre-implementation evidence、verification command、result を残す
 - `Closure Coverage` に各 required closure id と verification evidence の対応を残す
 - `Closure Delta` に追加・削除・変更・未実装 row と re-review 要否を残す
-- `complete` 判定に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡を残す
+- `complete` 判定に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡を、`issue finish` 前に active issue を確認できる状態の report に残す
+- `issue finish` 後は active issue が clear されていてよく、`complete` 判定は active state の残存ではなく `issue finish` 前に記録・確認した report evidence で行う
 - `complete` 判定に必要な required closure id は、report の `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved no-op として閉じている必要がある
 - required step（`sync` / `validate` / `required review`）を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
 - `blocked` / `未完了` の場合は reason と next action を残し、環境 blocker と product gap を混在させない
@@ -153,7 +166,7 @@ Issue は実装の最小単位です。
   - docs impact / docs refresh step が必要なら入っている
   - final diff review quality gate が独立している
 - report:
-  - `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が残っている
+  - `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が、`issue finish` 前に active issue を確認できる状態の report に残っている
   - required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で閉じている
   - required row の削除、locked expectation 変更、required 変更、spec link 意味変更がある場合は re-review 証跡が残っている
   - required step を未実施にした場合、または実行しても成功、pass、approval に到達しなかった場合は `blocked` / `未完了` の reason と next action が残っている

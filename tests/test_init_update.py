@@ -124,11 +124,17 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/scripts/spec_dock_runtime/application/contracts.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/application/doctor.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/application/repo_context.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py"
@@ -138,6 +144,18 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/scripts/spec_dock_runtime/application/import_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/cli/parser.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/cli/registry.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/commands/issue.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/issue.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/commands/new.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py"
@@ -150,6 +168,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py"
         ),
     }
 
@@ -628,6 +649,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00055-close-linked-github-issues-from-specdock-command/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00088-issue-lifecycle-start-and-finish-commands/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
@@ -668,6 +690,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00055-close-linked-github-issues-from-specdock-command/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00056-delete-local-spec-nodes-with-safeguards-and-epic-final-closeout/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00088-issue-lifecycle-start-and-finish-commands/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],

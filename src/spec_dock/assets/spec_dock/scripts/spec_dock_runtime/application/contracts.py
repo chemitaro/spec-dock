@@ -199,6 +199,36 @@ class CloseNodeResult:
     warnings: list[str]
 
 
+@dataclass(frozen=True)
+class IssueStartRequest:
+    target: TargetRef
+    force: bool
+    issue_limit: int
+
+
+@dataclass(frozen=True)
+class IssueStartResult:
+    target_display: str
+    requested_issue_id: str
+    active_set: ActiveSetResult
+    forced: bool
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
+class IssueFinishRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class IssueFinishResult:
+    issue_id: str
+    github_issue_number: int
+    already_closed: bool
+    active_cleared: bool
+    warnings: list[str]
+
+
 DeleteTerminalStatus = Literal[
     "ok",
     "invalid_selector_combination",
@@ -396,6 +426,12 @@ class UseCases:
     )
     close_node: Callable[[CloseNodeRequest], CloseNodeResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("close_node is not configured")
+    )
+    issue_start: Callable[[IssueStartRequest], IssueStartResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("issue_start is not configured")
+    )
+    issue_finish: Callable[[IssueFinishRequest], IssueFinishResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("issue_finish is not configured")
     )
     doctor: Callable[[DoctorRequest], DoctorResult] = (
         lambda _req: DoctorResult(ok=True, findings=[], warnings=[])

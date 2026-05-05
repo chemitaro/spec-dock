@@ -48,6 +48,10 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ./spec-dock/scripts/spec-dock import epic <num-or-canonical-url> --title "..." [--initiative <id>] [--allow-foreign-url]
 ./spec-dock/scripts/spec-dock import issue <num-or-canonical-url> --title "..." [--epic <id>] [--allow-foreign-url]
 
+./spec-dock/scripts/spec-dock issue start <github-issue-number>
+./spec-dock/scripts/spec-dock issue start --id <issue-id>
+./spec-dock/scripts/spec-dock issue finish
+
 ./spec-dock/scripts/spec-dock active set <id|#num|url>
 ./spec-dock/scripts/spec-dock active set --id <node-id>
 ./spec-dock/scripts/spec-dock active set --github-issue <n>
@@ -69,6 +73,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `new issue --create-github-issue` は default create の explicit alias
 - `--no-github` / `--allow-foreign-url` は compatibility flag として残るが、current contract mismatch を auto-migrate せず reject/fail-fast しうる
 - `import` は読み取り確認のみで、GitHub を更新しない。canonical URL は current repo と照合し、cross-repo node import は reject される
+- Issue 実行の通常入口は `issue start <target>`、終了導線は `issue finish`。`active set` / `active set --checkout` は manual / recovery 用の low-level command として使う
 - `active set` / `deps check` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` で整合を確認する
 - legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
