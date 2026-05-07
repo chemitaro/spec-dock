@@ -234,11 +234,12 @@ def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
                     )
                 )
 
+    checkout = active_issue_id != requested.id
     active_set_result = set_active(
         SetActiveRequest(
             target=req.target,
             force=False,
-            checkout=True,
+            checkout=checkout,
             use_github=True,
             issue_limit=req.issue_limit,
         ),

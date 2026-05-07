@@ -468,16 +468,20 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            initial_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
 
             first = self._run_runtime_capture(target, ["issue", "start", "101"], env=test_env)
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
             self._commit_all(target, "active first issue")
+            issue_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             same = self._run_runtime_capture(target, ["issue", "start", "101"], env=test_env)
             self.assertEqual(same.returncode, 0, same.stdout + same.stderr)
             self.assertNotIn("issue start blocked", same.stderr)
+            same_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(same_branch, issue_branch)
             self._commit_all(target, "same issue restart")
 
-            self._run_git(target, ["checkout", "main"])
+            self._run_git(target, ["checkout", initial_branch])
             main_start = self._run_runtime_capture(target, ["issue", "start", "102"], env=test_env)
             self.assertEqual(main_start.returncode, 0, main_start.stdout + main_start.stderr)
             self.assertNotIn("issue start blocked", main_start.stderr)
