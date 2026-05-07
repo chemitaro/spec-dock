@@ -13,6 +13,8 @@ from ..application.contracts import (
     DepsCheckResult,
     DoctorResult,
     ImportNodeResult,
+    IssueFinishResult,
+    IssueStartResult,
     MutateDepsError,
     MutateDepsResult,
     SyncCommandResult,
@@ -253,6 +255,37 @@ def render_close_text(result: CloseNodeResult, *, target_display: str) -> CliTex
                 "spec-dock: ok (close) "
                 f"target={target_display} node={result.node_id} kind={result.node_kind} "
                 f"github=#{result.github_issue_number} state={state} already_closed={'true' if result.already_closed else 'false'}"
+            )
+        ],
+        stderr_lines=[],
+        warnings=list(result.warnings),
+    )
+
+
+def render_issue_start_text(result: IssueStartResult) -> CliText:
+    selection = result.active_set.selection
+    ini = selection.initiative_id or "(none)"
+    epic = selection.epic_id or "(none)"
+    issue = selection.issue_id or "(none)"
+    stdout_lines = [
+        (
+            "spec-dock: ok (issue start) "
+            f"target={result.target_display} initiative={ini} epic={epic} issue={issue}"
+        )
+    ]
+    if result.active_set.branch is not None:
+        stdout_lines.append(f"spec-dock: ok (issue checkout) branch={result.active_set.branch.desired}")
+    return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
+
+
+def render_issue_finish_text(result: IssueFinishResult) -> CliText:
+    return CliText(
+        stdout_lines=[
+            (
+                "spec-dock: ok (issue finish) "
+                f"issue={result.issue_id} github=#{result.github_issue_number} state=CLOSED "
+                f"active_cleared={'true' if result.active_cleared else 'false'} "
+                f"already_closed={'true' if result.already_closed else 'false'}"
             )
         ],
         stderr_lines=[],

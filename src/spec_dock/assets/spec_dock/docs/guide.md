@@ -85,14 +85,17 @@ spec-dock/
 ## 最短 workflow
 
 1. 既存ノードに収まるか確認し、必要なら `new` / `import` する
-2. `active set` で作業対象を固定する
+2. Issue 実行では `issue start <target>` で作業対象を固定し、対象ブランチへ checkout する
 3. 対象 scope の `workflow_*.md` を正本にし、requirement / design は shared playbook、plan は `phase_plan.md` → `phase_plan_<scope>.md` の順で書く
 4. Initiative は Epic 分解、Epic は Issue 分割、Issue は agent-native / behavior-slice based execution contract を plan に落とす
-5. `validate` / `sync` で整合性と生成物を更新する
+5. `validate` / `sync` で整合性と生成物を更新し、Issue lifecycle を閉じる場合は `issue finish` を使う
 
 ## 代表コマンド（runtime script）
 
 ```bash
+./spec-dock/scripts/spec-dock issue start <github-issue-number>
+./spec-dock/scripts/spec-dock issue start --id <issue-id>
+./spec-dock/scripts/spec-dock issue finish
 ./spec-dock/scripts/spec-dock active set <id|#num|url>
 ./spec-dock/scripts/spec-dock deps check <target> --github
 ./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
@@ -100,6 +103,8 @@ spec-dock/
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync --github
 ```
+
+`active set` / `active set --checkout` は manual / recovery 用の low-level command です。通常の Issue 実行では `issue start` / `issue finish` を入口にします。
 
 
 ## 次に読む
