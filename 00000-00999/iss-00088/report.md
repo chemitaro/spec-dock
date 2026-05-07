@@ -5,7 +5,7 @@ ID: "iss-00088"
 関連GitHub: ["#88"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-05"
+最終更新: "2026-05-06"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -14,7 +14,7 @@ ID: "iss-00088"
 
 ## 実装サマリー
 - 実装完了。`issue start` / `issue finish` の guided lifecycle command、provider/docs/skill/mirror 更新、targeted tests、full regression、`validate`、`sync --github` を完了した。
-- `issue start -F` は unfinished active issue guard のみを bypass し、dependency/readiness checks は bypass しない契約として実装・テストした。
+- `issue start -f` は unfinished active issue guard のみを bypass し、dependency/readiness checks は bypass しない契約として実装・テストした。
 - `active set` / `active set --checkout` は manual / recovery command として既存 contract を維持した。
 
 ## 実装記録（セッションログ）
@@ -100,8 +100,8 @@ issue: iss-00088 (spec-dock/initiatives/init-local-00002-prototype-feature-expan
 #### 実施内容
 - `spec-dock issue start` / `spec-dock issue finish` command group を追加した。
 - `issue start` は issue node のみを対象にし、active set と checkout を一操作で行う。
-- unfinished active issue branch から別 issue を start する場合、GitHub state が `CLOSED` でない、または確認不能で、`-F` がないときは active mutation / checkout の前に block する。
-- `-F` / `--force` は lifecycle guard だけを bypass し、dependency/readiness check は `set_active(force=False)` として維持した。
+- unfinished active issue branch から別 issue を start する場合、GitHub state が `CLOSED` でない、または確認不能で、`-f` がないときは active mutation / checkout の前に block する。
+- `-f` / `--force` は lifecycle guard だけを bypass し、dependency/readiness check は `set_active(force=False)` として維持した。
 - `main` / `master` / `develop` / `staging` / non-issue branch からの start と same issue restart は block しない。
 - `issue finish` は active issue の linked GitHub issue を close し、already-closed を success として扱い、その成功後だけ active state を clear する。
 - `issue finish` の no active / no GitHub linkage / stale active node / GitHub state or close failure は active state を保持し、recovery guidance と raw reason を表示する。
@@ -142,8 +142,8 @@ python -m unittest discover -v
 # exposes issue start / issue finish
 
 ./spec-dock/scripts/spec-dock issue start --help
-# exposes --id, --github-issue, -F/--force, --gh-limit
-# -F help states dependency readiness checks still apply
+# exposes --id, --github-issue, -f/--force, --gh-limit
+# -f help states dependency readiness checks still apply
 
 ./spec-dock/scripts/spec-dock validate
 # spec-dock: ok (validate) nodes=37
@@ -169,7 +169,7 @@ diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-executi
 #### Step Contract Closure
 | step | closure ids | close condition | evidence | result | notes |
 |---|---|---|---|---|---|
-| S01 | lc-001, lc-002, lc-003, lc-004, lc-008 | application lifecycle guard and force scope implemented | `tests.cli_runtime.test_issue_lifecycle` pass | pass | `-F` does not bypass dependency guard |
+| S01 | lc-001, lc-002, lc-003, lc-004, lc-008 | application lifecycle guard and force scope implemented | `tests.cli_runtime.test_issue_lifecycle` pass | pass | `-f` does not bypass dependency guard |
 | S02 | lc-001, lc-002, lc-003, lc-004 | CLI `issue start` parser/output/action paths implemented | CLI help + lifecycle tests pass | pass | block message includes recovery commands |
 | S03 | lc-005, lc-006 | CLI `issue finish` close/clear ordering implemented | finish tests pass | pass | failure paths leave active unchanged |
 | S90 | lc-007 | docs/skill primary path updated and mirrored | docs/skill grep + mirror diffs clean | pass | `active set` documented as manual/recovery |
@@ -262,21 +262,42 @@ diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-executi
   - QA-reviewer pass: no P0/P1; P2 stale `workflow-tree.md` guidance was addressed after review.
   - final spec re-review pass: S99 `pending-review` contradiction resolved; no P0/P1 blockers remain.
   - spec-review P1 docs findings were resolved by documenting `issue start` / `issue finish` in root `README.md`, removing the skill contradiction that required active state after finish, and aligning `workflow_issue.md` completion wording with active clear.
+- Manual test:
+  - report directory: `manual-tests/reports/2026-05-05-iss-00088-issue-lifecycle/`
+  - workspace: `manual-tests/workspaces/2026-05-05-iss-00088-issue-lifecycle/repo`
+  - GitHub repo: `chemitaro/spec-dock-manual-iss-00088-lifecycle`
+  - verdict: pass
+  - covered real GitHub-backed `issue start`, unfinished branch guard, `-f` dependency readiness preservation, direct `active set --checkout` manual/recovery boundary, non-issue branch start, `issue finish` close+active clear, already-closed finish, and recovery guidance with active preservation.
+  - final health: `validate` ok (`nodes=7`), `sync --github` ok, `doctor` ok (`findings=0`), and all temporary GitHub issues were closed.
+  - operational observation: after `issue finish`, the current Git branch remains on the issue branch; running `sync --github` there can restore active from the branch name, so final cleanup should switch to `main` or another non-issue branch before sync when active should remain clear.
 
 ## 遭遇した問題と解決
+- 2026-05-06 force short option correction:
+  - user feedback により、`issue start` の unfinished active issue guard bypass short option を uppercase `-F` ではなく lowercase `-f` に修正した。
+  - long option `--force` は維持した。
+  - `active set --force` / `sync --force` など他 command の force contract は変更していない。
+  - block/recovery message、provider runtime、dogfooding runtime mirror、provider/dogfooding docs、root README、issue execution skill、tests、issue docs を `-f` に揃えた。
+  - verification:
+    - `./spec-dock/scripts/spec-dock issue start --help`: `-f, --force` を表示。
+    - `python -m unittest tests.cli_runtime.test_issue_lifecycle -v`: pass (`Ran 15 tests ... OK`)。
+    - `./spec-dock/scripts/spec-dock validate`: pass (`nodes=37`)。
+    - provider/dogfooding runtime mirror for `commands/issue.py` and `application/issue_lifecycle.py`: `cmp -s` pass。
+    - `git diff --check`: pass。
+  - old short options `-F` and accidental `-t` are rejected by lifecycle CLI regression test.
 - 2026-05-05 SG1 spec review は fail:
-  - `-F` の scope が dependency/readiness bypass と読める設計記述になっていた。
+  - `-f` の scope が dependency/readiness bypass と読める設計記述になっていた。
   - S99 final gate に `sync --github` evidence が不足していた。
   - S01-S03 に step-local の bounded implementation batch / verification / report evidence が不足していた。
   - S00 が lc-007 docs closure を先取りしており、S90 の docs closure と混同しやすかった。
 - 解決:
-  - `-F` を unfinished active issue guard 専用とし、dependency/readiness check は bypass しない契約へ修正した。
+  - `-f` を unfinished active issue guard 専用とし、dependency/readiness check は bypass しない契約へ修正した。
   - S99 に `./spec-dock/scripts/spec-dock sync --github` と report evidence を追加した。
   - S00-S03/S90 に bounded implementation batch、verification command、report evidence、refactor guardrails を補足した。
   - S00 は SG1 baseline として扱い、lc-007 は S90/S99 の docs/skill closure に限定した。
 
 ## 学んだこと
 - `issue finish` の completion source は local lifecycle flag ではなく GitHub `CLOSED` state として固定した。
+- 実運用では `issue finish` 後も Git branch 自体は issue branch のままなので、その状態で `sync --github` を走らせると branch 名から active が復元されうる。active clear を保ちたい終了手順では、`main` など non-issue branch へ移動してから final sync するのが安全。
 
 ## 今後の推奨事項
 - 追加の Phase 2 として force reason / audit schema、finish 前の delivery gate 連携、PR/merge automation を検討する場合は、別 issue で要件化してから実装する。

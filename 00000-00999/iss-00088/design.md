@@ -5,7 +5,7 @@ ID: "iss-00088"
 関連GitHub: ["#88"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-05"
+最終更新: "2026-05-06"
 依存: ["requirement.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -34,7 +34,7 @@ ID: "iss-00088"
 - 非交渉制約:
   - provider runtime source と dogfooding docs / assets の整合を保つ。
   - GitHub state が確認できない active issue は unfinished とみなす。
-  - `-F` / `--force` は理由入力なしで使える。
+  - `-f` / `--force` は理由入力なしで使える。
 - 前提:
   - `close_node`、`set_active`、`clear_active` は既存 use case として存在する。
   - `infer_active_node_from_branch` は current branch から issue node を推定できる。
@@ -82,7 +82,7 @@ ID: "iss-00088"
   - ユーザーが「判定は issue がクローズであるかどうかを使用する」と指定したため。
   - local finished flag を追加しないことで Phase 1 の保存状態を増やさない。
 - trade-off:
-  - GitHub state が取得できない場合は安全側に倒して stop するため、offline / auth failure 時は `-F` が必要になる。
+  - GitHub state が取得できない場合は安全側に倒して stop するため、offline / auth failure 時は `-f` が必要になる。
 
 ## 依存関係分析
 - module dependency:
@@ -139,15 +139,15 @@ IssueCmd --> Text : render lifecycle result
 
 ## インターフェース契約
 - CLI:
-  - `./spec-dock/scripts/spec-dock issue start <target> [-F|--force] [--gh-limit N]`
-  - `./spec-dock/scripts/spec-dock issue start --id <issue-id> [-F|--force] [--gh-limit N]`
-  - `./spec-dock/scripts/spec-dock issue start --github-issue <n> [-F|--force] [--gh-limit N]`
+  - `./spec-dock/scripts/spec-dock issue start <target> [-f|--force] [--gh-limit N]`
+  - `./spec-dock/scripts/spec-dock issue start --id <issue-id> [-f|--force] [--gh-limit N]`
+  - `./spec-dock/scripts/spec-dock issue start --github-issue <n> [-f|--force] [--gh-limit N]`
   - `./spec-dock/scripts/spec-dock issue finish`
 - Defaults:
   - `issue start` always performs checkout.
   - `issue start` uses GitHub status for guard/readiness by default; there is no `--github` opt-in flag in Phase 1 because normal behavior must not require users to remember it.
-  - `-F` / `--force` bypasses only the unfinished active issue guard introduced by this command.
-  - `issue start` must not widen existing dependency/readiness bypass semantics. If the underlying active-set path has a broader `force` flag, lifecycle guard force and dependency force must be separated so `issue start -F` does not silently skip dependency readiness.
+  - `-f` / `--force` bypasses only the unfinished active issue guard introduced by this command.
+  - `issue start` must not widen existing dependency/readiness bypass semantics. If the underlying active-set path has a broader `force` flag, lifecycle guard force and dependency force must be separated so `issue start -f` does not silently skip dependency readiness.
 - Output:
   - start success:
     - `spec-dock: ok (issue start) target=<target> initiative=<id> epic=<id> issue=<id>`
@@ -297,7 +297,7 @@ tests/
   - finish closes then clears active.
   - finish failure does not clear active.
 - CLI:
-  - parser accepts `issue start`, `issue start -F`, `issue finish`.
+  - parser accepts `issue start`, `issue start -f`, `issue finish`.
   - non-issue target fails for start.
   - blocked message contains exact recovery commands.
 - Integration / runtime:
@@ -311,7 +311,7 @@ tests/
 ## 要件 / 例外 -> verification mapping
 - AC-001 -> CLI runtime test for issue start success and branch checkout.
 - AC-002 -> CLI/application test for blocked unfinished branch.
-- AC-003 -> CLI/application test for `-F`.
+- AC-003 -> CLI/application test for `-f`.
 - AC-004 -> CLI/application test for main/non-issue branch.
 - AC-005 -> CLI/application test for finish close and active clear.
 - AC-006 -> CLI/application tests for no active / no link / close failure.
@@ -321,7 +321,7 @@ tests/
 ## リスク / 移行 / ロールバック
 - risk:
   - GitHub state lookup can be expensive or unavailable.
-  - Mitigation: failure is actionable and `-F` remains available.
+  - Mitigation: failure is actionable and `-f` remains available.
 - risk:
   - `finish` may be mistaken for merge/PR completion.
   - Mitigation: output/docs explicitly say it closes GitHub issue and clears active only.
