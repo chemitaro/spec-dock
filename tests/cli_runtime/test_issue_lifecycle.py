@@ -509,6 +509,42 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00102-second-issue")
 
+    def test_issue_start_then_finish_closes_open_issue_and_clears_active(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self._prepare_clean_repo_with_two_issues(target)
+            bin_dir = Path(bin_tmp)
+            state_path = self._make_gh_stub(bin_dir, states={101: "OPEN", 102: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            started = self._run_runtime_capture(target, ["issue", "start", "--id", "iss-00101"], env=test_env)
+            self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+            self.assertIn("spec-dock: ok (issue start)", started.stdout)
+            self.assertIn("issue=iss-00101", started.stdout)
+            self.assertIn("spec-dock: ok (issue checkout) branch=iss-00101-first-issue", started.stdout)
+            self.assertEqual(self._active_issue_id(target), "iss-00101")
+            started_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(started_branch, "iss-00101-first-issue")
+
+            finished = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
+
+            self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
+            self.assertIn("spec-dock: ok (issue finish)", finished.stdout)
+            self.assertIn("issue=iss-00101", finished.stdout)
+            self.assertIn("github=#101", finished.stdout)
+            self.assertIn("active_cleared=true", finished.stdout)
+            self.assertIn("already_closed=false", finished.stdout)
+            self.assertIsNone(self._active_issue_id(target))
+            finished_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+            self.assertEqual(finished_branch, "iss-00101-first-issue")
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["101"]["state"], "CLOSED")
+
     def test_issue_finish_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")

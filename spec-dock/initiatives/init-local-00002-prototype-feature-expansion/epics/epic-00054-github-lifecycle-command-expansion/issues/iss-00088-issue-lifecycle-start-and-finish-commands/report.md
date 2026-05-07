@@ -272,6 +272,27 @@ diff -u src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-executi
   - operational observation: after `issue finish`, the current Git branch remains on the issue branch; running `sync --github` there can restore active from the branch name, so final cleanup should switch to `main` or another non-issue branch before sync when active should remain clear.
 
 ## 遭遇した問題と解決
+- 2026-05-07 skill external review and remediation:
+  - consultant verdict: conditional_pass.
+    - finding: skill reminder should state that `issue start -f` / `--force` does not bypass dependency readiness, target validation, or checkout safety.
+    - finding: workflow command block should visually separate primary lifecycle and manual / recovery commands.
+    - finding: `issue finish` naming can be misread as delivery completion; skill already mitigates this but should keep the warning prominent.
+  - QA-reviewer verdict: pass with P2 findings.
+    - finding: skill did not yet warn that `sync --github` on a just-finished issue branch can restore active from branch-derived context.
+    - finding: automated regression did not yet cover the primary CLI path `issue start` -> `issue finish` in one scenario.
+  - spec-reviewer verdict: fail with P1.
+    - finding: shipped provider skill at `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` still documented old `issue start -F` while dogfooding mirror used `-f`.
+  - remediation:
+    - provider skill and dogfooding mirror skill now both document `issue start -f` / `--force`.
+    - skill now states that `-f` / `--force` bypasses only the unfinished active issue guard and does not bypass dependency readiness, target validation, or checkout safety.
+    - skill and workflow now warn that post-finish `sync --github` on the issue branch can restore active; final sync should move to `main` or another non-issue branch first, or be skipped after finish.
+    - workflow command block now separates `# primary lifecycle` from `# manual / recovery only`.
+    - added `test_issue_start_then_finish_closes_open_issue_and_clears_active` to cover the skill's primary lifecycle path.
+  - verification:
+    - provider skill / dogfooding mirror skill: `cmp -s` pass.
+    - provider workflow / dogfooding workflow: `cmp -s` pass.
+    - targeted grep found no stale `issue start -F` or accidental `issue start -t` guidance outside historical/report context.
+    - `python -m unittest tests.cli_runtime.test_issue_lifecycle -v`: pass (`Ran 16 tests ... OK`).
 - 2026-05-06 force short option correction:
   - user feedback により、`issue start` の unfinished active issue guard bypass short option を uppercase `-F` ではなく lowercase `-f` に修正した。
   - long option `--force` は維持した。
