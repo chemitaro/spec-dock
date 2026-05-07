@@ -24,7 +24,7 @@ Issue は実装の最小単位です。
 ./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title "..." [--epic <epic-id>]
 
 ./spec-dock/scripts/spec-dock issue start <issue-id|github-issue-number|url>
-./spec-dock/scripts/spec-dock issue start <issue-id|github-issue-number|url> -F
+./spec-dock/scripts/spec-dock issue start <issue-id|github-issue-number|url> -f
 ./spec-dock/scripts/spec-dock issue finish
 
 ./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>
@@ -44,7 +44,7 @@ Issue は実装の最小単位です。
 - canonical でない URL-like target は受け付けない
 - 通常の issue execution 開始は `./spec-dock/scripts/spec-dock issue start <target>` を primary path とし、active set と checkout を一操作で完了する
 - `issue start` は unfinished active issue branch 上で別 issue を始めようとした場合だけ default で block する。`main` / `master` / `develop` / `staging` や non-issue branch からの start は block しない
-- `./spec-dock/scripts/spec-dock issue start <target> -F` / `--force` は unfinished active issue guard だけを bypass する。依存未解決や他の readiness check は bypass しない
+- `./spec-dock/scripts/spec-dock issue start <target> -f` / `--force` は unfinished active issue guard だけを bypass する。依存未解決や他の readiness check は bypass しない
 - 通常の issue 完了は `./spec-dock/scripts/spec-dock issue finish` を primary path とする。active issue の linked GitHub issue を close し、already-closed も success として扱い、その確認後に active state を解除する
 `issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, sync, validate, test, or review completion; delivery completion still requires separate evidence in tests, reviews, reports, and PR/merge workflow.
 - delivery completion の判定と required evidence の記録・確認は、`issue finish` の前に、active issue が set され対象 issue を確認できる状態で `spec-dock/active/issue/report.md` に対して行う

@@ -50,7 +50,7 @@ description: Leaf skill for issue execution tasks in spec-dock.
 - Normal issue execution lifecycle:
   - `./spec-dock/scripts/spec-dock issue start <target>`
   - `./spec-dock/scripts/spec-dock issue finish`
-- `issue start -F` / `--force` bypasses only the unfinished active issue guard for switching away from another unfinished issue branch.
+- `issue start -f` / `--force` bypasses only the unfinished active issue guard for switching away from another unfinished issue branch.
 - `issue start` from `main` / `master` / `develop` / `staging` or another non-issue branch is allowed; the unfinished guard is for another unfinished active issue branch only.
 - Use direct `active set` only for manual / recovery work. It remains outside the unfinished issue guard.
 - Dependency mutation is command-first:

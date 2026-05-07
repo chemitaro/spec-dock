@@ -45,7 +45,7 @@ def _add_issue_start_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--id", help="Explicit issue node id target (e.g. iss-00123)")
     parser.add_argument("--github-issue", type=int, help="Explicit GitHub issue number target (e.g. 123)")
     parser.add_argument(
-        "-F",
+        "-f",
         "--force",
         action="store_true",
         help="Bypass only the unfinished active issue guard; dependency readiness checks still apply.",

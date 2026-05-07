@@ -228,7 +228,7 @@ def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
                             f"- github state: {github_state}",
                             "Next commands:",
                             "  spec-dock/scripts/spec-dock issue finish",
-                            f"  spec-dock/scripts/spec-dock issue start {requested_target} -F",
+                            f"  spec-dock/scripts/spec-dock issue start {requested_target} -f",
                             f"  spec-dock/scripts/spec-dock active set {requested_target} --checkout",
                         ]
                     )

@@ -22,7 +22,7 @@
 ### 1.2 ブランチ命名（checkout 後の正規化）
 
 - `issue start <target>`
-- `issue start <target> -F`
+- `issue start <target> -f`
 - `active set <target> --checkout`
   - デフォルト（`active set <target>`）は no-checkout のため、ブランチ操作は行いません
   - `issue start` は issue node 専用です。initiative / epic / issue の target kind を問わないのは `active set <target> --checkout` のみです
@@ -171,7 +171,7 @@ validation / allocation の扱い:
 
 ### 5.2 対象
 
-- `issue start <target>` / `issue start <target> -F`
+- `issue start <target>` / `issue start <target> -f`
   - issue node のみを受け付けます
 - `active set <target> --checkout` を明示した場合
   - target の node 種別（initiative / epic / issue）や GitHub 紐づき有無は問いません

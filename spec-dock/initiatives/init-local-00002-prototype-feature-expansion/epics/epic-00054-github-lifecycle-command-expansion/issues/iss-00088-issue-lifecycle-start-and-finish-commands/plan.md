@@ -5,7 +5,7 @@ ID: "iss-00088"
 関連GitHub: ["#88"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-05"
+最終更新: "2026-05-06"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -184,7 +184,7 @@ ID: "iss-00088"
 |---|---|---|---|---|---|---|---|---|---|---|
 | lc-001 | S01/S02 | issue start success | acceptance | AC-001 | `issue start <issue>` sets active issue and checks out the issue branch; non-issue targets fail-fast | CLI target issue node; active state; branch | missing guided start / wrong node kind accepted | yes | red-required | CLI/runtime test + report closure |
 | lc-002 | S01/S02 | unfinished guard | negative | AC-002, EC-002 | different issue start from unfinished active issue branch blocks before active/checkout mutation and prints next commands | active issue open/unknown; current branch maps to active issue; target differs; no force | accidental context switch / partial active mutation | yes | red-required | CLI/runtime test + report closure |
-| lc-003 | S01/S02 | force start | acceptance | AC-003 | `-F`/`--force` bypasses only the unfinished issue guard, does not bypass dependency/readiness checks, and shows forced start evidence | same as lc-002 plus force plus dependency-not-ready fixture | force ignored / silent force / dependency bypass leak | yes | red-required | CLI/runtime test + report closure |
+| lc-003 | S01/S02 | force start | acceptance | AC-003 | `-f`/`--force` bypasses only the unfinished issue guard, does not bypass dependency/readiness checks, and shows forced start evidence | same as lc-002 plus force plus dependency-not-ready fixture | force ignored / silent force / dependency bypass leak | yes | red-required | CLI/runtime test + report closure |
 | lc-004 | S01/S02 | safe branch start | regression | AC-004, EC-003 | main/non-issue branch and same issue restart do not trigger unfinished guard | current branch main/non-issue or requested==active issue | overblocking normal/emergency workflows | yes | red-required | CLI/runtime test + report closure |
 | lc-005 | S03 | issue finish success | acceptance | AC-005 | finish closes/already-closed active linked GitHub issue and clears active only after close success | active issue with GitHub link; issue state open/closed | finish does not clear / finish clears before close | yes | red-required | CLI/runtime test + report closure |
 | lc-006 | S03 | issue finish failure | negative | AC-006 | no active, no link, or close/status failure leaves active unchanged and gives recovery guidance | missing active / missing link / gateway error | silent failure / active lost on failure | yes | red-required | CLI/runtime test + report closure |
@@ -322,7 +322,7 @@ ID: "iss-00088"
   - evidence level:
     - red-required
   - acceptance:
-    - parser accepts target forms and `-F` / `--force`
+    - parser accepts target forms and `-f` / `--force`
     - success output includes active and checkout evidence
   - negative:
     - blocked output includes next commands

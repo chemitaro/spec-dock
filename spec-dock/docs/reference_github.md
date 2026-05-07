@@ -89,9 +89,9 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 
 - `issue start <target>` は issue node を解決して active set と checkout を一操作で行います
 - `issue start` は unfinished active issue branch 上で別 issue を start しようとした場合だけ default で block します
-- `issue start -F` / `--force` は unfinished active issue guard だけを bypass します。依存未解決や dirty worktree など他の safety check は bypass しません
+- `issue start -f` / `--force` は unfinished active issue guard だけを bypass します。依存未解決や dirty worktree など他の safety check は bypass しません
 - `main` / `master` / `develop` / `staging` や non-issue branch からの `issue start` は block しません
-- `issue start` の block message では `issue finish`、`issue start <target> -F`、manual `active set` の次アクションを案内します
+- `issue start` の block message では `issue finish`、`issue start <target> -f`、manual `active set` の次アクションを案内します
 
 `active set` は target を active として固定します。
 
