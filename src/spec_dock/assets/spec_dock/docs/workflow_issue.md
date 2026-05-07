@@ -18,6 +18,7 @@ Issue は実装の最小単位です。
 ## 作成と issue start
 
 ```bash
+# primary lifecycle
 ./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title "..."
 ./spec-dock/scripts/spec-dock new issue --create-github-issue --epic <epic-id> --title "..."
 
@@ -27,6 +28,7 @@ Issue は実装の最小単位です。
 ./spec-dock/scripts/spec-dock issue start <issue-id|github-issue-number|url> -f
 ./spec-dock/scripts/spec-dock issue finish
 
+# manual / recovery only
 ./spec-dock/scripts/spec-dock active set <issue-id|github-issue-number|url>
 ./spec-dock/scripts/spec-dock active set --id <issue-id>
 ./spec-dock/scripts/spec-dock active set --github-issue <n>
@@ -49,6 +51,7 @@ Issue は実装の最小単位です。
 `issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, sync, validate, test, or review completion; delivery completion still requires separate evidence in tests, reviews, reports, and PR/merge workflow.
 - delivery completion の判定と required evidence の記録・確認は、`issue finish` の前に、active issue が set され対象 issue を確認できる状態で `spec-dock/active/issue/report.md` に対して行う
 - `issue finish` 後は active issue が clear されていてよく、active issue が残っていること自体を `complete` condition にしてはならない
+- `issue finish` 後に issue branch のまま `./spec-dock/scripts/spec-dock sync --github` を実行すると、branch-derived active restoration により active が復元され得る。active clear を保ちたい final sync は `main` などの non-issue branch に移動してから実行するか、finish 後 sync 自体を避ける
 - `active set` は manual / recovery command として維持する。unfinished active issue guard の対象外であり、必要時だけ direct に使う
 - `active set` のデフォルトは no-checkout。ブランチ移動が必要な場合だけ `--checkout`
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
