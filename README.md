@@ -121,7 +121,7 @@ After `init`, day-to-day operations are done via the runtime script installed in
 Notes:
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
 - Legacy sequential discussion docs are grandfathered only. New docs do not reuse legacy sequence names, and spec-dock does not auto-rename or auto-repair them to preserve forced backward compatibility.
-- Normal issue execution should use `issue start <target>` / `issue finish` as the primary path.
+- Normal issue execution should use `issue start <target>` / `issue finish` as the primary path. Use `issue start <target> -f` / `--force` only to bypass the unfinished active issue guard; dependency readiness still applies.
 - `issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, validate, test, or review completion. Record delivery completion evidence before running it.
 - Treat direct `active set` / `active set --checkout` as manual / recovery / low-level commands. `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
 - With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
@@ -171,5 +171,5 @@ v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様�
 `spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
 状態の集計は `spec-dock/.agent/index.json` と `spec-dock/.agent/tree.json` を `./spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
 
-補足: 通常の issue 実行開始/終了は `issue start <target>` / `issue finish` を primary path とし、`active set` / `active set --checkout` は manual / recovery 向けの low-level path として扱います。`new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があり、`active set --checkout` を使う場合はブランチ名が `<id>-<slug>`（不適合なら `<id>`）へ正規化されます。
+補足: 通常の issue 実行開始/終了は `issue start <target>` / `issue finish` を primary path とし、unfinished active issue guard だけを bypass する場合は `issue start <target> -f` / `--force` を使います。`active set` / `active set --checkout` は manual / recovery 向けの low-level path として扱います。`new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があり、`active set --checkout` を使う場合はブランチ名が `<id>-<slug>`（不適合なら `<id>`）へ正規化されます。
 また、`github.issue_number` は initiative/epic/issue をまたいで一意です（重複は検知されます）。詳細は導入先の `spec-dock/docs/reference_github.md`（このリポジトリでは `src/spec_dock/assets/spec_dock/docs/reference_github.md`）を参照してください。

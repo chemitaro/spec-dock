@@ -272,7 +272,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("requested issue: iss-00102", p.stderr)
             self.assertIn("github state: OPEN", p.stderr)
             self.assertIn("issue finish", p.stderr)
-            self.assertIn("issue start iss-00102 -F", p.stderr)
+            self.assertIn("issue start iss-00102 -f", p.stderr)
             self.assertIn("active set iss-00102 --checkout", p.stderr)
             self.assertEqual((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"), before)
             after_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
@@ -374,7 +374,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("github state: UNKNOWN", p.stderr)
             self.assertIn("Next commands:", p.stderr)
             self.assertIn("spec-dock/scripts/spec-dock issue finish", p.stderr)
-            self.assertIn("spec-dock/scripts/spec-dock issue start iss-00102 -F", p.stderr)
+            self.assertIn("spec-dock/scripts/spec-dock issue start iss-00102 -f", p.stderr)
             self.assertIn("spec-dock/scripts/spec-dock active set iss-00102 --checkout", p.stderr)
             self.assertEqual((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"), before)
             after_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
@@ -411,13 +411,26 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self._run_runtime(target, ["issue", "start", "101"], env=test_env)
             self._commit_all(target, "active first issue")
 
-            p = self._run_runtime_capture(target, ["issue", "start", "102", "-F"], env=test_env)
+            p = self._run_runtime_capture(target, ["issue", "start", "102", "-f"], env=test_env)
             self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("active set blocked", p.stderr)
             self.assertNotIn("spec-dock: ok (issue start)", p.stdout)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00101-first-issue")
+
+    def test_issue_start_rejects_legacy_force_short_options(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            uppercase = self._run_runtime_capture(target, ["issue", "start", "102", "-F"])
+            old_t = self._run_runtime_capture(target, ["issue", "start", "102", "-t"])
+
+            self.assertNotEqual(uppercase.returncode, 0, uppercase.stdout + uppercase.stderr)
+            self.assertIn("unrecognized arguments: -F", uppercase.stderr)
+            self.assertNotEqual(old_t.returncode, 0, old_t.stdout + old_t.stderr)
+            self.assertIn("unrecognized arguments: -t", old_t.stderr)
 
     def test_issue_start_force_switches_when_dependency_ready_and_warns(self) -> None:
         if os.name == "nt":
