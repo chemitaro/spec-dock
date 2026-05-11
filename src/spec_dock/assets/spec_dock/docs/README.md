@@ -58,11 +58,11 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ./spec-dock/scripts/spec-dock active set <id|#num|url> --checkout
 ./spec-dock/scripts/spec-dock active show
 
-./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps check <target>
 ./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock validate
-./spec-dock/scripts/spec-dock sync --github
+./spec-dock/scripts/spec-dock sync
 ```
 
 ## 高頻度ルール
@@ -75,7 +75,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `import` は読み取り確認のみで、GitHub を更新しない。canonical URL は current repo と照合し、cross-repo node import は reject される
 - Issue 実行の通常入口は `issue start <target>`、終了導線は `issue finish`。`active set` / `active set --checkout` は manual / recovery 用の low-level command として使う
 - `active set` / `deps check` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
-- 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync --github` で整合を確認する
+- 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` で GitHub live state を含めて整合を確認する。GitHub を呼ばない確認が必要な場合だけ `--no-github` を指定する
 - legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
 - `spec-dock update` は managed files/docs/templates/scripts/skills の更新であり、old workspace の in-place migration ツールではない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
 - Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の正本は `workflow_issue.md`

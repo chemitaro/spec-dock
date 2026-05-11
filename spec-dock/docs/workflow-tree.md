@@ -96,7 +96,7 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 
 ```bash
 ./spec-dock/scripts/spec-dock sync
-./spec-dock/scripts/spec-dock sync --github
+./spec-dock/scripts/spec-dock sync --no-github
 ```
 
 - `spec-dock/.agent/tree.json`（人間向けのネスト表示）
@@ -141,14 +141,15 @@ Issueは単独で「要件→設計→計画→実装→報告」まで完結す
 ## 5.4 依存変更（Issue 間）
 
 ```bash
-./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps check <target>
 ./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock validate
-./spec-dock/scripts/spec-dock sync --github
+./spec-dock/scripts/spec-dock sync
 ```
 
 - Issue 依存の canonical storage は node metadata の top-level `depends_on` です（詳細は `reference_deps.md`）。
+- GitHub を呼ばない cache/local 確認が必要な場合だけ、`deps check` / `sync` / `active set` に `--no-github` を指定します。
 - metadata の手編集を current/fallback 運用にせず、command-first で更新してください。
 
 ## 6. 典型的な落とし穴（防止策）

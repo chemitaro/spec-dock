@@ -97,11 +97,11 @@ spec-dock/
 ./spec-dock/scripts/spec-dock issue start --id <issue-id>
 ./spec-dock/scripts/spec-dock issue finish
 ./spec-dock/scripts/spec-dock active set <id|#num|url>
-./spec-dock/scripts/spec-dock deps check <target> --github
+./spec-dock/scripts/spec-dock deps check <target>
 ./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock validate
-./spec-dock/scripts/spec-dock sync --github
+./spec-dock/scripts/spec-dock sync
 ```
 
 `active set` / `active set --checkout` は manual / recovery 用の low-level command です。通常の Issue 実行では `issue start` / `issue finish` を入口にします。
