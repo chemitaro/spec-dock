@@ -175,8 +175,8 @@ class TestCliValidate(CliRuntimeHarness):
             self._write_json_force(issue_meta, meta)
 
             for args in (
-                ["sync", "--no-update-active"],
-                ["sync", "--no-update-active", "--force"],
+                ["sync", "--no-github", "--no-update-active"],
+                ["sync", "--no-github", "--no-update-active", "--force"],
             ):
                 with self.subTest(args=args):
                     p = self._run_runtime_capture(target, args)
@@ -737,7 +737,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn(".meta.json", p_validate.stderr)
             self.assertNotIn("Missing required artifact", p_validate.stderr)
 
-            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
             self.assertIn("Create in-progress state detected", p_sync.stderr)
             self.assertNotIn("Missing required artifact", p_sync.stderr)
@@ -789,7 +789,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn(".meta.json", p_validate.stderr)
             self.assertNotIn("Missing required artifact", p_validate.stderr)
 
-            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
             self.assertIn("Stale create-lock state detected", p_sync.stderr)
             self.assertNotIn("Missing required artifact", p_sync.stderr)
@@ -817,7 +817,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("Missing required artifact", p_validate.stderr)
             self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
 
-            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
             self.assertIn("preflight validate failed", p_sync.stderr)
             self.assertIn("Missing required artifact", p_sync.stderr)
@@ -845,7 +845,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertIn("Missing required artifact", p_validate.stderr)
             self.assertIn(missing_rel_path.as_posix(), p_validate.stderr)
 
-            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertNotEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
             self.assertIn("preflight validate failed", p_sync.stderr)
             self.assertIn("Missing required artifact", p_sync.stderr)
@@ -857,7 +857,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
 
             self._create_same_repo_linked_hierarchy(target)
-            self._run_runtime(target, ["sync", "--no-update-active"])
+            self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
 
             agent_dir = target / "spec-dock" / ".agent"
             missing_rel_path = Path(
@@ -865,7 +865,7 @@ class TestCliValidate(CliRuntimeHarness):
             )
             (target / missing_rel_path).unlink(missing_ok=False)
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("preflight validate failed", p.stderr)
             self.assertIn("deps_preflight_failed", p.stderr)
@@ -902,7 +902,7 @@ class TestCliValidate(CliRuntimeHarness):
             meta["parent_id"] = "epic-99999"
             self._write_json_force(issue_meta, meta)
 
-            self._run_runtime_expect_fail(target, ["sync", "--no-update-active"])
+            self._run_runtime_expect_fail(target, ["sync", "--no-github", "--no-update-active"])
 
     def test_sync_force_continues_when_tree_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -911,7 +911,7 @@ class TestCliValidate(CliRuntimeHarness):
 
             self._create_same_repo_linked_hierarchy(target)
 
-            self._run_runtime(target, ["sync", "--no-update-active"])
+            self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
             agent_dir = target / "spec-dock" / ".agent"
             baseline_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
             self.assertTrue(baseline_index["deps"]["valid"])
@@ -933,7 +933,7 @@ class TestCliValidate(CliRuntimeHarness):
             meta["parent_id"] = "epic-99999"
             self._write_json_force(issue_meta, meta)
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("preflight validate failed", p.stderr)
             self.assertIn("deps_preflight_failed", p.stderr)
@@ -999,7 +999,7 @@ class TestCliValidate(CliRuntimeHarness):
             (agent_dir / "index-all.json").unlink(missing_ok=True)
             (agent_dir / "tree-all.json").unlink(missing_ok=True)
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("preflight validate failed", p.stderr)
             self.assertIn("deps_preflight_failed", p.stderr)
@@ -1419,7 +1419,7 @@ class TestCliValidate(CliRuntimeHarness):
             for generated_path in generated_top_level_paths:
                 self.assertFalse(generated_path.exists(), generated_path.as_posix())
 
-            for args in (["sync"], ["sync", "--force"]):
+            for args in (["sync"], ["sync", "--no-github", "--force"]):
                 result = self._run_runtime_capture(target, args)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("Unsupported legacy meta.json detected", result.stderr)
