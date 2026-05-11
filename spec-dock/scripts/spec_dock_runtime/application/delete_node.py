@@ -234,7 +234,7 @@ def _build_partial_failure_recovery_guidance(
     guidance = [
         restore_guidance,
         "run `./spec-dock/scripts/spec-dock validate` to verify local tree and active pointers",
-        "run `./spec-dock/scripts/spec-dock sync --github` to refresh derived issue/dependency artifacts",
+        "run `./spec-dock/scripts/spec-dock sync` to refresh derived issue/dependency artifacts with GitHub live state",
     ]
     if dependency_scrub_failures:
         guidance.append(

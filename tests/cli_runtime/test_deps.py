@@ -17,6 +17,15 @@ from tests.cli_runtime.harness import (
 
 
 class TestCliDeps(CliRuntimeHarness):
+    def test_deps_check_rejects_github_and_no_github_together(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00003", "--github", "--no-github"])
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("not allowed with argument", p.stderr)
+
     def _create_local_compat_hierarchy(
         self,
         target: Path,
@@ -1070,9 +1079,9 @@ class TestCliDeps(CliRuntimeHarness):
             guard_log.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
 
-            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"], env=test_env)
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--no-github", "--json"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertFalse(guard_log.exists(), "gh must not be invoked without --github")
+            self.assertFalse(guard_log.exists(), "gh must not be invoked with --no-github")
             data = json.loads(p.stdout)
             self.assertTrue(data["ready"])
             self.assertEqual(data["blockers"], [])
@@ -1082,7 +1091,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["target_status"]["last_sync_at"], "t")
             self.assertEqual(data["nodes"]["iss-00302"]["source"], "cache")
 
-    def test_deps_check_without_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
+    def test_deps_check_no_github_falls_back_to_unknown_when_snapshot_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1115,7 +1124,7 @@ class TestCliDeps(CliRuntimeHarness):
             (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
-            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"])
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--no-github", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
             self.assertFalse(data["ready"])
@@ -1176,7 +1185,7 @@ class TestCliDeps(CliRuntimeHarness):
                 self.assertEqual(data["target"], "iss-00301")
                 self.assertFalse(data["ready"])
 
-    def test_deps_check_github_ready_when_deps_closed(self) -> None:
+    def test_deps_check_default_github_ready_when_deps_closed(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1224,7 +1233,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--github", "--json"], env=test_env)
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             data = json.loads(p.stdout)
             self.assertTrue(data["ready"])
@@ -1232,7 +1241,7 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
 
-    def test_deps_check_without_github_uses_synced_index_status(self) -> None:
+    def test_deps_check_no_github_uses_synced_index_status(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1283,20 +1292,20 @@ class TestCliDeps(CliRuntimeHarness):
             p_sync = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
 
-            # Guard: `deps check` without --github must not fetch GitHub.
+            # Guard: `deps check --no-github` must not fetch GitHub.
             guard_log = bin_dir / "gh-guard.log"
             guard_log.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
 
-            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"], env=test_env)
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--no-github", "--json"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertFalse(guard_log.exists(), "gh must not be invoked without --github")
+            self.assertFalse(guard_log.exists(), "gh must not be invoked with --no-github")
             data = json.loads(p.stdout)
             self.assertTrue(data["ready"])
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
 
-    def test_deps_check_without_github_missing_index_defaults_unknown(self) -> None:
+    def test_deps_check_no_github_missing_index_defaults_unknown(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
@@ -1330,7 +1339,7 @@ class TestCliDeps(CliRuntimeHarness):
 
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
-            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"])
+            p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--no-github", "--json"])
             self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
             data = json.loads(p.stdout)
             self.assertFalse(data["ready"])
@@ -2232,7 +2241,7 @@ class TestCliDeps(CliRuntimeHarness):
             self._set_meta_depends_on(cycle_a_dir, ["iss-00303"])
             self._set_meta_depends_on(cycle_b_dir, ["iss-00302"])
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("iss-00302", p.stderr)
             self.assertIn("iss-00303", p.stderr)
@@ -2249,7 +2258,7 @@ class TestCliDeps(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Cycle a"])
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Cycle b"])
             agent_dir = target / "spec-dock" / ".agent"
-            self._run_runtime(target, ["sync", "--no-update-active"])
+            self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
             baseline_index = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
             self.assertTrue(baseline_index["deps"]["valid"])
             self.assertEqual(baseline_index["deps"]["issue_edges"], [])
@@ -2271,7 +2280,7 @@ class TestCliDeps(CliRuntimeHarness):
             (agent_dir / "index.json").unlink(missing_ok=True)
             (agent_dir / "tree.json").unlink(missing_ok=True)
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("deps_preflight_failed", p.stderr)
             self.assertTrue((agent_dir / "index.json").is_file())
@@ -2364,7 +2373,7 @@ class TestCliDeps(CliRuntimeHarness):
             (agent_dir / "deps.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
             (agent_dir / "deps.todo.puml").write_text("@startuml\n@enduml\n", encoding="utf-8")
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             self.assertFalse((agent_dir / "deps.json").exists())
