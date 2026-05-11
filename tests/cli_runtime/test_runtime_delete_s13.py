@@ -2227,7 +2227,7 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         self.assertGreaterEqual(len(result.recovery_guidance), 4)
         self.assertIn("active restore was not needed", result.recovery_guidance[0])
         self.assertIn("validate", result.recovery_guidance[1])
-        self.assertIn("sync --github", result.recovery_guidance[2])
+        self.assertIn("./spec-dock/scripts/spec-dock sync", result.recovery_guidance[2])
         self.assertIn(
             "./spec-dock/scripts/spec-dock delete --id iss-local-00056 --yes",
             result.recovery_guidance[-1],

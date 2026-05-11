@@ -674,6 +674,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00091-default-github-state-commands/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -739,6 +741,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00091-default-github-state-commands/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1838,10 +1842,10 @@ class TestInitUpdate(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock active set --id <issue-id>",
                 "./spec-dock/scripts/spec-dock active set --github-issue <n>",
                 "./spec-dock/scripts/spec-dock active show",
-                "./spec-dock/scripts/spec-dock deps check <target> --github",
-                "./spec-dock/scripts/spec-dock active set <target> --github --force",
+                "./spec-dock/scripts/spec-dock deps check <target>",
+                "./spec-dock/scripts/spec-dock active set <target> --force",
                 "./spec-dock/scripts/spec-dock validate",
-                "./spec-dock/scripts/spec-dock sync --github",
+                "./spec-dock/scripts/spec-dock sync",
             ):
                 self.assertIn(command, workflow_issue)
             self.assertNotIn("./spec ", workflow_issue)
@@ -1875,6 +1879,13 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("- initiative: (none)", context_pack_text)
             self.assertIn("- epic: (none)", context_pack_text)
             self.assertIn("- issue: (none)", context_pack_text)
+            self.assertIn("- state (github default): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
+            self.assertIn(
+                "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`",
+                context_pack_text,
+            )
+            self.assertNotIn("- state (local): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
+            self.assertNotIn("- state (github): `./spec-dock/scripts/spec-dock sync --github`", context_pack_text)
 
             # Legacy (v1) templates should not be installed.
             templates_dir = target / "spec-dock" / "templates"
@@ -1964,9 +1975,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("./spec-dock/scripts/spec-dock ...", skill_text)
             self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
             self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target> --github", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", skill_text)
             self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock sync --github", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock sync", skill_text)
             self.assertNotIn("./spec ", skill_text)
             self.assertNotIn("adrs/new-adr", skill_text)
             self.assertFalse(
@@ -8092,16 +8103,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         self.assertIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", issue_text)
         self.assertIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", issue_text)
-        self.assertIn("./spec-dock/scripts/spec-dock deps check <target> --github", issue_text)
+        self.assertIn("./spec-dock/scripts/spec-dock deps check <target>", issue_text)
         self.assertIn("./spec-dock/scripts/spec-dock validate", issue_text)
-        self.assertIn("./spec-dock/scripts/spec-dock sync --github", issue_text)
+        self.assertIn("./spec-dock/scripts/spec-dock sync", issue_text)
+        self.assertIn("--no-github", issue_text)
 
         for skill_text in (hub_text, codex_adapter_text, copilot_adapter_text):
             self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
             self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target> --github", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", skill_text)
             self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock sync --github", skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock sync", skill_text)
 
         self.assertIn("`spec-dock/docs/reference_deps.md`", codex_adapter_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", codex_adapter_text)
@@ -10679,7 +10691,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self._overlay_checked_in_dogfooding_runtime(target)
             self._create_minimal_local_tree(target)
 
-            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(
                 sync_result.returncode,
                 0,
@@ -10840,7 +10852,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn("epic missing parent_id", doctor_result.stderr)
             self.assertNotIn("Missing required artifact", doctor_result.stderr)
 
-            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(
                 sync_result.returncode,
                 1,
@@ -10859,7 +10871,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             (issue_dir / "report.md").chmod((issue_dir / "report.md").stat().st_mode | 0o200)
             (issue_dir / "report.md").unlink()
 
-            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(
                 sync_result.returncode,
                 1,
@@ -10994,7 +11006,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "report.md").chmod((issue_dir / "report.md").stat().st_mode | 0o200)
             (issue_dir / "report.md").unlink()
 
-            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active", "--force"])
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active", "--force"])
             self.assertEqual(
                 sync_result.returncode,
                 0,
@@ -11032,7 +11044,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             (issue_dir / "design.md").chmod((issue_dir / "design.md").stat().st_mode | 0o200)
             (issue_dir / "design.md").unlink()
 
-            sync_result = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            sync_result = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(
                 sync_result.returncode,
                 1,
@@ -11105,7 +11117,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             self.assertIn("Create in-progress state detected", validate_in_progress.stderr)
             self.assertNotIn("Missing required artifact", validate_in_progress.stderr)
 
-            sync_in_progress = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            sync_in_progress = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(
                 sync_in_progress.returncode,
                 1,
@@ -11146,7 +11158,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             self.assertIn("Stale create-lock state detected", validate_stale.stderr)
             self.assertNotIn("Missing required artifact", validate_stale.stderr)
 
-            sync_stale = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            sync_stale = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(
                 sync_stale.returncode,
                 1,
@@ -11213,6 +11225,13 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             self.assertIn("- `spec-dock/active/epic/requirement.md`", context_pack_text)
             self.assertIn("- `spec-dock/active/issue/report.md`", context_pack_text)
             self.assertNotIn("- `spec-dock/active/issue/README.md`", context_pack_text)
+            self.assertIn("- state (github default): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
+            self.assertIn(
+                "- state (cache/local opt-out): `./spec-dock/scripts/spec-dock sync --no-github`",
+                context_pack_text,
+            )
+            self.assertNotIn("- state (local): `./spec-dock/scripts/spec-dock sync`", context_pack_text)
+            self.assertNotIn("- state (github): `./spec-dock/scripts/spec-dock sync --github`", context_pack_text)
 
     def test_update_rebuilds_placeholder_symlink_entrypoints_from_persisted_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -53,11 +53,12 @@ description: Leaf skill for issue execution tasks in spec-dock.
 - `issue start -f` / `--force` bypasses only the unfinished active issue guard for switching away from another unfinished issue branch. It does not bypass dependency readiness, target validation, or checkout safety.
 - `issue start` from `main` / `master` / `develop` / `staging` or another non-issue branch is allowed; the unfinished guard is for another unfinished active issue branch only.
 - Use direct `active set` only for manual / recovery work. It remains outside the unfinished issue guard.
-- After `issue finish`, avoid running `sync --github` on the just-finished issue branch when you need active clear to remain clear. `sync --github` can restore active from branch-derived issue context; move to `main` or another non-issue branch before final sync, or skip post-finish sync.
+- After `issue finish`, avoid running `sync` on the just-finished issue branch when you need active clear to remain clear. `sync` can restore active from branch-derived issue context; move to `main` or another non-issue branch before final sync, or skip post-finish sync.
 - Dependency mutation is command-first:
   - `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>`
   - `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>`
-  - `./spec-dock/scripts/spec-dock deps check <target> --github`
+  - `./spec-dock/scripts/spec-dock deps check <target>`
 - Keep report evidence aligned with workflow checks:
   - `./spec-dock/scripts/spec-dock validate`
-  - `./spec-dock/scripts/spec-dock sync --github`
+  - `./spec-dock/scripts/spec-dock sync`
+- Use `--no-github` only for explicit cache/local verification with no GitHub calls.
