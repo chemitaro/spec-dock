@@ -115,7 +115,7 @@ class TestCliRulesContract(CliRuntimeHarness):
                     "<epic-id> --title \"...\""
                 ),
                 "./spec-dock/scripts/spec-dock validate",
-                "./spec-dock/scripts/spec-dock sync --github",
+                "./spec-dock/scripts/spec-dock sync",
             ):
                 self.assertIn(command, workflow_issue)
             self.assertNotIn("./spec ", workflow_issue)
@@ -167,16 +167,17 @@ class TestCliRulesContract(CliRuntimeHarness):
 
             self.assertIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", issue_skill)
             self.assertIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", issue_skill)
-            self.assertIn("./spec-dock/scripts/spec-dock deps check <target> --github", issue_skill)
+            self.assertIn("./spec-dock/scripts/spec-dock deps check <target>", issue_skill)
             self.assertIn("./spec-dock/scripts/spec-dock validate", issue_skill)
-            self.assertIn("./spec-dock/scripts/spec-dock sync --github", issue_skill)
+            self.assertIn("./spec-dock/scripts/spec-dock sync", issue_skill)
+            self.assertIn("--no-github", issue_skill)
 
             for skill_text in (hub_skill, codex_adapter_skill, copilot_adapter_skill):
                 self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
                 self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
-                self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target> --github", skill_text)
+                self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", skill_text)
                 self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
-                self.assertNotIn("./spec-dock/scripts/spec-dock sync --github", skill_text)
+                self.assertNotIn("./spec-dock/scripts/spec-dock sync", skill_text)
 
             self.assertIn("`spec-dock/docs/reference_deps.md`", hub_skill)
             self.assertIn("`spec-dock/docs/reference_sync.md`", hub_skill)

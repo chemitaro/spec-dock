@@ -79,6 +79,15 @@ class TestCliActive(CliRuntimeHarness):
             # Legacy flags were removed in favor of a single `target` argument.
             self._run_runtime_expect_fail(target, ["active", "set", "--issue", "1"])
 
+    def test_active_set_rejects_github_and_no_github_together(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            p = self._run_runtime_capture(target, ["active", "set", "iss-00003", "--github", "--no-github"])
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("not allowed with argument", p.stderr)
+
     def test_active_set_accepts_explicit_id_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1191,7 +1200,7 @@ class TestCliActive(CliRuntimeHarness):
             self._run_runtime(target, ["new", "issue", "--epic", "201", "--github-issue", "303", "--title", "Target C"])
 
             # Prepare cached `.agent/index*.json` / `.agent/tree*.json` to verify active-only patching.
-            self._run_runtime(target, ["sync", "--no-update-active"])
+            self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
 
             agent_dir = target / "spec-dock" / ".agent"
             self.assertTrue((agent_dir / "index-all.json").is_file())
@@ -1262,8 +1271,8 @@ class TestCliActive(CliRuntimeHarness):
             )
             self._set_meta_depends_on(issue_dir, [301])
 
-            # Baseline: set ready dep issue to active.
-            self._run_runtime(target, ["active", "set", "iss-00301", "--force"])
+            # Baseline: set ready dep issue to active without live GitHub setup calls.
+            self._run_runtime(target, ["active", "set", "iss-00301", "--no-github", "--force"])
             before = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
 
             bin_dir = target / ".bin"
@@ -1283,17 +1292,17 @@ class TestCliActive(CliRuntimeHarness):
             p_sync_open = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
             self.assertEqual(p_sync_open.returncode, 0, p_sync_open.stdout + p_sync_open.stderr)
 
-            # Guard: `active set` without --github must not fetch GitHub.
+            # Guard: `active set --no-github` must not fetch GitHub.
             guard_log_open = bin_dir / "gh-guard-open.log"
             guard_log_open.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log_open)
 
-            p_blocked = self._run_runtime_capture(target, ["active", "set", "iss-00302"], env=test_env)
+            p_blocked = self._run_runtime_capture(target, ["active", "set", "iss-00302", "--no-github"], env=test_env)
             self.assertEqual(p_blocked.returncode, 1, p_blocked.stdout + p_blocked.stderr)
             self.assertIn("iss-00301", p_blocked.stderr)
             after_blocked = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
             self.assertEqual(after_blocked, before)
-            self.assertFalse(guard_log_open.exists(), "gh must not be invoked without --github")
+            self.assertFalse(guard_log_open.exists(), "gh must not be invoked with --no-github")
 
             # 2) Dependency is CLOSED on GitHub -> index says done -> allowed.
             self._make_gh_issue_list_stub(
@@ -1311,7 +1320,7 @@ class TestCliActive(CliRuntimeHarness):
             self.assertEqual(p_sync_closed.returncode, 0, p_sync_closed.stdout + p_sync_closed.stderr)
 
             # Inject a conflicting snapshot in todo view.
-            # non-`--github` deps guard must still prefer `index-all.json`.
+            # `--no-github` deps guard must still prefer `index-all.json`.
             index_all_path = target / "spec-dock" / ".agent" / "index-all.json"
             index_todo_path = target / "spec-dock" / ".agent" / "index.json"
             index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
@@ -1321,29 +1330,109 @@ class TestCliActive(CliRuntimeHarness):
             index_todo["nodes"]["iss-00301"] = shadow
             index_todo_path.write_text(json.dumps(index_todo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-            # Guard again: no gh calls on active set without --github.
+            # Guard again: no gh calls on active set with --no-github.
             guard_log_closed = bin_dir / "gh-guard-closed.log"
             guard_log_closed.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log_closed)
 
-            p_allowed = self._run_runtime_capture(target, ["active", "set", "iss-00302"], env=test_env)
+            p_allowed = self._run_runtime_capture(target, ["active", "set", "iss-00302", "--no-github"], env=test_env)
             self.assertEqual(p_allowed.returncode, 0, p_allowed.stdout + p_allowed.stderr)
-            self.assertFalse(guard_log_closed.exists(), "gh must not be invoked without --github")
+            self.assertFalse(guard_log_closed.exists(), "gh must not be invoked with --no-github")
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00302")
 
             # The cached index statuses must survive a successful active set,
-            # so non-`--github` deps checks can continue to use `.agent/index.json`.
+            # so `--no-github` deps checks can continue to use `.agent/index.json`.
             guard_log_after = bin_dir / "gh-guard-after-active.log"
             guard_log_after.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log_after)
-            p_after = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--json"], env=test_env)
+            p_after = self._run_runtime_capture(
+                target, ["deps", "check", "iss-00302", "--no-github", "--json"], env=test_env
+            )
             self.assertEqual(p_after.returncode, 0, p_after.stdout + p_after.stderr)
-            self.assertFalse(guard_log_after.exists(), "gh must not be invoked without --github")
+            self.assertFalse(guard_log_after.exists(), "gh must not be invoked with --no-github")
             data = json.loads(p_after.stdout)
             self.assertTrue(data["ready"])
             self.assertEqual(data["blockers"], [])
             self.assertEqual(data["nodes"]["iss-00301"]["state"], "done")
+
+    def test_active_set_default_github_uses_live_state_for_deps_guard(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a bash stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Auth platform"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "JWT auth"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "301", "--title", "Dep issue"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "201", "--github-issue", "302", "--title", "Target issue"],
+            )
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00101-auth-platform"
+                / "epics"
+                / "epic-00201-jwt-auth"
+                / "issues"
+                / "iss-00302-target-issue"
+            )
+            self._set_meta_depends_on(issue_dir, [301])
+
+            # Baseline active state is established cache-only so setup cannot hit real gh.
+            self._run_runtime(target, ["active", "set", "iss-00301", "--no-github", "--force"])
+            before = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            log_open = bin_dir / "gh-live-open.log"
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "OPEN", "title": "Dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+                log_path=log_open,
+            )
+            p_blocked = self._run_runtime_capture(target, ["active", "set", "iss-00302"], env=test_env)
+            self.assertEqual(p_blocked.returncode, 1, p_blocked.stdout + p_blocked.stderr)
+            self.assertTrue(log_open.exists(), "active set default must invoke gh for live deps state")
+            self.assertIn("iss-00301", p_blocked.stderr)
+            after_blocked = (target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8")
+            self.assertEqual(after_blocked, before)
+
+            log_closed = bin_dir / "gh-live-closed.log"
+            self._make_gh_issue_list_stub(
+                bin_dir,
+                issues=[
+                    {"number": 101, "state": "OPEN", "title": "Init", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 201, "state": "OPEN", "title": "Epic", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 301, "state": "CLOSED", "title": "Dep", "labels": [], "updatedAt": "t", "url": "u"},
+                    {"number": 302, "state": "OPEN", "title": "Target", "labels": [], "updatedAt": "t", "url": "u"},
+                ],
+                log_path=log_closed,
+            )
+            p_allowed = self._run_runtime_capture(target, ["active", "set", "iss-00302"], env=test_env)
+            self.assertEqual(p_allowed.returncode, 0, p_allowed.stdout + p_allowed.stderr)
+            self.assertTrue(log_closed.exists(), "active set default must invoke gh for live deps state")
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            self.assertEqual(active["issue"]["id"], "iss-00302")
 
     def test_active_set_without_github_uses_index_snapshot_when_present(self) -> None:
         if os.name == "nt":
@@ -1417,9 +1506,9 @@ class TestCliActive(CliRuntimeHarness):
             guard_log.unlink(missing_ok=True)
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
 
-            p = self._run_runtime_capture(target, ["active", "set", "iss-00301"], env=test_env)
+            p = self._run_runtime_capture(target, ["active", "set", "iss-00301", "--no-github"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertFalse(guard_log.exists(), "gh must not be invoked without --github")
+            self.assertFalse(guard_log.exists(), "gh must not be invoked with --no-github")
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertEqual(active["issue"]["id"], "iss-00301")
 
@@ -1523,7 +1612,7 @@ class TestCliActive(CliRuntimeHarness):
             )
             self._set_meta_depends_on(target_issue_dir, ["epic-00202"])
 
-            self._run_runtime(target, ["sync", "--no-update-active"])
+            self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])
             agent_dir = target / "spec-dock" / ".agent"
             self._run_runtime(target, ["active", "clear"])
 

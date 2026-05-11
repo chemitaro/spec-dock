@@ -22,6 +22,15 @@ class TestCliSync(CliRuntimeHarness):
         meta["depends_on"] = depends_on
         self._write_json_force(meta_path, meta)
 
+    def test_sync_rejects_github_and_no_github_together(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            p = self._run_runtime_capture(target, ["sync", "--github", "--no-github"])
+            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+            self.assertIn("not allowed with argument", p.stderr)
+
     def test_new_and_active_and_sync(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -289,7 +298,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             self._set_meta_depends_on(target_issue_dir, ["epic-00202", "102", 401])
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
@@ -330,7 +339,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             self._set_meta_depends_on(target_issue_dir, ["epic-00202", "init-00102"])
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("deps_ref_expanded_to_empty", p.stderr)
 
@@ -364,7 +373,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             self._set_meta_depends_on(target_issue_dir, ["iss-99999"])
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn("iss-99999", p.stderr)
             self.assertIn(".meta.json", p.stderr)
@@ -388,7 +397,7 @@ class TestCliSync(CliRuntimeHarness):
             deps_path = init_dir / ".meta.json"
             self._set_meta_depends_on(init_dir, ["iss-00301"])
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
             self.assertIn(str(deps_path), p.stderr)
             self.assertIn("iss-00301", p.stderr)
@@ -418,14 +427,14 @@ class TestCliSync(CliRuntimeHarness):
 
             # Self dependency must fail.
             self._set_meta_depends_on(issue_one_dir, ["iss-00301"])
-            p_self = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_self = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p_self.returncode, 1, p_self.stdout + p_self.stderr)
             self.assertIn("iss-00301", p_self.stderr)
             self.assertIn(str(issue_one_deps_path), p_self.stderr)
 
             # Shorthand self (issue depends on own epic) must also fail.
             self._set_meta_depends_on(issue_one_dir, ["epic-00201"])
-            p_shorthand_self = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_shorthand_self = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p_shorthand_self.returncode, 1, p_shorthand_self.stdout + p_shorthand_self.stderr)
             self.assertIn("iss-00301", p_shorthand_self.stderr)
             self.assertIn("epic-00201", p_shorthand_self.stderr)
@@ -434,7 +443,7 @@ class TestCliSync(CliRuntimeHarness):
             # Cycle dependency must fail.
             self._set_meta_depends_on(issue_one_dir, ["iss-00302"])
             self._set_meta_depends_on(issue_two_dir, ["iss-00301"])
-            p_cycle = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_cycle = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p_cycle.returncode, 1, p_cycle.stdout + p_cycle.stderr)
             self.assertIn("iss-00301", p_cycle.stderr)
             self.assertIn("iss-00302", p_cycle.stderr)
@@ -535,7 +544,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             self._materialize_local_compat_ids(target)
 
-            p = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
@@ -574,11 +583,11 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(issues_root / "iss-00303-issue-three", ["iss-00302"])
             self._set_meta_depends_on(issues_root / "iss-00304-issue-target", ["iss-00303", "iss-00301"])
 
-            p1 = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p1 = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p1.returncode, 0, p1.stdout + p1.stderr)
             index1 = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
 
-            p2 = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p2 = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p2.returncode, 0, p2.stdout + p2.stderr)
             index2 = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
 
@@ -1097,7 +1106,7 @@ class TestCliSync(CliRuntimeHarness):
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsNone(active.get("issue"))
 
-            self._run_runtime(target, ["sync", "--force"])
+            self._run_runtime(target, ["sync", "--no-github", "--force"])
             active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
             self.assertIsNone(active.get("issue"))
 
@@ -1144,7 +1153,7 @@ class TestCliSync(CliRuntimeHarness):
             p_validate = self._run_runtime_capture(target, ["validate"])
             self.assertEqual(p_validate.returncode, 0, p_validate.stdout + p_validate.stderr)
 
-            p_sync = self._run_runtime_capture(target, ["sync", "--no-update-active"])
+            p_sync = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
             self.assertEqual(p_sync.returncode, 0, p_sync.stdout + p_sync.stderr)
 
             bin_dir = target / ".bin"
@@ -1168,7 +1177,7 @@ class TestCliSync(CliRuntimeHarness):
             index = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             self.assertIn("iss-00301", index["nodes"])
 
-    def test_sync_github_populates_issue_statuses(self) -> None:
+    def test_sync_default_github_populates_issue_statuses(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a bash stub for gh; skip on Windows.")
 
@@ -1204,7 +1213,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
@@ -1222,8 +1231,13 @@ class TestCliSync(CliRuntimeHarness):
             index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
             self.assertNotIn("iss-00301", index_todo["nodes"])
 
-            p_cache = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
+            guard_log = bin_dir / "gh-guard-sync-no-github.log"
+            guard_log.unlink(missing_ok=True)
+            self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True, log_path=guard_log)
+
+            p_cache = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"], env=test_env)
             self.assertEqual(p_cache.returncode, 0, p_cache.stdout + p_cache.stderr)
+            self.assertFalse(guard_log.exists(), "gh must not be invoked with sync --no-github")
             index_all_cache = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             cache_nodes = index_all_cache["nodes"]
             self.assertEqual(cache_nodes["iss-00301"]["source"], "cache")
@@ -1371,11 +1385,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(
-                target,
-                ["sync", "--github", "--gh-limit", "123", "--no-update-active"],
-                env=test_env,
-            )
+            p = self._run_runtime_capture(target, ["sync", "--gh-limit", "123", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
             self.assertTrue(log_path.is_file())
@@ -1418,7 +1428,7 @@ class TestCliSync(CliRuntimeHarness):
             )
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("gh_fetch_failed", p.stderr)
 
@@ -1454,7 +1464,7 @@ class TestCliSync(CliRuntimeHarness):
             self._make_gh_issue_list_stub(bin_dir, issues=[], fail=True)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-            p = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
+            p = self._run_runtime_capture(target, ["sync", "--no-update-active"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("gh_fetch_failed", p.stderr)
 
