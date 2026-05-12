@@ -1,0 +1,22 @@
+# Allow SpecDock's repo-local command entrypoints.
+#
+# This intentionally allows the entrypoint prefix instead of enumerating
+# subcommands, so newly added SpecDock commands are covered automatically.
+prefix_rule(
+    pattern = [["./spec-dock/scripts/spec-dock", "./spec"]],
+    decision = "allow",
+    justification = "Allow spec-dock managed repo-local command entrypoints for SpecDock workflows.",
+    match = [
+        "./spec-dock/scripts/spec-dock validate",
+        "./spec-dock/scripts/spec-dock sync",
+        "./spec-dock/scripts/spec-dock new future-command --flag value",
+        "./spec validate",
+        "./spec sync",
+        "./spec future-command --flag value",
+    ],
+    not_match = [
+        "spec-dock validate",
+        "uvx --from . spec-dock update .",
+        "./other/scripts/spec-dock validate",
+    ],
+)
