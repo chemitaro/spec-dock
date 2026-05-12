@@ -55,6 +55,11 @@ ID: "<ISS_ID>"
 |---|---|---|---|---|---|
 | none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no |
 
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | pass / fail / blocked | no delegation rationale / degraded reason |
+
 #### Code Review Gate
 | step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
 |---|---|---|---|---|---|---|
