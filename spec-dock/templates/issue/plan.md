@@ -87,19 +87,25 @@ ID: "<ISS_ID>"
 
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
-  - timing:
-  - scope:
+  - timing: each implementation step before commit
+  - reviewer: code-reviewer
+  - pass condition: review_status: pass
+  - scope: step diff, tests, docs/report updates, and spec impact for the current step
 - QG1 QA review:
-  - timing:
-  - scope:
+  - timing: S99 final quality gate
+  - reviewer: qa-reviewer
+  - scope: test adequacy and integration test need for the whole issue
 - SG1 spec review:
-  - timing:
-  - scope:
+  - timing: S90 docs impact resolution and S99 final quality gate
+  - reviewer: spec-reviewer
+  - scope: requirement / design / plan / report / docs alignment and requirement fulfillment
 
 ## 実行ルール（全ステップ共通）
 - 実行 policy、approval cadence、completion contract は `workflow_issue.md` を正本にする。
 - step / block / behavior slice の書き方は `phase_plan_issue.md` を正本にする。
 - plan 本文には、この Issue 固有の順序、依存、検証、review / QA gate だけを書く。
+- 各 implementation step は commit 単位として設計し、`code-reviewer gate` を pass してから `commit gate` で閉じる。
+- `approved-no-op` は差分なしの場合だけ許可し、理由、確認対象、差分なし確認コマンドを report に残す。
 
 ## 実装ステップ
 
@@ -128,8 +134,8 @@ ID: "<ISS_ID>"
   - negative:
 - pre-implementation evidence:
   - expected red / characterization pass / test sensitivity evidence:
-- report update:
-  - ...
+- report draft update before review:
+  - verification / closure / review intent evidence to include in the step diff:
 - notes:
   - ...
 
@@ -159,31 +165,68 @@ ID: "<ISS_ID>"
   - guardrail:
 
 #### step gate
-- review:
-  - ...
+- report draft update:
+  - update before code-reviewer so the evidence is reviewed and committed with the step:
+- code-reviewer gate:
+  - reviewer: code-reviewer
+  - review scope:
+  - pass condition: review_status: pass
+  - re-review rule: fix findings and re-run until pass
 - expected verification:
   - ...
-- report update:
-  - ...
+- commit gate:
+  - closure state: committed / approved-no-op
+  - commit scope:
+  - commit message intent:
+  - post-commit clean check:
+- no-op gate:
+  - allowed only when:
+  - diff check command:
+  - checked contracts / files:
+  - read-only confirmation evidence:
+  - rationale:
+- post-commit report evidence:
+  - commit hash / final ledger reference:
+  - clean check result:
 
 ### Sxx — <next observable behavior>
 - ...
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
-  - docs / assets / workflow / skill / none
+  - docs / templates / README / workflow / skill / migration notes / none
 - 対応:
   - ...
+- doc update owner:
+  - doc-writer when updates are required
+- spec/doc review:
+  - reviewer: spec-reviewer
+  - pass condition: docs align with requirement / design / plan and no required docs impact remains unresolved
 
-### S99 — final diff review quality gate
+### S99 — final quality gate
 - branch diff scope:
   - ...
 - required validation:
   - ...
-- reviewer approvals:
-  - ...
-- report update:
-  - ...
+- final QA gate:
+  - reviewer: qa-reviewer
+  - scope: test adequacy and integration test need for the whole issue
+  - pass condition: reviewer pass; add integration tests first if required
+  - re-review rule: fix findings and re-run qa-reviewer until pass
+- final code review gate:
+  - reviewer: code-reviewer
+  - scope: issue-wide integrated diff, structure, responsibility boundaries, regression risk, maintainability
+  - pass condition: review_status: pass
+  - re-review rule: fix findings and re-run code-reviewer until pass
+- final spec review gate:
+  - reviewer: spec-reviewer
+  - scope: requirement / design / plan / report / implementation / tests / docs alignment
+  - pass condition: reviewer pass
+  - re-review rule: fix findings and re-run spec-reviewer until pass
+- final commit gate:
+  - commit scope:
+  - final report ledger before commit:
+  - post-commit external evidence destination:
 
 ## 未確定事項
 - Q-001:
@@ -203,9 +246,17 @@ ID: "<ISS_ID>"
   - ...
 - docs impact resolved:
   - ...
-- final diff approved:
+- all implementation steps closed:
+  - committed / approved-no-op:
+- final quality gate passed:
+  - qa-reviewer:
+  - issue-wide code-reviewer:
+  - spec-reviewer:
+- final commit completed:
   - ...
 - required closure ids closed:
   - Step Contract Closure:
   - Test Contract Closure:
   - Closure Coverage:
+- final clean state:
+  - no unintended staged / unstaged changes:
