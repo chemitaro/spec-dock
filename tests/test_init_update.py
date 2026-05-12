@@ -353,6 +353,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ".codex/AGENTS.md",
         ".codex/config.toml",
+        ".codex/rules/spec-dock-commands.rules",
         ".codex/agents/code-reviewer.toml",
         ".codex/agents/consultant.toml",
         ".codex/agents/deep-consultant.toml",
@@ -439,6 +440,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/": (
             ".codex/AGENTS.md",
             ".codex/config.toml",
+        ),
+        ".codex/rules/": (
+            ".codex/rules/spec-dock-commands.rules",
         ),
         ".github/workflows/": (
             ".github/workflows/ci.yml",
@@ -990,6 +994,7 @@ class TestInitUpdate(CliRuntimeHarness):
             *managed_skill_paths,
             ".agents/host-adapters/meta.json",
             ".codex/agents/spec-manager.toml",
+            ".codex/rules/spec-dock-commands.rules",
             ".github/agents/orchestrator.agent.md",
             ".codex/agents/spec-dock-codex-adapter.toml",
             ".github/agents/spec-dock-copilot-adapter.agent.md",
@@ -1217,6 +1222,31 @@ class TestInitUpdate(CliRuntimeHarness):
             "SpecDock のコマンド操作は原則として `spec-manager` へ委任する。",
             text,
             f"codex main config missing spec-manager routing guidance ({shim_label})",
+        )
+
+    def _assert_codex_command_rules_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn("prefix_rule(", text, f"codex command rules missing prefix_rule ({shim_label})")
+        self.assertIn(
+            'pattern = [["./spec-dock/scripts/spec-dock", "./spec"]]',
+            text,
+            f"codex command rules missing repo-local entrypoint prefixes ({shim_label})",
+        )
+        self.assertIn('decision = "allow"', text, f"codex command rules missing allow decision ({shim_label})")
+        self.assertIn(
+            "./spec-dock/scripts/spec-dock new future-command --flag value",
+            text,
+            f"codex command rules must cover future subcommands by entrypoint prefix ({shim_label})",
+        )
+        self.assertIn(
+            "./spec future-command --flag value",
+            text,
+            f"codex command rules must cover future shortcut subcommands by entrypoint prefix ({shim_label})",
+        )
+        self.assertIn("spec-dock validate", text, f"codex command rules missing global-command guard ({shim_label})")
+        self.assertIn(
+            "uvx --from . spec-dock update .",
+            text,
+            f"codex command rules missing installer-command guard ({shim_label})",
         )
 
     def _issue_69_run_subprocess(
@@ -8005,11 +8035,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml"
             codex_bootstrap_path = assets_dir / "install_root" / ".codex" / "AGENTS.md"
             codex_config_path = assets_dir / "install_root" / ".codex" / "config.toml"
+            codex_rules_path = assets_dir / "install_root" / ".codex" / "rules" / "spec-dock-commands.rules"
             copilot_spec_manager_path = assets_dir / "install_root" / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md"
             self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
             self.assertTrue(codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}")
             self.assertTrue(codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}")
+            self.assertTrue(codex_rules_path.is_file(), f"missing bundled codex command rules: {codex_rules_path}")
             self.assertTrue(
                 copilot_spec_manager_path.is_file(),
                 f"missing bundled copilot spec-manager: {copilot_spec_manager_path}",
@@ -8018,6 +8050,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             codex_text = codex_path.read_text(encoding="utf-8")
             codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
             codex_config_text = codex_config_path.read_text(encoding="utf-8")
+            codex_rules_text = codex_rules_path.read_text(encoding="utf-8")
             copilot_spec_manager_text = copilot_spec_manager_path.read_text(encoding="utf-8")
             copilot_text = copilot_path.read_text(encoding="utf-8")
 
@@ -8037,6 +8070,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self._assert_codex_main_config_routing_contract(
             text=codex_config_text,
             shim_label="bundled codex main config",
+        )
+        self._assert_codex_command_rules_contract(
+            text=codex_rules_text,
+            shim_label="bundled codex command rules",
         )
         self._assert_spec_manager_contract(
             text=copilot_spec_manager_text,
