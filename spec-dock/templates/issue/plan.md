@@ -165,6 +165,9 @@ ID: "<ISS_ID>"
   - guardrail:
 
 #### step gate
+- delegation decision:
+  - delegated / approved-local-execution / degraded mode:
+  - required reason / no delegation rationale:
 - report draft update:
   - update before code-reviewer so the evidence is reviewed and committed with the step:
 - code-reviewer gate:
