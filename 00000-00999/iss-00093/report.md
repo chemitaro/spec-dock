@@ -487,6 +487,86 @@ git diff --check
 
 ---
 
+### 2026-05-14 02:13 JST - 02:33 JST
+
+#### 対象
+- Step: S05 `close` and `issue finish` lifecycle sync
+- AC/EC: AC-006, EC-001, EC-004, EC-005
+- Closure IDs: cl-010, cl-011, cl-012, cl-021
+
+#### 実施内容
+- S04 は `a6c9275 feat(delete): 削除後の自動同期を追加` で committed。
+- S05 は direct close、internal close suppression、active clear、branch-derived active restoration prevention、GitHub stub failure に跨るため、plan の Delegation Gate に従い `dev-coder` へ bounded implementation を委任する。
+- `CloseNodeRequest.run_post_sync` と `CloseNodeResult.post_sync` を追加し、direct close / already-closed success path で S01 post-mutation sync を実行する。
+- `issue finish` は internal `close_node` の post-sync を抑止し、`clear_active` 成功後に lifecycle-owned post-sync を 1 回だけ実行する。
+- close / finish command は mutation success stdout を保持しつつ、post-sync failure を exit code 1 と recovery guidance / warnings で公開する。
+- close / finish の preflight / close failure / clear-active failure は post-sync に到達しない境界を維持する。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00093-automatic-sync-after-state-mutations
+
+git log --oneline --decorate -1
+
+a6c9275 (HEAD -> iss-00093-automatic-sync-after-state-mutations) feat(delete): 削除後の自動同期を追加
+
+uv run pytest tests/cli_runtime/test_close.py tests/cli_runtime/test_issue_lifecycle.py
+
+failed: pytest executable unavailable in the current environment
+
+python -m unittest tests.cli_runtime.test_close tests.cli_runtime.test_issue_lifecycle -v
+
+OK (Ran 24 tests in 115.675s)
+
+python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 tests.cli_runtime.test_delete -v
+
+OK (Ran 21 tests in 53.411s)
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=40
+
+git diff --check
+
+OK
+```
+
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S05 | delegated | GitHub stub / lifecycle sequencing / active state / no-double-sync / failure recovery interactions | dev-coder (`019e2255-3baa-7223-91ef-8c7454a4d79d`) | Wire direct close and issue finish lifecycle-owned post-sync; suppress internal close sync before active clear; add tests for cl-010, cl-011, cl-012, cl-021; do not broaden manual sync or active set behavior. | pass | N/A |
+
+#### Code Review Gate
+| pass | reviewer | scope | result | notes |
+|---|---|---|---|---|
+| S05 | fresh `code-reviewer` (`019e2266-9cfc-7803-b140-3d4d68e11235`) | close/finish post-sync implementation, CLI output, lifecycle tests, report entry | pass | No actionable correctness issues; close / finish behavior matches S05 contract. |
+
+#### Step Commit Gate
+| step | commit | status | notes |
+|---|---|---|---|
+| S05 | pending | ready | Fresh code-review passed; commit S05 as the next step. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-010, cl-011, cl-012, cl-021 | tc-s05-001〜tc-s05-008 | cl-010, cl-011, cl-012, cl-021 | S05 executes approved plan as written. | no |
+
+#### Closure Coverage
+| closure id | evidence |
+|---|---|
+| cl-010 | Direct close / already-closed close refreshes GitHub-backed derived state without manual sync. |
+| cl-011 | `issue finish` clears active, preserves active-none projection, and does not restore branch-derived active state. |
+| cl-012 | `issue finish` suppresses internal close sync and runs lifecycle post-sync exactly once after active clear. |
+| cl-021 | close / finish preflight or mutation failure paths do not run post-sync; clear-active failure reports stale-artifact guidance. |
+
+#### メモ
+- S06 carry-over: parser-level no opt-out assertions and full CLI / JSON post-sync output integration across all mutation commands.
+- S90 carry-over: provider workflow docs and dogfooding docs impact resolution.
+
+---
+
 ### 2026-05-13 HH:MM - HH:MM
 
 #### 対象
