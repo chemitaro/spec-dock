@@ -1136,6 +1136,10 @@ class TestCliNew(CliRuntimeHarness):
                 "  fi\n"
                 "  exit 0\n"
                 "fi\n"
+                'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
+                '  echo "[{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"},{\\"number\\":124,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 124\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:04Z\\",\\"url\\":\\"https://github.com/example/repo/issues/124\\"}]"\n'
+                "  exit 0\n"
+                "fi\n"
                 "echo \"unexpected gh args: $@\" >&2\n"
                 "exit 1\n",
                 encoding="utf-8",
@@ -1184,6 +1188,10 @@ class TestCliNew(CliRuntimeHarness):
                 "set -euo pipefail\n"
                 'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
                 "  echo \"https://github.com/example/repo/issues/123\"\n"
+                "  exit 0\n"
+                "fi\n"
+                'if [[ \"$1\" == \"issue\" && \"$2\" == \"list\" ]]; then\n'
+                '  echo "[{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"}]"\n'
                 "  exit 0\n"
                 "fi\n"
                 "echo \"unexpected gh args: $@\" >&2\n"
@@ -1337,6 +1345,10 @@ class TestCliNew(CliRuntimeHarness):
                 "  echo \"https://github.com/example/repo/issues/123\"\n"
                 "  exit 0\n"
                 "fi\n"
+                'if [[ \"$1\" == \"issue\" && \"$2\" == \"list\" ]]; then\n'
+                '  echo "[{\\"number\\":1,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 1\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:01Z\\",\\"url\\":\\"https://github.com/example/repo/issues/1\\"},{\\"number\\":2,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 2\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:02Z\\",\\"url\\":\\"https://github.com/example/repo/issues/2\\"},{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"}]"\n'
+                "  exit 0\n"
+                "fi\n"
                 "echo \"unexpected gh args: $@\" >&2\n"
                 "exit 1\n",
                 encoding="utf-8",
@@ -1383,6 +1395,10 @@ class TestCliNew(CliRuntimeHarness):
                 "set -euo pipefail\n"
                 'if [[ \"$1\" == \"issue\" && \"$2\" == \"create\" ]]; then\n'
                 "  echo \"https://github.com/example/repo/issues/123\"\n"
+                "  exit 0\n"
+                "fi\n"
+                'if [[ \"$1\" == \"issue\" && \"$2\" == \"list\" ]]; then\n'
+                '  echo "[{\\"number\\":1,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 1\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:01Z\\",\\"url\\":\\"https://github.com/example/repo/issues/1\\"},{\\"number\\":2,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 2\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:02Z\\",\\"url\\":\\"https://github.com/example/repo/issues/2\\"},{\\"number\\":123,\\"state\\":\\"OPEN\\",\\"title\\":\\"Issue 123\\",\\"labels\\":[],\\"updatedAt\\":\\"2026-05-13T00:00:03Z\\",\\"url\\":\\"https://github.com/example/repo/issues/123\\"}]"\n'
                 "  exit 0\n"
                 "fi\n"
                 "echo \"unexpected gh args: $@\" >&2\n"
