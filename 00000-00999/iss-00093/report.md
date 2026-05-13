@@ -578,6 +578,78 @@ OK
 
 ---
 
+### 2026-05-14 02:39 JST - in progress
+
+#### 対象
+- Step: S06 CLI / JSON post-sync result integration
+- AC/EC: AC-007, AC-008, EC-003, EC-004
+- Closure IDs: cl-013, cl-014, cl-015
+
+#### 実施内容
+- S05 は `014d50a feat(lifecycle): closeとfinish後の自動同期を追加` で committed。
+- S06 は command / presentation / JSON / parser help に跨るため、plan の Delegation Gate に従い `dev-coder` へ bounded implementation を委任する。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00093-automatic-sync-after-state-mutations
+
+git log --oneline --decorate -1
+
+014d50a (HEAD -> iss-00093-automatic-sync-after-state-mutations) feat(lifecycle): closeとfinish後の自動同期を追加
+```
+
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S06 | delegated | command / presentation / JSON / parser-help integration is cross-cutting | dev-coder | Normalize post-sync failure output and exit handling, expose delete JSON post-sync outcome, and add no-opt-out parser/help assertions for cl-013, cl-014, cl-015. Do not change sync engine behavior or S01-S05 mutation sequencing. | in progress | N/A |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-013, cl-014, cl-015 | tc-s06-001〜tc-s06-004 | cl-013, cl-014, cl-015 | S06 executes approved plan as written. | no |
+
+#### S06 Completion Evidence
+- changed behavior:
+  - `new initiative` / `new epic` / `new issue` and `deps add/remove` now return exit code 1 when mutation succeeds but post-mutation sync fails.
+  - CLI rendering keeps the mutation success line visible and adds auto-sync failure guidance for post-sync failures.
+  - fatal GitHub post-sync warnings such as `gh_fetch_failed` and `gh_index_incomplete` surface as auto-sync failure guidance.
+  - `delete --json` includes `post_sync.status` (`success` / `failed` / `skipped`) plus warning/guidance details, and command exit is non-zero on post-sync failure.
+  - parser/help assertions confirm no `--no-auto-sync` / equivalent opt-out is exposed.
+- closure evidence:
+  - cl-013: `tc-s06-001`, `tc-s06-002`
+  - cl-014: `tc-s06-003`
+  - cl-015: `tc-s06-004`
+- verification:
+  - `python -m unittest tests.presentation_runtime.test_runtime_sync_s07` -> pass (`Ran 49 tests`)
+  - focused lifecycle regression bundle for new/deps/delete/close/issue finish -> pass (`Ran 9 tests`)
+  - `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_deps tests.cli_runtime.test_delete tests.cli_runtime.test_close tests.cli_runtime.test_issue_lifecycle tests.presentation_runtime.test_runtime_sync_s07` -> pass (`Ran 212 tests`)
+  - `./spec-dock/scripts/spec-dock validate` -> pass (`spec-dock: ok (validate) nodes=40`)
+  - `git diff --check` -> pass
+- review / fix:
+  - fresh `code-reviewer` (`019e227e-7946-75f2-80c2-638e7dcfb8fb`) -> fail: `deps add/remove` post-sync success / skip stdout が出ず、S06 の success / failure / skip 区別を満たせない P1。
+  - fix: `render_deps_mutation_text()` に shared post-sync stdout helper を接続し、updated success は `spec-dock: ok (deps ... auto-sync)`、unchanged skip は `spec-dock: skipped (deps ... auto-sync) reason=unchanged` を出す。
+  - fix verification: `python -m unittest tests.presentation_runtime.test_runtime_sync_s07 -v` -> pass (`Ran 49 tests`); `python -m unittest tests.cli_runtime.test_deps -v` -> pass (`Ran 86 tests`); `git diff --check` -> pass.
+  - fresh re-review `code-reviewer` (`019e2286-afac-7bc0-bbde-8c918589389e`) -> pass: deps success / skip output, failure exit behavior, and harness gh stubbing are compatible with S06 contract.
+  - post-fix regression: `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_deps tests.cli_runtime.test_delete tests.cli_runtime.test_close tests.cli_runtime.test_issue_lifecycle tests.presentation_runtime.test_runtime_sync_s07 -v` -> pass (`Ran 212 tests in 152.905s`).
+- refactor / tidy decision:
+  - Added small presentation helpers for post-sync stdout/stderr/warnings to avoid duplicating failure guidance formatting across command renderers.
+  - No sync engine behavior or S01-S05 mutation sequencing was changed.
+
+#### Code Review Gate
+| pass | reviewer | scope | result | notes |
+|---|---|---|---|---|
+| S06 initial | fresh `code-reviewer` (`019e227e-7946-75f2-80c2-638e7dcfb8fb`) | S06 command / presentation / JSON / parser-help diff | fail | P1: deps auto-sync success / skip lines missing. |
+| S06 re-review | fresh `code-reviewer` (`019e2286-afac-7bc0-bbde-8c918589389e`) | S06 diff after deps output fix | pass | No P0/P1 findings; previous deps stdout issue is fixed. |
+
+#### Step Commit Gate
+| step | commit | status | notes |
+|---|---|---|---|
+| S06 | pending | ready | Fresh re-review and post-fix regression passed. |
+
+---
+
 ## Spec Authoring Gate
 
 | phase | artifact | reviewer | verdict | findings / fixes | promotion |
