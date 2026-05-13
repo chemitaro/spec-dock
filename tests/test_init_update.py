@@ -1980,14 +1980,14 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("S99 — final quality gate", plan_text)
             self.assertIn("code-reviewer gate", plan_text)
             self.assertIn("commit gate", plan_text)
-            self.assertIn("delegation decision", plan_text)
+            self.assertIn("delegation 判断", plan_text)
             self.assertIn("report draft update before review", plan_text)
-            self.assertIn("read-only confirmation evidence", plan_text)
+            self.assertIn("read-only 確認 evidence", plan_text)
             self.assertIn("qa-reviewer", plan_text)
-            self.assertIn("re-run qa-reviewer until pass", plan_text)
-            self.assertIn("re-run code-reviewer until pass", plan_text)
-            self.assertIn("re-run spec-reviewer until pass", plan_text)
-            self.assertIn("target files:", plan_text)
+            self.assertIn("qa-reviewer を pass まで再実行", plan_text)
+            self.assertIn("code-reviewer を pass まで再実行", plan_text)
+            self.assertIn("spec-reviewer を pass まで再実行", plan_text)
+            self.assertIn("対象ファイル:", plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
@@ -2872,19 +2872,19 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("System(system", initiative_design)
         self.assertIn("System_Ext(external", initiative_design)
         self.assertIn("Rel(user, system", initiative_design)
-        self.assertIn("## System Context", initiative_design)
-        self.assertIn("- Title:\n  - System context / target-state overview", initiative_design)
+        self.assertIn("## システムコンテキスト", initiative_design)
+        self.assertIn("- タイトル:\n  - システムコンテキスト / 目指す状態の全体像", initiative_design)
         self.assertIn("## ドメイン境界 / ユビキタス言語（必要時）", initiative_design)
-        self.assertIn("## Container Overview（必要時）", initiative_design)
-        container_overview_section = initiative_design.split("## Container Overview（必要時）", 1)[1].split(
+        self.assertIn("## コンテナ概要（必要時）", initiative_design)
+        container_overview_section = initiative_design.split("## コンテナ概要（必要時）", 1)[1].split(
             "## 対象境界 / 依存", 1
         )[0]
-        self.assertIn("N/A: reason", container_overview_section)
+        self.assertIn("N/A: 理由", container_overview_section)
         self.assertNotIn("```plantuml", container_overview_section)
         self.assertIn("## Component / Module View", epic_design)
         self.assertIn("## Package Dependency", epic_design)
         self.assertIn("UML（推奨: package dependency / package dependency delta）", epic_design)
-        self.assertIn("diagram metadata:", epic_design)
+        self.assertIn("diagram メタデータ:", epic_design)
         self.assertIn("## Domain Model（DDD 必要時）", epic_design)
         self.assertIn("UML（推奨: component / module）", epic_design)
         self.assertIn("UML（推奨: main sequence）", epic_design)
@@ -2896,13 +2896,13 @@ class TestInitUpdate(CliRuntimeHarness):
         )[0]
         self.assertNotIn("```plantuml", domain_model_section)
         self.assertNotIn("```plantuml", data_model_section)
-        self.assertIn("N/A: reason", domain_model_section)
-        self.assertIn("N/A: reason", data_model_section)
+        self.assertIn("N/A: 理由", domain_model_section)
+        self.assertIn("N/A: 理由", data_model_section)
         self.assertIn("## State / Activity（必要時）", epic_design)
         state_activity_section = epic_design.split("## State / Activity（必要時）", 1)[1].split(
             "## 失敗設計", 1
         )[0]
-        self.assertIn("N/A: reason", state_activity_section)
+        self.assertIn("N/A: 理由", state_activity_section)
         self.assertNotIn("```plantuml", state_activity_section)
         for section in (
             epic_design.split("## Component / Module View", 1)[1].split("## Package Dependency", 1)[0],
@@ -2913,28 +2913,28 @@ class TestInitUpdate(CliRuntimeHarness):
             state_activity_section,
         ):
             for metadata_field in (
-                "Title:",
-                "Question answered:",
-                "Scope:",
-                "Excluded details:",
-                "Update trigger:",
+                "タイトル:",
+                "答える問い:",
+                "範囲:",
+                "含めない詳細:",
+                "更新条件:",
             ):
                 self.assertIn(metadata_field, section)
         self.assertIn("このテンプレートは最小 scaffold", issue_design)
         self.assertIn("項目は追加・削除・統合・並べ替えてよい", issue_design)
-        self.assertIn("## Parent Diagram References", issue_design)
-        self.assertIn("module dependency:", issue_design)
-        self.assertIn("class dependency（必要時）:", issue_design)
-        self.assertIn("function dependency（必要時）:", issue_design)
-        self.assertIn("file dependency:", issue_design)
+        self.assertIn("## 親 Diagram 参照", issue_design)
+        self.assertIn("module 依存:", issue_design)
+        self.assertIn("class 依存（必要時）:", issue_design)
+        self.assertIn("function 依存（必要時）:", issue_design)
+        self.assertIn("file 依存:", issue_design)
         self.assertIn("## Module Dependency Diagram", issue_design)
-        self.assertIn("- Title:", issue_design)
+        self.assertIn("- タイトル:", issue_design)
         self.assertIn("UML（原則: module dependency / package dependency delta）", issue_design)
         module_dependency_section = issue_design.split("## Module Dependency Diagram", 1)[1].split(
             "## Local Diagram Delta（必要時）", 1
         )[0]
         self.assertIn("```plantuml", module_dependency_section)
-        self.assertNotIn("N/A: reason", module_dependency_section)
+        self.assertNotIn("N/A: 理由", module_dependency_section)
         self.assertIn("## Local Diagram Delta（必要時）", issue_design)
         self.assertIn("## Sequence Delta（必要時）", issue_design)
         self.assertIn("## Domain Model Delta（必要時）", issue_design)
@@ -2949,7 +2949,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "## ディレクトリ / ファイル変更計画", 1
             )[0],
         ):
-            self.assertIn("N/A: reason", optional_issue_section)
+            self.assertIn("N/A: 理由", optional_issue_section)
             self.assertNotIn("```plantuml", optional_issue_section)
         self.assertEqual(
             1,
@@ -2959,9 +2959,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("必要な場合だけ追加する", issue_design)
         self.assertIn("## ディレクトリ / ファイル変更計画", issue_design)
         self.assertRegex(issue_design, r"```text\n\.\n\|-- src/\n\|   \|-- package/")
-        for operation in ("Add", "Modify", "Move/Rename", "Read only", "Delete"):
+        for operation in ("追加", "変更", "移動/rename", "読取のみ", "削除"):
             self.assertRegex(issue_design, rf"# .*{re.escape(operation)}")
-        self.assertIn("depends on:", issue_design)
+        self.assertIn("依存:", issue_design)
         self.assertNotIn("\n- Add:\n", issue_design)
         self.assertNotIn("\n- Modify:\n", issue_design)
         self.assertNotIn("\n- Delete:\n", issue_design)
@@ -2977,19 +2977,19 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("## 依存関係から導く実装順序", issue_plan)
         self.assertIn("`Module Dependency Diagram`", issue_plan)
         self.assertIn("`ディレクトリ / ファイル変更計画`", issue_plan)
-        self.assertIn("depends on:", issue_plan)
-        self.assertIn("unblocks:", issue_plan)
-        self.assertIn("target files:", issue_plan)
+        self.assertIn("依存:", issue_plan)
+        self.assertIn("unblock:", issue_plan)
+        self.assertIn("対象ファイル:", issue_plan)
         self.assertIn("## Spec-Locked Closure Index（仕様固定クロージャ索引）", issue_plan)
         self.assertIn("Issue 全体のテストケース一覧ではなく", issue_plan)
         self.assertIn("エージェントが仕様を縮小解釈・後付けテスト・過剰実装しない", issue_plan)
         self.assertIn("| id | phase / step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |", issue_plan)
-        self.assertIn("fixture notes:", issue_plan)
+        self.assertIn("fixture メモ:", issue_plan)
         self.assertIn("golden output:", issue_plan)
         self.assertIn("manual verification:", issue_plan)
         self.assertIn("property domain:", issue_plan)
-        self.assertIn("non-goals:", issue_plan)
-        self.assertIn("evidence level values:", issue_plan)
+        self.assertIn("非目標:", issue_plan)
+        self.assertIn("evidence level の値:", issue_plan)
         self.assertIn("red-required:", issue_plan)
         self.assertIn("covered-existing:", issue_plan)
         self.assertIn("inspect-only:", issue_plan)
@@ -2997,11 +2997,11 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("通常 Issue は step / behavior slice ごとに 1〜3 件程度の検証契約を書く", issue_plan)
         self.assertIn("中央 index は重複するテストケース表にせず", issue_plan)
         self.assertIn("test bundle:", issue_plan)
-        self.assertIn("closure ids:", issue_plan)
-        self.assertIn("test ids:", issue_plan)
+        self.assertIn("closure id:", issue_plan)
+        self.assertIn("test id:", issue_plan)
         self.assertIn("same as closure ids unless a project explicitly documents separate aliases", issue_plan)
         self.assertIn("evidence level:", issue_plan)
-        self.assertIn("acceptance:", issue_plan)
+        self.assertIn("受け入れ:", issue_plan)
         self.assertIn("characterization:", issue_plan)
         self.assertIn("property / invariant:", issue_plan)
         self.assertIn("regression:", issue_plan)
@@ -3009,16 +3009,16 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("pre-implementation evidence:", issue_plan)
         self.assertIn("expected red / characterization pass / test sensitivity evidence", issue_plan)
         self.assertIn("#### step closure contract", issue_plan)
-        self.assertIn("closure ids:", issue_plan)
-        self.assertIn("close when:", issue_plan)
-        self.assertIn("verification evidence:", issue_plan)
+        self.assertIn("closure id:", issue_plan)
+        self.assertIn("close 条件:", issue_plan)
+        self.assertIn("検証 evidence:", issue_plan)
         self.assertIn("Step Contract Closure:", issue_plan)
         self.assertIn("Closure Coverage:", issue_plan)
         self.assertIn("#### behavior slice execution", issue_plan)
-        self.assertIn("implementation batch:", issue_plan)
-        self.assertIn("allowed scope:", issue_plan)
-        self.assertIn("forbidden scope:", issue_plan)
-        self.assertIn("related / full command:", issue_plan)
+        self.assertIn("実装 batch:", issue_plan)
+        self.assertIn("許可範囲:", issue_plan)
+        self.assertIn("禁止範囲:", issue_plan)
+        self.assertIn("関連 / full command:", issue_plan)
         self.assertIn("refactor / tidy:", issue_plan)
         self.assertNotIn("TDD iterations", issue_plan)
         self.assertNotIn("update_plan", issue_plan)
