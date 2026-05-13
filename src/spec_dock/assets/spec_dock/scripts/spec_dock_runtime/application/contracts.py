@@ -96,6 +96,7 @@ class CreateNodeResult:
     node: SpecNode
     created_paths: list[Path]
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 @dataclass(frozen=True)

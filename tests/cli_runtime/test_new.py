@@ -43,6 +43,289 @@ class TestCliNew(CliRuntimeHarness):
             encoding="utf-8",
         )
 
+    def _assert_auto_sync_artifacts_include(
+        self,
+        target: Path,
+        node_id: str,
+        *,
+        require_node_in_working_artifacts: bool = True,
+    ) -> None:
+        specdock_dir = target / "spec-dock"
+        agent_dir = specdock_dir / ".agent"
+        index_all_path = agent_dir / "index-all.json"
+        index_path = agent_dir / "index.json"
+        tree_all_path = agent_dir / "tree-all.json"
+        tree_path = agent_dir / "tree.json"
+        deps_issues_path = agent_dir / "deps-issues.json"
+        tree_all_puml_path = specdock_dir / "tree-all.puml"
+        tree_puml_path = specdock_dir / "tree.puml"
+        deps_issues_puml_path = specdock_dir / "deps-issues.puml"
+        dashboard_path = specdock_dir / "dashboard.md"
+        artifact_paths = (
+            index_all_path,
+            index_path,
+            tree_all_path,
+            tree_path,
+            deps_issues_path,
+            tree_all_puml_path,
+            tree_puml_path,
+            deps_issues_puml_path,
+            dashboard_path,
+        )
+        for artifact_path in artifact_paths:
+            with self.subTest(artifact=artifact_path.name, node_id=node_id):
+                self.assertTrue(artifact_path.is_file(), f"missing artifact: {artifact_path}")
+
+        index_all = json.loads(index_all_path.read_text(encoding="utf-8"))
+        tree_all = json.loads(tree_all_path.read_text(encoding="utf-8"))
+        tree = json.loads(tree_path.read_text(encoding="utf-8"))
+        deps_issues = json.loads(deps_issues_path.read_text(encoding="utf-8"))
+        self.assertIn(node_id, index_all["nodes"])
+        self.assertIn(node_id, self._collect_tree_node_ids(tree_all))
+        self.assertTrue(deps_issues["deps"]["valid"])
+        self.assertEqual(
+            deps_issues["source"],
+            {"index": "spec-dock/.agent/index.json", "schema_version": 2},
+        )
+        for text_path in (tree_all_puml_path, tree_puml_path, deps_issues_puml_path):
+            self.assertIn("@startuml", text_path.read_text(encoding="utf-8"))
+        if node_id.startswith("iss-"):
+            self.assertIn(node_id, tree_all_puml_path.read_text(encoding="utf-8"))
+        if require_node_in_working_artifacts:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertIn(node_id, index["nodes"])
+            self.assertIn(node_id, self._collect_tree_node_ids(tree))
+            if node_id.startswith("iss-"):
+                self.assertIn(node_id, deps_issues["nodes"])
+                self.assertIn(node_id, tree_puml_path.read_text(encoding="utf-8"))
+                self.assertIn(node_id, deps_issues_puml_path.read_text(encoding="utf-8"))
+            self.assertIn(node_id, dashboard_path.read_text(encoding="utf-8"))
+
+    def _collect_tree_node_ids(self, tree_payload: dict[str, object]) -> set[str]:
+        node_ids: set[str] = set()
+        roots = tree_payload.get("tree")
+        if not isinstance(roots, list):
+            return node_ids
+        for initiative in roots:
+            if not isinstance(initiative, dict):
+                continue
+            init_id = initiative.get("id")
+            if isinstance(init_id, str):
+                node_ids.add(init_id)
+            epics = initiative.get("epics")
+            if not isinstance(epics, list):
+                continue
+            for epic in epics:
+                if not isinstance(epic, dict):
+                    continue
+                epic_id = epic.get("id")
+                if isinstance(epic_id, str):
+                    node_ids.add(epic_id)
+                issues = epic.get("issues")
+                if not isinstance(issues, list):
+                    continue
+                for issue in issues:
+                    if not isinstance(issue, dict):
+                        continue
+                    issue_id = issue.get("id")
+                    if isinstance(issue_id, str):
+                        node_ids.add(issue_id)
+        return node_ids
+
+    def _read_create_auto_sync_artifacts(self, target: Path) -> dict[str, str | None]:
+        artifact_paths = (
+            target / "spec-dock" / ".agent" / "index-all.json",
+            target / "spec-dock" / ".agent" / "index.json",
+            target / "spec-dock" / ".agent" / "tree-all.json",
+            target / "spec-dock" / ".agent" / "tree.json",
+            target / "spec-dock" / ".agent" / "deps-issues.json",
+            target / "spec-dock" / "tree-all.puml",
+            target / "spec-dock" / "tree.puml",
+            target / "spec-dock" / "deps-issues.puml",
+            target / "spec-dock" / "dashboard.md",
+        )
+        return {
+            path.relative_to(target).as_posix(): path.read_text(encoding="utf-8") if path.exists() else None
+            for path in artifact_paths
+        }
+
+    def _install_gh_issue_list_stub(
+        self,
+        target: Path,
+        *,
+        issue_numbers: list[int],
+        log_path: Path | None = None,
+    ) -> dict[str, str]:
+        bin_dir = target / ".bin-gh-list"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        self._make_gh_issue_list_stub(
+            bin_dir,
+            issues=[
+                {
+                    "number": issue_number,
+                    "state": "OPEN",
+                    "title": f"Issue {issue_number}",
+                    "labels": [],
+                    "updatedAt": f"2026-05-13T00:00:{issue_number:02d}Z",
+                    "url": f"https://github.com/example/repo/issues/{issue_number}",
+                }
+                for issue_number in issue_numbers
+            ],
+            log_path=log_path,
+        )
+        return {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+    def test_new_initiative_auto_syncs_index_and_dashboard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+            log_path = target / ".gh.log"
+            test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1], log_path=log_path)
+
+            self._run_runtime(
+                target,
+                ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"],
+                env=test_env,
+            )
+
+            self._assert_auto_sync_artifacts_include(
+                target,
+                "init-00001",
+                require_node_in_working_artifacts=False,
+            )
+            self.assertIn("issue list", log_path.read_text(encoding="utf-8"))
+
+    def test_new_epic_auto_syncs_index_and_dashboard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+            test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2])
+            self._run_runtime(
+                target,
+                ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"],
+                env=test_env,
+            )
+
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"],
+                env=test_env,
+            )
+
+            self._assert_auto_sync_artifacts_include(
+                target,
+                "epic-00002",
+                require_node_in_working_artifacts=False,
+            )
+
+    def test_new_issue_auto_syncs_index_and_dashboard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+            test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2, 3])
+            self._run_runtime(
+                target,
+                ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"],
+                env=test_env,
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"],
+                env=test_env,
+            )
+
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--github-issue", "3"],
+                env=test_env,
+            )
+
+            self._assert_auto_sync_artifacts_include(target, "iss-00003")
+
+    def test_new_issue_auto_sync_preserves_local_only_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+            test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2, 3, 4])
+            self._run_runtime(
+                target,
+                ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"],
+                env=test_env,
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"],
+                env=test_env,
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "2", "--title", "Local holder", "--github-issue", "3"],
+                env=test_env,
+            )
+            local_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-local-holder"
+            )
+            self._remove_github_link(local_issue_dir)
+
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "2", "--title", "Linked followup", "--github-issue", "4"],
+                env=test_env,
+            )
+
+            self._assert_auto_sync_artifacts_include(target, "iss-00003")
+            self._assert_auto_sync_artifacts_include(target, "iss-00004")
+
+    def test_new_failure_paths_do_not_run_post_sync_or_refresh_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._init_origin_repo(target)
+            log_path = target / ".gh.log"
+            test_env = self._install_gh_issue_list_stub(target, issue_numbers=[1, 2, 3], log_path=log_path)
+            self._run_runtime(
+                target,
+                ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"],
+                env=test_env,
+            )
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "1", "--title", "JWT auth", "--github-issue", "2"],
+                env=test_env,
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--github-issue", "3"],
+                env=test_env,
+            )
+
+            cases = (
+                ["new", "initiative", "--title", "Duplicate initiative", "--github-issue", "1"],
+                ["new", "epic", "--initiative", "missing", "--title", "Missing parent", "--github-issue", "4"],
+                ["new", "issue", "--epic", "missing", "--title", "Missing parent", "--github-issue", "5"],
+            )
+            for argv in cases:
+                with self.subTest(argv=argv):
+                    before_artifacts = self._read_create_auto_sync_artifacts(target)
+                    log_path.write_text("", encoding="utf-8")
+
+                    p = self._run_runtime_capture(target, argv, env=test_env)
+
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertEqual(before_artifacts, self._read_create_auto_sync_artifacts(target))
+                    self.assertEqual(log_path.read_text(encoding="utf-8"), "")
+
     def test_new_rejects_duplicate_id_with_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
