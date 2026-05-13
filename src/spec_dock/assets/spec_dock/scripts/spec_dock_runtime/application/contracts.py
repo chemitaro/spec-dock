@@ -20,6 +20,9 @@ from ..domain.models import (
 from ..infra.contracts import StoredMetaRecord
 
 
+POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed", "gh_index_incomplete")
+
+
 @dataclass(frozen=True)
 class ValidateTreeRequest:
     pass
@@ -401,6 +404,74 @@ class SyncCommandResult:
     write_result: ArtifactWriteResult | None
     active_update: ActiveUpdateOutcome | None
     artifact_failure: ArtifactWriteFailure | None
+
+
+@dataclass(frozen=True)
+class PostMutationSyncOutcome:
+    sync_result: SyncCommandResult | None
+    skipped_reason: str | None = None
+    exception_reason: str | None = None
+    fatal_warning_codes: tuple[str, ...] = POST_MUTATION_FATAL_WARNING_CODES
+    guidance: list[str] = field(default_factory=list)
+
+    @property
+    def warnings(self) -> list[str]:
+        if self.sync_result is None:
+            return []
+        return list(self.sync_result.state.warnings)
+
+    @property
+    def fatal_warnings(self) -> list[str]:
+        return [
+            code
+            for code in self.fatal_warning_codes
+            if any(warning == code or warning.startswith(f"{code}:") for warning in self.warnings)
+        ]
+
+    @property
+    def failed(self) -> bool:
+        if self.exception_reason is not None:
+            return True
+        if self.sync_result is not None and self.sync_result.artifact_failure is not None:
+            return True
+        return bool(self.fatal_warnings)
+
+    @classmethod
+    def skipped(cls, reason: str) -> PostMutationSyncOutcome:
+        return cls(sync_result=None, skipped_reason=reason, guidance=[])
+
+    @classmethod
+    def from_exception(cls, error: Exception) -> PostMutationSyncOutcome:
+        return cls(
+            sync_result=None,
+            exception_reason=str(error),
+            guidance=_post_mutation_sync_guidance("post-mutation sync raised an exception"),
+        )
+
+    @classmethod
+    def from_sync_result(cls, sync_result: SyncCommandResult) -> PostMutationSyncOutcome:
+        guidance: list[str] = []
+        if sync_result.artifact_failure is not None:
+            guidance = _post_mutation_sync_guidance("derived artifacts may be stale or partially written")
+        else:
+            fatal_warnings = [
+                code
+                for code in POST_MUTATION_FATAL_WARNING_CODES
+                if any(warning == code or warning.startswith(f"{code}:") for warning in sync_result.state.warnings)
+            ]
+            if fatal_warnings:
+                guidance = _post_mutation_sync_guidance(
+                    "GitHub issue state fetch was incomplete: " + ", ".join(fatal_warnings)
+                )
+        return cls(sync_result=sync_result, guidance=guidance)
+
+
+def _post_mutation_sync_guidance(reason: str) -> list[str]:
+    return [
+        f"mutation succeeded, but post-mutation sync failed: {reason}",
+        "derived artifacts may be stale or partially written",
+        "run `./spec-dock/scripts/spec-dock sync` to refresh derived artifacts with GitHub live state",
+    ]
 
 
 @dataclass(frozen=True)
