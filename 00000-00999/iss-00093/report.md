@@ -285,6 +285,109 @@ git diff --check
 
 ---
 
+### 2026-05-14 01:31 JST - 01:51 JST
+
+#### 対象
+- Step: S03 `deps add/remove` auto-sync and unchanged skip
+- AC/EC: AC-004, EC-001, EC-002
+- Closure IDs: cl-006, cl-007, cl-019
+
+#### 実施内容
+- S02 は `5bed5b2 feat(new): 作成後の自動同期を追加` で committed。
+- S03 は dependency metadata mutation、projection refresh、CLI runtime tests に跨るため、plan の Delegation Gate に従い `dev-coder` へ bounded implementation を委任する。
+- `MutateDepsResult.post_sync` を追加し、`deps add/remove` の updated path で `post_mutation_sync(ports)` を実行するようにした。
+- duplicate add の unchanged path は `skipped_post_mutation_sync("unchanged")` を持つ outcome として表現し、GitHub sync を呼ばない。
+- invalid target / failed mutation は既存の `MutateDepsError` 経路で抜け、post-sync に到達しない。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00093-automatic-sync-after-state-mutations
+
+git log --oneline --decorate -1
+
+5bed5b2 (HEAD -> iss-00093-automatic-sync-after-state-mutations) feat(new): 作成後の自動同期を追加
+
+python -m unittest tests.cli_runtime.test_deps.TestCliDeps.test_deps_add_updated_path_auto_syncs_dependency_projection tests.cli_runtime.test_deps.TestCliDeps.test_deps_remove_updated_path_auto_syncs_dependency_projection tests.cli_runtime.test_deps.TestCliDeps.test_deps_add_duplicate_skips_post_sync_and_does_not_claim_refresh tests.cli_runtime.test_deps.TestCliDeps.test_deps_invalid_target_does_not_run_post_sync_or_refresh_projection -v
+
+Ran 4 tests in 4.058s
+OK
+
+python -m unittest tests.cli_runtime.test_deps -v
+
+Ran 86 tests in 519.755s
+OK
+
+python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v
+
+Ran 8 tests in 0.025s
+OK
+
+python -m unittest tests.cli_runtime.test_new.TestCliNew.test_new_issue_auto_syncs_index_and_dashboard tests.cli_runtime.test_new.TestCliNew.test_new_failure_paths_do_not_run_post_sync_or_refresh_artifacts -v
+
+Ran 2 tests in 1.664s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=40
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | cl-006, cl-007, cl-019 | updated projection tests, unchanged skip tests, and deps failure no-sync tests pass | S03 focused 4 tests pass; `tests.cli_runtime.test_deps` 86 tests pass; S01/S02 regressions pass; `validate` ok nodes=40 | pass | Existing missing-edge remove remains `edge_not_found`; reviewer confirmed concrete S03 skip case is duplicate add. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-s03-001 | S03 | yes | red-required | before S03, deps add did not guarantee projection refresh without manual sync | S03 focused unittest / full `tests.cli_runtime.test_deps` | pass | `deps add` updated path refreshes `.agent/deps-issues.json` and `deps-issues.puml`, including GitHub sync call. |
+| tc-s03-002 | S03 | yes | red-required | before S03, deps remove did not guarantee projection refresh without manual sync | S03 focused unittest / full `tests.cli_runtime.test_deps` | pass | `deps remove` updated path refreshes deps projection and removes edge from JSON/PUML. |
+| tc-s03-003 | S03 | yes | red-required | before S03, unchanged skip had no post-sync outcome evidence | S03 focused unittest / full `tests.cli_runtime.test_deps` | pass | duplicate add returns unchanged, does not call GitHub sync, and does not claim post-sync/refreshed output. |
+| tc-s03-004 | S03 | yes | red-required | before S03, failure path no-sync behavior had no deps-specific auto-sync test | S03 focused unittest / full `tests.cli_runtime.test_deps` | pass | invalid add/remove targets leave projection unchanged and do not call GitHub sync. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-006 | S03 | tc-s03-001 and tc-s03-002 pass | pass | add/remove updated paths refresh deps JSON and PUML without manual sync. |
+| cl-007 | S03 | tc-s03-003 pass | pass | duplicate add skips post-sync and avoids misleading refreshed/post-sync output. |
+| cl-019 | S03 | tc-s03-004 pass | pass | failed deps mutation paths do not invoke post-sync and artifacts remain unchanged. |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S03 | delegated | source mutation plus dependency projection tests / runtime CLI behavior / GitHub-enabled sync interaction | dev-coder (`019e222e-5c08-7d01-afd1-e9e603ac5009`) | Wire deps updated paths to S01 post-mutation sync outcome; represent unchanged as skipped outcome; add/adjust tests for cl-006, cl-007, cl-019; do not touch delete/close/finish. | pass | N/A |
+
+#### Code Review Gate
+| step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
+|---|---|---|---|---|---|---|
+| S03 | fresh `code-reviewer` (`019e2243-99e8-7bc1-80a5-99269c3213e0`) | S03 deps updated/unchanged/failure wiring and tests | pass | No findings. Reviewer confirmed existing remove missing-edge behavior remains acceptable because concrete S03 no-op skip case is duplicate add. | 0 | pass |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | `MutateDepsResult.post_sync`, deps updated/unchanged post-sync wiring, S03 runtime tests, S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `MutateDepsResult.post_sync` field.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py` - updated path post-sync and duplicate-add skip outcome.
+- `tests/cli_runtime/test_deps.py` - S03 auto-sync, unchanged skip, and failure no-sync tests.
+- `spec-dock/active/issue/report.md` - S03 delegation, closure, verification, and review evidence.
+
+#### コミット
+- pending
+
+#### メモ
+- S06 carry-over: post-sync failure exit/guidance is not yet integrated into deps command output.
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-006, cl-007, cl-019 | tc-s03-001〜tc-s03-004 | cl-006, cl-007, cl-019 | S03 executes approved plan as written. | no |
+
+---
+
 ### 2026-05-13 HH:MM - HH:MM
 
 #### 対象
