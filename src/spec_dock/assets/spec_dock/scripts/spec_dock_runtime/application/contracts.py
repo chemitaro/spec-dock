@@ -295,6 +295,7 @@ class DeleteNodeResult:
     recovery_guidance: list[str]
     dependency_scrub_failures: list[DeleteDependencyScrubFailure]
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 @dataclass(frozen=True)
