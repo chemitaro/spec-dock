@@ -13,7 +13,8 @@ ID: "iss-00093"
 # iss-00093 Automatic Sync After State Mutations — 実装報告（LOG）
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- State mutation commands now run GitHub-enabled, no-migrate post-mutation sync after successful `new`, `deps`, `delete`, `close`, and `issue finish` operations. The CLI/JSON contract reports mutation success separately from auto-sync failure, returns non-zero for stale/partial post-sync risk, and exposes no opt-out flag.
+- Provider workflow docs and dogfooding docs now describe `issue finish` as lifecycle close + active clear + lifecycle-owned post-mutation sync, while preserving final delivery evidence requirements.
 
 ## 実装記録（セッションログ） (必須)
 
@@ -245,7 +246,7 @@ git diff --check
 #### Closure Coverage
 | closure id | step | verification evidence | result | notes |
 |---|---|---|---|---|
-| cl-004 | S02 | tc-s02-001〜tc-s02-003 pass | pass | Create success paths refresh derived artifacts without manual sync. Initiative/epic are asserted in all-index/tree surfaces because dashboard is issue-board focused. |
+| cl-004 | S02 | tc-s02-001〜tc-s02-003 pass | pass | Create success paths refresh derived artifacts without manual sync. Initiative/epic verify all-index/tree/deps/PUML refresh and dashboard generation; dashboard content is issue-board focused, so non-issue dashboard membership is recorded as a P2 follow-up clarification. |
 | cl-005 | S02 | tc-s02-004 pass | pass | Local-only node remains projected while linked nodes use GitHub fetch. |
 | cl-018 | S02 | tc-s02-005 pass | pass | Create failure paths do not invoke post-sync and artifacts remain unchanged. |
 
@@ -264,7 +265,7 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | `CreateNodeResult.post_sync`, create success post-sync wiring, S02 runtime tests, S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | `CreateNodeResult.post_sync`, create success post-sync wiring, S02 runtime tests, S02 report evidence | `5bed5b2 feat(new): 作成後の自動同期を追加` | post-commit clean before S03 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CreateNodeResult.post_sync` field.
@@ -273,7 +274,7 @@ git diff --check
 - `spec-dock/active/issue/report.md` - S02 delegation, closure, verification, and review evidence.
 
 #### コミット
-- pending
+- `5bed5b2 feat(new): 作成後の自動同期を追加`
 
 #### メモ
 - `uv run pytest tests/cli_runtime/test_new.py` was attempted by the delegated worker and failed because `pytest` executable is unavailable in this environment. The repository standard command is `unittest`; `python -m unittest tests.cli_runtime.test_new -v` passed.
@@ -367,7 +368,7 @@ spec-dock: ok (validate) nodes=40
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending commit | `MutateDepsResult.post_sync`, deps updated/unchanged post-sync wiring, S03 runtime tests, S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | `MutateDepsResult.post_sync`, deps updated/unchanged post-sync wiring, S03 runtime tests, S03 report evidence | `75bc271 feat(deps): 依存変更後の自動同期を追加` | post-commit clean before S04 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `MutateDepsResult.post_sync` field.
@@ -376,7 +377,7 @@ spec-dock: ok (validate) nodes=40
 - `spec-dock/active/issue/report.md` - S03 delegation, closure, verification, and review evidence.
 
 #### コミット
-- pending
+- `75bc271 feat(deps): 依存変更後の自動同期を追加`
 
 #### メモ
 - S06 carry-over: post-sync failure exit/guidance is not yet integrated into deps command output.
@@ -464,7 +465,7 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S04 | pending commit | `DeleteNodeResult.post_sync`, delete success post-sync wiring, delete-specific post-sync failure rendering/JSON, S04 runtime tests, S04 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | `DeleteNodeResult.post_sync`, delete success post-sync wiring, delete-specific post-sync failure rendering/JSON, S04 runtime tests, S04 report evidence | `a6c9275 feat(delete): 削除後の自動同期を追加` | post-commit clean before S05 | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `DeleteNodeResult.post_sync` field.
@@ -475,7 +476,7 @@ git diff --check
 - `spec-dock/active/issue/report.md` - S04 delegation, closure, verification, and review evidence.
 
 #### コミット
-- pending
+- `a6c9275 feat(delete): 削除後の自動同期を追加`
 
 #### メモ
 - S06 carry-over: `new` / `deps` / future lifecycle command post-sync failure output and parser no-opt-out assertions remain S06 scope.
@@ -546,7 +547,7 @@ OK
 #### Step Commit Gate
 | step | commit | status | notes |
 |---|---|---|---|
-| S05 | pending | ready | Fresh code-review passed; commit S05 as the next step. |
+| S05 | `014d50a feat(lifecycle): closeとfinish後の自動同期を追加` | committed | Fresh code-review passed before commit. |
 
 #### Closure Delta
 | change | closure id | test id alias | resolves to closure id | reason | re-review required |
@@ -578,7 +579,7 @@ OK
 
 ---
 
-### 2026-05-14 02:39 JST - in progress
+### 2026-05-14 02:39 JST - 03:10 JST
 
 #### 対象
 - Step: S06 CLI / JSON post-sync result integration
@@ -603,7 +604,7 @@ git log --oneline --decorate -1
 #### Implementation Delegation Gate
 | step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
 |---|---|---|---|---|---|---|
-| S06 | delegated | command / presentation / JSON / parser-help integration is cross-cutting | dev-coder | Normalize post-sync failure output and exit handling, expose delete JSON post-sync outcome, and add no-opt-out parser/help assertions for cl-013, cl-014, cl-015. Do not change sync engine behavior or S01-S05 mutation sequencing. | in progress | N/A |
+| S06 | delegated | command / presentation / JSON / parser-help integration is cross-cutting | dev-coder (`019e226c-a660-7e33-a813-e21cfce977fe`; fix worker `019e2281-224f-7ac0-a8d5-8f4c8e0bd9c1`) | Normalize post-sync failure output and exit handling, expose delete JSON post-sync outcome, and add no-opt-out parser/help assertions for cl-013, cl-014, cl-015. Do not change sync engine behavior or S01-S05 mutation sequencing. | pass | N/A |
 
 #### Closure Delta
 | change | closure id | test id alias | resolves to closure id | reason | re-review required |
@@ -646,7 +647,7 @@ git log --oneline --decorate -1
 #### Step Commit Gate
 | step | commit | status | notes |
 |---|---|---|---|
-| S06 | pending | ready | Fresh re-review and post-fix regression passed. |
+| S06 | `73382f4 feat(cli): 自動同期結果の出力契約を統合` | committed | Fresh re-review and post-fix regression passed before commit. |
 
 ---
 
@@ -706,7 +707,7 @@ OK
 #### Step Commit Gate
 | step | commit | status | notes |
 |---|---|---|---|
-| S90 | pending | ready | Fresh spec-review pass. |
+| S90 | `107948f docs(workflow): issue finish後の自動同期契約を反映` | committed | Fresh spec-review pass before commit. |
 
 #### Closure Delta
 | change | closure id | test id alias | resolves to closure id | reason | re-review required |
@@ -717,6 +718,112 @@ OK
 | closure id | evidence |
 |---|---|
 | cl-016 | Provider and dogfooding workflow docs now describe `issue finish` lifecycle-owned post-mutation sync after active clear, preserve delivery completion evidence requirements, and distinguish later manual `sync` caveats. |
+
+---
+
+### 2026-05-14 03:25 JST - in progress
+
+#### 対象
+- Step: S99 final quality gate
+- Closure ID: cl-017
+- Scope: issue-wide regression, remediation, final QA/code/spec review, final report ledger
+
+#### 実施内容
+- S90 は `107948f docs(workflow): issue finish後の自動同期契約を反映` で committed。
+- S99 の初回 full regression で 7 tests が fail したため、`dev-coder` へ remediation を委任した。
+- root causes:
+  - CLI runtime harness の default gh stub と new auto-sync により、failure path tests が `.agent/*` derived artifacts を生成したまま「失敗時にローカル変更しない」ことを検査していた。
+  - delete success path test の ports fixture に successful `sync_legacy_runner` がなく、post-sync failure で exit code 1 になっていた。
+  - provider-side runtime commit 後、checked-in dogfooding runtime mirror の一部が未同期だった。
+  - `iss-00093` の tracked `.meta.json` 追加により、dogfooding checked-in snapshot / legacy deps baseline の期待値更新が必要だった。
+- remediation:
+  - `tests/cli_runtime/harness.py` に generated sync artifacts cleanup helper を追加し、import / validate failure-path tests で setup 後に cleanup するようにした。
+  - delete success path fixture に successful post-sync runner を追加した。
+  - dogfooding runtime mirror の changed provider surfaces を同期した。
+  - dogfooding checked-in snapshot expectations を `iss-00093` 追加状態へ更新した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest discover -v
+
+Initial S99 run failed 7 tests:
+- tests.cli_runtime.test_import.TestCliImport.test_import_aborts_without_local_changes_when_gh_issue_view_fails
+- tests.cli_runtime.test_import.TestCliImport.test_import_aborts_without_local_changes_when_gh_issue_view_returns_non_json
+- tests.cli_runtime.test_import.TestCliImport.test_import_fails_preflight_on_legacy_meta_without_creating_nodes
+- tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13.test_issue_delete_success_path_returns_ok_and_cli_success_text
+- tests.cli_runtime.test_validate.TestCliValidate.test_sync_clause3_legacy_meta_json_fail_fast_no_auto_repair_or_agent_write_even_with_force
+- tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+- tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v
+
+Ran 1 test
+OK
+
+python -m unittest tests.cli_runtime.test_import.TestCliImport.test_import_aborts_without_local_changes_when_gh_issue_view_fails tests.cli_runtime.test_import.TestCliImport.test_import_aborts_without_local_changes_when_gh_issue_view_returns_non_json tests.cli_runtime.test_import.TestCliImport.test_import_fails_preflight_on_legacy_meta_without_creating_nodes tests.cli_runtime.test_runtime_delete_s13.TestRuntimeDeleteS13.test_issue_delete_success_path_returns_ok_and_cli_success_text tests.cli_runtime.test_validate.TestCliValidate.test_sync_clause3_legacy_meta_json_fail_fast_no_auto_repair_or_agent_write_even_with_force -v
+
+Ran 5 tests
+OK
+
+git diff --check
+
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=40
+
+python -m unittest discover -v
+
+Ran 796 tests in 366.779s
+OK
+```
+
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S99 remediation | delegated | tests / dogfooding runtime mirror / checked-in snapshot updates span runtime fixtures and scaffold parity checks | dev-coder (`019e229a-8588-7182-813a-e04d5a1eb8a5`) | Diagnose final regression failures, update tests/fixtures/mirror expectations only as needed, and preserve S01-S90 behavior contracts. | pass | N/A |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-017 | S99 | targeted remediation tests pass; `git diff --check` pass; `validate` ok nodes=40; full `python -m unittest discover -v` pass (`Ran 796 tests in 366.779s`, `OK`); final QA pass; final code review pass; final spec review pass | pass | Reviewers found only P2 follow-up candidates; stale ledger rows were normalized before final commit. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-017 | S99 final quality gate | cl-017 | S99 executes approved final quality plan as written; remediation fixes test/mirror evidence gaps revealed by full regression. | yes |
+
+#### 変更したファイル
+- `spec-dock/scripts/spec_dock_runtime/application/contracts.py` - dogfooding runtime mirror sync.
+- `spec-dock/scripts/spec_dock_runtime/application/create_node.py` - dogfooding runtime mirror sync.
+- `spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py` - dogfooding runtime mirror sync.
+- `spec-dock/scripts/spec_dock_runtime/application/sync_state.py` - dogfooding runtime mirror sync.
+- `spec-dock/scripts/spec_dock_runtime/commands/issue.py` - dogfooding runtime mirror sync.
+- `spec-dock/scripts/spec_dock_runtime/commands/new.py` - dogfooding runtime mirror sync.
+- `spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py` - dogfooding runtime mirror sync.
+- `tests/cli_runtime/harness.py` - generated sync artifacts cleanup helper for failure-path fixtures.
+- `tests/cli_runtime/test_import.py` - cleanup generated sync artifacts before local-change failure assertions.
+- `tests/cli_runtime/test_runtime_delete_s13.py` - successful post-sync runner for delete success path.
+- `tests/cli_runtime/test_validate.py` - cleanup generated sync artifacts before validate no-repair assertion.
+- `tests/test_init_update.py` - dogfooding checked-in snapshot / legacy deps baseline update for `iss-00093`.
+- `spec-dock/active/issue/report.md` - S99 remediation and validation evidence.
+
+#### Step Commit Gate
+| step | commit | status | notes |
+|---|---|---|---|
+| S99 | pending | ready | Fresh QA / code / spec review passed; final commit required. |
+
+#### Final QA / Code Review Evidence
+| gate | reviewer | review_status | findings / disposition |
+|---|---|---|---|
+| Final QA Gate | fresh `qa-reviewer` (`019e22ad-72cd-7252-80f8-8fb5788aa5a6`) | pass | P2 follow-ups: clarify/assert non-issue create dashboard contract; add explicit close/finish post-sync failure exit tests. Non-blocking because full regression and S06/S05 coverage pass, but recommended for later hardening. |
+| Final Code Review Gate | fresh `code-reviewer` (`019e22ad-7351-7353-bd1c-39254bef2413`) | pass | P2 follow-ups: consider avoiding GitHub fetch for purely local-only projections; surface concrete artifact/exception failure reason in text output. Non-blocking because current requirement fixes GitHub-enabled post-mutation sync and existing output gives recovery guidance. |
 
 ---
 
@@ -785,27 +892,27 @@ OK
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider and dogfooding `workflow_issue.md` | yes | doc-writer (`019e228e-508d-7bf2-bf53-b98341898512`) | lifecycle-owned `issue finish` post-mutation sync documented after active clear; manual sync caveat kept distinct; `validate` ok nodes=40; `git diff --check` pass | pass (`019e2292-c693-7fa0-9744-105fcc93f6cc`) |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue test adequacy | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| fresh `qa-reviewer` (`019e22ad-72cd-7252-80f8-8fb5788aa5a6`) | whole issue test adequacy | sufficient for gate; P2 follow-up tests recommended | targeted remediation tests pass; full `python -m unittest discover -v` pass (`Ran 796 tests in 366.779s`, `OK`); reviewer found no P0/P1 | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| fresh `code-reviewer` (`019e22ad-7351-7353-bd1c-39254bef2413`) | issue-wide integrated diff | P2 follow-ups only: local-only GitHub fetch optimization and richer failure reason text | 0 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| fresh `spec-reviewer` (`019e22b2-9676-7ef3-b86b-b83b9648c061`) | requirement / design / plan / report / implementation / tests / docs alignment | P2 follow-ups only: clarify non-issue dashboard acceptance coverage and normalize stale ledger rows. Stale ledger rows were normalized in this report update; non-issue dashboard contract remains recorded as follow-up. | 0 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final reviewer results recorded; cl-017 pass | S99 remediation, dogfooding runtime mirror sync, tests, final report ledger | final response | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
