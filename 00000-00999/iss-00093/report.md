@@ -180,6 +180,111 @@ spec-dock: ok (validate) nodes=40
 
 ---
 
+### 2026-05-14 00:57 JST - 01:20 JST
+
+#### 対象
+- Step: S02 `new initiative/epic/issue` auto-sync
+- AC/EC: AC-001, AC-002, AC-003, EC-001
+- Closure IDs: cl-004, cl-005, cl-018
+
+#### 実施内容
+- S01 は `d387c94 feat(sync): 状態変更後同期の基盤契約を追加` で committed。
+- S02 は runtime create use case、new command、CLI runtime tests に跨るため、plan の Delegation Gate に従い `dev-coder` へ bounded implementation を委任する。
+- `CreateNodeResult.post_sync` を追加し、create 成功後に S01 の `post_mutation_sync(ports)` を実行するようにした。
+- preflight / write / release failure path は post-sync に到達しない既存制御フローを維持した。
+- S02 tests は index / dashboard だけでなく tree / deps JSON と PUML artifact も確認し、issue node では PUML に node id が投影されることまで検証する。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00093-automatic-sync-after-state-mutations
+
+git log --oneline --decorate -1
+
+d387c94 (HEAD -> iss-00093-automatic-sync-after-state-mutations) feat(sync): 状態変更後同期の基盤契約を追加
+
+python -m unittest tests.cli_runtime.test_new.TestCliNew.test_new_initiative_auto_syncs_index_and_dashboard tests.cli_runtime.test_new.TestCliNew.test_new_epic_auto_syncs_index_and_dashboard tests.cli_runtime.test_new.TestCliNew.test_new_issue_auto_syncs_index_and_dashboard tests.cli_runtime.test_new.TestCliNew.test_new_issue_auto_sync_preserves_local_only_projection tests.cli_runtime.test_new.TestCliNew.test_new_failure_paths_do_not_run_post_sync_or_refresh_artifacts -v
+
+Ran 5 tests in 2.922s
+OK
+
+python -m unittest tests.cli_runtime.test_new -v
+
+Ran 40 tests in 90.162s
+OK
+
+python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v
+
+Ran 8 tests in 0.023s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=40
+
+git diff --check
+
+# no output
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | cl-004, cl-005, cl-018 | all three create scopes refresh artifacts, local-only projection is preserved, and create failure paths do not invoke post-sync | S02 focused 5 tests pass; `tests.cli_runtime.test_new` 40 tests pass; S01 regression pass; `validate` ok nodes=40 | pass | Command-wide post-sync failure rendering / exit remains S06 scope. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-s02-001 | S02 | yes | red-required | before S02, `new initiative` did not guarantee post-mutation sync artifact refresh | S02 focused unittest / full `tests.cli_runtime.test_new` | pass | Confirms `index-all`, tree/deps JSON, PUML surface, dashboard generation, and `gh issue list` call. |
+| tc-s02-002 | S02 | yes | red-required | before S02, `new epic` did not guarantee post-mutation sync artifact refresh | S02 focused unittest / full `tests.cli_runtime.test_new` | pass | Confirms `index-all`, tree/deps JSON, PUML surface, and dashboard generation. |
+| tc-s02-003 | S02 | yes | red-required | before S02, `new issue` did not guarantee post-mutation sync artifact refresh | S02 focused unittest / full `tests.cli_runtime.test_new` | pass | Confirms new issue in index / tree / deps JSON, PUML, and dashboard without manual sync. |
+| tc-s02-004 | S02 | yes | red-required | before S02, GitHub-enabled sync after create was not wired, risking dropped local-only projection | S02 focused unittest / full `tests.cli_runtime.test_new` | pass | Confirms local-only issue and newly linked issue both remain projected. |
+| tc-s02-005 | S02 | yes | red-required | before S02, failure path no-sync behavior had no create-specific test | S02 focused unittest / full `tests.cli_runtime.test_new` | pass | Confirms failed initiative / epic / issue create does not refresh artifacts or call `gh issue list`. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-004 | S02 | tc-s02-001〜tc-s02-003 pass | pass | Create success paths refresh derived artifacts without manual sync. Initiative/epic are asserted in all-index/tree surfaces because dashboard is issue-board focused. |
+| cl-005 | S02 | tc-s02-004 pass | pass | Local-only node remains projected while linked nodes use GitHub fetch. |
+| cl-018 | S02 | tc-s02-005 pass | pass | Create failure paths do not invoke post-sync and artifacts remain unchanged. |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S02 | delegated | runtime CLI behavior / shipped scaffold / fixture setup / source mutation plus artifact projection | dev-coder (`019e220f-0775-7f22-a659-780f39f28884`, follow-up `019e221b-8c71-7370-9080-6bc6f5b5f1c4`, `019e2223-6c64-78f0-9870-d0c018fb5f1c`) | Wire create success paths to S01 post-mutation sync outcome for `new initiative`, `new epic`, and `new issue`; add/adjust tests for cl-004, cl-005, cl-018; do not touch deps/delete/close/finish. Follow-ups strengthened tree/deps and PUML stale detection. | pass | N/A |
+
+#### Code Review Gate
+| step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
+|---|---|---|---|---|---|---|
+| S02 | fresh `code-reviewer` (`019e2218-7109-7f83-88cd-3f6ed233dd94`) | S02 create wiring / tests / report delegation | pass | P2: broaden artifact assertions beyond index/dashboard. Fixed by adding tree/deps JSON and PUML artifact assertions. | 0 | pass with fix |
+| S02 | fresh `code-reviewer` (`019e2220-9cf1-7251-af50-b06aa55a0046`) | S02 re-review after broader artifact assertions | pass | P2: assert refreshed PUML content, not only file shape. Fixed by asserting issue IDs in relevant PUML files. | 1 | pass with fix |
+| S02 | fresh `code-reviewer` (`019e2228-30bd-7213-9f02-8bf435576312`) | S02 final re-review after both P2 fixes | pass | No findings. | 2 | pass |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | `CreateNodeResult.post_sync`, create success post-sync wiring, S02 runtime tests, S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `CreateNodeResult.post_sync` field.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - create success path invokes `post_mutation_sync`.
+- `tests/cli_runtime/test_new.py` - S02 auto-sync, local-only preservation, and failure no-sync tests.
+- `spec-dock/active/issue/report.md` - S02 delegation, closure, verification, and review evidence.
+
+#### コミット
+- pending
+
+#### メモ
+- `uv run pytest tests/cli_runtime/test_new.py` was attempted by the delegated worker and failed because `pytest` executable is unavailable in this environment. The repository standard command is `unittest`; `python -m unittest tests.cli_runtime.test_new -v` passed.
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-004, cl-005, cl-018 | tc-s02-001〜tc-s02-005 | cl-004, cl-005, cl-018 | S02 executes approved plan as written. | no |
+
+---
+
 ### 2026-05-13 HH:MM - HH:MM
 
 #### 対象
