@@ -168,6 +168,7 @@ class MutateDepsResult:
     to_id: str
     result: MutateDepsResultKind
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 class MutateDepsError(RuntimeError):
