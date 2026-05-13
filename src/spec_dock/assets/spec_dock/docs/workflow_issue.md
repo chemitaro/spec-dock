@@ -9,6 +9,7 @@ Issue は実装の最小単位です。
 
 関連:
 - 総合: [guide.md](guide.md)
+- 仕様書作成: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Epic: [workflow_epic.md](workflow_epic.md)
 - ADR: [workflow_adr.md](workflow_adr.md)
 - GitHub 連携: [reference_github.md](reference_github.md)
@@ -62,6 +63,7 @@ Issue は実装の最小単位です。
 ## spec authoring
 
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
+- Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - `discussions/`: `new doc {adr|disc|research|note} --issue <issue-id> --title "..."` で、この issue の `discussions/` 配下に timestamp-prefixed original を作成する。標準形は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - templates は完成形ではなく、書き始めるための最小 scaffold に留める。仕様書作成の説明や判断基準は docs / skills を参照する
 - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
@@ -74,6 +76,7 @@ Issue は実装の最小単位です。
 ## 実行 contract
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
+- 実装前に `workflow_spec_authoring.md` の requirement / design / plan gate がすべて pass し、`Spec Authoring Gate` evidence が `report.md` に残っていることを確認する
 - 各 implementation step は `step closure contract / test bundle / pre-implementation evidence → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → code-reviewer → fix → re-review → commit → clean確認` の順で進める
 - 完成版 `plan.md` には `Spec-Locked Closure Index`（仕様固定クロージャ索引）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
 - `Spec-Locked Closure Index` は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
