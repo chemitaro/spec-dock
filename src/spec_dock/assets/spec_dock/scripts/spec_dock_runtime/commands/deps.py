@@ -144,7 +144,8 @@ def _run_deps_mutation(*, action: str, args: CommandArgs, use_cases: UseCases) -
         )
     except MutateDepsError as error:
         return CommandOutcome(exit_code=1, text=render_deps_mutation_error_text(error))
-    return CommandOutcome(exit_code=0, text=render_deps_mutation_text(result))
+    post_sync_failed = result.post_sync is not None and result.post_sync.failed
+    return CommandOutcome(exit_code=1 if post_sync_failed else 0, text=render_deps_mutation_text(result))
 
 
 def _expect_deps_check_args(args: CommandArgs) -> DepsCheckArgs:

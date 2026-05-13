@@ -3318,6 +3318,302 @@ class TestRuntimeSyncS07(unittest.TestCase):
             self.assertIn("iss-local-00001", state.graph.nodes_by_id)
             self.assertEqual(node_repo.backfill_calls, [])
 
+    def _s06_sync_result(self, app_contracts, domain_models, *, warnings=None, artifact_failure=None):
+        return app_contracts.SyncCommandResult(
+            state=app_contracts.SyncStateResult(
+                graph=domain_models.SpecGraph(nodes_by_id={}),
+                active=None,
+                issue_statuses={},
+                progress=domain_models.ProgressMap(by_node_id={}, counts={}),
+                deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+                deps_eval_by_id={},
+                generated_at="2026-03-12T00:00:00Z",
+                warnings=list(warnings or []),
+                deps_preflight_error=None,
+            ),
+            write_result=None
+            if artifact_failure is not None
+            else app_contracts.ArtifactWriteResult(
+                index_all_path="spec-dock/.agent/index-all.json",
+                index_todo_path="spec-dock/.agent/index.json",
+                tree_all_path="spec-dock/.agent/tree-all.json",
+                tree_todo_path="spec-dock/.agent/tree.json",
+                tree_all_puml_path="spec-dock/tree-all.puml",
+                tree_todo_puml_path="spec-dock/tree.puml",
+                deps_issues_json_path="spec-dock/.agent/deps-issues.json",
+                deps_issues_puml_path="spec-dock/deps-issues.puml",
+                dashboard_md_path="spec-dock/dashboard.md",
+            ),
+            active_update=None,
+            artifact_failure=artifact_failure,
+        )
+
+    def _s06_issue_node(self, app_contracts):
+        return app_contracts.SpecNode(
+            kind="issue",
+            id="iss-00093",
+            title="Automatic sync",
+            slug="automatic-sync",
+            path=Path(
+                "/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00093-automatic-sync"
+            ),
+            meta_path=Path(
+                "/repo/spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-00093-automatic-sync/.meta.json"
+            ),
+            parent_id="epic-local-00001",
+            initiative_id="init-local-00001",
+            epic_id="epic-local-00001",
+            github_issue_number=93,
+        )
+
+    def _s06_delete_result(self, app_contracts, *, post_sync):
+        return app_contracts.DeleteNodeResult(
+            status="ok",
+            target_id="iss-00093",
+            deleted_node_ids=["iss-00093"],
+            remaining_node_ids=[],
+            remote_close=app_contracts.DeleteRemoteCloseBuckets(
+                closed=[],
+                noop_already_closed=["iss-00093"],
+                failed=[],
+                skipped_not_attempted=[],
+            ),
+            offending_node_ids=[],
+            validation_reasons=[],
+            active_restore_result="not_needed",
+            recovery_guidance=[],
+            dependency_scrub_failures=[],
+            warnings=[],
+            post_sync=post_sync,
+        )
+
+    def test_tc_s06_001_new_post_sync_exception_is_nonzero_with_mutation_success_guidance(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        from spec_dock_runtime.commands import new as new_cmd
+
+        post_sync = app_contracts.PostMutationSyncOutcome.from_exception(RuntimeError("sync exploded"))
+        result = app_contracts.CreateNodeResult(
+            node=self._s06_issue_node(app_contracts),
+            created_paths=[],
+            warnings=[],
+            post_sync=post_sync,
+        )
+
+        class _UseCases:
+            def create_issue(self, req):
+                del req
+                return result
+
+        outcome = new_cmd._run_new_issue(
+            new_cmd.NewIssueArgs(
+                epic_id="epic-local-00001",
+                title="Automatic sync",
+                slug=None,
+                node_id=None,
+                create_github_issue=False,
+                github_issue_number=93,
+                no_github=False,
+            ),
+            _UseCases(),
+        )
+
+        self.assertEqual(outcome.exit_code, 1)
+        self.assertIn("spec-dock: ok (new issue)", "\n".join(outcome.text.stdout_lines))
+        self.assertIn("spec-dock: failed (new issue auto-sync) id=iss-00093", outcome.text.stderr_lines)
+        self.assertTrue(any("mutation succeeded" in line for line in outcome.text.stderr_lines))
+        self.assertTrue(any("sync` to refresh" in line for line in outcome.text.stderr_lines))
+
+    def test_tc_s06_002_deps_fatal_github_warning_is_post_sync_failure_guidance(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        from spec_dock_runtime.commands import deps as deps_cmd
+
+        post_sync = app_contracts.PostMutationSyncOutcome.from_sync_result(
+            self._s06_sync_result(app_contracts, domain_models, warnings=["gh_fetch_failed"])
+        )
+        result = app_contracts.MutateDepsResult(
+            action="add",
+            from_id="iss-00093",
+            to_id="iss-00094",
+            result="updated",
+            warnings=[],
+            post_sync=post_sync,
+        )
+
+        class _UseCases:
+            def mutate_deps(self, req):
+                del req
+                return result
+
+        outcome = deps_cmd._run_deps_add(
+            deps_cmd.DepsMutationArgs(from_id="iss-00093", to_id="iss-00094"),
+            _UseCases(),
+        )
+
+        self.assertEqual(outcome.exit_code, 1)
+        self.assertIn("spec-dock: ok (deps add)", "\n".join(outcome.text.stdout_lines))
+        self.assertNotIn("spec-dock: ok (deps add auto-sync)", outcome.text.stdout_lines)
+        self.assertIn(
+            "spec-dock: failed (deps add auto-sync) from=iss-00093 to=iss-00094",
+            outcome.text.stderr_lines,
+        )
+        self.assertTrue(any("GitHub issue state fetch was incomplete" in line for line in outcome.text.stderr_lines))
+        self.assertEqual(outcome.text.warnings, ["gh_fetch_failed"])
+
+        success_result = app_contracts.MutateDepsResult(
+            action="add",
+            from_id="iss-00093",
+            to_id="iss-00094",
+            result="updated",
+            warnings=[],
+            post_sync=app_contracts.PostMutationSyncOutcome.from_sync_result(
+                self._s06_sync_result(app_contracts, domain_models)
+            ),
+        )
+        skip_result = app_contracts.MutateDepsResult(
+            action="add",
+            from_id="iss-00093",
+            to_id="iss-00094",
+            result="unchanged",
+            warnings=[],
+            post_sync=app_contracts.PostMutationSyncOutcome.skipped("unchanged"),
+        )
+
+        class _SuccessUseCases:
+            def mutate_deps(self, req):
+                del req
+                return success_result
+
+        class _SkipUseCases:
+            def mutate_deps(self, req):
+                del req
+                return skip_result
+
+        success_outcome = deps_cmd._run_deps_add(
+            deps_cmd.DepsMutationArgs(from_id="iss-00093", to_id="iss-00094"),
+            _SuccessUseCases(),
+        )
+        skip_outcome = deps_cmd._run_deps_add(
+            deps_cmd.DepsMutationArgs(from_id="iss-00093", to_id="iss-00094"),
+            _SkipUseCases(),
+        )
+
+        self.assertEqual(success_outcome.exit_code, 0)
+        self.assertIn("spec-dock: ok (deps add auto-sync)", success_outcome.text.stdout_lines)
+        self.assertEqual(skip_outcome.exit_code, 0)
+        self.assertIn(
+            "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+            skip_outcome.text.stdout_lines,
+        )
+
+    def test_tc_s06_003_delete_json_includes_post_sync_outcome_and_failure_exit(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        from spec_dock_runtime.commands import delete as delete_cmd
+
+        success = app_contracts.PostMutationSyncOutcome.from_sync_result(
+            self._s06_sync_result(app_contracts, domain_models)
+        )
+        failure = app_contracts.PostMutationSyncOutcome.from_sync_result(
+            self._s06_sync_result(app_contracts, domain_models, warnings=["gh_index_incomplete"])
+        )
+        delete_args = delete_cmd.DeleteArgs(
+            positional_target="iss-00093",
+            node_id=None,
+            github_issue=None,
+            recursive=False,
+            force=False,
+            confirmed=True,
+            json_output=True,
+        )
+
+        outer = self
+
+        class _UseCases:
+            def __init__(self, post_sync):
+                self.post_sync = post_sync
+
+            def delete_node(self, req):
+                del req
+                return outer._s06_delete_result(app_contracts, post_sync=self.post_sync)
+
+        success_outcome = delete_cmd._run_delete(delete_args, _UseCases(success))
+        success_payload = json.loads(success_outcome.text.stdout_lines[0])
+        self.assertEqual(success_outcome.exit_code, 0)
+        self.assertEqual(success_payload["post_sync"]["status"], "success")
+        self.assertFalse(success_payload["post_sync"]["failed"])
+
+        failure_outcome = delete_cmd._run_delete(delete_args, _UseCases(failure))
+        failure_payload = json.loads(failure_outcome.text.stdout_lines[0])
+        self.assertEqual(failure_outcome.exit_code, 1)
+        self.assertEqual(failure_payload["post_sync"]["status"], "failed")
+        self.assertEqual(failure_payload["post_sync"]["fatal_warnings"], ["gh_index_incomplete"])
+        self.assertTrue(any("mutation succeeded" in line for line in failure_payload["post_sync"]["recovery_guidance"]))
+
+    def test_tc_s06_004_mutation_parser_help_exposes_no_auto_sync_opt_out(self) -> None:
+        (
+            _runtime_app,
+            _app_contracts,
+            _app_ports,
+            _app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        from spec_dock_runtime.cli import parser as cli_parser
+        from spec_dock_runtime.cli import registry as cli_registry
+
+        parser = cli_parser.build_parser(cli_registry.build_registry())
+        help_commands = [
+            ["new", "initiative", "--help"],
+            ["new", "epic", "--help"],
+            ["new", "issue", "--help"],
+            ["deps", "add", "--help"],
+            ["deps", "remove", "--help"],
+            ["delete", "--help"],
+            ["close", "--help"],
+            ["issue", "finish", "--help"],
+        ]
+        combined_help: list[str] = []
+        for argv in help_commands:
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                with self.assertRaises(SystemExit) as cm:
+                    parser.parse_args(argv)
+            self.assertEqual(cm.exception.code, 0)
+            combined_help.append(stdout.getvalue())
+
+        help_text = "\n".join(combined_help)
+        self.assertNotIn("--no-auto-sync", help_text)
+        self.assertNotIn("--disable-auto-sync", help_text)
+        self.assertNotIn("no_auto_sync", help_text)
+
     def test_sync_github_bulk_does_not_use_backfill_path_even_with_issue_index(self) -> None:
         (
             _runtime_app,

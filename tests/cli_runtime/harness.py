@@ -133,9 +133,7 @@ class CliRuntimeHarness(unittest.TestCase):
         script = target / "spec-dock" / "scripts" / "spec-dock"
         self.assertTrue(script.is_file(), f"runtime script missing: {script}")
 
-        merged_env = os.environ.copy()
-        if env:
-            merged_env.update(env)
+        merged_env = self._runtime_env(target, env)
 
         p = subprocess.run(
             [sys.executable, str(script), *args],
@@ -156,9 +154,7 @@ class CliRuntimeHarness(unittest.TestCase):
         script = target / "spec-dock" / "scripts" / "spec-dock"
         self.assertTrue(script.is_file(), f"runtime script missing: {script}")
 
-        merged_env = os.environ.copy()
-        if env:
-            merged_env.update(env)
+        merged_env = self._runtime_env(target, env)
 
         p = subprocess.run(
             [sys.executable, str(script), *args],
@@ -181,9 +177,7 @@ class CliRuntimeHarness(unittest.TestCase):
         script = target / "spec-dock" / "scripts" / "spec-dock"
         self.assertTrue(script.is_file(), f"runtime script missing: {script}")
 
-        merged_env = os.environ.copy()
-        if env:
-            merged_env.update(env)
+        merged_env = self._runtime_env(target, env)
 
         return subprocess.run(
             [sys.executable, str(script), *args],
@@ -192,6 +186,64 @@ class CliRuntimeHarness(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def _runtime_env(self, target: Path, env: dict[str, str] | None) -> dict[str, str]:
+        merged_env = os.environ.copy()
+        if env:
+            merged_env.update(env)
+            return merged_env
+        bin_dir = target / ".test-gh-default"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        self._make_default_gh_issue_list_stub(bin_dir)
+        merged_env["PATH"] = f"{bin_dir}{os.pathsep}{merged_env.get('PATH', '')}"
+        return merged_env
+
+    def _make_default_gh_issue_list_stub(self, bin_dir: Path) -> None:
+        gh_path = bin_dir / "gh"
+        if gh_path.exists():
+            return
+        gh_path.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            'if [[ "$1" == "issue" && "$2" == "list" ]]; then\n'
+            "  python - <<'PY'\n"
+            "import json\n"
+            "print(json.dumps([\n"
+            "    {\n"
+            "        'number': n,\n"
+            "        'state': 'OPEN',\n"
+            "        'title': f'Issue {n}',\n"
+            "        'labels': [],\n"
+            "        'updatedAt': f'2026-05-13T00:00:{n % 60:02d}Z',\n"
+            "        'url': f'https://github.com/example/repo/issues/{n}',\n"
+            "    }\n"
+            "    for n in range(1, 10001)\n"
+            "]))\n"
+            "PY\n"
+            "  exit 0\n"
+            "fi\n"
+            'if [[ "$1" == "issue" && "$2" == "view" ]]; then\n'
+            '  n="$3"\n'
+            "  python - \"$n\" <<'PY'\n"
+            "import json\n"
+            "import sys\n"
+            "n = int(sys.argv[1].lstrip('#'))\n"
+            "print(json.dumps({\n"
+            "    'number': n,\n"
+            "    'state': 'OPEN',\n"
+            "    'title': f'Issue {n}',\n"
+            "    'labels': [],\n"
+            "    'updatedAt': f'2026-05-13T00:00:{n % 60:02d}Z',\n"
+            "    'url': f'https://github.com/example/repo/issues/{n}',\n"
+            "}))\n"
+            "PY\n"
+            "  exit 0\n"
+            "fi\n"
+            'echo "unexpected gh args: $@" >&2\n'
+            "exit 99\n",
+            encoding="utf-8",
+        )
+        gh_path.chmod(0o755)
 
     def _run_wrapper_capture(
         self,

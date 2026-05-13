@@ -1276,10 +1276,10 @@ class TestCliDeps(CliRuntimeHarness):
             ]
             for form in forms:
                 p = self._run_runtime_capture(target, ["deps", "check", form, "--json"])
-                self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 data = json.loads(p.stdout)
                 self.assertEqual(data["target"], "iss-00301")
-                self.assertFalse(data["ready"])
+                self.assertTrue(data["ready"])
 
     def test_deps_check_default_github_ready_when_deps_closed(self) -> None:
         if os.name == "nt":
@@ -1433,6 +1433,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             self._set_meta_depends_on(issue_dir, [301])
 
+            (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--no-github", "--json"])
@@ -2522,7 +2523,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(p.stderr.strip(), "")
             self.assertEqual(
                 p.stdout.strip(),
-                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps add auto-sync)",
+                    ]
+                ),
             )
 
             from_meta: dict[str, object] | None = None
@@ -2592,7 +2598,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(second.stderr.strip(), "")
             self.assertEqual(
                 second.stdout.strip(),
-                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                        "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+                    ]
+                ),
             )
 
             after_second = from_meta_path.read_text(encoding="utf-8")
@@ -2626,7 +2637,7 @@ class TestCliDeps(CliRuntimeHarness):
 
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             self.assertIn("result=unchanged", second.stdout)
-            self.assertNotIn("post-sync", second.stdout + second.stderr)
+            self.assertIn("spec-dock: skipped (deps add auto-sync) reason=unchanged", second.stdout)
             self.assertNotIn("refreshed", second.stdout + second.stderr)
             self.assertEqual(before, self._read_deps_projection_artifacts(target))
             self.assertEqual(log_path.read_text(encoding="utf-8"), "")
@@ -2652,7 +2663,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(p.stderr.strip(), "")
             self.assertEqual(
                 p.stdout.strip(),
-                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps add auto-sync)",
+                    ]
+                ),
             )
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
@@ -2683,7 +2699,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(removed.stderr.strip(), "")
             self.assertEqual(
                 removed.stdout.strip(),
-                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps remove auto-sync)",
+                    ]
+                ),
             )
 
             from_meta: dict[str, object] | None = None
@@ -2785,7 +2806,12 @@ class TestCliDeps(CliRuntimeHarness):
                     self.assertEqual(p.stderr.strip(), "")
                     self.assertEqual(
                         p.stdout.strip(),
-                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "\n".join(
+                            [
+                                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                                "spec-dock: ok (deps remove auto-sync)",
+                            ]
+                        ),
                     )
                     after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                     self.assertEqual(after.get("depends_on"), [])
