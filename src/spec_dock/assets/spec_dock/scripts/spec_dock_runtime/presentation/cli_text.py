@@ -249,6 +249,10 @@ def render_active_clear_text(result: ActiveClearResult) -> CliText:
 
 def render_close_text(result: CloseNodeResult, *, target_display: str) -> CliText:
     state = str(result.issue_snapshot.state).strip().upper() or "UNKNOWN"
+    stderr_lines: list[str] = []
+    if result.post_sync is not None and result.post_sync.failed:
+        stderr_lines.append(f"spec-dock: failed (close auto-sync) target={target_display}")
+        stderr_lines.extend(result.post_sync.guidance)
     return CliText(
         stdout_lines=[
             (
@@ -257,8 +261,8 @@ def render_close_text(result: CloseNodeResult, *, target_display: str) -> CliTex
                 f"github=#{result.github_issue_number} state={state} already_closed={'true' if result.already_closed else 'false'}"
             )
         ],
-        stderr_lines=[],
-        warnings=list(result.warnings),
+        stderr_lines=stderr_lines,
+        warnings=[*list(result.warnings), *list(result.post_sync.warnings if result.post_sync else [])],
     )
 
 
@@ -279,6 +283,10 @@ def render_issue_start_text(result: IssueStartResult) -> CliText:
 
 
 def render_issue_finish_text(result: IssueFinishResult) -> CliText:
+    stderr_lines: list[str] = []
+    if result.post_sync is not None and result.post_sync.failed:
+        stderr_lines.append(f"spec-dock: failed (issue finish auto-sync) issue={result.issue_id}")
+        stderr_lines.extend(result.post_sync.guidance)
     return CliText(
         stdout_lines=[
             (
@@ -288,8 +296,8 @@ def render_issue_finish_text(result: IssueFinishResult) -> CliText:
                 f"already_closed={'true' if result.already_closed else 'false'}"
             )
         ],
-        stderr_lines=[],
-        warnings=list(result.warnings),
+        stderr_lines=stderr_lines,
+        warnings=[*list(result.warnings), *list(result.post_sync.warnings if result.post_sync else [])],
     )
 
 
