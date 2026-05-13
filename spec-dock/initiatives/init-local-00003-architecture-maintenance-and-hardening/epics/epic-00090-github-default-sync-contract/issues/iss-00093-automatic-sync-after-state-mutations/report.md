@@ -650,6 +650,76 @@ git log --oneline --decorate -1
 
 ---
 
+### 2026-05-14 03:16 JST - 03:21 JST
+
+#### 対象
+- Step: S90 docs impact resolution / docs refresh
+- Docs closure: cl-016 / tc-s90-001
+- Scope: provider `workflow_issue.md`, dogfooding `workflow_issue.md`, issue report evidence
+
+#### 実施内容
+- S06 は `73382f4 feat(cli): 自動同期結果の出力契約を統合` で committed。
+- `rg -n "issue finish|sync|active"` で provider / dogfooding docs を確認し、旧 caveat が残っていることを確認した。
+- 特に `issue finish` 後の manual `sync` 回避 guidance は、実装済みの lifecycle-owned post-mutation sync / active clear preservation contract と矛盾するため更新が必要。
+- `doc-writer` に provider `workflow_issue.md` と dogfooding `workflow_issue.md` の文言更新を委任した。
+- `issue finish` は delivery completion を保証しない lifecycle closure のまま、active clear 後に lifecycle-owned post-mutation sync を実行することを明記した。
+- lifecycle-owned post-mutation sync と manual `sync` を分離し、自動 sync は no-migrate / no branch-active-update policy により active clear を復元しない一方、後続の manual sync には branch-derived active restoration caveat が残り得ることを明記した。
+- completion evidence / final quality gate requirements は弱めていない。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00093-automatic-sync-after-state-mutations
+
+rg -n "issue finish|sync|active" src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+
+found stale finish-after-sync caveat in both provider and dogfooding workflow docs
+
+rg -n "issue finish|sync|active" src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+
+provider and dogfooding docs aligned:
+- issue finish closes/confirms linked issue, clears active, then runs lifecycle-owned post-mutation sync
+- lifecycle-owned sync uses no-migrate / no branch-active-update policy and must not restore active
+- manual sync remains distinct and may retain branch-derived active restoration caveat
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=40
+
+git diff --check
+
+OK
+```
+
+#### Documentation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S90 | delegated | shared provider docs and dogfooding docs must remain aligned | doc-writer (`019e228e-508d-7bf2-bf53-b98341898512`) | Update workflow_issue docs so issue finish is described as lifecycle close + active clear + automatic no-migrate post-sync, while preserving delivery completion evidence requirements. | pass | N/A |
+
+#### Spec Review Gate
+| pass | reviewer | scope | result | notes |
+|---|---|---|---|---|
+| S90 initial | fresh `spec-reviewer` (`019e2290-3c89-76d2-8c9c-63f1b26655bf`) | provider / dogfooding workflow docs plus S90 report evidence | fail | Docs align with S90 contract, but report still in-progress and missing completed verification evidence. |
+| S90 re-review | fresh `spec-reviewer` (`019e2292-c693-7fa0-9744-105fcc93f6cc`) | docs/spec alignment after report evidence repair | pass | No findings; docs and report evidence satisfy cl-016. |
+
+#### Step Commit Gate
+| step | commit | status | notes |
+|---|---|---|---|
+| S90 | pending | ready | Fresh spec-review pass. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-016 | tc-s90-001 | cl-016 | S90 executes approved docs alignment plan as written. | no |
+
+#### Closure Coverage
+| closure id | evidence |
+|---|---|
+| cl-016 | Provider and dogfooding workflow docs now describe `issue finish` lifecycle-owned post-mutation sync after active clear, preserve delivery completion evidence requirements, and distinguish later manual `sync` caveats. |
+
+---
+
 ## Spec Authoring Gate
 
 | phase | artifact | reviewer | verdict | findings / fixes | promotion |

@@ -49,10 +49,11 @@ Issue は実装の最小単位です。
 - `issue start` は unfinished active issue branch 上で別 issue を始めようとした場合だけ default で block する。`main` / `master` / `develop` / `staging` や non-issue branch からの start は block しない
 - `./spec-dock/scripts/spec-dock issue start <target> -f` / `--force` は unfinished active issue guard だけを bypass する。依存未解決や他の readiness check は bypass しない
 - 通常の issue 完了は `./spec-dock/scripts/spec-dock issue finish` を primary path とする。active issue の linked GitHub issue を close し、already-closed も success として扱い、その確認後に active state を解除する
-`issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, sync, validate, test, or review completion; delivery completion still requires separate evidence in tests, reviews, reports, and PR/merge workflow.
+`issue finish` is lifecycle closure only for delivery completion: it closes or confirms the linked GitHub issue, clears active state, and then runs lifecycle-owned post-mutation sync, but it still does not guarantee commit, push, PR, merge, validate, test, review, or final delivery completion; delivery completion still requires separate evidence in tests, reviews, reports, and PR/merge workflow.
 - delivery completion の判定と required evidence の記録・確認は、`issue finish` の前に、active issue が set され対象 issue を確認できる状態で `spec-dock/active/issue/report.md` に対して行う
 - `issue finish` 後は active issue が clear されていてよく、active issue が残っていること自体を `complete` condition にしてはならない
-- `issue finish` 後に issue branch のまま `./spec-dock/scripts/spec-dock sync` を実行すると、branch-derived active restoration により active が復元され得る。active clear を保ちたい final sync は `main` などの non-issue branch に移動してから実行するか、finish 後 sync 自体を避ける
+- `issue finish` の lifecycle-owned post-mutation sync は、active clear 後に post-mutation no-migrate / no branch-active-update policy で実行される。この自動 sync は、issue branch 上で finish した場合でも、直前に clear した active issue を復元してはならない
+- manual `./spec-dock/scripts/spec-dock sync` は lifecycle-owned post-mutation sync とは別物である。人が後から issue branch 上で manual `sync` を実行した場合は、manual sync 側の policy が変わらない限り branch-derived active restoration の caveat が残り得る
 - `active set` は manual / recovery command として維持する。unfinished active issue guard の対象外であり、必要時だけ direct に使う
 - `active set` のデフォルトは no-checkout。ブランチ移動が必要な場合だけ `--checkout`
 - `active set` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
