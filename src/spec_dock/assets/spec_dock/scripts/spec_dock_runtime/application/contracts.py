@@ -192,6 +192,7 @@ class MutateDepsError(RuntimeError):
 @dataclass(frozen=True)
 class CloseNodeRequest:
     target: TargetRef
+    run_post_sync: bool = True
 
 
 @dataclass(frozen=True)
@@ -202,6 +203,7 @@ class CloseNodeResult:
     issue_snapshot: IssueSnapshot
     already_closed: bool
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 @dataclass(frozen=True)
@@ -232,6 +234,7 @@ class IssueFinishResult:
     already_closed: bool
     active_cleared: bool
     warnings: list[str]
+    post_sync: PostMutationSyncOutcome | None = None
 
 
 DeleteTerminalStatus = Literal[

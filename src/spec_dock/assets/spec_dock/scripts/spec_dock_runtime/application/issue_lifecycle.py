@@ -23,6 +23,7 @@ from .github_issue_targets import normalize_repo_slug
 from .ports import Ports
 from .repo_context import resolve_current_repo_slug
 from .set_active import clear_active, set_active
+from .sync_state import post_mutation_sync
 
 
 def _to_spec_node_seed(record: StoredMetaRecord) -> SpecNodeSeed:
@@ -185,6 +186,7 @@ def _finish_active_clear_failure_guidance(
             "  spec-dock/scripts/spec-dock issue finish",
             "  spec-dock/scripts/spec-dock active set <issue-id> --checkout",
             "Use manual active recovery if active metadata is stale or points at the wrong issue.",
+            "Derived artifacts may remain stale because lifecycle auto-sync was skipped.",
             str(error),
         ]
     )
@@ -274,6 +276,7 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
         close_result = close_node(
             CloseNodeRequest(
                 target=TargetRef(kind="node_id", node_id=active_issue_id, github_issue_number=None),
+                run_post_sync=False,
             ),
             ports,
         )
@@ -289,6 +292,7 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
                 error=error,
             )
         ) from error
+    post_sync = post_mutation_sync(ports)
     warnings = [*active_load.warnings, *close_result.warnings, *clear_result.warnings]
     return IssueFinishResult(
         issue_id=close_result.node_id,
@@ -296,4 +300,5 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
         already_closed=close_result.already_closed,
         active_cleared=clear_result.cleared,
         warnings=warnings,
+        post_sync=post_sync,
     )

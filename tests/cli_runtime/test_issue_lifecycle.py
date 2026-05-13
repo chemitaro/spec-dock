@@ -60,13 +60,16 @@ class TestIssueLifecycleApplication(unittest.TestCase):
         app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
         original_close_node = app_issue_lifecycle.close_node
         original_clear_active = app_issue_lifecycle.clear_active
+        original_post_mutation_sync = app_issue_lifecycle.post_mutation_sync
         try:
             for already_closed in (False, True):
                 with self.subTest(already_closed=already_closed):
                     close_calls = []
+                    sync_calls = []
 
                     def fake_close_node(req, ports):
                         close_calls.append((req, ports))
+                        self.assertFalse(req.run_post_sync)
                         return app_contracts.CloseNodeResult(
                             node_id="iss-00101",
                             node_kind="issue",
@@ -87,8 +90,13 @@ class TestIssueLifecycleApplication(unittest.TestCase):
                         del req, ports
                         raise RuntimeError("clear active failed")
 
+                    def fake_post_mutation_sync(ports):
+                        sync_calls.append(ports)
+                        return app_contracts.PostMutationSyncOutcome.skipped("test")
+
                     app_issue_lifecycle.close_node = fake_close_node
                     app_issue_lifecycle.clear_active = fake_clear_active
+                    app_issue_lifecycle.post_mutation_sync = fake_post_mutation_sync
 
                     with tempfile.TemporaryDirectory() as tmp:
                         repo_root = Path(tmp)
@@ -103,10 +111,12 @@ class TestIssueLifecycleApplication(unittest.TestCase):
 
                     message = str(raised.exception)
                     self.assertEqual(len(close_calls), 1)
+                    self.assertEqual(sync_calls, [])
                     self.assertIn("issue finish failed after GitHub close/already-closed step", message)
                     self.assertIn("GitHub issue #101 may have been closed successfully", message)
                     self.assertIn("may already have been closed", message)
                     self.assertIn("Active selection was not cleared.", message)
+                    self.assertIn("Derived artifacts may remain stale", message)
                     self.assertIn("spec-dock/scripts/spec-dock active show", message)
                     self.assertIn("spec-dock/scripts/spec-dock issue finish", message)
                     self.assertIn("spec-dock/scripts/spec-dock active set <issue-id> --checkout", message)
@@ -115,6 +125,68 @@ class TestIssueLifecycleApplication(unittest.TestCase):
         finally:
             app_issue_lifecycle.close_node = original_close_node
             app_issue_lifecycle.clear_active = original_clear_active
+            app_issue_lifecycle.post_mutation_sync = original_post_mutation_sync
+
+    def test_issue_finish_suppresses_internal_close_sync_and_runs_lifecycle_sync_once(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        original_clear_active = app_issue_lifecycle.clear_active
+        original_post_mutation_sync = app_issue_lifecycle.post_mutation_sync
+        close_calls = []
+        clear_calls = []
+        sync_calls = []
+        post_sync = app_contracts.PostMutationSyncOutcome.skipped("test lifecycle sync")
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                self.assertFalse(req.run_post_sync)
+                return app_contracts.CloseNodeResult(
+                    node_id="iss-00101",
+                    node_kind="issue",
+                    github_issue_number=101,
+                    issue_snapshot=domain_models.IssueSnapshot(
+                        issue_number=101,
+                        state="CLOSED",
+                        title="First issue",
+                        labels=[],
+                        updated_at="2026-05-05T00:00:00Z",
+                        url="https://github.com/example/repo/issues/101",
+                    ),
+                    already_closed=False,
+                    warnings=[],
+                )
+
+            def fake_clear_active(req, ports):
+                clear_calls.append((req, ports))
+                return app_contracts.ActiveClearResult(cleared=True, previous=None, warnings=[])
+
+            def fake_post_mutation_sync(ports):
+                sync_calls.append(ports)
+                return post_sync
+
+            app_issue_lifecycle.close_node = fake_close_node
+            app_issue_lifecycle.clear_active = fake_clear_active
+            app_issue_lifecycle.post_mutation_sync = fake_post_mutation_sync
+
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                ports = app_ports.Ports(
+                    node_reader=_StubNodeReader(),
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                    active_state_store=_StubActiveStateStore(infra_contracts),
+                )
+                result = app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+            self.assertEqual(len(close_calls), 1)
+            self.assertEqual(len(clear_calls), 1)
+            self.assertEqual(len(sync_calls), 1)
+            self.assertIs(result.post_sync, post_sync)
+            self.assertTrue(result.active_cleared)
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
+            app_issue_lifecycle.clear_active = original_clear_active
+            app_issue_lifecycle.post_mutation_sync = original_post_mutation_sync
 
 
 class TestCliIssueLifecycle(CliRuntimeHarness):
@@ -145,6 +217,8 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
         fail_close_numbers: set[int] | None = None,
     ) -> Path:
         state_path = bin_dir / "gh-state.json"
+        log_path = bin_dir / "gh-calls.log"
+        all_states = {1: "OPEN", 2: "OPEN", **states}
         payload = {
             str(number): {
                 "number": int(number),
@@ -154,7 +228,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
                 "updatedAt": "2026-05-05T00:00:00Z",
                 "url": f"https://github.com/example/repo/issues/{number}",
             }
-            for number, state in states.items()
+            for number, state in all_states.items()
         }
         state_path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
         fail_numbers = sorted(int(number) for number in (fail_view_numbers or set()))
@@ -167,10 +241,12 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
                 "import sys\n"
                 "from pathlib import Path\n\n"
                 f"STATE_PATH = Path({state_path.as_posix()!r})\n"
+                f"LOG_PATH = Path({log_path.as_posix()!r})\n"
                 f"FAIL_VIEW = {fail_numbers!r}\n"
                 f"FAIL_CLOSE = {fail_close!r}\n"
                 "args = sys.argv[1:]\n"
                 "state = json.loads(STATE_PATH.read_text(encoding='utf-8'))\n"
+                "LOG_PATH.write_text(LOG_PATH.read_text(encoding='utf-8') + ' '.join(args) + '\\n' if LOG_PATH.exists() else ' '.join(args) + '\\n', encoding='utf-8')\n"
                 "if args[:2] == ['issue', 'list']:\n"
                 "    print(json.dumps(list(state.values())))\n"
                 "    raise SystemExit(0)\n"
@@ -207,6 +283,15 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
         if not isinstance(issue, dict):
             return None
         return issue.get("id")
+
+    def _active_issue_pointer_text(self, target: Path) -> str:
+        issue_pointer = target / "spec-dock" / "active" / "issue"
+        if issue_pointer.is_symlink():
+            return os.readlink(issue_pointer)
+        path_file = issue_pointer.with_name("issue.path")
+        if path_file.is_file():
+            return path_file.read_text(encoding="utf-8").strip()
+        return ""
 
     def test_issue_start_sets_active_and_checks_out_issue_branch(self) -> None:
         if os.name == "nt":
@@ -534,6 +619,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertEqual(self._active_issue_id(target), "iss-00101")
             started_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(started_branch, "iss-00101-first-issue")
+            list_count_before_finish = (bin_dir / "gh-calls.log").read_text(encoding="utf-8").count("issue list")
 
             finished = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
 
@@ -544,10 +630,15 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("active_cleared=true", finished.stdout)
             self.assertIn("already_closed=false", finished.stdout)
             self.assertIsNone(self._active_issue_id(target))
+            self.assertIn("system/active-none/issue", self._active_issue_pointer_text(target))
             finished_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(finished_branch, "iss-00101-first-issue")
             state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(state["101"]["state"], "CLOSED")
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_all["nodes"]["iss-00101"]["status"], "done")
+            log = (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
+            self.assertEqual(log.count("issue list"), list_count_before_finish + 1)
 
     def test_issue_finish_closes_open_issue_and_clears_active(self) -> None:
         if os.name == "nt":
@@ -590,6 +681,11 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("already_closed=true", p.stdout)
             self.assertIsNone(self._active_issue_id(target))
+            self.assertIn("system/active-none/issue", self._active_issue_pointer_text(target))
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_all["nodes"]["iss-00101"]["status"], "done")
+            log = (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
+            self.assertEqual(log.count("issue list"), 1)
 
     def test_issue_finish_failures_leave_active_unchanged(self) -> None:
         if os.name == "nt":
@@ -661,6 +757,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("spec-dock/scripts/spec-dock active show", close_failure.stderr)
             self.assertIn("view failed: 101", close_failure.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self.assertNotIn("issue list", (bin_dir / "gh-calls.log").read_text(encoding="utf-8"))
 
             self._make_gh_stub(bin_dir, states={101: "OPEN"}, fail_close_numbers={101})
             close_command_failure = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
@@ -672,3 +769,4 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("spec-dock/scripts/spec-dock active show", close_command_failure.stderr)
             self.assertIn("close failed: 101", close_command_failure.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self.assertNotIn("issue list", (bin_dir / "gh-calls.log").read_text(encoding="utf-8"))
