@@ -1362,6 +1362,7 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
 
             self._create_same_repo_linked_hierarchy(target)
+            self._remove_generated_sync_artifacts(target)
 
             issue_dir = (
                 target

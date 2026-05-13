@@ -115,6 +115,7 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
 
             self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
+            self._remove_generated_sync_artifacts(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
@@ -145,6 +146,7 @@ class TestCliImport(CliRuntimeHarness):
             self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
             # Unrelated legacy file to trigger preflight failure.
             self._run_runtime(target, ["new", "initiative", "--title", "Legacy holder", "--github-issue", "99"])
+            self._remove_generated_sync_artifacts(target)
 
             legacy_init_dir = target / "spec-dock" / "initiatives" / "init-00099-legacy-holder"
             dot_meta_path = legacy_init_dir / ".meta.json"
@@ -1429,6 +1431,7 @@ class TestCliImport(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
 
             self._create_linked_parents(target, initiative_title="Parent initiative", epic_title="Parent epic")
+            self._remove_generated_sync_artifacts(target)
 
             bin_dir = target / ".bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

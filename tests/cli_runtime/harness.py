@@ -245,6 +245,20 @@ class CliRuntimeHarness(unittest.TestCase):
         )
         gh_path.chmod(0o755)
 
+    def _remove_generated_sync_artifacts(self, target: Path) -> None:
+        for rel_path in (
+            "spec-dock/.agent/index.json",
+            "spec-dock/.agent/tree.json",
+            "spec-dock/.agent/index-all.json",
+            "spec-dock/.agent/tree-all.json",
+            "spec-dock/.agent/deps-issues.json",
+            "spec-dock/tree-all.puml",
+            "spec-dock/tree.puml",
+            "spec-dock/deps-issues.puml",
+            "spec-dock/dashboard.md",
+        ):
+            (target / rel_path).unlink(missing_ok=True)
+
     def _run_wrapper_capture(
         self,
         script: Path,
