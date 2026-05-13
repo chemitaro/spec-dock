@@ -320,6 +320,27 @@ def _delete_validation_reasons_payload(result: DeleteNodeResult) -> list[dict[st
     ]
 
 
+def _delete_post_sync_payload(result: DeleteNodeResult) -> dict[str, object] | None:
+    outcome = result.post_sync
+    if outcome is None:
+        return None
+    artifact_failure = None
+    if outcome.sync_result is not None and outcome.sync_result.artifact_failure is not None:
+        artifact_failure = {
+            "status": outcome.sync_result.artifact_failure.status,
+            "reason": outcome.sync_result.artifact_failure.reason,
+        }
+    return {
+        "failed": outcome.failed,
+        "skipped_reason": outcome.skipped_reason,
+        "exception_reason": outcome.exception_reason,
+        "fatal_warnings": list(outcome.fatal_warnings),
+        "warnings": list(outcome.warnings),
+        "artifact_failure": artifact_failure,
+        "recovery_guidance": list(outcome.guidance),
+    }
+
+
 def _build_delete_json_payload(result: DeleteNodeResult) -> dict[str, object]:
     status = result.status
     blockers = {
@@ -372,7 +393,7 @@ def _build_delete_json_payload(result: DeleteNodeResult) -> dict[str, object]:
             ],
         }
     # `ok`
-    return {
+    payload = {
         "status": status,
         "target_id": result.target_id,
         "deleted_node_ids": list(result.deleted_node_ids),
@@ -380,6 +401,10 @@ def _build_delete_json_payload(result: DeleteNodeResult) -> dict[str, object]:
         "remote_close": _delete_remote_close_payload(result),
         "active_restore_result": result.active_restore_result,
     }
+    post_sync = _delete_post_sync_payload(result)
+    if post_sync is not None:
+        payload["post_sync"] = post_sync
+    return payload
 
 
 def render_delete_text(result: DeleteNodeResult, *, json_output: bool) -> CliText:
@@ -391,10 +416,15 @@ def render_delete_text(result: DeleteNodeResult, *, json_output: bool) -> CliTex
         )
 
     if result.status == "ok":
+        stdout_lines = [f"spec-dock: ok (delete) target={result.target_id}"]
+        stderr_lines: list[str] = []
+        if result.post_sync is not None and result.post_sync.failed:
+            stderr_lines.append(f"spec-dock: failed (delete auto-sync) target={result.target_id}")
+            stderr_lines.extend(result.post_sync.guidance)
         return CliText(
-            stdout_lines=[f"spec-dock: ok (delete) target={result.target_id}"],
-            stderr_lines=[],
-            warnings=list(result.warnings),
+            stdout_lines=stdout_lines,
+            stderr_lines=stderr_lines,
+            warnings=[*list(result.warnings), *list(result.post_sync.warnings if result.post_sync else [])],
         )
     return CliText(
         stdout_lines=[],

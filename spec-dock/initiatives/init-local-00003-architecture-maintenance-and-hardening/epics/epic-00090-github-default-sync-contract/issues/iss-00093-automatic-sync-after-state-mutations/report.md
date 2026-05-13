@@ -388,6 +388,105 @@ spec-dock: ok (validate) nodes=40
 
 ---
 
+### 2026-05-14 01:59 JST - 02:12 JST
+
+#### 対象
+- Step: S04 `delete` auto-sync
+- AC/EC: AC-005, AC-007, EC-001, EC-003
+- Closure IDs: cl-008, cl-009, cl-020
+
+#### 実施内容
+- S03 は `75bc271 feat(deps): 依存変更後の自動同期を追加` で committed。
+- S04 は destructive local tree deletion、dependency scrub、JSON command behavior、partial/stale failure evidence に跨るため、plan の Delegation Gate に従い `dev-coder` へ bounded implementation を委任する。
+- `DeleteNodeResult.post_sync` を追加し、delete success path のみ `post_mutation_sync(ports)` を実行するようにした。
+- post-sync failure 時は delete command の exit code を `1` にし、stdout には mutation success、stderr には auto-sync failure と recovery guidance を表示する delete-specific minimal handling を追加した。
+- `delete --json` の ok payload に `post_sync` outcome を含めた。
+- blocked / preflight / remote close failure / local partial failure path は post-sync に到達しない既存 early return を維持した。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00093-automatic-sync-after-state-mutations
+
+git log --oneline --decorate -1
+
+75bc271 (HEAD -> iss-00093-automatic-sync-after-state-mutations) feat(deps): 依存変更後の自動同期を追加
+
+python -m unittest tests.cli_runtime.test_delete -v
+
+Ran 13 tests in 55.725s
+OK
+
+python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 tests.cli_runtime.test_deps.TestCliDeps.test_deps_add_updated_path_auto_syncs_dependency_projection tests.cli_runtime.test_deps.TestCliDeps.test_deps_add_duplicate_skips_post_sync_and_does_not_claim_refresh tests.cli_runtime.test_deps.TestCliDeps.test_deps_remove_updated_path_auto_syncs_dependency_projection tests.cli_runtime.test_deps.TestCliDeps.test_deps_invalid_target_does_not_run_post_sync_or_refresh_projection -v
+
+Ran 12 tests in 3.938s
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=40
+
+git diff --check
+
+# no output
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S04 | cl-008, cl-009, cl-020 | delete success refresh, post-sync failure, and delete failure no-sync tests pass | `tests.cli_runtime.test_delete` 13 tests pass; S01/S03 regressions pass; `validate` ok nodes=40 | pass | JSON payload closure for delete success is included; broader cross-command JSON shape remains S06. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-s04-001 | S04 | yes | red-required | before S04, delete did not guarantee derived artifact refresh without manual sync | `python -m unittest tests.cli_runtime.test_delete -v` | pass | Deleted issue absent from index, dashboard, deps JSON, and deps PUML after delete without manual sync. |
+| tc-s04-002 | S04 | yes | red-required | before S04, delete post-sync artifact failure did not affect command exit or guidance | `python -m unittest tests.cli_runtime.test_delete -v` | pass | Delete mutation succeeds, post-sync artifact failure returns exit 1, stdout shows delete success, stderr shows recovery guidance. |
+| tc-s04-003 | S04 | yes | red-required | before S04, delete failure no-sync behavior lacked artifact/gh-call evidence | `python -m unittest tests.cli_runtime.test_delete -v` | pass | target-not-found preflight failure leaves artifacts unchanged and does not run post-sync. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-008 | S04 | tc-s04-001 pass | pass | Delete success removes target from derived artifacts without manual sync. |
+| cl-009 | S04 | tc-s04-002 pass | pass | Destructive partial/stale state is surfaced as non-zero with mutation success visible. |
+| cl-020 | S04 | tc-s04-003 pass | pass | Failed delete path does not invoke post-sync and artifacts stay unchanged. |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
+|---|---|---|---|---|---|---|
+| S04 | delegated | destructive mutation / dependency scrub / partial failure behavior / runtime CLI and JSON tests | dev-coder (`019e2247-bee4-7dc3-aad6-406505e450d8`) | Wire delete success path to S01 post-mutation sync outcome; expose outcome through delete result / JSON as needed for cl-008〜cl-009; add failure no-sync tests for cl-020; do not touch close/finish. | pass | N/A |
+
+#### Code Review Gate
+| step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
+|---|---|---|---|---|---|---|
+| S04 | fresh `code-reviewer` (`019e224e-ded6-7f11-8aff-e5f55693e580`) | S04 delete success / post-sync failure / no-sync failure path, JSON/text output, tests | pass | No findings. | 0 | pass |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending commit | `DeleteNodeResult.post_sync`, delete success post-sync wiring, delete-specific post-sync failure rendering/JSON, S04 runtime tests, S04 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - `DeleteNodeResult.post_sync` field.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` - delete success path invokes `post_mutation_sync`.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/delete.py` - delete-specific post-sync failure exit code handling.
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` - delete text/JSON post-sync outcome rendering.
+- `tests/cli_runtime/test_delete.py` - S04 auto-sync, post-sync artifact failure, and failure no-sync tests.
+- `spec-dock/active/issue/report.md` - S04 delegation, closure, verification, and review evidence.
+
+#### コミット
+- pending
+
+#### メモ
+- S06 carry-over: `new` / `deps` / future lifecycle command post-sync failure output and parser no-opt-out assertions remain S06 scope.
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none | cl-008, cl-009, cl-020 | tc-s04-001〜tc-s04-003 | cl-008, cl-009, cl-020 | S04 executes approved plan as written. | no |
+
+---
+
 ### 2026-05-13 HH:MM - HH:MM
 
 #### 対象
