@@ -78,6 +78,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/phase_plan_issue.md": (
             "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"
         ),
+        "spec-dock/docs/workflow_spec_authoring.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
+        ),
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
@@ -102,6 +105,12 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         ".agents/skills/spec-driven-tdd-workflow/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-initiative-planning/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-epic-planning/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
         ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
@@ -1823,6 +1832,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((docs_dir / "workflow_initiative.md").is_file())
             self.assertTrue((docs_dir / "workflow_epic.md").is_file())
             self.assertTrue((docs_dir / "workflow_issue.md").is_file())
+            self.assertTrue((docs_dir / "workflow_spec_authoring.md").is_file())
             self.assertTrue((docs_dir / "workflow_adr.md").is_file())
             self.assertTrue((docs_dir / "workflow-tree.md").is_file())
             self.assertTrue((docs_dir / "phase_requirement.md").is_file())
@@ -1839,12 +1849,14 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("spec-dock-issue-execution", docs_readme)
             self.assertIn("spec-dock-adr-facilitation", docs_readme)
             self.assertIn("reference レイヤ", docs_readme)
+            self.assertIn("[workflow_spec_authoring.md](workflow_spec_authoring.md)", docs_readme)
             self.assertIn("[phase_requirement.md](phase_requirement.md)", docs_readme)
             self.assertIn("[phase_design.md](phase_design.md)", docs_readme)
             self.assertIn("[phase_plan.md](phase_plan.md)", docs_readme)
 
             guide_text = (docs_dir / "guide.md").read_text(encoding="utf-8")
             self.assertIn("phase playbook（共通の作り方）", guide_text)
+            self.assertIn("[workflow_spec_authoring.md](workflow_spec_authoring.md)", guide_text)
             self.assertIn("[phase_requirement.md](phase_requirement.md)", guide_text)
             self.assertIn("[phase_design.md](phase_design.md)", guide_text)
             self.assertIn("[phase_plan.md](phase_plan.md)", guide_text)
@@ -1855,7 +1867,26 @@ class TestInitUpdate(CliRuntimeHarness):
             workflow_initiative = (docs_dir / "workflow_initiative.md").read_text(encoding="utf-8")
             workflow_epic = (docs_dir / "workflow_epic.md").read_text(encoding="utf-8")
             workflow_issue = (docs_dir / "workflow_issue.md").read_text(encoding="utf-8")
+            workflow_spec_authoring = (docs_dir / "workflow_spec_authoring.md").read_text(encoding="utf-8")
             workflow_adr = (docs_dir / "workflow_adr.md").read_text(encoding="utf-8")
+            phase_requirement = (docs_dir / "phase_requirement.md").read_text(encoding="utf-8")
+            phase_design = (docs_dir / "phase_design.md").read_text(encoding="utf-8")
+            phase_plan = (docs_dir / "phase_plan.md").read_text(encoding="utf-8")
+            self.assertIn("fresh `spec-reviewer`", workflow_spec_authoring)
+            self.assertIn("`review_status: pass`", workflow_spec_authoring)
+            self.assertIn("Spec Authoring Gate", workflow_spec_authoring)
+            self.assertIn("scope / non-scope", workflow_spec_authoring)
+            for workflow_text in (workflow_initiative, workflow_epic, workflow_issue):
+                self.assertIn("workflow_spec_authoring.md", workflow_text)
+                self.assertIn("fresh `spec-reviewer`", workflow_text)
+                self.assertIn("`review_status: pass`", workflow_text)
+                self.assertIn("Spec Authoring Gate", workflow_text)
+            for phase_text in (phase_requirement, phase_design, phase_plan):
+                self.assertIn("workflow_spec_authoring.md", phase_text)
+                self.assertIn("fresh `spec-reviewer`", phase_text)
+                self.assertIn("`review_status: pass`", phase_text)
+                self.assertIn("Spec Authoring Gate", phase_text)
+            self.assertIn("scope / non-scope / user intent / acceptance criteria", phase_requirement)
             self.assertIn("spec-dock-initiative-planning", workflow_initiative)
             self.assertIn("spec-dock-epic-planning", workflow_epic)
             self.assertIn("spec-dock-issue-execution", workflow_issue)
@@ -2160,6 +2191,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
                 "spec-dock/docs/workflow_issue.md",
+                "spec-dock/docs/workflow_spec_authoring.md",
                 "spec-dock/docs/workflow_epic.md",
                 "spec-dock/docs/workflow_initiative.md",
                 "spec-dock/docs/phase_requirement.md",
@@ -2271,6 +2303,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
                 "spec-dock/docs/workflow_issue.md",
+                "spec-dock/docs/workflow_spec_authoring.md",
                 "spec-dock/docs/workflow_epic.md",
                 "spec-dock/docs/workflow_initiative.md",
                 "spec-dock/docs/phase_requirement.md",
@@ -8187,6 +8220,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/reference_deps.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
+        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", hub_text)
         self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
         self.assertIn("issue-00049", codex_adapter_text)
         self.assertIn("spec-dock/docs/workflow_issue.md", codex_adapter_text)
@@ -8219,6 +8253,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/reference_sync.md`", copilot_adapter_text)
 
         self.assertIn("`spec-dock/docs/workflow_initiative.md`", initiative_text)
+        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", initiative_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", initiative_text)
@@ -8227,8 +8262,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/phase_plan.md`", initiative_text)
         self.assertIn("create/import an initiative", initiative_text)
         self.assertIn("scope-specific constraints and decisions", initiative_text)
+        self.assertIn("fresh `spec-reviewer`", initiative_text)
+        self.assertIn("Spec Authoring Gate", initiative_text)
 
         self.assertIn("`spec-dock/docs/workflow_epic.md`", epic_text)
+        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", epic_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", epic_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", epic_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", epic_text)
@@ -8237,7 +8275,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/phase_plan.md`", epic_text)
         self.assertIn("create/import an epic", epic_text)
         self.assertIn("scope-specific constraints and decisions", epic_text)
+        self.assertIn("fresh `spec-reviewer`", epic_text)
+        self.assertIn("Spec Authoring Gate", epic_text)
         self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
+        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
         self.assertIn("`spec-dock/docs/reference_github.md`", issue_text)
@@ -8248,6 +8289,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/active/context-pack.md`", issue_text)
         self.assertIn("approved behavior-slice execution", issue_text)
         self.assertIn("source of truth", issue_text)
+        self.assertIn("fresh `spec-reviewer`", issue_text)
+        self.assertIn("Spec Authoring Gate", issue_text)
         self.assertIn("docs impact resolution step", issue_text)
         self.assertIn("final quality gate", issue_text)
 

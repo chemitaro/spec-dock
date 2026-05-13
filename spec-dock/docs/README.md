@@ -1,7 +1,7 @@
 # spec-dock docs（入口）
 
 このディレクトリは `spec-dock init/update` により導入先リポジトリへ配置されます。  
-まず `guide.md` で全体像を掴み、その後は対象 scope の `workflow_*.md` を入口にしてください。
+まず `guide.md` で全体像を掴み、仕様書作成は `workflow_spec_authoring.md`、scope 固有の lifecycle / governance は対象 scope の `workflow_*.md` を入口にしてください。
 plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の scope-specific playbook を合わせて参照します。
 runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
 
@@ -19,6 +19,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 
 1. [guide.md](guide.md)
 2. 対象 scope の workflow
+   - [workflow_spec_authoring.md](workflow_spec_authoring.md)
    - [workflow_initiative.md](workflow_initiative.md)
    - [workflow_epic.md](workflow_epic.md)
    - [workflow_issue.md](workflow_issue.md)
@@ -68,6 +69,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ## 高頻度ルール
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
+- Requirement / design / plan 作成は `workflow_spec_authoring.md` の phase promotion gate を正本にし、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作る。node create/import で local-only create へ自動フォールバックしない
 - `new issue --create-github-issue` は default create の explicit alias
