@@ -13,9 +13,20 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 仕様書作成は `requirement -> spec-reviewer pass -> design -> spec-reviewer pass -> plan -> spec-reviewer pass -> downstream handoff` の順に進める。
 - 各 phase promotion は fresh `spec-reviewer` の `review_status: pass` を必須にする。
 - `spec-reviewer` が `fail` を返した場合は指摘を修正し、同じ reviewer 状態を再利用せず fresh `spec-reviewer` で再レビューする。
+- phase gate verdict は `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` のいずれかで記録する。自動 promotion を許可するのは fresh `passed` だけである。
+- `waived` は、ユーザーが明示的に risk acceptance を与え、その内容と対象 scope が `report.md` に残っている場合だけ使える。`waived` を reviewer pass と表現してはならない。
+- `provisional` は orchestrator self-check の記録であり、`spec-reviewer` の代替ではない。
+- reviewer が missing / stale / failed / unavailable / denied / waived / provisional の場合は、phase promotion を block または incomplete として扱う。degraded mode を reviewer gate の degraded success として扱ってはならない。
 - 調査で解消できる不明点をユーザー質問で代替しない。先に docs / code / ADR / discussions / 外部一次情報を確認する。
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、次 phase へ進む前にユーザーへヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
+
+## workflow-scoped delegation consent
+
+- Issue scope の spec authoring では、reviewer / read-only specialist sub-agent を使う前に、current repo/worktree、active issue、session、named role に限定した issue-scoped workflow delegation consent を確認し、`report.md` に記録する。
+- 現在のユーザー指示が「この issue workflow 内では reviewer / specialist を自律利用してよい」と明示している場合、その指示を同一 issue / repo / session / named role に限定した consent として扱える。
+- consent がある場合、orchestrator は requirement / design / plan の各 phase ごとに再確認せず、必要な `spec-reviewer` や read-only specialist を起動してよい。
+- consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation を許可しない。scope が変わる場合は再確認する。
 
 ## authoring lifecycle
 
@@ -64,8 +75,9 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - phase: `requirement` / `design` / `plan`
 - investigated facts: 確認した docs / code / ADR / discussions / 外部一次情報
 - open questions: 未確定事項、ユーザー質問、回答
+- delegation consent: scope、named roles、source、boundary、expires / invalidation condition
 - reviewer: fresh `spec-reviewer` の実行単位と review scope
-- verdict: `review_status` と理由
+- verdict: `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` と理由。`passed` 以外は reviewer gate pass ではない
 - fixes: 指摘に対する修正要約
 - promotion: 次 phase へ進めるか、`blocked` / `incomplete` の reason と next action
 
