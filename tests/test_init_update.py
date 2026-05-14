@@ -1346,6 +1346,21 @@ class TestInitUpdate(CliRuntimeHarness):
             text,
             f"codex command rules missing installer-command guard ({shim_label})",
         )
+        self.assertIn(
+            'pattern = [["./.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"]]',
+            text,
+            f"codex command rules missing PR review wrapper allow prefix ({shim_label})",
+        )
+        self.assertIn(
+            "gh api repos/owner/repo/pulls/13/comments",
+            text,
+            f"codex command rules missing direct gh api guard ({shim_label})",
+        )
+        self.assertIn(
+            "curl https://api.github.com/repos/owner/repo/pulls/13/comments",
+            text,
+            f"codex command rules missing direct curl guard ({shim_label})",
+        )
 
     def _issue_69_run_subprocess(
         self,
@@ -9517,6 +9532,157 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     content,
                     f"issue-75 guidance still contains legacy absolute helper path in: {rel_path}",
                 )
+                self.assertIn(
+                    "always use the approved read-only wrapper",
+                    content,
+                    f"issue-75 guidance must require the read-only wrapper in: {rel_path}",
+                )
+                for forbidden_fallback in (
+                    "direct `gh api`",
+                    "direct `curl`",
+                    "GraphQL",
+                    "POST / PATCH / PUT / DELETE",
+                    "Do not request approval or fall back to direct GitHub API calls.",
+                ):
+                    self.assertIn(
+                        forbidden_fallback,
+                        content,
+                        f"issue-75 guidance missing forbidden fallback '{forbidden_fallback}' in: {rel_path}",
+                    )
+
+    def test_issue_75_pr_review_wrapper_uses_fixed_read_only_gh_api_endpoints(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            out_dir = tmp_path / "out"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+case "$*" in
+  *"--method GET"* ) ;;
+  *) echo "missing GET method" >&2; exit 42 ;;
+esac
+case "$*" in
+  *"repos/owner/repo/issues/13/comments?per_page=100"*)
+    printf '%s\\n' '[{"id":1,"user":{"login":"codex-reviewer"},"body":"conversation"}]'
+    ;;
+  *"repos/owner/repo/pulls/13/comments?per_page=100"*)
+    printf '%s\\n' '[{"id":2,"user":{"login":"codex-reviewer"},"body":"inline","path":"src/app.py","line":10}]'
+    ;;
+  *"repos/owner/repo/pulls/13/reviews?per_page=100"*)
+    printf '%s\\n' '[{"id":3,"user":{"login":"codex-reviewer"},"body":"review","state":"COMMENTED"}]'
+    ;;
+  *)
+    echo "unexpected endpoint: $*" >&2
+    exit 43
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            result = subprocess.run(
+                [str(script_path), "--repo", "owner/repo", "--pr", "13", "--out", str(out_dir)],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            gh_calls = gh_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(gh_calls), 3, gh_calls)
+            for call in gh_calls:
+                self.assertIn("--method GET", call)
+                self.assertIn("--paginate", call)
+                self.assertIn("--slurp", call)
+                self.assertNotIn("--method POST", call)
+                self.assertNotIn("graphql", call.lower())
+
+            self.assertTrue(
+                any("repos/owner/repo/issues/13/comments?per_page=100" in call for call in gh_calls),
+                gh_calls,
+            )
+            self.assertTrue(
+                any("repos/owner/repo/pulls/13/comments?per_page=100" in call for call in gh_calls),
+                gh_calls,
+            )
+            self.assertTrue(
+                any("repos/owner/repo/pulls/13/reviews?per_page=100" in call for call in gh_calls),
+                gh_calls,
+            )
+
+            review_data = json.loads((out_dir / "review_data.json").read_text(encoding="utf-8"))
+            self.assertEqual(review_data["meta"]["transport"], "gh api --method GET")
+            self.assertEqual(len(review_data["issue_comments"]), 1)
+            self.assertEqual(len(review_data["review_comments"]), 1)
+            self.assertEqual(len(review_data["reviews"]), 1)
+            self.assertEqual(len(review_data["codex"]["issue_comments"]), 1)
+            self.assertIn("inline review comments: 1", (out_dir / "codex_report.md").read_text(encoding="utf-8"))
+
+    def test_issue_75_pr_review_wrapper_rejects_unsafe_inputs_before_gh_api(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            gh_log = tmp_path / "gh.log"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_FAKE_LOG"
+exit 44
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_FAKE_LOG": str(gh_log),
+            }
+
+            invalid_args = (
+                ("--repo", "owner/repo", "--pr", "13", "--endpoint", "repos/owner/repo/issues"),
+                ("--repo", "owner/repo", "--pr", "13;rm"),
+                ("--repo", "owner/repo/extra", "--pr", "13"),
+                ("--repo", "owner/../repo", "--pr", "13"),
+                ("--repo", "owner/repo", "--pr", "0"),
+            )
+            for args in invalid_args:
+                with self.subTest(args=args):
+                    if gh_log.exists():
+                        gh_log.unlink()
+                    result = subprocess.run(
+                        [str(script_path), *args],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse(gh_log.exists(), "unsafe input reached fake gh api")
 
     def test_issue_71_upstream_handoff_reports_expose_evidence_bearing_sections(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
