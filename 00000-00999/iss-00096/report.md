@@ -3,9 +3,9 @@
 ID: "iss-00096"
 タイトル: "Add self update command"
 関連GitHub: ["#96"]
-状態: "draft | approved"
+状態: "in_progress"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-14"
+最終更新: "2026-05-15"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00054", "init-local-00002"]
 ---
@@ -13,124 +13,277 @@ ID: "iss-00096"
 # iss-00096 Add self update command — 実装報告（LOG）
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Requirement / design / plan gate は fresh `spec-reviewer` pass 済みで、write-capable delegation consent gate も記録済み。
+- S01 runtime command implementation は実装・ targeted verification・per-step `code-reviewer` pass まで完了し、S01 commit gate 待ち。
 
 ## 実装記録（セッションログ） (必須)
 
-### 2026-05-14 HH:MM - HH:MM
+### 2026-05-15 Requirement Authoring
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Phase: requirement
+- Artifact: `spec-dock/active/issue/requirement.md`
+
+#### Workflow Delegation Consent
+| consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation | status |
+|---|---|---|---|---|---|---|---|
+| User request: 「ワークフローに則って要件定義書を、まず要件定義書を作成」 and adopted discussion `20260514t154002z-disc-workflow-scoped-delegation-consent.md` | `/Users/iwasawayuuta/workspace/tools/spec-dock` | `iss-00096` | current Codex session | `spec-reviewer`, read-only specialist roles required for spec authoring | read-only review / findings only; no destructive action, external publishing, credentialed access, scope expansion, or write-capable delegation | active issue change, issue finish, session end, user revoke, scope expansion | present |
+
+#### Spec Authoring Gate
+| phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
+|---|---|---|---|---|---|---|---|
+| requirement | `src/spec_dock/cli.py` installer update parser; `README.md` uvx usage and cache workaround; runtime parser/registry; active epic requirement/design; GitHub issue #96; adopted workflow delegation discussion | Requirement-blocking questions: none. Design questions: option surface and target path normalization | issue-scoped workflow delegation consent recorded above | pending fresh `spec-reviewer` | provisional: requirement draft authored, reviewer not yet run in this row | N/A | blocked until fresh `spec-reviewer` returns `passed` |
 
 #### 実施内容
-- ...
+- `iss-00096` の requirement scaffold を、runtime self-update command の WHAT / WHY / scope / success criteria に更新した。
+- Runtime update は installer update wrapper に限定し、`uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` を必須契約として固定した。
+- `init --force` と runtime update を混同しないよう、update の user-facing interface は existing installer update interface に合わせる要件にした。
+- Requirement gate を止める未確定事項はなしとし、option surface と target path normalization は design へ送る論点として分離した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git status --short --branch
 
-<result>
+## iss-00096-self-update-command
 ```
+
+#### Reviewer Gate Status
+| gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision |
+|---|---|---|---|---|---|
+| requirement review | spec-reviewer | pending after latest requirement draft | provisional | none | Do not promote to design until `passed` |
+| requirement review | spec-reviewer | reviewed initial requirement draft before upstream epic alignment fix | failed | none | Blocked promotion. Finding: self-update issue was not traceable to parent epic scope, which still described close/delete only |
+| requirement review | spec-reviewer | reviewed requirement after parent epic scope and issue-count fixes | passed | none | Requirement gate passed; design phase may start next |
+
+#### Review Findings / Fixes
+| reviewer | finding | fix | re-review required |
+|---|---|---|---|
+| spec-reviewer | P1: Align self-update issue with its parent epic scope. Parent epic requirement/design described GitHub close/delete and local deletion only, while issue requirement defined runtime self-update | Updated `spec-dock/active/epic/requirement.md` and `spec-dock/active/epic/design.md` to include repo-local self-update command, `uvx --no-cache`, subprocess evidence, and E-AC-005 trace. Added upstream scope source to issue requirement | yes |
+| spec-reviewer | P1: Resolve the parent epic issue-count contradiction. Parent epic still required a fixed 2 issue structure while `iss-00096` is an additional self-update issue | Replaced fixed 2 issue wording with close/delete/self-update capability scopes, and changed final close-out ownership from fixed second issue to the last completed issue / explicit close-out owner | yes |
+| spec-reviewer | Re-review after fixes found no findings | No further requirement changes required | no |
+
+#### 変更したファイル
+- `spec-dock/active/issue/requirement.md` - self-update command の要件定義を作成
+- `spec-dock/active/issue/report.md` - requirement authoring と delegation consent / provisional gate evidence を記録
+- `spec-dock/active/epic/requirement.md` - self-update command を parent epic scope に追記
+- `spec-dock/active/epic/design.md` - self-update flow / failure / test strategy を parent epic design に追記
+
+---
+
+### 2026-05-15 Design / Plan Authoring
+
+#### 対象
+- Phase: design / plan
+- Artifacts:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+
+#### 実施内容
+- `workflow_issue.md`、`workflow_spec_authoring.md`、`phase_design.md`、`phase_plan_issue.md`、`docs/authoring/issue-plan.md` を確認し、`design.md` と `plan.md` がテンプレート状態のため implementation-ready ではないと判定した。
+- Runtime command の既存 pattern として、`cli/parser.py`、`cli/registry.py`、`commands/*.py`、`application/contracts.py`、`cli/dispatch.py`、`tests/cli_runtime/harness.py`、installer `src/spec_dock/cli.py` を確認した。
+- `design.md` を self-update command 専用の HOW に置き換え、runtime command wrapper、fixed `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock` subprocess、target path normalization、stdout/stderr/exit code propagation、docs/tests impact を固定した。
+- `plan.md` を Issue execution contract に置き換え、S01 runtime command implementation、S02 docs parity、S90 docs impact resolution、S99 final quality gate を定義した。
+- `plan.md` の各 implementation step に step-local `具体テストケース一覧` をカード型ネストリストで追加し、各 case に `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法`、`関連 closure id` を置いた。
+
+#### 実行コマンド / 結果
+```bash
+sed -n '1,240p' /Users/iwasawayuuta/workspace/tools/spec-dock/.agents/skills/spec-dock-issue-execution/SKILL.md
+
+success: issue execution skill contract confirmed
+```
+
+```bash
+./spec-dock/scripts/spec-dock active show
+
+initiative: init-local-00002 (spec-dock/initiatives/init-local-00002-prototype-feature-expansion)
+epic: epic-00054 (spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion)
+issue: iss-00096 (spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command)
+```
+
+```bash
+git status --short --branch
+
+## iss-00096-self-update-command
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/design.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/report.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/requirement.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/requirement.md
+```
+
+#### Spec Authoring Gate
+| phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
+|---|---|---|---|---|---|---|---|
+| design | requirement gate passed in prior row; runtime parser/registry/commands/dispatch; installer update interface; CLI runtime harness; README uvx guidance; active epic requirement/design alignment | none | issue-scoped workflow delegation consent recorded in requirement row | pending fresh `spec-reviewer` | provisional: design authored, reviewer not yet run | N/A | blocked until fresh `spec-reviewer` returns `passed` |
+| plan | reviewer-pass requirement assumed from prior row; design authored in this session; `workflow_issue.md`; `workflow_spec_authoring.md`; `phase_plan_issue.md`; `docs/authoring/issue-plan.md` | none | issue-scoped workflow delegation consent recorded in requirement row | pending fresh `spec-reviewer` | provisional: plan authored with step-local concrete test cases, reviewer not yet run | N/A | blocked until fresh `spec-reviewer` returns `passed` |
+
+#### Reviewer Gate Status
+| gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision |
+|---|---|---|---|---|---|
+| design review | spec-reviewer | pending after latest design draft | provisional | none | Do not promote to plan implementation until `passed` |
+| plan review | spec-reviewer | pending after latest plan draft | provisional | none | Do not start implementation until `passed` |
+
+#### 変更したファイル
+- `spec-dock/active/issue/design.md` - runtime self-update command の design を作成
+- `spec-dock/active/issue/plan.md` - S01/S02/S90/S99 execution contract と closure index を作成
+- `spec-dock/active/issue/report.md` - design/plan authoring evidence と provisional gate を記録
+
+---
+
+### 2026-05-15 Design / Plan Spec Review Fixes
+
+#### 対象
+- Phase: design / plan
+- Artifacts:
+  - `spec-dock/active/issue/design.md`
+  - `spec-dock/active/issue/plan.md`
+  - `spec-dock/active/issue/report.md`
+
+#### Reviewer Gate Status
+| gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision |
+|---|---|---|---|---|---|
+| design / plan review | spec-reviewer | fresh review after design/plan authoring | failed | none | Implementation remains blocked until fixes are reviewed and pass |
+| design / plan re-review | spec-reviewer | fresh re-review after delegation/dogfooding/report fixes | passed | none | Design and plan gate passed; implementation may start after write-capable delegation consent gate is recorded |
+
+#### Review Findings / Fixes
+| reviewer | finding | fix | re-review required |
+|---|---|---|---|
+| spec-reviewer | P1: Plan requires write-capable `dev-coder` / `doc-writer` delegation while recorded workflow consent explicitly covers read-only roles only | Added `Pre-Implementation Delegation Consent Gate` to `plan.md`. It requires explicit report evidence for write-capable `dev-coder` / `doc-writer` scope before S01/S02/S03 can start, and states the issue must remain blocked/incomplete if consent is not present | yes |
+| spec-reviewer | P1: Requirement requires provider-side assets and dogfooding mirror confirmation, but design/plan lacked local `spec-dock/scripts/...` mirror refresh/inspection | Added dogfooding mirror impact to `design.md`; added S03 dogfooding mirror refresh/inspection step, closure id `tc-007`, concrete test case `tc-s03-001`, S99 validation command `./spec-dock/scripts/spec-dock update --help`, and final exit coverage for tc-001 through tc-007 | yes |
+| spec-reviewer | P2: Design/plan authoring report had stale `git status` evidence that did not list newly authored `design.md` / `plan.md` | Recorded current status below and updated this row with the failed review/fix state | yes |
+| spec-reviewer | P2: Report frontmatter still had template status `draft | approved` and stale date `2026-05-14` | Set report status to `in_progress` and updated `最終更新` to `2026-05-15` | no; previous reviewer classified this as non-blocking and design/plan gate passed |
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+
+## iss-00096-self-update-command
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/design.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/design.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/plan.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/report.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/requirement.md
+ M spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/requirement.md
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=41
+```
+
+#### Spec Authoring Gate
+| phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
+|---|---|---|---|---|---|---|---|
+| design | Fresh spec-reviewer findings on write-capable delegation boundary and dogfooding mirror verification gap | none | read-only reviewer consent present; write-capable implementation consent must be recorded before S01 | fresh `spec-reviewer` failed first design/plan review | failed -> fixes applied | Added write-capable consent gate and dogfooding mirror design impact | blocked until fresh re-review returns `passed` |
+| plan | Fresh spec-reviewer findings on implementation readiness, closure coverage, and stale report evidence | none | read-only reviewer consent present; write-capable implementation consent must be recorded before S01 | fresh `spec-reviewer` failed first design/plan review | failed -> fixes applied | Added S03 / tc-007 / concrete test case / final validation and current report evidence | blocked until fresh re-review returns `passed` |
+| design / plan | Fresh spec-reviewer re-review confirmed prior P1 blockers are addressed; remaining frontmatter metadata cleanup was P2 non-blocking | none | read-only reviewer consent present; write-capable implementation consent recorded below before implementation | fresh `spec-reviewer` re-review | passed | Fixed frontmatter status/date metadata after pass | promoted to implementation |
+
+#### Pre-Implementation Write-Capable Delegation Consent
+| consent source | repo/worktree | active issue | session | write-capable roles | boundary | expires / invalidation | status |
+|---|---|---|---|---|---|---|---|
+| User objective: "Complete the currently active spec-dock issue" with issue workflow requiring implementation delegation / review gates, plus orchestrator role instructions for dev-coder / doc-writer bounded tasks | `/Users/iwasawayuuta/workspace/tools/spec-dock` | `iss-00096` | current Codex session | `dev-coder` for S01/S03 bounded implementation or mirror refresh; `doc-writer` for S02/S90 docs updates | active issue scope only; no destructive operations, no external publishing, no credentialed access, no browser/private external systems, no scope expansion; implementation must follow reviewed plan steps and reviewer gates | active issue change, issue finish, session end, user revoke, scope expansion, or need for destructive/external action | present |
+
+#### 変更したファイル
+- `spec-dock/active/issue/design.md` - dogfooding mirror refresh/inspection impact を追加
+- `spec-dock/active/issue/plan.md` - write-capable delegation consent gate と S03 / tc-007 を追加
+- `spec-dock/active/issue/report.md` - failed review findings / fixes / current status evidence を記録
+
+---
+
+### Implementation Execution Ledger
 
 #### Step Contract Closure
 | step | closure ids | close condition | evidence | result | notes |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001, tc-002, tc-003, tc-004, tc-005 | Runtime update command tests pass and fixed upstream no-cache subprocess contract is implemented | `python -m unittest tests.cli_runtime.test_update -v` -> OK, 6 tests; `python -m unittest tests.cli_runtime.test_wrappers -v` -> OK, 6 tests; fresh `code-reviewer` pass | implemented / review passed | S01 only; commit gate pending |
+| S02 | tc-006 | README / shipped docs parity is updated or valid approved-no-op is justified | Not started | not started | Blocked until S01 and design/plan spec-reviewer pass |
+| S03 | tc-007 | Dogfooding mirror is refreshed/inspected and local `update --help` passes | Not started | not started | Blocked until S01/S02 and write-capable delegation consent gate |
 
 #### Test Contract Closure
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Central index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+| tc-001 | S01 | yes | red-required | Current runtime had no `update` command before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_help_describes_upstream_no_cache_and_default_target` confirms help mentions update, `uvx --no-cache`, fixed upstream source, and default cwd target |
+| tc-002 | S01 | yes | red-required | Current runtime had no default-target update command before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_runs_uvx_no_cache_with_default_target` uses hermetic `uvx` stub and captures fixed args ending with resolved cwd |
+| tc-003 | S01 | yes | red-required | Current runtime had no explicit-target update command before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_passes_explicit_target_to_installer_update` confirms explicit relative target resolves from runtime cwd |
+| tc-004 | S01 | yes | red-required | Current runtime had no subprocess failure propagation path before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_propagates_subprocess_failure_output_and_exit_code` preserves stdout, stderr, and exit code 7 from stub |
+| tc-005 | S01 | yes | red-required | Current runtime had no `uvx` missing / unsupported force behavior before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_missing_uvx_fails_with_actionable_error` and `test_update_rejects_force_option` fail closed without live network |
+| tc-006 | S02 | yes | inspect-only | Current README has installer uvx update guidance but not repo-local self-update guidance | docs diff and relevant docs/scaffold tests | not started | Docs parity planned |
+| tc-007 | S03 | yes | inspect-only | Local dogfooding mirror may be stale until provider assets are refreshed | `python -m spec_dock.cli update .`; `./spec-dock/scripts/spec-dock update --help` | not started | Dogfooding mirror planned |
 
 #### Closure Coverage
 | closure id | step | verification evidence | result | notes |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Help contract covered |
+| tc-002 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Default target fixed subprocess args covered |
+| tc-003 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Explicit target path forwarding covered |
+| tc-004 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Subprocess stdout/stderr/exit propagation covered |
+| tc-005 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Missing `uvx` and unsupported `--force` covered |
+| tc-006 | S02 | Not started | not started | Blocked until docs step |
+| tc-007 | S03 | Not started | not started | Blocked until dogfooding mirror step |
 
 #### Closure Delta
 | change | closure id | test id alias | resolves to closure id | reason | re-review required |
 |---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no |
+| added | tc-007 | tc-007 | tc-007 | Fresh spec-reviewer found dogfooding mirror verification gap required by AC-005 / dogfooding rules | yes |
 
 #### Implementation Delegation Gate
 | step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
 |---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | pass / fail / blocked | no delegation rationale / degraded reason |
+| S01 | delegated | runtime CLI, shipped scaffold, and integration tests cross multiple files/layers | dev-coder | Add runtime update command and tests after plan gate pass | implemented; targeted verification passed | N/A |
+| S02 | planned delegated | persistent README / shipped docs changes are outside main-agent direct edit boundary | doc-writer | Update docs parity after S01 contract is implemented | not started | N/A |
+| S03 | planned delegated or approved-local-execution for command-only inspection | dogfooding mirror refresh touches generated scaffold mirror; command-only inspection may be local if no generated files change | dev-coder or N/A | Refresh/inspect local dogfooding mirror after S01/S02 | not started | N/A |
 
 #### Code Review Gate
 | step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
 |---|---|---|---|---|---|---|
-| S01 | code-reviewer | step diff / tests / docs-report updates | pass / fail | ... | 0 | pass / blocked |
+| S01 | code-reviewer | S01 runtime command, tests, report evidence | pass | No findings. Reviewer confirmed command registration, fixed no-cache uvx invocation, cwd-based target resolution, stdout/stderr/exit propagation, `--force` rejection, and hermetic tests | 0 | pass |
+| S02 | code-reviewer | S02 docs diff, tests if any, report evidence | not started | N/A | 0 | blocked until docs update |
+| S03 | code-reviewer | S03 generated mirror diff and report evidence | not started | N/A | 0 | blocked until dogfooding mirror step |
 
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### 2026-05-14 HH:MM - HH:MM
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
+| S01 | verification passed / not committed | Runtime command + tests + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
+| S02 | not started | Docs parity + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
+| S03 | not started | Dogfooding mirror refresh/inspection + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
 
 ## Final Quality Gate (必須)
 
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | pending inspection after S01/S02 | doc-writer when updates are required | Not started | blocked until implementation steps complete |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue test adequacy | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue test adequacy | pending | Not started | blocked until S90 complete |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | Not started | 0 | blocked until S90 complete |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | Not started | 0 | blocked until final QA and code review pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| Final closure, review, validation, and commit scope ledger | Final report ledger and any final gate fixes | final response; PR / issue comment only if explicitly requested later | blocked until final gates pass |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `design.md` と `plan.md` がテンプレート状態で implementation-ready ではなかった。
+  - 解決: spec authoring workflow に戻し、Issue 固有の design / plan / closure index / step-local concrete test cases を作成した。
 
 ## 学んだこと (任意)
-- ...
-- ...
+- Runtime self-update は installer update の再実装ではなく、fixed upstream no-cache subprocess wrapper として扱うのが最小境界になる。
 
 ## 今後の推奨事項 (任意)
-- ...
-- ...
+- Design / plan spec-reviewer pass 後、S01 は `dev-coder` へ bounded implementation として委任する。
+- S02 は persistent docs change のため `doc-writer` に委任する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
