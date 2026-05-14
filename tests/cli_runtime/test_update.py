@@ -95,6 +95,28 @@ class UpdateCommandTests(CliRuntimeHarness):
             self.assertNotEqual(p.returncode, 0)
             self.assertIn("unrecognized arguments: --force", p.stderr)
 
+    def test_update_rejects_source_and_cache_overrides_without_invoking_uvx(self) -> None:
+        cases = (
+            (["update", "--from", "git+https://example.invalid/spec-dock"], "--from"),
+            (["update", "--cache-dir", ".uv-cache"], "--cache-dir"),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            bin_dir = target / ".test-bin"
+            args_log = target / "uvx-args.txt"
+            self._make_uvx_stub(bin_dir, args_log=args_log)
+
+            for args, rejected_option in cases:
+                with self.subTest(args=args):
+                    args_log.unlink(missing_ok=True)
+
+                    p = self._run_runtime_capture(target, args, env={"PATH": str(bin_dir)})
+
+                    self.assertNotEqual(p.returncode, 0)
+                    self.assertIn(f"unrecognized arguments: {rejected_option}", p.stderr)
+                    self.assertFalse(args_log.exists(), "uvx must not be invoked for rejected options")
+
     def _make_uvx_stub(
         self,
         bin_dir: Path,
