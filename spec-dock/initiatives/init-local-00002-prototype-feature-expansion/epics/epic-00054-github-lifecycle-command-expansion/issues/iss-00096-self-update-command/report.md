@@ -196,7 +196,7 @@ spec-dock: ok (validate) nodes=41
 | step | closure ids | close condition | evidence | result | notes |
 |---|---|---|---|---|---|
 | S01 | tc-001, tc-002, tc-003, tc-004, tc-005 | Runtime update command tests pass and fixed upstream no-cache subprocess contract is implemented | `python -m unittest tests.cli_runtime.test_update -v` -> OK, 6 tests; `python -m unittest tests.cli_runtime.test_wrappers -v` -> OK, 6 tests; fresh `code-reviewer` pass | implemented / review passed | S01 only; commit gate pending |
-| S02 | tc-006 | README / shipped docs parity is updated or valid approved-no-op is justified | Not started | not started | Blocked until S01 and design/plan spec-reviewer pass |
+| S02 | tc-006 | README / shipped docs parity is updated or valid approved-no-op is justified | `rg -n "scripts/spec-dock update|uvx --no-cache|spec-dock update" README.md src/spec_dock/assets/spec_dock` -> updated docs hits present; `python -m unittest tests.cli_runtime.test_wrappers -v` -> OK, 6 tests; fresh `code-reviewer` pass | implemented / review passed | README, shipped templates README, docs README, and GitHub reference now document repo-local no-cache self-update path |
 | S03 | tc-007 | Dogfooding mirror is refreshed/inspected and local `update --help` passes | Not started | not started | Blocked until S01/S02 and write-capable delegation consent gate |
 
 #### Test Contract Closure
@@ -207,7 +207,7 @@ spec-dock: ok (validate) nodes=41
 | tc-003 | S01 | yes | red-required | Current runtime had no explicit-target update command before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_passes_explicit_target_to_installer_update` confirms explicit relative target resolves from runtime cwd |
 | tc-004 | S01 | yes | red-required | Current runtime had no subprocess failure propagation path before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_propagates_subprocess_failure_output_and_exit_code` preserves stdout, stderr, and exit code 7 from stub |
 | tc-005 | S01 | yes | red-required | Current runtime had no `uvx` missing / unsupported force behavior before S01 implementation; characterized by issue requirement/design | `python -m unittest tests.cli_runtime.test_update -v` | pass | `test_update_missing_uvx_fails_with_actionable_error` and `test_update_rejects_force_option` fail closed without live network |
-| tc-006 | S02 | yes | inspect-only | Current README has installer uvx update guidance but not repo-local self-update guidance | docs diff and relevant docs/scaffold tests | not started | Docs parity planned |
+| tc-006 | S02 | yes | inspect-only | Current README had installer uvx update guidance but not repo-local self-update guidance | `rg -n "scripts/spec-dock update|uvx --no-cache|spec-dock update" README.md src/spec_dock/assets/spec_dock` -> updated docs hits present; `python -m unittest tests.cli_runtime.test_wrappers -v` -> OK, 6 tests | pass | Docs now state `./spec-dock/scripts/spec-dock update [path]`, fixed upstream `git+https://github.com/chemitaro/spec-dock`, mandatory `uvx --no-cache`, default current-directory target, explicit target path, and non-migration / non-`init --force` semantics |
 | tc-007 | S03 | yes | inspect-only | Local dogfooding mirror may be stale until provider assets are refreshed | `python -m spec_dock.cli update .`; `./spec-dock/scripts/spec-dock update --help` | not started | Dogfooding mirror planned |
 
 #### Closure Coverage
@@ -218,7 +218,7 @@ spec-dock: ok (validate) nodes=41
 | tc-003 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Explicit target path forwarding covered |
 | tc-004 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Subprocess stdout/stderr/exit propagation covered |
 | tc-005 | S01 | `python -m unittest tests.cli_runtime.test_update -v` | pass | Missing `uvx` and unsupported `--force` covered |
-| tc-006 | S02 | Not started | not started | Blocked until docs step |
+| tc-006 | S02 | docs diff inspection; `rg -n "scripts/spec-dock update|uvx --no-cache|spec-dock update" README.md src/spec_dock/assets/spec_dock`; `python -m unittest tests.cli_runtime.test_wrappers -v` -> OK, 6 tests | pass | Docs parity implemented for S02 scope |
 | tc-007 | S03 | Not started | not started | Blocked until dogfooding mirror step |
 
 #### Closure Delta
@@ -230,21 +230,21 @@ spec-dock: ok (validate) nodes=41
 | step | decision | required reason | agent role | delegated scope | result | local-execution rationale |
 |---|---|---|---|---|---|---|
 | S01 | delegated | runtime CLI, shipped scaffold, and integration tests cross multiple files/layers | dev-coder | Add runtime update command and tests after plan gate pass | implemented; targeted verification passed | N/A |
-| S02 | planned delegated | persistent README / shipped docs changes are outside main-agent direct edit boundary | doc-writer | Update docs parity after S01 contract is implemented | not started | N/A |
+| S02 | delegated | persistent README / shipped docs changes are outside main-agent direct edit boundary | doc-writer | Update docs parity after S01 contract is implemented | implemented / local verification passed | N/A |
 | S03 | planned delegated or approved-local-execution for command-only inspection | dogfooding mirror refresh touches generated scaffold mirror; command-only inspection may be local if no generated files change | dev-coder or N/A | Refresh/inspect local dogfooding mirror after S01/S02 | not started | N/A |
 
 #### Code Review Gate
 | step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
 |---|---|---|---|---|---|---|
 | S01 | code-reviewer | S01 runtime command, tests, report evidence | pass | No findings. Reviewer confirmed command registration, fixed no-cache uvx invocation, cwd-based target resolution, stdout/stderr/exit propagation, `--force` rejection, and hermetic tests | 0 | pass |
-| S02 | code-reviewer | S02 docs diff, tests if any, report evidence | not started | N/A | 0 | blocked until docs update |
+| S02 | code-reviewer | S02 docs diff, tests if any, report evidence | pass | No findings. Reviewer confirmed repo-local update path, default/explicit target, fixed no-cache upstream wrapper, unsupported options, and non-migration wording | 0 | pass |
 | S03 | code-reviewer | S03 generated mirror diff and report evidence | not started | N/A | 0 | blocked until dogfooding mirror step |
 
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
 | S01 | verification passed / not committed | Runtime command + tests + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
-| S02 | not started | Docs parity + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
+| S02 | verification passed / not committed | Docs parity + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
 | S03 | not started | Dogfooding mirror refresh/inspection + report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
 
 ## Final Quality Gate (必須)
