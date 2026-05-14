@@ -65,6 +65,10 @@ ID: "iss-00096"
     - 依存: S03 dogfooding mirror confirmation
     - unblock: S90 docs impact resolution, S99 final quality gate
     - 対象ファイル: `tests/test_init_update.py`
+  - S05:
+    - 依存: final QA P2 hardening finding
+    - unblock: final issue-wide code/spec review
+    - 対象ファイル: `tests/cli_runtime/test_update.py`
 
 ## ステップ一覧
 - S01:
@@ -95,6 +99,13 @@ ID: "iss-00096"
   - 対象ファイル: `tests/test_init_update.py`
   - 閉じる要件: AC-005 dogfooding validation parity
   - レビューゲート: per-step `code-reviewer` pass before commit
+- S05:
+  - 観測可能な振る舞い: source/cache override forms for runtime `update` fail closed and do not invoke `uvx`.
+  - 依存: final QA P2 hardening finding
+  - unblock: final issue-wide code/spec review
+  - 対象ファイル: `tests/cli_runtime/test_update.py`
+  - 閉じる要件: EC-001, EC-004, fixed upstream / no arbitrary source / no cache-control option constraints
+  - レビューゲート: per-step `code-reviewer` pass before commit
 - S90:
   - 観測可能な振る舞い: docs / templates / README / workflow / skill / migration notes impact is resolved or explicitly justified as no update.
   - 閉じる要件: docs impact portion of AC-005
@@ -117,6 +128,7 @@ ID: "iss-00096"
 - EC-004 -> S01
 - EC-005 -> S01
 - no-cache / fixed upstream / fail-closed / no arbitrary source / no force semantics -> S01, S02
+- no arbitrary source / no cache-control option hardening -> S05
 
 ## Spec-Locked Closure Index（仕様固定クロージャ索引）
 
@@ -130,6 +142,7 @@ ID: "iss-00096"
 | tc-006 | S02 | docs parity | acceptance | AC-005 | README and shipped docs/templates explain repo-local update command, no-cache, fixed upstream source, and target default consistently | docs diff and generated scaffold docs inspection | docs teach stale-cache or installer-only path while runtime supports self-update | yes | inspect-only | docs diff; S90 spec-reviewer docs alignment |
 | tc-007 | S03 | dogfooding mirror confirmation | acceptance | AC-005, dogfooding rules | local dogfooding mirror is refreshed or inspected, and `./spec-dock/scripts/spec-dock update --help` exposes the new command without live upstream update | provider asset changes after S01/S02; local dogfooding workspace in this repo | provider source passes tests but local consumer mirror remains stale | yes | inspect-only | local installer update / mirror diff / help evidence in report |
 | tc-008 | S04 | dogfooding metadata snapshot parity | regression | AC-005, dogfooding rules | checked-in dogfooding metadata snapshot includes `iss-00096-self-update-command/.meta.json` with empty `depends_on` snapshot | full-suite failure in `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; active issue `.meta.json` has no `depends_on` | dogfooding validation fails even though current issue metadata is intentionally checked in | yes | regression-required | `tests/test_init_update.py`; targeted snapshot test; full unittest discover |
+| tc-009 | S05 | source/cache override rejection | negative | EC-001, EC-004, constraints | runtime `update --from <source>` and `update --cache-dir <path>` fail closed before subprocess execution | hermetic managed repo with `uvx` stub and args log | future parser exposes arbitrary source or cache override while core subprocess tests still pass | yes | regression-required | `tests/cli_runtime/test_update.py`; targeted update test |
 
 ## レビュー / QA ゲート方針
 - RG1 S01 implementation review:
@@ -174,7 +187,7 @@ ID: "iss-00096"
 - Each implementation step must close its referenced closure ids through `Step Contract Closure`, `Test Contract Closure`, and `Closure Coverage`.
 - Each implementation step must record `Implementation Delegation Gate`.
 - Each implementation step must reach fresh `code-reviewer` pass before commit.
-- Each implementation step is one commit. Do not mix S01, S02, S03, and S04 in the same commit unless this plan is amended and re-reviewed first.
+- Each implementation step is one commit. Do not mix S01, S02, S03, S04, and S05 in the same commit unless this plan is amended and re-reviewed first.
 
 ## 実装ステップ
 
