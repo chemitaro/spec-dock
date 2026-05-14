@@ -20,12 +20,13 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 ## authoring lifecycle
 
 1. 対象 scope と既存 node を確認する。
-2. 対象 scope の `workflow_*.md` と phase playbook を読む。
-3. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。
-4. 対象 artifact を更新する。
-5. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
-6. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
-7. `pass` なら `report.md` に gate evidence を残し、次 phase へ進む。
+2. 対象 artifact に対応する `docs/authoring/<scope>-<phase>.md` がある場合は最初に読む。
+3. 対象 scope の `workflow_*.md` と phase playbook を読む。
+4. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。
+5. 対象 artifact を更新する。
+6. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
+7. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
+8. `pass` なら `report.md` に gate evidence を残し、次 phase へ進む。
 
 ## requirement gate
 
@@ -46,6 +47,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - reviewer-pass 済み requirement / design を前提にする。
 - 分解、順序、依存、検証、review gate、完了条件、downstream handoff を固定する。
 - 未解決設計論点や未承認 requirement を plan に先送りしない。
+- Issue plan は `docs/authoring/issue-plan.md` の concrete test case contract に従い、各 implementation step に step-local な `具体テストケース一覧` を置く。
 - `spec-reviewer` は plan が requirement / design と矛盾せず、次工程へ安全に渡せることを確認する。
 
 ## downstream handoff

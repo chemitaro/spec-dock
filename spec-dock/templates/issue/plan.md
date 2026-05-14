@@ -62,7 +62,7 @@ ID: "<ISS_ID>"
 
 ## Spec-Locked Closure Index（仕様固定クロージャ索引）
 
-> これは Issue 全体のテストケース一覧ではなく、エージェントが仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の test contract と close 条件は各 step の `step closure contract` に置く。private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
+> これは Issue 全体のテストケース一覧ではなく、エージェントが仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の test contract と close 条件は各 step の `step closure contract` に置く。具体テストケース本文は各 implementation step の `具体テストケース一覧` にカード型ネストリストで置く。private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
 
 | id | phase / step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -83,6 +83,7 @@ ID: "<ISS_ID>"
 - 詳細化方針:
   - 通常 Issue は step / behavior slice ごとに 1〜3 件程度の検証契約を書く。
   - 中央 index は重複するテストケース表にせず、仕様ロック、担当 step、required、evidence level、closure evidence だけを追う。
+  - 具体テストケース本文は横長 table にせず、各 step の `具体テストケース一覧` にネストリストで書く。
   - public CLI behavior、shipped scaffold / runtime contract、template / system docs の互換性、installer / update / migration、filesystem / GitHub / active store、negative path、既存 regression、複数 Agent 並列実装の領域では詳細化する。
 
 ## レビュー / QA ゲート方針
@@ -106,6 +107,7 @@ ID: "<ISS_ID>"
 - plan 本文には、この Issue 固有の順序、依存、検証、review / QA gate だけを書く。
 - 各 implementation step は commit 単位として設計し、`code-reviewer gate` を pass してから `commit gate` で閉じる。
 - `approved-no-op` は差分なしの場合だけ許可し、理由、確認対象、差分なし確認コマンドを report に残す。
+- implementation step を追加する場合は S01 の subsections を複製し、`具体テストケース一覧`、`step closure contract`、`behavior slice execution`、`step gate` を各 step に必ず置く。
 
 ## 実装ステップ
 
@@ -134,6 +136,28 @@ ID: "<ISS_ID>"
   - negative:
 - pre-implementation evidence:
   - expected red / characterization pass / test sensitivity evidence:
+
+#### 具体テストケース一覧
+
+- `tc-s01-001` acceptance: <短い説明>
+  - 前提: ...
+  - 操作: ...
+  - 期待結果: ...
+  - 失敗検出: ...
+  - 検証方法: ...
+  - 関連 closure id: tc-001
+
+- `tc-s01-002` negative: <短い説明>
+  - 前提: ...
+  - 操作: ...
+  - 期待結果: ...
+  - 失敗検出: ...
+  - 検証方法: ...
+  - 関連 closure id: tc-002
+
+- docs-only / approved-no-op step の場合:
+  - テスト不要理由: ...
+  - 代替検証方法: ...
 - report draft update before review:
   - verification / closure / review intent evidence to include in the step diff:
 - notes:
@@ -193,7 +217,8 @@ ID: "<ISS_ID>"
   - clean check result:
 
 ### Sxx — <next observable behavior>
-- ...
+- S01 の subsections を複製して記入する。
+- `具体テストケース一覧`、`step closure contract`、`behavior slice execution`、`step gate` がない implementation step は implementation-ready ではない。
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
