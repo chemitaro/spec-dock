@@ -74,6 +74,14 @@ Issue は実装の最小単位です。
 - Issue design では [phase_design.md](phase_design.md) に従い、必要な粒度で依存関係分析、`Module Dependency Diagram`、Linux `tree` style の `ディレクトリ / ファイル変更計画` を置く
 - Issue plan では [phase_plan_issue.md](phase_plan_issue.md) に従い、design の依存関係分析、module dependency diagram、directory / file change plan から step 順を導く
 
+## workflow-scoped delegation consent
+
+- Issue workflow の開始時、または reviewer / specialist sub-agent を初めて起動する前に、active issue scope の issue-scoped workflow delegation consent を確認し、`report.md` に記録する。
+- consent scope は current repo/worktree、active issue、current session、named reviewer / read-only specialist role に限定する。現在のユーザー指示がこの scope の自律委任を明示している場合は consent として扱える。
+- consent がある場合、orchestrator は同一 issue / repo / session / named role の範囲で、`spec-reviewer`、`code-reviewer`、`qa-reviewer`、および必要な read-only specialist を phase ごとに再確認せず起動してよい。
+- consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation、browser/private external systems の利用を許可しない。これらが必要な場合は別途明示確認する。
+- consent がない、または host policy と衝突する場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
+
 ## 実行 contract
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
@@ -88,7 +96,9 @@ Issue は実装の最小単位です。
 - `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを記録し、failing-first を完全要求できない場合もテストが欠陥を検出できる根拠を残す
 - `Implementation Delegation Gate` は各 implementation step の開始前に必ず置く。step が複数 layer / module / package にまたがる、runtime / CLI / infra / templates / shipped scaffold / shared docs に影響する、既存 pattern 調査や影響範囲分析が必要、integration test / migration / backward compatibility / filesystem / GitHub / active state に関わる、または独立 worker scope に分割できる大きさの場合は、適切なサブエージェント利用を必須にする
 - `delegated` の場合は sub-agent role、scope、依頼内容、戻り値、取り込み結果を `report.md` に残す。`approved-local-execution` は小さい単一ファイル修正、機械的文言修正、明確な localized change、または即時 blocking / tightly coupled で main agent が担当すべき場合だけ許可し、条件付き必須に該当しない理由を `no delegation rationale` として残す
-- サブエージェント機能が利用できない環境では degraded mode とし、利用不能理由、代替確認、追加した verification / review evidence を `report.md` に残す。degraded mode は reviewer gate の省略理由にはならない
+- reviewer gate state は `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` のいずれかで記録する。required reviewer gate を満たすのは fresh `passed` だけである
+- `waived` はユーザーの明示的 risk acceptance が `report.md` にある場合だけ許可する。`provisional` は orchestrator self-check の記録であり、`spec-reviewer` / `code-reviewer` / `qa-reviewer` の代替ではない
+- サブエージェント機能が利用できない、拒否された、または host policy と衝突する場合、required reviewer gate は `unavailable` / `denied` として blocked / 未完了に分類する。degraded mode は status/context gathering や追加 verification に限定し、reviewer gate、implementation readiness、final quality gate を満たさない
 - `bounded implementation batch` は step の scope、allowed files、forbidden scope に収まる最小実装単位とする
 - `refactor/tidy` は verification 後の bounded decision point とし、plan では詳細 task を事前確定しない
 - step 順は `design.md` の依存関係分析、module dependency diagram、directory / file change plan を根拠に、upstream / prerequisite から downstream へ組む
@@ -111,7 +121,7 @@ Issue は実装の最小単位です。
 - `qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer` のいずれかが `fail` の場合は修正し、該当 reviewer を再実行して `pass` まで回す
 - 三者すべての final gate が `pass` した後、final report ledger に各 step の closure、三者 final review、final commit scope、post-commit external evidence の記録先を更新し、final commit を作成する。final commit の hash と clean check は final commit 後にしか確定できないため、committed `report.md` 内の必須記録ではなく、最終応答、PR、issue comment などの external delivery evidence として残す
 - route だけ、または manual `active set` だけでは Issue work は完了しない。通常の開始/終了は `issue start` / `issue finish` を使う
-- `complete` と報告してよいのは、`issue finish` 前に active issue が set されその対象 issue を確認できる状態で、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、各 implementation step の `Implementation Delegation Gate` が `delegated` / `approved-local-execution` / degraded mode のいずれかで閉じている証跡、required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved-no-op として閉じている証跡、全 implementation step が `committed` または正当な `approved-no-op` で閉じている証跡、final docs impact resolved、final `qa-reviewer` pass、issue-wide `code-reviewer` pass、final `spec-reviewer` pass、final report ledger が記録済みであり、final commit 済みと意図しない staged / unstaged 変更なしの post-commit external delivery evidence を確認している場合のみである
+- `complete` と報告してよいのは、`issue finish` 前に active issue が set されその対象 issue を確認できる状態で、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、各 implementation step の `Implementation Delegation Gate` が `delegated` / `approved-local-execution` / degraded mode のいずれかで閉じている証跡、required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved-no-op として閉じている証跡、全 implementation step が `committed` または正当な `approved-no-op` で閉じている証跡、final docs impact resolved、final `qa-reviewer` pass、issue-wide `code-reviewer` pass、final `spec-reviewer` pass、final report ledger が記録済みであり、final commit 済みと意図しない staged / unstaged 変更なしの post-commit external delivery evidence を確認している場合のみである。ここで degraded mode は implementation delegation availability の証跡に限られ、required reviewer gate pass ではない
 - 4 点の issue docs のいずれかが untouched、template、placeholder、または実質未記入の状態で残る場合は `未完了` であり、成功報告をしてはならない
 - required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step code review / step commit / final QA review / issue-wide code review / final spec review / final commit）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
 - `blocked` は、外部依存、権限不足、サービス停止、その他の環境条件によって次の required action を進められない状態を指す
@@ -128,6 +138,8 @@ Issue は実装の最小単位です。
 - `Closure Coverage` に各 required closure id と verification evidence の対応を残す
 - `Closure Delta` に追加・削除・変更・未実装 row と re-review 要否を残す
 - `Implementation Delegation Gate` に step、decision、required reason、agent role、delegated scope、result、local-execution rationale を残す。`delegated` の場合は依頼内容、戻り値、取り込み結果を追跡し、`approved-local-execution` の場合は no delegation rationale を残す
+- `Workflow Delegation Consent` に consent source、repo/worktree、active issue、session、named roles、boundary、expires / invalidation condition、`denied` / `unavailable` の場合の reason と next action を残す
+- `Reviewer Gate Status` に gate name、reviewer role、freshness、state（`passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional`）、risk acceptance の有無、promotion / completion decision を残す
 - `Step Commit Gate` に step、review scope、`code-reviewer` verdict、commit scope、closure state、commit evidence、post-commit clean check を残す
 - `Final QA Gate` に `qa-reviewer` verdict、テスト十分性、integration test 追加要否、追加した場合の evidence を残す
 - `Final Code Review Gate` に issue-wide `code-reviewer` verdict、統合 diff scope、修正と re-review の evidence を残す

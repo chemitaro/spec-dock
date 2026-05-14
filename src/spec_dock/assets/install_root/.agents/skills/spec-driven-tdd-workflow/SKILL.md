@@ -11,6 +11,8 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 - Put spec authoring rules and workflow explanations in `spec-dock/docs/` and route through these skills.
 - Use `spec-dock/docs/workflow_spec_authoring.md` as the source of truth for requirement / design / plan phase promotion across Initiative, Epic, and Issue.
 - In spec authoring mode, each artifact must pass a fresh `spec-reviewer` (`review_status: pass`) before the next phase starts; fix findings and re-run a fresh reviewer until pass.
+- In spec authoring or issue execution mode, honor workflow-scoped delegation consent before routing reviewer work: if the current user request or active report evidence grants issue-scoped consent, the orchestrator may invoke named reviewer / read-only specialist roles within that scope without per-phase confirmation.
+- Missing, stale, failed, unavailable, denied, waived, or provisional reviewer results are not `review_status: pass`. Do not route to implementation or completion by treating them as degraded success.
 - Agents may add, remove, merge, reorder, or rewrite template sections when it improves correctness, human understanding, or agent executability for the specific project.
 - Use `spec-dock/docs/phase_design.md` as the source of truth for optional diagram choices. Add useful UML / PlantUML / table sections from the catalog, or project-specific sections outside the catalog, when they clarify structure, boundaries, responsibility, flow, state, or dependency.
 - Route once the main output is clear; leaf skills own the workflow details.

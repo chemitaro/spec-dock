@@ -18,7 +18,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/pr
 # Overwrite managed files if 'spec-dock' already exists
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
 
-# Update managed files (docs/templates/scripts/skills only; not an in-place migration tool)
+# Installer-level refresh of managed files (docs/templates/scripts/skills only)
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
 ```
 
@@ -45,10 +45,10 @@ uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
 uvx --from ~/src/spec-dock spec-dock update
 ```
 
-`spec-dock update` refreshes managed files/docs/templates/scripts/skills, but it does **not**
-guarantee in-place migration of older workspaces. If an older tree still has legacy `meta.json`,
-partial linkage, or current-repo mismatches, current runtime commands may reject/fail-fast; normalize
-manually or rebuild the workspace instead of expecting auto-migration.
+`spec-dock update` refreshes managed files/docs/templates/scripts/skills, but it is not `init --force`
+and does **not** guarantee in-place migration of older workspaces. If an older tree still has legacy
+`meta.json`, partial linkage, or current-repo mismatches, current runtime commands may
+reject/fail-fast; normalize manually or rebuild the workspace instead of expecting auto-migration.
 
 Troubleshooting:
 - If `.spec-dock/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
@@ -116,9 +116,24 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 # Validate the spec tree structure
 ./spec-dock/scripts/spec-dock validate
+
+# Refresh this managed repo from the fixed upstream package (target defaults to the current directory)
+./spec-dock/scripts/spec-dock update
+
+# Or refresh an explicit managed repo path
+./spec-dock/scripts/spec-dock update /path/to/project
 ```
 
 Notes:
+- `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
+  installer update command by running
+  `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.
+  The target defaults to the current working directory, and an explicit path is resolved before it is
+  passed to the installer.
+- Runtime update always uses the fixed upstream `git+https://github.com/chemitaro/spec-dock` source
+  with `uvx --no-cache`; it does not expose arbitrary package source, cache, or `--force` options.
+- Runtime update refreshes managed files through installer update. It is not `init --force` and is
+  not an automatic migration tool for legacy or incompatible workspaces.
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
 - Legacy sequential discussion docs are grandfathered only. New docs do not reuse legacy sequence names, and spec-dock does not auto-rename or auto-repair them to preserve forced backward compatibility.
 - Normal issue execution should use `issue start <target>` / `issue finish` as the primary path. Use `issue start <target> -f` / `--force` only to bypass the unfinished active issue guard; dependency readiness still applies.
