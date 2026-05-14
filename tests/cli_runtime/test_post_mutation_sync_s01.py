@@ -112,15 +112,16 @@ class PostMutationSyncS01Tests(unittest.TestCase):
         self.assertEqual(outcome.fatal_warnings, ["gh_fetch_failed"])
         self.assertTrue(any("gh_fetch_failed" in line for line in outcome.guidance))
 
-    def test_tc_s01_005_gh_index_incomplete_warning_is_failed(self) -> None:
+    def test_tc_s01_005_gh_index_incomplete_warning_is_non_fatal(self) -> None:
         app_contracts, _app_sync_state, domain_models = _runtime_modules()
         result = _sync_result(app_contracts, domain_models, warnings=["gh_index_incomplete"])
 
         outcome = app_contracts.PostMutationSyncOutcome.from_sync_result(result)
 
-        self.assertTrue(outcome.failed)
-        self.assertEqual(outcome.fatal_warnings, ["gh_index_incomplete"])
-        self.assertTrue(any("gh_index_incomplete" in line for line in outcome.guidance))
+        self.assertFalse(outcome.failed)
+        self.assertEqual(outcome.warnings, ["gh_index_incomplete"])
+        self.assertEqual(outcome.fatal_warnings, [])
+        self.assertEqual(outcome.guidance, [])
 
     def test_tc_s01_006_request_policy_uses_github_no_branch_update_and_no_migrate(self) -> None:
         app_contracts, app_sync_state, domain_models = _runtime_modules()
