@@ -3539,8 +3539,11 @@ class TestRuntimeSyncS07(unittest.TestCase):
         success = app_contracts.PostMutationSyncOutcome.from_sync_result(
             self._s06_sync_result(app_contracts, domain_models)
         )
-        failure = app_contracts.PostMutationSyncOutcome.from_sync_result(
+        non_fatal_warning = app_contracts.PostMutationSyncOutcome.from_sync_result(
             self._s06_sync_result(app_contracts, domain_models, warnings=["gh_index_incomplete"])
+        )
+        failure = app_contracts.PostMutationSyncOutcome.from_sync_result(
+            self._s06_sync_result(app_contracts, domain_models, warnings=["gh_fetch_failed"])
         )
         delete_args = delete_cmd.DeleteArgs(
             positional_target="iss-00093",
@@ -3568,11 +3571,19 @@ class TestRuntimeSyncS07(unittest.TestCase):
         self.assertEqual(success_payload["post_sync"]["status"], "success")
         self.assertFalse(success_payload["post_sync"]["failed"])
 
+        warning_outcome = delete_cmd._run_delete(delete_args, _UseCases(non_fatal_warning))
+        warning_payload = json.loads(warning_outcome.text.stdout_lines[0])
+        self.assertEqual(warning_outcome.exit_code, 0)
+        self.assertEqual(warning_payload["post_sync"]["status"], "success")
+        self.assertFalse(warning_payload["post_sync"]["failed"])
+        self.assertEqual(warning_payload["post_sync"]["warnings"], ["gh_index_incomplete"])
+        self.assertEqual(warning_payload["post_sync"]["fatal_warnings"], [])
+
         failure_outcome = delete_cmd._run_delete(delete_args, _UseCases(failure))
         failure_payload = json.loads(failure_outcome.text.stdout_lines[0])
         self.assertEqual(failure_outcome.exit_code, 1)
         self.assertEqual(failure_payload["post_sync"]["status"], "failed")
-        self.assertEqual(failure_payload["post_sync"]["fatal_warnings"], ["gh_index_incomplete"])
+        self.assertEqual(failure_payload["post_sync"]["fatal_warnings"], ["gh_fetch_failed"])
         self.assertTrue(any("mutation succeeded" in line for line in failure_payload["post_sync"]["recovery_guidance"]))
 
     def test_tc_s06_004_mutation_parser_help_exposes_no_auto_sync_opt_out(self) -> None:

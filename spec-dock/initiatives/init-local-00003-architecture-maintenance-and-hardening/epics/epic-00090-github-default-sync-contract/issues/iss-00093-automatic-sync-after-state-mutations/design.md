@@ -78,7 +78,8 @@ ID: "iss-00093"
   - 対象 mutation の post-mutation sync request は `github_enabled=True`、`issue_limit=10000`、`force=False`、`update_active_from_branch=False` とする。
   - `update_active_from_branch=False` は全対象 mutation に適用する。目的は artifact refresh であり、active inference ではないため。これにより `issue finish` 後の active clear を維持する。
   - `deps add/remove` が `unchanged` の場合は source-of-truth が変わらないため post-mutation sync を skip し、CLI で更新済み扱いをしない。
-  - post-mutation sync では、既存 sync が warning として扱う `gh_fetch_failed` と `gh_index_incomplete` を failure predicate に含める。対象 mutation 後の GitHub 状態取得が不完全な場合、artifact write が成功していても command exit code は `1` にする。
+  - post-mutation sync では、既存 sync が warning として扱う `gh_fetch_failed` を failure predicate に含める。対象 mutation 後の GitHub 状態取得自体に失敗した場合、artifact write が成功していても command exit code は `1` にする。
+  - `gh_index_incomplete` は `issue list` の索引不足を示す warning として保持するが、per-issue fetch で補完できる経路があるため post-mutation fatal warning には含めない。
   - `close_node` は command から直接呼ばれる場合だけ post-mutation sync する。`issue_finish` から内部利用される close では post-mutation sync を抑止し、`clear_active()` 後に `issue_finish` が lifecycle-owned sync を1回だけ実行する。
 
 ## 依存関係分析
@@ -195,7 +196,7 @@ CmdIssue --> CliText : render + exit by post-sync
   - `skipped_reason`: `str | None`
   - `exception_reason`: `str | None`
   - `failed`: `exception_reason is not None`、`sync_result.artifact_failure is not None`、または `sync_result.state.warnings` に post-mutation fatal warning が含まれる場合に `true`
-  - `fatal_warning_codes`: `["gh_fetch_failed", "gh_index_incomplete"]`
+  - `fatal_warning_codes`: `["gh_fetch_failed"]`
   - `warnings`: sync warnings plus post-sync-specific warning codes
   - `guidance`: recovery guidance lines for CLI / JSON payload
 - Result 型:
@@ -216,7 +217,8 @@ CmdIssue --> CliText : render + exit by post-sync
   - Failure:
     - helper は mutation 成功後に呼ばれるため、`sync_state.sync()` / `_sync_impl()` が `SyncCommandResult` を返さず例外を投げた場合も捕捉し、`PostMutationSyncOutcome(sync_result=None, exception_reason=str(error), failed=True, guidance=[...])` として返す。mutation 本体の成功は取り消さない。
     - sync が `artifact_failure` を返した場合、mutation result には mutation success と sync failure の両方を保持する。
-    - sync の `state.warnings` に `gh_fetch_failed` または `gh_index_incomplete` が含まれる場合、post-mutation sync failure として扱う。これは requirement の「GitHub issue の最新状態取得」を満たせなかった状態であり、通常の manual `sync` warning とは別に command failure へ昇格する。
+    - sync の `state.warnings` に `gh_fetch_failed` が含まれる場合、post-mutation sync failure として扱う。これは requirement の「GitHub issue の最新状態取得」を満たせなかった状態であり、通常の manual `sync` warning とは別に command failure へ昇格する。
+    - `gh_index_incomplete` は warning として出力・JSON に残すが、それ単独では command failure へ昇格しない。
     - command exit code は post-sync failure があれば `1`。
     - renderer は `mutation succeeded; auto-sync failed; artifacts may be stale or partially written; run ./spec-dock/scripts/spec-dock sync` 相当の guidance を出す。
 - CLI contract:
@@ -374,7 +376,7 @@ tests/
 - AC-004 -> `mutate_deps.py` updated path post-sync + unchanged skip contract + `test_deps.py`
 - AC-005 -> `delete_node.py` ok path post-sync + delete projection cleanup + `test_delete.py`
 - AC-006 -> direct `close_node.py` post-sync and `issue_lifecycle.py` lifecycle-owned post-sync after active clear + `test_close.py` / `test_issue_lifecycle.py`
-- AC-007 -> shared post-sync outcome + command exit code/rendering + artifact/GitHub failure tests; includes `gh_fetch_failed` / `gh_index_incomplete` fatal warning predicate
+- AC-007 -> shared post-sync outcome + command exit code/rendering + artifact/GitHub failure tests; includes `gh_fetch_failed` fatal warning predicate and `gh_index_incomplete` non-fatal warning coverage
 - AC-008 -> no parser option changes; help/parser tests confirm no opt-out
 - Docs -> `workflow_issue.md` の `issue finish` guidance を、manual sync 前提から lifecycle-owned post-sync 前提へ更新する。provider docs を正本として更新し、dogfooding workspace 側も refresh または差分確認する。
 - EC-001 -> mutation failure path returns before post-sync helper

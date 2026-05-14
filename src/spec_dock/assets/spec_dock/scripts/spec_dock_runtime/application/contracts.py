@@ -20,7 +20,7 @@ from ..domain.models import (
 from ..infra.contracts import StoredMetaRecord
 
 
-POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed", "gh_index_incomplete")
+POST_MUTATION_FATAL_WARNING_CODES: tuple[str, ...] = ("gh_fetch_failed",)
 
 
 @dataclass(frozen=True)
