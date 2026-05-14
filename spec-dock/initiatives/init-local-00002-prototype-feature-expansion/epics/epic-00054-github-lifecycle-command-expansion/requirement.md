@@ -5,7 +5,7 @@ ID: "epic-00054"
 関連GitHub: ["#54"]
 状態: "draft | approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-08"
+最終更新: "2026-05-15"
 親: ["init-local-00002"]
 ---
 
@@ -15,10 +15,12 @@ ID: "epic-00054"
 - initiative goal / metric:
   - `init-local-00002` の feature expansion として、SpecDock の GitHub lifecycle 操作を create だけでなく close まで command 側へ広げる。
   - dogfooding 中に顕在化した「作成は CLI だが close は GitHub Web UI へ戻る」「local tree cleanup は手作業 directory 削除に頼る」という gap を、運用可能な feature backlog として固定する。
+  - 追加の command lifecycle gap として、導入済み workspace の managed assets 更新を repo-local runtime command から実行できるようにし、長い `uvx --from ... spec-dock update` 手順への依存を減らす。
 - この epic が提供する能力:
   - linked GitHub issue を command 側から close できる。
   - local spec node（issue / epic / initiative）を directory ごと削除できる。
   - destructive な local delete と、より安全な remote close を分離した lifecycle contract を提供する。
+  - repo-local runtime command から upstream package 経由の self-update を実行できる。
   - review-only issue を分離せず、各 implementation issue の中で review と成功性確認を完結させる。
 
 ## ユースケース
@@ -26,6 +28,7 @@ ID: "epic-00054"
   - maintainer が SpecDock から issue を完了させる際、GitHub Web UI を開かずに linked GitHub issue を close できる。
   - maintainer が不要になった issue / epic / initiative を local workspace から削除する際、対象 directory を command 経由で安全に除去できる。
   - issue / epic / initiative の local delete では、remote 側は delete ではなく close に留めることで、GitHub 履歴と事故防止のバランスを保てる。
+  - maintainer が managed repo 内で `./spec-dock/scripts/spec-dock update` を実行し、upstream GitHub package から shipped docs / scripts / skills を更新できる。
 - exception / operation scenario:
   - active target や dependency を持つ node を delete しようとした場合は、事前確認または fail-fast で誤操作を防ぐ。
   - linked GitHub issue を持たない local-only cleanup は local delete だけで完結する。
@@ -45,9 +48,13 @@ ID: "epic-00054"
 - E-RQ-006:
   - GitHub-side issue delete はこの epic の対象外とし、docs / design / plan / acceptance criteria の success path に含めないこと。
 - E-RQ-007:
-  - epic の execution は 2 issue 構成とし、各 issue がそれぞれの scope に対する docs / tests / review / success verification を内包すること。
+  - epic の execution は close command、local delete command、self-update command の各 issue scope に分け、各 issue がそれぞれの scope に対する docs / tests / review / success verification を内包すること。
 - E-RQ-008:
-  - 第2 issue（local delete 側）は、その issue scope の review / success verification に加えて、epic 全体の final review / final validation / close-out evidence を保持すること。
+  - epic 全体の final review / final validation / close-out evidence は、最後に完了する issue が保持すること。固定の第2 issue に閉じず、issue 追加時も close-out owner を明示して扱えること。
+- E-RQ-009:
+  - SpecDock は repo-local runtime command から installer `spec-dock update [path]` を呼び出す self-update 操作を提供し、maintainer が long-form `uvx` invocation を覚えなくても managed assets を更新できること。
+- E-RQ-010:
+  - self-update 操作は uvx cache による stale package 混入を避けるため、upstream GitHub package を `uvx --no-cache` で実行すること。
 
 ## Epic acceptance criteria
 - E-AC-001:
@@ -94,31 +101,49 @@ ID: "epic-00054"
     - epic の contract を参照する
   - Then:
     - close と local delete の境界、destructive guardrail、GitHub-side delete exclusion が一貫している
-    - review-only issue を立てず、各 issue 自身が review と acceptance evidence を持ち、最終 close-out は第2 issue に集約されている
+    - review-only issue を立てず、各 issue 自身が review と acceptance evidence を持ち、最終 close-out owner が最後に完了する issue として明示されている
   - 観測点:
     - docs parity
     - final spec review
+- E-AC-005:
+  - Given:
+    - `spec-dock/` workspace を持つ managed repo がある
+  - When:
+    - maintainer が repo-local runtime command から update を実行する
+  - Then:
+    - upstream GitHub package の installer `spec-dock update [path]` が no-cache uvx 経由で実行される
+    - target path は省略時 current workspace、明示時 explicit target として扱われる
+    - uvx / network / permission / installer failure は隠蔽されず、operator が追える CLI evidence と exit status で返る
+  - 観測点:
+    - runtime / CLI tests
+    - subprocess args assertion
+    - docs contract
 
 ## スコープ
 - MUST:
   - command-side GitHub issue close
   - local issue / epic / initiative delete
+  - repo-local runtime self-update command
   - destructive guardrail、confirmation、docs/tests 整備
   - dogfooding での lifecycle completeness gap を埋めること
-  - 2 issue 構成で進め、各 issue に review と成功性確認を内包すること
+  - close / delete / self-update の各 issue scope で進め、各 issue に review と成功性確認を内包すること
 - MUST NOT:
   - remote GitHub issue delete を success path に含めない
   - destructive local delete を silent / implicit に実行しない
+  - self-update で uvx cache を標準経路として使わない
   - review / validation だけを目的とする standalone issue を作らない
 - OUT OF SCOPE:
   - GitHub-side issue delete
   - GitHub issue 以外の remote artifact 削除
   - project-wide garbage collection の自動化
+  - package update availability check / version comparison
+  - legacy workspace の自動 migration
 
 ## 境界
 - Always:
   - remote handling は close-only とし、GitHub 履歴保全と事故防止を優先する
   - local delete は directory removal を伴う destructive operation として扱う
+  - self-update は upstream GitHub package を `uvx --no-cache` で呼び出し、cache stale による誤更新を避ける
   - issue / epic / initiative の各階層差を docs / command contract で明示する
 - Ask:
   - active target や dependency を含む node を delete する前に、どの guardrail を必須にするか。
@@ -142,11 +167,13 @@ ID: "epic-00054"
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py`
+  - `src/spec_dock/cli.py`
   - `src/spec_dock/assets/spec_dock/docs/`
   - `tests/`
   - `spec-dock/`
 - external dependency:
   - GitHub CLI / auth / permission
+  - uvx / upstream GitHub package fetch
 - compatibility:
   - additive change を基本とし、既存 create / import / sync / validate contract を壊さない
 

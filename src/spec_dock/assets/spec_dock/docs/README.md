@@ -64,6 +64,10 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
+
+# managed files/docs/templates/scripts/skills refresh
+./spec-dock/scripts/spec-dock update
+./spec-dock/scripts/spec-dock update /path/to/project
 ```
 
 ## 高頻度ルール
@@ -79,6 +83,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `active set` / `deps check` は `<target>` の後方互換を維持しつつ、`--id` / `--github-issue` の explicit form も使える
 - 依存関係の追加/削除/確認は metadata の直編集ではなく `./spec-dock/scripts/spec-dock deps add/remove/check` を使い、変更後は `./spec-dock/scripts/spec-dock validate` と `./spec-dock/scripts/spec-dock sync` で GitHub live state を含めて整合を確認する。GitHub を呼ばない確認が必要な場合だけ `--no-github` を指定する
 - legacy sequential discussion docs は grandfathered only。新規作成で sequence reuse / auto-rename / auto-repair はしない
-- `spec-dock update` は managed files/docs/templates/scripts/skills の更新であり、old workspace の in-place migration ツールではない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
+- `./spec-dock/scripts/spec-dock update [path]` は repo-local self-update path で、target 省略時は current directory を更新する。明示 path を渡すとその managed repo を更新する
+- runtime update は installer update の wrapper であり、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` として実行する。arbitrary source / cache / `--force` option は公開しない
+- update は managed files/docs/templates/scripts/skills の更新であり、`init --force` でも old workspace の in-place migration ツールでもない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
 - Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の正本は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する
