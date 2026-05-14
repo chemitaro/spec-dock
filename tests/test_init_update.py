@@ -1235,6 +1235,19 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("[features]", text, f"codex spec-manager missing features table ({shim_label})")
         self.assertIn("shell_tool = true", text, f"codex spec-manager missing shell tool enable ({shim_label})")
 
+    def _assert_codex_doc_writer_contract(self, *, text: str, shim_label: str) -> None:
+        self.assertIn('name = "doc-writer"', text, f"codex doc-writer missing name ({shim_label})")
+        self.assertIn('model = "gpt-5.5"', text, f"codex doc-writer missing model ({shim_label})")
+        self.assertIn(
+            'model_reasoning_effort = "medium"',
+            text,
+            f"codex doc-writer missing reasoning effort ({shim_label})",
+        )
+        self.assertIn('approval_policy = "never"', text, f"codex doc-writer missing approval policy ({shim_label})")
+        self.assertIn('sandbox_mode = "workspace-write"', text, f"codex doc-writer missing sandbox mode ({shim_label})")
+        self.assertIn("[features]", text, f"codex doc-writer missing features table ({shim_label})")
+        self.assertIn("shell_tool = true", text, f"codex doc-writer missing shell tool enable ({shim_label})")
+
     def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
         self.assertIn("model: gpt-5.4-mini", text, f"copilot spec-manager model missing ({shim_label})")
@@ -8254,12 +8267,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with cli._assets_dir() as assets_dir:
             codex_path = assets_dir / "install_root" / ".codex" / "agents" / "spec-manager.toml"
+            codex_doc_writer_path = assets_dir / "install_root" / ".codex" / "agents" / "doc-writer.toml"
             codex_bootstrap_path = assets_dir / "install_root" / ".codex" / "AGENTS.md"
             codex_config_path = assets_dir / "install_root" / ".codex" / "config.toml"
             codex_rules_path = assets_dir / "install_root" / ".codex" / "rules" / "spec-dock-commands.rules"
             copilot_spec_manager_path = assets_dir / "install_root" / ".github" / "agents" / "spec-manager.agent.md"
             copilot_path = assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md"
             self.assertTrue(codex_path.is_file(), f"missing bundled codex native shim: {codex_path}")
+            self.assertTrue(
+                codex_doc_writer_path.is_file(),
+                f"missing bundled codex doc-writer agent: {codex_doc_writer_path}",
+            )
             self.assertTrue(codex_bootstrap_path.is_file(), f"missing bundled codex bootstrap guide: {codex_bootstrap_path}")
             self.assertTrue(codex_config_path.is_file(), f"missing bundled codex main config: {codex_config_path}")
             self.assertTrue(codex_rules_path.is_file(), f"missing bundled codex command rules: {codex_rules_path}")
@@ -8269,6 +8287,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             )
             self.assertTrue(copilot_path.is_file(), f"missing bundled copilot native shim: {copilot_path}")
             codex_text = codex_path.read_text(encoding="utf-8")
+            codex_doc_writer_text = codex_doc_writer_path.read_text(encoding="utf-8")
             codex_bootstrap_text = codex_bootstrap_path.read_text(encoding="utf-8")
             codex_config_text = codex_config_path.read_text(encoding="utf-8")
             codex_rules_text = codex_rules_path.read_text(encoding="utf-8")
@@ -8283,6 +8302,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self._assert_codex_native_shim_loader_contract(
             text=codex_text,
             shim_label="bundled codex native shim",
+        )
+        self._assert_codex_doc_writer_contract(
+            text=codex_doc_writer_text,
+            shim_label="bundled codex doc-writer agent",
         )
         self._assert_codex_bootstrap_routing_contract(
             text=codex_bootstrap_text,
