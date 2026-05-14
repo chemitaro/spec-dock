@@ -36,7 +36,7 @@ ID: "iss-00096"
   - 対象: local consumer workspace `spec-dock/scripts/...` and generated docs mirror
   - 完了条件: provider-side asset changes are refreshed/inspected in the dogfooding mirror and `./spec-dock/scripts/spec-dock update --help` confirms the runtime command surface.
 - M4 final quality:
-  - 対象: sync / validate / full tests / final QA, code, spec reviews
+  - 対象: checked-in dogfooding metadata snapshot parity / sync / validate / full tests / final QA, code, spec reviews
   - 完了条件: required gates が pass し、report ledger と final commit scope が記録される。
 
 ## 依存関係から導く実装順序
@@ -59,8 +59,12 @@ ID: "iss-00096"
     - 対象ファイル: README and shipped docs/templates
   - S03:
     - 依存: S01 runtime command, S02 docs parity
-    - unblock: S90 docs impact resolution, S99 final quality gate
+    - unblock: S04 snapshot parity, S90 docs impact resolution, S99 final quality gate
     - 対象ファイル: local dogfooding mirror under `spec-dock/scripts/...` and generated docs/templates mirror when refreshed
+  - S04:
+    - 依存: S03 dogfooding mirror confirmation
+    - unblock: S90 docs impact resolution, S99 final quality gate
+    - 対象ファイル: `tests/test_init_update.py`
 
 ## ステップ一覧
 - S01:
@@ -84,6 +88,13 @@ ID: "iss-00096"
   - 対象ファイル: `spec-dock/scripts/spec_dock_runtime/...`, generated `spec-dock/docs` / `spec-dock/templates` mirror files if refreshed, `spec-dock/active/issue/report.md`
   - 閉じる要件: AC-005 provider/dogfooding mirror confirmation
   - レビューゲート: per-step `code-reviewer` pass before commit; if local installer refresh produces no diff, close as valid approved-no-op with inspection evidence
+- S04:
+  - 観測可能な振る舞い: checked-in dogfooding `.meta.json` snapshot tests include the active issue metadata path and dependency snapshot.
+  - 依存: S03 dogfooding mirror confirmation and full-suite failure evidence
+  - unblock: S90 docs impact resolution and S99 final quality
+  - 対象ファイル: `tests/test_init_update.py`
+  - 閉じる要件: AC-005 dogfooding validation parity
+  - レビューゲート: per-step `code-reviewer` pass before commit
 - S90:
   - 観測可能な振る舞い: docs / templates / README / workflow / skill / migration notes impact is resolved or explicitly justified as no update.
   - 閉じる要件: docs impact portion of AC-005
@@ -99,6 +110,7 @@ ID: "iss-00096"
 - AC-003 -> S01
 - AC-004 -> S01
 - AC-005 -> S02, S03, S90
+- AC-005 dogfooding snapshot parity -> S04
 - EC-001 -> S01
 - EC-002 -> S01
 - EC-003 -> S01
@@ -117,6 +129,7 @@ ID: "iss-00096"
 | tc-005 | S01 | missing uvx / unsupported force | negative | EC-001, EC-004, constraints | missing `uvx` and unsupported `--force` both fail closed and do not run an alternate update path | PATH without `uvx`; parser args `update --force` | missing dependency or destructive option accepted as success | yes | red-required | `tests/cli_runtime/test_update.py`; non-zero assertions |
 | tc-006 | S02 | docs parity | acceptance | AC-005 | README and shipped docs/templates explain repo-local update command, no-cache, fixed upstream source, and target default consistently | docs diff and generated scaffold docs inspection | docs teach stale-cache or installer-only path while runtime supports self-update | yes | inspect-only | docs diff; S90 spec-reviewer docs alignment |
 | tc-007 | S03 | dogfooding mirror confirmation | acceptance | AC-005, dogfooding rules | local dogfooding mirror is refreshed or inspected, and `./spec-dock/scripts/spec-dock update --help` exposes the new command without live upstream update | provider asset changes after S01/S02; local dogfooding workspace in this repo | provider source passes tests but local consumer mirror remains stale | yes | inspect-only | local installer update / mirror diff / help evidence in report |
+| tc-008 | S04 | dogfooding metadata snapshot parity | regression | AC-005, dogfooding rules | checked-in dogfooding metadata snapshot includes `iss-00096-self-update-command/.meta.json` with empty `depends_on` snapshot | full-suite failure in `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; active issue `.meta.json` has no `depends_on` | dogfooding validation fails even though current issue metadata is intentionally checked in | yes | regression-required | `tests/test_init_update.py`; targeted snapshot test; full unittest discover |
 
 ## レビュー / QA ゲート方針
 - RG1 S01 implementation review:
@@ -126,6 +139,10 @@ ID: "iss-00096"
 - RG2 S02 docs review:
   - reviewer: fresh `code-reviewer`
   - scope: S02 docs diff and report updates
+  - pass condition: `review_status: pass`
+- RG3 S04 snapshot review:
+  - reviewer: fresh `code-reviewer`
+  - scope: S04 dogfooding metadata snapshot diff and validation evidence
   - pass condition: `review_status: pass`
 - QG1 final QA review:
   - reviewer: fresh `qa-reviewer`
@@ -157,7 +174,7 @@ ID: "iss-00096"
 - Each implementation step must close its referenced closure ids through `Step Contract Closure`, `Test Contract Closure`, and `Closure Coverage`.
 - Each implementation step must record `Implementation Delegation Gate`.
 - Each implementation step must reach fresh `code-reviewer` pass before commit.
-- Each implementation step is one commit. Do not mix S01, S02, and S03 in the same commit unless this plan is amended and re-reviewed first.
+- Each implementation step is one commit. Do not mix S01, S02, S03, and S04 in the same commit unless this plan is amended and re-reviewed first.
 
 ## 実装ステップ
 
