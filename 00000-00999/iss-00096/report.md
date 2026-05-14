@@ -3,7 +3,7 @@
 ID: "iss-00096"
 タイトル: "Add self update command"
 関連GitHub: ["#96"]
-状態: "in_progress"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-05-15"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -297,7 +297,7 @@ spec-dock: ok (validate) nodes=41
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
 | Final closure, review, validation, and commit scope ledger | Final report ledger and any final gate fixes | final response; PR / issue comment only if explicitly requested later | blocked until final gates pass |
-| Final closure, review, validation, and commit scope ledger | Final plan/report ledger for S90/S99, S05 hardening, final reviews, and finish permission | final response; PR / issue comment only if explicitly requested later | pending final ledger commit |
+| Final closure, review, validation, and commit scope ledger | Final plan/report ledger for S90/S99, S05 hardening, final reviews, finish permission, and post-finish report status cleanup | final response and PR | ready for PR / external delivery evidence |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `design.md` と `plan.md` がテンプレート状態で implementation-ready ではなかった。
