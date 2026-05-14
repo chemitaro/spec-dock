@@ -612,6 +612,8 @@ ID: "iss-00096"
   - S01 committed.
   - S02 committed or valid approved-no-op.
   - S03 committed or valid approved-no-op.
+  - S04 committed.
+  - S05 committed.
 - final quality gate pass:
   - qa-reviewer: pass
   - issue-wide code-reviewer: pass
@@ -619,9 +621,9 @@ ID: "iss-00096"
 - final commit 完了:
   - final report ledger committed after all final gates pass.
 - 必須 closure id 完了:
-  - Step Contract Closure: tc-001 through tc-007 pass or valid approved-no-op where allowed.
-  - Test Contract Closure: tc-001 through tc-007 pass or valid approved-no-op where allowed.
-  - Closure Coverage: tc-001 through tc-007 pass or valid approved-no-op where allowed.
+  - Step Contract Closure: tc-001 through tc-009 pass or valid approved-no-op where allowed.
+  - Test Contract Closure: tc-001 through tc-009 pass or valid approved-no-op where allowed.
+  - Closure Coverage: tc-001 through tc-009 pass or valid approved-no-op where allowed.
 - final clean state:
   - no unintended staged / unstaged changes.
   - final commit hash and clean check recorded as external delivery evidence.
