@@ -124,6 +124,15 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/host-adapters/meta.json": "src/spec_dock/assets/install_root/.agents/host-adapters/meta.json",
         ".codex/AGENTS.md": "src/spec_dock/assets/install_root/.codex/AGENTS.md",
         ".codex/config.toml": "src/spec_dock/assets/install_root/.codex/config.toml",
+        ".codex/prompts/execute-issue.md": (
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-issue.md"
+        ),
+        ".codex/prompts/execute-epic.md": (
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-epic.md"
+        ),
+        ".codex/prompts/execute-initiative.md": (
+            "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
+        ),
         ".codex/agents/spec-manager.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
         ".github/agents/orchestrator.agent.md": (
             "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md"
@@ -362,6 +371,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ".codex/AGENTS.md",
         ".codex/config.toml",
+        ".codex/prompts/execute-epic.md",
+        ".codex/prompts/execute-initiative.md",
+        ".codex/prompts/execute-issue.md",
         ".codex/rules/spec-dock-commands.rules",
         ".codex/agents/code-reviewer.toml",
         ".codex/agents/consultant.toml",
@@ -449,6 +461,11 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/": (
             ".codex/AGENTS.md",
             ".codex/config.toml",
+        ),
+        ".codex/prompts/": (
+            ".codex/prompts/execute-epic.md",
+            ".codex/prompts/execute-initiative.md",
+            ".codex/prompts/execute-issue.md",
         ),
         ".codex/rules/": (
             ".codex/rules/spec-dock-commands.rules",
@@ -689,6 +706,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00091-default-github-state-commands/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00093-automatic-sync-after-state-mutations/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -756,6 +774,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00091-default-github-state-commands/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00093-automatic-sync-after-state-mutations/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -9231,6 +9250,106 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         f"{rel_path}"
                     ),
                 )
+
+    def test_issue_93_execute_prompts_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        prompt_contracts = {
+            "execute-epic.md": (
+                "$spec-dock-epic-planning",
+                "$spec-dock-issue-execution",
+                "/execute-issue",
+                "spec-dock/docs/workflow_epic.md",
+                "spec-dock/docs/phase_plan_epic.md",
+                "spec-dock/docs/rules/epic/issues.md",
+                "issue start <issue-id>",
+                "active epic `report.md`",
+                "report the epic as blocked or",
+                "epic plan is amended and fresh spec-reviewed",
+            ),
+            "execute-initiative.md": (
+                "$spec-dock-initiative-planning",
+                "$spec-dock-epic-planning",
+                "$spec-dock-issue-execution",
+                "/execute-epic",
+                "/execute-issue",
+                "spec-dock/docs/workflow_initiative.md",
+                "spec-dock/docs/phase_plan_initiative.md",
+                "spec-dock/docs/rules/initiative/epics.md",
+                "issue start <issue-id>",
+                "active initiative `report.md`",
+                "report the initiative as blocked or",
+                "initiative and affected epic plans are amended",
+            ),
+            "execute-issue.md": (
+                "$spec-dock-issue-execution",
+                "spec-dock/active/issue/requirement.md",
+                "spec-dock/active/issue/design.md",
+                "spec-dock/active/issue/plan.md",
+                "spec-dock/active/issue/report.md",
+                "spec-dock/docs/workflow_issue.md",
+                "1 implementation step = 1 code-reviewer scope = 1 commit",
+            ),
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            for prompt_name, scope_fragments in prompt_contracts.items():
+                with self.subTest(prompt=prompt_name):
+                    provider_prompt_path = (
+                        repo_root
+                        / "src"
+                        / "spec_dock"
+                        / "assets"
+                        / "install_root"
+                        / ".codex"
+                        / "prompts"
+                        / prompt_name
+                    )
+                    dogfooding_prompt_path = repo_root / ".codex/prompts" / prompt_name
+                    installed_prompt_path = target / ".codex/prompts" / prompt_name
+
+                    self.assertTrue(
+                        provider_prompt_path.is_file(),
+                        f"missing execute prompt provider asset: {provider_prompt_path}",
+                    )
+                    self.assertTrue(
+                        dogfooding_prompt_path.is_file(),
+                        f"missing execute prompt dogfooding mirror: {dogfooding_prompt_path}",
+                    )
+                    self.assertEqual(
+                        dogfooding_prompt_path.read_bytes(),
+                        provider_prompt_path.read_bytes(),
+                        "execute prompt dogfooding mirror must match provider asset",
+                    )
+                    self.assertEqual(
+                        installed_prompt_path.read_bytes(),
+                        provider_prompt_path.read_bytes(),
+                        "execute prompt must be installed from provider asset",
+                    )
+
+                    prompt_text = provider_prompt_path.read_text(encoding="utf-8")
+                    required_fragments = (
+                        "Standalone mode",
+                        "Goal-assisted mode",
+                        "Do not embed, simulate, or try to execute `/goal` from inside this prompt.",
+                        "spec-dock/active/context-pack.md",
+                        "spec-dock/docs/workflow_spec_authoring.md",
+                        *scope_fragments,
+                    )
+                    for fragment in required_fragments:
+                        self.assertIn(fragment, prompt_text)
+
+                    if prompt_name in {"execute-epic.md", "execute-initiative.md"}:
+                        self.assertIn("nested slash command", prompt_text)
+
+                    forbidden_fragments = (
+                        "Create a new skill",
+                        "run `/goal` for the user",
+                    )
+                    for fragment in forbidden_fragments:
+                        self.assertNotIn(fragment, prompt_text)
 
     def test_issue_75_pr_monitor_guidance_uses_repo_relative_helper_path(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

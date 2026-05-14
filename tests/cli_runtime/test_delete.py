@@ -108,7 +108,20 @@ class TestCliDelete(CliRuntimeHarness):
                 "    STATE_PATH.write_text(json.dumps(state) + '\\n', encoding='utf-8')\n"
                 "    raise SystemExit(0)\n"
                 "if args[:2] == ['issue', 'list']:\n"
-                "    print(json.dumps([state]))\n"
+                "    issues = []\n"
+                "    for number in range(1, 1000):\n"
+                "        item = {\n"
+                "            'number': number,\n"
+                "            'state': 'OPEN',\n"
+                "            'title': f'Issue {number}',\n"
+                "            'labels': [],\n"
+                "            'updatedAt': '2026-04-09T00:00:00Z',\n"
+                "            'url': f'https://github.com/{EXPECTED_REPO}/issues/{number}',\n"
+                "        }\n"
+                "        if number == EXPECTED_NUMBER:\n"
+                "            item.update(state)\n"
+                "        issues.append(item)\n"
+                "    print(json.dumps(issues))\n"
                 "    raise SystemExit(0)\n"
                 "print(f'unexpected gh args: {args}', file=sys.stderr)\n"
                 "raise SystemExit(99)\n"
@@ -157,6 +170,56 @@ class TestCliDelete(CliRuntimeHarness):
         env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
         return target, issue_dir, state_path, env
 
+    def _read_delete_auto_sync_artifacts(self, target: Path) -> dict[str, str | None]:
+        paths = (
+            target / "spec-dock" / ".agent" / "index-all.json",
+            target / "spec-dock" / ".agent" / "index.json",
+            target / "spec-dock" / ".agent" / "deps-issues.json",
+            target / "spec-dock" / "deps-issues.puml",
+            target / "spec-dock" / "dashboard.md",
+        )
+        return {
+            path.relative_to(target).as_posix(): path.read_text(encoding="utf-8") if path.exists() else None
+            for path in paths
+        }
+
+    def _assert_delete_auto_sync_artifacts_absent(self, target: Path, node_id: str) -> None:
+        specdock_dir = target / "spec-dock"
+        index_all = json.loads((specdock_dir / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+        index = json.loads((specdock_dir / ".agent" / "index.json").read_text(encoding="utf-8"))
+        deps_issues = json.loads((specdock_dir / ".agent" / "deps-issues.json").read_text(encoding="utf-8"))
+        dashboard = (specdock_dir / "dashboard.md").read_text(encoding="utf-8")
+        deps_puml = (specdock_dir / "deps-issues.puml").read_text(encoding="utf-8")
+
+        self.assertNotIn(node_id, index_all["nodes"])
+        self.assertNotIn(node_id, index["nodes"])
+        self.assertNotIn(node_id, deps_issues["nodes"])
+        self.assertFalse(
+            any(
+                edge.get("from") == node_id or edge.get("to") == node_id
+                for edge in deps_issues.get("edges", [])
+                if isinstance(edge, dict)
+            )
+        )
+        self.assertNotIn(node_id, dashboard)
+        self.assertNotIn(node_id, deps_puml)
+
+    def _inject_delete_post_sync_artifact_failure(self, target: Path) -> None:
+        writer_path = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "artifact_writer.py"
+        original = writer_path.read_text(encoding="utf-8")
+        writer_path.write_text(
+            original.replace(
+                "def _write_text(path: Path, text: str) -> None:\n",
+                (
+                    "def _write_text(path: Path, text: str) -> None:\n"
+                    "    if path.name == 'dashboard.md':\n"
+                    "        raise RuntimeError('injected artifact writer failure')\n"
+                ),
+                1,
+            ),
+            encoding="utf-8",
+        )
+
     def test_delete_issue_by_positional_target_removes_local_leaf_and_closes_remote(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
@@ -168,6 +231,62 @@ class TestCliDelete(CliRuntimeHarness):
         self.assertFalse(issue_dir.exists())
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertEqual(state["state"], "CLOSED")
+
+    def test_delete_issue_auto_syncs_index_dashboard_and_dependency_projection(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        target, issue_dir, _state_path, env = self._setup_delete_target_repo(issue_number=56)
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "2", "--title", "Survivor issue", "--github-issue", "58"],
+            env=env,
+        )
+        self._run_runtime(target, ["deps", "add", "--from", "iss-00058", "--to", "iss-00056"], env=env)
+        self._run_runtime(target, ["sync"], env=env)
+        before = self._read_delete_auto_sync_artifacts(target)
+        self.assertTrue(any("iss-00056" in (text or "") for text in before.values()))
+
+        p = self._run_runtime_capture(target, ["delete", "--id", "iss-00056", "--force", "--yes"], env=env)
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delete) target=iss-00056", p.stdout)
+        self.assertEqual(p.stderr.strip(), "")
+        self.assertFalse(issue_dir.exists())
+        self._assert_delete_auto_sync_artifacts_absent(target, "iss-00056")
+
+    def test_delete_issue_post_sync_artifact_failure_returns_nonzero_with_recovery_guidance(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        target, issue_dir, _state_path, env = self._setup_delete_target_repo(issue_number=56)
+        self._run_runtime(target, ["sync"], env=env)
+        self._inject_delete_post_sync_artifact_failure(target)
+
+        p = self._run_runtime_capture(target, ["delete", "--id", "iss-00056", "--yes"], env=env)
+
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delete) target=iss-00056", p.stdout)
+        self.assertIn("spec-dock: failed (delete auto-sync) target=iss-00056", p.stderr)
+        self.assertIn("mutation succeeded", p.stderr)
+        self.assertIn("derived artifacts may be stale or partially written", p.stderr)
+        self.assertIn("./spec-dock/scripts/spec-dock sync", p.stderr)
+        self.assertFalse(issue_dir.exists())
+
+    def test_delete_preflight_failure_does_not_run_post_sync_or_refresh_artifacts(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        target, issue_dir, _state_path, env = self._setup_delete_target_repo(issue_number=56)
+        self._run_runtime(target, ["sync"], env=env)
+        before = self._read_delete_auto_sync_artifacts(target)
+
+        p = self._run_runtime_capture(target, ["delete", "--id", "iss-00999", "--yes"], env=env)
+
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delete) status=target_not_found", p.stderr)
+        self.assertTrue(issue_dir.exists())
+        self.assertEqual(before, self._read_delete_auto_sync_artifacts(target))
 
     def test_delete_issue_by_id_flag_removes_local_leaf_and_closes_remote(self) -> None:
         if os.name == "nt":

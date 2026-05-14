@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00093",
+  "title": "Automatic Sync After State Mutations",
+  "slug": "automatic-sync-after-state-mutations",
+  "created_at": "2026-05-13T19:01:27+09:00",
+  "updated_at": "2026-05-13T19:01:27+09:00",
+  "parent_id": "epic-00090",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00090",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 93,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

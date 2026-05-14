@@ -22,6 +22,7 @@ from .contracts import (
 )
 from .github_issue_targets import normalize_repo_slug
 from .ports import Ports
+from .sync_state import post_mutation_sync
 
 _NUM_RE = re.compile(r"^[0-9]+$")
 _SCOPED_ISSUE_REF_RE = re.compile(
@@ -1332,4 +1333,5 @@ def delete_node(req: DeleteNodeRequest, ports: Ports) -> DeleteNodeResult:
         recovery_guidance=[],
         dependency_scrub_failures=[],
         warnings=warnings,
+        post_sync=post_mutation_sync(ports),
     )

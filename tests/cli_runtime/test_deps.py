@@ -95,6 +95,102 @@ class TestCliDeps(CliRuntimeHarness):
                 return meta_path
         raise AssertionError(f"meta path not found for node id: {node_id}")
 
+    def _install_gh_issue_list_stub(
+        self,
+        target: Path,
+        *,
+        issue_numbers: list[int],
+        log_path: Path | None = None,
+    ) -> dict[str, str]:
+        bin_dir = target / ".bin-gh-list"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        self._make_gh_issue_list_stub(
+            bin_dir,
+            issues=[
+                {
+                    "number": issue_number,
+                    "state": "OPEN",
+                    "title": f"Issue {issue_number}",
+                    "labels": [],
+                    "updatedAt": f"2026-05-13T00:00:{issue_number:02d}Z",
+                    "url": f"https://github.com/example/repo/issues/{issue_number}",
+                }
+                for issue_number in issue_numbers
+            ],
+            log_path=log_path,
+        )
+        return {
+            **os.environ,
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+        }
+
+    def _read_deps_projection_artifacts(self, target: Path) -> dict[str, str | None]:
+        paths = (
+            target / "spec-dock" / ".agent" / "deps-issues.json",
+            target / "spec-dock" / "deps-issues.puml",
+        )
+        return {
+            path.relative_to(target).as_posix(): path.read_text(encoding="utf-8") if path.exists() else None
+            for path in paths
+        }
+
+    def _assert_deps_projection_has_edge(self, target: Path, from_id: str, to_id: str) -> None:
+        specdock_dir = target / "spec-dock"
+        deps_json_path = specdock_dir / ".agent" / "deps-issues.json"
+        deps_puml_path = specdock_dir / "deps-issues.puml"
+        self.assertTrue(deps_json_path.is_file(), f"missing artifact: {deps_json_path}")
+        self.assertTrue(deps_puml_path.is_file(), f"missing artifact: {deps_puml_path}")
+        deps_issues = json.loads(deps_json_path.read_text(encoding="utf-8"))
+        self.assertIn({"from": from_id, "to": to_id}, deps_issues["edges"])
+        deps_puml = deps_puml_path.read_text(encoding="utf-8")
+        self.assertIn(from_id, deps_puml)
+        self.assertIn(to_id, deps_puml)
+        self.assertIn(": blocks", deps_puml)
+
+    def _assert_deps_projection_lacks_edge(self, target: Path, from_id: str, to_id: str) -> None:
+        deps_json_path = target / "spec-dock" / ".agent" / "deps-issues.json"
+        deps_puml_path = target / "spec-dock" / "deps-issues.puml"
+        self.assertTrue(deps_json_path.is_file(), f"missing artifact: {deps_json_path}")
+        self.assertTrue(deps_puml_path.is_file(), f"missing artifact: {deps_puml_path}")
+        deps_issues = json.loads(deps_json_path.read_text(encoding="utf-8"))
+        self.assertNotIn({"from": from_id, "to": to_id}, deps_issues["edges"])
+        deps_puml = deps_puml_path.read_text(encoding="utf-8")
+        self.assertNotIn(": blocks", deps_puml)
+
+    def _create_deps_auto_sync_fixture(self, target: Path, *, log_path: Path) -> dict[str, str]:
+        self._init_origin_repo(target)
+        test_env = self._install_gh_issue_list_stub(
+            target,
+            issue_numbers=[101, 201, 301, 302],
+            log_path=log_path,
+        )
+        self._run_runtime(
+            target,
+            ["new", "initiative", "--title", "Auth platform", "--github-issue", "101"],
+            env=test_env,
+        )
+        self._run_runtime(
+            target,
+            ["new", "epic", "--initiative", "101", "--title", "JWT auth", "--github-issue", "201"],
+            env=test_env,
+        )
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "201", "--title", "From issue", "--github-issue", "301"],
+            env=test_env,
+        )
+        self._run_runtime(
+            target,
+            ["new", "issue", "--epic", "201", "--title", "To issue", "--github-issue", "302"],
+            env=test_env,
+        )
+        log_path.write_text("", encoding="utf-8")
+        return {
+            "env": test_env,
+            "from_id": "iss-00301",
+            "to_id": "iss-00302",
+        }
+
     def _create_cross_epic_inherited_dependency_fixture(self, target: Path) -> dict[str, str]:
         self._create_same_repo_linked_hierarchy(
             target,
@@ -1180,10 +1276,10 @@ class TestCliDeps(CliRuntimeHarness):
             ]
             for form in forms:
                 p = self._run_runtime_capture(target, ["deps", "check", form, "--json"])
-                self.assertEqual(p.returncode, 3, p.stdout + p.stderr)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 data = json.loads(p.stdout)
                 self.assertEqual(data["target"], "iss-00301")
-                self.assertFalse(data["ready"])
+                self.assertTrue(data["ready"])
 
     def test_deps_check_default_github_ready_when_deps_closed(self) -> None:
         if os.name == "nt":
@@ -1337,6 +1433,7 @@ class TestCliDeps(CliRuntimeHarness):
             )
             self._set_meta_depends_on(issue_dir, [301])
 
+            (target / "spec-dock" / ".agent" / "index-all.json").unlink(missing_ok=True)
             (target / "spec-dock" / ".agent" / "index.json").unlink(missing_ok=True)
 
             p = self._run_runtime_capture(target, ["deps", "check", "iss-00302", "--no-github", "--json"])
@@ -2426,7 +2523,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(p.stderr.strip(), "")
             self.assertEqual(
                 p.stdout.strip(),
-                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps add auto-sync)",
+                    ]
+                ),
             )
 
             from_meta: dict[str, object] | None = None
@@ -2438,6 +2540,28 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIsNotNone(from_meta)
             assert from_meta is not None
             self.assertEqual(from_meta.get("depends_on"), [to_id])
+
+    def test_deps_add_updated_path_auto_syncs_dependency_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            log_path = target / ".gh.log"
+            fixture = self._create_deps_auto_sync_fixture(target, log_path=log_path)
+            from_id = fixture["from_id"]
+            to_id = fixture["to_id"]
+
+            before = self._read_deps_projection_artifacts(target)
+            p = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+                env=fixture["env"],
+            )
+
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("result=updated", p.stdout)
+            self.assertNotEqual(before, self._read_deps_projection_artifacts(target))
+            self._assert_deps_projection_has_edge(target, from_id, to_id)
+            self.assertIn("issue list", log_path.read_text(encoding="utf-8"))
 
     def test_deps_add_duplicate_returns_unchanged_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2474,13 +2598,49 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(second.stderr.strip(), "")
             self.assertEqual(
                 second.stdout.strip(),
-                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=unchanged",
+                        "spec-dock: skipped (deps add auto-sync) reason=unchanged",
+                    ]
+                ),
             )
 
             after_second = from_meta_path.read_text(encoding="utf-8")
             self.assertEqual(after_second, before_second)
             from_meta = json.loads(after_second)
             self.assertEqual(from_meta.get("depends_on"), [to_id])
+
+    def test_deps_add_duplicate_skips_post_sync_and_does_not_claim_refresh(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            log_path = target / ".gh.log"
+            fixture = self._create_deps_auto_sync_fixture(target, log_path=log_path)
+            from_id = fixture["from_id"]
+            to_id = fixture["to_id"]
+
+            first = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+                env=fixture["env"],
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            log_path.write_text("", encoding="utf-8")
+            before = self._read_deps_projection_artifacts(target)
+
+            second = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+                env=fixture["env"],
+            )
+
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertIn("result=unchanged", second.stdout)
+            self.assertIn("spec-dock: skipped (deps add auto-sync) reason=unchanged", second.stdout)
+            self.assertNotIn("refreshed", second.stdout + second.stderr)
+            self.assertEqual(before, self._read_deps_projection_artifacts(target))
+            self.assertEqual(log_path.read_text(encoding="utf-8"), "")
 
     def test_deps_add_inherited_only_edge_adds_direct_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2503,7 +2663,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(p.stderr.strip(), "")
             self.assertEqual(
                 p.stdout.strip(),
-                f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps add) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps add auto-sync)",
+                    ]
+                ),
             )
 
             after = json.loads(from_meta_path.read_text(encoding="utf-8"))
@@ -2534,7 +2699,12 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertEqual(removed.stderr.strip(), "")
             self.assertEqual(
                 removed.stdout.strip(),
-                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                "\n".join(
+                    [
+                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "spec-dock: ok (deps remove auto-sync)",
+                    ]
+                ),
             )
 
             from_meta: dict[str, object] | None = None
@@ -2546,6 +2716,36 @@ class TestCliDeps(CliRuntimeHarness):
             self.assertIsNotNone(from_meta)
             assert from_meta is not None
             self.assertEqual(from_meta.get("depends_on"), [])
+
+    def test_deps_remove_updated_path_auto_syncs_dependency_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            log_path = target / ".gh.log"
+            fixture = self._create_deps_auto_sync_fixture(target, log_path=log_path)
+            from_id = fixture["from_id"]
+            to_id = fixture["to_id"]
+            added = self._run_runtime_capture(
+                target,
+                ["deps", "add", "--from", from_id, "--to", to_id],
+                env=fixture["env"],
+            )
+            self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+            self._assert_deps_projection_has_edge(target, from_id, to_id)
+            log_path.write_text("", encoding="utf-8")
+            before = self._read_deps_projection_artifacts(target)
+
+            removed = self._run_runtime_capture(
+                target,
+                ["deps", "remove", "--from", from_id, "--to", to_id],
+                env=fixture["env"],
+            )
+
+            self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+            self.assertIn("result=updated", removed.stdout)
+            self.assertNotEqual(before, self._read_deps_projection_artifacts(target))
+            self._assert_deps_projection_lacks_edge(target, from_id, to_id)
+            self.assertIn("issue list", log_path.read_text(encoding="utf-8"))
 
     def test_deps_remove_inherited_only_edge_returns_edge_not_found(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2606,7 +2806,12 @@ class TestCliDeps(CliRuntimeHarness):
                     self.assertEqual(p.stderr.strip(), "")
                     self.assertEqual(
                         p.stdout.strip(),
-                        f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                        "\n".join(
+                            [
+                                f"spec-dock: ok (deps remove) from={from_id} to={to_id} result=updated",
+                                "spec-dock: ok (deps remove auto-sync)",
+                            ]
+                        ),
                     )
                     after = json.loads(from_meta_path.read_text(encoding="utf-8"))
                     self.assertEqual(after.get("depends_on"), [])
@@ -2799,6 +3004,28 @@ class TestCliDeps(CliRuntimeHarness):
 
             after = from_meta_path.read_text(encoding="utf-8")
             self.assertEqual(after, before)
+
+    def test_deps_invalid_target_does_not_run_post_sync_or_refresh_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            log_path = target / ".gh.log"
+            fixture = self._create_deps_auto_sync_fixture(target, log_path=log_path)
+            from_id = fixture["from_id"]
+            log_path.write_text("", encoding="utf-8")
+            before = self._read_deps_projection_artifacts(target)
+
+            for argv in (
+                ["deps", "add", "--from", from_id, "--to", "iss-00999"],
+                ["deps", "remove", "--from", from_id, "--to", "iss-00999"],
+            ):
+                with self.subTest(argv=argv):
+                    p = self._run_runtime_capture(target, argv, env=fixture["env"])
+
+                    self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+                    self.assertEqual(p.stdout.strip(), "")
+                    self.assertEqual(before, self._read_deps_projection_artifacts(target))
+                    self.assertEqual(log_path.read_text(encoding="utf-8"), "")
 
     def test_deps_remove_unresolved_source_returns_edge_not_found_and_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

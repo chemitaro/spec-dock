@@ -12,19 +12,30 @@ class TestCliClose(CliRuntimeHarness):
         bin_dir: Path,
         *,
         issue_number: int,
+        initial_state: str = "OPEN",
+        fail_close: bool = False,
         owner: str = "example",
         repo: str = "repo",
     ) -> Path:
         state_path = bin_dir / "gh-state.json"
+        log_path = bin_dir / "gh-calls.log"
+        issues = {
+            1: "OPEN",
+            2: "OPEN",
+            int(issue_number): initial_state,
+        }
         state_path.write_text(
             json.dumps(
                 {
-                    "number": int(issue_number),
-                    "state": "OPEN",
-                    "title": f"Issue {issue_number}",
-                    "labels": [],
-                    "updatedAt": "2026-04-09T00:00:00Z",
-                    "url": f"https://github.com/{owner}/{repo}/issues/{issue_number}",
+                    str(number): {
+                        "number": int(number),
+                        "state": state,
+                        "title": f"Issue {number}",
+                        "labels": [],
+                        "updatedAt": "2026-04-09T00:00:00Z",
+                        "url": f"https://github.com/{owner}/{repo}/issues/{number}",
+                    }
+                    for number, state in issues.items()
                 },
                 ensure_ascii=False,
             )
@@ -39,17 +50,23 @@ class TestCliClose(CliRuntimeHarness):
                 "import sys\n"
                 "from pathlib import Path\n\n"
                 f"STATE_PATH = Path({state_path.as_posix()!r})\n"
+                f"LOG_PATH = Path({log_path.as_posix()!r})\n"
+                f"FAIL_CLOSE = {bool(fail_close)!r}\n"
                 "args = sys.argv[1:]\n"
                 "state = json.loads(STATE_PATH.read_text(encoding='utf-8'))\n"
+                "LOG_PATH.write_text(LOG_PATH.read_text(encoding='utf-8') + ' '.join(args) + '\\n' if LOG_PATH.exists() else ' '.join(args) + '\\n', encoding='utf-8')\n"
                 "if args[:2] == ['issue', 'view']:\n"
-                "    print(json.dumps(state))\n"
+                "    print(json.dumps(state[str(int(args[2]))]))\n"
                 "    raise SystemExit(0)\n"
                 "if args[:2] == ['issue', 'close']:\n"
-                "    state['state'] = 'CLOSED'\n"
+                "    if FAIL_CLOSE:\n"
+                "        print(f'close failed: {args[2]}', file=sys.stderr)\n"
+                "        raise SystemExit(1)\n"
+                "    state[str(int(args[2]))]['state'] = 'CLOSED'\n"
                 "    STATE_PATH.write_text(json.dumps(state) + '\\n', encoding='utf-8')\n"
                 "    raise SystemExit(0)\n"
                 "if args[:2] == ['issue', 'list']:\n"
-                "    print(json.dumps([state]))\n"
+                "    print(json.dumps(list(state.values())))\n"
                 "    raise SystemExit(0)\n"
                 "print(f'unexpected gh args: {args}', file=sys.stderr)\n"
                 "raise SystemExit(99)\n"
@@ -93,7 +110,7 @@ class TestCliClose(CliRuntimeHarness):
             self.assertTrue(issue_dir.is_dir())
 
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            self.assertEqual(state["state"], "CLOSED")
+            self.assertEqual(state["55"]["state"], "CLOSED")
 
     def test_close_command_accepts_explicit_github_issue_flag(self) -> None:
         if os.name == "nt":
@@ -156,7 +173,7 @@ class TestCliClose(CliRuntimeHarness):
             self.assertIn("spec-dock: ok (close)", p.stdout)
             self.assertIn("target=github:example/repo#55", p.stdout)
 
-    def test_close_then_sync_github_marks_issue_done(self) -> None:
+    def test_close_refreshes_github_backed_derived_state_without_manual_sync(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
 
@@ -178,8 +195,52 @@ class TestCliClose(CliRuntimeHarness):
             close_result = self._run_runtime_capture(target, ["close", "55"], env=test_env)
             self.assertEqual(close_result.returncode, 0, close_result.stdout + close_result.stderr)
 
-            sync_result = self._run_runtime_capture(target, ["sync", "--github", "--no-update-active"], env=test_env)
-            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            self.assertEqual(index_all["nodes"]["iss-00055"]["status"], "done")
+
+    def test_close_already_closed_refreshes_github_backed_derived_state(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=1,
+                epic_issue_number=2,
+                issue_issue_number=55,
+            )
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_close_stub(bin_dir, issue_number=55, initial_state="CLOSED")
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            close_result = self._run_runtime_capture(target, ["close", "55"], env=test_env)
+            self.assertEqual(close_result.returncode, 0, close_result.stdout + close_result.stderr)
+            self.assertIn("already_closed=true", close_result.stdout)
 
             index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
             self.assertEqual(index_all["nodes"]["iss-00055"]["status"], "done")
+
+    def test_close_failure_does_not_run_post_sync(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target, issue_issue_number=55)
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            self._make_gh_issue_close_stub(bin_dir, issue_number=55, fail_close=True)
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["close", "55"], env=test_env)
+
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("close failed: 55", p.stderr)
+            log = (bin_dir / "gh-calls.log").read_text(encoding="utf-8")
+            self.assertNotIn("issue list", log)
