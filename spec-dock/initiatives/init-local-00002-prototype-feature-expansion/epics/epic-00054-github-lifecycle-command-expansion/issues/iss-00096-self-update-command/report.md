@@ -201,7 +201,7 @@ spec-dock: ok (validate) nodes=41
 | S02 | tc-006 | README / shipped docs parity is updated or valid approved-no-op is justified | `rg -n "scripts/spec-dock update|uvx --no-cache|spec-dock update" README.md src/spec_dock/assets/spec_dock` -> updated docs hits present; `python -m unittest tests.cli_runtime.test_wrappers -v` -> OK, 6 tests; fresh `code-reviewer` pass | implemented / review passed | README, shipped templates README, docs README, and GitHub reference now document repo-local no-cache self-update path |
 | S03 | tc-007 | Dogfooding mirror is refreshed/inspected and local `update --help` passes | Pre-check `./spec-dock/scripts/spec-dock update --help` failed before refresh with invalid choice; `PYTHONPATH=src python -m spec_dock.cli update .` failed in sandbox on `.agents/host-adapters/meta.json`; escalated rerun succeeded; `./spec-dock/scripts/spec-dock update --help` -> pass; `./spec-dock/scripts/spec-dock validate` -> ok; fresh `code-reviewer` pass | implemented / review passed | Dogfooding mirror now contains runtime update command and shipped docs mirror |
 | S04 | tc-008 | Checked-in dogfooding metadata snapshot includes the active issue `.meta.json` path and empty dependency snapshot | First `python -m unittest discover -v` failed only in `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`; observed extra path was `iss-00096-self-update-command/.meta.json`; targeted snapshot test after fix -> OK; second full suite -> `Ran 804 tests in 391.705s` / `OK`; fresh `code-reviewer` pass | implemented / review passed / committed | Snapshot-only test maintenance in `tests/test_init_update.py` |
-| S05 | tc-009 | Source/cache override forms fail closed without invoking `uvx` | Final QA P2 finding requested explicit coverage for arbitrary source/cache override boundary; `python -m unittest tests.cli_runtime.test_update -v` -> Ran 7 tests / OK | implemented / review pending | Test-only hardening; runtime code unchanged |
+| S05 | tc-009 | Source/cache override forms fail closed without invoking `uvx` | Final QA P2 finding requested explicit coverage for arbitrary source/cache override boundary; `python -m unittest tests.cli_runtime.test_update -v` -> Ran 7 tests / OK; fresh `code-reviewer` pass | implemented / review passed / committed | Test-only hardening; runtime code unchanged |
 
 #### Test Contract Closure
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
@@ -261,7 +261,7 @@ spec-dock: ok (validate) nodes=41
 | S02 | committed | Docs parity + report evidence | `f5f0edc3b01bdbc0601533cc5c714b29e179b95a` | `git status --short --branch` after commit showed only later-step work | N/A | N/A | N/A | N/A |
 | S03 | committed | Dogfooding mirror refresh/inspection + report evidence | `ad216408f97c81dd6b03c73f3da87bdf262043f1` | `git status --short --branch` after commit clean before S04 snapshot fix | N/A | N/A | N/A | N/A |
 | S04 | committed | Checked-in dogfooding metadata snapshot test update + plan/report evidence | `1dd1da1ec24c59fef9ebde3399dd68bf5f52bc2d` | `git status --short --branch` after commit clean | N/A | N/A | N/A | N/A |
-| S05 | verification passed / review passed / not committed | QA hardening source/cache override negative tests + plan/report evidence | N/A | N/A | N/A | N/A | N/A | N/A |
+| S05 | committed | QA hardening source/cache override negative tests + plan/report evidence | `abb3b70176ed454736405e0fb6ebb22aeafca10e` | `git status --short --branch` after commit clean | N/A | N/A | N/A | N/A |
 
 ## Final Quality Gate (必須)
 
@@ -278,21 +278,26 @@ spec-dock: ok (validate) nodes=41
 | qa-reviewer | whole issue test adequacy | pending | Not started | blocked until S90 complete |
 | qa-reviewer | whole issue test adequacy | targeted tests plus full suite; integration live network update intentionally not exercised because command is a fixed subprocess wrapper | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate`; `python -m unittest tests.cli_runtime.test_update -v`; `python -m unittest tests.cli_runtime.test_wrappers -v`; `python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -v`; `./spec-dock/scripts/spec-dock update --help`; `python -m unittest discover -v` -> 804 tests OK; `rg --files | rg '[A-Z]'` existing uppercase paths only | pending fresh QA review |
 | qa-reviewer | final QA P2 hardening follow-up | focused negative behavior coverage only; no live network and no runtime code change | Added `test_update_rejects_source_and_cache_overrides_without_invoking_uvx` for `update --from <source>` and `update --cache-dir <path>`; `python -m unittest tests.cli_runtime.test_update -v` -> Ran 7 tests / OK; hermetic `uvx` args log remains absent for rejected override forms | addressed |
+| qa-reviewer | whole issue final QA re-review after S05 | no additional live-network integration required; fixed subprocess wrapper is covered by hermetic command construction and output/exit propagation tests | Fresh `qa-reviewer` pass after S05. Reviewer confirmed source/cache override P2 is addressed and no new P0/P1 test adequacy gaps remain; `python -m unittest tests.cli_runtime.test_update -v` -> Ran 7 tests / OK; `./spec-dock/scripts/spec-dock validate` -> ok nodes=41 | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
 | code-reviewer | issue-wide integrated diff | Not started | 0 | blocked until S90 complete |
+| code-reviewer | issue-wide integrated diff, runtime command, parser/registry wiring, provider/dogfooding assets, docs, tests, and report ledger | No findings. Reviewer found no integrated correctness, security-boundary, or regression issues and said final spec review may proceed | 0 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
 | spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | Not started | 0 | blocked until final QA and code review pass |
+| spec-reviewer | first final spec review | P1: Final Exit Contract omitted `tc-008` and `tc-009`; P1: S05 commit ledger was stale. Fixed by updating plan final exit coverage to `tc-001` through `tc-009` and recording S05 commit `abb3b70176ed454736405e0fb6ebb22aeafca10e` with clean post-commit evidence | 1 | re-review pending |
+| spec-reviewer | final spec re-review after P1 fixes | No findings. Reviewer confirmed prior P1 issues are corrected and `./spec-dock/scripts/spec-dock issue finish` may run after final ledger commit and clean worktree confirmation | 1 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
 | Final closure, review, validation, and commit scope ledger | Final report ledger and any final gate fixes | final response; PR / issue comment only if explicitly requested later | blocked until final gates pass |
+| Final closure, review, validation, and commit scope ledger | Final plan/report ledger for S90/S99, S05 hardening, final reviews, and finish permission | final response; PR / issue comment only if explicitly requested later | pending final ledger commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `design.md` と `plan.md` がテンプレート状態で implementation-ready ではなかった。
