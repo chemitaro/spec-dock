@@ -817,7 +817,7 @@ OK
 #### Step Commit Gate
 | step | commit | status | notes |
 |---|---|---|---|
-| S99 | pending | ready | Fresh QA / code / spec review passed; final commit required. |
+| S99 | `1ed5c69 test(sync): 自動同期の最終品質ゲートを閉じる` | committed | Fresh QA / code / spec review passed before final quality-gate commit. |
 
 #### Final QA / Code Review Evidence
 | gate | reviewer | review_status | findings / disposition |
@@ -909,10 +909,15 @@ OK
 |---|---|---|---|---|
 | fresh `spec-reviewer` (`019e22b2-9676-7ef3-b86b-b83b9648c061`) | requirement / design / plan / report / implementation / tests / docs alignment | P2 follow-ups only: clarify non-issue dashboard acceptance coverage and normalize stale ledger rows. Stale ledger rows were normalized in this report update; non-issue dashboard contract remains recorded as follow-up. | 0 | pass |
 
+### Manual Test Gate
+| manual test | GitHub repo | evidence | result |
+|---|---|---|---|
+| 2026-05-14 hands-on auto-sync workflow | `chemitaro/spec-dock-manual-iss-00093-auto-sync` | `manual-tests/reports/2026-05-14-iss-00093-auto-sync-manual/summary.md`; `manual-tests/reports/2026-05-14-iss-00093-auto-sync-manual/execution-log.md`; `validate` ok nodes=7; `doctor` ok findings=0; all temporary GitHub issues closed | pass |
+
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| final reviewer results recorded; cl-017 pass | S99 remediation, dogfooding runtime mirror sync, tests, final report ledger | final response | ready |
+| final reviewer results recorded; cl-017 pass; manual test gate pass recorded | S99 remediation, dogfooding runtime mirror sync, tests, final report ledger, manual test evidence ledger | PR and issue close-out response | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
