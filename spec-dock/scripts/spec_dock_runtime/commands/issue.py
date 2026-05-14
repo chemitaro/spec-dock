@@ -91,7 +91,8 @@ def _run_issue_start(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 def _run_issue_finish(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     _expect_issue_finish_args(args)
     result = use_cases.issue_finish(IssueFinishRequest())
-    return CommandOutcome(exit_code=0, text=render_issue_finish_text(result))
+    post_sync_failed = result.post_sync is not None and result.post_sync.failed
+    return CommandOutcome(exit_code=1 if post_sync_failed else 0, text=render_issue_finish_text(result))
 
 
 def _expect_issue_start_args(args: CommandArgs) -> IssueStartArgs:

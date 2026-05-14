@@ -221,6 +221,32 @@ class _StubActiveStateStore:
         self.calls.append(("restore_previous_state", str(specdock_dir), snapshot))
 
 
+class _SuccessfulSyncLegacyRunner:
+    def __init__(self, app_contracts, domain_models):
+        self._app_contracts = app_contracts
+        self._domain_models = domain_models
+        self.calls = []
+
+    def run_sync(self, req, *, active_manifest_mode="migrate"):
+        self.calls.append((req, active_manifest_mode))
+        return self._app_contracts.SyncCommandResult(
+            state=self._app_contracts.SyncStateResult(
+                graph=self._domain_models.SpecGraph(nodes_by_id={}),
+                active=None,
+                issue_statuses={},
+                progress=self._domain_models.ProgressMap(by_node_id={}, counts={}),
+                deps_state=self._domain_models.DepsState(nodes=[], warnings=[]),
+                deps_eval_by_id={},
+                generated_at="2026-05-13T00:00:00Z",
+                warnings=[],
+                deps_preflight_error=None,
+            ),
+            write_result=None,
+            active_update=None,
+            artifact_failure=None,
+        )
+
+
 class _StubNodeRepository:
     def __init__(self):
         self.delete_calls = []
@@ -334,11 +360,11 @@ class TestRuntimeDeleteS13(unittest.TestCase):
         node_repo=None,
         active_state_store=None,
         node_reader=None,
+        sync_legacy_runner=None,
     ):
         app_contracts, _app_delete_node, app_ports, _cli_dispatch, _cli_parser, _cli_registry, _domain_models, infra_contracts = (
             _runtime_modules()
         )
-        del app_contracts
         if repo_root is None:
             repo_root = Path("/repo")
         for record in records:
@@ -356,6 +382,8 @@ class TestRuntimeDeleteS13(unittest.TestCase):
             active_state_store=active_state_store or _StubActiveStateStore(infra_contracts, active_manifest),
             issue_gateway=issue_gateway,
             node_repo=node_repo,
+            sync_legacy_runner=sync_legacy_runner
+            or _SuccessfulSyncLegacyRunner(app_contracts, _domain_models),
         )
 
     def _request(self, app_contracts, **overrides):
