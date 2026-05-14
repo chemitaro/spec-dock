@@ -908,6 +908,7 @@ OK
 | reviewer | finding | fix | verification | result |
 |---|---|---|---|---|
 | Codex GitHub review `discussion_r3238202755` | `gh_index_incomplete` was treated as a fatal post-sync warning, causing false failures when `issue list` is incomplete but per-issue fetch backfills state. | Removed `gh_index_incomplete` from `POST_MUTATION_FATAL_WARNING_CODES`; kept it as a non-fatal warning in outcome / JSON; updated provider and dogfooding runtime mirrors plus tests and spec docs. | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 tests.presentation_runtime.test_runtime_sync_s07 -v`; `./spec-dock/scripts/spec-dock validate` | pass |
+| Codex GitHub review `discussion_r3238246448` | dogfooding mirror missed provider command-layer post-sync failure semantics for `deps`, `delete`, and `close`. | Synchronized mirror command/use-case files from provider source for `deps`, `delete`, and `close`, preserving provider as source of truth and dogfooding parity. | provider/mirror `diff -u` for affected files produced no output; focused command suites and `validate` rerun | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
