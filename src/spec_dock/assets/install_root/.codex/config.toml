@@ -91,7 +91,6 @@ developer_instructions = """
 - handoff は前提 / 結論 / 未解決事項だけを短く渡す。
 """
 
-approvals_reviewer = "user"
 project_doc_fallback_filenames = [".codex/AGENTS.md"]
 
 
