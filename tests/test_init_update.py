@@ -81,6 +81,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/workflow_spec_authoring.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
         ),
+        "spec-dock/docs/authoring/issue-plan.md": (
+            "src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"
+        ),
         "spec-dock/docs/workflow_initiative.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"
         ),
@@ -883,6 +886,60 @@ class TestInitUpdate(CliRuntimeHarness):
                 legacy_token,
                 guide_text,
                 f"guide contains legacy link token: {legacy_token}",
+            )
+
+    def _assert_concrete_test_cases_nested_list_contract(self, text: str, *, source: str) -> None:
+        marker = "#### 具体テストケース一覧"
+        self.assertIn(marker, text, f"{source} must include concrete test case section")
+        section = text.split(marker, 1)[1]
+        section_end_candidates = [
+            index
+            for index in (
+                section.find("\n#### "),
+                section.find("\n## "),
+            )
+            if index != -1
+        ]
+        if section_end_candidates:
+            section = section[: min(section_end_candidates)]
+        self.assertNotRegex(
+            section,
+            r"(?m)^\|.*\|$",
+            f"{source} concrete test case section must not contain table rows",
+        )
+        case_pattern = re.compile(
+            r"(?m)^- `tc-s\d{2}-\d{3}` [a-z-]+: .+\n"
+            r"(?:  - .+\n)+"
+        )
+        case_blocks = case_pattern.findall(section)
+        self.assertGreaterEqual(
+            len(case_blocks),
+            2,
+            f"{source} must include at least two concrete nested test case examples",
+        )
+        require_related_closure_id = len(case_blocks) > 1
+        for case_block in case_blocks:
+            self.assertRegex(
+                case_block,
+                r"(?m)^- `tc-s\d{2}-\d{3}` [a-z-]+: .+$",
+                f"{source} concrete case must start with a backticked concrete test case id bullet",
+            )
+            for label in ("前提", "操作", "期待結果", "失敗検出", "検証方法"):
+                self.assertRegex(
+                    case_block,
+                    rf"(?m)^  - {label}: .+",
+                    f"{source} concrete case missing nested {label}: {case_block}",
+                )
+            if require_related_closure_id:
+                self.assertRegex(
+                    case_block,
+                    r"(?m)^  - 関連 closure id: .+",
+                    f"{source} multi-case section must map each case to related closure id: {case_block}",
+                )
+            self.assertNotRegex(
+                case_block,
+                r"(?m)^\|.*\|$",
+                f"{source} concrete case must not use a table row: {case_block}",
             )
 
     def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
@@ -1857,6 +1914,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((docs_dir / "phase_requirement.md").is_file())
             self.assertTrue((docs_dir / "phase_design.md").is_file())
             self.assertTrue((docs_dir / "phase_plan.md").is_file())
+            self.assertTrue((docs_dir / "authoring" / "issue-plan.md").is_file())
             self.assertTrue((docs_dir / "reference_github.md").is_file())
             self.assertTrue((docs_dir / "reference_naming.md").is_file())
             self.assertTrue((docs_dir / "reference_sync.md").is_file())
@@ -1891,10 +1949,30 @@ class TestInitUpdate(CliRuntimeHarness):
             phase_requirement = (docs_dir / "phase_requirement.md").read_text(encoding="utf-8")
             phase_design = (docs_dir / "phase_design.md").read_text(encoding="utf-8")
             phase_plan = (docs_dir / "phase_plan.md").read_text(encoding="utf-8")
+            issue_plan_authoring = (docs_dir / "authoring" / "issue-plan.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("fresh `spec-reviewer`", workflow_spec_authoring)
             self.assertIn("`review_status: pass`", workflow_spec_authoring)
             self.assertIn("Spec Authoring Gate", workflow_spec_authoring)
             self.assertIn("scope / non-scope", workflow_spec_authoring)
+            self.assertIn("docs/authoring/<scope>-<phase>.md", workflow_spec_authoring)
+            self.assertIn("docs/authoring/issue-plan.md", workflow_spec_authoring)
+            self.assertIn("具体テストケース一覧", workflow_spec_authoring)
+            self.assertIn("カード型のネストリスト", issue_plan_authoring)
+            self.assertIn("横長テーブルに押し込まない", issue_plan_authoring)
+            self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan_authoring)
+            self.assertIn("concrete test case id", issue_plan_authoring)
+            self.assertIn("関連 closure id", issue_plan_authoring)
+            self.assertIn("この文書を入口として読んだあと", issue_plan_authoring)
+            self.assertIn("複数の closure id または複数の concrete test case", issue_plan_authoring)
+            self._assert_concrete_test_cases_nested_list_contract(
+                issue_plan_authoring,
+                source="docs/authoring/issue-plan.md",
+            )
+            for fragment in ("前提", "操作", "期待結果", "失敗検出", "検証方法"):
+                self.assertIn(fragment, issue_plan_authoring)
+            self.assertIn("Spec-Locked Closure Index", issue_plan_authoring)
             for workflow_text in (workflow_initiative, workflow_epic, workflow_issue):
                 self.assertIn("workflow_spec_authoring.md", workflow_text)
                 self.assertIn("fresh `spec-reviewer`", workflow_text)
@@ -3060,6 +3138,20 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("negative:", issue_plan)
         self.assertIn("pre-implementation evidence:", issue_plan)
         self.assertIn("expected red / characterization pass / test sensitivity evidence", issue_plan)
+        self.assertIn("#### 具体テストケース一覧", issue_plan)
+        self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan)
+        self.assertIn("- `tc-s01-002` negative: <短い説明>", issue_plan)
+        self.assertIn("具体テストケース本文は横長 table にせず", issue_plan)
+        self._assert_concrete_test_cases_nested_list_contract(
+            issue_plan,
+            source="templates/issue/plan.md",
+        )
+        for fragment in ("前提:", "操作:", "期待結果:", "失敗検出:", "検証方法:"):
+            self.assertIn(fragment, issue_plan)
+        self.assertIn("テスト不要理由:", issue_plan)
+        self.assertIn("代替検証方法:", issue_plan)
+        self.assertIn("S01 の subsections を複製して記入する", issue_plan)
+        self.assertIn("implementation-ready ではない", issue_plan)
         self.assertIn("#### step closure contract", issue_plan)
         self.assertIn("closure id:", issue_plan)
         self.assertIn("close 条件:", issue_plan)
@@ -3158,6 +3250,15 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("`test id alias` と `resolves to closure id`", phase_plan_issue)
         self.assertIn("`test bundle` は Central index の `locked expectation` / `observable input/state` を再記述しない", phase_plan_issue)
         self.assertIn("各 step の close 判定は Issue 全体の一覧表ではなく", phase_plan_issue)
+        self.assertIn("`具体テストケース一覧`", phase_plan_issue)
+        self.assertIn("カード型ネストリスト", phase_plan_issue)
+        self.assertIn("横長 table は trace matrix", phase_plan_issue)
+        self.assertIn("- `tc-s01-001` acceptance: <短い説明>", phase_plan_issue)
+        self.assertIn("concrete test case id", phase_plan_issue)
+        self.assertIn("closure `id` や `test ids` alias とは別物", phase_plan_issue)
+        for fragment in ("`前提`", "`操作`", "`期待結果`", "`失敗検出`", "`検証方法`"):
+            self.assertIn(fragment, phase_plan_issue)
+        self.assertIn("implementation-ready ではない", phase_plan_issue)
         self.assertIn("plan amendment と re-review を必須", phase_plan_issue)
         self.assertIn("every `required=yes` closure row", phase_plan_issue)
         self.assertIn("every bundle `closure id` が Central index に存在", phase_plan_issue)
@@ -3221,6 +3322,7 @@ class TestInitUpdate(CliRuntimeHarness):
             / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ).read_text(encoding="utf-8")
         self.assertIn("spec-dock/docs/phase_plan_issue.md", issue_execution_skill)
+        self.assertIn("spec-dock/docs/authoring/issue-plan.md", issue_execution_skill)
         self.assertIn("Keep templates as scaffolds", issue_execution_skill)
         self.assertIn("Spec authoring mode", issue_execution_skill)
         self.assertIn("Execution mode", issue_execution_skill)
@@ -3243,6 +3345,12 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("final commit hash plus post-commit clean evidence are recorded in external delivery evidence", issue_execution_skill)
         self.assertIn("required closure id", issue_execution_skill)
         self.assertIn("behavior slice `closure ids` / `test ids`", issue_execution_skill)
+        self.assertIn("具体テストケース一覧", issue_execution_skill)
+        self.assertIn("table-only", issue_execution_skill)
+        self.assertIn("concrete test case id", issue_execution_skill)
+        self.assertNotIn("each test id at the start", issue_execution_skill)
+        for fragment in ("`前提`", "`操作`", "`期待結果`", "`失敗検出`", "`検証方法`"):
+            self.assertIn(fragment, issue_execution_skill)
         self.assertIn("verification command, or evidence path", issue_execution_skill)
         self.assertIn("Step Contract Closure", issue_execution_skill)
         self.assertIn("Test Contract Closure", issue_execution_skill)
@@ -9287,6 +9395,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "spec-dock/active/issue/plan.md",
                 "spec-dock/active/issue/report.md",
                 "spec-dock/docs/workflow_issue.md",
+                "spec-dock/docs/authoring/issue-plan.md",
+                "具体テストケース一覧",
+                "前提",
+                "操作",
+                "期待結果",
+                "失敗検出",
+                "検証方法",
                 "1 implementation step = 1 code-reviewer scope = 1 commit",
             ),
         }

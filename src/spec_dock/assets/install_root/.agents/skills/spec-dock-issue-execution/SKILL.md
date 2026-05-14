@@ -19,8 +19,10 @@ description: Leaf skill for issue execution tasks in spec-dock.
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
   - `spec-dock/docs/phase_plan_issue.md`
+  - `spec-dock/docs/authoring/issue-plan.md`
 - Keep templates as scaffolds. Use the docs above for authoring guidance, including Issue dependency analysis, `Module Dependency Diagram`, Linux `tree` style file-change planning, and step ordering.
 - Spec authoring mode: shape `requirement.md`, `design.md`, and `plan.md` for the project. Add, remove, merge, reorder, or rewrite template sections when it improves correctness, human understanding, or agent executability. Remove irrelevant placeholders.
+- In spec authoring mode, Issue `plan.md` must satisfy `spec-dock/docs/authoring/issue-plan.md`. Each implementation step needs a `具体テストケース一覧` that uses card-style nested list test cases, not a wide table, with each concrete test case id at the start of the top-level bullet.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to implementation until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
 - Record each `Spec Authoring Gate` in `spec-dock/active/issue/report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
 - In spec authoring mode, use the optional diagram catalog in `spec-dock/docs/phase_design.md` as the authoritative source for diagram choices. Add catalog-listed or project-specific sections only when they clarify the issue.
@@ -34,6 +36,7 @@ description: Leaf skill for issue execution tasks in spec-dock.
 - If sub-agents are unavailable, use degraded mode and record the environment reason, alternate verification, and added review evidence. Degraded mode never waives `code-reviewer`, `qa-reviewer`, or `spec-reviewer` gates.
 - Role selection matrix: `repo-analyst` maps code paths, impact, dependencies, and existing patterns before implementation; `dev-coder` handles bounded implementation steps with a clear write scope; `doc-writer` updates docs / templates / workflow / skill text; `qa-reviewer` owns final test adequacy and integration-test need; `code-reviewer` owns per-step diffs and the issue-wide integrated diff; `spec-reviewer` owns requirement / design / plan / report / implementation / docs alignment.
 - Before implementation starts, stop if any required closure id in `plan.md` is not referenced from a behavior slice `closure ids` / `test ids` list, or if a required closure row has no step-local close condition, verification command, or evidence path.
+- Before implementation starts, stop if any implementation step is missing `具体テストケース一覧`, if concrete test cases are only global / table-only / abstract, or if a test case lacks the standard `前提`, `操作`, `期待結果`, `失敗検出`, and `検証方法` fields. Docs-only or approved-no-op steps must state the test-not-needed reason and alternate verification.
 - Do not change a required closure row, `locked expectation`, `required`, or meaning-bearing `spec link` during implementation without first updating the plan/design and getting re-review.
 - Do not report complete unless every required closure id is closed in `spec-dock/active/issue/report.md` through `Step Contract Closure`, `Test Contract Closure`, and `Closure Coverage`.
 - Record additions, removals, changed rows, intentionally unimplemented rows, and re-review decisions in `Closure Delta`.
