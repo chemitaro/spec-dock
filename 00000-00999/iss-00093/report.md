@@ -72,7 +72,7 @@ spec-dock: ok (validate) nodes=40
 | tc-s01-002 | S01 | yes | red-required | exception capture missing before S01 implementation | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | exception outcome keeps mutation-success context and guidance. |
 | tc-s01-003 | S01 | yes | red-required | artifact failure was not represented as post-mutation outcome before S01 | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | artifact failure marks failed and reports stale / partial guidance. |
 | tc-s01-004 | S01 | yes | red-required | fatal GitHub warning predicate missing before S01 | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | `gh_fetch_failed` marks failed. |
-| tc-s01-005 | S01 | yes | red-required | fatal GitHub warning predicate missing before S01 | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | `gh_index_incomplete` marks failed. |
+| tc-s01-005 | S01 | yes | revised-after-pr-review | `gh_index_incomplete` was originally fatal, but Codex PR review found it can be a false failure when per-issue fetch backfills missing index entries | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | `gh_index_incomplete` remains a warning but does not mark post-sync failed. |
 | tc-s01-006 | S01 | yes | red-required | no post-mutation request policy wrapper before S01 | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | request uses GitHub enabled, limit 10000, force false, no branch active update, no-migrate active manifest. |
 | tc-s01-007 | S01 | yes | red-required | helper boundary not present before S01 | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v`; code review inspection | pass | helper is explicit-call only; no command-handler generic finally hook or target mutation wiring was added. |
 | tc-s01-008 | S01 | yes | red-required | skip outcome path missing before S01 | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 -v` | pass | skipped outcome is non-failed and has no recovery guidance. |
@@ -615,7 +615,7 @@ git log --oneline --decorate -1
 - changed behavior:
   - `new initiative` / `new epic` / `new issue` and `deps add/remove` now return exit code 1 when mutation succeeds but post-mutation sync fails.
   - CLI rendering keeps the mutation success line visible and adds auto-sync failure guidance for post-sync failures.
-  - fatal GitHub post-sync warnings such as `gh_fetch_failed` and `gh_index_incomplete` surface as auto-sync failure guidance.
+  - fatal GitHub post-sync warnings such as `gh_fetch_failed` surface as auto-sync failure guidance; `gh_index_incomplete` remains a non-fatal warning because per-issue fetch can backfill index misses.
   - `delete --json` includes `post_sync.status` (`success` / `failed` / `skipped`) plus warning/guidance details, and command exit is non-zero on post-sync failure.
   - parser/help assertions confirm no `--no-auto-sync` / equivalent opt-out is exposed.
 - closure evidence:
@@ -903,6 +903,11 @@ OK
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
 | fresh `code-reviewer` (`019e22ad-7351-7353-bd1c-39254bef2413`) | issue-wide integrated diff | P2 follow-ups only: local-only GitHub fetch optimization and richer failure reason text | 0 | pass |
+
+### PR Review Remediation
+| reviewer | finding | fix | verification | result |
+|---|---|---|---|---|
+| Codex GitHub review `discussion_r3238202755` | `gh_index_incomplete` was treated as a fatal post-sync warning, causing false failures when `issue list` is incomplete but per-issue fetch backfills state. | Removed `gh_index_incomplete` from `POST_MUTATION_FATAL_WARNING_CODES`; kept it as a non-fatal warning in outcome / JSON; updated provider and dogfooding runtime mirrors plus tests and spec docs. | `python -m unittest tests.cli_runtime.test_post_mutation_sync_s01 tests.presentation_runtime.test_runtime_sync_s07 -v`; `./spec-dock/scripts/spec-dock validate` | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
