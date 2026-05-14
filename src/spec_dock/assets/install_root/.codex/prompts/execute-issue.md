@@ -30,16 +30,21 @@ Before implementation starts:
    execution and completion.
 5. Treat `spec-dock/docs/workflow_spec_authoring.md` as the source of truth if
    requirement, design, or plan is not implementation-ready.
+6. Read `spec-dock/docs/authoring/issue-plan.md` when it exists and use it as
+   the Issue `plan.md` authoring contract for step-local concrete test cases.
 
 If the active issue docs are missing, contradictory, template-only, or not
 implementation-ready, do not start coding. Repair the issue docs through the
 spec authoring workflow and fresh spec-reviewer gates before implementation.
+Missing step-local `具体テストケース一覧`, table-only concrete test cases, or
+cases without `前提`, `操作`, `期待結果`, `失敗検出`, and `検証方法` fields means
+the plan is not implementation-ready.
 
 When implementation is ready:
 
 - Follow `plan.md` step order exactly.
-- Use each step's step-local test cases, closure ids, close conditions,
-  verification commands, and evidence paths.
+- Use each step's card-style nested `具体テストケース一覧`, closure ids, close
+  conditions, verification commands, and evidence paths.
 - Preserve the `1 implementation step = 1 code-reviewer scope = 1 commit`
   contract unless the approved issue plan is amended and re-reviewed first.
 - Record implementation delegation decisions, step evidence, reviewer results,

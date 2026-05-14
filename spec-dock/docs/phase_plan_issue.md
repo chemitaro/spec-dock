@@ -41,6 +41,12 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - required row の削除、`locked expectation` の変更、`required` の変更、`spec link` の意味変更は plan amendment と re-review を必須にする
 - typo / link correction は `report.md` の `Closure Delta` に記録してよい。新規 bug による regression 追加は Central index と step closure contract へ追加し、report に記録する
 - `test bundle` は必要な範囲で acceptance / characterization / property or invariant / regression / negative を分類する
+- 各 implementation step は `具体テストケース一覧` を必須で持つ。これは TDD 実行入力であり、`Spec-Locked Closure Index` や `test bundle` の代替ではない
+- `具体テストケース一覧` は PC の Markdown preview / GitHub 表示で読みやすいカード型ネストリストを標準にする。横長 table は trace matrix や短い index に限定し、1ケースの本文を table に押し込まない
+- 各 concrete test case は top-level bullet を ``- `tc-s01-001` acceptance: <短い説明>`` の形にし、下位項目として `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法` を持つ
+- concrete test case id は検索できるように各 concrete test case の先頭へ backtick 付きで置く。これは Central index の closure `id` や `test ids` alias とは別物であり、必要な場合だけ `関連 closure id` で紐付ける
+- docs-only / approved-no-op step で concrete test case を置かない場合は、テスト不要理由と代替検証方法を `具体テストケース一覧` に明記する
+- `具体テストケース一覧` がない implementation step、または「テストを追加する」「動作確認する」だけの抽象表現は implementation-ready ではない
 - `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを明記する
 - `test sensitivity evidence` は failing-first を完全要求できない場合に、bug-seed / mutation / contract mismatch / property violation などでテストが欠陥を検出できることを示す
 - 各 step の close 判定は Issue 全体の一覧表ではなく、その step の `step closure contract` を正本にする
@@ -77,6 +83,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `Spec-Locked Closure Index` を置く
 - `実装ステップ` を step / block / behavior slice で書く
 - 各 behavior slice の `step closure contract` / `test bundle` / `pre-implementation evidence` / `bounded implementation batch` / `verification` を置き、`test bundle` は closure index の `id` を参照できるようにする
+- 各 implementation step に `具体テストケース一覧` を置き、ネストリストで `前提` / `操作` / `期待結果` / `失敗検出` / `検証方法` を書く
 - `refactor / tidy` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
 - 各 step gate に `code-reviewer gate`、`commit gate`、`no-op gate`、`report update` を置く
 - `S90 docs impact resolution / docs refresh` を必須で置く
@@ -100,6 +107,9 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - every required row が non-placeholder の `spec link`、`observable input/state`、`locked expectation`、`evidence level`、`closure evidence` を持つ
 - every required row に step-local close condition と planned verification evidence path がある
 - behavior slice が step closure contract、test bundle、pre-implementation evidence を持ち、bounded implementation batch として原因局所化できる
+- 各 implementation step が step-local な `具体テストケース一覧` を持ち、各 case が `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法` を含む
+- concrete test case が横長 table に押し込まれて読みづらい場合、または global test plan だけで step-local case がない場合は fail とする
+- docs-only / approved-no-op step は、テスト不要理由と inspection / manual / docs diff などの代替検証方法を持つ
 - 各 implementation step が commit 単位として設計され、`code-reviewer gate`、`commit gate`、`no-op gate` を持っている
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
