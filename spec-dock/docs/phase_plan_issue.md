@@ -16,6 +16,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
   - review / QA / spec gate 方針
   - 依存関係から導いた step 順
   - nested execution structure
+  - per-step delegation contract
   - docs impact gate
   - final quality gate with `qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`
   - final exit contract
@@ -35,6 +36,15 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - 各 behavior slice には closure index の `id` に対応する `step closure contract`、`test bundle`、`pre-implementation evidence`、`bounded implementation batch`、`verification`、`refactor / tidy` を置く
 - Central index は仕様由来の `spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step を所有する
 - `step closure contract` はその step で満たす closure `id`、close condition、test bundle、pre-implementation evidence、verification command / evidence path、report evidence を所有する
+- 各 implementation step には `delegation contract` を置く。これは `workflow_issue.md` の `Parent Agent Invariant`、`Implementation Delegation Gate`、delegated worker handoff、reviewer gate mapping を plan step へ埋め込むための欄であり、実行 policy を再定義しない
+- `delegation contract` は `delegated role`、`input docs`、`allowed paths`、`forbidden changes`、`acceptance criteria`、`required tests or docs-only verification`、`reviewer focus`、`stop conditions`、`output required` を持つ
+- `delegated role` は step の変更種別に合わせる。runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`、shipped docs / templates / skills / workflow text は `doc-writer` を primary worker とし、混在する場合は step を分割するか reviewer focus と gate を明記する
+- `input docs` は `requirement.md`、`design.md`、`plan.md`、該当 workflow / authoring docs、target files など、worker が判断を補わずに読める正本を列挙する
+- `allowed paths` は `design.md` の `ディレクトリ / ファイル変更計画` から該当 step の subset として書き、`forbidden changes` には source-of-truth 逸脱、scope 外ファイル、別 step の変更、runtime / docs の混在などを明記する
+- `acceptance criteria` は closure index と step closure contract へ追跡できる観測可能な完了条件にし、`required tests or docs-only verification` は targeted command、manual evidence、inspection、docs diff など step に必要な検証を具体化する
+- `reviewer focus` は `workflow_issue.md` の reviewer gate mapping を参照して、code / runtime / tests / scaffold behavior なら `code-reviewer`、docs-only / template-only / skill-text-only なら `spec-reviewer` docs/spec alignment を基本にする。委任は reviewer gate の代替ではない
+- `stop conditions` は許可パス外変更、入力 docs の矛盾、検証不能、delegated role 不適合、host policy / tool 制約、acceptance 未達など、worker が親 Codex へ戻す条件を書く
+- `output required` は changed files、worker summary、verification result、unresolved risks、reviewer が確認すべき evidence、report へ転記する delegation evidence を指定する
 - `test bundle` は step closure contract の一部として、必要な範囲で acceptance / characterization / property or invariant / regression / negative を分類する
 - `test ids` と書く場合も Central index の closure `id` の alias として扱い、別 alias を使う場合は report の `Closure Delta` に `test id alias` と `resolves to closure id` を記録する
 - `test bundle` は Central index の `locked expectation` / `observable input/state` を再記述しない
@@ -52,7 +62,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - 各 step の close 判定は Issue 全体の一覧表ではなく、その step の `step closure contract` を正本にする
 - `step closure contract` は `close when`、`verification evidence`、`report evidence`、`residual risk` を持ち、step result approval の対象にする
 - 各 implementation step は commit 単位として設計し、`1 implementation step = 1 review scope = 1 commit` を標準にする。step が大きすぎる場合は commit をまとめず step を分割する
-- 各 step gate には `code-reviewer gate`、`commit gate`、`no-op gate` を置き、`code-reviewer` pass 後に step commit で閉じる。`approved-no-op` は差分なしの場合だけ許可する
+- 各 step gate には `step reviewer gate`、`commit gate`、`no-op gate` を置き、`workflow_issue.md` の reviewer gate mapping に従う reviewer pass 後に step commit で閉じる。`approved-no-op` は差分なしの場合だけ許可する
 - review / QA / docs / final quality gate は behavior slice の外に置き、step gate / milestone gate / `S90` / `S99` に配置する
 - `refactor / tidy` は bounded decision point として残し、事前に詳細な cleanup task を書き込まない
 - cleanup が最初から明確で大きい場合は、`bounded implementation batch` / design / 別 step で扱う
@@ -83,9 +93,10 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - `Spec-Locked Closure Index` を置く
 - `実装ステップ` を step / block / behavior slice で書く
 - 各 behavior slice の `step closure contract` / `test bundle` / `pre-implementation evidence` / `bounded implementation batch` / `verification` を置き、`test bundle` は closure index の `id` を参照できるようにする
+- 各 implementation step に `delegation contract` を置き、`workflow_issue.md` の execution policy を再定義せずに worker handoff へ必要な入力、許可範囲、禁止範囲、検証、reviewer focus、停止条件、出力を具体化する
 - 各 implementation step に `具体テストケース一覧` を置き、ネストリストで `前提` / `操作` / `期待結果` / `失敗検出` / `検証方法` を書く
 - `refactor / tidy` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
-- 各 step gate に `code-reviewer gate`、`commit gate`、`no-op gate`、`report update` を置く
+- 各 step gate に `step reviewer gate`、`commit gate`、`no-op gate`、`report update` を置き、reviewer は `workflow_issue.md` の mapping に従って選ぶ
 - `S90 docs impact resolution / docs refresh` を必須で置く
 - `S99 final quality gate` を必須で置き、`qa-reviewer` のテスト十分性確認、issue-wide `code-reviewer` の統合 diff review、`spec-reviewer` の要件達成確認を配置する
 - `final exit contract` を置く
@@ -107,13 +118,16 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の execution policy は
 - every required row が non-placeholder の `spec link`、`observable input/state`、`locked expectation`、`evidence level`、`closure evidence` を持つ
 - every required row に step-local close condition と planned verification evidence path がある
 - behavior slice が step closure contract、test bundle、pre-implementation evidence を持ち、bounded implementation batch として原因局所化できる
+- 各 implementation step が `delegation contract` を持ち、`delegated role`、`input docs`、`allowed paths`、`forbidden changes`、`acceptance criteria`、`required tests or docs-only verification`、`reviewer focus`、`stop conditions`、`output required` を埋めている
+- `delegation contract` が `workflow_issue.md` の policy を再定義せず、step 固有の handoff contract として書かれている
+- reviewer focus が step の変更種別と矛盾する場合、または delegated worker work を reviewer gate の代替として扱っている場合は fail とする
 - 各 implementation step が step-local な `具体テストケース一覧` を持ち、各 case が `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法` を含む
 - concrete test case が横長 table に押し込まれて読みづらい場合、または global test plan だけで step-local case がない場合は fail とする
 - docs-only / approved-no-op step は、テスト不要理由と inspection / manual / docs diff などの代替検証方法を持つ
-- 各 implementation step が commit 単位として設計され、`code-reviewer gate`、`commit gate`、`no-op gate` を持っている
+- 各 implementation step が commit 単位として設計され、`step reviewer gate`、`commit gate`、`no-op gate` を持っている
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
-- report update が stage gate に置かれている。report-before-commit、code-reviewer pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
+- report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
 - AC / EC と step の対応が取れている
 - docs impact と final quality gate が計画に埋め込まれ、`doc-writer` による必要 docs 更新、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review が追跡できる
 - reviewer が「この plan で実装してよい」と判断できる

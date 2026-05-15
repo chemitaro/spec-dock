@@ -706,6 +706,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00070-installer-source-discovery-and-managed-ownership/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -775,6 +776,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json": [
             "iss-00071"
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -967,6 +969,22 @@ class TestInitUpdate(CliRuntimeHarness):
                 asset_path.read_text(encoding="utf-8"),
                 f"checked-in dogfooding runtime mirror file diverged from provider asset: {mirror_rel_path}",
             )
+
+    def _assert_issue_execution_runtime_command_reminders(self, text: str, *, source: str) -> None:
+        for fragment in (
+            "## Runtime Command Reminders",
+            "Use the shipped runtime path: `./spec-dock/scripts/spec-dock ...`",
+            "Normal lifecycle is `issue start <target>`",
+            "`issue finish` only after the workflow completion gates pass",
+            "`issue start -f` / `issue start --force`",
+            "unfinished-active-issue guard",
+            "avoid `sync` on the just-finished issue branch",
+            "`deps add`, `deps remove`, and `deps check`",
+            "`validate` and `sync`",
+            "`--no-github`",
+            "Do not copy the full workflow here",
+        ):
+            self.assertIn(fragment, text, f"{source} missing concise runtime command reminder: {fragment}")
 
     def _assert_installed_templates_match_provider_assets(
         self,
@@ -2003,6 +2021,21 @@ class TestInitUpdate(CliRuntimeHarness):
             for fragment in ("前提", "操作", "期待結果", "失敗検出", "検証方法"):
                 self.assertIn(fragment, issue_plan_authoring)
             self.assertIn("Spec-Locked Closure Index", issue_plan_authoring)
+            self.assertIn("Parent Agent Invariant", issue_plan_authoring)
+            self.assertIn("delegated worker handoff", issue_plan_authoring)
+            self.assertIn("reviewer gate mapping", issue_plan_authoring)
+            for fragment in (
+                "`delegated role`",
+                "`input docs`",
+                "`allowed paths`",
+                "`forbidden changes`",
+                "`acceptance criteria`",
+                "`required tests or docs-only verification`",
+                "`reviewer focus`",
+                "`stop conditions`",
+                "`output required`",
+            ):
+                self.assertIn(fragment, issue_plan_authoring)
             for workflow_text in (workflow_initiative, workflow_epic, workflow_issue):
                 self.assertIn("workflow_spec_authoring.md", workflow_text)
                 self.assertIn("fresh `spec-reviewer`", workflow_text)
@@ -2024,6 +2057,13 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("final quality gate", workflow_issue)
             self.assertIn("`qa-reviewer`", workflow_issue)
             self.assertIn("issue-wide `code-reviewer`", workflow_issue)
+            self.assertIn("Parent Agent Invariant", workflow_issue)
+            self.assertIn("inspect / plan / delegate / verify / integrate / report", workflow_issue)
+            self.assertIn("delegated worker handoff", workflow_issue)
+            self.assertIn("Parent Implementation Exception", workflow_issue)
+            self.assertIn("run-local orchestration metadata", workflow_issue)
+            self.assertIn("reviewer gate mapping", workflow_issue)
+            self.assertIn("docs-only / template-only / skill-text-only", workflow_issue)
             for command in (
                 "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title",
                 "./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title",
@@ -2136,7 +2176,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("phase_plan_issue.md", plan_text)
             self.assertIn("S90 — docs impact resolution / docs refresh", plan_text)
             self.assertIn("S99 — final quality gate", plan_text)
-            self.assertIn("code-reviewer gate", plan_text)
+            self.assertIn("step reviewer gate", plan_text)
             self.assertIn("commit gate", plan_text)
             self.assertIn("delegation 判断", plan_text)
             self.assertIn("report draft update before review", plan_text)
@@ -2146,6 +2186,23 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("code-reviewer を pass まで再実行", plan_text)
             self.assertIn("spec-reviewer を pass まで再実行", plan_text)
             self.assertIn("対象ファイル:", plan_text)
+            self.assertIn("#### delegation contract", plan_text)
+            for fragment in (
+                "delegated role:",
+                "input docs:",
+                "allowed paths:",
+                "forbidden changes:",
+                "acceptance criteria:",
+                "required tests or docs-only verification:",
+                "reviewer focus:",
+                "stop conditions:",
+                "output required:",
+                "#### 具体テストケース一覧",
+                "#### step closure contract",
+                "#### behavior slice execution",
+                "#### step gate",
+            ):
+                self.assertIn(fragment, plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
@@ -2154,6 +2211,8 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("#### Closure Coverage", report_text)
             self.assertIn("#### Closure Delta", report_text)
             self.assertIn("#### Implementation Delegation Gate", report_text)
+            self.assertIn("#### Delegated Worker Evidence", report_text)
+            self.assertIn("#### Parent Implementation Exception", report_text)
             self.assertIn("#### Code Review Gate", report_text)
             self.assertIn("#### Step Commit Gate", report_text)
             self.assertIn("## Final Quality Gate", report_text)
@@ -2165,7 +2224,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("no-op diff-clean command", report_text)
             self.assertIn("no-op read-only confirmation", report_text)
             self.assertIn("post-commit external evidence destination", report_text)
-            self.assertIn("| step | decision | required reason | agent role | delegated scope | result | local-execution rationale |", report_text)
+            self.assertIn("| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |", report_text)
+            self.assertIn("| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |", report_text)
+            self.assertIn("| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |", report_text)
             self.assertIn("delegated / approved-local-execution / degraded mode", report_text)
             self.assertNotIn("clean / expected only", report_text)
             self.assertIn("| step | closure ids | close condition | evidence | result | notes |", report_text)
@@ -2180,19 +2241,35 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((target / ".codex" / "agents" / "spec-manager.toml").is_file())
             self.assertTrue((target / ".github" / "agents" / "orchestrator.agent.md").is_file())
 
-            skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
-            self.assertIn("`discussions/`", skill_text)
-            self.assertIn("./spec-dock/scripts/spec-dock new doc adr --issue", skill_text)
-            self.assertIn("`spec-dock/docs/reference_deps.md`", skill_text)
-            self.assertIn("`spec-dock/docs/reference_sync.md`", skill_text)
-            self.assertIn("./spec-dock/scripts/spec-dock ...", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock validate", skill_text)
-            self.assertNotIn("./spec-dock/scripts/spec-dock sync", skill_text)
-            self.assertNotIn("./spec ", skill_text)
-            self.assertNotIn("adrs/new-adr", skill_text)
+            workflow_skill_text = (skills_root / "spec-driven-tdd-workflow" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("`discussions/`", workflow_skill_text)
+            self.assertIn("./spec-dock/scripts/spec-dock new doc adr --issue", workflow_skill_text)
+            self.assertIn("`spec-dock/docs/reference_deps.md`", workflow_skill_text)
+            self.assertIn("`spec-dock/docs/reference_sync.md`", workflow_skill_text)
+            self.assertIn("./spec-dock/scripts/spec-dock ...", workflow_skill_text)
+            self.assertNotIn(
+                "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>",
+                workflow_skill_text,
+            )
+            self.assertNotIn(
+                "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>",
+                workflow_skill_text,
+            )
+            self.assertNotIn("./spec-dock/scripts/spec-dock deps check <target>", workflow_skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock validate", workflow_skill_text)
+            self.assertNotIn("./spec-dock/scripts/spec-dock sync", workflow_skill_text)
+            self.assertNotIn("./spec ", workflow_skill_text)
+            self.assertNotIn("adrs/new-adr", workflow_skill_text)
+
+            issue_skill_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self._assert_issue_execution_runtime_command_reminders(
+                issue_skill_text,
+                source="generated issue-execution skill",
+            )
             self.assertFalse(
                 (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
             )
@@ -3024,6 +3101,7 @@ class TestInitUpdate(CliRuntimeHarness):
         epic_design = (template_root / "epic" / "design.md").read_text(encoding="utf-8")
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
+        issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
         self.assertIn("UML（推奨: system context / target-state overview）", initiative_design)
         self.assertIn("```plantuml", initiative_design)
         self.assertIn("!include C4_Context.puml", initiative_design)
@@ -3182,6 +3260,19 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("代替検証方法:", issue_plan)
         self.assertIn("S01 の subsections を複製して記入する", issue_plan)
         self.assertIn("implementation-ready ではない", issue_plan)
+        self.assertIn("#### delegation contract", issue_plan)
+        for fragment in (
+            "delegated role:",
+            "input docs:",
+            "allowed paths:",
+            "forbidden changes:",
+            "acceptance criteria:",
+            "required tests or docs-only verification:",
+            "reviewer focus:",
+            "stop conditions:",
+            "output required:",
+        ):
+            self.assertIn(fragment, issue_plan)
         self.assertIn("#### step closure contract", issue_plan)
         self.assertIn("closure id:", issue_plan)
         self.assertIn("close 条件:", issue_plan)
@@ -3197,9 +3288,25 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("TDD iterations", issue_plan)
         self.assertNotIn("update_plan", issue_plan)
         self.assertIn("commit gate", issue_plan)
-        self.assertIn("code-reviewer gate", issue_plan)
+        self.assertIn("step reviewer gate", issue_plan)
         self.assertIn("no-op gate", issue_plan)
         self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
+        self.assertIn("delegation contract evidence:", issue_plan)
+        self.assertIn("code-reviewer / spec-reviewer docs/spec alignment", issue_plan)
+
+        self.assertIn("#### Delegated Worker Evidence", issue_report)
+        self.assertIn("#### Parent Implementation Exception", issue_report)
+        self.assertIn("| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |", issue_report)
+        self.assertIn("| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |", issue_report)
+        for fragment in (
+            "workflow_issue.md",
+            "source of truth",
+            "dev-coder / doc-writer",
+            "docs-only inspection",
+            "reviewer role + passed / failed / unavailable / denied / waived / provisional",
+            "blocked / incomplete / waived with explicit risk acceptance / next action",
+        ):
+            self.assertIn(fragment, issue_report)
 
         phase_design = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md").read_text(
             encoding="utf-8"
@@ -3280,6 +3387,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("`test id alias` と `resolves to closure id`", phase_plan_issue)
         self.assertIn("`test bundle` は Central index の `locked expectation` / `observable input/state` を再記述しない", phase_plan_issue)
         self.assertIn("各 step の close 判定は Issue 全体の一覧表ではなく", phase_plan_issue)
+        self.assertIn("`delegation contract` は `delegated role`、`input docs`、`allowed paths`、`forbidden changes`、`acceptance criteria`、`required tests or docs-only verification`、`reviewer focus`、`stop conditions`、`output required` を持つ", phase_plan_issue)
+        self.assertIn("runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`", phase_plan_issue)
+        self.assertIn("shipped docs / templates / skills / workflow text は `doc-writer`", phase_plan_issue)
         self.assertIn("`具体テストケース一覧`", phase_plan_issue)
         self.assertIn("カード型ネストリスト", phase_plan_issue)
         self.assertIn("横長 table は trace matrix", phase_plan_issue)
@@ -3289,6 +3399,7 @@ class TestInitUpdate(CliRuntimeHarness):
         for fragment in ("`前提`", "`操作`", "`期待結果`", "`失敗検出`", "`検証方法`"):
             self.assertIn(fragment, phase_plan_issue)
         self.assertIn("implementation-ready ではない", phase_plan_issue)
+        self.assertIn("delegated worker work を reviewer gate の代替として扱っている場合は fail", phase_plan_issue)
         self.assertIn("plan amendment と re-review を必須", phase_plan_issue)
         self.assertIn("every `required=yes` closure row", phase_plan_issue)
         self.assertIn("every bundle `closure id` が Central index に存在", phase_plan_issue)
@@ -3297,9 +3408,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("failing test は iteration ごとに 1 本ずつ進める", phase_plan_issue)
         self.assertIn("commit/no-op は `workflow_issue.md` の実行 contract が所有", phase_plan_issue)
         self.assertIn("step 固有の review scope、commit scope、no-op 条件", phase_plan_issue)
-        self.assertIn("report-before-commit、code-reviewer pass、step commit、approved-no-op", phase_plan_issue)
+        self.assertIn("report-before-commit、step reviewer gate pass、step commit、approved-no-op", phase_plan_issue)
         self.assertIn("`1 implementation step = 1 review scope = 1 commit`", phase_plan_issue)
-        self.assertIn("`code-reviewer gate`、`commit gate`、`no-op gate`", phase_plan_issue)
+        self.assertIn("`step reviewer gate`、`commit gate`、`no-op gate`", phase_plan_issue)
         self.assertIn("`S99 final quality gate` は標準配置", phase_plan_issue)
         self.assertIn("`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer`", phase_plan_issue)
         self.assertIn("`doc-writer` が修正", phase_plan_issue)
@@ -3317,6 +3428,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("仕様固定マイクロバッチTDD", workflow_issue)
         self.assertIn("Spec-Locked Micro-Batch TDD", workflow_issue)
         self.assertIn("Spec-Locked Closure Index", workflow_issue)
+        self.assertIn("Parent Agent Invariant", workflow_issue)
+        self.assertIn("inspect / plan / delegate / verify / integrate / report", workflow_issue)
+        self.assertIn("run-local orchestration metadata", workflow_issue)
         self.assertIn("Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく", workflow_issue)
         self.assertIn("closure index の `id` を参照", workflow_issue)
         self.assertIn("required closure id が behavior slice", workflow_issue)
@@ -3329,14 +3443,21 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("step closure contract / test bundle / pre-implementation evidence", workflow_issue)
         self.assertIn("bounded implementation batch", workflow_issue)
         self.assertIn("Implementation Delegation Gate", workflow_issue)
+        self.assertIn("delegated worker handoff", workflow_issue)
+        self.assertIn("`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required`", workflow_issue)
         self.assertIn("複数 layer / module / package", workflow_issue)
         self.assertIn("runtime / CLI / infra / templates / shipped scaffold / shared docs", workflow_issue)
         self.assertIn("integration test / migration / backward compatibility / filesystem / GitHub / active state", workflow_issue)
         self.assertIn("`delegated` / `approved-local-execution` / degraded mode", workflow_issue)
-        self.assertIn("implementation delegation は per-step `code-reviewer` の代替ではない", workflow_issue)
+        self.assertIn("implementation delegation は reviewer gate の代替ではない", workflow_issue)
+        self.assertIn("Parent Implementation Exception", workflow_issue)
+        self.assertIn("delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate", workflow_issue)
+        self.assertIn("reviewer gate mapping", workflow_issue)
+        self.assertIn("docs-only / template-only / skill-text-only", workflow_issue)
+        self.assertIn("bounded delegated follow-up", workflow_issue)
         self.assertIn("test sensitivity evidence", workflow_issue)
         self.assertNotIn("Red → Green → Refactor → review", workflow_issue)
-        self.assertIn("code-reviewer → fix → re-review → commit → clean確認", workflow_issue)
+        self.assertIn("step reviewer gate → fix → re-review → commit → clean確認", workflow_issue)
         self.assertIn("`1 implementation step = 1 review scope = 1 commit`", workflow_issue)
         self.assertIn("`committed` または `approved-no-op`", workflow_issue)
         self.assertIn("docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認", workflow_issue)
@@ -3351,41 +3472,22 @@ class TestInitUpdate(CliRuntimeHarness):
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("spec-dock/docs/phase_plan_issue.md", issue_execution_skill)
-        self.assertIn("spec-dock/docs/authoring/issue-plan.md", issue_execution_skill)
-        self.assertIn("Keep templates as scaffolds", issue_execution_skill)
-        self.assertIn("Spec authoring mode", issue_execution_skill)
-        self.assertIn("Execution mode", issue_execution_skill)
-        self.assertIn("optional diagram catalog", issue_execution_skill)
-        self.assertIn("authoritative source for diagram choices", issue_execution_skill)
-        self.assertIn("catalog-listed or project-specific sections", issue_execution_skill)
-        self.assertIn("Spec-Locked Closure Index", issue_execution_skill)
-        self.assertIn("1 implementation step = 1 code-reviewer scope = 1 commit", issue_execution_skill)
-        self.assertIn("Implementation Delegation Gate", issue_execution_skill)
-        self.assertIn("Delegation is conditionally mandatory", issue_execution_skill)
-        self.assertIn("Role selection matrix", issue_execution_skill)
-        self.assertIn("`repo-analyst` maps code paths", issue_execution_skill)
-        self.assertIn("`dev-coder` handles bounded implementation steps", issue_execution_skill)
-        self.assertIn("Implementation delegation does not replace review gates", issue_execution_skill)
-        self.assertIn("run the `code-reviewer` sub-agent", issue_execution_skill)
-        self.assertIn("After the step `code-reviewer` pass, commit the step scope", issue_execution_skill)
-        self.assertIn("In `S99 final quality gate`, run `qa-reviewer`, issue-wide `code-reviewer`, and `spec-reviewer`", issue_execution_skill)
-        self.assertIn("use `doc-writer` for the update and `spec-reviewer` for docs/spec alignment review", issue_execution_skill)
-        self.assertIn("final report ledger / final commit scope before the final commit", issue_execution_skill)
-        self.assertIn("final commit hash plus post-commit clean evidence are recorded in external delivery evidence", issue_execution_skill)
-        self.assertIn("required closure id", issue_execution_skill)
-        self.assertIn("behavior slice `closure ids` / `test ids`", issue_execution_skill)
-        self.assertIn("具体テストケース一覧", issue_execution_skill)
-        self.assertIn("table-only", issue_execution_skill)
-        self.assertIn("concrete test case id", issue_execution_skill)
-        self.assertNotIn("each test id at the start", issue_execution_skill)
-        for fragment in ("`前提`", "`操作`", "`期待結果`", "`失敗検出`", "`検証方法`"):
+        for fragment in (
+            "spec-dock/docs/workflow_issue.md as the source of truth",
+            "concise reminder for issue execution",
+            "parent agent responsible for orchestration",
+            "Route runtime, tests, and scaffold behavior to `dev-coder`",
+            "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
+            "bounded delegated follow-up",
+            "Parent direct fixes require a documented Parent Implementation Exception",
+        ):
             self.assertIn(fragment, issue_execution_skill)
-        self.assertIn("verification command, or evidence path", issue_execution_skill)
-        self.assertIn("Step Contract Closure", issue_execution_skill)
-        self.assertIn("Test Contract Closure", issue_execution_skill)
-        self.assertIn("Closure Coverage", issue_execution_skill)
-        self.assertIn("Closure Delta", issue_execution_skill)
+        self._assert_issue_execution_runtime_command_reminders(
+            issue_execution_skill,
+            source="provider issue-execution skill",
+        )
+        self.assertNotIn("Spec authoring mode", issue_execution_skill)
+        self.assertNotIn("Role selection matrix", issue_execution_skill)
         self.assertNotIn("Add Use Case, Sequence", issue_execution_skill)
 
         workflow_skill = (
@@ -8397,15 +8499,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("thin", copilot_adapter_text.lower())
 
         for skill_text in (hub_text, issue_text, codex_adapter_text, copilot_adapter_text):
-            self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
+            if "./spec-dock/scripts/spec-dock" not in skill_text:
+                self.assertIn("spec-dock/docs/workflow_issue.md as the source of truth", skill_text)
+            else:
+                self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
             self.assertNotIn("./spec ", skill_text)
 
-        self.assertIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", issue_text)
-        self.assertIn("./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>", issue_text)
-        self.assertIn("./spec-dock/scripts/spec-dock deps check <target>", issue_text)
-        self.assertIn("./spec-dock/scripts/spec-dock validate", issue_text)
-        self.assertIn("./spec-dock/scripts/spec-dock sync", issue_text)
-        self.assertIn("--no-github", issue_text)
+        for fragment in (
+            "spec-dock/docs/workflow_issue.md as the source of truth",
+            "parent agent responsible for orchestration",
+            "Route runtime, tests, and scaffold behavior to `dev-coder`",
+            "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
+            "bounded delegated follow-up",
+            "Parent direct fixes require a documented Parent Implementation Exception",
+        ):
+            self.assertIn(fragment, issue_text)
+        self._assert_issue_execution_runtime_command_reminders(
+            issue_text,
+            source="bundled issue-execution skill",
+        )
 
         for skill_text in (hub_text, codex_adapter_text, copilot_adapter_text):
             self.assertNotIn("./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>", skill_text)
@@ -8444,22 +8556,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("scope-specific constraints and decisions", epic_text)
         self.assertIn("fresh `spec-reviewer`", epic_text)
         self.assertIn("Spec Authoring Gate", epic_text)
-        self.assertIn("`spec-dock/docs/workflow_issue.md`", issue_text)
-        self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", issue_text)
-        self.assertIn("`spec-dock/docs/reference_deps.md`", issue_text)
-        self.assertIn("`spec-dock/docs/reference_sync.md`", issue_text)
-        self.assertIn("`spec-dock/docs/reference_github.md`", issue_text)
-        self.assertIn("`spec-dock/docs/reference_naming.md`", issue_text)
-        self.assertIn("`spec-dock/docs/phase_requirement.md`", issue_text)
-        self.assertIn("`spec-dock/docs/phase_design.md`", issue_text)
-        self.assertIn("`spec-dock/docs/phase_plan.md`", issue_text)
-        self.assertIn("`spec-dock/active/context-pack.md`", issue_text)
-        self.assertIn("approved behavior-slice execution", issue_text)
-        self.assertIn("source of truth", issue_text)
-        self.assertIn("fresh `spec-reviewer`", issue_text)
-        self.assertIn("Spec Authoring Gate", issue_text)
-        self.assertIn("docs impact resolution step", issue_text)
-        self.assertIn("final quality gate", issue_text)
+        for fragment in (
+            "spec-dock/docs/workflow_issue.md as the source of truth",
+            "concise reminder for issue execution",
+            "parent agent responsible for orchestration",
+            "Route runtime, tests, and scaffold behavior to `dev-coder`",
+            "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
+            "Parent direct fixes require a documented Parent Implementation Exception",
+        ):
+            self.assertIn(fragment, issue_text)
 
         self.assertIn("`spec-dock/docs/workflow_adr.md`", adr_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", adr_text)
