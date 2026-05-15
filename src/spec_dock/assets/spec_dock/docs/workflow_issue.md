@@ -86,7 +86,9 @@ Issue は実装の最小単位です。
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
 - 実装前に `workflow_spec_authoring.md` の requirement / design / plan gate がすべて pass し、`Spec Authoring Gate` evidence が `report.md` に残っていることを確認する
-- 各 implementation step は `step closure contract / test bundle / pre-implementation evidence → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → code-reviewer → fix → re-review → commit → clean確認` の順で進める
+- `Parent Agent Invariant`: normal execution における親 Codex は inspect / plan / delegate / verify / integrate / report を担当する orchestration owner であり、code / runtime / tests / scaffold behavior / templates / shipped docs / skills / workflow text の直接実装者ではない
+- 親 Codex が直接作成・更新してよいのは、`report.md`、handoff note、phase evidence など run-local orchestration metadata に限定する。shipped docs / templates / skills / workflow text、runtime-facing scaffold、コード、テスト、runtime behavior は delegated worker work として扱う
+- 各 implementation step は `step closure contract / test bundle / pre-implementation evidence → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → commit → clean確認` の順で進める
 - 完成版 `plan.md` には `Spec-Locked Closure Index`（仕様固定クロージャ索引）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
 - `Spec-Locked Closure Index` は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
 - `test bundle` は step closure contract の一部として、step の観測可能な振る舞いに必要な acceptance / characterization / property or invariant / regression / negative を分類する
@@ -94,18 +96,21 @@ Issue は実装の最小単位です。
 - 実装開始前に required closure id が behavior slice の `closure ids` / `test ids` から参照され、各 required row に step-local close condition と verification command または evidence path があることを確認する
 - required closure row、`locked expectation`、`required`、`spec link` を変更する場合は plan amendment と re-review を先に通す
 - `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを記録し、failing-first を完全要求できない場合もテストが欠陥を検出できる根拠を残す
-- `Implementation Delegation Gate` は各 implementation step の開始前に必ず置く。step が複数 layer / module / package にまたがる、runtime / CLI / infra / templates / shipped scaffold / shared docs に影響する、既存 pattern 調査や影響範囲分析が必要、integration test / migration / backward compatibility / filesystem / GitHub / active state に関わる、または独立 worker scope に分割できる大きさの場合は、適切なサブエージェント利用を必須にする
-- `delegated` の場合は sub-agent role、scope、依頼内容、戻り値、取り込み結果を `report.md` に残す。`approved-local-execution` は小さい単一ファイル修正、機械的文言修正、明確な localized change、または即時 blocking / tightly coupled で main agent が担当すべき場合だけ許可し、条件付き必須に該当しない理由を `no delegation rationale` として残す
+- `Implementation Delegation Gate` は各 implementation step の開始前に必ず置く。runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`、shipped docs / templates / skills / workflow text は `doc-writer` を primary delegated worker とし、step が複数 layer / module / package にまたがる、runtime / CLI / infra / templates / shipped scaffold / shared docs に影響する、既存 pattern 調査や影響範囲分析が必要、integration test / migration / backward compatibility / filesystem / GitHub / active state に関わる、または独立 worker scope に分割できる大きさの場合は、適切なサブエージェント利用を必須にする
+- delegated worker handoff には、`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required` を必ず含める。複数 layer / package / shipped asset にまたがる step は、親 Codex が direct implementation せず、allowed paths と dependency boundary を明記して委任する
+- `delegated` の場合は delegated role、scope、source of truth、allowed changes、forbidden changes、required verification、stop conditions、output required、worker summary、changed files、verification result、unresolved risks、取り込み結果を `report.md` に残す
+- 親 Codex が例外的に直接実装する場合は `Parent Implementation Exception` として、delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate を事前に記録する。`approved-local-execution` はこの exception record を満たす場合だけ使用し、小さい変更、機械的変更、親が修正を知っていることを理由にした無記録 direct implementation として扱ってはならない
 - reviewer gate state は `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` のいずれかで記録する。required reviewer gate を満たすのは fresh `passed` だけである
-- `waived` はユーザーの明示的 risk acceptance が `report.md` にある場合だけ許可する。`provisional` は orchestrator self-check の記録であり、`spec-reviewer` / `code-reviewer` / `qa-reviewer` の代替ではない
-- サブエージェント機能が利用できない、拒否された、または host policy と衝突する場合、required reviewer gate は `unavailable` / `denied` として blocked / 未完了に分類する。degraded mode は status/context gathering や追加 verification に限定し、reviewer gate、implementation readiness、final quality gate を満たさない
+- `waived` はユーザーの明示的 risk acceptance が `report.md` にある場合だけ許可する。waiver は reviewer pass ではなく、delegation / reviewer gate の unavailable / denied を degraded success にしない。waiver 後に親 Codex が直接実装する場合も、別途 `Parent Implementation Exception` の user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate を必要とする
+- サブエージェント機能が利用できない、拒否された、または host policy と衝突する場合、required delegation / reviewer gate は `unavailable` / `denied` として blocked / 未完了に分類する。unavailable / denied / host conflict は degraded success でも、親 Codex の direct implementation 自動承認でもない。degraded mode は status/context gathering や追加 verification に限定し、reviewer gate、implementation readiness、final quality gate を満たさない
 - `bounded implementation batch` は step の scope、allowed files、forbidden scope に収まる最小実装単位とする
 - `refactor/tidy` は verification 後の bounded decision point とし、plan では詳細 task を事前確定しない
 - step 順は `design.md` の依存関係分析、module dependency diagram、directory / file change plan を根拠に、upstream / prerequisite から downstream へ組む
 - cleanup が既知で大きい場合は `bounded implementation batch` / design / 別 step へ切り出す
 - review / QA / spec の各 stage gate は `pass` まで回す
-- 各 implementation step は、サブエージェント `code-reviewer` の `review_status: pass` を得てから、その step の実装・テスト・必要な report draft update をまとめてコミットする
-- implementation delegation は per-step `code-reviewer` の代替ではない。`dev-coder` などの worker が実装した場合でも、その step diff は必ず `code-reviewer` pass を得る
+- reviewer gate mapping は step の変更種別で決める。code / runtime / tests / scaffold behavior を含む step は per-step `code-reviewer` pass を必要とし、docs-only / template-only / skill-text-only step は `spec-reviewer` docs/spec alignment pass を必要とする。両方を含む場合は step を分割するか、両方の reviewer focus を明記して必要な gate を通す
+- implementation delegation は reviewer gate の代替ではない。`dev-coder` / `doc-writer` などの worker が実作業した場合でも、step diff は上記 mapping に従う reviewer pass を得る
+- reviewer が `fail` を返した場合、親 Codex は原則として自分で direct fix せず、指摘を bounded delegated follow-up として同じ delegated worker または適切な worker に再委任する。親 Codex が直接修正するには `Parent Implementation Exception` を別途満たす
 - `1 implementation step = 1 review scope = 1 commit` を標準とし、複数 step の変更を 1 commit に混ぜてはならない。step が大きすぎる場合は commit をまとめず step を分割する
 - step commit 後は `git status --short` などで、次 step へ持ち越す意図しない staged / unstaged 変更がないことを確認する
 - step の close state は `committed` または `approved-no-op` のどちらかにする。`approved-no-op` は差分が本当にない場合だけ許可し、小さい変更、あとでまとめる、report だけ、時間不足を理由にしてはならない
@@ -123,7 +128,7 @@ Issue は実装の最小単位です。
 - route だけ、または manual `active set` だけでは Issue work は完了しない。通常の開始/終了は `issue start` / `issue finish` を使う
 - `complete` と報告してよいのは、`issue finish` 前に active issue が set されその対象 issue を確認できる状態で、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、各 implementation step の `Implementation Delegation Gate` が `delegated` / `approved-local-execution` / degraded mode のいずれかで閉じている証跡、required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved-no-op として閉じている証跡、全 implementation step が `committed` または正当な `approved-no-op` で閉じている証跡、final docs impact resolved、final `qa-reviewer` pass、issue-wide `code-reviewer` pass、final `spec-reviewer` pass、final report ledger が記録済みであり、final commit 済みと意図しない staged / unstaged 変更なしの post-commit external delivery evidence を確認している場合のみである。ここで degraded mode は implementation delegation availability の証跡に限られ、required reviewer gate pass ではない
 - 4 点の issue docs のいずれかが untouched、template、placeholder、または実質未記入の状態で残る場合は `未完了` であり、成功報告をしてはならない
-- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step code review / step commit / final QA review / issue-wide code review / final spec review / final commit）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
+- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step reviewer gate / step commit / final QA review / issue-wide code review / final spec review / final commit）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
 - `blocked` は、外部依存、権限不足、サービス停止、その他の環境条件によって次の required action を進められない状態を指す
 - `blocked` の場合は `report.md` に reason と next action を残す。blocker type と impact は該当する場合に併記する
 - `未完了` は、product work、docs 更新、または証跡が不足している状態を指す。product gap は環境 blocker がない限り `blocked` ではなく `未完了` として扱う
@@ -137,10 +142,11 @@ Issue は実装の最小単位です。
 - `Test Contract Closure` に required closure id、step、evidence level、pre-implementation evidence、verification command、result を残す
 - `Closure Coverage` に各 required closure id と verification evidence の対応を残す
 - `Closure Delta` に追加・削除・変更・未実装 row と re-review 要否を残す
-- `Implementation Delegation Gate` に step、decision、required reason、agent role、delegated scope、result、local-execution rationale を残す。`delegated` の場合は依頼内容、戻り値、取り込み結果を追跡し、`approved-local-execution` の場合は no delegation rationale を残す
+- `Implementation Delegation Gate` に step、decision、required reason、delegated role、scope、source of truth、allowed changes、forbidden changes、required verification、stop conditions、output required、result を残す。`delegated` の場合は worker summary、changed files、verification result、unresolved risks、parent integration decision を追跡する
+- `Parent Implementation Exception` に delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate、unavailable / denied / host conflict / waiver の扱い、risk acceptance の有無を残す。exception record がない親 Codex direct implementation は required gate 未完了として扱う
 - `Workflow Delegation Consent` に consent source、repo/worktree、active issue、session、named roles、boundary、expires / invalidation condition、`denied` / `unavailable` の場合の reason と next action を残す
 - `Reviewer Gate Status` に gate name、reviewer role、freshness、state（`passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional`）、risk acceptance の有無、promotion / completion decision を残す
-- `Step Commit Gate` に step、review scope、`code-reviewer` verdict、commit scope、closure state、commit evidence、post-commit clean check を残す
+- `Step Commit Gate` に step、review scope、step reviewer verdict、commit scope、closure state、commit evidence、post-commit clean check を残す。step reviewer は reviewer gate mapping に従って `code-reviewer` または `spec-reviewer` を記録する
 - `Final QA Gate` に `qa-reviewer` verdict、テスト十分性、integration test 追加要否、追加した場合の evidence を残す
 - `Final Code Review Gate` に issue-wide `code-reviewer` verdict、統合 diff scope、修正と re-review の evidence を残す
 - `Final Spec Review Gate` に `spec-reviewer` verdict、requirement / design / plan / report / docs 整合、docs 修正が必要な場合の `doc-writer` 更新 evidence を残す
@@ -149,7 +155,7 @@ Issue は実装の最小単位です。
 - `issue finish` 後は active issue が clear されていてよく、`complete` 判定は active state の残存ではなく `issue finish` 前に記録・確認した report evidence で行う
 - `complete` 判定に必要な required closure id は、report の `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved-no-op として閉じている必要がある
 - `complete` 判定に必要な各 implementation step は、report の `Implementation Delegation Gate` で `delegated`、`approved-local-execution`、または degraded mode として閉じている必要がある。delegation evidence が不足している場合は `未完了` として扱う
-- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step code review / step commit / final QA review / issue-wide code review / final spec review / final commit）を未実施にした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
+- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step reviewer gate / step commit / final QA review / issue-wide code review / final spec review / final commit）を未実施にした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
 - `blocked` / `未完了` の場合は reason と next action を残し、環境 blocker と product gap を混在させない
 - `blocked` では blocker type と impact を該当する範囲で残す
 - stage gate ごとの reviewer verdict / test結果 / 修正内容 / no-op 理由もここに残す
@@ -205,7 +211,7 @@ Issue は実装の最小単位です。
   - docs impact / docs refresh step が必要なら入っている
   - final quality gate が独立し、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review を含んでいる
   - 各 implementation step に Implementation Delegation Gate があり、条件付き必須 trigger に該当する step では適切なサブエージェント利用または degraded mode evidence がある
-  - 各 implementation step に code-reviewer gate、commit gate、no-op gate がある
+  - 各 implementation step に step reviewer gate、commit gate、no-op gate がある
 - report:
   - `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が、`issue finish` 前に active issue を確認できる状態の report に残っている
   - required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で閉じている

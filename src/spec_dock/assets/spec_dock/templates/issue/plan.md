@@ -89,7 +89,7 @@ ID: "<ISS_ID>"
 ## レビュー / QA ゲート方針
 - RG1 implementation review:
   - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer
+  - reviewer: code-reviewer for code / runtime / tests / scaffold behavior; spec-reviewer docs/spec alignment for docs-only / template-only / skill-text-only
   - pass 条件: review_status: pass
   - 範囲: 現在 step の diff、tests、docs/report 更新、spec 影響
 - QG1 QA review:
@@ -105,9 +105,10 @@ ID: "<ISS_ID>"
 - 実行 policy、approval cadence、completion contract は `workflow_issue.md` を正本にする。
 - step / block / behavior slice の書き方は `phase_plan_issue.md` を正本にする。
 - plan 本文には、この Issue 固有の順序、依存、検証、review / QA gate だけを書く。
-- 各 implementation step は commit 単位として設計し、`code-reviewer gate` を pass してから `commit gate` で閉じる。
+- 各 implementation step は `workflow_issue.md` の policy を再定義せず、step-local な `delegation contract` に worker handoff の入力、許可範囲、禁止範囲、検証、reviewer focus、停止条件、出力を書く。
+- 各 implementation step は commit 単位として設計し、`workflow_issue.md` の reviewer gate mapping に従う `step reviewer gate` を pass してから `commit gate` で閉じる。
 - `approved-no-op` は差分なしの場合だけ許可し、理由、確認対象、差分なし確認コマンドを report に残す。
-- implementation step を追加する場合は S01 の subsections を複製し、`具体テストケース一覧`、`step closure contract`、`behavior slice execution`、`step gate` を各 step に必ず置く。
+- implementation step を追加する場合は S01 の subsections を複製し、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`behavior slice execution`、`step gate` を各 step に必ず置く。
 
 ## 実装ステップ
 
@@ -136,6 +137,34 @@ ID: "<ISS_ID>"
   - negative:
 - pre-implementation evidence:
   - expected red / characterization pass / test sensitivity evidence:
+
+#### delegation contract
+- delegated role:
+  - dev-coder / doc-writer / other named worker:
+- input docs:
+  - `requirement.md`:
+  - `design.md`:
+  - `plan.md`:
+  - workflow / authoring docs:
+  - current target files:
+- allowed paths:
+  - ...
+- forbidden changes:
+  - ...
+- acceptance criteria:
+  - ...
+- required tests or docs-only verification:
+  - targeted command / manual evidence / inspection / docs diff:
+- reviewer focus:
+  - code-reviewer for code / runtime / tests / scaffold behavior, or spec-reviewer docs/spec alignment for docs-only / template-only / skill-text-only:
+- stop conditions:
+  - input docs conflict / path outside allowed scope / verification cannot run / delegated role mismatch / host policy conflict / acceptance cannot be met:
+- output required:
+  - changed files:
+  - worker summary:
+  - verification result:
+  - unresolved risks:
+  - report evidence to update:
 
 #### 具体テストケース一覧
 
@@ -192,10 +221,17 @@ ID: "<ISS_ID>"
 - delegation 判断:
   - delegated / approved-local-execution / degraded mode:
   - 必須理由 / no delegation rationale:
+- delegation contract evidence:
+  - delegated role:
+  - allowed paths:
+  - forbidden changes:
+  - required tests or docs-only verification:
+  - stop conditions:
+  - output required:
 - report draft update:
-  - update before code-reviewer so the evidence is reviewed and committed with the step:
-- code-reviewer gate:
-  - reviewer: code-reviewer
+  - update before the step reviewer gate so the evidence is reviewed and committed with the step:
+- step reviewer gate:
+  - reviewer: code-reviewer / spec-reviewer docs/spec alignment, according to `workflow_issue.md` reviewer gate mapping
   - review 範囲:
   - pass 条件: review_status: pass
   - re-review rule: 指摘を修正し pass まで再実行
@@ -218,7 +254,7 @@ ID: "<ISS_ID>"
 
 ### Sxx — <next observable behavior>
 - S01 の subsections を複製して記入する。
-- `具体テストケース一覧`、`step closure contract`、`behavior slice execution`、`step gate` がない implementation step は implementation-ready ではない。
+- `delegation contract`、`具体テストケース一覧`、`step closure contract`、`behavior slice execution`、`step gate` がない implementation step は implementation-ready ではない。
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
