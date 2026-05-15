@@ -18,6 +18,7 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 - reviewer-pass 済みの `requirement.md` と `design.md` を、実装可能な step、検証、review gate、commit gate、final quality gate へ変換する。
 - `Spec-Locked Closure Index` で仕様 coverage を固定し、各 implementation step の `具体テストケース一覧` で TDD 実行入力を固定する。
 - step 順、依存、対象ファイル、検証方法、report evidence を実装者が判断せずに実行できる粒度へ落とす。
+- `workflow_issue.md` の delegated-by-default policy を再定義せず、各 implementation step の `delegation contract` として委任先、入力、許可範囲、検証、reviewer focus、停止条件、出力を具体化する。
 
 ## 必須項目
 
@@ -26,6 +27,7 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 - `ステップ一覧`
 - `要件 ↔ ステップ対応`
 - `Spec-Locked Closure Index`
+- 各 implementation step の `delegation contract`
 - 各 implementation step の `具体テストケース一覧`
 - 各 implementation step の `step closure contract`
 - 各 implementation step の `behavior slice execution`
@@ -33,6 +35,34 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 - `S90 docs impact resolution / docs refresh`
 - `S99 final quality gate`
 - `Final Exit Contract`
+
+## delegation contract
+
+各 implementation step は、`workflow_issue.md` の `Parent Agent Invariant`、`Implementation Delegation Gate`、delegated worker handoff、reviewer gate mapping を参照し、その step 固有の handoff contract を持つ。
+この欄は execution policy の再定義ではない。plan author は、worker が追加判断なしに作業でき、reviewer が scope / verification / report evidence を確認できるように、次の項目を step-local に埋める。
+
+標準項目:
+
+- `delegated role`:
+  - runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`、shipped docs / templates / skills / workflow text は `doc-writer` を primary worker とする。
+- `input docs`:
+  - `requirement.md`、`design.md`、`plan.md`、該当 workflow / authoring docs、target files などの source of truth。
+- `allowed paths`:
+  - `design.md` の `ディレクトリ / ファイル変更計画` から、その step が触る subset。
+- `forbidden changes`:
+  - scope 外ファイル、別 step の変更、source-of-truth 逸脱、runtime と docs の不用意な混在など。
+- `acceptance criteria`:
+  - closure index と step closure contract へ追跡できる、観測可能な完了条件。
+- `required tests or docs-only verification`:
+  - targeted command、manual evidence、inspection、docs diff など、その step の検証方法。
+- `reviewer focus`:
+  - `workflow_issue.md` の mapping に従い、code / runtime / tests / scaffold behavior は `code-reviewer`、docs-only / template-only / skill-text-only は `spec-reviewer` docs/spec alignment を基本にする。
+- `stop conditions`:
+  - 入力 docs の矛盾、許可パス外変更が必要、検証不能、delegated role 不適合、host policy / tool 制約、acceptance 未達など。
+- `output required`:
+  - changed files、worker summary、verification result、unresolved risks、report へ転記する delegation evidence。
+
+複数 layer / package / shipped asset にまたがる step は、親 Codex が直接実装せず、allowed paths と dependency boundary を明記して委任する。docs-only / template-only / skill-text-only step であっても、shipped artifact を変更する場合は `doc-writer` 委任と docs/spec alignment review を plan に残す。
 
 ## 具体テストケース一覧
 
@@ -64,6 +94,9 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 ## reviewer fail 条件
 
 - implementation step に `具体テストケース一覧` がない。
+- implementation step に `delegation contract` がない、または `delegated role`、`input docs`、`allowed paths`、`forbidden changes`、`acceptance criteria`、`required tests or docs-only verification`、`reviewer focus`、`stop conditions`、`output required` のいずれかが欠けている。
+- `delegation contract` が `workflow_issue.md` と矛盾する execution policy を再定義している。
+- delegated worker work を reviewer gate の代替として扱っている、または step の変更種別と reviewer focus が矛盾している。
 - concrete test case が step-local ではなく、global test plan だけに置かれている。
 - `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法` のいずれかが欠けている。
 - 「テストを追加する」「動作確認する」など、実装者が fixture / command / expected observation を判断する必要がある抽象表現だけになっている。
