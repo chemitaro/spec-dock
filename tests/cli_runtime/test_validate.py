@@ -389,7 +389,10 @@ class TestCliValidate(CliRuntimeHarness):
             discussions_dir.mkdir(parents=True, exist_ok=True)
             (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
+            (discussions_dir / "002-note-legacy-note.md").write_text("legacy note\n", encoding="utf-8")
             (discussions_dir / "20260329t123456z-note-current.md").write_text("current\n", encoding="utf-8")
+            (discussions_dir / "20260329t123457z-scratch-capture.md").write_text("scratch\n", encoding="utf-8")
+            (discussions_dir / "20260329t123458z-interview-hearing.md").write_text("interview\n", encoding="utf-8")
             (discussions_dir / "20260329todo.md").write_text("ignore me\n", encoding="utf-8")
             (discussions_dir / "rules.md").write_text("notes\n", encoding="utf-8")
 
@@ -405,6 +408,7 @@ class TestCliValidate(CliRuntimeHarness):
             "20260329t123456z-0a-adr-kickoff.md",
             "20260329t123456z-ADR-kickoff.md",
             "20260329t123456z-01-NOTE-memo.md",
+            "20260329t123456z-01-SCRATCH-memo.md",
             "20260329t123456z-bogus-kickoff.md",
             "20260329T123456z-adr-upper-t.md",
             "20260329t123456Z-adr-upper-z.md",
@@ -428,8 +432,10 @@ class TestCliValidate(CliRuntimeHarness):
             "001_adr-kickoff.md",
             "001-bogus-kickoff.md",
             "foo-adr-kickoff.md",
+            "foo-scratch-capture.md",
             "bogus-01-adr-kickoff.md",
             "adr-kickoff.md",
+            "interview_kickoff.md",
             "adr_kickoff.md",
         )
         for name in cases:
@@ -483,6 +489,8 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123456z-adr-kickoff.md").write_text("kickoff\n", encoding="utf-8")
             (discussions_dir / "20260329t123456z-01-disc-options.md").write_text("options\n", encoding="utf-8")
             (discussions_dir / "20260329t123456z-99-research-spike.md").write_text("spike\n", encoding="utf-8")
+            (discussions_dir / "20260329t123457z-interview-hearing.md").write_text("hearing\n", encoding="utf-8")
+            (discussions_dir / "20260329t123458z-scratch-capture.md").write_text("capture\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -540,6 +548,32 @@ class TestCliValidate(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["validate"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("spec-dock: ok", p.stdout)
+
+    def test_validate_rejects_legacy_sequence_for_new_discussion_types(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            discussions_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "discussions"
+            )
+            discussions_dir.mkdir(parents=True, exist_ok=True)
+            (discussions_dir / "001-scratch-legacy-capture.md").write_text("legacy\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("Malformed discussion document filename", p.stderr)
+            self.assertIn("001-scratch-legacy-capture.md", p.stderr)
 
     def test_validate_detects_duplicate_discussion_timestamp_slot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

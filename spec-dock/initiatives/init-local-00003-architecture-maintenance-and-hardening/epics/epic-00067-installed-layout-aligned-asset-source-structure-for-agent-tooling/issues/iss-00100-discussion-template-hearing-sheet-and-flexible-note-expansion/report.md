@@ -271,6 +271,90 @@ ls src/spec_dock/assets/spec_dock/templates/discussions
 
 ---
 
+### 2026-05-17 HH:MM - HH:MM
+
+#### 対象
+- Step: S02 runtime allowlist, parser, validation, tests
+- AC/EC: AC-006, AC-007, EC-007
+
+#### 実施内容
+- `dev-coder` に S02 を委任し、creatable discussion doc type を `adr` / `disc` / `research` / `interview` / `scratch` に更新した。
+- `note` は parser の generic invalid choice ではなく use case 側の retired guidance で失敗するようにした。
+- validation / legacy runtime constants は `note` を grandfathered type として許容しつつ、`interview` / `scratch` filenames も受けるように更新した。
+- runtime tests と installer/update tests を更新し、new type creation、retired `note`、validation grandfathering、managed template prune を固定した。
+- code-reviewer の P2 指摘を受け、grandfathered legacy sequence filename は既存系の `adr` / `disc` / `research` / `note` のみに限定した。新規 type の `interview` / `scratch` は timestamp 形式のみ validation で許容する。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_preserves_legacy_artifacts_inside_existing_node_trees
+# Ran 97 tests in 116.426s
+# OK
+
+python -m unittest tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_legacy_sequence_for_new_discussion_types tests.cli_runtime.test_validate.TestCliValidate.test_validate_accepts_research_discussion_docs
+# Ran 2 tests in 1.961s
+# OK
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=43
+
+git diff --check
+# pass
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | cl-004, cl-005, cl-006, cl-007 | targeted tests pass, validate pass, report updated, code-reviewer pass, commit created | tests/validate/diff-check pass; reviewer pass with P2 fixed; commit pending | in_progress | broader dogfooding mirror intentionally deferred to S03 |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| cl-004 | S02 | yes | red-required | parser/use case previously lacked `interview` / `scratch` creatable support | targeted unittest suite | pass | `new doc scratch/interview` covered |
+| cl-005 | S02 | yes | red-required | `note` previously creatable / parser constrained choices | targeted unittest suite | pass | retired guidance suggests `scratch`, no generic invalid choice |
+| cl-006 | S02 | yes | red-required | validation type set lacked `interview` / `scratch` | targeted unittest suite | pass | grandfathered timestamp/legacy `note` remains valid |
+| cl-007 | S02 | yes | red-required | init/update scaffold previously shipped managed `note.md` | targeted init/update tests | pass | `interview.md` / `scratch.md` installed, managed `note.md` pruned |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-004 | S02 | targeted runtime tests | pass | code-reviewer pass |
+| cl-005 | S02 | targeted retired note negative test | pass | code-reviewer pass |
+| cl-006 | S02 | targeted validation tests | pass | code-reviewer pass; P2 legacy-sequence looseness fixed |
+| cl-007 | S02 | targeted init/update tests | pass | code-reviewer pass |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | runtime / tests / scaffold behavior | dev-coder | runtime allowlist/parser/validation/tests only | requirement/design/plan S02 | S02 target runtime/test files | shipped docs/templates except test fixtures, dogfooding mirror, active issue docs/report, existing discussion artifact migration | targeted unittest suite, validate, diff-check | type policy requires design change, parser cannot route retired error, broad unrelated rewrite needed | changed files, tests, summary, risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | creatable/current doc types and validation grandfathering split; tests updated | runtime/test files listed below | targeted unittest suite -> OK; validate -> pass; diff-check -> pass | pass | full `tests.test_init_update` expected to fail until S03 dogfooding mirror update | accepted; reviewer P2 fixed before commit |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | P2 fixed before commit and re-reviewed | proceed to S02 commit | reviewer `019e35e8-b4db-7f71-b46e-ac4f92ab40c6`; no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending | runtime/tests + S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py` - parser doc_type choices removal / help update
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` - request type literal update
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - creatable/retired type split and new placeholders
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py` - accepted filename types include `interview` / `scratch` / grandfathered `note`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py` - legacy compatibility regex update
+- `tests/cli_runtime/test_new.py` - CLI creation/retired note tests
+- `tests/cli_runtime/test_runtime_new_doc_s09.py` - use case creation/filename tests
+- `tests/cli_runtime/test_validate.py` - validation grandfathering and new-type legacy-sequence rejection tests
+- `tests/test_init_update.py` - scaffold inventory/prune tests
+
+---
+
 ## Final Quality Gate (必須)
 
 ### S90 Docs Impact Resolution
