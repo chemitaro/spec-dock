@@ -741,6 +741,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -811,6 +812,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00071"
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
