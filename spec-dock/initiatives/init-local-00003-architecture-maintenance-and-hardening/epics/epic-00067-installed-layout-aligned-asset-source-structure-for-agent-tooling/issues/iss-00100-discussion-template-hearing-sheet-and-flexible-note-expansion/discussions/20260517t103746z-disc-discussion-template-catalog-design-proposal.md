@@ -22,14 +22,14 @@ ID: "20260517t103746z-disc"
 - `note` は廃止し、`scratch` に統合する。`note` と `scratch` を分けると、利用者もエージェントも「これは整理済みメモか、作業中メモか」で迷いやすい。
 - `freeform` は type 名にしない。自由記述の体験は `scratch` の本文で提供する。
 - `promotion-record` は独立 type にしない。文書そのものを昇格させるのではなく、蓄積した文脈をもとに新しい `adr` / `requirement.md` / `design.md` / `plan.md` を作成または修正する。
-- authority level は front matter に持つ案が優勢だが、詳細は別 question sheet `20260517t104954z-disc-question-authority-level-placement.md` で扱う。
+- authority level は、doc type 既定値 + 例外時のみ front matter override とする。詳細は別 question sheet `20260517t104954z-disc-question-authority-level-placement.md` にユーザー回答として記録済み。
 
 ## 推奨する初期 catalog
 
 | type key | 日本語名 | lifecycle | 主用途 | authority 既定値 |
 |---|---|---|---|---|
 | `scratch` | 作業メモ | capture | 未整理メモ、思考途中、下書き、会話ログを一時保存する | `raw` |
-| `interview` | ヒアリング記録 | elicitation | 利用者・関係者から得た事実、要望、制約、判断基準を残す | `raw` / `synthesized` |
+| `interview` | ヒアリング記録 | elicitation | 利用者・関係者から得た事実、要望、制約、判断基準を残す | `raw` |
 | `research` | 調査記録 | research | 外部/内部根拠、比較、検証結果、未確実性を残す | `synthesized` |
 | `disc` | 議論記録 | framing | 未決の論点、選択肢、評価軸、合意/未合意を整理する | `proposed` |
 | `adr` | 意思決定記録 | decision | 採用した判断、理由、影響、見直し条件を固定化する | `accepted` |
@@ -49,7 +49,7 @@ package "capture" {
 }
 
 package "elicitation" {
-  rectangle "interview\nヒアリング記録\nraw / synthesized" as interview #e8f7ee
+  rectangle "interview\nヒアリング記録\nraw" as interview #e8f7ee
 }
 
 package "research" {
@@ -79,7 +79,7 @@ disc --> adr : 合意を固定化
 ## 共通 metadata 案
 - front matter の key は runtime / automation で扱いやすい英語 slug を維持する。
 - template 本文の見出しと項目名は日本語にする。
-- authority と反映履歴の exact field は設計フェーズで確定する。
+- authority は doc type ごとの既定値を持ち、例外時だけ front matter の `authority` で override できるようにする。反映履歴の exact field は設計フェーズで確定する。
 
 ### 必須 metadata
 | key | 日本語名 | 説明 |
@@ -116,19 +116,19 @@ disc --> adr : 合意を固定化
 ### 必須項目
 | 項目名 | 説明 |
 |---|---|
-| 目的 | 何のための作業メモか |
-| メモ | 思考、下書き、作業ログ、断片的な気づき |
-| 文脈 | このメモが生まれた背景や作業状況 |
-| 次にすること | 残す、捨てる、整理する、別文書を作成する、など |
+| メモ | 思考、下書き、作業ログ、断片的な気づき。自由記述を主役にする |
 
 ### 任意項目
 | 項目名 | 説明 |
 |---|---|
+| 目的 | 何のための作業メモか |
+| 文脈 | このメモが生まれた背景や作業状況 |
 | 仮説 | まだ検証していない考え |
 | 気になる点 | 違和感、懸念、後で確認したい点 |
 | 参考 | 関連リンク、コード、既存資料 |
 | 整理先候補 | `interview`, `research`, `disc`, `adr` のどれに整理するか |
 | 破棄条件 | いつ、どの条件で捨てるか |
+| 次にすること | 残す、捨てる、整理する、別文書を作成する、など |
 
 ## `interview`: ヒアリング記録
 - 目的:
@@ -145,15 +145,22 @@ disc --> adr : 合意を固定化
 | 聞き取り目的 | 何を明らかにするためのヒアリングか |
 | 対象者・立場 | 誰から、どの立場の情報を得るか。必要なら匿名化する |
 | 背景 | なぜこの聞き取りが必要か |
-| 質問 | 聞いた主な質問 |
-| 回答 | 得られた回答。発言と解釈を混ぜない |
+| 質問主題 | 何について回答してほしいか |
+| 回答してほしいこと | 人間に判断・確認してほしい具体的な問い |
+| なぜ質問するのか | なぜエージェントだけで決めず、人間の判断が必要なのか |
+| 詳細説明 | 回答者が判断するために必要な補足、制約、前提 |
+| 事前分析 | エージェントが質問前に調査・分析した内容 |
+| 回答欄 | 得られた回答。発言と解釈を混ぜない |
 | 確認した事実 | 回答から客観情報として扱えるもの |
 | 要望・課題 | 相手が求めていること、困っていること |
 | 回答案 | 人間が選びやすいように、エージェントが事前分析した複数の回答候補 |
 | 選択肢比較 | 各回答案の利点、欠点、リスク、可逆性、実装・運用影響 |
+| ベストプラクティス分析 | 一般的な推奨、既存実装との整合、長期保守性の観点で最もよい案を分析する |
 | 推奨案 | エージェントが最も推奨する案と理由 |
+| 未回答時の影響 | 回答が得られない場合に止まる判断、リスク、暫定対応 |
 | 未確認事項 | 追加で確認すべきこと |
 | 仕様・判断への影響 | requirement / design / plan / ADR にどう影響するか |
+| 回答後フォローアップ | 回答後に作成・修正する `requirement` / `design` / `plan` / `adr` / `research` / `disc` |
 
 ### 任意項目
 | 項目名 | 説明 |
