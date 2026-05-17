@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00100",
+  "title": "Discussion template hearing sheet and flexible note expansion",
+  "slug": "discussion-template-hearing-sheet-and-flexible-note-expansion",
+  "created_at": "2026-05-17T15:48:37+09:00",
+  "updated_at": "2026-05-17T15:48:37+09:00",
+  "parent_id": "epic-00067",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00067",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 100,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
