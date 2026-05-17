@@ -185,6 +185,92 @@ git diff --check
 
 ---
 
+### 2026-05-17 HH:MM - HH:MM
+
+#### 対象
+- Step: S01 provider docs/templates catalog
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-008, AC-009, AC-010, EC-001, EC-002, EC-003, EC-004, EC-005, EC-006
+
+#### 実施内容
+- `doc-writer` に S01 を委任し、provider-side shipped docs/templates catalog を `scratch` / `interview` / `research` / `disc` / `adr` に更新した。
+- `interview.md` と `scratch.md` を provider template catalog に追加し、provider-side `note.md` を削除した。
+- `adr` / `disc` / `research` templates と shipped docs / README / workflow / rules docs に authority、reflection、retired `note`、`interview` / `scratch` の使い分けを追加した。
+- 親側で S01 diff、template inventory、label assertion、stale scan、uppercase path check、`git diff --check` を確認した。
+
+#### 実行コマンド / 結果
+```bash
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=43
+
+for label in 質問主題 回答してほしいこと なぜ質問するのか 背景 詳細説明 事前分析 回答案 選択肢比較 メリット デメリット リスク ベストプラクティス分析 推奨案 未回答時の影響 回答欄 回答後フォローアップ; do rg -q -- "$label" src/spec_dock/assets/spec_dock/templates/discussions/interview.md || exit 1; done; printf 'all interview labels present\n'
+# all interview labels present
+
+rg -n "new doc note|adr\|disc\|research\|note" src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/scripts/README.md
+# no matches
+
+ls src/spec_dock/assets/spec_dock/templates/discussions
+# adr.md
+# disc.md
+# interview.md
+# research.md
+# scratch.md
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | cl-001, cl-002, cl-003 | S01 files changed, verification passes, report updated, spec-reviewer pass, commit created | verification evidence recorded; reviewer `019e35d0-11a1-7d71-8a49-dd79b796ab16` pass; commit pending | pass | runtime/tests and dogfooding mirror intentionally untouched |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| cl-001 | S01 | yes | inspect-only | old `note` catalog existed; no `interview.md` / `scratch.md` | stale scan over provider docs/templates/scripts README | pass | no current `new doc note` / old catalog examples found |
+| cl-002 | S01 | yes | red-required | provider `interview.md` absent before S01 | interview label assertion | pass | required question-block labels present |
+| cl-003 | S01 | yes | inspect-only | provider `scratch.md` absent before S01 | template inspection | pass | required body centered on `メモ`; organization fields optional |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-001 | S01 | stale scan + changed docs/templates inventory | pass | reviewer pending |
+| cl-002 | S01 | label assertion command | pass | reviewer pending |
+| cl-003 | S01 | `scratch.md` inspection | pass | reviewer pending |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | shipped docs/templates / workflow text | doc-writer | provider-side docs/templates catalog only | requirement/design/plan S01 | S01 target files under `src/spec_dock/assets/spec_dock/{templates,docs,scripts}` | runtime/tests, dogfooding mirror, active issue docs/report, existing discussion artifact migration | `git diff --check`, interview label assertion, stale scan | path outside allowed scope, required label set cannot fit template, target docs contradict design | changed files, summary, verification result, risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S01 | doc-writer | provider-side shipped docs/templates catalog updated; runtime/tests/dogfooding mirror untouched | provider docs/templates listed below | `git diff --check` pass; label assertion pass; stale scan no matches | pending | S02 runtime and S03 dogfooding still pending | accepted for S01 review |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to commit | reviewer `019e35d0-11a1-7d71-8a49-dd79b796ab16`; no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed | provider docs/templates + S01 report evidence | pending until commit command completes | pending until post-commit check | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/templates/discussions/adr.md` - authority/reflection guidance
+- `src/spec_dock/assets/spec_dock/templates/discussions/disc.md` - framing boundary and split guidance
+- `src/spec_dock/assets/spec_dock/templates/discussions/research.md` - facts/uncertainty/decision implication guidance
+- `src/spec_dock/assets/spec_dock/templates/discussions/interview.md` - new hearing/interview template
+- `src/spec_dock/assets/spec_dock/templates/discussions/scratch.md` - new raw capture template
+- `src/spec_dock/assets/spec_dock/templates/discussions/note.md` - retired from provider template catalog
+- `src/spec_dock/assets/spec_dock/docs/*` and `src/spec_dock/assets/spec_dock/docs/rules/*/discussions.md` - shipped lifecycle/selection guidance
+- `src/spec_dock/assets/spec_dock/templates/README.md` - template inventory
+- `src/spec_dock/assets/spec_dock/scripts/README.md` - command catalog guidance
+
+---
+
 ## Final Quality Gate (必須)
 
 ### S90 Docs Impact Resolution
