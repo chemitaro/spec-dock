@@ -653,15 +653,15 @@ class TestCliNew(CliRuntimeHarness):
 
             p_init = self._run_runtime_capture(
                 target,
-                ["new", "doc", "note", "--initiative", "1", "--title", "Initiative note"],
+                ["new", "doc", "scratch", "--initiative", "1", "--title", "Initiative note"],
             )
             p_epic = self._run_runtime_capture(
                 target,
-                ["new", "doc", "note", "--epic", "2", "--title", "Epic note"],
+                ["new", "doc", "scratch", "--epic", "2", "--title", "Epic note"],
             )
             p_issue = self._run_runtime_capture(
                 target,
-                ["new", "doc", "note", "--issue", "3", "--title", "Issue note"],
+                ["new", "doc", "scratch", "--issue", "3", "--title", "Issue note"],
             )
             self.assertEqual(p_init.returncode, 0, p_init.stdout + p_init.stderr)
             self.assertEqual(p_epic.returncode, 0, p_epic.stdout + p_epic.stderr)
@@ -673,9 +673,9 @@ class TestCliNew(CliRuntimeHarness):
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
-            self.assertEqual(len(sorted((init_dir / "discussions").glob("*-note-initiative-note.md"))), 1)
-            self.assertEqual(len(sorted((epic_dir / "discussions").glob("*-note-epic-note.md"))), 1)
-            self.assertEqual(len(sorted((issue_dir / "discussions").glob("*-note-issue-note.md"))), 1)
+            self.assertEqual(len(sorted((init_dir / "discussions").glob("*-scratch-initiative-note.md"))), 1)
+            self.assertEqual(len(sorted((epic_dir / "discussions").glob("*-scratch-epic-note.md"))), 1)
+            self.assertEqual(len(sorted((issue_dir / "discussions").glob("*-scratch-issue-note.md"))), 1)
 
     def test_new_doc_uses_timestamp_family_across_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -685,7 +685,8 @@ class TestCliNew(CliRuntimeHarness):
             self._run_runtime(target, ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"])
             self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
             self._run_runtime(target, ["new", "doc", "research", "--issue", "iss-00003", "--title", "Research one"])
-            self._run_runtime(target, ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"])
+            self._run_runtime(target, ["new", "doc", "interview", "--issue", "iss-00003", "--title", "Interview one"])
+            self._run_runtime(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Scratch one"])
 
             issue_dir = (
                 target
@@ -701,7 +702,37 @@ class TestCliNew(CliRuntimeHarness):
             self.assertEqual(len(sorted(discussions_dir.glob("*-disc-discussion-one.md"))), 1)
             self.assertEqual(len(sorted(discussions_dir.glob("*-adr-decision-one.md"))), 1)
             self.assertEqual(len(sorted(discussions_dir.glob("*-research-research-one.md"))), 1)
-            self.assertEqual(len(sorted(discussions_dir.glob("*-note-note-one.md"))), 1)
+            self.assertEqual(len(sorted(discussions_dir.glob("*-interview-interview-one.md"))), 1)
+            self.assertEqual(len(sorted(discussions_dir.glob("*-scratch-scratch-one.md"))), 1)
+
+    def test_new_doc_note_is_retired_with_scratch_guidance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target)
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"],
+            )
+
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("note", p.stderr)
+            self.assertIn("retired", p.stderr)
+            self.assertIn("scratch", p.stderr)
+            self.assertNotIn("invalid choice", p.stderr)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            self.assertEqual(list((issue_dir / "discussions").glob("*-note-note-one.md")), [])
 
     def test_new_doc_stdout_uses_slugless_id_and_discussions_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -736,7 +767,7 @@ class TestCliNew(CliRuntimeHarness):
                 today="2026-03-11",
             )
 
-            self._run_runtime(target, ["new", "doc", "note", "--issue", "iss-00003", "--title", "UTC date check"])
+            self._run_runtime(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "UTC date check"])
 
             issue_dir = (
                 target
@@ -748,7 +779,7 @@ class TestCliNew(CliRuntimeHarness):
                 / "issues"
                 / "iss-00003-add-refresh-token"
             )
-            created = issue_dir / "discussions" / "20260312t003000z-note-utc-date-check.md"
+            created = issue_dir / "discussions" / "20260312t003000z-scratch-utc-date-check.md"
             self.assertTrue(created.is_file())
             self.assertIn("2026-03-12", created.read_text(encoding="utf-8"))
             self.assertNotIn("2026-03-11", created.read_text(encoding="utf-8"))
@@ -865,10 +896,10 @@ class TestCliNew(CliRuntimeHarness):
             (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
             (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
 
-            p = self._run_runtime_capture(target, ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"])
+            p = self._run_runtime_capture(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Note one"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertRegex(p.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-note\b")
-            self.assertEqual(len(sorted(discussions_dir.glob("*-note-note-one.md"))), 1)
+            self.assertRegex(p.stdout, r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-scratch\b")
+            self.assertEqual(len(sorted(discussions_dir.glob("*-scratch-note-one.md"))), 1)
 
     def test_new_doc_rejects_invalid_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -934,7 +965,7 @@ class TestCliNew(CliRuntimeHarness):
             target = Path(tmp)
             self.assertEqual(main(["init", str(target)]), 0)
 
-            for per_type in ("adr", "disc", "research", "note"):
+            for per_type in ("adr", "disc", "research", "interview", "scratch", "note"):
                 p = self._run_runtime_capture(
                     target,
                     ["new", per_type, "--issue", "iss-00003", "--title", "Doc title"],
@@ -953,6 +984,8 @@ class TestCliNew(CliRuntimeHarness):
             self.assertNotIn("\n    adr", p_new.stdout)
             self.assertNotIn("\n    disc", p_new.stdout)
             self.assertNotIn("\n    research", p_new.stdout)
+            self.assertNotIn("\n    interview", p_new.stdout)
+            self.assertNotIn("\n    scratch", p_new.stdout)
             self.assertNotIn("\n    note", p_new.stdout)
 
             p_doc = self._run_runtime_capture(target, ["new", "doc", "--help"])
@@ -960,6 +993,8 @@ class TestCliNew(CliRuntimeHarness):
             self.assertIn("adr", p_doc.stdout)
             self.assertIn("disc", p_doc.stdout)
             self.assertIn("research", p_doc.stdout)
+            self.assertIn("interview", p_doc.stdout)
+            self.assertIn("scratch", p_doc.stdout)
             self.assertIn("note", p_doc.stdout)
             self.assertNotIn("--id", p_doc.stdout)
             self.assertNotIn("--seq", p_doc.stdout)
@@ -1007,8 +1042,9 @@ class TestCliNew(CliRuntimeHarness):
                 target,
                 ["new", "doc", "unknown", "--issue", "iss-00003", "--title", "Doc title"],
             )
-            self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
-            self.assertIn("invalid choice: 'unknown'", p.stderr)
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("Unknown discussion doc type: unknown", p.stderr)
+            self.assertNotIn("invalid choice", p.stderr)
 
     def test_new_nodes_do_not_generate_readme_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

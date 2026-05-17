@@ -145,12 +145,19 @@ class TestRuntimeNewDocS09(unittest.TestCase):
     def _prepare_discussion_templates(self, specdock_dir: Path) -> None:
         templates_dir = specdock_dir / "templates" / "discussions"
         templates_dir.mkdir(parents=True, exist_ok=True)
-        for doc_type in ("adr", "disc", "research", "note"):
+        placeholders = {
+            "adr": ("<ADR_ID>", "<ADR_TITLE>"),
+            "disc": ("<DISC_ID>", "<DISC_TITLE>"),
+            "research": ("<RESEARCH_ID>", "<RESEARCH_TITLE>"),
+            "interview": ("<INTERVIEW_ID>", "<INTERVIEW_TITLE>"),
+            "scratch": ("<SCRATCH_ID>", "<SCRATCH_TITLE>"),
+        }
+        for doc_type, (id_placeholder, title_placeholder) in placeholders.items():
             (templates_dir / f"{doc_type}.md").write_text(
                 (
                     f"type={doc_type}\n"
-                    "id=<ADR_ID>\n"
-                    "title=<ADR_TITLE>\n"
+                    f"id={id_placeholder}\n"
+                    f"title={title_placeholder}\n"
                     "scope=<SCOPE_ID>\n"
                     "author=<YOUR_NAME>\n"
                     "date=YYYY-MM-DD\n"
@@ -269,7 +276,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
 
             result = app_create_node.create_discussion_doc(
                 app_contracts.CreateDiscussionDocRequest(
-                    doc_type="note",
+                    doc_type="scratch",
                     scope_node_id="iss-local-00001",
                     title="Note one",
                     slug=None,
@@ -277,15 +284,15 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 ports,
             )
 
-            self.assertEqual(result.doc_id, "20260312t010203z-note")
-            self.assertEqual(result.doc_type, "note")
-            self.assertEqual(result.path.name, "20260312t010203z-note-note-one.md")
+            self.assertEqual(result.doc_id, "20260312t010203z-scratch")
+            self.assertEqual(result.doc_type, "scratch")
+            self.assertEqual(result.path.name, "20260312t010203z-scratch-note-one.md")
             self.assertTrue(result.path.exists())
             self.assertEqual(events, ["load_template_text", "render_text", "write_text"])
 
             content = result.path.read_text(encoding="utf-8")
-            self.assertIn("type=note", content)
-            self.assertIn("id=20260312t010203z-note", content)
+            self.assertIn("type=scratch", content)
+            self.assertIn("id=20260312t010203z-scratch", content)
             self.assertIn("title=Note one", content)
             self.assertIn("scope=iss-local-00001", content)
             self.assertIn("date=2026-03-12", content)
@@ -303,9 +310,10 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 "adr": "20260312t010203z-adr",
                 "disc": "20260312t010203z-01-disc",
                 "research": "20260312t010203z-02-research",
-                "note": "20260312t010203z-03-note",
+                "interview": "20260312t010203z-03-interview",
+                "scratch": "20260312t010203z-04-scratch",
             }
-            for doc_type in ("adr", "disc", "research", "note"):
+            for doc_type in ("adr", "disc", "research", "interview", "scratch"):
                 result = app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
                         doc_type=doc_type,
@@ -343,7 +351,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Discussion timestamp suffix exhaustion"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
-                        doc_type="note",
+                        doc_type="scratch",
                         scope_node_id="iss-local-00001",
                         title="Note one",
                         slug=None,
@@ -352,7 +360,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 )
 
             self.assertEqual(events, [])
-            self.assertEqual(list(discussions_dir.glob("20260312t010203z-*-note-*.md")), [])
+            self.assertEqual(list(discussions_dir.glob("20260312t010203z-*-scratch-*.md")), [])
 
     def test_duplicate_timestamp_corruption_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -372,7 +380,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp slot detected"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
-                        doc_type="note",
+                        doc_type="scratch",
                         scope_node_id="iss-local-00001",
                         title="Note one",
                         slug=None,
@@ -410,7 +418,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp suffix detected"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
-                        doc_type="note",
+                        doc_type="scratch",
                         scope_node_id="iss-local-00001",
                         title="Note one",
                         slug=None,
@@ -473,7 +481,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "Duplicate discussion timestamp slot detected"):
                         app_create_node.create_discussion_doc(
                             app_contracts.CreateDiscussionDocRequest(
-                                doc_type="note",
+                                doc_type="scratch",
                                 scope_node_id="iss-local-00001",
                                 title="Note one",
                                 slug=None,
@@ -516,7 +524,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
                         app_create_node.create_discussion_doc(
                             app_contracts.CreateDiscussionDocRequest(
-                                doc_type="note",
+                                doc_type="scratch",
                                 scope_node_id="iss-local-00001",
                                 title="Note one",
                                 slug=None,
@@ -548,7 +556,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
                 app_create_node.create_discussion_doc(
                     app_contracts.CreateDiscussionDocRequest(
-                        doc_type="note",
+                        doc_type="scratch",
                         scope_node_id="iss-local-00001",
                         title="Note one",
                         slug=None,
@@ -609,7 +617,7 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                             with self.assertRaisesRegex(RuntimeError, "Malformed discussion document filename"):
                                 app_create_node.create_discussion_doc(
                                     app_contracts.CreateDiscussionDocRequest(
-                                        doc_type="note",
+                                        doc_type="scratch",
                                         scope_node_id="iss-local-00001",
                                         title="Note one",
                                         slug=None,
