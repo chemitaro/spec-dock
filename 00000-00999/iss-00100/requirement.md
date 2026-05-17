@@ -79,6 +79,7 @@ capture -> elicitation -> research -> framing -> decision -> execution handoff
 ## スコープ
 - 必須:
   - 既存 `adr` / `disc` / `research` の責務と、追加候補 `interview` / `scratch` の authority level、使い分けを docs または template guidance で明確化する。
+  - authority level は doc type ごとの既定値を持たせ、例外時だけ front matter の `authority` で override できる設計にする。全 artifact で `authority` を明示必須にしない。
   - `disc` は主に framing / decision support のための template であり、ヒアリング回答の主たる記録先ではないことを明確にする。
   - elicitation 用の支援を実装する。暫定推奨は新 type `interview` とし、日本語表示名は「ヒアリング記録」とする。
   - raw capture / freestyle writing 用の支援を実装する。暫定推奨は新 type `scratch` とする。
@@ -107,6 +108,8 @@ capture -> elicitation -> research -> framing -> decision -> execution handoff
 - 新規または変更する path / doc type 名は lowercase とする。
 - 人間への質問は、短時間で回答できる構造を持たなければならない。
 - 人間への質問は、質問ごとに質問主題、質問理由、背景、事前分析、回答候補、選択肢分析、推奨案、回答欄、回答後 follow-up を持たなければならない。
+- `interview` は、単なる聞き取りログではなく、人間が回答しやすい意思決定支援シートとして、回答候補、選択肢比較、メリット/デメリット、リスク、ベストプラクティス分析、推奨案を必須で持たなければならない。
+- authority level は、doc type default + optional front matter override を契約とする。必須 front matter 化または docs guidance のみの扱いに変更する場合は、設計変更として明示レビューを必要とする。
 - 人間への質問は、調査可能事項を質問で代替しないための guardrail を持たなければならない。
 - raw capture は、front matter / header / title 以外の本文構造を強制しないか、強制する場合でも自由記述を妨げない最小限に留めなければならない。
 - raw capture は、非 authoritative であり、必要に応じて `research` / `disc` / `adr` / `requirement` / `design` / `plan` を作成・修正する guidance を持たなければならない。
@@ -194,6 +197,13 @@ capture -> elicitation -> research -> framing -> decision -> execution handoff
     - discussion docs は思考、知識、未確定情報を外部化する作業面であることが説明されている。
     - discussion docs 自体を正本化せず、discussion docs の文脈をもとに新しい `adr` を作成し、`requirement.md` / `design.md` / `plan.md` へ織り込んで固定化することが説明されている。
     - authority level、reflected_to、stale / discard condition の考え方が説明されている。
+- AC-010: authority level は既定値と override の契約を持つ
+  - アクター: エージェント / maintainer / reviewer
+  - 前提: docs または template guidance を読む
+  - 期待結果:
+    - `scratch` / `interview` / `research` / `disc` / `adr` の authority 既定値が説明されている。
+    - 通常は doc type から authority を推定し、例外時だけ front matter の `authority` で override できることが説明されている。
+    - 全 artifact で `authority` を明示必須にしないことが分かる。
 
 ## 例外・エッジケース
 - EC-001: 単純な yes/no 確認
