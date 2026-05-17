@@ -1,31 +1,22 @@
 # discussions/rules.md
 
-このディレクトリは、initiative に紐づく検討資料（ADR/議論/調査/メモ）を記録する場所です。
+このディレクトリには initiative に紐づく議論資料を置きます。
 
-## 1. 種類（type）
-- `adr`: 意思決定（Architecture Decision Record）
-- `disc`: 議論シート（選択肢比較、推奨案）
-- `research`: 調査メモ（結果と結論）
-- `note`: 軽量メモ（会議・作業・思考）
-
-## 2. 命名規約
-- ファイル名は `NNN-type-slug.md`（`NNN` は 3 桁固定）
-- 例:
-  - `001-adr-token-rotation.md`
-  - `002-disc-doc-structure.md`
-  - `003-research-naming-rules.md`
-  - `004-note-kickoff-memo.md`
-
-## 3. 作成方法（runtime command）
-- `./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title "<title>"`
-- `./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title "<title>"`
-- `./spec-dock/scripts/spec-dock new doc research --initiative <id> --title "<title>"`
-- `./spec-dock/scripts/spec-dock new doc note --initiative <id> --title "<title>"`
-
-## 4. ルール
-- `discussions/` 配下に `new-*` などのラッパスクリプトを置かない。
-- 採番は type ごとではなく `discussions/` 全体で共有します（new-format files の最大 `NNN` + 1）。
-- 採番対象は `NNN-type-slug.md` に一致する new-format files のみです。
-- `rules.md` と legacy/nonconforming files（例: `adr-00001-...`, `foo.md`）は採番対象外です。既存ファイルは rename しません。
-- `999` を超える採番は失敗します。follow-up issue を作成し、archive または桁拡張を判断してください。
-- 公開済みファイルの番号を振り直さない。
+- Discussion workflow: `spec-dock/docs/workflow_adr.md`
+- Naming rules: `spec-dock/docs/reference_naming.md`
+- 作成される docs はこの directory に timestamp-prefixed original として保存されます（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。legacy sequential files は grandfathered で、自動 rename しません。
+- 実行場所: コマンドはリポジトリ root から実行してください。`./spec-dock/scripts/spec-dock ...` はその位置で保証される実行経路で、nested directory では相対 path が変わります。
+- Current catalog:
+  - `scratch`: raw capture。非 authoritative。未整理の発話、観察、思考、会話ログを置く。
+  - `interview`: ヒアリング記録。人間から未確定情報を引き出し、回答欄と反映先を管理する。
+  - `research`: 事実調査。事実、推測、未検証、判断への含意を分ける。
+  - `disc`: 論点整理。集まった情報をもとに評価軸、選択肢、合意点を整理する。
+  - `adr`: 意思決定記録。長期的な判断と理由を固定する。
+- `note` は retired。既存 artifact は grandfathered だが、新規 raw capture は `scratch` を使う。
+- `disc` が大きくなりすぎたら、質問回答は `interview`、事実調査は `research`、生ログは `scratch`、長期判断は `adr` へ分割してください。
+- Create commands:
+  - `./spec-dock/scripts/spec-dock new doc scratch --initiative <id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc interview --initiative <id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc research --initiative <id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title "<title>"`
+  - `./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title "<title>"`

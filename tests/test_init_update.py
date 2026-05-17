@@ -40,6 +40,25 @@ _ISS_00031_EXCLUDE_PATTERNS = (
     "assets/spec_dock/templates/epic/issues/new-issue",
 )
 
+_INTERVIEW_REQUIRED_LABELS = (
+    "質問主題",
+    "回答してほしいこと",
+    "なぜ質問するのか",
+    "背景",
+    "詳細説明",
+    "事前分析",
+    "回答案",
+    "選択肢比較",
+    "メリット",
+    "デメリット",
+    "リスク",
+    "ベストプラクティス分析",
+    "推奨案",
+    "未回答時の影響",
+    "回答欄",
+    "回答後フォローアップ",
+)
+
 
 class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_PROVIDER_ASSET_MAP = {
@@ -205,11 +224,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title",
                 "./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title",
                 "./spec-dock/scripts/spec-dock new doc research --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc note --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new doc interview --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new doc scratch --initiative <id> --title",
             ),
             "absent": (
                 "--epic <id>",
                 "--issue <id>",
+                "new doc note",
             ),
         },
         "docs/rules/initiative/epics.md": {
@@ -235,11 +256,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock new doc adr --epic <id> --title",
                 "./spec-dock/scripts/spec-dock new doc disc --epic <id> --title",
                 "./spec-dock/scripts/spec-dock new doc research --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc note --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new doc interview --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new doc scratch --epic <id> --title",
             ),
             "absent": (
                 "--initiative <id>",
                 "--issue <id>",
+                "new doc note",
             ),
         },
         "docs/rules/epic/issues.md": {
@@ -265,11 +288,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock new doc adr --issue <id> --title",
                 "./spec-dock/scripts/spec-dock new doc disc --issue <id> --title",
                 "./spec-dock/scripts/spec-dock new doc research --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc note --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new doc interview --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new doc scratch --issue <id> --title",
             ),
             "absent": (
                 "--initiative <id>",
                 "--epic <id>",
+                "new doc note",
             ),
         },
     }
@@ -286,6 +311,15 @@ class TestInitUpdate(CliRuntimeHarness):
         "generated ADR mirror",
         "`sync` で rebuild / gitignore 対象",
     )
+
+    def test_provider_discussion_interview_template_contains_required_labels(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        interview_text = (
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates" / "discussions" / "interview.md"
+        ).read_text(encoding="utf-8")
+
+        for label in _INTERVIEW_REQUIRED_LABELS:
+            self.assertIn(label, interview_text)
     _GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS = (
         "[workflow_initiative.md](workflow_initiative.md)",
         "[workflow_epic.md](workflow_epic.md)",
@@ -707,6 +741,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00071-verification-dogfooding-and-update-parity/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00072-legacy-authority-retirement-and-final-spec-close/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -777,6 +812,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00071"
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00098-delegated-implementation-orchestration-contract/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -2156,9 +2192,14 @@ class TestInitUpdate(CliRuntimeHarness):
 
             discussions_templates_dir = templates_dir / "discussions"
             self.assertTrue((discussions_templates_dir / "adr.md").is_file())
-            self.assertTrue((discussions_templates_dir / "note.md").is_file())
             self.assertTrue((discussions_templates_dir / "disc.md").is_file())
             self.assertTrue((discussions_templates_dir / "research.md").is_file())
+            self.assertTrue((discussions_templates_dir / "interview.md").is_file())
+            self.assertTrue((discussions_templates_dir / "scratch.md").is_file())
+            self.assertFalse((discussions_templates_dir / "note.md").exists())
+            interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
+            for label in _INTERVIEW_REQUIRED_LABELS:
+                self.assertIn(label, interview_text)
             self.assertEqual(list(initiative_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(epic_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(issue_templates_dir.rglob("README.md")), [])
@@ -2433,6 +2474,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
             legacy_template_text_map = {
                 "spec-dock/templates/adr.md": "# legacy adr template\n",
+                "spec-dock/templates/discussions/note.md": "# retired note template\n",
                 "spec-dock/templates/initiative/discussions/rules.md": (
                     "legacy naming: <type>-00001-<slug>.md\n"
                 ),
@@ -2532,6 +2574,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "corrupted managed rules\n",
             )
             managed_legacy_artifacts = {
+                target / "spec-dock" / "templates" / "discussions" / "note.md": "# retired note template\n",
                 target / "spec-dock" / "templates" / "initiative" / "epics" / "new-epic": "#!/bin/sh\n",
                 target / "spec-dock" / "templates" / "epic" / "issues" / "new-issue": "#!/bin/sh\n",
                 target / "spec-dock" / "templates" / "issue" / "discussions" / "rules.md": (
@@ -2549,6 +2592,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 node_root / "epics" / "epic-local-00001-jwt-auth" / "issues" / "new-issue": (
                     "node issue wrapper\n"
                 ),
+                node_root
+                / "epics"
+                / "epic-local-00001-jwt-auth"
+                / "issues"
+                / "iss-local-00001-refresh-token"
+                / "discussions"
+                / "20260329t123456z-note-existing.md": "existing retired note discussion\n",
                 node_root
                 / "epics"
                 / "epic-local-00001-jwt-auth"

@@ -530,7 +530,8 @@ class CliRuntimeHarness(unittest.TestCase):
         self.assertIn("new doc adr", combined)
         self.assertIn("new doc disc", combined)
         self.assertIn("new doc research", combined)
-        self.assertIn("new doc note", combined)
+        self.assertIn("new doc interview", combined)
+        self.assertIn("new doc scratch", combined)
         self.assertIn("<ts>-<kind>-<slug>.md", combined)
         self.assertIn("<ts>-<nn>-<kind>-<slug>.md", combined)
         self.assertIn("yyyymmddthhmmssz", combined)
@@ -542,6 +543,7 @@ class CliRuntimeHarness(unittest.TestCase):
         self.assertIn("archive", combined)
 
         self.assertNotIn("new adr --", combined)
+        self.assertNotIn("new doc note", combined)
         self.assertNotIn("<type>-00001-<slug>.md", combined)
         self.assertNotIn("<type>-xxxxx-<slug>.md", combined)
         for rel_path, text in text_map.items():
