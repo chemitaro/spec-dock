@@ -558,15 +558,16 @@ git diff --check
   - 解決: provider `src/spec_dock/assets/spec_dock/scripts/**` から dogfooding `spec-dock/scripts/**` を同期し、local runtime help と provider/mirror diff を確認した。
 - 問題: guidance contract tests が retired `note` を current command として期待していた。
   - 解決: `interview` / `scratch` を期待し、`new doc note` を current guidance から除外する contract へ更新した。
+- 問題: post-implementation integration review で、active initiative 直下の node-local `discussions/rules.md` が旧 catalog と `new doc note` を案内していた。
+  - 解決: active initiative の node-local guidance を current catalog (`scratch` / `interview` / `research` / `disc` / `adr`) に更新し、fresh `spec-reviewer` `019e37f1-54ac-7663-8e87-cc9af6567954` で pass を確認した。
 
 ## 学んだこと (任意)
 - docs/templates だけでなく dogfooding runtime mirror も scaffold-affecting change の検証対象に含める必要がある。
 - `note` retired のような catalog change は、help text、guidance contract、installed scaffold content、validation grandfathering を同時に確認する必要がある。
-- ...
+- active context から辿れる node-local guidance は historical artifact ではなく agent-facing instruction として扱い、current runtime interface と矛盾しないことを確認する必要がある。
 
 ## 今後の推奨事項 (任意)
 - follow-up: `uvx --from . spec-dock update .` が作業ツリー provider asset ではなく stale packaged content を使った経路を別 issue で調査すると、dogfooding mirror 更新の手動同期を減らせる。
-- ...
 
 ## 省略/例外メモ (必須)
 - 該当なし
