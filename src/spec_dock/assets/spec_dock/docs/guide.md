@@ -58,7 +58,7 @@ current catalog は `scratch` / `interview` / `research` / `disc` / `adr` です
 
 通常は doc type から authority を推定します。例外時だけ front matter の `authority` で override し、全 artifact で明示必須にはしません。`derived_from` / `reflected_to` は任意 metadata として、元になった discussion docs と反映先を追うために使えます。
 
-`note` は新規作成 catalog から retired されています。既存 `note` artifact は grandfathered として壊さず、以後の raw capture は `scratch` に置きます。
+`note` は新規作成 catalog から retired されています。軽量メモと raw capture の境界が曖昧で `scratch` と役割が重複するため、未整理の記録先を `scratch` に一本化します。これは raw capture type の重複を避け、選択時の認知的曖昧さを減らすためです。既存 `note` artifact は grandfathered として壊さず、以後の raw capture は `scratch` に置きます。
 
 reflection rules:
 - `scratch`: 事実確認が必要なら `research`、論点整理が必要なら `disc`、人間判断が必要なら `interview`、長期判断なら `adr` を新規作成する。
