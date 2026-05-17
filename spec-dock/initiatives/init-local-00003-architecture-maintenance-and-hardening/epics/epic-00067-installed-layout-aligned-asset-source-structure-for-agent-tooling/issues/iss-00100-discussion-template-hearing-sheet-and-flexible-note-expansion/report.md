@@ -451,7 +451,7 @@ rg --files | rg '[A-Z]'
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending | dogfooding docs/templates/scripts README + S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | pass | dogfooding docs/templates/scripts README + S03 report evidence | `bc9546a` | clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `spec-dock/docs/guide.md` - dogfooding lifecycle / discussion catalog guidance
@@ -469,43 +469,103 @@ rg --files | rg '[A-Z]'
 
 ---
 
+### 2026-05-17 HH:MM - HH:MM
+
+#### 対象
+- Remediation after final QA/code/spec review failures
+- AC/EC: AC-001, AC-002, AC-006, AC-009, AC-010, EC-007
+
+#### 実施内容
+- stale だった dogfooding runtime mirror を provider runtime から同期し、`spec-dock/scripts/spec_dock_runtime/**` と `spec-dock/scripts/spec-dock` を provider `src/spec_dock/assets/spec_dock/scripts/**` と整合させた。
+- dogfooding CLI の `new doc --help` が `interview` / `scratch` を表示し、`note` retired guidance を示すことを確認した。
+- `_assert_discussion_guidance_contract` の stale expectation を、current catalog の `interview` / `scratch` と `new doc note` absence に更新した。
+- provider/installed `interview.md` が必須 label set を持つ contract test を追加した。
+- shipped guidance rationale と dogfooding mirror に、`note` を `scratch` へ統合した理由として raw capture type の重複回避と認知的曖昧さの低減を明記した。
+
+#### 実行コマンド / 結果
+```bash
+rsync -a --delete --exclude __pycache__ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ spec-dock/scripts/spec_dock_runtime/
+cp src/spec_dock/assets/spec_dock/scripts/spec-dock spec-dock/scripts/spec-dock
+# pass
+
+diff -qr --exclude __pycache__ src/spec_dock/assets/spec_dock/scripts spec-dock/scripts
+# no output
+
+./spec-dock/scripts/spec-dock new doc --help
+# doc_type help lists adr, disc, research, interview, scratch
+# note is retired; use scratch for new raw capture docs
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure
+# Ran 3 tests in 0.277s
+# OK
+
+python -m unittest tests.cli_runtime.test_new.TestCliNew.test_new_help_exposes_only_doc_discussion_entrypoint tests.cli_runtime.test_new.TestCliNew.test_new_doc_note_is_retired_with_scratch_guidance tests.cli_runtime.test_validate.TestCliValidate.test_validate_rejects_legacy_sequence_for_new_discussion_types
+# Ran 3 tests in 2.096s
+# OK
+
+python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 tests.cli_runtime.test_validate tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_update_preserves_legacy_artifacts_inside_existing_node_trees tests.test_init_update.TestInitUpdate.test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set tests.test_init_update.TestInitUpdate.test_update_refreshes_discussion_guidance_without_legacy_examples_across_asset_set
+# Ran 99 tests in 132.386s
+# OK
+
+rg -n "new doc note|adr\|disc\|research\|note|\{adr\|disc\|research\|note\}|note\.md|doc type.*note|note.*doc type" src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/scripts/README.md spec-dock/docs spec-dock/templates spec-dock/scripts/README.md
+# no matches
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=43
+
+git diff --check
+# pass
+```
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-002 | remediation | provider/installed interview label contract tests added | pass | final targeted suite and integrated 99-test suite pass |
+| cl-004 | remediation | dogfooding runtime help exposes `interview` / `scratch` | pass | provider/mirror runtime diff clean excluding pycache |
+| cl-005 | remediation | dogfooding runtime help routes `note` to retired guidance | pass | use-case negative behavior covered by existing runtime tests |
+| cl-008 | remediation | dogfooding runtime mirror synced from provider runtime | pass | docs/templates mirror had already been refreshed |
+| cl-009 | remediation | guidance contract expects no current `new doc note` | pass | stale scan and guidance contract tests pass |
+
 ## Final Quality Gate (必須)
 
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | doc-writer + remediation | S01 provider docs/templates, S03 dogfooding mirror, remediation guide rationale, stale scan no matches, provider/dogfooding mirror diff clean | pass (`019e35fd-7734-7880-a255-676ebdf94d99`) |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue test adequacy | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue test adequacy | added | first review found stale guidance contract and missing interview label contract; remediation added/updated tests; 99-test suite pass | pass (`019e35fd-7606-7dc1-82f8-c910d70ad26a`) |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | first review found stale dogfooding runtime; remediation synced dogfooding runtime from provider and verified local help/new catalog | 1 | pass (`019e35fd-7688-77c3-9ad3-e49269102085`) |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first review found final gate placeholders, update/dogfooding alignment risk, and missing note-to-scratch rationale; remediation and final ledger addressed these | 1 | pass (`019e35fd-7734-7880-a255-676ebdf94d99`) |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final gates closed in report; post-commit hash to be added by final response ledger | remediation: dogfooding runtime mirror, guidance contract tests, interview label contract test, note-to-scratch rationale, final gate ledger | final response | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final review で dogfooding runtime mirror が provider runtime より古く、local `./spec-dock/scripts/spec-dock new doc --help` が旧 catalog を表示することが判明した。
+  - 解決: provider `src/spec_dock/assets/spec_dock/scripts/**` から dogfooding `spec-dock/scripts/**` を同期し、local runtime help と provider/mirror diff を確認した。
+- 問題: guidance contract tests が retired `note` を current command として期待していた。
+  - 解決: `interview` / `scratch` を期待し、`new doc note` を current guidance から除外する contract へ更新した。
 
 ## 学んだこと (任意)
-- ...
+- docs/templates だけでなく dogfooding runtime mirror も scaffold-affecting change の検証対象に含める必要がある。
+- `note` retired のような catalog change は、help text、guidance contract、installed scaffold content、validation grandfathering を同時に確認する必要がある。
 - ...
 
 ## 今後の推奨事項 (任意)
-- ...
+- follow-up: `uvx --from . spec-dock update .` が作業ツリー provider asset ではなく stale packaged content を使った経路を別 issue で調査すると、dogfooding mirror 更新の手動同期を減らせる。
 - ...
 
 ## 省略/例外メモ (必須)

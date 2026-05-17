@@ -40,6 +40,25 @@ _ISS_00031_EXCLUDE_PATTERNS = (
     "assets/spec_dock/templates/epic/issues/new-issue",
 )
 
+_INTERVIEW_REQUIRED_LABELS = (
+    "質問主題",
+    "回答してほしいこと",
+    "なぜ質問するのか",
+    "背景",
+    "詳細説明",
+    "事前分析",
+    "回答案",
+    "選択肢比較",
+    "メリット",
+    "デメリット",
+    "リスク",
+    "ベストプラクティス分析",
+    "推奨案",
+    "未回答時の影響",
+    "回答欄",
+    "回答後フォローアップ",
+)
+
 
 class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_PROVIDER_ASSET_MAP = {
@@ -292,6 +311,15 @@ class TestInitUpdate(CliRuntimeHarness):
         "generated ADR mirror",
         "`sync` で rebuild / gitignore 対象",
     )
+
+    def test_provider_discussion_interview_template_contains_required_labels(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        interview_text = (
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates" / "discussions" / "interview.md"
+        ).read_text(encoding="utf-8")
+
+        for label in _INTERVIEW_REQUIRED_LABELS:
+            self.assertIn(label, interview_text)
     _GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS = (
         "[workflow_initiative.md](workflow_initiative.md)",
         "[workflow_epic.md](workflow_epic.md)",
@@ -2167,6 +2195,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((discussions_templates_dir / "interview.md").is_file())
             self.assertTrue((discussions_templates_dir / "scratch.md").is_file())
             self.assertFalse((discussions_templates_dir / "note.md").exists())
+            interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
+            for label in _INTERVIEW_REQUIRED_LABELS:
+                self.assertIn(label, interview_text)
             self.assertEqual(list(initiative_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(epic_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(issue_templates_dir.rglob("README.md")), [])
