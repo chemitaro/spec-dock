@@ -355,6 +355,120 @@ git diff --check
 
 ---
 
+### 2026-05-17 21:18 - 21:34 JST
+
+#### 対象
+- Step: S03 dogfooding mirror, stale-doc scan, report evidence
+- AC/EC: AC-001, AC-003, AC-005, AC-006, AC-008, AC-009, AC-010, EC-006, EC-007
+
+#### 実施内容
+- 指定どおり最初に repo root で `uvx --from . spec-dock update .` を実行した。
+- update command は `spec-dock: ok (update)` を返したが、packaged asset resolution が provider working tree と一致せず、`spec-dock/templates/discussions` は旧 `note.md` のままで、dogfooding docs に `new doc note` / `adr|disc|research|note` が残った。
+- 上記を S03 の documented blocker として扱い、失敗した broad update 差分を戻したうえで、S03 許可範囲だけを local provider assets から直接同期した。
+- 同期対象は `spec-dock/docs/`、`spec-dock/templates/`、stale scan 対象の `spec-dock/scripts/README.md` に限定した。provider source、runtime/tests、既存 issue discussion artifacts は変更していない。
+- dogfooding `templates/discussions` は `adr.md` / `disc.md` / `interview.md` / `research.md` / `scratch.md` となり、managed `note.md` は削除された。
+- 既存 `*-note-*.md` historical discussion artifacts は rename / migration せず維持した。
+
+#### 実行コマンド / 結果
+```bash
+uvx --from . spec-dock update .
+# spec-dock: (warn) repo-root shortcut already exists (skipped): /Users/iwasawayuuta/workspace/tools/spec-dock/spec
+# spec-dock: ok (update) -> /Users/iwasawayuuta/workspace/tools/spec-dock
+# blocker: dogfooding docs/templates still contained stale note catalog, so S03 used direct source-asset sync.
+
+rsync -a --delete src/spec_dock/assets/spec_dock/docs/ spec-dock/docs/
+rsync -a --delete src/spec_dock/assets/spec_dock/templates/ spec-dock/templates/
+cp src/spec_dock/assets/spec_dock/scripts/README.md spec-dock/scripts/README.md
+# pass
+
+find spec-dock/templates/discussions -maxdepth 1 -type f -name '*.md' -print | sort
+# spec-dock/templates/discussions/adr.md
+# spec-dock/templates/discussions/disc.md
+# spec-dock/templates/discussions/interview.md
+# spec-dock/templates/discussions/research.md
+# spec-dock/templates/discussions/scratch.md
+
+rg -n "new doc note|adr\|disc\|research\|note|\{adr\|disc\|research\|note\}|note\.md|doc type.*note|note.*doc type" spec-dock/docs spec-dock/templates spec-dock/scripts/README.md
+# no matches
+
+diff -qr src/spec_dock/assets/spec_dock/templates/discussions spec-dock/templates/discussions
+# no output
+
+diff -qr src/spec_dock/assets/spec_dock/docs spec-dock/docs
+# no output
+
+diff -q src/spec_dock/assets/spec_dock/scripts/README.md spec-dock/scripts/README.md
+# no output
+
+find spec-dock/initiatives -path '*/discussions/*note*.md' -print | sort
+# existing historical note artifacts remain present; no migration/rename was performed.
+
+git diff --name-status -- 'spec-dock/initiatives/**/discussions/**'
+# no output
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=43
+
+git diff --check
+# pass
+
+rg --files | rg '[A-Z]'
+# existing uppercase contract paths only, including README.md / AGENTS.md / LICENSE.
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | cl-008, cl-009 | dogfooding mirror updated, stale scan clear, historical note artifacts preserved, validate/diff-check pass, report updated | inventory, stale scan, provider/mirror diff, validate, diff-check | pass | preferred update command was attempted first but produced stale packaged content; direct source-asset sync used as safest repo-local alternative |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| cl-008 | S03 | yes | manual-required | dogfooding `templates/discussions` had managed `note.md` and lacked `interview.md` / `scratch.md` | inventory + provider/mirror `diff -qr` + validate | pass | existing historical `*-note-*.md` artifacts remain in node trees |
+| cl-009 | S03 | yes | inspect-only | update attempt left stale `new doc note` / old catalog references in dogfooding docs | stale `rg` scan over dogfooding docs/templates/scripts README | pass | no current old-catalog command advertisement remains |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| cl-008 | S03 | template inventory, provider/mirror diff, validate | pass | managed `note.md` pruned; no node tree migration |
+| cl-009 | S03 | stale scan | pass | grandfathered note wording remains only outside stale patterns |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | dogfooding mirror / stale scan only | doc-writer | local provider asset sync for dogfooding docs/templates and report evidence | requirement/design/plan S03 | `spec-dock/docs/**`, `spec-dock/templates/**`, `spec-dock/scripts/README.md`, active issue `report.md` | `src/spec_dock/**`, `tests/**`, existing discussion artifact migration/rename, broad unrelated formatting | inventory, stale scan, provider/mirror diff, validate, diff-check | provider source/runtime/test blocker, update cannot be safely scoped, stale references remain | changed files, evidence, residual risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S03 | doc-writer | dogfooding mirror refreshed from local provider assets after preferred update command left stale catalog content | dogfooding docs/templates/scripts README + report | inventory/stale scan/provider diff/validate/diff-check -> pass | pending | `uvx --from . spec-dock update .` packaging result was stale; S03 did not edit provider source to fix packaging behavior | accepted for S03 review; scope closed by direct source-asset sync |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh | passed | P2 evidence wording fixed before commit | proceed to S03 commit | reviewer `019e35f0-3328-7af1-b662-0348a1ccc7a3`; functional contract satisfied |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending | dogfooding docs/templates/scripts README + S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `spec-dock/docs/guide.md` - dogfooding lifecycle / discussion catalog guidance
+- `spec-dock/docs/phase_design.md` - `scratch` / `interview` guidance
+- `spec-dock/docs/phase_requirement.md` - `scratch` / `interview` guidance
+- `spec-dock/docs/reference_naming.md` - current discussion type set and `note` grandfathering
+- `spec-dock/docs/rules/{initiative,epic,issue}/discussions.md` - selection guide and current create commands
+- `spec-dock/docs/workflow_{initiative,epic,issue}.md` - current `new doc` examples and retired `note` guidance
+- `spec-dock/docs/workflow_spec_authoring.md` - discussion externalization/fixation guidance
+- `spec-dock/scripts/README.md` - current `new doc` command catalog and retired `note` guidance
+- `spec-dock/templates/README.md` - dogfooding template inventory
+- `spec-dock/templates/discussions/{adr,disc,research,interview,scratch}.md` - dogfooding discussion templates
+- `spec-dock/templates/discussions/note.md` - removed managed retired template
+- `spec-dock/active/issue/report.md` - S03 evidence
+
+---
+
 ## Final Quality Gate (必須)
 
 ### S90 Docs Impact Resolution
