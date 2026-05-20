@@ -294,6 +294,7 @@ ID: "iss-00103"
   - implementation scope:
     - allowed paths: `tests/test_init_update.py`
     - forbidden changes: provider assets、runtime code、dogfooding mirror。
+    - exception: structural test creation reveals an S01 target asset drift from the approved design (for example, missing Type vocabulary or disposition evidence guidance). In that case, the orchestrator may correct only the affected S01 provider asset, record the discovered drift / scope delta in `report.md`, and require code-reviewer re-review before closing S02.
   - Green verification:
     - `uv run python -m unittest tests.test_init_update.TestInitUpdate.<new_test_method>`
     - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets`
@@ -303,6 +304,7 @@ ID: "iss-00103"
     - `report.md` S02 session.
   - amendment trigger:
     - test requires runtime validator or semantic parser.
+    - S02 discovers that an S01 provider asset does not actually satisfy tc-001..tc-004 and must be corrected before the structural test can honestly close.
 
 #### delegation contract
 - delegated role:
@@ -319,6 +321,8 @@ ID: "iss-00103"
   - provider assets
   - runtime code
   - dogfooding mirror
+- orchestrator exception:
+  - If S02 exposes an S01 provider asset drift, the main orchestrator may correct the minimum affected S01 target file, but must record it as discovered drift / closure delta and obtain code-reviewer re-review.
 - acceptance criteria:
   - tc-005
 - required tests or docs-only verification:
@@ -365,7 +369,7 @@ ID: "iss-00103"
   - pass 条件: review_status: pass
 - commit / no-op gate:
   - closure 状態: committed
-  - commit 範囲: S02 tests + S02 report evidence
+  - commit 範囲: S02 tests + S02 report evidence + plan amendment evidence + minimum S01 provider template correction discovered by tc-005
 
 ### S90 — docs impact resolution / dogfooding mirror refresh
 - behavior goal:
