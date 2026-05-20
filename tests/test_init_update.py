@@ -8681,6 +8681,172 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with self.subTest(asset=label, fragment=fragment):
                     self.assertIn(fragment, text)
 
+    def test_issue_103_report_decision_ledger_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            asset_paths = {
+                "issue report template": assets_dir / "spec_dock" / "templates" / "issue" / "report.md",
+                "workflow issue docs": assets_dir / "spec_dock" / "docs" / "workflow_issue.md",
+                "issue plan authoring docs": assets_dir
+                / "spec_dock"
+                / "docs"
+                / "authoring"
+                / "issue-plan.md",
+                "execute issue prompt": assets_dir
+                / "install_root"
+                / ".codex"
+                / "prompts"
+                / "execute-issue.md",
+                "issue execution skill": assets_dir
+                / "install_root"
+                / ".agents"
+                / "skills"
+                / "spec-dock-issue-execution"
+                / "SKILL.md",
+                "dev-coder agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "dev-coder.toml",
+                "doc-writer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "doc-writer.toml",
+                "utility-worker agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "utility-worker.toml",
+                "code-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "code-reviewer.toml",
+                "qa-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "qa-reviewer.toml",
+                "spec-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-reviewer.toml",
+            }
+            texts = {
+                label: path.read_text(encoding="utf-8")
+                for label, path in asset_paths.items()
+            }
+
+        expected_fragments = {
+            "issue report template": (
+                "Spec Interpretation / Decision Ledger",
+                "No material interpretation changes.",
+                "No decision entries.",
+                "`Status`",
+                "`Disposition`",
+                "`Type`",
+                "Raised By",
+                "Trigger / Gap",
+                "interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up",
+                "Options Considered",
+                "promoted_to_design",
+                "Disposition required evidence",
+                "converted_to_followup",
+                "no_action",
+            ),
+            "workflow issue docs": (
+                "Spec Interpretation / Decision Ledger",
+                "Ledger Note",
+                "source-agent",
+                "options considered",
+                "needs orchestrator decision",
+                "No material implementation decisions beyond the approved plan.",
+                "Status=open",
+                "report-only durable decision",
+            ),
+            "issue plan authoring docs": (
+                "Spec Interpretation / Decision Ledger",
+                "Ledger Note",
+                "source-agent",
+                "options considered",
+                "needs orchestrator decision",
+                "No material implementation decisions beyond the approved plan.",
+                "durable decision",
+            ),
+            "execute issue prompt": (
+                "Spec Interpretation / Decision Ledger",
+                "Ledger Note",
+                "No material interpretation changes.",
+                "No decision entries.",
+                "No material implementation decisions beyond the approved plan.",
+                "Status=open",
+                "report-only durable decisions",
+            ),
+            "issue execution skill": (
+                "Spec Interpretation / Decision Ledger",
+                "Ledger Note",
+                "source-agent",
+                "options considered",
+                "needs orchestrator decision",
+                "No material implementation decisions beyond the approved plan.",
+                "Status=open",
+                "report-only durable decision",
+            ),
+            "dev-coder agent": (
+                "Ledger Note",
+                "source-agent",
+                "options considered",
+                "needs orchestrator decision",
+                "No material implementation decisions beyond the approved plan.",
+            ),
+            "doc-writer agent": (
+                "Ledger Note",
+                "source-agent",
+                "options considered",
+                "needs orchestrator decision",
+                "No material implementation decisions beyond the approved plan.",
+            ),
+            "utility-worker agent": (
+                "Ledger Note",
+                "source-agent",
+                "options considered",
+                "needs orchestrator decision",
+                "No material implementation decisions beyond the approved plan.",
+            ),
+            "code-reviewer agent": (
+                "Spec Interpretation / Decision Ledger",
+                "Status=open",
+                "missing disposition evidence",
+                "report-only durable",
+                "missing promotion / follow-up",
+                "proposed decision",
+            ),
+            "qa-reviewer agent": (
+                "Spec Interpretation / Decision Ledger",
+                "Status=open",
+                "missing disposition evidence",
+                "report-only durable",
+                "missing promotion / follow-up",
+                "proposed decision",
+            ),
+            "spec-reviewer agent": (
+                "Spec Interpretation / Decision Ledger",
+                "Status=open",
+                "missing disposition evidence",
+                "report-only durable",
+                "missing promotion / follow-up",
+                "proposed decision",
+            ),
+        }
+        for label, fragments in expected_fragments.items():
+            text = texts[label]
+            for fragment in fragments:
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
 
