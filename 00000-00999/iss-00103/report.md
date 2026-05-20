@@ -19,111 +19,13 @@ ID: "iss-00103"
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | deviation | code-reviewer / orchestrator | S02 structural test review found the provider report template Type vocabulary and disposition evidence guidance did not fully match approved `design.md`, while S02 originally allowed tests-only changes. | leave drift until later; revert provider correction and weaken tc-005; amend S02 to allow a minimum S01 target correction discovered by tc-005 | Amend S02 plan to allow a minimum orchestrator-owned correction to the affected S01 provider asset when structural testing exposes approved-design drift, then lock the corrected contract in the structural test. | Closing S02 with a known provider-template drift would make tc-001/tc-005 green without protecting the approved ledger contract. The correction is limited to the S01 target report template and is re-reviewed. | promoted_to_plan | `plan.md` S02 implementation scope / commit scope amendment; `src/spec_dock/assets/spec_dock/templates/issue/report.md` Type/table/evidence correction; `tests/test_init_update.py` marker assertions; code-reviewer finding | none; covered by S02 re-review and S90 dogfooding sync |
+| D-002 | resolved | operation | spec-reviewer / orchestrator | S90 full dogfooding update path produced broad stale unrelated drift and removed current workflow content, while tc-006 required mirror reflection or documented intentional handling. | commit full generated drift; skip mirror sync; copy only touched provider assets and record the full-update drift risk | Reject the broad stale full-update diff, revert it, and perform a minimum provider-to-mirror copy for the 11 touched assets only. | The full update output was outside this issue scope and would have overwritten unrelated current dogfooding content. The minimum copy preserves provider/mirror parity for the changed report-ledger contract while avoiding unrelated destructive drift. | no_action | S90 Docs Impact Notes; `./spec-dock/scripts/spec-dock validate` pass; targeted structural tests pass; S90 spec-reviewer pass; mirror target parity review | follow-up may be needed in a separate issue for stale full-update behavior if it remains reproducible |
 
 ## 実装サマリー (任意)
 - 実装開始。`spec-dock-issue-execution` workflow に従い、まず requirement の spec-reviewer review / polish から進める。
 - 親 Codex は orchestration / report / reviewer gate / final closure を担当し、shipped docs/templates/skills/workflow text は `doc-writer`、tests は `dev-coder` へ委任する。
 
 ## 実装記録（セッションログ） (必須)
-
-### 2026-05-21 HH:MM - HH:MM
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- Planned source:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### Red/Green/Refactor Evidence
-| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
-|---|---|---|---|---|---|---|
-| S01 | Red / alternative | red-required / covered-existing / inspect-only / manual-required | ... | `command` / docs inspection / manual record | pass / approved-no-op / fail / blocked | ... |
-| S01 | Green | ... | ... | `command` / inspection / manual record | pass / fail / blocked | ... |
-| S01 | Refactor | guardrail satisfied / no refactor needed | ... | diff inspection / command | pass / approved-no-op / fail / blocked | ... |
-
-#### Discovered Tests
-| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### Step Contract Closure
-| step | closure ids | close condition from plan | observed evidence | result | notes |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### Test Contract Closure
-| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### Closure Coverage
-| closure id | step | verification evidence | observed result | notes |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### Closure Delta
-| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### Workflow Delegation Consent
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00103 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### Implementation Delegation Gate
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### Delegated Worker Evidence
-| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### Parent Implementation Exception
-| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### Reviewer Gate Status
-| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### Step Commit Gate
-| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
 
 ### 2026-05-21 requirement review start
 
@@ -315,19 +217,6 @@ git status --short --branch
 |---|---|---|---|---|---|---|
 | changed | tc-001, tc-005 | test_issue_103_report_decision_ledger_contract_assets | tc-005 | S02 structural review found S01 report-template drift; minimum provider template correction added and structural lock expanded. | yes | yes |
 
----
-
-### 2026-05-21 HH:MM - HH:MM
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
-
 ## Final Quality Gate (必須)
 
 ### S90 Docs Impact Resolution
@@ -377,37 +266,58 @@ git status --short --branch
 #### S90 Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S90 | pending commit | dogfooding mirror touched assets and S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | dogfooding mirror touched assets and S90 report evidence | `8fd855c` | `git status --short --branch` -> clean before S99 | N/A | N/A | N/A | N/A |
+
+#### S99 Final Verification Evidence
+| step | verification | command / reviewer | observed result | notes |
+|---|---|---|---|---|
+| S99 | active issue context | `./spec-dock/scripts/spec-dock active show` | pass | active issue remains `iss-00103` |
+| S99 | final validation | `./spec-dock/scripts/spec-dock validate` | pass | `spec-dock: ok (validate) nodes=45` |
+| S99 | targeted structural regression | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_103_report_decision_ledger_contract_assets tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` | pass | 2 tests OK |
+| S99 | diff hygiene | `git diff --check` | pass | no output |
+| S99 | final diff review input | `git diff --stat main...HEAD`; `git log --oneline main..HEAD` | pass | Branch includes prior `iss-00102` commits because this issue intentionally continued without opening an intermediate PR. Final reviewers were asked to focus on `iss-00103` changes unless integration risk exists. |
+
+#### S99 Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S99 | tc-007 | final QA, issue-wide code review, final spec review, validate, targeted unittest, and final report ledger are complete. | validate pass; targeted unittest pass; diff check pass; code-reviewer pass; spec-reviewer pass; QA closure-evidence finding fixed in this final report ledger | pass | Final QA re-run verifies this closure row before final report commit. |
+
+#### S99 Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-007 | S99 | final validation, targeted unittest, final QA/code/spec reviewer gates, final report ledger | pass | Final QA re-run result is recorded in this final report commit. |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient | first attempt failed because subagent could not inspect due `Too many open files`; second attempt required tc-007 closure evidence; final re-run passed with no findings | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | first review found S90 commit gate still pending; fixed by recording `8fd855c` and clean status evidence; re-review passed with no findings | 1 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first review found S99 pending rows, missing S90 decision ledger entry, and template placeholders; fixed by adding D-002, removing placeholders, and updating final gate evidence; re-review passed with no findings | 2 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01/S02/S90/S99 closed | final report ledger and reviewer-driven final fixes | final response / PR / issue comment / PR monitor evidence | ready after final report commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: full `uvx --from . spec-dock update .` が broad stale drift を生成した。
+  - 解決: 生成差分を revert し、S90 では touched provider assets のみを dogfooding mirror へ最小同期した。判断は D-002 に記録した。
+- 問題: final reviewer subagent の一部が `Too many open files` で検査不能になった。
+  - 解決: 完了済み agent を close し、軽量な re-review に切り替えた。
 
 ## 学んだこと (任意)
-- ...
+- report decision ledger は、S02/S90 のような実装中の計画例外を後から追跡する用途で有効だった。
 
 ## 今後の推奨事項 (任意)
-- ...
+- dogfooding full update が stale drift を出す原因は、別 issue で調査するとよい。
 
 ## 省略/例外メモ (必須)
 - 該当なし
