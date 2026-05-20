@@ -14,6 +14,34 @@ ID: "<ISS_ID>"
 
 > `report.md` は observed evidence ledger です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、discovered tests、closure delta、reviewer status、commit/no-op evidence を記録する。
 
+## Spec Interpretation / Decision Ledger (必須)
+
+`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
+
+Material な判断がない場合もこの section は残し、次を明示する。
+
+- No material interpretation changes.
+- No decision entries.
+
+Ledger entry は次の値を使う。
+
+- `Status`: `open` / `resolved` / `superseded`
+- `Type`: `interpretation` / `decision` / `deviation` / `tradeoff` / `open_question` / `promotion` / `followup`
+- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
+
+Completion semantics:
+- issue completion 前に `Status=open` の entry を残してはならない。
+- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
+- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
+- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
+- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
+- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
+- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
+
+| ID | Status | Type | Topic | Trigger | Options Considered | Decision / Interpretation | Rationale | Evidence | Disposition | Follow-up / Promotion | Owner | Confidence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| D-001 | open / resolved / superseded | interpretation / decision / deviation / tradeoff / open_question / promotion / followup | ... | plan ambiguity / implementation constraint / reviewer finding / discovered risk | option A; option B; no action | ... | ... | `path` / command / reviewer finding / discussion | applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded | target artifact / issue / discussion / replacement entry / none with reason | orchestrator / reviewer / worker source | high / medium / low |
+
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
 

@@ -51,6 +51,17 @@ When implementation is ready:
 - Treat `report.md` as the observed evidence ledger. Record actual Red / Green /
   Refactor results, verification output, discovered tests, closure delta,
   delegated worker evidence, reviewer verdicts, and commit/no-op evidence there.
+- Treat `report.md` as the canonical `Spec Interpretation / Decision Ledger`
+  for material implementation-time interpretation, decisions, deviations,
+  tradeoffs, open questions, and promotion / follow-up. If no material
+  decision occurred, keep the ledger section and record
+  `No material interpretation changes.` plus `No decision entries.`.
+- Require each delegated worker output to include either a structured
+  `Ledger Note` or
+  `No material implementation decisions beyond the approved plan.`. A worker
+  `proposed decision` is provisional input, not an accepted decision; the parent
+  orchestrator owns report integration, disposition evidence, and promotion /
+  follow-up decisions.
 - Use each step's card-style nested `具体テストケース一覧`, closure ids, close
   conditions, verification commands, alternative evidence paths, and report
   evidence destinations.
@@ -59,6 +70,9 @@ When implementation is ready:
 - If implementation reveals a new specification, bug class, external contract
   risk, or closure obligation outside the approved step contract, stop for plan
   amendment and re-review instead of closing it with report evidence alone.
+- Do not finish the issue with `Status=open` ledger entries, missing disposition
+  evidence, report-only durable decisions, invalid no-decision claims, or ledger
+  content that includes transcripts, private reasoning, or secrets.
 - Record implementation delegation decisions, step evidence, reviewer results,
   closure coverage, and final delivery evidence in
   `spec-dock/active/issue/report.md`.

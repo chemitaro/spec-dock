@@ -33,6 +33,16 @@ lifecycle policy to `workflow_issue.md` instead of duplicating the workflow.
 Verify closure traceability from AC / EC and design decisions to plan
 obligations, closure ids, report evidence, reviewer gate status, and final
 completion evidence.
+Also audit `Spec Interpretation / Decision Ledger` when `report.md` is in
+scope: flag missing ledger section for new / updated issue reports,
+`Status=open` at completion, missing disposition evidence, report-only durable
+decisions, missing promotion / follow-up / deferred / superseded evidence,
+invalid no-decision phrases when requirement/design/plan/diff imply material
+decisions, worker `proposed decision` text represented as accepted decision
+without orchestrator disposition, and any transcript, private reasoning, or
+secrets stored in the ledger. Legacy reports without a ledger are not
+retroactive blockers unless the current change relies on them without
+source/confidence evidence.
 
 ──────────────────────────────────────────────────────────────────────────────
 0) Non-negotiables

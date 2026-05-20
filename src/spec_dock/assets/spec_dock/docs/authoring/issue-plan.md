@@ -44,6 +44,8 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
   - delegated worker evidence
   - reviewer gate status
   - step commit / approved-no-op evidence
+- `report.md` は `Spec Interpretation / Decision Ledger` も持つ。実行中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up は report 側に記録し、`plan.md` を実行中判断の追記先にしない。
+- `plan.md` は decision result を所有しない。将来も効く durable decision が実行中に見つかった場合は、report に evidence と disposition を残したうえで、必要に応じて `design.md`、ADR、plan amendment、follow-up issue へ昇格する。
 - 実行中に見つかった新しい bug class、外部 contract risk、仕様差分が既存 plan obligation の範囲外なら、report に発見を残すだけで閉じず、plan amendment と re-review を先に行う。
 
 ## 必須項目
@@ -114,6 +116,8 @@ Sxx behavior slice
   - 入力 docs の矛盾、許可パス外変更が必要、検証不能、delegated role 不適合、host policy / tool 制約、acceptance 未達など。
 - `output required`:
   - changed files、worker summary、verification result、unresolved risks、report へ転記する delegation evidence。
+  - `Ledger Note` または `No material implementation decisions beyond the approved plan.`。
+  - `Ledger Note` は worker の一次情報であり accepted decision ではない。material な仕様解釈、判断、逸脱、tradeoff、open question、follow-up がある場合は、source-agent、topic、trigger、ambiguity / constraint、observed facts、options considered、proposed decision、rationale、affected files、affected tests、risk if wrong、rollback or revisit、confidence、needs orchestrator decision を含める。
 
 複数 layer / package / shipped asset にまたがる step は、親 Codex が直接実装せず、allowed paths と dependency boundary を明記して委任する。docs-only / template-only / skill-text-only step であっても、shipped artifact を変更する場合は `doc-writer` 委任と docs/spec alignment review を plan に残す。
 
