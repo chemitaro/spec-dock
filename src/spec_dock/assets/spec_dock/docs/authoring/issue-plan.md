@@ -1,7 +1,8 @@
 # authoring: issue plan
 
 Issue の `plan.md` を作成・更新するときの agent-facing entrypoint です。
-共通正本は `workflow_spec_authoring.md`、`phase_plan.md`、`phase_plan_issue.md`、`workflow_issue.md` です。この文書は、それらを Issue plan 作成時に読み落とさないための entrypoint です。
+共通正本は `workflow_spec_authoring.md`、`phase_plan.md`、`phase_plan_issue.md`、`workflow_issue.md` です。
+この文書は Issue plan の field semantics と executable step schema の正本です。Lifecycle / execution / reviewer / completion policy は `workflow_issue.md`、plan philosophy と review checklist は `phase_plan_issue.md` を参照します。
 
 ## 読む順序
 
@@ -16,9 +17,34 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 ## この artifact の責務
 
 - reviewer-pass 済みの `requirement.md` と `design.md` を、実装可能な step、検証、review gate、commit gate、final quality gate へ変換する。
-- `Spec-Locked Closure Index` で仕様 coverage を固定し、各 implementation step の `具体テストケース一覧` で TDD 実行入力を固定する。
-- step 順、依存、対象ファイル、検証方法、report evidence を実装者が判断せずに実行できる粒度へ落とす。
+- `plan.md` を planned contract として扱い、実装者が step を上から順に実行できる command queue にする。
+- `report.md` を observed evidence ledger として扱い、実際の Red / Green / Refactor 結果、discovered tests、closure delta、reviewer verdict、commit/no-op evidence の記録先にする。
+- `Spec-Locked Closure Index` で仕様 coverage を固定し、各 implementation step の `具体テストケース一覧` で step-local obligation と concrete red / characterization / inspect / manual seeds を固定する。
+- step 順、依存、対象ファイル、検証方法、report evidence destination、amendment trigger を実装者が判断せずに実行できる粒度へ落とす。
 - `workflow_issue.md` の delegated-by-default policy を再定義せず、各 implementation step の `delegation contract` として委任先、入力、許可範囲、検証、reviewer focus、停止条件、出力を具体化する。
+
+## planned contract / observed evidence ledger
+
+- `plan.md` は planned executable workflow contract である。
+  - behavior goal
+  - scope / allowed paths / forbidden changes
+  - risk-calibrated test obligation coverage
+  - Red evidence requirement or justified alternative path
+  - implementation scope
+  - Green verification command or evidence path
+  - refactor / cleanup guardrail
+  - closure evidence requirements
+  - report evidence destination
+  - amendment trigger
+- `report.md` は observed evidence ledger である。
+  - actual Red / Green / Refactor evidence
+  - actual verification result
+  - observed deviations and discovered tests
+  - closure delta and amendment history
+  - delegated worker evidence
+  - reviewer gate status
+  - step commit / approved-no-op evidence
+- 実行中に見つかった新しい bug class、外部 contract risk、仕様差分が既存 plan obligation の範囲外なら、report に発見を残すだけで閉じず、plan amendment と re-review を先に行う。
 
 ## 必須項目
 
@@ -35,6 +61,33 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 - `S90 docs impact resolution / docs refresh`
 - `S99 final quality gate`
 - `Final Exit Contract`
+
+## executable step schema
+
+各 implementation step は、少なくとも次の意味を表現できる構造にする。
+
+```text
+Sxx behavior slice
+|-- behavior goal
+|-- planned contract
+|   |-- scope
+|   |-- test obligation
+|   |-- red or alternative evidence requirement
+|   |-- green verification
+|   |-- refactor guardrail
+|   `-- amendment trigger
+|-- delegation contract
+|-- 具体テストケース一覧
+|-- step closure contract
+|-- report evidence destination
+`-- step gate
+```
+
+- `test obligation` は raw test count ではなく、AC / EC、changed contract、negative / error path、regression、invariant、manual / integration risk に基づく risk-calibrated obligation coverage として書く。
+- `red or alternative evidence requirement` は `red-required`、`covered-existing`、`inspect-only`、`manual-required` のいずれかを使い、failing-first を完全要求できない場合も test sensitivity または代替 evidence path を固定する。
+- docs-only / template-only / skill-text-only step は code test を無理に作らず、inspection、structural assertion、manual evidence、docs diff、spec-review evidence を planned verification として書く。
+- `report evidence destination` は、実行結果を `report.md` のどの ledger に残すかを明示する。`plan.md` へ observed evidence を戻して正本を二重化しない。
+- `amendment trigger` は、どの発見が report 記録だけで足りず plan amendment / re-review を必要にするかを示す。
 
 ## delegation contract
 
@@ -67,6 +120,7 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 ## 具体テストケース一覧
 
 各 implementation step は、PC の Markdown preview / GitHub 表示で読みやすいカード型のネストリストで具体テストケースを書く。横長テーブルに押し込まない。
+この見出しは完全な test inventory ではない。step 開始前に実装を後付けにしないための concrete red / characterization / inspect / manual seeds と、risk-calibrated obligation coverage への対応を固定する欄である。
 ここで先頭に置く ID は concrete test case id であり、`Spec-Locked Closure Index` の closure `id` や `test ids` alias とは別物として扱う。step に複数の closure id または複数の concrete test case がある場合は、各 case に `関連 closure id` を置いて紐付ける。1 step = 1 closure id = 1 concrete case で対応が明らかな場合だけ省略してよい。
 
 標準形:
