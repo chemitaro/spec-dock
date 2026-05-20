@@ -2219,13 +2219,16 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("S99 — final quality gate", plan_text)
             self.assertIn("step reviewer gate", plan_text)
             self.assertIn("commit gate", plan_text)
-            self.assertIn("delegation 判断", plan_text)
-            self.assertIn("report draft update before review", plan_text)
-            self.assertIn("read-only 確認 evidence", plan_text)
+            self.assertIn("planned contract", plan_text)
+            self.assertIn("command queue", plan_text)
+            self.assertIn("observed evidence ledger", plan_text)
+            self.assertIn("report evidence destination", plan_text)
+            self.assertIn("amendment trigger", plan_text)
+            self.assertIn("read-only evidence", plan_text)
             self.assertIn("qa-reviewer", plan_text)
-            self.assertIn("qa-reviewer を pass まで再実行", plan_text)
-            self.assertIn("code-reviewer を pass まで再実行", plan_text)
-            self.assertIn("spec-reviewer を pass まで再実行", plan_text)
+            self.assertIn("final QA gate", plan_text)
+            self.assertIn("final code review ゲート", plan_text)
+            self.assertIn("final spec review ゲート", plan_text)
             self.assertIn("対象ファイル:", plan_text)
             self.assertIn("#### delegation contract", plan_text)
             for fragment in (
@@ -2233,20 +2236,20 @@ class TestInitUpdate(CliRuntimeHarness):
                 "input docs:",
                 "allowed paths:",
                 "forbidden changes:",
-                "acceptance criteria:",
-                "required tests or docs-only verification:",
-                "reviewer focus:",
+                "required output:",
+                "verification result:",
                 "stop conditions:",
-                "output required:",
                 "#### 具体テストケース一覧",
                 "#### step closure contract",
-                "#### behavior slice execution",
                 "#### step gate",
             ):
                 self.assertIn(fragment, plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
+            self.assertIn("Observed Evidence Ledger", report_text)
+            self.assertIn("#### Red/Green/Refactor Evidence", report_text)
+            self.assertIn("#### Discovered Tests", report_text)
             self.assertIn("#### Step Contract Closure", report_text)
             self.assertIn("#### Test Contract Closure", report_text)
             self.assertIn("#### Closure Coverage", report_text)
@@ -2254,7 +2257,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("#### Implementation Delegation Gate", report_text)
             self.assertIn("#### Delegated Worker Evidence", report_text)
             self.assertIn("#### Parent Implementation Exception", report_text)
-            self.assertIn("#### Code Review Gate", report_text)
+            self.assertIn("#### Reviewer Gate Status", report_text)
             self.assertIn("#### Step Commit Gate", report_text)
             self.assertIn("## Final Quality Gate", report_text)
             self.assertIn("### Final QA Gate", report_text)
@@ -2265,15 +2268,15 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("no-op diff-clean command", report_text)
             self.assertIn("no-op read-only confirmation", report_text)
             self.assertIn("post-commit external evidence destination", report_text)
-            self.assertIn("| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |", report_text)
+            self.assertIn("| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |", report_text)
             self.assertIn("| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |", report_text)
             self.assertIn("| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |", report_text)
             self.assertIn("delegated / approved-local-execution / degraded mode", report_text)
             self.assertNotIn("clean / expected only", report_text)
-            self.assertIn("| step | closure ids | close condition | evidence | result | notes |", report_text)
-            self.assertIn("| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |", report_text)
-            self.assertIn("| change | closure id | test id alias | resolves to closure id | reason | re-review required |", report_text)
-            self.assertIn("`closure id / test id` は Central index の `id` を指す", report_text)
+            self.assertIn("| step | closure ids | close condition from plan | observed evidence | result | notes |", report_text)
+            self.assertIn("| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |", report_text)
+            self.assertIn("| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |", report_text)
+            self.assertIn("`closure id / test id` は Spec-Locked Closure Index の `id` を指す", report_text)
             self.assertIn("pass / approved-no-op / fail / blocked", report_text)
             self.assertIn("|---|---|---|---|---|", report_text)
 
@@ -8501,6 +8504,167 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             text=copilot_text,
             shim_label="bundled copilot orchestrator",
         )
+
+    def test_issue_102_agentic_tdd_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            asset_paths = {
+                "workflow issue docs": assets_dir / "spec_dock" / "docs" / "workflow_issue.md",
+                "phase issue plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_issue.md",
+                "issue plan authoring docs": assets_dir
+                / "spec_dock"
+                / "docs"
+                / "authoring"
+                / "issue-plan.md",
+                "issue plan template": assets_dir / "spec_dock" / "templates" / "issue" / "plan.md",
+                "issue report template": assets_dir / "spec_dock" / "templates" / "issue" / "report.md",
+                "execute issue prompt": assets_dir
+                / "install_root"
+                / ".codex"
+                / "prompts"
+                / "execute-issue.md",
+                "issue execution skill": assets_dir
+                / "install_root"
+                / ".agents"
+                / "skills"
+                / "spec-dock-issue-execution"
+                / "SKILL.md",
+                "dev-coder agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "dev-coder.toml",
+                "code-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "code-reviewer.toml",
+                "qa-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "qa-reviewer.toml",
+                "spec-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-reviewer.toml",
+            }
+            texts = {
+                label: path.read_text(encoding="utf-8")
+                for label, path in asset_paths.items()
+            }
+
+        for label, text in texts.items():
+            with self.subTest(asset=label, stale_count_guidance=True):
+                self.assertNotIn("1〜3件程度", text)
+                self.assertNotIn("1〜3件", text)
+                self.assertNotIn("1~3件", text)
+                self.assertNotIn("minimal necessary tests", text)
+                self.assertNotIn("minimal tests", text)
+
+        for label in (
+            "workflow issue docs",
+            "phase issue plan docs",
+            "issue plan authoring docs",
+            "issue plan template",
+        ):
+            with self.subTest(asset=label, raw_count_context=True):
+                if "raw count" in texts[label]:
+                    self.assertIn("risk-calibrated", texts[label])
+
+        plan_text = texts["issue plan template"]
+        for fragment in (
+            "planned contract",
+            "command queue",
+            "observed evidence ledger",
+            "report evidence destination",
+            "amendment trigger",
+            "#### 具体テストケース一覧",
+            "step-local obligation",
+            "concrete red / characterization / inspect / manual seeds",
+            "#### step closure contract",
+            "#### step gate",
+            "Red / alternative evidence requirement",
+            "Green verification",
+            "Refactor / cleanup guardrail",
+        ):
+            with self.subTest(asset="issue plan template", fragment=fragment):
+                self.assertIn(fragment, plan_text)
+
+        report_text = texts["issue report template"]
+        for fragment in (
+            "Observed Evidence Ledger",
+            "observed evidence ledger",
+            "#### Red/Green/Refactor Evidence",
+            "#### Discovered Tests",
+            "#### Closure Delta",
+            "#### Reviewer Gate Status",
+            "#### Step Commit Gate",
+            "実際の Red / Green / Refactor evidence",
+            "closure delta",
+            "reviewer status",
+            "commit/no-op evidence",
+        ):
+            with self.subTest(asset="issue report template", fragment=fragment):
+                self.assertIn(fragment, report_text)
+
+        for label in ("execute issue prompt", "issue execution skill"):
+            text = texts[label]
+            for fragment in (
+                "planned executable workflow contract / command queue",
+                "observed evidence ledger",
+                "report evidence destination",
+                "amendment trigger",
+                "具体テストケース一覧",
+                "docs/authoring/issue-plan.md",
+                "workflow_issue.md",
+            ):
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+
+        agent_contracts = {
+            "dev-coder agent": (
+                "planned executable workflow",
+                "command queue",
+                "observed evidence ledger",
+                "obligation coverage",
+                "closure ids",
+                "amendment trigger",
+                "do not treat raw test count as a sufficiency rule.",
+            ),
+            "code-reviewer agent": (
+                "planned executable workflow contract / command queue",
+                "observed evidence ledger",
+                "closure ids",
+                "report",
+                "Red / alternative evidence",
+                "Green verification",
+            ),
+            "qa-reviewer agent": (
+                "planned executable workflow",
+                "command queue",
+                "observed evidence ledger",
+                "obligation coverage",
+                "closure ids",
+                "Do not use raw test count as the pass condition.",
+            ),
+            "spec-reviewer agent": (
+                "planned executable workflow contract / command queue",
+                "observed evidence ledger",
+                "docs/authoring/issue-plan.md",
+                "workflow_issue.md",
+                "closure ids",
+                "report evidence",
+                "reviewer gate status",
+            ),
+        }
+        for label, fragments in agent_contracts.items():
+            text = texts[label]
+            for fragment in fragments:
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
