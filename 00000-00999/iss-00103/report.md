@@ -159,6 +159,8 @@ git status --short --branch
 | requirement | requirement spec review | spec-reviewer | fresh | passed | N/A | proceed to design phase | Re-review found no findings; prior blockers resolved. |
 | design | design spec review | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: missing Options Considered in canonical ledger, incomplete disposition required evidence, pytest-style command. Design updated with Options Considered column, Disposition Required Evidence, blocker rules, and unittest commands. |
 | design | design spec review | spec-reviewer | fresh | passed | N/A | proceed to plan phase | Re-review found no findings; prior blockers resolved. |
+| plan | plan spec review | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: S01/S02 closure deadlock, incomplete S01 concrete test cards, missing doc-writer/utility-worker configs, under-specified S90/S99 exit contracts. Plan updated to close S01 on inspect-only evidence, add worker configs, complete S01 cards, expand S90/S99, and add Final Exit Contract. |
+| plan | plan spec review | spec-reviewer | fresh | passed | N/A | proceed to implementation S01 | Re-review found no findings; prior blockers resolved. |
 
 #### メモ
 - Requirement は `iss-00102` から切り出した report ledger contract を扱う。`iss-00102` の plan contract 再実装は対象外。
