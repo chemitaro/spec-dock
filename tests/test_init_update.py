@@ -951,7 +951,7 @@ class TestInitUpdate(CliRuntimeHarness):
             f"{source} concrete test case section must not contain table rows",
         )
         case_pattern = re.compile(
-            r"(?m)^- `tc-s\d{2}-\d{3}` [a-z-]+: .+\n"
+            r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+\n"
             r"(?:  - .+\n)+"
         )
         case_blocks = case_pattern.findall(section)
@@ -964,15 +964,22 @@ class TestInitUpdate(CliRuntimeHarness):
         for case_block in case_blocks:
             self.assertRegex(
                 case_block,
-                r"(?m)^- `tc-s\d{2}-\d{3}` [a-z-]+: .+$",
+                r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+$",
                 f"{source} concrete case must start with a backticked concrete test case id bullet",
             )
-            for label in ("前提", "操作", "期待結果", "失敗検出", "検証方法"):
-                self.assertRegex(
-                    case_block,
-                    rf"(?m)^  - {label}: .+",
-                    f"{source} concrete case missing nested {label}: {case_block}",
-                )
+            standard_labels_present = all(
+                re.search(rf"(?m)^  - {label}:[ \t]*\S.*$", case_block)
+                for label in ("前提", "操作", "期待結果", "失敗検出", "検証方法")
+            )
+            alternative_labels_present = all(
+                re.search(rf"(?m)^  - {label}:[ \t]*\S.*$", case_block)
+                for label in ("テスト不要理由", "代替検証方法", "期待結果", "記録先")
+            )
+            self.assertTrue(
+                standard_labels_present or alternative_labels_present,
+                f"{source} concrete case must include standard test labels "
+                f"or inspect/manual alternative labels: {case_block}",
+            )
             if require_related_closure_id:
                 self.assertRegex(
                     case_block,
@@ -2239,7 +2246,10 @@ class TestInitUpdate(CliRuntimeHarness):
                 "input docs:",
                 "allowed paths:",
                 "forbidden changes:",
-                "required output:",
+                "acceptance criteria:",
+                "required tests or docs-only verification:",
+                "reviewer focus:",
+                "output required:",
                 "verification result:",
                 "stop conditions:",
                 "#### 具体テストケース一覧",
@@ -2257,6 +2267,14 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("#### Test Contract Closure", report_text)
             self.assertIn("#### Closure Coverage", report_text)
             self.assertIn("#### Closure Delta", report_text)
+            self.assertIn("#### Workflow Delegation Consent", report_text)
+            for fragment in (
+                "consent source",
+                "boundary",
+                "expires / invalidation condition",
+                "denied / unavailable handling",
+            ):
+                self.assertIn(fragment, report_text)
             self.assertIn("#### Implementation Delegation Gate", report_text)
             self.assertIn("#### Delegated Worker Evidence", report_text)
             self.assertIn("#### Parent Implementation Exception", report_text)
@@ -3269,43 +3287,36 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("workflow_issue.md", issue_plan)
         self.assertIn("phase_plan_issue.md", issue_plan)
         self.assertIn("## 依存関係から導く実装順序", issue_plan)
-        self.assertIn("`Module Dependency Diagram`", issue_plan)
-        self.assertIn("`ディレクトリ / ファイル変更計画`", issue_plan)
+        self.assertIn("planned contract", issue_plan)
+        self.assertIn("command queue", issue_plan)
+        self.assertIn("observed evidence ledger", issue_plan)
         self.assertIn("依存:", issue_plan)
         self.assertIn("unblock:", issue_plan)
         self.assertIn("対象ファイル:", issue_plan)
         self.assertIn("## Spec-Locked Closure Index（仕様固定クロージャ索引）", issue_plan)
-        self.assertIn("Issue 全体のテストケース一覧ではなく", issue_plan)
-        self.assertIn("エージェントが仕様を縮小解釈・後付けテスト・過剰実装しない", issue_plan)
-        self.assertIn("| id | phase / step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |", issue_plan)
-        self.assertIn("fixture メモ:", issue_plan)
-        self.assertIn("golden output:", issue_plan)
-        self.assertIn("manual verification:", issue_plan)
-        self.assertIn("property domain:", issue_plan)
-        self.assertIn("非目標:", issue_plan)
-        self.assertIn("evidence level の値:", issue_plan)
+        self.assertIn("coverage ledger", issue_plan)
+        self.assertIn("実際の step-local obligation", issue_plan)
+        self.assertIn("| id | step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |", issue_plan)
+        self.assertIn("evidence level:", issue_plan)
         self.assertIn("red-required:", issue_plan)
         self.assertIn("covered-existing:", issue_plan)
         self.assertIn("inspect-only:", issue_plan)
         self.assertIn("manual-required:", issue_plan)
-        self.assertIn("通常 Issue は step / behavior slice ごとに 1〜3 件程度の検証契約を書く", issue_plan)
-        self.assertIn("中央 index は重複するテストケース表にせず", issue_plan)
-        self.assertIn("test bundle:", issue_plan)
+        self.assertIn("件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk", issue_plan)
+        self.assertIn("private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない", issue_plan)
+        self.assertIn("test obligation:", issue_plan)
         self.assertIn("closure id:", issue_plan)
-        self.assertIn("test id:", issue_plan)
-        self.assertIn("same as closure ids unless a project explicitly documents separate aliases", issue_plan)
-        self.assertIn("evidence level:", issue_plan)
-        self.assertIn("受け入れ:", issue_plan)
-        self.assertIn("characterization:", issue_plan)
-        self.assertIn("property / invariant:", issue_plan)
-        self.assertIn("regression:", issue_plan)
-        self.assertIn("negative:", issue_plan)
-        self.assertIn("pre-implementation evidence:", issue_plan)
-        self.assertIn("expected red / characterization pass / test sensitivity evidence", issue_plan)
+        self.assertIn("coverage rationale:", issue_plan)
+        self.assertIn("Red / alternative evidence requirement:", issue_plan)
+        self.assertIn("代替 evidence path:", issue_plan)
+        self.assertIn("Green verification:", issue_plan)
+        self.assertIn("Refactor / cleanup guardrail:", issue_plan)
+        self.assertIn("report evidence destination:", issue_plan)
+        self.assertIn("amendment trigger:", issue_plan)
         self.assertIn("#### 具体テストケース一覧", issue_plan)
         self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan)
-        self.assertIn("- `tc-s01-002` negative: <短い説明>", issue_plan)
-        self.assertIn("具体テストケース本文は横長 table にせず", issue_plan)
+        self.assertIn("- `tc-s01-002` inspect-only / manual-required: <短い説明>", issue_plan)
+        self.assertIn("step-local obligation と concrete red / characterization / inspect / manual seeds", issue_plan)
         self._assert_concrete_test_cases_nested_list_contract(
             issue_plan,
             source="templates/issue/plan.md",
@@ -3314,6 +3325,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn(fragment, issue_plan)
         self.assertIn("テスト不要理由:", issue_plan)
         self.assertIn("代替検証方法:", issue_plan)
+        self.assertIn("記録先:", issue_plan)
         self.assertIn("S01 の subsections を複製して記入する", issue_plan)
         self.assertIn("implementation-ready ではない", issue_plan)
         self.assertIn("#### delegation contract", issue_plan)
@@ -3325,8 +3337,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "acceptance criteria:",
             "required tests or docs-only verification:",
             "reviewer focus:",
-            "stop conditions:",
             "output required:",
+            "verification result:",
+            "stop conditions:",
         ):
             self.assertIn(fragment, issue_plan)
         self.assertIn("#### step closure contract", issue_plan)
@@ -3334,22 +3347,24 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("close 条件:", issue_plan)
         self.assertIn("検証 evidence:", issue_plan)
         self.assertIn("Step Contract Closure:", issue_plan)
+        self.assertIn("Test Contract Closure:", issue_plan)
         self.assertIn("Closure Coverage:", issue_plan)
-        self.assertIn("#### behavior slice execution", issue_plan)
-        self.assertIn("実装 batch:", issue_plan)
-        self.assertIn("許可範囲:", issue_plan)
-        self.assertIn("禁止範囲:", issue_plan)
-        self.assertIn("関連 / full command:", issue_plan)
-        self.assertIn("refactor / tidy:", issue_plan)
         self.assertNotIn("TDD iterations", issue_plan)
         self.assertNotIn("update_plan", issue_plan)
         self.assertIn("commit gate", issue_plan)
         self.assertIn("step reviewer gate", issue_plan)
         self.assertIn("no-op gate", issue_plan)
+        self.assertIn("#### step gate", issue_plan)
         self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
-        self.assertIn("delegation contract evidence:", issue_plan)
-        self.assertIn("code-reviewer / spec-reviewer docs/spec alignment", issue_plan)
 
+        self.assertIn("#### Workflow Delegation Consent", issue_report)
+        for fragment in (
+            "consent source",
+            "boundary",
+            "expires / invalidation condition",
+            "denied / unavailable handling",
+        ):
+            self.assertIn(fragment, issue_report)
         self.assertIn("#### Delegated Worker Evidence", issue_report)
         self.assertIn("#### Parent Implementation Exception", issue_report)
         self.assertIn("| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |", issue_report)
@@ -3425,51 +3440,46 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("`depends on`", phase_plan_issue)
         self.assertIn("`unblocks`", phase_plan_issue)
         self.assertIn("`target files`", phase_plan_issue)
-        self.assertIn("canonical path inventory", phase_plan_issue)
+        self.assertIn("planned contract", phase_plan_issue)
+        self.assertIn("command queue", phase_plan_issue)
+        self.assertIn("observed evidence ledger", phase_plan_issue)
         self.assertIn("templates は最小 scaffold", phase_plan_issue)
         self.assertIn("`behavior slice` は 1 つの観測可能な振る舞い", phase_plan_issue)
-        self.assertIn("`test bundle`", phase_plan_issue)
-        self.assertIn("`pre-implementation evidence`", phase_plan_issue)
-        self.assertIn("`bounded implementation batch`", phase_plan_issue)
-        self.assertIn("`test sensitivity evidence`", phase_plan_issue)
+        self.assertIn("step-local obligation", phase_plan_issue)
+        self.assertIn("planned verification evidence", phase_plan_issue)
+        self.assertIn("observed evidence ledger", phase_plan_issue)
+        self.assertIn("report evidence destination", phase_plan_issue)
+        self.assertIn("amendment trigger", phase_plan_issue)
         self.assertIn("`Spec-Locked Closure Index`（仕様固定クロージャ索引）", phase_plan_issue)
-        self.assertIn("Issue 全体のテストケース一覧ではなく", phase_plan_issue)
-        self.assertIn("`id`、`phase / step`、`slice`、`type`、`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、`closure evidence`", phase_plan_issue)
-        self.assertIn("`red-required`、`covered-existing`、`inspect-only`、`manual-required`", phase_plan_issue)
-        self.assertIn("すべての row に failing test を要求しない", phase_plan_issue)
-        self.assertIn("Central index は仕様由来の `spec link`", phase_plan_issue)
-        self.assertIn("`step closure contract` はその step で満たす closure `id`", phase_plan_issue)
-        self.assertIn("`test ids` と書く場合も Central index の closure `id` の alias", phase_plan_issue)
-        self.assertIn("`test id alias` と `resolves to closure id`", phase_plan_issue)
-        self.assertIn("`test bundle` は Central index の `locked expectation` / `observable input/state` を再記述しない", phase_plan_issue)
-        self.assertIn("各 step の close 判定は Issue 全体の一覧表ではなく", phase_plan_issue)
-        self.assertIn("`delegation contract` は `delegated role`、`input docs`、`allowed paths`、`forbidden changes`、`acceptance criteria`、`required tests or docs-only verification`、`reviewer focus`、`stop conditions`、`output required` を持つ", phase_plan_issue)
-        self.assertIn("runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`", phase_plan_issue)
-        self.assertIn("shipped docs / templates / skills / workflow text は `doc-writer`", phase_plan_issue)
+        self.assertIn("coverage ledger", phase_plan_issue)
+        self.assertIn("`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step", phase_plan_issue)
+        self.assertIn("docs-only / inspect-only / manual-required", phase_plan_issue)
+        self.assertIn("code test を義務化しない", phase_plan_issue)
+        self.assertIn("raw count ではなく risk-calibrated obligation coverage", phase_plan_issue)
+        self.assertIn("docs-only / inspect-only step は code test を義務化しない", phase_plan_issue)
+        self.assertIn("代替 evidence path と rationale", phase_plan_issue)
+        self.assertIn("required row の削除", phase_plan_issue)
+        self.assertIn("plan amendment と re-review", phase_plan_issue)
+        self.assertIn("`delegation contract` の field semantics", phase_plan_issue)
+        self.assertIn("`doc-writer` による必要 docs 更新", phase_plan_issue)
+        self.assertIn("issue-wide `code-reviewer`", phase_plan_issue)
         self.assertIn("`具体テストケース一覧`", phase_plan_issue)
-        self.assertIn("カード型ネストリスト", phase_plan_issue)
-        self.assertIn("横長 table は trace matrix", phase_plan_issue)
-        self.assertIn("- `tc-s01-001` acceptance: <短い説明>", phase_plan_issue)
-        self.assertIn("concrete test case id", phase_plan_issue)
-        self.assertIn("closure `id` や `test ids` alias とは別物", phase_plan_issue)
-        for fragment in ("`前提`", "`操作`", "`期待結果`", "`失敗検出`", "`検証方法`"):
-            self.assertIn(fragment, phase_plan_issue)
-        self.assertIn("implementation-ready ではない", phase_plan_issue)
+        self.assertIn("concrete red / characterization / inspect / manual seeds", phase_plan_issue)
+        self.assertIn("alternative evidence path", phase_plan_issue)
+        self.assertIn("planned contract として実行できる", phase_plan_issue)
         self.assertIn("delegated worker work を reviewer gate の代替として扱っている場合は fail", phase_plan_issue)
         self.assertIn("plan amendment と re-review を必須", phase_plan_issue)
         self.assertIn("every `required=yes` closure row", phase_plan_issue)
-        self.assertIn("every bundle `closure id` が Central index に存在", phase_plan_issue)
-        self.assertIn("private method、実装アルゴリズム、mock 構造、assert 細部を原則固定しない", phase_plan_issue)
+        self.assertIn("every required row に step-local close condition", phase_plan_issue)
         self.assertIn("public CLI behavior、shipped scaffold / runtime contract", phase_plan_issue)
         self.assertNotIn("failing test は iteration ごとに 1 本ずつ進める", phase_plan_issue)
-        self.assertIn("commit/no-op は `workflow_issue.md` の実行 contract が所有", phase_plan_issue)
-        self.assertIn("step 固有の review scope、commit scope、no-op 条件", phase_plan_issue)
+        self.assertIn("completion policy の正本は `workflow_issue.md`", phase_plan_issue)
+        self.assertIn("step 固有の worker handoff contract", phase_plan_issue)
         self.assertIn("report-before-commit、step reviewer gate pass、step commit、approved-no-op", phase_plan_issue)
         self.assertIn("`1 implementation step = 1 review scope = 1 commit`", phase_plan_issue)
         self.assertIn("`step reviewer gate`、`commit gate`、`no-op gate`", phase_plan_issue)
-        self.assertIn("`S99 final quality gate` は標準配置", phase_plan_issue)
-        self.assertIn("`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer`", phase_plan_issue)
-        self.assertIn("`doc-writer` が修正", phase_plan_issue)
+        self.assertIn("`S99 final quality gate`", phase_plan_issue)
+        self.assertIn("`qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`", phase_plan_issue)
         self.assertIn("三者 final quality gate", phase_plan_issue)
 
         workflow_issue = (
@@ -3496,7 +3506,11 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("Closure Coverage", workflow_issue)
         self.assertIn("required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved-no-op", workflow_issue)
         self.assertIn("Closure Delta", workflow_issue)
-        self.assertIn("step closure contract / test bundle / pre-implementation evidence", workflow_issue)
+        self.assertIn("planned executable workflow contract / command queue", workflow_issue)
+        self.assertIn("`report.md` は observed evidence ledger", workflow_issue)
+        self.assertIn("field semantics、card schema、risk-calibrated obligation coverage", workflow_issue)
+        self.assertIn("lifecycle、実行順、reviewer gate、completion policy", workflow_issue)
+        self.assertNotIn("test bundle", workflow_issue)
         self.assertIn("bounded implementation batch", workflow_issue)
         self.assertIn("Implementation Delegation Gate", workflow_issue)
         self.assertIn("delegated worker handoff", workflow_issue)
@@ -8561,9 +8575,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for label, text in texts.items():
             with self.subTest(asset=label, stale_count_guidance=True):
-                self.assertNotIn("1〜3件程度", text)
-                self.assertNotIn("1〜3件", text)
-                self.assertNotIn("1~3件", text)
+                self.assertNotRegex(text, r"1\s*[〜～~]\s*3\s*件(?:程度)?")
                 self.assertNotIn("minimal necessary tests", text)
                 self.assertNotIn("minimal tests", text)
 
