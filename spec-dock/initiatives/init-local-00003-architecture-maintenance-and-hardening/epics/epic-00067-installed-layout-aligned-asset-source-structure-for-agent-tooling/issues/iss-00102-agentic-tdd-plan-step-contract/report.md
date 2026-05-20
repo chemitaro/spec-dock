@@ -101,17 +101,114 @@ This table is for reviewer / read-only specialist workflow-scoped consent. Write
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | committed | provider docs and S01 report evidence | `7e0018a` | `git status --short --branch` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
 - `path/to/file2` - ...
 
 #### コミット
-- <hash> <message>
+- `7e0018a docs(spec): Issue計画の正本境界を整理`
 
 #### メモ
 - ...
+
+---
+
+### 2026-05-20 S02 templates update
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-003, AC-007, EC-001, EC-002, EC-004
+
+#### 実施内容
+- S02 の template-only implementation を `doc-writer` に委任した。
+- `plan.md` template を planned contract / command queue として整理し、`report.md` template を observed evidence ledger として整理した。
+- `具体テストケース一覧` 見出しは維持しつつ、full test inventory ではなく step-local obligation / concrete seeds の欄だと明記した。
+- S02 対象の `plan.md` / `report.md` から `1〜3件程度` の規範的 guidance が残っていないことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+rg -n "planned contract|observed evidence ledger|amendment trigger|report evidence destination|1〜3|具体テストケース一覧" src/spec_dock/assets/spec_dock/templates/issue
+# required markers present in plan/report templates
+# 1〜3 only matched src/spec_dock/assets/spec_dock/templates/issue/requirement.md:15, outside S02 target scope
+
+rg -n "Discovered Tests|Red/Green|observed evidence|Closure Delta" src/spec_dock/assets/spec_dock/templates/issue/report.md
+# Observed Evidence Ledger / Red-Green-Refactor Evidence / Discovered Tests / Closure Delta markers present
+
+git diff --check -- src/spec_dock/assets/spec_dock/templates/issue/plan.md src/spec_dock/assets/spec_dock/templates/issue/report.md
+# pass
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | Red / alternative | inspect-only template contract | prior template carried ambiguous plan/report ownership and count-based guidance; S02 diff replaces it with planned/observed contract language | template diff inspection | pass | docs/template-only step |
+| S02 | Green | target templates contain planned contract, evidence destination, amendment trigger, observed evidence ledger, discovered tests, closure delta | `rg -n "planned contract|observed evidence ledger|amendment trigger|report evidence destination|1〜3|具体テストケース一覧" src/spec_dock/assets/spec_dock/templates/issue` | pass | `1〜3` remains only in `requirement.md` placeholder outside S02 scope |
+| S02 | Refactor | no extra cleanup beyond template contract simplification | `git diff --check -- <S02 target templates>` | pass | no unrelated template files changed |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S02 | none | implementation inspection | no action | N/A | no | target template markers and diff hygiene verified |
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | tc-003, tc-004 | Issue plan/report templates encode planned step contract, alternative evidence path, observed ledger, closure delta, discovered tests, reviewer/commit evidence. | doc-writer changed 2 provider templates; targeted `rg`; `git diff --check`; spec-reviewer pass after traceability corrections | pass | S02 template-only closure |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-003 | S02 | yes | inspect-only | existing issue plan template did not make planned contract / report evidence destination explicit enough | targeted template inspection + spec-reviewer pass | pass | plan template now has planned contract scaffold |
+| tc-004 | S02 | yes | inspect-only | existing report template did not clearly own observed evidence ledger / discovered tests | targeted template inspection + spec-reviewer pass | pass | report template now has evidence ledger scaffold |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| tc-003 | S02 | `planned contract`, `report evidence destination`, `amendment trigger`, `具体テストケース一覧` markers in plan template | pass | planned workflow expression added |
+| tc-004 | S02 | `Observed Evidence Ledger`, `Red/Green/Refactor Evidence`, `Discovered Tests`, `Closure Delta` markers in report template; S02 target templates have no `1〜3` count guidance | pass | observed evidence structure added; count-guidance check is evidence for S02 template scope, not a separate S02 closure id |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| changed | tc-003 | N/A | tc-003 | plan template now provides copyable planned contract skeleton | yes, completed by S02 spec-reviewer |
+| changed | tc-004 | N/A | tc-004 | report template now provides observed evidence ledger skeleton and S02 target templates remove normative test-count guidance | yes, completed by S02 spec-reviewer |
+
+#### Implementation Delegation Gate
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records evidence only.
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | shipped issue templates update | doc-writer | provider-side issue plan/report templates | `requirement.md`, `design.md`, `plan.md`, S01 docs | `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `src/spec_dock/assets/spec_dock/templates/issue/report.md` | runtime code, tests, installed agent assets, dogfooding mirror direct edits, accepted requirement changes | targeted marker inspection, `1〜3` target-scope check, `git diff --check` | requirement conflict, need to rename `具体テストケース一覧`, need to edit outside allowed paths | changed files, template summary, inspection results, unresolved risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | doc-writer | Updated issue plan template as planned contract / command queue and report template as observed evidence ledger; kept `具体テストケース一覧` as step-local obligation / concrete seeds; removed `1〜3件程度` guidance from plan template; separated docs-only / inspect-only / manual-required alternative evidence path. | `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `src/spec_dock/assets/spec_dock/templates/issue/report.md` | marker `rg`; `1〜3` target-scope inspection; `git diff --check -- <S02 targets>` -> pass | spec-reviewer pass | `templates/issue/requirement.md` still contains unrelated `（1〜3行）` summary placeholder outside S02 scope. | accepted and closed for S02 commit |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | spec-reviewer | fresh | pending | N/A | blocked until review pass | template-only scope |
+| S02 | step reviewer | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | initial review found S02 report incorrectly reused S03 `tc-005`; report evidence corrected to S02 `tc-003` / `tc-004` only |
+| S02 | step reviewer | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | second review found S02 AC/EC traceability overclaimed `AC-004` / `AC-005`; plan/report traceability corrected to S02-owned AC/EC only |
+| S02 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S02 commit gate | final review_status pass; no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | provider issue plan/report templates plus S02 plan/report traceability evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/templates/issue/plan.md` - planned contract / command queue scaffold に更新
+- `src/spec_dock/assets/spec_dock/templates/issue/report.md` - observed evidence ledger scaffold に更新
+
+#### コミット
+- pending
+
+#### メモ
+- S02 は template-only step のため code test は置かず、inspection と spec-reviewer pass で閉じる。
 
 ---
 

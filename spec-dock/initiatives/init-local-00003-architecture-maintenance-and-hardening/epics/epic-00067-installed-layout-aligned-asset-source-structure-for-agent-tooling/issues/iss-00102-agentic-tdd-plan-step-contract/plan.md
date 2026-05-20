@@ -79,7 +79,7 @@ ID: "iss-00102"
   - 依存: S01.
   - unblock: prompt/skill/agent configs and tests.
   - 対象ファイル: `templates/issue/plan.md`, `templates/issue/report.md`.
-  - 閉じる要件: AC-002, AC-003, AC-004, AC-007, EC-001, EC-002.
+  - 閉じる要件: AC-001, AC-002, AC-003, AC-007, EC-001, EC-002, EC-004.
   - レビューゲート: spec-reviewer docs/spec alignment.
 - S03:
   - 観測可能な振る舞い: installed agent prompt/skill/configs consume the new plan step contract without duplicating policy.
@@ -122,8 +122,8 @@ ID: "iss-00102"
 |---|---|---|---|---|---|---|---|---|---|---|
 | tc-001 | S01 | source-of-truth docs | acceptance | AC-005 | workflow / authoring / phase docs have non-overlapping ownership | provider docs text | policy drift | yes | inspect-only | report S01 closure |
 | tc-002 | S01 | test obligation language | acceptance | AC-001, EC-004 | raw `1〜3件程度` guidance is removed or non-normative | provider docs text | under-testing by count heuristic | yes | inspect-only | report S01 closure |
-| tc-003 | S02 | plan template schema | acceptance | AC-003 | plan template encodes behavior goal, obligations, red/alternative path, green verification, refactor, report destination, amendment trigger | generated issue plan scaffold | plan as passive task list | yes | inspect-only | report S02 closure |
-| tc-004 | S02 | report ledger | acceptance | AC-007 | report template owns observed evidence ledger and discovered tests | generated issue report scaffold | evidence authority confusion | yes | inspect-only | report S02 closure |
+| tc-003 | S02 | plan template schema | acceptance | AC-001, AC-002, AC-003, EC-004 | plan template encodes behavior goal, obligations, red/alternative path, green verification, refactor, report destination, amendment trigger | generated issue plan scaffold | plan as passive task list | yes | inspect-only | report S02 closure |
+| tc-004 | S02 | report ledger | acceptance | AC-007, EC-001, EC-002 | report template owns observed evidence ledger and discovered tests | generated issue report scaffold | evidence authority confusion | yes | inspect-only | report S02 closure |
 | tc-005 | S03 | agent routing | acceptance | AC-004, AC-005 | prompt/skill/configs consume plan contract and avoid duplicated detailed policy | installed agent assets | agents bypass plan contract | yes | inspect-only | report S03 closure |
 | tc-006 | S04 | regression assertions | regression | AC-006 | tests fail if stale count guidance or missing executable contract language returns | `tests/test_init_update.py` | scaffold regression | yes | red-required | report S04 closure |
 | tc-007 | S90 | dogfooding mirror | acceptance | AC-006 | local dogfooding workspace reflects provider-side source or has recorded divergence rationale | mirror paths | provider/consumer drift | yes | manual-required | report S90 closure |
@@ -319,7 +319,7 @@ ID: "iss-00102"
   - installed agent assets.
   - dogfooding mirror direct edits before provider source update.
 - acceptance criteria:
-  - AC-002, AC-003, AC-004, AC-007.
+  - AC-001, AC-002, AC-003, AC-007, EC-001, EC-002, EC-004.
 - required tests or docs-only verification:
   - `rg -n "planned contract|observed evidence ledger|amendment trigger|report evidence destination|1〜3" src/spec_dock/assets/spec_dock/templates/issue`.
 - reviewer focus:
