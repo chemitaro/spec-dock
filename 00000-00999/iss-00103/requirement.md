@@ -47,11 +47,12 @@ ID: "iss-00103"
 ## 対象ユーザー / 利用シナリオ
 - 主な利用者:
   - Issue を実行する main orchestrator。
-  - 実装・文書更新を担当する dev-coder / doc-writer / utility-worker。
+  - 実装・文書更新・補助作業を担当する dev-coder / doc-writer / utility-worker。
   - code-reviewer / qa-reviewer / spec-reviewer。
   - spec-dock を導入した consumer repo の利用者。
 - 代表シナリオ:
   - dev-coder が実装中に plan の曖昧さや既存実装制約を発見し、structured `Ledger Note` として orchestrator に返す。
+  - utility-worker が補助作業中に material な仕様解釈・逸脱・follow-up を発見した場合も、同じ `Ledger Note` schema で orchestrator に返す。
   - main orchestrator が worker note を検証し、`report.md` の `Spec Interpretation / Decision Ledger` に統合する。
   - reviewer が diff / plan / report / tests を照合し、重要判断が追跡可能か、open decision が残っていないか、report-only にしてはいけない判断が昇格されているかを確認する。
   - 小規模 issue では material な判断がなかったことを明示し、過剰な記録負担を避ける。
@@ -129,7 +130,7 @@ ID: "iss-00103"
   - 期待結果: `open` entry は残らず、将来も効く判断は `design.md` / ADR / plan amendment / follow-up issue へ昇格または変換され、issue-local な判断は理由付きで閉じられている。
   - 観測点: `templates/issue/report.md`、reviewer instruction、completion checklist。
 - AC-004:
-  - アクター: dev-coder / doc-writer / main orchestrator
+  - アクター: dev-coder / doc-writer / utility-worker / main orchestrator
   - 前提: 複数 agent に実装または文書更新を委任する。
   - 操作: worker が material decision を発見し、作業完了時に `Ledger Note` を返す。
   - 期待結果: worker は提案・観測事実・根拠・リスクを返し、orchestrator が canonical `report.md` に採用 / 却下 / 保留 / 昇格を統合する。worker の提案が、未統合のまま accepted decision として扱われない。
@@ -175,11 +176,65 @@ ID: "iss-00103"
   - Ledger Note:
     - worker が orchestrator に返す structured note。authoritative decision ではなく、orchestrator が `report.md` に統合するための一次情報。
 - TERM-003:
+  - Ledger Status:
+    - decision ledger entry の解決状態。allowed values は `open`、`resolved`、`superseded` とする。
+      - `open`: 未確定。issue completion 前に `resolved` または `superseded` へ移行しなければならない。
+      - `resolved`: この issue 内で扱いが確定し、`Disposition`、evidence、必要な follow-up が記録されている。
+      - `superseded`: 別 entry に置換された。置換先 ID を follow-up または evidence に持つ。
+- TERM-004:
   - Disposition:
     - decision ledger entry がどこへ着地したかを表す分類。例: `applied`, `rejected`, `promoted_to_design`, `promoted_to_adr`, `promoted_to_plan`, `converted_to_followup`, `deferred`, `no_action`, `superseded`。
-- TERM-004:
+- TERM-005:
   - Promotion:
     - `report.md` に記録された判断を、将来の実装者が守るべき正本へ昇格すること。昇格先は `design.md`、ADR、plan amendment、follow-up issue など。
+
+## Ledger Entry State Model
+- `Status` と `Disposition` は分離する。
+  - `Status` は entry の解決状態を表す。
+  - `Disposition` は entry の着地先を表す。
+- allowed `Status`:
+  - `open`
+  - `resolved`
+  - `superseded`
+- allowed `Disposition`:
+  - `applied`
+  - `rejected`
+  - `promoted_to_design`
+  - `promoted_to_adr`
+  - `promoted_to_plan`
+  - `converted_to_followup`
+  - `deferred`
+  - `no_action`
+  - `superseded`
+- completion semantics:
+  - issue completion 前に `Status=open` の entry が残っていてはならない。
+  - `Status=resolved` の entry は `Disposition`、evidence、必要な follow-up を持つ。
+  - `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
+  - `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
+  - `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
+  - `Disposition=superseded` または `Status=superseded` は置換先 entry ID を持つ。
+  - `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。
+  - durable decision が `Disposition=no_action` のまま `report.md` に閉じ込められている場合は reviewer finding とする。
+
+## Ledger Note Minimum Schema
+- dev-coder / doc-writer / utility-worker は、material な仕様解釈・判断・逸脱・tradeoff・open question・follow-up を発見した場合、少なくとも次の fields を持つ `Ledger Note` を返す。
+  - `source-agent`: `dev-coder` / `doc-writer` / `utility-worker`
+  - `topic`
+  - `trigger`
+  - `ambiguity / constraint`
+  - `observed facts`
+  - `options considered`
+  - `proposed decision`
+  - `rationale`
+  - `affected files`
+  - `affected tests`
+  - `risk if wrong`
+  - `rollback or revisit`
+  - `confidence`: `high` / `medium` / `low`
+  - `needs orchestrator decision`: `yes` / `no`
+- material な判断がない場合も、worker は `No material implementation decisions beyond the approved plan.` と明示する。
+- worker の `proposed decision` は accepted decision ではない。accepted / rejected / deferred / promoted の判断は main orchestrator が `report.md` に統合する時点で確定する。
+- orchestrator は raw note をそのまま貼るのではなく、source docs、diff、tests、reviewer output と照合し、canonical ledger entry として status / disposition / evidence / follow-up を整える。
 
 ## 未確定事項
 - Q-001:

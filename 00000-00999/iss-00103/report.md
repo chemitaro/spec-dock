@@ -15,7 +15,8 @@ ID: "iss-00103"
 > `report.md` は observed evidence ledger です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、discovered tests、closure delta、reviewer status、commit/no-op evidence を記録する。
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- 実装開始。`spec-dock-issue-execution` workflow に従い、まず requirement の spec-reviewer review / polish から進める。
+- 親 Codex は orchestration / report / reviewer gate / final closure を担当し、shipped docs/templates/skills/workflow text は `doc-writer`、tests は `dev-coder` へ委任する。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -115,6 +116,50 @@ ID: "iss-00103"
 
 #### メモ
 - ...
+
+---
+
+### 2026-05-21 requirement review start
+
+#### 対象
+- Step: spec authoring / requirement gate
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
+- Planned source:
+  - `requirement.md`
+  - workflow source: `spec-dock/docs/workflow_issue.md`
+
+#### 実施内容
+- active issue が `iss-00103` であることを確認した。
+- `workflow_issue.md` と active issue requirement を読み、まず requirement phase の spec-reviewer gate へ進む。
+- ユーザー指示により、active issue scope の reviewer / PR monitor 利用は許可済みとして記録する。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock active show
+# initiative: init-local-00003
+# epic: epic-00067
+# issue: iss-00103
+
+git status --short --branch
+# ## iss-00103-agentic-tdd-report-decision-ledger
+```
+
+#### Workflow Delegation Consent
+`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+
+| consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
+|---|---|---|---|---|---|---|---|---|
+| user message requesting issue execution, spec review, PR creation, and PR monitor | `/Users/iwasawayuuta/workspace/tools/spec-dock` | iss-00103 | current session | spec-reviewer / code-reviewer / qa-reviewer / doc-writer / dev-coder / pr-monitor | same repo, active issue, current session, named role; destructive actions and merge excluded unless separately requested | issue complete / session end / scope change / user revocation / host policy conflict | none | proceed with requirement spec review |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| requirement | requirement spec review | spec-reviewer | fresh | provisional | N/A | blocked until review pass | review requested after this report entry |
+| requirement | requirement spec review | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: missing ledger status model, missing Ledger Note minimum schema, utility-worker boundary gap. Requirement updated with status/disposition semantics, Ledger Note schema, and utility-worker inclusion. |
+| requirement | requirement spec review | spec-reviewer | fresh | passed | N/A | proceed to design phase | Re-review found no findings; prior blockers resolved. |
+
+#### メモ
+- Requirement は `iss-00102` から切り出した report ledger contract を扱う。`iss-00102` の plan contract 再実装は対象外。
 
 ---
 
