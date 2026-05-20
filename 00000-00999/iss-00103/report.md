@@ -157,6 +157,8 @@ git status --short --branch
 | requirement | requirement spec review | spec-reviewer | fresh | provisional | N/A | blocked until review pass | review requested after this report entry |
 | requirement | requirement spec review | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: missing ledger status model, missing Ledger Note minimum schema, utility-worker boundary gap. Requirement updated with status/disposition semantics, Ledger Note schema, and utility-worker inclusion. |
 | requirement | requirement spec review | spec-reviewer | fresh | passed | N/A | proceed to design phase | Re-review found no findings; prior blockers resolved. |
+| design | design spec review | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: missing Options Considered in canonical ledger, incomplete disposition required evidence, pytest-style command. Design updated with Options Considered column, Disposition Required Evidence, blocker rules, and unittest commands. |
+| design | design spec review | spec-reviewer | fresh | passed | N/A | proceed to plan phase | Re-review found no findings; prior blockers resolved. |
 
 #### メモ
 - Requirement は `iss-00102` から切り出した report ledger contract を扱う。`iss-00102` の plan contract 再実装は対象外。
