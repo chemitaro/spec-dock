@@ -10,7 +10,9 @@ ID: "<ISS_ID>"
 親: ["<EPIC_ID>", "<INIT_ID>"]
 ---
 
-# <ISS_ID> <ISS_TITLE> — 実装報告（LOG）
+# <ISS_ID> <ISS_TITLE> — 実装報告（Observed Evidence Ledger）
+
+> `report.md` は observed evidence ledger です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、discovered tests、closure delta、reviewer status、commit/no-op evidence を記録する。
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
@@ -22,6 +24,9 @@ ID: "<ISS_ID>"
 #### 対象
 - Step: S01, S02, ...
 - AC/EC: AC-___, EC-___
+- Planned source:
+  - `plan.md` section:
+  - closure ids:
 
 #### 実施内容
 - ...
@@ -33,32 +38,44 @@ ID: "<ISS_ID>"
 <result>
 ```
 
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S01 | Red / alternative | red-required / covered-existing / inspect-only / manual-required | ... | `command` / docs inspection / manual record | pass / approved-no-op / fail / blocked | ... |
+| S01 | Green | ... | ... | `command` / inspection / manual record | pass / fail / blocked | ... |
+| S01 | Refactor | guardrail satisfied / no refactor needed | ... | diff inspection / command | pass / approved-no-op / fail / blocked | ... |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+
 #### Step Contract Closure
-| step | closure ids | close condition | evidence | result | notes |
+| step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
 | S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
 
 #### Test Contract Closure
-| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
 
-- `closure id / test id` は Central index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### Closure Coverage
-| closure id | step | verification evidence | result | notes |
+| closure id | step | verification evidence | observed result | notes |
 |---|---|---|---|---|
 | tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
 
 #### Closure Delta
-| change | closure id | test id alias | resolves to closure id | reason | re-review required |
-|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no |
+| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
+|---|---|---|---|---|---|---|
+| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
 
 #### Implementation Delegation Gate
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records evidence only.
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
-| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
 
@@ -72,22 +89,10 @@ ID: "<ISS_ID>"
 |---|---|---|---|---|---|---|---|---|
 | S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
 
-#### Workflow Delegation Consent
-This table is for reviewer / read-only specialist workflow-scoped consent. Write-capable delegation such as `dev-coder` or `doc-writer` is recorded in `Implementation Delegation Gate` and `Delegated Worker Evidence`, not as generic workflow-scoped consent.
-
-| consent source | repo / worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
-|---|---|---|---|---|---|---|---|---|
-| user message / policy / N/A | ... | iss-_____ | ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | reviewer / read-only specialist scope only | ... | none / ... | ... |
-
 #### Reviewer Gate Status
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
 | S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### Code Review Gate
-| step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
-|---|---|---|---|---|---|---|
-| S01 | code-reviewer | step diff / tests / docs-report updates | pass / fail | ... | 0 | pass / blocked |
 
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
@@ -127,7 +132,7 @@ This table is for reviewer / read-only specialist workflow-scoped consent. Write
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue test adequacy | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
@@ -150,10 +155,8 @@ This table is for reviewer / read-only specialist workflow-scoped consent. Write
 
 ## 学んだこと (任意)
 - ...
-- ...
 
 ## 今後の推奨事項 (任意)
-- ...
 - ...
 
 ## 省略/例外メモ (必須)

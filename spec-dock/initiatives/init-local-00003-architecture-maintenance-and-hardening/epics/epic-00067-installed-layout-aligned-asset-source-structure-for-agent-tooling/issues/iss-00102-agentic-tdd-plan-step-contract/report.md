@@ -367,12 +367,101 @@ uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_create
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S04 | pending commit | `tests/test_init_update.py` plus S04 plan/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S04 | committed | `tests/test_init_update.py` plus S04 plan/report evidence | `d8ab5a9` | `git status --short --branch` -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### 2026-05-20 S90 docs impact resolution / mirror refresh
+
+#### 対象
+- Step: S90
+- AC/EC: AC-006, AC-007
+
+#### 実施内容
+- provider-side docs/templates/installed agent assets を dogfooding mirror へ反映した。
+- `spec-dock/docs/reference_hard_cutover.md` は mirror 側に未存在だったため、provider から新規追加した。
+- すべての S90 provider -> mirror ペアは exact mirror とし、意図的 divergence はない。
+- S90 parity verification で `test_issue_93_execute_prompts_contract` が旧 `code-reviewer scope` fragment を期待して落ちたため、`review scope` 期待に更新した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock sync
+# pass: active unchanged; generated tree/dashboard files had no tracked diff
+
+./spec-dock/scripts/spec-dock validate
+# pass: spec-dock: ok (validate) nodes=44
+
+uv run python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets \
+  tests.test_init_update.TestInitUpdate.test_issue_93_execute_prompts_contract \
+  tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset \
+  tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets
+# pass: Ran 6 tests OK
+
+git diff --check -- tests/test_init_update.py .agents/skills/spec-dock-issue-execution/SKILL.md .codex/prompts/execute-issue.md .codex/agents/dev-coder.toml .codex/agents/code-reviewer.toml .codex/agents/qa-reviewer.toml .codex/agents/spec-reviewer.toml spec-dock/docs/workflow_issue.md spec-dock/docs/phase_plan_issue.md spec-dock/docs/authoring/issue-plan.md spec-dock/docs/reference_hard_cutover.md spec-dock/templates/issue/plan.md spec-dock/templates/issue/report.md spec-dock/active/issue/report.md
+# pass
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S90 | Red / alternative | manual-required mirror parity evidence | before mirror refresh, full `tests.test_init_update` reported dogfooding mirror parity failures for changed docs/templates/prompts | full unittest attempt during S04 planning | fail as expected | full suite also had unrelated `No module named pip`; targeted parity subset used for S90 |
+| S90 | Green | provider docs/templates/installed assets reflected in dogfooding mirror | docs/templates/agent-tooling parity subset passed; validate passed; sync passed | targeted 6-test parity subset, `./spec-dock/scripts/spec-dock validate`, `./spec-dock/scripts/spec-dock sync` | pass | no intentional divergence |
+| S90 | Refactor | mirror refresh only, no provider/runtime change | diff is limited to dogfooding mirror files plus stale test fragment update and report evidence | `git diff --check -- <S90 files>` | pass | provider source unchanged in S90 |
+| S90 | Green follow-up | P2 parity-map review finding addressed | added `reference_hard_cutover.md` to dogfooding docs parity map | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` | pass | 2 tests OK |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S90 | execute prompt parity test expected old `code-reviewer scope` fragment | targeted S90 parity verification | updated expected fragment to `1 implementation step = 1 review scope = 1 commit` in `tests/test_init_update.py` | tc-006 / tc-007 | no | targeted parity subset passes |
+| S90 | `reference_hard_cutover.md` mirror was not covered by parity map | spec-reviewer P2 finding | added provider/mirror pair to `_DOGFOODING_MIRROR_PROVIDER_ASSET_MAP` | tc-007 | no | targeted docs parity test passes |
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S90 | tc-007 | local dogfooding workspace reflects provider-side source or has recorded divergence rationale | doc-writer mirrored all provider pairs exactly; targeted parity subset OK; sync OK; validate OK; spec-reviewer pass with P2 addressed | pass | no divergence rationale needed |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-007 | S90 | yes | manual-required | provider and dogfooding mirror diverged after S01-S03 provider updates | targeted parity subset OK; sync OK; validate OK; spec-reviewer pass with P2 addressed | pass | includes docs/templates and installed agent tooling |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| tc-007 | S90 | target dogfooding mirror files match provider assets; targeted parity subset OK; parity map covers `reference_hard_cutover.md` | pass | `reference_hard_cutover.md` newly mirrored |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| added | tc-007 | `spec-dock/docs/reference_hard_cutover.md` | tc-007 | provider reference doc added in S01 needed dogfooding mirror counterpart | yes, completed by S90 spec-reviewer |
+| changed | tc-006 / tc-007 | `test_issue_93_execute_prompts_contract` | tc-006 / tc-007 | stale prompt expectation still used `code-reviewer scope`; S03 contract uses `review scope` | yes, completed by S90 spec-reviewer |
+| changed | tc-007 | `_DOGFOODING_MIRROR_PROVIDER_ASSET_MAP` | tc-007 | add `reference_hard_cutover.md` parity protection after S90 P2 finding | yes, P2 addressed |
+
+#### Implementation Delegation Gate
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records evidence only.
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S90 | delegated | dogfooding mirror refresh / docs impact resolution | doc-writer | provider-to-dogfooding mirror for changed docs/templates/installed assets | S01-S03 provider assets, `plan.md` S90 | dogfooding mirror docs/templates/agent assets listed in S90 handoff | provider source, runtime code, active issue docs, unrelated historical issue docs | provider/mirror byte comparison, targeted parity subset, sync, validate, diff check | ambiguous provider/mirror mapping, need to edit provider source/tests/runtime | changed files, mirror pair status, verification, unresolved risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Mirrored provider docs/templates/installed agent assets into dogfooding workspace; all provider -> mirror pairs exact; added missing `reference_hard_cutover.md`. | `.agents/skills/spec-dock-issue-execution/SKILL.md`, `.codex/prompts/execute-issue.md`, `.codex/agents/dev-coder.toml`, `.codex/agents/code-reviewer.toml`, `.codex/agents/qa-reviewer.toml`, `.codex/agents/spec-reviewer.toml`, `spec-dock/docs/workflow_issue.md`, `spec-dock/docs/phase_plan_issue.md`, `spec-dock/docs/authoring/issue-plan.md`, `spec-dock/docs/reference_hard_cutover.md`, `spec-dock/templates/issue/plan.md`, `spec-dock/templates/issue/report.md` | mirror pair cmp checks; sync OK; validate OK; parent targeted parity subset OK | spec-reviewer pass with P2 | none | accepted and closed for S90 commit |
+| S90 | dev-coder | Updated stale execute prompt test expectation from `code-reviewer scope` to `review scope`; added `reference_hard_cutover.md` to dogfooding docs parity map after spec-reviewer P2 finding. | `tests/test_init_update.py` | `test_issue_93_execute_prompts_contract` + `test_issue_102_agentic_tdd_contract_assets` OK; docs parity test OK; diff check pass | spec-reviewer pass with P2 addressed | none | accepted and closed for S90 commit |
 
 #### Reviewer Gate Status
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
-| S04 | step reviewer | code-reviewer | fresh | pending | N/A | blocked until dev-coder output and review pass | tests-only scope |
+| S90 | docs impact review | spec-reviewer | fresh | passed | N/A | proceed to S90 commit gate | review_status pass; P2 parity-map finding addressed before commit |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending commit | dogfooding mirror files, stale prompt test expectation, parity map update, S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 ---
 

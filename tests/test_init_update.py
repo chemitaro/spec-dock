@@ -112,6 +112,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/reference_github.md": (
             "src/spec_dock/assets/spec_dock/docs/reference_github.md"
         ),
+        "spec-dock/docs/reference_hard_cutover.md": (
+            "src/spec_dock/assets/spec_dock/docs/reference_hard_cutover.md"
+        ),
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
@@ -9761,7 +9764,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "期待結果",
                 "失敗検出",
                 "検証方法",
-                "1 implementation step = 1 code-reviewer scope = 1 commit",
+                "1 implementation step = 1 review scope = 1 commit",
             ),
         }
 
