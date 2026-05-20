@@ -41,6 +41,8 @@ ID: "iss-00102"
   - dogfooding workspace: `spec-dock/` 側の mirror と active issue docs。
   - tests: scaffold / installed asset の内容を検証する structural assertions。
 - 情報源:
+  - この要件定義書が正本であり、discussion / scratch は検討材料として扱う。古い discussion と要件が衝突する場合は、この要件定義書を優先する。
+  - `spec-dock/active/issue/discussions/20260520t081426z-disc-plan-as-executable-agentic-tdd-workflow-contract.md`
   - `spec-dock/active/issue/discussions/20260520t074027z-disc-agentic-tdd-cycle-and-plan-step-contract-analysis.md`
   - `spec-dock/active/issue/discussions/20260520t075709z-disc-current-workflow-and-plan-template-remediation-analysis.md`
   - `spec-dock/active/issue/discussions/20260520t075311z-scratch-current-plan-workflow-audit-notes.md`
@@ -85,6 +87,7 @@ ID: "iss-00102"
   - `spec-dock/` dogfooding workspace だけを変更し、provider-side source を更新しない。
 - 対象外:
   - spec-dock runtime の新しい lint command や `validate --strict-docs` の本格実装。
+  - Plan QA Gate の mandatory runtime validation 化。今回の Issue では plan review / reviewer config / final QA gate の観点強化までを対象にする。
   - GitHub issue / PR workflow 全体の再設計。
   - 既存 Issue docs 全件の migration。
   - Agent runtime や model selection policy の変更。
@@ -97,9 +100,6 @@ ID: "iss-00102"
   - Issue execution と completion policy は `workflow_issue.md`、plan authoring contract は `docs/authoring/issue-plan.md`、template は最小 scaffold という境界を保つ。
   - 変更後の workflow が、実装 agent と reviewer agent の input/output に落ちることを確認する。
 - 判断が必要:
-  - `phase_plan_issue.md` を thin redirect に近づけるか、plan philosophy + checklist として残すか。
-  - `具体テストケース一覧` という名称を維持するか、`Step Test Obligations / Concrete Seeds` などへ改名するか。
-  - Plan QA Gate をこの Issue で必須化するか、まず reviewer config と final QA gate の強化に留めるか。
   - `hard cutover evidence contract` をどの reference doc へ分離するか。
 - 行わない:
   - 既存の active / historical issue docs を一括変換しない。
@@ -107,6 +107,20 @@ ID: "iss-00102"
   - テストケースの完全な issue-wide inventory を plan に義務化しない。
   - Red を必ず新規 code test に限定しない。characterization、inspect-only、manual-only、no-new-test exception は許容するが、理由と代替 evidence を必要にする。
   - 低リスク docs-only step に過剰な code test 作成を義務化しない。
+
+## 確定判断
+- `具体テストケース一覧` という見出し名は維持する。
+  - 理由:
+    - 既存 template / prompt / skill / reviewer docs との連続性を保つ。
+    - 改名による migration ではなく、見出し直下の定義で「完全な test inventory ではなく step-local obligations / concrete seeds」と明確化する方が今回の目的に合う。
+  - 実装への要求:
+    - 見出し名だけで意味を判断させず、`Test Obligation Matrix`、`Concrete Red / Characterization Seeds`、`Discovered Test Ledger` との役割差を authoring docs と template に明示する。
+- `phase_plan_issue.md` は thin redirect にはせず、plan philosophy + review checklist として残す。
+  - 理由:
+    - 既存利用者の planning guidance 導線を残しつつ、field-level 詳細と reviewer fail 条件を `docs/authoring/issue-plan.md` に寄せれば重複を減らせる。
+    - `workflow_issue.md` が lifecycle / execution policy、`docs/authoring/issue-plan.md` が plan authoring contract、`templates/issue/plan.md` が scaffold という正本分離を保てる。
+  - 実装への要求:
+    - `phase_plan_issue.md` から重複する field-level template 記法や execution policy を削り、plan philosophy、粒度、review checklist、正本への routing に絞る。
 
 ## 非交渉制約
 - `src/spec_dock/assets/spec_dock/...` は shipped scaffold docs/templates/system の provider-side source of truth として扱う。
@@ -121,7 +135,7 @@ ID: "iss-00102"
 - 高度な coding agent は人間より広い context を扱えるため、1つの step 内で複数の密接な micro assertion や characterization を扱える。
 - それでも、テストを実装後に都合よく合わせることを避けるため、step 開始前に何を red / characterization / inspect / manual evidence とするかは明示する必要がある。
 - plan 段階で必要なのは完全な test function inventory ではなく、実装を縛る十分な test obligation と representative concrete seeds である。
-- `plan.md` に実行中の Red / Green / Refactor / closure evidence を置き、`report.md` に最終 evidence summary、逸脱、discovered tests、amendment 履歴を残す役割分担にする。
+- `plan.md` は planned contract として Red / Green / Refactor / closure evidence の要求、記録先、closure 条件を定義し、`report.md` は observed evidence ledger として実行結果、逸脱、discovered tests、amendment 履歴を保持する。
 - 実装中に新しい仕様・bug class・外部 contract・risk surface が見つかる場合は、report evidence だけで済ませず、必要に応じて plan amendment を行う。
 
 ## 受け入れ条件
@@ -135,13 +149,13 @@ ID: "iss-00102"
   - アクター: main orchestrator / dev-coder / doc-writer / utility-worker
   - 前提: implementation step を開始する。
   - 操作: step contract を読み、事前に red-required / covered-existing / inspect-only / manual-required の evidence 方針を確認する。
-  - 期待結果: 実装前に concrete red / characterization seeds が固定され、実装後の後付けテストや仕様縮小解釈を避けられる。
+  - 期待結果: 実装前に concrete red / characterization seeds、または正当化された covered-existing / inspect-only / manual-required の evidence path が固定され、実装後の後付けテストや仕様縮小解釈を避けられる。
   - 観測点: `templates/issue/plan.md`、`execute-issue.md`、`spec-dock-issue-execution/SKILL.md`、dev-coder config。
 - AC-003:
   - アクター: main orchestrator / delegated worker
   - 前提: generated Issue `plan.md` に implementation step がある。
   - 操作: 実装エージェントが step を上から順に実行する。
-  - 期待結果: 各 step は behavior goal、test obligation、Red evidence または代替理由、implementation scope、Green verification、Refactor / cleanup、closure evidence、amendment trigger を持ち、`plan.md` だけで Agentic TDD の作業順序を実行できる。
+  - 期待結果: 各 step は behavior goal、test obligation、Red evidence または代替理由、implementation scope、Green verification、Refactor / cleanup、closure evidence requirements、report evidence destination、amendment trigger を持ち、`plan.md` だけで Agentic TDD の作業順序を実行できる。
   - 観測点: `templates/issue/plan.md`、`docs/authoring/issue-plan.md`、`execute-issue.md`、`spec-dock-issue-execution/SKILL.md`。
 - AC-004:
   - アクター: qa-reviewer / code-reviewer / spec-reviewer
@@ -153,7 +167,7 @@ ID: "iss-00102"
   - アクター: spec-dock maintainer
   - 前提: workflow / template / prompt / skill を読む、または更新する。
   - 操作: どの文書が lifecycle policy、plan authoring contract、template scaffold、execution routing、report evidence ledger を所有するかを確認する。
-  - 期待結果: 同じ policy を複数箇所で再定義せず、正本分離と routing が明確になっている。
+  - 期待結果: `plan.md` は planned contract、`report.md` は observed evidence ledger として分離され、同じ policy や evidence authority を複数箇所で再定義しない routing が明確になっている。
   - 観測点: `workflow_issue.md`、`docs/authoring/issue-plan.md`、`phase_plan_issue.md`、`templates/issue/plan.md`、`execute-issue.md`、skill。
 - AC-006:
   - アクター: consumer repo user
@@ -165,7 +179,7 @@ ID: "iss-00102"
   - アクター: spec-reviewer / qa-reviewer
   - 前提: Issue plan または final report をレビューする。
   - 操作: 各 step の closure 状態を確認する。
-  - 期待結果: Red / Green / Refactor / Evidence / report update / reviewer gate のいずれかが欠ける step は、明示的な no-new-test / inspect-only / manual-only exception と代替 evidence がない限り closure 不可として扱える。
+  - 期待結果: plan の Red / Green / Refactor / Evidence requirements と report の observed evidence / report update / reviewer gate のいずれかが欠ける step は、明示的な no-new-test / inspect-only / manual-only exception と代替 evidence がない限り closure 不可として扱える。
   - 観測点: `templates/issue/plan.md`、`templates/issue/report.md`、reviewer agent config。
 
 ## 例外・エッジケース
@@ -221,42 +235,14 @@ ID: "iss-00102"
     - code-reviewer / spec-reviewer / qa-reviewer が検証できる差分と evidence の範囲。docs-only step では code-reviewer ではなく spec-reviewer が主 reviewer になりうる。
 - TERM-008:
   - Executable workflow contract:
-    - 実装エージェントが外部説明を解釈し直さず、`plan.md` の step を順に実行するだけで、Agentic TDD の Red / Green / Refactor / Evidence / Closure を進められる契約。
+    - 実装エージェントが外部説明を解釈し直さず、`plan.md` の step を順に実行するだけで、Agentic TDD の Red / Green / Refactor / Evidence / Closure を進められる planned contract。実行結果の正本は `report.md` に残す。
 - TERM-009:
   - Amendment trigger:
     - 実装中の発見が step scope、test obligation、risk、acceptance criteria、review boundary を変えるため、実装継続前に plan 更新へ戻るべき条件。
+- TERM-010:
+  - Observed evidence ledger:
+    - 実際に実行した Red / Green / Refactor / verification / review / amendment / discovered tests の結果を保持する `report.md` 側の記録。
 
 ## 未確定事項
-- Q-001:
-  - 質問: `具体テストケース一覧` の名称を維持するか。
-  - 選択肢:
-    - A: 維持する。
-      - 既存 template との連続性が高いが、test obligation / concrete seeds / discovered tests の違いを補足する必要がある。
-    - B: `Step Test Obligations / Concrete Seeds` などへ改名する。
-      - 意味は明確になるが、既存 docs と利用者の慣れに影響する。
-  - 推奨案:
-    - A を採用しつつ、見出し直下で「完全な一覧ではなく step-local seeds / obligations」と明記する。
-  - 影響範囲:
-    - plan template、authoring docs、execute prompt、skill、structural tests。
-- Q-002:
-  - 質問: `phase_plan_issue.md` を thin redirect に近づけるか、plan philosophy + checklist として残すか。
-  - 選択肢:
-    - A: thin redirect にする。
-      - 正本分離は最も明確だが、既存利用者が読んでいた planning guidance が薄くなる。
-    - B: philosophy + checklist に絞って残す。
-      - migration 負荷が低く、重複を減らしながら導線を残せる。
-  - 推奨案:
-    - B。field-level 詳細と reviewer fail 条件は `docs/authoring/issue-plan.md` に寄せる。
-  - 影響範囲:
-    - docs navigation、template intro、skill / prompt routing。
-- Q-003:
-  - 質問: Plan QA Gate をこの Issue で必須化するか。
-  - 選択肢:
-    - A: Medium/High risk plan で必須化する。
-      - テスト不足を早期に検出しやすいが workflow が重くなる。
-    - B: この Issue では reviewer config / final QA gate の観点強化に留める。
-      - 小さく導入できるが、plan 作成時のゲートはまだ弱い。
-  - 推奨案:
-    - B。この Issue では概念と観点を整備し、必須 gate 化や strict docs validation は後続 Issue に切り出す。
-  - 影響範囲:
-    - workflow_issue.md、qa-reviewer config、future runtime validation。
+- 現時点で、実装着手を止める未確定事項はない。
+- `hard cutover evidence contract` の移動先は設計で file-level に決める。要件としては、標準 Issue workflow から optional / reference pattern へ分離することを求める。
