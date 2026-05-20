@@ -198,17 +198,97 @@ git diff --check -- src/spec_dock/assets/spec_dock/templates/issue/plan.md src/s
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | provider issue plan/report templates plus S02 plan/report traceability evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | provider issue plan/report templates plus S02 plan/report traceability evidence | `7d204aa` | `git status --short --branch` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/templates/issue/plan.md` - planned contract / command queue scaffold に更新
 - `src/spec_dock/assets/spec_dock/templates/issue/report.md` - observed evidence ledger scaffold に更新
 
 #### コミット
-- pending
+- `7d204aa docs(spec): Issue計画テンプレートを実行契約へ更新`
 
 #### メモ
 - S02 は template-only step のため code test は置かず、inspection と spec-reviewer pass で閉じる。
+
+---
+
+### 2026-05-20 S03 agent routing assets update
+
+#### 対象
+- Step: S03
+- AC/EC: AC-004, AC-005, AC-007
+
+#### 実施内容
+- S02 commit 後の clean worktree を確認した。
+- S03 の installed agent asset / prompt / skill / role config 更新に向けて、対象ファイルの現状を inspection した。
+- S03 の docs/text implementation を `doc-writer` に委任するため、Implementation Delegation Gate を記録した。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+## iss-00102-agentic-tdd-plan-step-contract
+
+rg -n "executable|planned contract|observed evidence|obligation|code-reviewer scope|1〜3|具体テストケース一覧|plan.md|report.md" src/spec_dock/assets/install_root/.codex src/spec_dock/assets/install_root/.agents
+# execute-issue prompt mentions plan/report and `具体テストケース一覧`, but does not yet use planned contract / observed evidence ledger boundary.
+# issue execution skill is concise and workflow-routed, but does not yet remind implementers to execute step-local planned contract fields.
+# role configs do not yet express obligation coverage / report ledger expectations for reviewer output.
+```
+
+#### Implementation Delegation Gate
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records evidence only.
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | installed agent prompt / skill / role config routing update | doc-writer | provider-side installed agent assets | `requirement.md`, `design.md`, `plan.md`, S01 docs, S02 templates | `src/spec_dock/assets/install_root/.codex/prompts/execute-issue.md`, `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`, `src/spec_dock/assets/install_root/.codex/agents/dev-coder.toml`, `src/spec_dock/assets/install_root/.codex/agents/code-reviewer.toml`, `src/spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml`, `src/spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml` | runtime code, tests, non-issue prompts/skills unless direct stale reference is found and reported, model/tool changes | targeted `rg` inspection for executable/planned/observed/obligation/stale wording; `git diff --check` | role config needs model/tool changes, prompt/skill would become a duplicate workflow manual, need to rename `具体テストケース一覧` | changed files, role contract summary, inspection evidence, unresolved risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S03 | doc-writer | Updated execute prompt, issue execution skill, dev-coder, code-reviewer, qa-reviewer, and spec-reviewer instructions so agents route through `plan.md` as planned executable workflow contract / command queue and `report.md` as observed evidence ledger. Kept workflow policy routed to `workflow_issue.md` and step field semantics to `authoring/issue-plan.md`; removed stale `code-reviewer scope` wording from execute prompt. | `src/spec_dock/assets/install_root/.codex/prompts/execute-issue.md`, `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`, `src/spec_dock/assets/install_root/.codex/agents/dev-coder.toml`, `src/spec_dock/assets/install_root/.codex/agents/code-reviewer.toml`, `src/spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml`, `src/spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml` | `rg -n "executable|planned contract|observed evidence|obligation|code-reviewer scope|1〜3|具体テストケース一覧" src/spec_dock/assets/install_root/.codex src/spec_dock/assets/install_root/.agents`; `git diff --check -- <S03 allowed files>` -> pass | spec-reviewer pass after P2 cleanup | none reported | accepted and closed for S03 commit |
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S03 | Red / alternative | inspect-only current assets lack full plan-as-command-queue and role output contracts | pre-change inspection showed execute prompt referenced plan/report and concrete cases but did not yet use planned/observed boundary; role configs lacked obligation/report-ledger review contracts | targeted asset inspection | pass | docs/text-only step |
+| S03 | Green | installed agent assets contain executable/planned/observed/obligation markers and no stale `code-reviewer scope` / `1〜3` wording | marker `rg` found expected terms in updated prompt/skill/configs; no `code-reviewer scope` or `1〜3` matches in allowed files | `rg -n "executable|planned contract|observed evidence|obligation|code-reviewer scope|1〜3|具体テストケース一覧" src/spec_dock/assets/install_root/.codex src/spec_dock/assets/install_root/.agents` | pass | `具体テストケース一覧` intentionally remains in prompt/skill routing |
+| S03 | Refactor | keep prompt/skill concise and avoid full workflow duplication | diff inspection confirms skill adds short reminders and routes policy/details to docs | `git diff --check -- <S03 allowed files>` | pass | no model/tool/sandbox/approval/notify settings changed |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S03 | none | implementation inspection | no action | N/A | no | worker reported no unresolved risks; parent inspection found target-scope markers present |
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | tc-005 | installed agent assets route through the planned contract and observed evidence ledger. | doc-writer changed 6 provider installed agent assets; targeted `rg`; `git diff --check`; spec-reviewer pass after P2 cleanup | pass | S03 docs/text-only closure |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-005 | S03 | yes | inspect-only | current assets lacked complete plan-as-command-queue and role output contracts | targeted asset inspection + spec-reviewer pass after P2 cleanup | pass | prompt/skill/config routing updated |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| tc-005 | S03 | `planned executable workflow contract`, `observed evidence ledger`, `obligation coverage`, and `authoring/issue-plan.md` routing markers in S03 assets; no `1〜3` or `code-reviewer scope` matches | pass | installed agent routing updated |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| changed | tc-005 | N/A | tc-005 | installed agent prompt/skill/configs now consume plan contract and report ledger | yes, completed by S03 spec-reviewer |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | spec-reviewer | fresh | passed | N/A | follow-up applied before commit | initial review_status pass with P2 findings |
+| S03 | step reviewer | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | re-review found mixed pending/pass ledger rows; report status normalized to pending re-review |
+| S03 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S03 commit gate | final re-review_status pass; no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | installed agent prompt/skill/role configs plus S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 ---
 
