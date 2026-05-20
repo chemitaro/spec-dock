@@ -94,12 +94,11 @@ Issue は実装の最小単位です。
 - `report.md` は observed evidence ledger である。実際の Red / Green / Refactor 結果、verification result、discovered tests、closure delta、reviewer verdict、commit/no-op evidence は `report.md` に記録し、`plan.md` を実行結果の正本にしない
 - `Parent Agent Invariant`: normal execution における親 Codex は inspect / plan / delegate / verify / integrate / report を担当する orchestration owner であり、code / runtime / tests / scaffold behavior / templates / shipped docs / skills / workflow text の直接実装者ではない
 - 親 Codex が直接作成・更新してよいのは、`report.md`、handoff note、phase evidence など run-local orchestration metadata に限定する。shipped docs / templates / skills / workflow text、runtime-facing scaffold、コード、テスト、runtime behavior は delegated worker work として扱う
-- 各 implementation step は `step closure contract / test bundle / pre-implementation evidence → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → commit → clean確認` の順で進める
+- 各 implementation step は `step closure contract → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → commit → clean確認` の順で進める
 - 完成版 `plan.md` には `Spec-Locked Closure Index`（仕様固定クロージャ索引）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
 - `Spec-Locked Closure Index` は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
-- `test bundle` は step closure contract の一部として、step の観測可能な振る舞いに必要な acceptance / characterization / property or invariant / regression / negative を分類する。十分性は raw count ではなく risk-calibrated obligation coverage、changed contract、failure mode、regression risk、manual/integration risk で判断する
 - `step closure contract` は closure index の `id` を参照し、どの検証契約をその step で満たせば close してよいかを追えるようにする
-- 実装開始前に required closure id が behavior slice の `closure ids` / `test ids` から参照され、各 required row に step-local close condition と verification command または evidence path があることを確認する
+- 実装開始前に required closure id が step-local close condition と verification command または evidence path へ追跡できることを確認する。field semantics、card schema、risk-calibrated obligation coverage の詳細は [authoring/issue-plan.md](authoring/issue-plan.md) を正本にする
 - required closure row、`locked expectation`、`required`、`spec link` を変更する場合は plan amendment と re-review を先に通す
 - `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを記録し、failing-first を完全要求できない場合もテストが欠陥を検出できる根拠を残す
 - plan field semantics、`具体テストケース一覧` の card schema、docs-only / inspect-only / manual-required の書き方は [authoring/issue-plan.md](authoring/issue-plan.md) を正本にする。この workflow は lifecycle、実行順、reviewer gate、completion policy を所有し、field-level template manual を再定義しない
@@ -187,7 +186,7 @@ Issue は実装の最小単位です。
 - plan:
   - step が behavior slice と review loop を回せる粒度
   - `Spec-Locked Closure Index` が AC / EC / design / bug / risk と behavior slice を結び、詳細なテスト実装指示になっていない
-  - step closure contract / test bundle / pre-implementation evidence / bounded implementation batch が追える
+  - step closure contract / verification evidence path / bounded implementation batch が追える
   - every required closure id が behavior slice、step-local close condition、verification evidence、report closure へ追跡できる
   - docs impact / docs refresh step が必要なら入っている
   - final quality gate が独立し、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review を含んでいる

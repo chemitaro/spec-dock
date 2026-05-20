@@ -461,18 +461,146 @@ git diff --check -- tests/test_init_update.py .agents/skills/spec-dock-issue-exe
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S90 | pending commit | dogfooding mirror files, stale prompt test expectation, parity map update, S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S90 | committed | dogfooding mirror files, stale prompt test expectation, parity map update, S90 report evidence | `036eab3` | `git status --short --branch` -> clean before S99 follow-up test repair | N/A | N/A | N/A | N/A |
 
 ---
 
-### 2026-05-20 HH:MM - HH:MM
+### 2026-05-20 S99 final validation / stale test repair
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S99
+- AC/EC: AC-001 through AC-007 / EC-001 through EC-004
 
 #### 実施内容
-- ...
+- S90 後の final validation で、`test_spec_document_templates_keep_policy_out_of_scaffold` が旧 issue plan template contract を期待して失敗した。
+- dev-coder に委任し、issue plan / phase plan issue の scaffold contract assertions を新しい Agentic TDD plan-step contract に合わせた。
+- full `tests.test_init_update` では今回変更由来の失敗は解消し、残存 11 failures は既知の環境/既存 snapshot 系として分離した。
+
+#### 実行コマンド / 結果
+```bash
+uv run python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_spec_document_templates_keep_policy_out_of_scaffold \
+  tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets \
+  tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure \
+  tests.test_init_update.TestInitUpdate.test_issue_93_execute_prompts_contract \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets
+# pass: Ran 5 tests OK
+
+git diff --check -- tests/test_init_update.py
+# pass
+
+UV_CACHE_DIR=/private/tmp/uv-cache-iss102 uv run python -m unittest tests.test_init_update
+# fail: Ran 168 tests; 11 failures remain
+# separated residuals:
+# - 10 issue-69/70/71 wheel/install tests fail because .venv/bin/python3 has no pip
+# - 1 dogfooding .meta.json cutover snapshot mismatch remains unrelated to iss-00102
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S99 | Red / alternative | final validation catches stale scaffold-test expectations | full `tests.test_init_update` failed on old `Module Dependency Diagram` assertion after S90 | `UV_CACHE_DIR=/private/tmp/uv-cache-iss102 uv run python -m unittest tests.test_init_update` | fail as expected | also exposed unrelated pre-existing failures |
+| S99 | Green | changed contract assertions pass after stale test repair | targeted 5-test issue/contract/parity subset passed | targeted unittest subset | pass | covers issue plan template, issue102 contract, init scaffold, execute prompt, docs parity |
+| S99 | Refactor | no behavior source change; only test assertion alignment and report evidence | diff limited to `tests/test_init_update.py` and issue report | `git diff --check -- tests/test_init_update.py` | pass | provider/runtime/docs unchanged in S99 |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S99 | `test_spec_document_templates_keep_policy_out_of_scaffold` still asserted old diagram/test-bundle markers | final validation | updated scaffold contract assertions to planned contract / command queue / observed ledger / risk-calibrated coverage markers | tc-006 / tc-007 | no | targeted 5-test subset passes |
+| S99 | alternative evidence rows use inspect/manual case labels rather than standard test-action labels | final validation / template inspection | updated nested test-case contract helper to accept standard case labels or inspect/manual alternative labels | tc-006 | no | targeted scaffold template test passes |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-006 | S99 | yes | automated | stale scaffold assertion failed against new template contract | targeted 5-test subset; diff check | pass | final full suite residuals are separated as unrelated |
+| tc-007 | S99 | yes | automated/manual-required | dogfooding parity and template contract needed final confirmation | targeted docs parity + issue102 contract subset; diff check | pass | mirror parity remains covered |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| changed | tc-006 | `test_spec_document_templates_keep_policy_out_of_scaffold` | tc-006 | align old scaffold-policy assertions with Agentic TDD plan-step contract | yes |
+| changed | tc-006 | `_assert_concrete_test_cases_nested_list_contract` | tc-006 | allow explicit inspect/manual alternative evidence rows in addition to executable test rows | yes |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S99 | dev-coder | Repaired stale scaffold contract assertions discovered by final validation; confirmed targeted contract/parity subset passes. | `tests/test_init_update.py` | targeted 3-test subset OK by worker; parent targeted 5-test subset OK; diff check pass | pending final code/spec/QA review | full `tests.test_init_update` still has unrelated residual failures | accepted for final review |
+
+#### Final Validation Residuals
+| command | result | issue-caused? | disposition |
+|---|---|---|---|
+| `UV_CACHE_DIR=/private/tmp/uv-cache-iss102 uv run python -m unittest tests.test_init_update` | fail, 11 failures | no | record as residual environment/existing snapshot failures |
+| issue-69/70/71 wheel/install tests | fail because `.venv/bin/python3: No module named pip` | no | existing local virtualenv/tooling condition; out of iss-00102 scope |
+| `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` | fail due checked-in `.meta.json` cutover snapshot mismatch | no | existing dogfooding snapshot drift; out of iss-00102 scope |
+
+---
+
+### 2026-05-20 S99 reviewer findings remediation
+
+#### 対象
+- Step: S99 follow-up
+- AC/EC: AC-001 through AC-007 / EC-001 through EC-004
+
+#### 実施内容
+- final QA review failed because stale count guidance regression tests did not reject spaced variants such as `1〜3 件程度`, and alternative evidence labels could be blank.
+- final code review failed because the issue plan template delegation contract no longer carried required handoff fields, and the report template lacked `Workflow Delegation Consent` scaffold.
+- final spec review failed because final gate tables were still placeholders, `workflow_issue.md` retained stale `test bundle` workflow semantics, and S99 scope named nonexistent EC-005/EC-006.
+- dev-coder / doc-writer follow-ups corrected tests, provider docs/templates, and dogfooding mirror. Fresh final re-review passed after additional regex and placeholder fixes.
+
+#### 実行コマンド / 結果
+```bash
+uv run python -m unittest \
+  tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset \
+  tests.test_init_update.TestInitUpdate.test_spec_document_templates_keep_policy_out_of_scaffold \
+  tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets \
+  tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_templates_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets \
+  tests.test_init_update.TestInitUpdate.test_issue_93_execute_prompts_contract
+# pass: Ran 7 tests OK
+
+./spec-dock/scripts/spec-dock validate
+# pass: spec-dock: ok (validate) nodes=44
+
+git diff --check
+# pass
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S99 follow-up | Red / alternative | final reviewers catch missed contract gaps | qa-reviewer P1/P2; code-reviewer P1/P2; spec-reviewer P1/P1/P2 | final reviewer outputs | fail as expected | review gates stayed failed until fixes |
+| S99 follow-up | Green | reviewer findings fixed and targeted contract tests pass | targeted 7-test subset OK; validate OK; diff check pass | commands above | pass | re-review required before closure |
+| S99 follow-up | Refactor | old workflow terminology removed without broad rewrite | `workflow_issue.md` no longer contains `test bundle`; provider/mirror docs/templates synchronized | doc-writer cmp / `rg` evidence; parent targeted tests | pass | provider and dogfooding mirror updated |
+| S99 follow-up | Green follow-up | same-line non-empty alternative evidence fields are protected | issue plan template alternative evidence placeholders are non-empty on the same line; helper uses `[ \t]*\S.*$`; targeted 7-test subset OK | code-reviewer pass, qa-reviewer pass, parent targeted tests | pass | closes late regex/newline finding |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| changed | tc-006 | stale count guidance regex | tc-006 | reject spaced full-width wave / full-width tilde / ASCII tilde count forms | yes |
+| changed | tc-006 | concrete case label assertion | tc-006 | require non-empty standard and inspect/manual alternative evidence fields | yes |
+| changed | tc-006 | concrete case label no-newline regex | tc-006 | prevent `\s*` from crossing lines and letting blank labels pass | yes, completed |
+| changed | tc-006 | inspect/manual template placeholders | tc-006 | make alternative evidence example fields non-empty on the same line | yes, completed |
+| changed | tc-003 | issue plan delegation contract | tc-003 | restore allowed paths / forbidden changes / acceptance criteria / required verification / reviewer focus in handoff section | yes |
+| changed | tc-004 | issue report workflow delegation consent | tc-004 | provide report scaffold for reviewer/read-only specialist consent evidence | yes |
+| changed | tc-001 / tc-006 | workflow_issue lifecycle language | tc-001 / tc-006 | remove stale `test bundle` field-schema ownership from workflow policy | yes |
+| changed | report traceability | S99 EC scope | N/A | correct nonexistent EC-005/EC-006 reference to EC-001 through EC-004 | yes |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S99 follow-up | dev-coder | Strengthened stale count guidance assertion; required non-empty concrete/alternative evidence labels; updated structural assertions for delegation contract, report consent scaffold, and workflow lifecycle ownership; fixed same-line no-newline regex after code-reviewer P1. | `tests/test_init_update.py` | targeted 5-test subset OK, targeted 6-test subset OK, targeted 2-test subset OK by worker; parent targeted 7-test subset OK; diff check pass | code-reviewer pass; qa-reviewer pass | full suite residuals unchanged and unrelated | accepted and closed |
+| S99 follow-up | doc-writer | Restored plan delegation contract fields, added report workflow delegation consent scaffold, removed stale `test bundle` workflow semantics, mirrored provider changes into dogfooding workspace, and filled inspect/manual placeholder fields on the same line. | `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`, `src/spec_dock/assets/spec_dock/templates/issue/plan.md`, `src/spec_dock/assets/spec_dock/templates/issue/report.md`, `spec-dock/docs/workflow_issue.md`, `spec-dock/templates/issue/plan.md`, `spec-dock/templates/issue/report.md` | provider/mirror cmp pass; `workflow_issue.md` no `test bundle`; validate OK; docs/templates diff check pass | code-reviewer pass; spec-reviewer pass | none | accepted and closed |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S99 | final QA gate | qa-reviewer | fresh | failed | N/A | fix and re-review | P1 stale count variant; P2 blank alternative evidence fields |
+| S99 | final code review gate | code-reviewer | fresh | failed | N/A | fix and re-review | P1 missing delegation handoff fields; P2 missing workflow delegation consent scaffold |
+| S99 | final spec review gate | spec-reviewer | fresh | failed | N/A | fix and re-review | P1 placeholder final gates; P1 stale `test bundle` semantics; P2 nonexistent EC scope |
+| S99 follow-up | final code re-review | code-reviewer | fresh | passed | N/A | proceed to final report/commit gate | previous P1/P2 resolved; later same-line regex P1 resolved and re-reviewed pass |
+| S99 follow-up | final QA re-review | qa-reviewer | fresh | passed | N/A | proceed to final report/commit gate | stale count variants and non-empty alternative evidence fields adequately protected |
+| S99 follow-up | final spec re-review | spec-reviewer | fresh | passed | N/A | proceed to final report/commit gate | previous content findings resolved; one unreadable-artifact review was replaced by fresh excerpt-based pass |
 
 ---
 
@@ -481,27 +609,27 @@ git diff --check -- tests/test_init_update.py .agents/skills/spec-dock-issue-exe
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / workflow / skill assets / dogfooding mirror | yes | doc-writer / dev-coder for parity tests | S90 mirror refresh committed as `036eab3`; S99 follow-up docs/templates mirrored provider to dogfooding; targeted parity/contract subset OK; validate OK; diff check pass | pass |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue test adequacy | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue test adequacy | targeted structural/parity tests added and strengthened; no new integration test required beyond existing scaffold/runtime structural checks | first final QA failed; dev-coder fixed stale count variant, delimiter whitespace, and same-line non-empty alternative evidence assertions; targeted 7-test subset OK; full suite residuals separated as unrelated; final qa-reviewer pass | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | first review failed; doc-writer restored issue plan delegation fields and report workflow delegation consent scaffold; tests updated to protect both; same-line regex finding fixed | 2 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first review failed; stale `test bundle` workflow semantics removed; S99 EC scope corrected; final gate placeholders replaced with concrete entries; final spec-reviewer pass | 1 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 final validation, reviewer remediation, final pass verdicts recorded | S99 follow-up docs/templates/tests/report | final response after final commit | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

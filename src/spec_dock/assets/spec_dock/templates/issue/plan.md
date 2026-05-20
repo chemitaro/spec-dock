@@ -142,7 +142,17 @@ ID: "<ISS_ID>"
   - `plan.md`
   - workflow / authoring docs:
   - current target files:
-- required output:
+- allowed paths:
+  - ...
+- forbidden changes:
+  - ...
+- acceptance criteria:
+  - closure id / step close condition:
+- required tests or docs-only verification:
+  - targeted command / inspection / docs diff / manual evidence:
+- reviewer focus:
+  - code-reviewer for code / runtime / tests / scaffold behavior; spec-reviewer for docs-only / template-only / skill-text-only docs/spec alignment
+- output required:
   - changed files:
   - verification result:
   - report evidence to update:
@@ -163,10 +173,10 @@ ID: "<ISS_ID>"
   - 関連 closure id: tc-001
 
 - `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由:
-  - 代替検証方法:
-  - 期待結果:
-  - 記録先:
+  - テスト不要理由: <自動テスト不要の理由>
+  - 代替検証方法: <確認手順>
+  - 期待結果: <期待される状態>
+  - 記録先: <証跡の保存先>
   - 関連 closure id: tc-002
 
 #### step closure contract
