@@ -14,6 +14,13 @@ ID: "iss-00103"
 
 > `report.md` は observed evidence ledger です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、discovered tests、closure delta、reviewer status、commit/no-op evidence を記録する。
 
+## Spec Interpretation / Decision Ledger
+
+- No material interpretation changes.
+- No decision entries.
+
+この issue では S01 時点で、approved requirement / design / plan から外れる material decision は発生していない。worker からの Ledger Note も `No material implementation decisions beyond the approved plan.` であり、追加の promotion / follow-up はない。
+
 ## 実装サマリー (任意)
 - 実装開始。`spec-dock-issue-execution` workflow に従い、まず requirement の spec-reviewer review / polish から進める。
 - 親 Codex は orchestration / report / reviewer gate / final closure を担当し、shipped docs/templates/skills/workflow text は `doc-writer`、tests は `dev-coder` へ委任する。
@@ -164,6 +171,73 @@ git status --short --branch
 
 #### メモ
 - Requirement は `iss-00102` から切り出した report ledger contract を扱う。`iss-00102` の plan contract 再実装は対象外。
+
+---
+
+### 2026-05-21 S01 start
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003, EC-004
+- Planned source:
+  - `plan.md` S01
+  - closure ids: tc-001, tc-002, tc-003, tc-004
+
+#### 実施内容
+- S01 の docs/template/skill/agent-text implementation を `doc-writer` に委任する。
+- S01 は inspect-only step として、provider-side assets に decision ledger contract を実装し、S02 structural tests で後続固定する。
+
+#### Implementation Delegation Gate
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | shipped docs/templates/skills/workflow text update | doc-writer | provider-side report template, workflow/authoring docs, issue execution skill, execute prompt, worker/reviewer agent configs | `requirement.md`, `design.md`, `plan.md`, S01 target files | S01 target files only | runtime code, tests, dogfooding mirror direct edits, accepted requirement/design/plan semantics changes, new standard `implementation-notes.md` artifact | targeted marker inspection; `git diff --check -- <S01 targets>` | need to add runtime validator; need standard `implementation-notes.md`; requirement/design conflict | changed files, verification result, Ledger Note or no-material-decision statement, unresolved risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S01 | doc-writer | Added report decision ledger contract to provider report template, workflow/authoring docs, issue execution skill, execute prompt, worker configs, and reviewer configs. | `src/spec_dock/assets/spec_dock/templates/issue/report.md`, `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`, `src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md`, `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`, `src/spec_dock/assets/install_root/.codex/prompts/execute-issue.md`, `src/spec_dock/assets/install_root/.codex/agents/dev-coder.toml`, `src/spec_dock/assets/install_root/.codex/agents/doc-writer.toml`, `src/spec_dock/assets/install_root/.codex/agents/utility-worker.toml`, `src/spec_dock/assets/install_root/.codex/agents/code-reviewer.toml`, `src/spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml`, `src/spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml` | targeted marker inspection -> pass; `git diff --check -- <S01 targets>` -> pass | pending spec-reviewer | S02 structural tests and S90 dogfooding mirror refresh remain intentionally pending. | accepted for S01 review |
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S01 | Red / alternative | inspect-only pre-change marker gap | Required decision ledger markers were not part of the pre-S01 provider contract; S02 will add structural regression lock. | targeted file inspection before S01 delegation | pass | docs/template/agent-text step |
+| S01 | Green | provider assets contain decision ledger, Ledger Note, reviewer audit, and lifecycle markers | Required markers found across report template, workflow/authoring docs, skill/prompt, worker configs, and reviewer configs. | `rg -n "Spec Interpretation / Decision Ledger|No material interpretation changes|No decision entries|Options Considered|promoted_to_design|Ledger Note|source-agent|options considered|needs orchestrator decision|No material implementation decisions beyond the approved plan|Status=open|report-only durable|durable decision|legacy issue report|retroactive" <S01 targets>` | pass | marker output observed by parent |
+| S01 | Refactor | no unrelated cleanup | whitespace/diff hygiene passed | `git diff --check -- <S01 targets>` | pass | no output |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | inspect-only | report template lacked canonical decision ledger contract before S01 | marker inspection for report template | pass | S02 will lock structurally |
+| tc-002 | S01 | yes | inspect-only | worker handoff lacked Ledger Note output obligation before S01 | marker inspection for skill/prompt/worker configs | pass | proposed decision remains non-authoritative |
+| tc-003 | S01 | yes | inspect-only | reviewer configs lacked report decision ledger audit checks before S01 | marker inspection for reviewer configs | pass | open/report-only durable checks present |
+| tc-004 | S01 | yes | inspect-only | workflow docs lacked lifecycle/promotion/legacy compatibility language before S01 | marker inspection for workflow/authoring docs | pass | legacy reports not retroactive blocker |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | tc-001, tc-002, tc-003, tc-004 | S01 target files contain required contract markers and spec-reviewer pass. | marker inspection pass; diff check pass; spec-reviewer pass | pass | S02 structural tests still pending by design |
+
+#### Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-001 | S01 | report template marker inspection | pass | S02 structural lock pending |
+| tc-002 | S01 | skill/prompt/worker config marker inspection | pass | S02 structural lock pending |
+| tc-003 | S01 | reviewer config marker inspection | pass | S02 structural lock pending |
+| tc-004 | S01 | workflow/authoring docs marker inspection | pass | S02 structural lock pending |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | spec-reviewer | fresh | provisional | N/A | blocked until review pass | provider asset docs/template/skill/agent-text review requested after this update |
+| S01 | step reviewer | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Finding: active report lacked current decision ledger section. Added `Spec Interpretation / Decision Ledger` with no-decision entries and S01 no-material-decision rationale. |
+| S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S01 commit gate | Re-review found no findings; previous blocker resolved. |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed | S01 provider assets and S01 report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 ---
 
