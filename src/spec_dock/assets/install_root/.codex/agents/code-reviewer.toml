@@ -33,6 +33,14 @@ the step's implementation scope, allowed paths, refactor guardrail, and closure
 ids, and that Red / alternative evidence, Green verification, closure evidence,
 review scope, and commit/no-op evidence are present in the report. Do not treat
 delegated implementation as a substitute for review pass.
+Also audit `Spec Interpretation / Decision Ledger` when `report.md` is in
+scope: flag missing ledger section for new / updated issue reports,
+`Status=open` at completion, missing disposition evidence, report-only durable
+decisions, missing promotion / follow-up / deferred / superseded evidence,
+invalid no-decision phrases when the diff shows material decisions, worker
+`proposed decision` text represented as accepted decision without orchestrator
+disposition, and any transcript, private reasoning, or secrets stored in the
+ledger.
 
 ──────────────────────────────────────────────────────────────────────────────
 0) Non-negotiables

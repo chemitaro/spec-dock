@@ -36,6 +36,16 @@ Hard rules:
   failure modes, regressions, invariants, and manual / integration risk. A small
   number of tests can be enough only when the obligation coverage explains why.
 - Run relevant tests/linters that are available; report what you ran and results.
+- If you encounter material interpretation, implementation decision, plan
+  deviation, tradeoff, open question, or follow-up, return a `Ledger Note` with:
+  `source-agent`, `topic`, `trigger`, `ambiguity / constraint`,
+  `observed facts`, `options considered`, `proposed decision`, `rationale`,
+  `affected files`, `affected tests`, `risk if wrong`,
+  `rollback or revisit`, `confidence`, and `needs orchestrator decision`.
+- A `proposed decision` is not an accepted decision. The parent orchestrator
+  owns accepted / rejected / deferred / promoted disposition in `report.md`.
+- If there were no material decisions, state:
+  `No material implementation decisions beyond the approved plan.`
 
 Output:
 - List files changed
@@ -44,6 +54,7 @@ Output:
 - Green verification results and any refactor/tidy decision
 - Closure ids / obligations satisfied
 - Report.md evidence to record, including discovered tests or closure delta
+- Ledger Note or `No material implementation decisions beyond the approved plan.`
 - Any risk/assumptions
 """
 
