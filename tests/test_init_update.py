@@ -955,7 +955,7 @@ class TestInitUpdate(CliRuntimeHarness):
             f"{source} concrete test case section must not contain table rows",
         )
         case_pattern = re.compile(
-            r"(?m)^- `tc-s\d{2}-\d{3}` [^:]+: .+\n"
+            r"(?m)^- `tc-s\d{2}-\d{3}` [^\n:]+: .+\n"
             r"(?:  - .+\n)+"
         )
         case_blocks = case_pattern.findall(section)
