@@ -86,12 +86,22 @@ Issue は実装の最小単位です。
 - consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation、browser/private external systems の利用を許可しない。これらが必要な場合は別途明示確認する。
 - consent がない、または host policy と衝突する場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
 
+## report decision ledger lifecycle
+- `report.md` は observed evidence ledger に加えて `Spec Interpretation / Decision Ledger` を持つ。ここには実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up だけを記録し、shell transcript、worker raw note、private reasoning、secret、逐次作業ログは置かない。
+- material な判断がない小規模 issue でも ledger section は省略しない。`No material interpretation changes.` と `No decision entries.` を残し、reviewer は diff / plan / report から本当に material decision がない場合だけ有効な no-decision 表現として扱う。
+- delegated worker は material decision を発見したら `Ledger Note` を返す。最低限、source-agent、topic、trigger、ambiguity / constraint、observed facts、options considered、proposed decision、rationale、affected files、affected tests、risk if wrong、rollback or revisit、confidence、needs orchestrator decision を含める。material decision がない場合は `No material implementation decisions beyond the approved plan.` と明示する。
+- worker の `proposed decision` は accepted decision ではない。orchestrator は source docs、diff、tests、reviewer output と照合し、canonical `report.md` entry として `Status`、`Disposition`、evidence、follow-up / promotion を整えて統合する。
+- ledger entry の `Status` は `open` / `resolved` / `superseded`、`Disposition` は `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded` を使う。issue completion 前に `Status=open` を残してはならない。
+- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。`converted_to_followup` は follow-up issue / discussion / ADR candidate、`deferred` は scope 外理由、blocking でない根拠、revisit 条件、`superseded` は置換先 entry ID、`no_action` は issue-local で追加対応不要な理由を持つ。
+- 将来の実装者が守るべき durable decision は `report.md` だけに閉じ込めない。`design.md`、ADR、plan amendment、follow-up issue のいずれかへ昇格するか、issue-local な判断として閉じる理由を evidence 付きで残す。
+- legacy issue report に ledger がないことは遡及 blocker にしない。必要な場合だけ source と confidence を明示して backfill し、新規 / 更新中 issue にはこの lifecycle を適用する。
 ## 実行 contract
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
 - 実装前に `workflow_spec_authoring.md` の requirement / design / plan gate がすべて pass し、`Spec Authoring Gate` evidence が `report.md` に残っていることを確認する
 - `plan.md` は planned executable workflow contract / command queue である。実行者は step を上から順に読み、各 step の behavior goal、planned obligation、Red または代替 evidence、Green verification、refactor guardrail、closure requirements、report evidence destination、amendment trigger に従って作業する
 - `report.md` は observed evidence ledger である。実際の Red / Green / Refactor 結果、verification result、discovered tests、closure delta、reviewer verdict、commit/no-op evidence は `report.md` に記録し、`plan.md` を実行結果の正本にしない
+- `report.md` の `Spec Interpretation / Decision Ledger` は実行中判断の audit trail であり、planned contract の正本ではない。report に durable decision が残った場合は、completion 前に canonical artifact への promotion、follow-up 化、または issue-local disposition の evidence を残す
 - `Parent Agent Invariant`: normal execution における親 Codex は inspect / plan / delegate / verify / integrate / report を担当する orchestration owner であり、code / runtime / tests / scaffold behavior / templates / shipped docs / skills / workflow text の直接実装者ではない
 - 親 Codex が直接作成・更新してよいのは、`report.md`、handoff note、phase evidence など run-local orchestration metadata に限定する。shipped docs / templates / skills / workflow text、runtime-facing scaffold、コード、テスト、runtime behavior は delegated worker work として扱う
 - 各 implementation step は `step closure contract → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → commit → clean確認` の順で進める
@@ -105,6 +115,7 @@ Issue は実装の最小単位です。
 - `Implementation Delegation Gate` は各 implementation step の開始前に必ず置く。runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`、shipped docs / templates / skills / workflow text は `doc-writer` を primary delegated worker とし、step が複数 layer / module / package にまたがる、runtime / CLI / infra / templates / shipped scaffold / shared docs に影響する、既存 pattern 調査や影響範囲分析が必要、integration test / migration / backward compatibility / filesystem / GitHub / active state に関わる、または独立 worker scope に分割できる大きさの場合は、適切なサブエージェント利用を必須にする
 - delegated worker handoff には、`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required` を必ず含める。複数 layer / package / shipped asset にまたがる step は、親 Codex が direct implementation せず、allowed paths と dependency boundary を明記して委任する
 - `delegated` の場合は delegated role、scope、source of truth、allowed changes、forbidden changes、required verification、stop conditions、output required、worker summary、changed files、verification result、unresolved risks、取り込み結果を `report.md` に残す
+- delegated worker の output には `Ledger Note` または `No material implementation decisions beyond the approved plan.` を含める。orchestrator は worker note を accepted decision として扱わず、report decision ledger へ採用 / 却下 / 保留 / 昇格するかを明示する
 - 親 Codex が例外的に直接実装する場合は `Parent Implementation Exception` として、delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate を事前に記録する。`approved-local-execution` はこの exception record を満たす場合だけ使用し、小さい変更、機械的変更、親が修正を知っていることを理由にした無記録 direct implementation として扱ってはならない
 - reviewer gate state は `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` のいずれかで記録する。required reviewer gate を満たすのは fresh `passed` だけである
 - `waived` はユーザーの明示的 risk acceptance が `report.md` にある場合だけ許可する。waiver は reviewer pass ではなく、delegation / reviewer gate の unavailable / denied を degraded success にしない。waiver 後に親 Codex が直接実装する場合も、別途 `Parent Implementation Exception` の user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate を必要とする
@@ -144,6 +155,8 @@ Issue は実装の最小単位です。
 ## report
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
+- `Spec Interpretation / Decision Ledger` に material な仕様解釈、判断、逸脱、tradeoff、open question、promotion / follow-up を残す。material decision がない場合は `No material interpretation changes.` と `No decision entries.` を残す
+- ledger entry は `Status`、`Type`、`Options Considered`、`Disposition`、evidence、必要な follow-up / promotion を持つ。`Status=open` は completion blocker とし、`Disposition` に必要な evidence がない entry、report-only durable decision、根拠のない `no_action` / `deferred` / `superseded` は reviewer finding として扱う
 - `Step Contract Closure` に step、closure id、close condition、evidence、result を残す
 - `Test Contract Closure` に required closure id、step、evidence level、pre-implementation evidence、verification command、result を残す
 - `Closure Coverage` に各 required closure id と verification evidence の対応を残す
