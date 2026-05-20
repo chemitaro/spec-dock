@@ -288,7 +288,91 @@ rg -n "executable|planned contract|observed evidence|obligation|code-reviewer sc
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending commit | installed agent prompt/skill/role configs plus S03 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | installed agent prompt/skill/role configs plus S03 report evidence | `3878877` | `git status --short --branch` -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### 2026-05-20 S04 structural tests
+
+#### 対象
+- Step: S04
+- AC/EC: AC-006
+
+#### 実施内容
+- S03 commit 後の clean worktree を確認した。
+- S04 計画の検証コマンドを、repo の unittest 前提に合わせて plan amendment した。
+- S04 は provider-side structural assertions に閉じ、dogfooding mirror parity を伴う full `tests.test_init_update` は S90/S99 で扱うことにした。
+- Red evidence として、更新前の targeted unittest subset が stale plan template assertion と未追加の Issue 102 structural test で失敗することを確認した。
+- S04 の test implementation を `dev-coder` に委任するため、Implementation Delegation Gate を記録した。
+
+#### 実行コマンド / 結果
+```bash
+git status --short --branch
+## iss-00102-agentic-tdd-plan-step-contract
+
+uv run pytest tests/test_init_update.py -q
+# fail: pytest command unavailable in this repo (`No such file or directory`)
+
+uv run python -m unittest tests.test_init_update -q
+# fail: full suite currently includes S90 dogfooding mirror parity failures and unrelated environment issue (`No module named pip`)
+
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets
+# fail: stale `delegation 判断` expectation in issue plan scaffold; `test_issue_102_agentic_tdd_contract_assets` not yet added
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S04 | Red | targeted structural assertions should fail before tests are updated | existing targeted subset fails because `test_init_creates_expected_structure` still expects removed `delegation 判断`; new `test_issue_102_agentic_tdd_contract_assets` is not yet present | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` | fail as expected | full suite also fails before S90 mirror refresh, so S04 uses provider-side targeted subset |
+| S04 | Green | targeted structural assertions pass after test update | `test_init_creates_expected_structure` updated to new planned/observed contract; `test_issue_102_agentic_tdd_contract_assets` added | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` | pass | 3 tests OK |
+| S04 | Refactor | keep assertions marker-based and limited to stable contract terms | diff inspection shows tests-only marker assertions, no broad rewrites | `git diff --check -- tests/test_init_update.py` | pass | no provider/runtime/docs edits in S04 |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| changed | tc-006 | verification command | tc-006 | `pytest` is unavailable and repo uses `unittest`; S04 must use targeted provider-side structural unittest subset, while full `tests.test_init_update` belongs after S90 mirror refresh | yes, S04 code-reviewer will review test plan/diff |
+
+#### Implementation Delegation Gate
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records evidence only.
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | structural regression tests for shipped contract | dev-coder | targeted test assertions in `tests/test_init_update.py` | `requirement.md`, `design.md`, `plan.md`, changed provider assets from S01-S03 | `tests/test_init_update.py` | runtime behavior changes, broad unrelated test rewrites, removing existing coverage, dogfooding mirror changes | red evidence from targeted unittest subset, green targeted unittest subset, `./spec-dock/scripts/spec-dock validate` | assertions require unstable exact prose, validation fails for unrelated existing issue, test needs runtime support beyond structural assertions | changed files, red/green evidence, verification results, unresolved risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Updated stale issue scaffold assertions and added `test_issue_102_agentic_tdd_contract_assets` to protect stable Agentic TDD contract markers across provider docs/templates/installed assets. | `tests/test_init_update.py` | targeted unittest subset -> OK; `./spec-dock/scripts/spec-dock validate` -> ok; `git diff --check -- tests/test_init_update.py` -> pass | code-reviewer pass | full `tests.test_init_update` is deferred until S90/S99 because current failures include dogfooding mirror parity before sync and unrelated environment `No module named pip` | accepted and closed for S04 commit |
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S04 | tc-006 | Structural tests cover stable contract markers. | targeted unittest subset OK; validate OK; diff check pass; code-reviewer pass | pass | S04 tests-only closure |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-006 | S04 | yes | red-required | targeted subset failed on stale scaffold assertion and missing `test_issue_102_agentic_tdd_contract_assets` | targeted unittest subset OK after test update; code-reviewer pass | pass | protects stale count guidance and executable contract markers |
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| tc-006 | S04 | `test_issue_102_agentic_tdd_contract_assets`, updated `test_init_creates_expected_structure`, targeted unittest subset OK, validate OK, code-reviewer pass | pass | structural test coverage for provider assets |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to S04 commit gate | review_status pass; no findings |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending commit | `tests/test_init_update.py` plus S04 plan/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | pending | N/A | blocked until dev-coder output and review pass | tests-only scope |
 
 ---
 

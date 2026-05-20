@@ -497,7 +497,8 @@ ID: "iss-00102"
   - Red / alternative evidence requirement:
     - red-required for test assertions where feasible: add assertions that fail before provider updates or demonstrate equivalent pre-change failure by targeted inspection.
   - Green verification:
-    - `uv run pytest tests/test_init_update.py`
+    - targeted unittest subset for updated structural assertions:
+      - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets`
     - `./spec-dock/scripts/spec-dock validate`
   - Refactor / cleanup:
     - keep assertions focused on stable contract terms, not prose paragraphs.
@@ -525,7 +526,8 @@ ID: "iss-00102"
 - acceptance criteria:
   - AC-006.
 - required tests or docs-only verification:
-  - `uv run pytest tests/test_init_update.py`
+  - targeted unittest subset for updated structural assertions:
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets`
   - `./spec-dock/scripts/spec-dock validate`
 - reviewer focus:
   - code-reviewer for tests.
@@ -543,14 +545,14 @@ ID: "iss-00102"
   - 操作: run targeted test suite.
   - 期待結果: tests fail if normative `1〜3件程度` guidance returns in relevant provider assets.
   - 失敗検出: raw count heuristic is reintroduced as plan/test sufficiency rule.
-  - 検証方法: `uv run pytest tests/test_init_update.py`.
+  - 検証方法: targeted unittest subset for updated structural assertions.
   - 関連 closure id: tc-006
 - `tc-s04-002` red-required: executable contract fields are protected
   - 前提: tests assert stable contract markers in plan/report templates and agent assets.
   - 操作: run targeted test suite.
   - 期待結果: tests fail if planned contract, observed evidence ledger, amendment trigger, or report evidence destination markers disappear.
   - 失敗検出: plan becomes passive task list again or report loses observed ledger.
-  - 検証方法: `uv run pytest tests/test_init_update.py`.
+  - 検証方法: targeted unittest subset for updated structural assertions.
   - 関連 closure id: tc-006
 #### step closure contract
 - closure id:
@@ -558,7 +560,7 @@ ID: "iss-00102"
 - close 条件:
   - Structural tests cover stable contract markers.
 - 検証 evidence:
-  - `uv run pytest tests/test_init_update.py`
+  - targeted unittest subset for updated structural assertions.
   - `./spec-dock/scripts/spec-dock validate`
 - report evidence:
   - Step Contract Closure.
@@ -608,7 +610,7 @@ ID: "iss-00102"
   - tests.
   - dogfooding mirror if refreshed.
 - 必須 validation:
-  - `uv run pytest tests/test_init_update.py`
+  - `uv run python -m unittest tests.test_init_update`
   - `./spec-dock/scripts/spec-dock validate`
   - `./spec-dock/scripts/spec-dock sync`
   - `git status --short --branch`
