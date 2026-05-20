@@ -31,7 +31,8 @@ Before implementation starts:
 5. Treat `spec-dock/docs/workflow_spec_authoring.md` as the source of truth if
    requirement, design, or plan is not implementation-ready.
 6. Read `spec-dock/docs/authoring/issue-plan.md` when it exists and use it as
-   the Issue `plan.md` authoring contract for step-local concrete test cases.
+   the Issue `plan.md` authoring contract for step-local concrete test cases
+   and executable step field semantics.
 
 If the active issue docs are missing, contradictory, template-only, or not
 implementation-ready, do not start coding. Repair the issue docs through the
@@ -42,11 +43,22 @@ the plan is not implementation-ready.
 
 When implementation is ready:
 
-- Follow `plan.md` step order exactly.
+- Treat `plan.md` as the planned executable workflow contract / command queue.
+  Follow step order exactly and execute each step through its behavior goal,
+  planned obligation, Red or justified alternative evidence, implementation
+  scope, Green verification, Refactor / cleanup guardrail, closure
+  requirements, report evidence destination, and amendment trigger.
+- Treat `report.md` as the observed evidence ledger. Record actual Red / Green /
+  Refactor results, verification output, discovered tests, closure delta,
+  delegated worker evidence, reviewer verdicts, and commit/no-op evidence there.
 - Use each step's card-style nested `具体テストケース一覧`, closure ids, close
-  conditions, verification commands, and evidence paths.
-- Preserve the `1 implementation step = 1 code-reviewer scope = 1 commit`
+  conditions, verification commands, alternative evidence paths, and report
+  evidence destinations.
+- Preserve the `1 implementation step = 1 review scope = 1 commit`
   contract unless the approved issue plan is amended and re-reviewed first.
+- If implementation reveals a new specification, bug class, external contract
+  risk, or closure obligation outside the approved step contract, stop for plan
+  amendment and re-review instead of closing it with report evidence alone.
 - Record implementation delegation decisions, step evidence, reviewer results,
   closure coverage, and final delivery evidence in
   `spec-dock/active/issue/report.md`.
