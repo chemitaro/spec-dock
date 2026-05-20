@@ -1,0 +1,160 @@
+---
+種別: 実装報告書（Issue）
+ID: "iss-00102"
+タイトル: "Agentic TDD plan step contract"
+関連GitHub: ["#102"]
+状態: "draft | approved"
+作成者: "iwasawayuuta"
+最終更新: "2026-05-20"
+依存: ["requirement.md", "design.md", "plan.md"]
+親: ["epic-00067", "init-local-00003"]
+---
+
+# iss-00102 Agentic TDD plan step contract — 実装報告（LOG）
+
+## 実装サマリー (任意)
+- [実装した内容の概要を2-3文で記載]
+
+## 実装記録（セッションログ） (必須)
+
+### 2026-05-20 HH:MM - HH:MM
+
+#### 対象
+- Step: S01, S02, ...
+- AC/EC: AC-___, EC-___
+
+#### 実施内容
+- ...
+
+#### 実行コマンド / 結果
+```bash
+<command>
+
+<result>
+```
+
+#### Step Contract Closure
+| step | closure ids | close condition | evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | red-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+
+- `closure id / test id` は Central index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+
+#### Closure Coverage
+| closure id | step | verification evidence | result | notes |
+|---|---|---|---|---|
+| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | re-review required |
+|---|---|---|---|---|---|
+| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no |
+
+#### Implementation Delegation Gate
+`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records evidence only.
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+
+#### Parent Implementation Exception
+| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |
+|---|---|---|---|---|---|---|---|---|
+| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+
+#### Workflow Delegation Consent
+This table is for reviewer / read-only specialist workflow-scoped consent. Write-capable delegation such as `dev-coder` or `doc-writer` is recorded in `Implementation Delegation Gate` and `Delegated Worker Evidence`, not as generic workflow-scoped consent.
+
+| consent source | repo / worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
+|---|---|---|---|---|---|---|---|---|
+| user message / policy / N/A | ... | iss-_____ | ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | reviewer / read-only specialist scope only | ... | none / ... | ... |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+
+#### Code Review Gate
+| step | reviewer | review scope | review_status | findings / fixes | re-review count | result |
+|---|---|---|---|---|---|---|
+| S01 | code-reviewer | step diff / tests / docs-report updates | pass / fail | ... | 0 | pass / blocked |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+
+#### 変更したファイル
+- `path/to/file1` - ...
+- `path/to/file2` - ...
+
+#### コミット
+- <hash> <message>
+
+#### メモ
+- ...
+
+---
+
+### 2026-05-20 HH:MM - HH:MM
+
+#### 対象
+- Step: ...
+- AC/EC: ...
+
+#### 実施内容
+- ...
+
+---
+
+## Final Quality Gate (必須)
+
+### S90 Docs Impact Resolution
+| target | update required | owner | evidence | spec-reviewer result |
+|---|---|---|---|---|
+| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+
+### Final QA Gate
+| reviewer | scope | integration test decision | evidence | result |
+|---|---|---|---|---|
+| qa-reviewer | whole issue test adequacy | added / already sufficient / not applicable | ... | pass / fail / blocked |
+
+### Final Code Review Gate
+| reviewer | scope | findings / fixes | re-review count | result |
+|---|---|---|---|---|
+| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+
+### Final Spec Review Gate
+| reviewer | scope | findings / fixes | re-review count | result |
+|---|---|---|---|---|
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+
+### Final Commit
+| final report ledger | final commit scope | post-commit external evidence destination | result |
+|---|---|---|---|
+| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+
+## 遭遇した問題と解決 (任意)
+- 問題: ...
+  - 解決: ...
+
+## 学んだこと (任意)
+- ...
+- ...
+
+## 今後の推奨事項 (任意)
+- ...
+- ...
+
+## 省略/例外メモ (必須)
+- 該当なし
