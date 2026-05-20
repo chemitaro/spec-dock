@@ -9,6 +9,9 @@ Use `spec-dock/docs/workflow_issue.md` as the source of truth. This skill is onl
 
 - Keep the parent agent responsible for orchestration, context, acceptance evidence, and final closure. Delegates may implement bounded tasks, but they do not own the issue.
 - Preserve parent invariants before, during, and after delegated work: active issue context, allowed paths, acceptance criteria, reviewer requirements, and stop conditions remain the parent agent's responsibility.
+- Treat `plan.md` as the planned executable workflow contract / command queue. Execute each implementation step through its behavior goal, planned obligation, Red or justified alternative evidence, implementation scope, Green verification, refactor guardrail, closure requirements, report evidence destination, and amendment trigger.
+- Treat `report.md` as the observed evidence ledger for actual Red / Green / Refactor results, verification output, discovered tests, closure delta, reviewer verdicts, and commit/no-op evidence.
+- Route step field semantics, `具体テストケース一覧`, obligation coverage, alternative evidence paths, and amendment rules to `spec-dock/docs/authoring/issue-plan.md`; keep lifecycle and completion policy in `spec-dock/docs/workflow_issue.md`.
 - Route runtime, tests, and scaffold behavior to `dev-coder`.
 - Route shipped docs, templates, skills, and workflow text to `doc-writer`.
 - Treat unavailable tooling, denied access, host conflicts, waiver requests, and similar blockers as stop/incomplete unless explicit workflow policy evidence says they count as success.
