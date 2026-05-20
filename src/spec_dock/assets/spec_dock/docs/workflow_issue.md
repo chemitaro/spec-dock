@@ -15,6 +15,8 @@ Issue は実装の最小単位です。
 - GitHub 連携: [reference_github.md](reference_github.md)
 - 共通 phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 - Issue plan playbook: [phase_plan_issue.md](phase_plan_issue.md)
+- Issue plan authoring contract: [authoring/issue-plan.md](authoring/issue-plan.md)
+- Hard cutover reference: [reference_hard_cutover.md](reference_hard_cutover.md)
 
 ## 作成と issue start
 
@@ -72,7 +74,7 @@ Issue は実装の最小単位です。
 - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
 - 不要な placeholder や該当しない節は削ってよいが、正確性、検証可能性、人間の理解、エージェントの実行に必要な情報は削らない
 - テンプレートにない図表や節も、[phase_design.md](phase_design.md) の `optional diagram catalog` から必要なものを選んで追加してよい。カタログ外でも、構造・境界・責務・流れ・状態・依存を人間が理解しやすくする情報なら追加してよい
-- shared な書き方は `phase_*.md`、Issue plan の構造化は `phase_plan_issue.md`、Issue 固有の実行 policy はこの workflow を正本とする
+- shared な書き方は `phase_*.md`、Issue plan の哲学と review checklist は `phase_plan_issue.md`、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md)、Issue 固有の lifecycle / execution / reviewer / completion policy はこの workflow を正本とする
 - Issue design では [phase_design.md](phase_design.md) に従い、必要な粒度で依存関係分析、`Module Dependency Diagram`、Linux `tree` style の `ディレクトリ / ファイル変更計画` を置く
 - Issue plan では [phase_plan_issue.md](phase_plan_issue.md) に従い、design の依存関係分析、module dependency diagram、directory / file change plan から step 順を導く
 
@@ -88,16 +90,19 @@ Issue は実装の最小単位です。
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
 - 実装前に `workflow_spec_authoring.md` の requirement / design / plan gate がすべて pass し、`Spec Authoring Gate` evidence が `report.md` に残っていることを確認する
+- `plan.md` は planned executable workflow contract / command queue である。実行者は step を上から順に読み、各 step の behavior goal、planned obligation、Red または代替 evidence、Green verification、refactor guardrail、closure requirements、report evidence destination、amendment trigger に従って作業する
+- `report.md` は observed evidence ledger である。実際の Red / Green / Refactor 結果、verification result、discovered tests、closure delta、reviewer verdict、commit/no-op evidence は `report.md` に記録し、`plan.md` を実行結果の正本にしない
 - `Parent Agent Invariant`: normal execution における親 Codex は inspect / plan / delegate / verify / integrate / report を担当する orchestration owner であり、code / runtime / tests / scaffold behavior / templates / shipped docs / skills / workflow text の直接実装者ではない
 - 親 Codex が直接作成・更新してよいのは、`report.md`、handoff note、phase evidence など run-local orchestration metadata に限定する。shipped docs / templates / skills / workflow text、runtime-facing scaffold、コード、テスト、runtime behavior は delegated worker work として扱う
 - 各 implementation step は `step closure contract / test bundle / pre-implementation evidence → implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → commit → clean確認` の順で進める
 - 完成版 `plan.md` には `Spec-Locked Closure Index`（仕様固定クロージャ索引）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
 - `Spec-Locked Closure Index` は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
-- `test bundle` は step closure contract の一部として、step の観測可能な振る舞いに必要な acceptance / characterization / property or invariant / regression / negative を分類する
+- `test bundle` は step closure contract の一部として、step の観測可能な振る舞いに必要な acceptance / characterization / property or invariant / regression / negative を分類する。十分性は raw count ではなく risk-calibrated obligation coverage、changed contract、failure mode、regression risk、manual/integration risk で判断する
 - `step closure contract` は closure index の `id` を参照し、どの検証契約をその step で満たせば close してよいかを追えるようにする
 - 実装開始前に required closure id が behavior slice の `closure ids` / `test ids` から参照され、各 required row に step-local close condition と verification command または evidence path があることを確認する
 - required closure row、`locked expectation`、`required`、`spec link` を変更する場合は plan amendment と re-review を先に通す
 - `pre-implementation evidence` は expected red / characterization pass / test sensitivity evidence のいずれかを記録し、failing-first を完全要求できない場合もテストが欠陥を検出できる根拠を残す
+- plan field semantics、`具体テストケース一覧` の card schema、docs-only / inspect-only / manual-required の書き方は [authoring/issue-plan.md](authoring/issue-plan.md) を正本にする。この workflow は lifecycle、実行順、reviewer gate、completion policy を所有し、field-level template manual を再定義しない
 - `Implementation Delegation Gate` は各 implementation step の開始前に必ず置く。runtime / CLI / infra / code / tests / scaffold behavior は `dev-coder`、shipped docs / templates / skills / workflow text は `doc-writer` を primary delegated worker とし、step が複数 layer / module / package にまたがる、runtime / CLI / infra / templates / shipped scaffold / shared docs に影響する、既存 pattern 調査や影響範囲分析が必要、integration test / migration / backward compatibility / filesystem / GitHub / active state に関わる、または独立 worker scope に分割できる大きさの場合は、適切なサブエージェント利用を必須にする
 - delegated worker handoff には、`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required` を必ず含める。複数 layer / package / shipped asset にまたがる step は、親 Codex が direct implementation せず、allowed paths と dependency boundary を明記して委任する
 - `delegated` の場合は delegated role、scope、source of truth、allowed changes、forbidden changes、required verification、stop conditions、output required、worker summary、changed files、verification result、unresolved risks、取り込み結果を `report.md` に残す
@@ -165,35 +170,9 @@ Issue は実装の最小単位です。
 - 依存関係の想定と違った実装順や refactor が必要になった場合もここに残す
 - 1 セッション 1 追記でよいが、未来の自分と reviewer が追える粒度を保つ
 
-## hard cutover evidence contract（必要な issue のみ）
+## optional hard cutover pattern
 
-- issue plan が hard cutover を含む場合、entry 条件は `docs 更新 + checked-in data manual fix + validate/sync evidence` の 3 点を必須にする。
-- T3/T4 owner split は次に固定する:
-  - T3 integration issue（例: `iss-00062`）が entry 条件充足と hard cutover judgment の primary owner
-  - T4 closure issue（例: `iss-00063`）は T3 judgment を参照して final parity / close review を実施
-- hard cutover evidence の fixed-key contract は issue-level `report.md` に残す。最低限、以下のキー群を使う:
-  - `cutover_entry.docs_update.paths`
-  - `cutover_entry.docs_update.pass`
-  - `cutover_entry.manual_fix.paths`
-  - `cutover_entry.manual_fix.pass`
-  - `cutover_entry.boundary_tests`
-  - `cutover_entry.validate.command`
-  - `cutover_entry.validate.exit_code`
-  - `cutover_entry.validate.pass`
-  - `cutover_entry.sync.command`
-  - `cutover_entry.sync.exit_code`
-  - `cutover_entry.sync.pass`
-  - `cutover_entry.targeted_regression_summary.scope`
-  - `cutover_entry.targeted_regression_summary.results`
-  - `cutover_entry.targeted_regression_summary.pass`
-  - `cutover_entry.entry_conditions_pass`
-  - `cutover_judgment.owner_issue_id`
-  - `cutover_judgment.owner_role`
-  - `cutover_judgment.verdict`
-  - `cutover_judgment.fixed_at`
-  - `cutover_judgment.follow_up_issue_id`
-  - `cutover_judgment.notes`
-- no fallback / no dual-read contract を崩す救済策は採用しない（canonical storage / mutation contract の詳細は [reference_deps.md](reference_deps.md) を参照）。
+標準 Issue workflow は hard cutover を前提にしない。fallback 廃止、checked-in data の手動境界修正、entry judgment、T3/T4 owner split などを伴う issue だけ、[reference_hard_cutover.md](reference_hard_cutover.md) の optional pattern を plan / report contract へ明示的に取り込む。
 
 ## 品質ゲート
 
