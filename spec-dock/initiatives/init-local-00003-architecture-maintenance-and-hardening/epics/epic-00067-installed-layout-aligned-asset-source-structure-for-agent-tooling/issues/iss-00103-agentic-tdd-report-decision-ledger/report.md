@@ -16,10 +16,9 @@ ID: "iss-00103"
 
 ## Spec Interpretation / Decision Ledger
 
-- No material interpretation changes.
-- No decision entries.
-
-この issue では S01 時点で、approved requirement / design / plan から外れる material decision は発生していない。worker からの Ledger Note も `No material implementation decisions beyond the approved plan.` であり、追加の promotion / follow-up はない。
+| ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
+|---|---|---|---|---|---|---|---|---|---|---|
+| D-001 | resolved | deviation | code-reviewer / orchestrator | S02 structural test review found the provider report template Type vocabulary and disposition evidence guidance did not fully match approved `design.md`, while S02 originally allowed tests-only changes. | leave drift until later; revert provider correction and weaken tc-005; amend S02 to allow a minimum S01 target correction discovered by tc-005 | Amend S02 plan to allow a minimum orchestrator-owned correction to the affected S01 provider asset when structural testing exposes approved-design drift, then lock the corrected contract in the structural test. | Closing S02 with a known provider-template drift would make tc-001/tc-005 green without protecting the approved ledger contract. The correction is limited to the S01 target report template and is re-reviewed. | promoted_to_plan | `plan.md` S02 implementation scope / commit scope amendment; `src/spec_dock/assets/spec_dock/templates/issue/report.md` Type/table/evidence correction; `tests/test_init_update.py` marker assertions; code-reviewer finding | none; covered by S02 re-review and S90 dogfooding sync |
 
 ## 実装サマリー (任意)
 - 実装開始。`spec-dock-issue-execution` workflow に従い、まず requirement の spec-reviewer review / polish から進める。
@@ -237,7 +236,84 @@ git status --short --branch
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed | S01 provider assets and S01 report evidence | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 provider assets and S01 report evidence | `4dea9ca` | `git status --short --branch` -> clean | N/A | N/A | N/A | N/A |
+
+---
+
+### 2026-05-21 S02 start
+
+#### 対象
+- Step: S02
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005
+- Planned source:
+  - `plan.md` S02
+  - closure id: tc-005
+
+#### 実施内容
+- S02 の structural test implementation を `dev-coder` に委任する。
+- S02 は S01 で追加した provider asset markers を tests で固定する。
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | tests / scaffold contract regression | dev-coder | `tests/test_init_update.py` structural marker assertions | `requirement.md`, `design.md`, `plan.md`, S01 provider assets | `tests/test_init_update.py` | provider assets, runtime code, dogfooding mirror | targeted red/sensitivity evidence; targeted unittest green | test command cannot run; required markers require semantic parser | changed files, red/green evidence, Ledger Note or no-material-decision statement, unresolved risks | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added a structural unittest that locks the report decision ledger contract across the report template, workflow docs, authoring docs, execute prompt, issue-execution skill, worker configs, and reviewer configs. Ledger Note: No material implementation decisions beyond the approved plan. | `tests/test_init_update.py` | temporary missing-marker expectation -> failed as expected; `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_103_report_decision_ledger_contract_assets` -> pass; `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` -> pass; `git diff --check -- tests/test_init_update.py` -> pass | failed then pending re-review | reviewer requested stronger reviewer-agent marker coverage and report-template Type/evidence coverage; fixed by adding `missing disposition evidence`, `missing promotion / follow-up`, Type vocabulary, and disposition evidence assertions. | accepted after parent fix and re-review |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S02 | Structural test review exposed S01 provider report-template drift: Type vocabulary and disposition evidence guidance were not fully aligned with `design.md`. | code-reviewer finding during S02 | Corrected only `src/spec_dock/assets/spec_dock/templates/issue/report.md`, expanded structural assertions, and amended S02 plan exception to allow minimum S01 target drift correction discovered by tc-005. | tc-001, tc-005 | yes | code-reviewer finding; provider template diff; targeted unittest pass |
+
+#### Parent Implementation Exception
+| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |
+|---|---|---|---|---|---|---|---|---|
+| S02 | delegated dev-coder scope was tests-only, but code-reviewer found the provider report template itself drifted from approved design; correcting it required orchestrator-owned S01 target asset patch. | workflow scope; no risk waiver requested | `src/spec_dock/assets/spec_dock/templates/issue/report.md` | minimal Type vocabulary and disposition evidence guidance correction | revert the provider template hunk and related test assertions if re-review rejects the exception | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_103_report_decision_ledger_contract_assets tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` -> pass; `git diff --check -- tests/test_init_update.py src/spec_dock/assets/spec_dock/templates/issue/report.md spec-dock/active/issue/report.md` -> pass | code-reviewer re-review pending; plan re-review pending | not a waiver; recorded as plan amendment / closure delta |
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | Red / alternative | sensitivity evidence that the structural test fails when a required marker is absent | dev-coder reported a temporary missing-marker expectation failed as expected before finalizing the assertion set. | temporary local mutation / missing marker expectation | pass | The temporary mutation was not committed. |
+| S02 | Green | new structural test passes for S01 provider assets | Report decision ledger markers found in all required provider assets, including Type vocabulary and disposition evidence guidance. | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_103_report_decision_ledger_contract_assets` | pass | Parent and delegated worker both observed pass. |
+| S02 | Green | existing issue-102 agentic TDD contract test remains green | Existing agentic TDD contract markers remain intact. | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` | pass | Parent observed pass. |
+| S02 | Refactor | diff hygiene and no unrelated code changes | `tests/test_init_update.py` plus provider report-template drift correction changed for S02. | `git diff --check -- tests/test_init_update.py src/spec_dock/assets/spec_dock/templates/issue/report.md spec-dock/active/issue/report.md` | pass | no output |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-005 | S02 | yes | red-required | temporary marker-removal sensitivity check failed as expected | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_103_report_decision_ledger_contract_assets` | pass | Structural lock covers S01 target asset families, report template Type/evidence contract, and reviewer promotion/disposition audit markers. |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | tc-005 | Structural test fails for missing required marker, passes after S01 contract is present, issue-102 contract remains green, and code-reviewer passes. | sensitivity evidence pass; issue-103 targeted test pass; issue-102 targeted test pass; diff check pass; code-reviewer pass; plan amendment spec-reviewer pass | pass | Code-reviewer failures fixed: report evidence completed; reviewer-agent marker coverage strengthened; report-template Type/evidence drift corrected. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-005 | S02 | targeted structural unittest, issue-102 regression unittest, code-reviewer pass, and plan amendment spec-reviewer pass | pass | S02 closed after D-001 decision ledger entry and plan amendment review passed. |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: S02 report evidence missing; reviewer config structural lock lacked disposition/promotion audit markers. Report evidence added and reviewer marker assertions strengthened. |
+| S02 | step reviewer | code-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Finding: report-template Type/evidence contract was not fully locked and provider template Type vocabulary drifted from design. Provider template corrected to design vocabulary, disposition evidence guidance added, and structural assertions expanded. |
+| S02 | plan amendment review | spec-reviewer | fresh | failed | N/A | follow-up completed; re-review required | Findings: material S02 amendment missing from canonical decision ledger; S02 commit contract omitted provider correction; report template table shape drifted from design. Added D-001 ledger entry, expanded S02 commit scope, and aligned provider template table shape. |
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to S02 commit gate | Re-review found no findings; tc-005 evidence and recorded exception are scoped to the amended S02 contract. |
+| S02 | plan amendment review | spec-reviewer | fresh | passed | N/A | proceed to S02 commit gate | Re-review found no findings; D-001, S02 commit scope, and report template table shape are aligned. |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | S02 tests, provider report-template correction discovered by tc-005, plan amendment, and S02 report evidence | final S02 commit containing this ledger row | `git status --short --branch` -> clean after amend | N/A | N/A | N/A | N/A |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
+|---|---|---|---|---|---|---|
+| changed | tc-001, tc-005 | test_issue_103_report_decision_ledger_contract_assets | tc-005 | S02 structural review found S01 report-template drift; minimum provider template correction added and structural lock expanded. | yes | yes |
 
 ---
 

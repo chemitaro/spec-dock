@@ -26,7 +26,7 @@ Material な判断がない場合もこの section は残し、次を明示す�
 Ledger entry は次の値を使う。
 
 - `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `decision` / `deviation` / `tradeoff` / `open_question` / `promotion` / `followup`
+- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
 - `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
 
 Completion semantics:
@@ -38,9 +38,18 @@ Completion semantics:
 - `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
 - `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
 
-| ID | Status | Type | Topic | Trigger | Options Considered | Decision / Interpretation | Rationale | Evidence | Disposition | Follow-up / Promotion | Owner | Confidence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | open / resolved / superseded | interpretation / decision / deviation / tradeoff / open_question / promotion / followup | ... | plan ambiguity / implementation constraint / reviewer finding / discovered risk | option A; option B; no action | ... | ... | `path` / command / reviewer finding / discussion | applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded | target artifact / issue / discussion / replacement entry / none with reason | orchestrator / reviewer / worker source | high / medium / low |
+Disposition required evidence:
+- `applied`: changed artifact / implementation evidence and why issue-local application is sufficient.
+- `rejected`: rejected option, reason, and no remaining blocking impact.
+- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: promoted artifact reference and evidence.
+- `converted_to_followup`: follow-up issue / discussion / ADR candidate reference and blocking / non-blocking classification.
+- `deferred`: scope-out reason, non-blocking rationale, and revisit condition.
+- `no_action`: reason the decision is issue-local and not durable.
+- `superseded`: replacement entry ID and reason for replacement.
+
+| ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
+|---|---|---|---|---|---|---|---|---|---|---|
+| D-001 | open / resolved / superseded | interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up | orchestrator / reviewer / worker source | plan ambiguity / implementation constraint / reviewer finding / discovered risk | option A; option B; no action | ... | ... | applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded | `path` / command / reviewer finding / discussion | target artifact / issue / discussion / replacement entry / none with reason |
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
