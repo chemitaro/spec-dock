@@ -333,7 +333,51 @@ git status --short --branch
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| dogfooding mirror for report ledger touched assets | yes | orchestrator exception after stale full update | `./spec-dock/scripts/spec-dock sync` -> ok, active/index only; `uvx --from . spec-dock update .` produced broad stale drift and was reverted; minimal provider-to-mirror copy performed for 11 touched files; `./spec-dock/scripts/spec-dock validate` -> ok; targeted structural tests -> ok; `git diff --check` -> ok | pass |
+
+#### S90 Docs Impact Notes
+- Full `uvx --from . spec-dock update .` was attempted for dogfooding mirror refresh, but it produced broad unrelated stale drift across runtime/docs/templates and removed current workflow content. That generated diff was reverted and not accepted as S90 evidence.
+- To keep this issue scoped, S90 copied only the provider assets touched by S01/S02 into the dogfooding mirror:
+  - `.agents/skills/spec-dock-issue-execution/SKILL.md`
+  - `.codex/prompts/execute-issue.md`
+  - `.codex/agents/dev-coder.toml`
+  - `.codex/agents/doc-writer.toml`
+  - `.codex/agents/utility-worker.toml`
+  - `.codex/agents/code-reviewer.toml`
+  - `.codex/agents/qa-reviewer.toml`
+  - `.codex/agents/spec-reviewer.toml`
+  - `spec-dock/docs/workflow_issue.md`
+  - `spec-dock/docs/authoring/issue-plan.md`
+  - `spec-dock/templates/issue/report.md`
+
+#### S90 Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S90 | Red / alternative | detect provider / dogfooding mirror drift | Full update produced broad stale drift and was rejected; marker inspection showed mirror lacked S01/S02 contract before minimal sync. | `uvx --from . spec-dock update .`; `rg` marker inspection | pass | Generated broad drift was reverted as out-of-scope. |
+| S90 | Green | dogfooding mirror contains touched report ledger contract markers | Marker inspection found decision ledger / Ledger Note / reviewer audit markers in mirrored touched assets. | `rg -n "Spec Interpretation / Decision Ledger\|Ledger Note\|missing disposition evidence" <mirror targets>` | pass | Minimal mirror copy only. |
+| S90 | Green | spec-dock metadata remains valid | Validation succeeded. | `./spec-dock/scripts/spec-dock validate` | pass | nodes=45 |
+| S90 | Green | structural tests remain green after mirror sync | Issue-103 and issue-102 contract tests passed. | `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_103_report_decision_ledger_contract_assets tests.test_init_update.TestInitUpdate.test_issue_102_agentic_tdd_contract_assets` | pass | 2 tests OK |
+| S90 | Refactor | diff hygiene | No whitespace errors. | `git diff --check` | pass | no output |
+
+#### S90 Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S90 | tc-006 | provider asset changes are reflected or intentionally inspected in dogfooding mirror and spec-reviewer passes. | minimal mirror sync pass; validate pass; structural tests pass; spec-reviewer pass | pass | Full update stale drift recorded and rejected. |
+
+#### S90 Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-006 | S90 | mirror marker inspection, validate, targeted structural tests, diff check, spec-reviewer pass | pass | dogfooding mirror targets match provider-side source |
+
+#### S90 Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S90 | docs impact review | spec-reviewer | fresh | passed | N/A | proceed to S90 commit gate | Review found no findings; minimal mirror sync acceptable and recorded. |
+
+#### S90 Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S90 | pending commit | dogfooding mirror touched assets and S90 report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
