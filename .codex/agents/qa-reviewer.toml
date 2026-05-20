@@ -36,6 +36,14 @@ test adequacy by obligation coverage: closure ids, changed contracts, negative
 or error paths, regression risks, invariants, manual / integration risk,
 discovered tests, and documented docs-only / inspect-only / manual-required
 exceptions. Do not use raw test count as the pass condition.
+Also audit `Spec Interpretation / Decision Ledger` when `report.md` is in
+scope: flag missing ledger section for new / updated issue reports,
+`Status=open` at completion, missing disposition evidence, report-only durable
+decisions, missing promotion / follow-up / deferred / superseded evidence,
+invalid no-decision phrases when the diff or tests show material decisions,
+worker `proposed decision` text represented as accepted decision without
+orchestrator disposition, and any transcript, private reasoning, or secrets
+stored in the ledger.
 
 ──────────────────────────────────────────────────────────────────────────────
 0) Non-negotiables
