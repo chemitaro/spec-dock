@@ -50,6 +50,7 @@ Disposition required evidence:
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | scope | orchestrator + consultant | User requested `spec-dock-issue-execution` to use the PR merge-preparation skill as part of issue execution completion. | standalone PR skill only; extend issue execution final delivery gate; change `issue_finish()` runtime semantics | Extend issue execution's workflow completion boundary with PR Delivery Gate and Merge Preparation Gate, while keeping `issue_finish()` runtime semantics unchanged. | This satisfies the user's intent that issue execution prepares a mergeable PR without mixing PR readiness into the lifecycle command. | applied | `requirement.md` D-008/D-009; `discussions/20260521t004308z-disc-issue-execution-pr-delivery-scope.md`; spec-reviewer pass | Promote sequence/responsibility/evidence details into `design.md` |
+| D-002 | resolved | scope | dev-coder + orchestrator | S03 tests needed to treat `github-pr-merge-preparer` as a first-class managed skill, but the approved S03 scope listed only `tests/test_init_update.py`. | issue-only expected list in tests; add asset files only; add runtime managed-skill manifest entry plus shared harness expectation | Add `github-pr-merge-preparer` to the installer managed skill manifest and shared test harness expectation, then keep S03 regression assertions aligned with that source of truth. | AC-007 requires install/update managed asset inventory coverage. A test-only expected list would pass locally while leaving `_managed_skill_names()` stale, weakening the update/repair contract. | promoted_to_plan | `plan.md` S03 allowed paths amended to include `src/spec_dock/cli.py` and `tests/cli_runtime/harness.py`; implementation diff updates `_MANAGED_SKILL_NAMES` and `_EXPECTED_MANAGED_SKILL_NAMES`; fresh spec-review pass with non-blocking P2 wording fix applied | none |
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
@@ -371,7 +372,7 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-m
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | S01 skill files + S01 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | S01 skill files + S01 report evidence | `a683185 feat(skills): PR仕上げスキルを追加` | `git status --short` after commit showed later S02/S03 work only | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md` - New provider skill.
@@ -380,7 +381,7 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-m
 - `.agents/skills/github-pr-merge-preparer/agents/openai.yaml` - Dogfooding mirror metadata.
 
 #### コミット
-- pending
+- `a683185 feat(skills): PR仕上げスキルを追加`
 
 #### メモ
 - `Too many open files` occurred while some subagents were open; closing completed agents restored parent verification commands.
@@ -460,7 +461,7 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/spec-dock-i
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | S02 skill/workflow files + S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | S02 skill/workflow files + S02 report evidence | `dedb6ac docs(workflow): issue実行にPR仕上げゲートを追加` | `git status --short` after commit showed later S03 work only | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` - Added final delivery handoff reminder.
@@ -469,9 +470,118 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/spec-dock-i
 - `spec-dock/docs/workflow_issue.md` - Dogfooding mirror.
 
 #### コミット
+- `dedb6ac docs(workflow): issue実行にPR仕上げゲートを追加`
+
+#### メモ
+
+---
+
+### 2026-05-21 10:50 JST - 10:50 JST
+
+#### 対象
+- Step: S03
+- AC/EC: AC-002..AC-010, EC-001..EC-007
+- Planned source:
+  - `plan.md` section: `S03 — Lock install/update, parity, and content regression tests`
+  - closure ids: tc-004, tc-005
+
+#### 実施内容
+- `dev-coder` の S03 実装結果を統合し、`github-pr-merge-preparer` を installer の管理対象スキル manifest と共有 test harness の期待値に追加した。
+- `tests/test_init_update.py` に、install/update 復旧、dogfooding parity、critical phrase regression のテストを追加した。
+- 実装中に、test-only expected list では `_managed_skill_names()` が stale のままになることを確認したため、D-002 として plan amendment を記録した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/test_init_update.py -k "managed_skills or issue_71_checked_in_dogfooding_agent_tooling_parity or issue_105 or workflow_issue_doc_matches_bundled_asset"
+
+error: Failed to spawn: `pytest`
+  Caused by: No such file or directory (os error 2)
+```
+
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_assets_cover_managed_manifest tests.test_init_update.TestInitUpdate.test_update_migrates_legacy_single_skill_and_preserves_custom_skill tests.test_init_update.TestInitUpdate.test_update_installs_full_skill_set_for_legacy_no_skill_repo tests.test_init_update.TestInitUpdate.test_update_skill_sync_converges_after_interrupted_run tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_issue_105_pr_merge_preparer_install_and_update_contract tests.test_init_update.TestInitUpdate.test_issue_105_pr_merge_preparer_content_regression_contract tests.test_init_update.TestInitUpdate.test_workflow_issue_doc_matches_bundled_asset
+
+Ran 8 tests in 0.640s
+OK
+```
+
+```bash
+python -m py_compile tests/test_init_update.py tests/cli_runtime/harness.py src/spec_dock/cli.py
+git diff --check
+./spec-dock/scripts/spec-dock validate
+
+# all commands exited 0
+spec-dock: ok (validate) nodes=46
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S03 | Red / alternative | red-required or justified alternative | S01/S02 assets already existed before S03 implementation, so a clean pre-change red for missing files was not practical. `uv run pytest` could not run because pytest is unavailable in this environment. | `uv run pytest ...` | blocked fallback | Fallback used explicit unittest test names. |
+| S03 | Green | targeted install/update, parity, and content tests pass | 8 targeted unittest tests passed. | `python -m unittest ...` | pass | Covers managed manifest, update repair, parity, issue_105 content, and workflow doc parity. |
+| S03 | Refactor | stable phrases, no broad rewrites | Assertions target stable contract phrases and managed file inventory rather than full paragraphs. | diff inspection; `git diff --check` | pass | Runtime change is limited to managed skill manifest entry. |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S03 | `_managed_skill_names()` would remain stale if tests used an issue-local expected list only. | dev-coder ledger note + parent diff inspection | Added `github-pr-merge-preparer` to `_MANAGED_SKILL_NAMES` and shared `_EXPECTED_MANAGED_SKILL_NAMES`; amended S03 allowed paths. | tc-004 | yes | D-002; targeted unittest pass; pending fresh spec-review |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | tc-004, tc-005 | Updated targeted tests pass and cover asset inventory / parity / critical text contracts. | Targeted unittest pass, py_compile pass, diff-check pass, validate pass. | pass | Awaiting fresh code-reviewer and amendment spec-reviewer before commit. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-004 | S03 | yes | red-required with fallback | New skill assets already existed from S01. | targeted unittest install/update and parity tests | pass | `pytest` unavailable; unittest fallback used. |
+| tc-005 | S03 | yes | red-required with fallback | S01/S02 text already existed before tests. | targeted unittest content regression test | pass | Stable phrase assertions protect critical workflow boundaries. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-004 | S03 | `_MANAGED_SKILL_NAMES`; `_EXPECTED_MANAGED_SKILL_NAMES`; install/update tests; parity test | pass | Covers new `SKILL.md` and `agents/openai.yaml`. |
+| tc-005 | S03 | `test_issue_105_pr_merge_preparer_content_regression_contract` | pass | Covers PR creation/monitoring boundaries, non-required waiver, unresolved review limitation, base resolution, and lifecycle-only `issue finish`. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
+|---|---|---|---|---|---|---|
+| changed | tc-004 | tc-s03-001 | tc-004 | Managed skill inventory requires runtime manifest plus shared harness expectation, not a test-only issue list. | yes | yes |
+| none | tc-005 | tc-s03-003 | tc-005 | Planned content regression closure met. | no | no |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated + parent amendment integration | tests and managed scaffold behavior | dev-coder | Add install/update, parity, and content regression tests | `requirement.md`, `design.md`, `plan.md`, S01/S02 files, `tests/test_init_update.py` | originally `tests/test_init_update.py`; amended to include `src/spec_dock/cli.py` and `tests/cli_runtime/harness.py` | assets, docs, broad runtime behavior, issue lifecycle runtime behavior | targeted pytest or unittest fallback; py_compile; diff-check; validate | runtime behavior beyond managed manifest; inability to represent inventory | changed files, verification, risks, ledger note | pass with D-002 amendment |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added install/update and content regression tests; reported that runtime managed manifest might need update. | `tests/test_init_update.py` | `python -m unittest ...` -> pass; `python -m py_compile ...` -> pass; `git diff --check -- tests/test_init_update.py` -> pass | pending | `_managed_skill_names()` stale risk if not updated | accepted with amendment and parent manifest/harness fix |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S03 | amendment reviewer | spec-reviewer | fresh | passed | N/A | proceed | review_status `pass`; P2 stale target-file summary fixed in `plan.md` |
+| S03 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to S03 commit | review_status `pass`; findings 0; confidence 0.88 |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | `src/spec_dock/cli.py`; `tests/cli_runtime/harness.py`; `tests/test_init_update.py`; S03 plan/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/cli.py` - Add `github-pr-merge-preparer` to managed skill names.
+- `tests/cli_runtime/harness.py` - Add `github-pr-merge-preparer` to shared expected managed skill names.
+- `tests/test_init_update.py` - Add issue_105 install/update and content regression tests; add new skill to parity inventories.
+- `spec-dock/active/issue/plan.md` - Amend S03 allowed files for managed manifest/harness.
+- `spec-dock/active/issue/report.md` - Record D-002 and S03 evidence.
+
+#### コミット
 - pending
 
 #### メモ
+- `pytest` is unavailable in the current environment; targeted `unittest` command is the verified fallback.
 - No material implementation decisions beyond the approved plan.
 
 ---
