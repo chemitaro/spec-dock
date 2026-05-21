@@ -666,6 +666,16 @@ spec-dock: ok (validate) nodes=46
 |---|---|---|---|
 | Final gate evidence recorded through S90/S99 | `tests/test_init_update.py`; final `report.md` updates | PR delivery / merge-preparation evidence after final commit | ready for final commit |
 
+### PR Delivery Gate
+| PR URL | base | base-resolution source | conflict / handling | draft / ready | head branch | head SHA | issue linkage | PR decision |
+|---|---|---|---|---|---|---|---|---|
+| https://github.com/chemitaro/spec-dock/pull/106 | `main` | repository default branch; no branch `gh-merge-base`; no existing PR | none | ready; local final gates passed | `iss-00105-pr-creation-and-merge-ready-monitoring-skill` | `b9aaca203a7e65ce2c7820a61bf55c92ed7d5aef` | `Closes #105`; GitHub closing issue reference confirmed | new PR created after `git push -u origin HEAD` |
+
+### Merge Preparation Gate
+| PR open state | monitor status | latest monitored head SHA | fix loop count / history | required check status | non-required check status / waiver | blocking review status | merge conflict / blocker status | unresolved review-thread limitation status | unresolved blockers | final merge-prepared decision |
+|---|---|---|---|---|---|---|---|---|---|---|
+| open; draft false | success | `b9aaca203a7e65ce2c7820a61bf55c92ed7d5aef` | 0 repairs; no failure_class after PR creation | `validate` pass; `provider-tests` pass | no failed or pending non-required checks observed; waiver not used | no PR conversation comments, inline review comments, or review submissions observed via fixed REST GET endpoints; `reviewDecision` empty and no blocking review found | `mergeable=MERGEABLE`; `mergeStateStatus=CLEAN` | REST endpoints for issue comments, review comments, and reviews returned empty arrays; no unresolved review/thread evidence observed | none | merge-prepared: yes; merge remains a human action |
+
 ## 遭遇した問題と解決 (任意)
 - 問題: `uv run pytest ...` はこの環境で `pytest` が存在せず実行できなかった。
   - 解決: project-native `unittest` の明示 test list と full suite を実行し、実行結果を evidence として記録した。
