@@ -20,6 +20,7 @@ Use `spec-dock/docs/workflow_issue.md` as the source of truth. This skill is onl
 - Route shipped docs, templates, skills, and workflow text to `doc-writer`.
 - Treat unavailable tooling, denied access, host conflicts, waiver requests, and similar blockers as stop/incomplete unless explicit workflow policy evidence says they count as success.
 - When review fails, perform bounded delegated follow-up and rerun review. Parent direct fixes require a documented Parent Implementation Exception.
+- After final commit gates pass, use `github-pr-merge-preparer` for final PR delivery and merge-preparation evidence before `issue finish`; keep the detailed completion policy in `workflow_issue.md`.
 
 ## Runtime Command Reminders
 
