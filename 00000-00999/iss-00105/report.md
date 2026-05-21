@@ -49,7 +49,7 @@ Disposition required evidence:
 
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | resolved | scope | orchestrator + consultant | User requested `spec-dock-issue-execution` to use the PR merge-preparation skill as part of issue execution completion. | standalone PR skill only; extend issue execution final delivery gate; change `issue_finish()` runtime semantics | Extend issue execution's workflow completion boundary with PR Delivery Gate and Merge Preparation Gate, while keeping `issue_finish()` runtime semantics unchanged. | This satisfies the user's intent that issue execution prepares a mergeable PR without mixing PR readiness into the lifecycle command. | applied | `requirement.md` D-008/D-009; `discussions/20260521t004308z-disc-issue-execution-pr-delivery-scope.md`; spec-reviewer pass | Promote sequence/responsibility/evidence details into `design.md` |
+| D-001 | resolved | scope | orchestrator + consultant | User requested `spec-dock-issue-execution` to use the PR merge-preparation skill as part of issue execution completion. | standalone PR skill only; extend issue execution final delivery gate; change `issue_finish()` runtime semantics | Extend issue execution's workflow completion boundary with PR Delivery Gate and Merge Preparation Gate, while keeping `issue_finish()` runtime semantics unchanged. | This satisfies the user's intent that issue execution prepares a mergeable PR without mixing PR readiness into the lifecycle command. | applied | `requirement.md` D-008/D-009; `discussions/20260521t004308z-disc-issue-execution-pr-delivery-scope.md`; `design.md` promotes sequence/responsibility/evidence details through the sequence diagram, responsibility boundary table, Issue Execution Integration, and Evidence Model; design spec-reviewer pass | none |
 | D-002 | resolved | scope | dev-coder + orchestrator | S03 tests needed to treat `github-pr-merge-preparer` as a first-class managed skill, but the approved S03 scope listed only `tests/test_init_update.py`. | issue-only expected list in tests; add asset files only; add runtime managed-skill manifest entry plus shared harness expectation | Add `github-pr-merge-preparer` to the installer managed skill manifest and shared test harness expectation, then keep S03 regression assertions aligned with that source of truth. | AC-007 requires install/update managed asset inventory coverage. A test-only expected list would pass locally while leaving `_managed_skill_names()` stale, weakening the update/repair contract. | promoted_to_plan | `plan.md` S03 allowed paths amended to include `src/spec_dock/cli.py` and `tests/cli_runtime/harness.py`; implementation diff updates `_MANAGED_SKILL_NAMES` and `_EXPECTED_MANAGED_SKILL_NAMES`; fresh spec-review pass with non-blocking P2 wording fix applied | none |
 
 ## 実装サマリー (任意)
@@ -529,7 +529,7 @@ spec-dock: ok (validate) nodes=46
 #### Step Contract Closure
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
-| S03 | tc-004, tc-005 | Updated targeted tests pass and cover asset inventory / parity / critical text contracts. | Targeted unittest pass, py_compile pass, diff-check pass, validate pass. | pass | Awaiting fresh code-reviewer and amendment spec-reviewer before commit. |
+| S03 | tc-004, tc-005 | Updated targeted tests pass and cover asset inventory / parity / critical text contracts. | Targeted unittest pass, py_compile pass, diff-check pass, validate pass, and full unittest suite pass after dogfooding meta snapshot update. | pass | Fresh code-reviewer and amendment spec-reviewer passed before S03 commit. |
 
 #### Test Contract Closure
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
@@ -568,7 +568,7 @@ spec-dock: ok (validate) nodes=46
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending commit | `src/spec_dock/cli.py`; `tests/cli_runtime/harness.py`; `tests/test_init_update.py`; S03 plan/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | `src/spec_dock/cli.py`; `tests/cli_runtime/harness.py`; `tests/test_init_update.py`; S03 plan/report evidence | `d329683 test(skills): PR仕上げスキルの管理対象化を検証` | `git status --short` after S03 commit showed only dogfooding meta snapshot baseline update, which was resolved by the follow-up `tests/test_init_update.py` snapshot patch. | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - Add `github-pr-merge-preparer` to managed skill names.
@@ -578,7 +578,7 @@ spec-dock: ok (validate) nodes=46
 - `spec-dock/active/issue/report.md` - Record D-002 and S03 evidence.
 
 #### コミット
-- pending
+- `d329683 test(skills): PR仕上げスキルの管理対象化を検証`
 
 #### メモ
 - `pytest` is unavailable in the current environment; targeted `unittest` command is the verified fallback.
@@ -586,14 +586,55 @@ spec-dock: ok (validate) nodes=46
 
 ---
 
-### 2026-05-21 HH:MM - HH:MM
+### 2026-05-21 11:14 JST - 11:14 JST
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S03 follow-up, S90, S99 preparation
+- AC/EC: AC-002..AC-010, EC-001..EC-007
 
 #### 実施内容
-- ...
+- S03 commit 後の full suite で、checked-in dogfooding initiatives baseline に `iss-00105` の `.meta.json` が未登録であることを検出した。
+- `tests/test_init_update.py` の dogfooding meta snapshot expected list / deps map に `iss-00105` を追加し、full suite の failure を解消した。
+- `issue_finish()` runtime path に差分がないことを確認し、PR delivery gate 追加が lifecycle command semantics を変更していないことを確認した。
+
+#### 実行コマンド / 結果
+```bash
+python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+
+Ran 1 test in 0.012s
+OK
+```
+
+```bash
+python -m unittest tests.cli_runtime.test_issue_lifecycle
+
+Ran 17 tests in 26.380s
+OK
+```
+
+```bash
+python -m unittest discover -v
+
+Ran 812 tests in 416.088s
+OK
+```
+
+```bash
+git diff --name-only 36b78a0..HEAD -- src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime
+
+# no output
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=46
+```
+
+#### Final Review Follow-up
+| reviewer | finding | action | verification | result |
+|---|---|---|---|---|
+| qa-reviewer | P2: content regression test did not explicitly lock fix-loop stop and blocker clauses. | Added stable phrase assertions for repair attempt limits, repeated `failure_class` stop condition, permission / external / base / unknown blocker gates, requirement expansion / breaking change / migration / secret / deployment setting gates, and ambiguous review intent. | `python -m unittest tests.test_init_update.TestInitUpdate.test_issue_105_pr_merge_preparer_content_regression_contract`; targeted 8-test unittest command; `git diff --check`; `./spec-dock/scripts/spec-dock validate` after FD retry | pass |
 
 ---
 
@@ -602,31 +643,36 @@ spec-dock: ok (validate) nodes=46
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| workflow / skill | yes | doc-writer | S01 added `github-pr-merge-preparer`; S02 updated `spec-dock-issue-execution` and `workflow_issue.md`; provider and dogfooding mirrors are byte-identical. | pass; fresh actual-repo spec re-review passed with findings 0 and confidence 0.94 |
+| README / templates / migration notes | no | N/A | Change affects agent workflow / shipped skill contracts, not public CLI usage, templates, or migration behavior. `issue_finish()` runtime semantics were not changed. | pass; fresh actual-repo spec re-review passed with findings 0 and confidence 0.94 |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient, with unittest fallback because `pytest` is unavailable | targeted 8-test unittest pass; `test_issue_lifecycle` pass; dogfooding meta snapshot test pass; full `python -m unittest discover -v` pass; `spec-dock validate` pass; P2 fix-loop regression coverage follow-up added and targeted tests pass; fresh actual-repo QA re-review passed with findings 0 and confidence 0.93 | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | fresh actual-repo review passed before QA P2 follow-up; final actual-repo refresh after QA/spec follow-up passed with findings 0 and confidence 0.92 | 1 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | fresh actual-repo final spec review found P1/P2 ledger gaps; D-001 follow-up and Final QA Gate row were fixed; fresh actual-repo re-review passed with findings 0 and confidence 0.94 | 1 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| Final gate evidence recorded through S90/S99 | `tests/test_init_update.py`; final `report.md` updates | PR delivery / merge-preparation evidence after final commit | ready for final commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `uv run pytest ...` はこの環境で `pytest` が存在せず実行できなかった。
+  - 解決: project-native `unittest` の明示 test list と full suite を実行し、実行結果を evidence として記録した。
+- 問題: S03 commit 後の full suite で dogfooding initiative meta snapshot が `iss-00105` を未登録として失敗した。
+  - 解決: checked-in dogfooding baseline の expected list / deps map に `iss-00105` の `.meta.json` を追加し、対象 test と full suite を再実行して pass を確認した。
+- 問題: 長時間実行中に一時的な file descriptor 枯渇が発生した。
+  - 解決: 完了済み subagent を閉じ、親プロセスで検証コマンドを再開した。未完了差分は `git status` と report / test diff で復元した。
 
 ## 学んだこと (任意)
 - ...
@@ -635,4 +681,6 @@ spec-dock: ok (validate) nodes=46
 - ...
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- `uv run pytest ...` は実行不可だったため、`unittest` fallback を採用した。
+- `issue_finish()` runtime semantics の検証は runtime 差分なし、および `tests.cli_runtime.test_issue_lifecycle` pass により代替した。
+- 手動の実 PR 失敗/修復シナリオ simulation は実装 step では未実施。最終 delivery は `github-pr-merge-preparer` gate で実 PR 作成/監視 evidence として扱う。
