@@ -3,7 +3,7 @@
 ID: "iss-00105"
 タイトル: "PR Creation And Merge Ready Monitoring Skill"
 関連GitHub: ["#105"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-05-21"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,7 @@ Disposition required evidence:
 
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | open / resolved / superseded | interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up | orchestrator / reviewer / worker source | plan ambiguity / implementation constraint / reviewer finding / discovered risk | option A; option B; no action | ... | ... | applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded | `path` / command / reviewer finding / discussion | target artifact / issue / discussion / replacement entry / none with reason |
+| D-001 | resolved | scope | orchestrator + consultant | User requested `spec-dock-issue-execution` to use the PR merge-preparation skill as part of issue execution completion. | standalone PR skill only; extend issue execution final delivery gate; change `issue_finish()` runtime semantics | Extend issue execution's workflow completion boundary with PR Delivery Gate and Merge Preparation Gate, while keeping `issue_finish()` runtime semantics unchanged. | This satisfies the user's intent that issue execution prepares a mergeable PR without mixing PR readiness into the lifecycle command. | applied | `requirement.md` D-008/D-009; `discussions/20260521t004308z-disc-issue-execution-pr-delivery-scope.md`; spec-reviewer pass | Promote sequence/responsibility/evidence details into `design.md` |
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
@@ -152,6 +152,141 @@ Disposition required evidence:
 
 #### メモ
 - ...
+
+---
+
+### 2026-05-21 09:55 JST - 09:55 JST
+
+#### 対象
+- Phase: requirement authoring gate
+- AC/EC: AC-001..AC-010, EC-001..EC-007
+- Planned source:
+  - `workflow_spec_authoring.md` requirement gate
+  - `workflow_issue.md` spec authoring section
+
+#### 実施内容
+- `requirement.md` をユーザー補足要求に合わせて更新し、`github-pr-merge-preparer` 単体追加だけでなく、`spec-dock-issue-execution` の final delivery gate として利用する要件を追加した。
+- コンサルタント分析を `discussions/20260521t004308z-disc-issue-execution-pr-delivery-scope.md` に整理した。
+- `issue_finish()` runtime command の意味は変更せず、PR readiness は workflow / skill evidence として扱う方針を要件に固定した。
+- fresh `spec-reviewer` を起動し、更新後 requirement と discussion doc の整合を確認した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=46
+```
+
+#### Spec Authoring Gate
+| phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
+|---|---|---|---|---|---|---|---|
+| requirement | `requirement.md`; `workflow_spec_authoring.md`; `workflow_issue.md`; `spec-dock-issue-execution/SKILL.md`; existing `github-pr-creator` / `pr-monitor` boundaries; discussions under active issue | none blocking | User explicitly requested consultant / reviewer style analysis in this issue scope; named reviewer use limited to current repo, active issue, current session | fresh `spec-reviewer` Einstein reviewed updated `requirement.md` and `20260521t004308z-disc-issue-execution-pr-delivery-scope.md` | passed | none | proceed to design |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| requirement | Spec Authoring Gate | spec-reviewer | fresh | passed | N/A | proceed to design | review_status `pass`; findings 0; confidence 0.94 |
+
+#### 変更したファイル
+- `requirement.md` - Requirement gate pass により front matter を `approved` に更新。
+- `report.md` - Requirement Spec Authoring Gate evidence を記録。
+- `discussions/20260521t004308z-disc-issue-execution-pr-delivery-scope.md` - issue execution 統合の分析を記録。
+
+#### コミット
+- 未実施。Requirement / discussion / report authoring changes are not committed yet.
+
+#### メモ
+- 次 phase は `design.md`。Sequence、responsibility split、state matrix、evidence model、affected files / tests を設計へ落とし込む。
+
+---
+
+### 2026-05-21 10:07 JST - 10:07 JST
+
+#### 対象
+- Phase: design authoring gate
+- AC/EC: AC-001..AC-010, EC-001..EC-007
+- Planned source:
+  - `workflow_spec_authoring.md` design gate
+  - `phase_design.md` Issue design checklist
+  - reviewer-pass済み `requirement.md`
+
+#### 実施内容
+- `design.md` を作成し、`github-pr-merge-preparer`、`github-pr-creator`、`pr-monitor`、`spec-dock-issue-execution`、`workflow_issue.md`、`issue_finish()` の責務境界を整理した。
+- Sequence、module dependency、directory / file change plan、interface contract、fix-loop stop contract、merge-prepared predicate evidence、test strategy を追加した。
+- `spec-reviewer` で design review loop を実施し、P1/P2 指摘を修正した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=46
+```
+
+#### Spec Authoring Gate
+| phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
+|---|---|---|---|---|---|---|---|
+| design | `requirement.md`; `design.md`; `workflow_spec_authoring.md`; `phase_design.md`; `workflow_issue.md`; `github-pr-creator`; `pr-monitor`; `spec-dock-issue-execution`; `tests/test_init_update.py` asset/parity patterns | none blocking | User explicitly requested issue workflow analysis and reviewer use in this issue scope; named reviewer use limited to current repo, active issue, current session | fresh `spec-reviewer` Aquinas reviewed final `design.md` against `requirement.md` | passed | Added base-resolution precedence, existing PR conflict handling, non-required check waiver evidence, draft/ready rule, fix-loop stop contract, merge-prepared predicate fields, forbidden write boundaries, and dogfooding mirror file plan. | proceed to plan |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| design | Spec Authoring Gate | spec-reviewer | fresh | passed | N/A | proceed to plan | review_status `pass`; findings 0; confidence 0.94 |
+
+#### 変更したファイル
+- `design.md` - Issue design を作成し、Spec Authoring Gate pass により front matter を `approved` に更新。
+- `report.md` - Design Spec Authoring Gate evidence を記録。
+
+#### コミット
+- 未実施。Requirement / design / discussion / report authoring changes are not committed yet.
+
+#### メモ
+- 次 phase は `plan.md`。`phase_plan_issue.md` に従い、docs/skill text work は `doc-writer`、tests は `dev-coder` の delegated implementation step として切る。
+
+---
+
+### 2026-05-21 10:14 JST - 10:14 JST
+
+#### 対象
+- Phase: plan authoring gate
+- AC/EC: AC-001..AC-010, EC-001..EC-007
+- Planned source:
+  - `workflow_spec_authoring.md` plan gate
+  - `phase_plan_issue.md`
+  - `docs/authoring/issue-plan.md`
+  - reviewer-pass済み `requirement.md` / `design.md`
+
+#### 実施内容
+- `plan.md` を作成し、S01 `github-pr-merge-preparer` shared skill 追加、S02 `spec-dock-issue-execution` / `workflow_issue.md` 統合、S03 installer / parity / content regression tests の 3 implementation step に分解した。
+- `Spec-Locked Closure Index`、各 step の delegation contract、具体テストケース一覧、step closure contract、S90 docs impact、S99 final quality gate、Final Exit Contract を追加した。
+- `spec-reviewer` の指摘により、未解決 review-thread limitation human gate と `issue_finish()` runtime semantics evidence を closure / test contract に明示した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=46
+```
+
+#### Spec Authoring Gate
+| phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
+|---|---|---|---|---|---|---|---|
+| plan | `requirement.md`; `design.md`; `plan.md`; `phase_plan_issue.md`; `docs/authoring/issue-plan.md`; `workflow_issue.md`; existing test locations for managed asset / parity / issue lifecycle coverage | none blocking | User explicitly requested issue workflow analysis and reviewer use in this issue scope; named reviewer use limited to current repo, active issue, current session | fresh `spec-reviewer` Gibbs reviewed final `plan.md` against requirement/design | passed | Added unresolved review-thread limitation disclosure / human gate to tc-001, tc-005, S01/S03 concrete tests; added concrete `issue_finish()` runtime/no-runtime-diff evidence requirement. | proceed to implementation |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| plan | Spec Authoring Gate | spec-reviewer | fresh | passed | N/A | proceed to implementation | review_status `pass`; findings 0; confidence 0.92 |
+
+#### 変更したファイル
+- `plan.md` - Issue execution-ready plan を作成し、Spec Authoring Gate pass により front matter を `approved` に更新。
+- `report.md` - Plan Spec Authoring Gate evidence を記録。
+
+#### コミット
+- 未実施。Spec authoring changes are not committed yet.
+
+#### メモ
+- Requirement / design / plan の Spec Authoring Gate はすべて fresh `spec-reviewer` pass 済み。
+- 次は `workflow_issue.md` の execution contract に従い、S01 から implementation step を開始できる。
 
 ---
 
