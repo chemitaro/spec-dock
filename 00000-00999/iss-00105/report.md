@@ -387,6 +387,95 @@ git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-m
 
 ---
 
+### 2026-05-21 10:38 JST - 10:38 JST
+
+#### 対象
+- Step: S02
+- AC/EC: AC-008, AC-009, AC-010, EC-006, EC-007
+- Planned source:
+  - `plan.md` section: `S02 — Integrate merge preparation into issue execution workflow`
+  - closure ids: tc-003
+
+#### 実施内容
+- `doc-writer` に S02 を委譲し、`spec-dock-issue-execution` skill と `workflow_issue.md` に PR Delivery Gate / Merge Preparation Gate を統合した。
+- `spec-dock-issue-execution` は concise reminder のまま維持し、詳細 completion policy は `workflow_issue.md` に置いた。
+- `issue finish` は lifecycle-only command であり、PR readiness / checks / review / merge-prepared を保証しない境界を明記した。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md .agents/skills/spec-dock-issue-execution/SKILL.md
+cmp -s src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md .agents/skills/spec-dock-issue-execution/SKILL.md src/spec_dock/assets/spec_dock/docs/workflow_issue.md spec-dock/docs/workflow_issue.md
+
+# all commands exited 0
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | alternative | inspect-only | Code behavior does not change; verified by docs/skill inspection, parity, and spec review. | docs inspection | pass | Runtime `issue_finish()` was not edited. |
+| S02 | Green | workflow docs include final delivery gates and lifecycle boundary | Required phrases present; provider/dogfooding copies match. | `rg ... workflow_issue.md`; `cmp -s ...`; `git diff --check ...` | pass | Includes blocked/incomplete handling and report evidence fields. |
+| S02 | Refactor | keep `workflow_issue.md` as source of truth | `spec-dock-issue-execution` remains concise and points to `github-pr-merge-preparer`. | diff inspection | pass | No full workflow copied into skill. |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S02 | none | implementation / review | N/A | tc-003 | no | S02 spec-reviewer pass |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | tc-003 | Skill and workflow docs express final delivery gates and issue_finish boundary without runtime semantic drift. | Provider/dogfooding parity; S02 spec-reviewer pass. | pass | Full end-to-end PR preparation remains later workflow behavior, not executed in S02. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-003 | S02 | yes | inspect-only | Workflow docs lacked PR Delivery / Merge Preparation gates before S02. | docs inspection + spec-reviewer pass | pass | S03 will add content regression tests. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-003 | S02 | `spec-reviewer` S02 pass; provider/dogfooding parity | pass | Includes PR Delivery Gate, Merge Preparation Gate, blocked/incomplete handling, and lifecycle-only `issue finish`. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
+|---|---|---|---|---|---|---|
+| none | tc-003 | tc-s02-001 / tc-s02-002 | tc-003 | Planned closure met. | no | no |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | shipped workflow / skill text | doc-writer | Integrate final delivery gates into issue execution workflow | `requirement.md`, `design.md`, `plan.md`, S01 skill | issue-execution skill provider/mirror; workflow_issue provider/mirror | runtime, tests, pr-monitor agent files, unrelated docs | provider/dogfooding byte parity, content inspection, `git diff --check` | need runtime behavior change or inability to express gate without duplicated workflow | changed files, verification, risks, ledger note | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | doc-writer | Added final PR delivery / merge-preparation handoff and workflow gates while preserving `issue finish` lifecycle boundary. | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; `.agents/skills/spec-dock-issue-execution/SKILL.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; `spec-dock/docs/workflow_issue.md` | docs-only inspection; provider/dogfooding `cmp -s`; `git diff --check` | pass | S03 still needs content tests | accepted |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S02 commit | review_status `pass`; findings 0; confidence 0.92 |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | S02 skill/workflow files + S02 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` - Added final delivery handoff reminder.
+- `.agents/skills/spec-dock-issue-execution/SKILL.md` - Dogfooding mirror.
+- `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` - Added PR Delivery / Merge Preparation gates and evidence requirements.
+- `spec-dock/docs/workflow_issue.md` - Dogfooding mirror.
+
+#### コミット
+- pending
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ### 2026-05-21 HH:MM - HH:MM
 
 #### 対象
