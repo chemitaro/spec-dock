@@ -37,6 +37,7 @@ _MANAGED_SKILL_NAMES = (
     "git-commit-conventional-ja",
     "github-codex-pr-review-comments",
     "github-pr-creator",
+    "github-pr-merge-preparer",
 )
 _LEGACY_MANAGED_SKILL_NAMES = ("spec-driven-tdd-workflow",)
 _DEFAULT_SPEC_DOCK_GITIGNORE = (

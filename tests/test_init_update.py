@@ -140,6 +140,12 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
+        ".agents/skills/github-pr-merge-preparer/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
+        ),
+        ".agents/skills/github-pr-merge-preparer/agents/openai.yaml": (
+            "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/agents/openai.yaml"
+        ),
         ".agents/skills/spec-dock-codex-adapter/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-codex-adapter/SKILL.md"
         ),
@@ -402,6 +408,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
         ".agents/skills/github-pr-creator/SKILL.md",
         ".agents/skills/github-pr-creator/agents/openai.yaml",
+        ".agents/skills/github-pr-merge-preparer/SKILL.md",
+        ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
         ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
         ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
@@ -455,6 +463,8 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/github-codex-pr-review-comments/scripts/fetch_codex_pr_review_comments.sh",
             ".agents/skills/github-pr-creator/SKILL.md",
             ".agents/skills/github-pr-creator/agents/openai.yaml",
+            ".agents/skills/github-pr-merge-preparer/SKILL.md",
+            ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
             ".agents/skills/spec-driven-tdd-workflow/SKILL.md",
             ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
@@ -747,6 +757,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00102-agentic-tdd-plan-step-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -820,6 +831,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00100-discussion-template-hearing-sheet-and-flexible-note-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00102-agentic-tdd-plan-step-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -1143,7 +1155,8 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _managed_contract_guard_paths(self) -> tuple[str, ...]:
         managed_skill_paths = tuple(
-            f".agents/skills/{skill_name}/SKILL.md" for skill_name in _EXPECTED_MANAGED_SKILL_NAMES
+            f".agents/skills/{skill_name}/SKILL.md"
+            for skill_name in _EXPECTED_MANAGED_SKILL_NAMES
         )
         return (
             *managed_skill_paths,
@@ -9903,6 +9916,110 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     ),
                 )
 
+    def test_issue_105_pr_merge_preparer_install_and_update_contract(self) -> None:
+        required_paths = (
+            ".agents/skills/github-pr-merge-preparer/SKILL.md",
+            ".agents/skills/github-pr-merge-preparer/agents/openai.yaml",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            for rel_path in required_paths:
+                self.assertTrue(
+                    (target / rel_path).is_file(),
+                    f"missing github-pr-merge-preparer managed asset after init: {rel_path}",
+                )
+
+            shutil.rmtree(target / ".agents" / "skills" / "github-pr-merge-preparer")
+            self.assertEqual(main(["update", str(target)]), 0)
+            self._assert_managed_skills_installed(target)
+            for rel_path in required_paths:
+                self.assertTrue(
+                    (target / rel_path).is_file(),
+                    f"missing github-pr-merge-preparer managed asset after update: {rel_path}",
+                )
+
+    def test_issue_105_pr_merge_preparer_content_regression_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        merge_preparer = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "install_root"
+            / ".agents"
+            / "skills"
+            / "github-pr-merge-preparer"
+            / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        issue_execution = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "install_root"
+            / ".agents"
+            / "skills"
+            / "spec-dock-issue-execution"
+            / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        workflow_issue = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "docs"
+            / "workflow_issue.md"
+        ).read_text(encoding="utf-8")
+
+        merge_preparer_phrases = (
+            "github-pr-merge-preparer",
+            "failure_class",
+            "Default autonomous repair limit is two repair attempts for the same `failure_class`.",
+            "Default total autonomous repair limit is four repair attempts per PR preparation invocation.",
+            "Stop at a human gate when the same `failure_class` appears after a repair",
+            "the blocker is `permission_or_auth`, `external_or_flaky`, `base_branch_conflict`, `unknown`",
+            "a requirement expansion, a breaking change, a migration, a secret or deployment setting change",
+            "ambiguous review intent",
+            "No non-required check failure remains unless the check is known optional",
+            "Any waived non-required check failure is reported as residual risk.",
+            "If unresolved review-thread state cannot be determined",
+            "stop at a human gate. Do not hide the limitation.",
+            "If an existing PR exists, use its base for monitoring.",
+            "If no PR exists, prefer an explicit user base.",
+            "Otherwise respect `branch.<current>.gh-merge-base` when present.",
+            "PR merge.",
+            "Auto-merge enablement.",
+            "GitHub issue close.",
+            "Review comment reply.",
+            "Review thread resolve.",
+            "Running `spec-dock issue finish`",
+        )
+        for phrase in merge_preparer_phrases:
+            self.assertIn(phrase, merge_preparer)
+
+        workflow_phrases = (
+            "github-pr-merge-preparer",
+            "PR Delivery Gate",
+            "Merge Preparation Gate",
+            "non-required check status and waiver evidence",
+            "unresolved review-thread limitation status",
+            "`issue finish` is lifecycle closure only",
+            "`issue finish` は lifecycle-only command",
+            "does not guarantee commit, push, PR, merge, validate, test, review, or final delivery",
+        )
+        for phrase in workflow_phrases:
+            self.assertIn(phrase, workflow_issue)
+
+        issue_execution_phrases = (
+            "github-pr-merge-preparer",
+            "final PR delivery and merge-preparation evidence before `issue finish`",
+        )
+        for phrase in issue_execution_phrases:
+            self.assertIn(phrase, issue_execution)
+
     def test_issue_93_execute_prompts_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         prompt_contracts = {
@@ -10118,6 +10235,7 @@ esac
                 self.assertIn("--method GET", call)
                 self.assertIn("--paginate", call)
                 self.assertIn("--slurp", call)
+                self.assertNotIn("--jq", call)
                 self.assertNotIn("--method POST", call)
                 self.assertNotIn("graphql", call.lower())
 

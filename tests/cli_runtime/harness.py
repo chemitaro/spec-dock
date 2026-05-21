@@ -40,6 +40,7 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "git-commit-conventional-ja",
     "github-codex-pr-review-comments",
     "github-pr-creator",
+    "github-pr-merge-preparer",
 )
 
 
