@@ -1,0 +1,384 @@
+---
+種別: 要件定義書（Issue）
+ID: "iss-00105"
+タイトル: "PR Creation And Merge Ready Monitoring Skill"
+関連GitHub: ["#105"]
+状態: "approved"
+作成者: "iwasawayuuta"
+最終更新: "2026-05-21"
+親: ["epic-00067", "init-local-00003"]
+---
+
+# iss-00105 PR Creation And Merge Ready Monitoring Skill — 要件定義（WHAT / WHY）
+
+## 目的
+- GitHub Pull Request を作成して終わりにせず、CI / review の結果を確認し、必要な修正と再 push / 再監視を繰り返して、人間ユーザーが merge 判断に入れる状態まで PR を整える shared skill を追加する。
+- 新 skill 名は `github-pr-merge-preparer` とし、merge 自体は実行しない。
+- skill は詳細な実装判断を抱え込まず、既存の `github-pr-creator`、`pr-monitor`、修正担当 worker、分析担当 worker を呼び分ける最小限の workflow coordinator として定義する。
+- 既存 `spec-dock-issue-execution` の完了境界を拡張し、issue 実行の最終段階で `github-pr-merge-preparer` を利用して、PR 作成から merge 可能状態の準備までを issue execution の通常完了範囲に含める。
+
+## 背景・現状
+- 現状の挙動:
+  - `github-pr-creator` は current branch の diff を確認し、PR title / body 作成、issue linkage、push、PR 作成、`pr-monitor` handoff までを扱う。
+  - `pr-monitor` は read-only agent として、PR に紐づく checks / statuses と Codex review を監視し、`success` / `failed` / `review_changes_requested` / `timeout` を返す。
+  - CI failure や review 指摘があった場合、原因分析、修正、commit / push、再監視の反復は、ユーザーが毎回口頭で指示している。
+- 現状の課題:
+  - PR 作成後の「仕上げ」workflow が skill 化されておらず、ユーザーが同じ指示を繰り返す必要がある。
+  - PR 作成だけで作業完了扱いになると、CI / review / mergeability が未確認のまま止まりやすい。
+  - `pr-monitor` は read-only であり、修正や再 push の orchestration owner にはならない。
+- 情報源:
+  - `20260520t231224z-research-pr-lifecycle-skill-analysis.md`
+  - `20260520t231819z-disc-pr-lifecycle-skill-direction.md`
+  - `20260520t231908z-interview-pr-lifecycle-skill-decisions.md`
+  - `20260521t000352z-disc-pr-completion-skill-naming.md`
+  - `20260521t000352z-01-interview-review-thread-state-policy.md`
+  - `20260521t000352z-02-interview-non-required-check-policy.md`
+  - `20260521t000352z-03-interview-pr-draft-ready-and-base-resolution-policy.md`
+  - `20260521t004308z-disc-issue-execution-pr-delivery-scope.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-creator/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/install_root/.codex/agents/pr-monitor.toml`
+  - `src/spec_dock/assets/install_root/.github/agents/pr-monitor.agent.md`
+
+## 対象ユーザー / 利用シナリオ
+- 主な利用者:
+  - spec-dock を使って issue 実行後の PR delivery を進める maintainer / agent orchestrator。
+- 代表シナリオ:
+  - ユーザーが作業完了後に `github-pr-merge-preparer` を使う。
+  - skill は active issue docs、report、branch、base/head diff、既存 PR の有無を確認する。
+  - PR がなければ `github-pr-creator` などの bounded worker に PR 作成を委譲する。
+  - PR 作成後または既存 PR 検出後、`pr-monitor` に監視を委譲する。
+  - CI failure や review 指摘があれば、内容を分類し、必要な修正を適切な worker へ委譲する。
+  - 修正が commit / push されたら、最新 head SHA で再度 `pr-monitor` に監視を委譲する。
+  - PR が人間ユーザーの merge 判断に入れる状態になったら、PR URL、checks / review 状態、残リスクを報告して停止する。
+- issue 実行統合シナリオ:
+  - ユーザーが `spec-dock-issue-execution` を使って issue 実装を進める。
+  - issue workflow は final local gates と final commit の後、PR Delivery Gate に進む。
+  - PR Delivery Gate は `github-pr-creator` を使って PR を作成または既存 PR を特定し、PR URL、base / head、latest head SHA、issue linkage を evidence として残す。
+  - Merge Preparation Gate は `github-pr-merge-preparer` を使って monitor / fix / re-push / re-monitor を進め、人間が merge 判断に入れる状態かを evidence として残す。
+  - PR merge preparation evidence が確定してから、既存 `issue finish` lifecycle closure に進む。
+
+## スコープ
+- 必須:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md` を shared skill として追加する。
+  - dogfooding 側 `.agents/skills/github-pr-merge-preparer/SKILL.md` へ provider asset と同等の内容を反映する。
+  - `github-pr-merge-preparer` は PR 作成、PR 監視、failure / review 指摘の分類、bounded fix 委譲、delegated fix 後の commit / push 確認、再監視、merge 可能状態の報告までの workflow を定義する。
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` と dogfooding 側 `.agents/skills/spec-dock-issue-execution/SKILL.md` に、final delivery gate で `github-pr-merge-preparer` を利用することを追記する。
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` と dogfooding 側 `spec-dock/docs/workflow_issue.md` に、PR Delivery Gate と Merge Preparation Gate を issue completion contract として追加する。
+  - 既存 `github-pr-creator` は PR 作成 leaf skill として再利用し、必要なら `github-pr-merge-preparer` との使い分けを追記する。
+  - 既存 `pr-monitor` は read-only watcher として再利用し、必要なら merge 判断に必要な最小出力を追記する。
+  - installer / packaging / dogfooding parity の tests を、新 shared skill 追加に合わせて更新する。
+- 禁止:
+  - `github-pr-merge-preparer` に merge / auto-merge / branch delete / issue close / admin override を実行させない。
+  - `pr-monitor` に修正、push、コメント返信、review thread 解決、merge などの write operation を持たせない。
+  - CI log parsing、review thread handling、実装修正ロジックを `github-pr-merge-preparer` 本体に詰め込みすぎない。
+  - ユーザー確認なしに要件・設計の意味を変える修正、breaking change、migration、secret / credential / deployment setting 変更を行う workflow にしない。
+- 対象外:
+  - GitHub Actions / review thread 用の汎用 API client 新設。
+  - auto-merge 有効化。
+  - PR merge 実行。
+  - `issue_finish()` runtime command に PR readiness 判定を組み込むこと。
+  - `github-pr-merge-preparer` 単体に GitHub issue close や spec-dock `issue finish` を実行させること。
+  - 既存 GitHub plugin skills の再実装。
+
+## 境界
+- 常に行う:
+  - PR 作成前に current branch、base branch、既存 PR、active issue docs / report、base/head diff を確認する。
+  - PR title / body は branch 名や file 名だけで作らず、diff と issue context に基づける。
+  - PR には関連 issue を `Closes #...` または `Refs #...` で関連付ける。完了を確信できない場合は `Refs` を使う。
+  - PR 作成後または push 後は、最新 head SHA を添えて `pr-monitor` に監視を委譲する。
+  - 監視結果が古い head SHA に対するものなら stale として扱い、最新 push 後に再監視する。
+  - failure / review 指摘は、修正可能なもの、外部要因、ユーザー判断が必要なものに分類する。
+  - 修正後は担当 worker または既存 skill による commit / push を確認し、再監視して、人間が merge 判断に入れる状態まで反復する。
+  - `spec-dock-issue-execution` から利用する場合は、final commit 後に PR Delivery Gate と Merge Preparation Gate を実行し、その evidence を `report.md` または completion evidence として残してから `issue finish` へ進む。
+- 判断が必要:
+  - 同じ failure class が繰り返し発生する場合。
+  - CI failure が flaky / external outage / permission / infrastructure 起因に見える場合。
+  - review 指摘の意図が曖昧、または複数の妥当な対応案がある場合。
+  - required ではない check が失敗しており、修正対象か waiver 対象か判断が必要な場合。
+  - PR が draft のままか ready で作成するかが local completion evidence から判断できない場合。
+  - base branch の候補が矛盾している場合。
+- 行わない:
+  - merge しない。
+  - auto-merge を有効化しない。
+  - GitHub review comment へ返信しない。
+  - review thread を resolve しない。
+  - GitHub issue を close しない。
+
+## 非交渉制約
+- skill invocation は、PR 作成から bounded fix / re-push / re-monitor / merge 可能状態の報告までを一続きの作業として扱う。
+- merge 実行は常に人間ユーザーの操作であり、この skill の完了条件に含めない。
+- skill は workflow を定義する。すべての観点や全ての例外処理を skill 本体に詰め込みすぎない。
+- PR が「人間が merge 判断に入れる状態」になったかどうかは、最低限、PR が open、最新 head SHA の監視結果であること、blocking check failure がないこと、blocking review 指摘がないこと、merge conflict が見えていないことを確認して判断する。
+- non-required check failure は原則として blocking risk として扱う。ただし既知の optional check またはユーザーの明示 waiver がある場合は、残リスクとして報告できる。
+- review thread の unresolved state を厳密に取得できない場合は、その limitation を隠さず、明確に判断できない review 指摘は human gate にする。
+
+## 前提
+- `github-pr-creator` は PR 作成 leaf skill として維持する。
+- `pr-monitor` は read-only monitor として維持する。
+- `github-codex-pr-review-comments` の fixed read-only REST wrapper は、Codex review / PR comment 取得の既存境界として維持する。
+- `spec-dock-issue-execution` は `workflow_issue.md` を正本とする薄い orchestrator reminder として維持する。
+- `issue_finish()` runtime command は従来どおり active issue lifecycle closure として維持し、PR readiness 判定の責務を持たせない。
+- Agent-tooling assets の provider-side source-of-truth は `src/spec_dock/assets/install_root/` である。
+- Dogfooding root の `.agents/`, `.codex/`, `.github/` は provider asset と parity を取る。
+
+## 受け入れ条件
+- AC-001:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - active issue の実装が完了し、PR delivery に進む。
+  - 操作:
+    - `github-pr-merge-preparer` skill を起動する。
+  - 期待結果:
+    - skill は PR 作成で止まらず、PR 作成または既存 PR 検出、監視、必要な修正委譲、再 push、再監視、人間が merge 判断に入れる状態の報告までの workflow を示す。
+  - 観測点:
+    - `SKILL.md` の workflow / completion rules。
+- AC-002:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - current branch に PR がまだ存在しない。
+  - 操作:
+    - skill が PR 作成 workflow を開始する。
+  - 期待結果:
+    - current branch、base branch、diff、active issue docs / report を確認し、PR 作成を `github-pr-creator` または bounded worker へ委譲する手順が定義されている。
+    - PR body には関連 issue linkage を含める。
+  - 観測点:
+    - `SKILL.md` の prepare / create-or-find-pr section。
+- AC-003:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - PR が作成済み、または既存 PR が検出されている。
+  - 操作:
+    - skill が PR 監視へ進む。
+  - 期待結果:
+    - `pr-monitor` に repo、PR、head SHA、reason を渡し、CI / review 状態を監視させる。
+    - push 後は古い監視結果を使わず、最新 head SHA で再監視する。
+  - 観測点:
+    - `SKILL.md` の monitor / re-monitor section。
+- AC-004:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - `pr-monitor` が failed checks、review 指摘、timeout のいずれかを返す。
+  - 操作:
+    - skill が結果を分類する。
+  - 期待結果:
+    - 修正可能な failure / review 指摘は適切な worker へ委譲する。
+    - 外部要因、権限不足、曖昧な設計判断、scope expansion、breaking change、secret / deployment setting 変更は human gate として止める。
+  - 観測点:
+    - `SKILL.md` の classify / delegate section。
+- AC-005:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - 修正が commit / push された。
+  - 操作:
+    - skill が再監視へ進む。
+  - 期待結果:
+    - 最新 head SHA を取得し、`pr-monitor` を再実行する。
+    - 同じ failure class の再発や反復上限到達時は human gate として止める。
+  - 観測点:
+    - `SKILL.md` の loop / stop condition。
+- AC-006:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - PR-linked checks / statuses と review の監視結果が出揃っている。
+  - 操作:
+    - skill が完了判定を行う。
+  - 期待結果:
+    - blocking check failure、blocking review 指摘、merge conflict、stale head がない場合に、人間が merge 判断に入れる状態として報告する。
+    - 報告には PR URL、base / head、checks / review 状態、残リスク、merge は人間が行うことを含める。
+  - 観測点:
+    - `SKILL.md` の completion rules / response checklist。
+- AC-007:
+  - アクター:
+    - Maintainer / installer test
+  - 前提:
+    - provider asset と dogfooding mirror を確認する。
+  - 操作:
+    - `python -m unittest` または関連 installer tests を実行する。
+  - 期待結果:
+    - 新 shared skill が install_root asset inventory、packaging、dogfooding parity の対象に含まれる。
+  - 観測点:
+    - `tests/test_init_update.py` の asset inventory / parity assertions。
+- AC-008:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - `spec-dock-issue-execution` による issue 実装が final local gates と final commit まで到達している。
+  - 操作:
+    - issue execution workflow が final delivery へ進む。
+  - 期待結果:
+    - workflow は実装完了で止まらず、PR Delivery Gate と Merge Preparation Gate を実行する。
+    - PR Delivery Gate は PR 作成または既存 PR 検出を行い、PR URL、base / head、latest head SHA、issue linkage を evidence として残す。
+    - Merge Preparation Gate は `github-pr-merge-preparer` を利用し、monitor / fix / re-push / re-monitor の結果を evidence として残す。
+  - 観測点:
+    - `spec-dock-issue-execution/SKILL.md` と `workflow_issue.md` の final delivery guidance。
+- AC-009:
+  - アクター:
+    - Maintainer / orchestrator
+  - 前提:
+    - PR Delivery Gate または Merge Preparation Gate が failed / timeout / blocked / human gate になっている。
+  - 操作:
+    - issue execution workflow が完了判定を行う。
+  - 期待結果:
+    - workflow は issue execution を complete と報告しない。
+    - 未解決 blocker、必要なユーザー判断、取得済み evidence、次アクションを report または final response に残す。
+    - `issue finish` へは進まない。
+  - 観測点:
+    - `workflow_issue.md` の completion rules / blocked handling。
+- AC-010:
+  - アクター:
+    - Maintainer / runtime maintainer
+  - 前提:
+    - issue execution workflow が PR merge preparation evidence を確定している。
+  - 操作:
+    - workflow が `issue finish` lifecycle closure へ進む。
+  - 期待結果:
+    - `issue_finish()` runtime command の意味は、GitHub issue close、active clear、post-mutation sync のまま維持される。
+    - PR readiness の判定は `github-pr-merge-preparer` evidence と workflow docs によって表現され、runtime command に混入しない。
+  - 観測点:
+    - `workflow_issue.md` の boundary。
+    - 既存 `issue_finish` runtime tests の維持。
+
+## 例外・エッジケース
+- EC-001:
+  - 条件:
+    - PR がすでに存在する。
+  - 期待:
+    - duplicate PR を作らず、既存 PR の base / head / URL を使って監視へ進む。
+  - 観測点:
+    - `SKILL.md` の create-or-find-pr guidance。
+- EC-002:
+  - 条件:
+    - base branch 候補が矛盾する。
+  - 期待:
+    - 勝手に PR を作らず、選択候補と矛盾理由を報告して human gate にする。
+  - 観測点:
+    - `SKILL.md` の base resolution guardrail。
+- EC-003:
+  - 条件:
+    - CI failure が external outage、permission、flaky suspected、secret / deploy setting 起因に見える。
+  - 期待:
+    - 実装修正へ進まず、分類と根拠を報告して human gate または blocked とする。
+  - 観測点:
+    - `SKILL.md` の failure classification。
+- EC-004:
+  - 条件:
+    - review 指摘が要件変更、設計変更、breaking change、migration を要求している。
+  - 期待:
+    - 自動修正せず、human gate にする。
+  - 観測点:
+    - `SKILL.md` の human gate。
+- EC-005:
+  - 条件:
+    - review thread state を厳密に取得できない。
+  - 期待:
+    - limitation を報告し、明確に actionable か判断できない指摘は human gate にする。
+  - 観測点:
+    - `SKILL.md` の review limitation handling。
+- EC-006:
+  - 条件:
+    - `spec-dock-issue-execution` の final delivery gate で PR preparation が timeout、permission error、external outage、review unavailable などにより成功しない。
+  - 期待:
+    - issue execution は complete を報告せず、blocked / human gate として evidence と次アクションを残す。
+    - PR preparation 未完了のまま `issue finish` を実行しない。
+  - 観測点:
+    - `workflow_issue.md` の PR Delivery Gate / Merge Preparation Gate failure handling。
+- EC-007:
+  - 条件:
+    - `issue finish` の実行可否と PR readiness の evidence が混同されそうになる。
+  - 期待:
+    - `issue finish` は lifecycle closure であり、PR readiness は `github-pr-merge-preparer` evidence によって別途示す。
+  - 観測点:
+    - `workflow_issue.md` と `spec-dock-issue-execution/SKILL.md` の boundary wording。
+
+## 入力→出力例
+- EX-001:
+  - 入力:
+    - 「この issue の作業が終わったので PR を仕上げてください」
+  - 出力:
+    - PR URL、base / head、latest head SHA、checks / review 状態、実施した修正 loop、残リスク、人間が merge できる状態かどうか。
+- EX-002:
+  - 入力:
+    - `pr-monitor` が `failed` を返し、特定 test job が失敗している。
+  - 出力:
+    - failure class、取得したログ、委譲先、修正 / push / 再監視結果、または human gate 理由。
+
+## 用語（ドメイン語彙）
+- `github-pr-merge-preparer`:
+  - GitHub PR を作成または検出し、監視、修正委譲、再 push、再監視を通じて、人間が merge 判断に入れる状態まで整える shared skill。
+- `merge-prepared`:
+  - この skill が到達を目指す状態。merge 実行を意味しない。人間が PR URL と残リスクを見て merge 判断できる状態を指す。
+- `human gate`:
+  - skill が自律継続せず、ユーザー判断を求めて停止する境界。
+- `PR Delivery Gate`:
+  - `spec-dock-issue-execution` の final commit 後に、PR 作成または既存 PR 検出、base / head、latest head SHA、issue linkage を確認して evidence 化する gate。
+- `Merge Preparation Gate`:
+  - `github-pr-merge-preparer` を使って PR を監視し、必要な修正と再監視を経て、人間が merge 判断に入れる状態を evidence 化する gate。
+- `blocking check failure`:
+  - required check failure、または waiver されていない non-required check failure。
+- `blocking review feedback`:
+  - 未対応の actionable review 指摘、または actionable か判断できないが merge 判断を妨げる review signal。
+
+## 決定済み方針
+- D-001:
+  - 方針:
+    - skill 名は `github-pr-merge-preparer` を採用する。
+  - 根拠:
+    - PR を merge するのではなく、人間が merge できるように準備する skill であることを名前で示すため。
+  - 影響範囲:
+    - skill path、tests、docs、description。
+- D-002:
+  - 方針:
+    - skill invocation は一段階で、PR 作成から bounded fix / re-push / re-monitor / merge 可能状態の報告まで進める。
+  - 根拠:
+    - PR 作成で終わらず、都度ユーザー確認なしに merge 可能な状態まで持っていくことがこの skill の価値であるため。
+  - 影響範囲:
+    - workflow、human gate、completion rules。
+- D-003:
+  - 方針:
+    - merge / auto-merge / branch delete / issue close / admin override は対象外とする。
+  - 根拠:
+    - merge は人間ユーザーが行う操作であり、この skill は merge 可能な状態まで整えて報告するため。
+  - 影響範囲:
+    - scope、forbidden actions、completion rules。
+- D-004:
+  - 方針:
+    - non-required check failure は原則 blocking risk とし、明示 waiver がある場合だけ残リスク扱いにできる。ただし skill 本体では複雑な check taxonomy を持ちすぎず、最小分類に留める。
+  - 影響範囲:
+    - merge-prepared 判定、failure classification。
+- D-005:
+  - 方針:
+    - review thread state は初期版では現行 REST wrapper の limitation を明示し、不明時は human gate にする。fixed GraphQL wrapper は必要になった時点の follow-up とする。
+  - 影響範囲:
+    - review feedback 判定、future follow-up。
+- D-006:
+  - 方針:
+    - local final gates pass 後なら ready PR 作成を許可し、未完了なら draft または human gate にする。
+  - 影響範囲:
+    - PR creation guidance。
+- D-007:
+  - 方針:
+    - base branch 解決で `branch.<current>.gh-merge-base` を尊重し、既存 PR base と矛盾する場合は既存 PR base を優先、docs / config と矛盾する場合は human gate にする。
+  - 影響範囲:
+    - base resolution guidance、`github-pr-creator` update scope。
+- D-008:
+  - 方針:
+    - `spec-dock-issue-execution` は final commit 後に `github-pr-merge-preparer` を使う PR Delivery Gate / Merge Preparation Gate まで進める。
+  - 根拠:
+    - issue 実行の価値を、単なる実装完了ではなく「人間が merge 可能な PR を確認できる状態」まで拡張するため。
+  - 影響範囲:
+    - `spec-dock-issue-execution/SKILL.md`、`workflow_issue.md`、design / plan、tests。
+- D-009:
+  - 方針:
+    - `issue_finish()` runtime command の意味は変更せず、PR readiness は workflow / skill evidence として扱う。
+  - 根拠:
+    - lifecycle command に PR readiness 判定を混ぜると、runtime command と agent orchestration の責務が曖昧になるため。
+  - 影響範囲:
+    - `workflow_issue.md` の boundary、runtime tests の非変更方針。
