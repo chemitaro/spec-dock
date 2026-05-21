@@ -41,7 +41,7 @@ ID: "iss-00105"
   - S03:
     - 依存: S01, S02
     - unblock: S90, S99
-    - 対象ファイル: `tests/test_init_update.py`
+    - 対象ファイル: `src/spec_dock/cli.py`, `tests/cli_runtime/harness.py`, `tests/test_init_update.py`
 
 ## ステップ一覧
 - S01:
@@ -62,7 +62,7 @@ ID: "iss-00105"
   - 観測可能な振る舞い: installer / dogfooding parity / content regression tests が新 skill と final delivery contract を守る。
   - 依存: S01, S02
   - unblock: final quality gate
-  - 対象ファイル: `tests/test_init_update.py`
+  - 対象ファイル: `src/spec_dock/cli.py`, `tests/cli_runtime/harness.py`, `tests/test_init_update.py`
   - 閉じる要件: AC-007 and regression coverage for AC/EC
   - レビューゲート: code-reviewer
 - S90:
@@ -370,6 +370,8 @@ ID: "iss-00105"
 - unblock:
   - S90, S99
 - 対象ファイル:
+  - `src/spec_dock/cli.py`
+  - `tests/cli_runtime/harness.py`
   - `tests/test_init_update.py`
 - planned contract:
   - scope:
@@ -385,9 +387,12 @@ ID: "iss-00105"
       - If adding tests after files already exist, record inspect-only explanation for why pre-change red cannot be captured and run targeted green.
   - implementation scope:
     - allowed paths:
+      - `src/spec_dock/cli.py`
+      - `tests/cli_runtime/harness.py`
       - `tests/test_init_update.py`
     - forbidden changes:
-      - Runtime code, asset text, workflow docs.
+      - Runtime behavior beyond adding `github-pr-merge-preparer` to the managed skill manifest.
+      - Asset text, workflow docs.
   - Green verification:
     - command:
       - `uv run pytest tests/test_init_update.py -k "managed_skills or issue_71_checked_in_dogfooding_agent_tooling_parity or issue_105 or workflow_issue_doc_matches_bundled_asset"`
@@ -401,7 +406,7 @@ ID: "iss-00105"
   - report evidence destination:
     - `report.md` S03 Red/Green/Refactor, Delegated Worker Evidence, Reviewer Gate Status, Step Commit Gate.
   - amendment trigger:
-    - Tests require changing installer behavior or adding runtime behavior.
+    - Tests require changing installer behavior beyond adding the managed skill manifest entry, or adding issue lifecycle runtime behavior.
 
 #### delegation contract
 - delegated role:
@@ -411,11 +416,16 @@ ID: "iss-00105"
   - `design.md`
   - `plan.md`
   - S01/S02 changed files
+  - `src/spec_dock/cli.py`
+  - `tests/cli_runtime/harness.py`
   - `tests/test_init_update.py`
 - allowed paths:
+  - `src/spec_dock/cli.py`
+  - `tests/cli_runtime/harness.py`
   - `tests/test_init_update.py`
 - forbidden changes:
-  - Runtime code, assets, docs, broad test rewrites.
+  - Runtime behavior beyond adding `github-pr-merge-preparer` to `_MANAGED_SKILL_NAMES`.
+  - Assets, docs, broad test rewrites.
 - acceptance criteria:
   - tc-004 and tc-005 close conditions are met.
 - required tests or docs-only verification:
@@ -426,7 +436,7 @@ ID: "iss-00105"
   - changed files, test command/result, unresolved risks, and `Ledger Note` or `No material implementation decisions beyond the approved plan.`
 - stop conditions:
   - Existing test structure cannot represent the new skill inventory without broader refactor.
-  - Targeted tests require runtime or installer behavior changes not in design.
+  - Targeted tests require runtime or installer behavior changes beyond the managed skill manifest entry.
 
 #### 具体テストケース一覧
 
@@ -469,7 +479,7 @@ ID: "iss-00105"
 #### step gate
 - step reviewer gate:
   - reviewer: code-reviewer
-  - review 範囲: tests-only diff and whether assertions are stable and sufficient.
+  - review 範囲: managed skill manifest diff, harness expectation diff, and whether assertions are stable and sufficient.
   - pass 条件: review_status: pass
   - re-review rule: 指摘を修正し pass まで再実行。
 - commit / no-op gate:
