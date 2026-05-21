@@ -290,6 +290,103 @@ spec-dock: ok (validate) nodes=46
 
 ---
 
+### 2026-05-21 10:29 JST - 10:29 JST
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001..AC-006, EC-001..EC-005, EC-007
+- Planned source:
+  - `plan.md` section: `S01 — Add github-pr-merge-preparer shared skill`
+  - closure ids: tc-001, tc-002
+
+#### 実施内容
+- `doc-writer` に S01 を委譲し、provider asset と dogfooding mirror に `github-pr-merge-preparer` shared skill を追加した。
+- `spec-reviewer` の P2 指摘を受け、`Forbidden Writes` に `spec-dock issue finish` / active lifecycle closure の禁止を追記した。
+- provider / dogfooding の `SKILL.md` と `agents/openai.yaml` が byte-identical であることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md .agents/skills/github-pr-merge-preparer/SKILL.md
+cmp -s src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/agents/openai.yaml .agents/skills/github-pr-merge-preparer/agents/openai.yaml
+git diff --check -- src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer .agents/skills/github-pr-merge-preparer
+
+# all commands exited 0
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S01 | alternative | inspect-only | Code test is not meaningful for initial skill text creation; verified by file existence, content inspection, parity, and spec review. | docs inspection | pass | S03 will add installer/content regression tests. |
+| S01 | Green | provider/dogfooding parity and skill contract inspection | `SKILL.md` and `openai.yaml` exist in provider and dogfooding mirror, match byte-for-byte, and include required coordinator boundaries. | `cmp -s ...`; `rg ...`; `git diff --check ...` | pass | Required wording includes `github-pr-creator`, `pr-monitor`, `failure_class`, non-required checks, unresolved review-thread limitation, and forbidden writes. |
+| S01 | Refactor | keep text concise and avoid CI/review repair implementation | No refactor needed beyond P2 wording addition. | diff inspection | pass | Skill remains coordinator-only. |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S01 | `spec-dock issue finish` needed explicit forbidden-write wording | spec-reviewer P2 | Added explicit forbidden write and re-reviewed | tc-001 | no | final S01 spec-reviewer pass |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | tc-001, tc-002 | Provider and dogfooding files exist, match, and satisfy the designed contract. | Provider/dogfooding parity; metadata exists; S01 spec-reviewer pass. | pass | Text semantics are inspect-only; S03 adds tests. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | inspect-only | New skill text did not exist before S01. | content inspection + spec-reviewer pass | pass | New skill defines bounded PR preparation. |
+| tc-002 | S01 | yes | inspect-only | New metadata did not exist before S01. | metadata inspection + provider/dogfooding `cmp -s` | pass | Metadata follows existing shared skill style. |
+
+#### Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-001 | S01 | `spec-reviewer` final S01 pass; provider/dogfooding `SKILL.md` parity | pass | Includes unresolved review-thread limitation human gate and forbidden lifecycle closure. |
+| tc-002 | S01 | provider/dogfooding `agents/openai.yaml` parity | pass | Installer inventory coverage deferred to S03. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
+|---|---|---|---|---|---|---|
+| none | tc-001 | tc-s01-001 | tc-001 | Planned closure met. | no | no |
+| none | tc-002 | tc-s01-002 | tc-002 | Planned closure met. | no | no |
+
+#### Workflow Delegation Consent
+| consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
+|---|---|---|---|---|---|---|---|---|
+| user instruction to execute workflow | `/Users/iwasawayuuta/workspace/tools/spec-dock` | iss-00105 | current session | doc-writer, spec-reviewer | same repo, active issue, session, named roles; no destructive action / publishing / credentialed access / scope expansion beyond S01 | issue complete / session end / scope change / user revocation | none | proceed |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | shipped skill text | doc-writer | Add `github-pr-merge-preparer` provider and dogfooding skill files | `requirement.md`, `design.md`, `plan.md`, existing `github-pr-creator` / `pr-monitor` assets | `src/.../github-pr-merge-preparer/**`, `.agents/skills/github-pr-merge-preparer/**` | runtime, tests, workflow docs, existing skills, `.codex/agents`, `.github/agents`, merge / issue close authority | provider/dogfooding byte parity, content inspection, `git diff --check` | need new API wrapper, monitor output, merge authority, or issue finish authority | changed files, verification, risks, ledger note | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S01 | doc-writer | Added merge-preparer skill and metadata, then added explicit `spec-dock issue finish` forbidden-write wording after review. | `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/agents/openai.yaml`; `.agents/skills/github-pr-merge-preparer/SKILL.md`; `.agents/skills/github-pr-merge-preparer/agents/openai.yaml` | docs-only inspection; provider/dogfooding `cmp -s`; `git diff --check` | pass | S03 still needs installer/content tests | accepted |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | spec-reviewer | fresh after P2 fix | passed | N/A | proceed to S01 commit | final review_status `pass`; findings 0; confidence 0.94 |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S01 | pending commit | S01 skill files + S01 report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md` - New provider skill.
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/agents/openai.yaml` - New provider skill metadata.
+- `.agents/skills/github-pr-merge-preparer/SKILL.md` - Dogfooding mirror.
+- `.agents/skills/github-pr-merge-preparer/agents/openai.yaml` - Dogfooding mirror metadata.
+
+#### コミット
+- pending
+
+#### メモ
+- `Too many open files` occurred while some subagents were open; closing completed agents restored parent verification commands.
+
+---
+
 ### 2026-05-21 HH:MM - HH:MM
 
 #### 対象
