@@ -10235,6 +10235,7 @@ esac
                 self.assertIn("--method GET", call)
                 self.assertIn("--paginate", call)
                 self.assertIn("--slurp", call)
+                self.assertNotIn("--jq", call)
                 self.assertNotIn("--method POST", call)
                 self.assertNotIn("graphql", call.lower())
 
