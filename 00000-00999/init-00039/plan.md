@@ -84,6 +84,29 @@ ID: "init-local-00002"
     - 既存 installer foundation 上の asset 追加として 1 implementation issue で進める。
     - 同一 issue の中で metadata / file placement / tests / docs / cross-host validation を完了させる。
     - 新しい installer mechanism が必要と判明した場合だけ再分割する。
+- epic-00107-worktree-provisioning:
+  - 目的:
+    - SpecDock runtime command から、並行開発用の linked worktree と initial branch を安全に作成できる operator capability を追加する。
+  - deliverable:
+    - `spec-dock worktree create [LABEL]` command
+    - `<repo-basename>-worktrees/` sibling container placement
+    - label / id / directory / branch naming contract
+    - optional / non-fatal `make init` bootstrap
+    - Git failure / collision / linked-worktree invocation handling
+    - provider docs / dogfooding parity / tests
+  - metric link:
+    - Metric-001
+    - Metric-002
+  - depends on:
+    - current runtime command baseline
+    - `epic-00054` の lifecycle command expansion と command UX が競合しないこと
+  - 背景:
+    - `epic-00054` は GitHub issue close / local node delete / self-update の lifecycle gap を扱う。
+    - `epic-00107` は別の operator capability として、複数 issue / 複数変更を branch / checkout 単位で分離して前進できる worktree 作成導線を扱う。
+    - 既存 `taikyohiyou_project` で実用している `make worktree` の naming UX を参考にしつつ、SpecDock runtime の layered architecture へ取り込む。
+  - 実行方針:
+    - requirement / design / plan の spec authoring gate を通してから issue 分割する。
+    - command core、bootstrap/output/docs parity、dogfooding verification の順で閉じる。
 - epic-0003-operator-value-expansion:
   - 目的:
     - operator が日常運用で得られる feature value を広げる。
@@ -112,10 +135,12 @@ ID: "init-local-00002"
   - `epic-00054` は review-only issue を別建てせず、各 implementation issue に review と成功性確認を内包する。
   - `epic-00074` は `epic-00048` の completed baseline を拡張し、host-native config / subagent managed deployment を concrete feature epic として進める。
   - `epic-00074` は `epic-00067` の authority cleanup を再所有せず、feature initiative 側では利用価値としての multi-host setup 拡張に限定する。
+  - `epic-00107` は `epic-00054` と同じく runtime command を拡張するが、close/delete/update の lifecycle completion ではなく、並行開発用 worktree provisioning を扱うため独立 epic とする。
   - post-prototype 候補は current initiative の出口を曖昧にしないよう最後に整理する。
 - parallelizable:
   - `epic-00054` と epic-0003 は並行検討できる。
   - `epic-00074` は prerequisite groundwork が閉じている前提で `epic-00054` と並行検討できるが、installer / docs / dogfooding の重なりは調整が必要。
+  - `epic-00107` は `epic-00054` と command parser / docs / tests の変更面が重なるため、実装 issue の同時編集は避ける。ただし spec planning は並行可能である。
 
 ## 意思決定ゲート
 - G1 strategy review:
@@ -125,6 +150,7 @@ ID: "init-local-00002"
 - G3 governance/docs impact:
   - architecture initiative 側の guardrail を破っていないか確認する
   - `epic-00074` が architecture cleanup ではなく feature expansion として閉じているか確認する
+  - `epic-00107` が Codex-managed worktree を再実装せず、manual long-lived worktree provisioning に限定されているか確認する
 - G9 final initiative plan review:
   - current initiative と post-prototype candidate の境界を確認する
 
