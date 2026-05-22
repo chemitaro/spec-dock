@@ -11,6 +11,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `phase_*.md`: shared phase playbook（共通の作り方）
 - `phase_plan_<scope>.md`: scope 固有の plan authoring rule
 - `reference_*.md`: GitHub / naming / deps / sync などの参照仕様
+- Worktree: [reference_worktree.md](reference_worktree.md)
 - `discussions/`: raw capture、ヒアリング、調査、議論、ADR の作業面
 
 phase playbook:
@@ -126,6 +127,7 @@ spec-dock/
 ./spec-dock/scripts/spec-dock deps check <target>
 ./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>
 ./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>
+./spec-dock/scripts/spec-dock worktree create [label]
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 ```

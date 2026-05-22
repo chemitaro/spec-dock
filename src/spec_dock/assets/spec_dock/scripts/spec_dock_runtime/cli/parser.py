@@ -61,6 +61,14 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(issue_sub.add_parser("start", help="Set active issue and checkout its branch"), registry, "issue_start")
     _bind_leaf(issue_sub.add_parser("finish", help="Close active issue and clear active pointers"), registry, "issue_finish")
 
+    p_worktree = sub.add_parser("worktree", help="Manage long-lived Git worktrees")
+    worktree_sub = p_worktree.add_subparsers(dest="worktree_cmd", required=True)
+    _bind_leaf(
+        worktree_sub.add_parser("create", help="Create a sibling Git worktree and optional make init bootstrap"),
+        registry,
+        "worktree_create",
+    )
+
     _bind_leaf(
         sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)"),
         registry,
