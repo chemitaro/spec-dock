@@ -11,6 +11,7 @@ from ..commands import new as new_commands
 from ..commands import sync as sync_commands
 from ..commands import update as update_commands
 from ..commands import validate as validate_commands
+from ..commands import worktree as worktree_commands
 from ..commands.contracts import CommandRegistry, CommandSpec
 
 
@@ -23,6 +24,7 @@ def build_registry() -> CommandRegistry:
     items.update(close_commands.command_specs())
     items.update(update_commands.command_specs())
     items.update(issue_commands.command_specs())
+    items.update(worktree_commands.command_specs())
     items.update(sync_commands.command_specs())
     items.update(deps_commands.command_specs())
     items.update(validate_commands.command_specs())
