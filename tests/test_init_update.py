@@ -83,6 +83,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
         "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
+        "spec-dock/docs/reference_worktree.md": (
+            "src/spec_dock/assets/spec_dock/docs/reference_worktree.md"
+        ),
         "spec-dock/docs/phase_requirement.md": (
             "src/spec_dock/assets/spec_dock/docs/phase_requirement.md"
         ),
@@ -191,6 +194,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/scripts/spec_dock_runtime/application/sync_state.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py"
         ),
+        "spec-dock/scripts/spec_dock_runtime/application/worktree.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/application/import_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py"
         ),
@@ -212,11 +218,17 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
         ),
+        "spec-dock/scripts/spec_dock_runtime/commands/worktree.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/domain/validation.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/infra/make_cli.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/make_cli.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py"
@@ -733,6 +745,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00108-worktree-create-cli-and-output/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00109-worktree-docs-dogfooding-and-final-verification/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00110-worktree-create-core-use-case/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json",
@@ -783,6 +799,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00054-github-lifecycle-command-expansion/issues/iss-00096-self-update-command/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00074-multi-host-agent-and-config-asset-expansion/issues/iss-00075-multi-host-agent-and-config-asset-install/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00108-worktree-create-cli-and-output/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00109-worktree-docs-dogfooding-and-final-verification/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00110-worktree-create-core-use-case/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json": [],

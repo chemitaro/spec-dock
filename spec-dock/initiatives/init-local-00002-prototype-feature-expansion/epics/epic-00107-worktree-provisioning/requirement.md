@@ -1,0 +1,324 @@
+---
+種別: 要件定義書（Epic）
+ID: "epic-00107"
+タイトル: "Worktree Provisioning"
+関連GitHub: ["#107"]
+状態: "approved"
+作成者: "iwasawayuuta"
+最終更新: "2026-05-22"
+親: ["init-local-00002"]
+---
+
+# epic-00107 Worktree Provisioning — 要件定義（WHAT / WHY）
+
+## 目的（Initiative との紐づき）
+- Initiative 目標 / 指標:
+  - `init-local-00002` の feature expansion として、SpecDock の日常運用に「並行開発用 worktree を安全に作る」能力を追加する。
+  - feature work を architecture maintenance と混ぜず、operator が複数 issue / 複数変更を branch / checkout 単位で分離して前進できるようにする。
+  - `Metric-001` の「feature value 中心の portfolio」に対して、runtime command で実用できる operator value を追加する。
+- この epic が提供する能力:
+  - repo-local SpecDock runtime command から、現在 checkout に紐づく linked worktree と新規 branch を作成できる。
+  - 作成先は main checkout の中ではなく、main checkout と同じ親 directory に作る `<repo-basename>-worktrees/` container 配下へ集約できる。
+  - worktree directory name / initial branch name は、既に実用している `taikyohiyou_project` の naming UX を踏襲して自動合成できる。
+  - worktree 作成後に、project-local bootstrap interface として worktree root の `make init` を optional / non-fatal に呼び出せる。
+  - Codex app が管理する短命 worktree とは別に、開発者が自分で管理する長命 worktree を作る導線を提供する。
+
+## ユースケース
+- 正常系:
+  - maintainer が `spec-dock` main checkout から worktree 作成 command を実行し、現在 branch を基点にした新 branch と linked worktree を作成する。
+  - maintainer が optional label を指定し、directory / branch に読みやすい suffix を付けた worktree を作成する。
+  - label を省略した場合、command は `wt1`, `wt2`, ... のように未使用 suffix を自動採番して作成する。
+  - 作成された worktree root に `make init` が存在する場合、command は bootstrap としてそれを実行する。
+  - `make init` が存在しない repo でも、worktree 作成自体は成功する。
+- 例外 / 運用シナリオ:
+  - directory / branch / Git worktree record が衝突する場合、command は次の suffix を試し、operator が手で番号を探さなくてよい。
+  - detached HEAD、Git repo 外、invalid label、permission error、unknown `git worktree add` error は fail-fast し、worktree 作成を成功扱いしない。
+  - `make init` が存在して失敗した場合でも、作成済み worktree / branch は成功成果物として残し、command 全体は作成失敗にしない。ただし non-fatal warning として operator が追える情報を出す。
+  - Codex-managed worktree は `$CODEX_HOME/worktrees` 側の短命作業として維持し、この command はそれを移動・置換・cleanup しない。
+
+## Epic 要件
+- E-RQ-001:
+  - SpecDock は repo-local runtime command として worktree 作成 capability を提供し、maintainer が `git worktree add` の naming / collision handling / bootstrap を毎回手作業で組み立てなくてよいこと。
+- E-RQ-002:
+  - 作成先 container は main checkout の内側ではなく、main checkout の親 directory 直下の `<repo-basename>-worktrees/` とすること。
+  - container 名は lowercase path policy に従い、dot suffix ではなく hyphen suffix を標準とすること。
+  - 例: `/Users/.../spec-dock` から作る場合、container は `/Users/.../spec-dock-worktrees/` であること。
+  - command が既存 linked worktree から実行された場合も、container placement と repo basename は Git が認識する main worktree を基準に正規化すること。
+- E-RQ-003:
+  - 個別 worktree directory name と initial branch name は、参照プロダクトの実用 naming を踏襲すること。
+  - label 省略時の id は `wt1`, `wt2`, ... とし、label 指定時の id は `<label>`, `<label>2`, ... とすること。
+  - 個別 worktree directory は `<repo-basename>-<id>` を基本とし、container 配下に作ること。
+  - initial branch は `<current-branch>-<id>` を基本とすること。
+- E-RQ-004:
+  - label は lowercase alphanumeric と hyphen のみを許可し、uppercase、underscore、dot、space、slash、shell metacharacter を拒否すること。
+- E-RQ-005:
+  - command は directory existence、branch existence、`git worktree list --porcelain` による worktree record existence を確認し、衝突時は次の id を試すこと。
+  - `git worktree add` 実行時に既存 branch / path / record 由来の retryable collision が発生した場合も、次の id を試すこと。
+- E-RQ-006:
+  - 作成後 bootstrap は worktree root の `make init` を project-local interface として扱うこと。
+  - `make init` が定義されていない repo では何もしないこと。
+  - `make init` が失敗しても worktree 作成自体を失敗にしないこと。
+  - `make init` が失敗した場合も command process は exit code 0 を返し、worktree 作成成功 + bootstrap warning として扱うこと。
+  - non-fatal bootstrap failure は warning / output として観測可能にし、作成済み path と branch を operator が把握できること。
+- E-RQ-007:
+  - command output は少なくとも、採用 id、worktree path、branch name、bootstrap 実行有無、bootstrap result を示すこと。
+- E-RQ-008:
+  - この epic は手動管理の長命 linked worktree 作成を扱い、Codex app の短命 / detached HEAD worktree 管理、Handoff、cleanup を再実装しないこと。
+- E-RQ-009:
+  - main checkout での実装作業を全面禁止する policy change はこの epic の目的にしないこと。
+  - ただし、複数変更を並行させる場合は dedicated worktree を作る導線を first-class にすること。
+- E-RQ-010:
+  - provider-side source of truth は `src/spec_dock/assets/spec_dock/...` とし、dogfooding workspace `spec-dock/...` は検証・反映対象として扱うこと。
+  - command 追加は既存 layered runtime architecture に沿い、monolithic shell script への逆戻りを避けること。
+
+## Epic 受け入れ条件
+- E-AC-001:
+  - 前提:
+    - Git repo の main checkout が `/tmp/example/spec-dock` にあり、current branch が `main` である
+    - `../spec-dock-worktrees/` は存在しない、または空である
+  - 操作:
+    - maintainer が worktree 作成 command を label なしで実行する
+  - 期待結果:
+    - `/tmp/example/spec-dock-worktrees/spec-dock-wt1` が linked worktree として作成される
+    - `main-wt1` branch が作成され、その worktree で checkout される
+    - command output が id / path / branch / bootstrap result を表示する
+  - 観測点:
+    - CLI / runtime test
+    - `git worktree list --porcelain` assertion
+- E-AC-002:
+  - 前提:
+    - `spec-dock-wt1` / `main-wt1` が既に存在する
+  - 操作:
+    - maintainer が label なしで再度 worktree 作成 command を実行する
+  - 期待結果:
+    - command は衝突を避けて `wt2` を採用する
+    - `/tmp/example/spec-dock-worktrees/spec-dock-wt2` と `main-wt2` が作成される
+  - 観測点:
+    - CLI / runtime test
+    - branch / directory / worktree record collision test
+- E-AC-003:
+  - 前提:
+    - current branch が `feature/base` である
+  - 操作:
+    - maintainer が worktree 作成 command に label `issue-107-worktree` を指定する
+  - 期待結果:
+    - id は `issue-107-worktree` になる
+    - worktree path は `<repo-parent>/<repo-basename>-worktrees/<repo-basename>-issue-107-worktree` になる
+    - branch は `feature/base-issue-107-worktree` になる
+  - 観測点:
+    - naming unit test
+    - CLI / runtime test
+- E-AC-004:
+  - 前提:
+    - label に `Issue_107`, `issue.107`, `issue/107`, `issue 107` のいずれかが指定される
+  - 操作:
+    - maintainer が worktree 作成 command を実行する
+  - 期待結果:
+    - command は invalid label として fail-fast する
+    - Git worktree / branch / directory は作成されない
+  - 観測点:
+    - validation test
+- E-AC-005:
+  - 前提:
+    - 作成先 worktree root の `Makefile` に `init` target が定義されている
+  - 操作:
+    - maintainer が worktree 作成 command を実行する
+  - 期待結果:
+    - command は worktree root で `make init` を実行する
+    - `make init` が成功した場合、output は bootstrap success を示す
+  - 観測点:
+    - subprocess invocation test
+    - cwd assertion
+- E-AC-006:
+  - 前提:
+    - 作成先 worktree root に `Makefile` がない、または `init` target がない
+  - 操作:
+    - maintainer が worktree 作成 command を実行する
+  - 期待結果:
+    - command は bootstrap を skip する
+    - worktree 作成は成功する
+    - output は bootstrap skipped を示す
+  - 観測点:
+    - CLI / runtime test
+- E-AC-007:
+  - 前提:
+    - 作成先 worktree root の `make init` が非ゼロ終了する
+  - 操作:
+    - maintainer が worktree 作成 command を実行する
+  - 期待結果:
+    - worktree / branch は作成済み成果物として残る
+    - command は exit code 0 で作成結果を成功として返す
+    - output は bootstrap failure を non-fatal warning として表示する
+  - 観測点:
+    - CLI / runtime test
+    - output assertion
+- E-AC-008:
+  - 前提:
+    - command が `/tmp/example/spec-dock-worktrees/spec-dock-existing` のような既存 linked worktree から実行される
+    - Git が認識する main worktree は `/tmp/example/spec-dock` である
+    - current branch は `main-existing` である
+  - 操作:
+    - maintainer が label なしで worktree 作成 command を実行する
+  - 期待結果:
+    - command は main worktree basename `spec-dock` を使って container `/tmp/example/spec-dock-worktrees/` を選ぶ
+    - 新しい個別 worktree は `/tmp/example/spec-dock-worktrees/spec-dock-wtN` に作成される
+    - initial branch は実行元 current branch を基点に `main-existing-wtN` として合成される
+    - `spec-dock-existing-worktrees/` や `spec-dock-existing-wtN` のような chained path は作られない
+  - 観測点:
+    - main-worktree normalization test
+    - CLI / runtime test
+- E-AC-009:
+  - 前提:
+    - label は valid で、current checkout も Git repo 内の branch checkout である
+    - ただし parent directory の permission、path creation、または `git worktree add` が retryable collision ではない理由で失敗する
+  - 操作:
+    - maintainer が worktree 作成 command を実行する
+  - 期待結果:
+    - command は fail-fast し、作成成功として扱わない
+    - unknown failure を次番号 retry で握りつぶさない
+    - output は non-retryable failure の原因と、作成済み成果物がないこと、または部分作成が発生した場合の状態を示す
+  - 観測点:
+    - non-retryable Git failure test
+    - permission / path failure test
+- E-AC-010:
+  - 前提:
+    - current checkout が detached HEAD である、または Git repo 外である
+  - 操作:
+    - maintainer が worktree 作成 command を実行する
+  - 期待結果:
+    - command は fail-fast する
+    - worktree / branch / directory は作成されない
+  - 観測点:
+    - failure-path test
+- E-AC-011:
+  - 前提:
+    - provider-side runtime implementation と dogfooding workspace を確認する
+  - 操作:
+    - epic close-out 時に docs / tests / command help を確認する
+  - 期待結果:
+    - provider-side source of truth と dogfooding `spec-dock/` の command contract が一致している
+    - Codex-managed worktree を再実装しない scope boundary が docs に残っている
+  - 観測点:
+    - provider / dogfooding parity check
+    - final spec review
+
+## スコープ
+- 必須:
+  - SpecDock runtime worktree creation command
+  - repo sibling `<repo-basename>-worktrees/` container placement
+  - taikyohiyou_project 由来の id / directory / branch naming
+  - label validation
+  - collision detection and retry
+  - optional / non-fatal `make init` bootstrap
+  - CLI output contract
+  - provider-side implementation docs / tests
+  - dogfooding workspace inspection / parity confirmation
+- 禁止:
+  - main checkout 内に `.worktrees/` や `worktrees/` を標準作成先として持ち込むこと
+  - Codex app managed worktree を移動・削除・再実装すること
+  - `make init` failure を worktree 作成失敗として扱うこと
+  - invalid label を shell / Git command に渡してから失敗させること
+  - unknown `git worktree add` failure を retryable collision として握りつぶすこと
+  - provider-side source of truth を飛ばして dogfooding workspace だけを編集すること
+- 対象外:
+  - worktree remove / prune / repair command
+  - worktree status dashboard / all-worktree diff summary
+  - Codex app Handoff integration
+  - Codex local environment `.codex` setup scripts の設計
+  - project-specific secret / env projection の実装
+  - main checkout での実装作業を禁止する repository policy 変更
+  - GitHub PR creation / merge lifecycle
+
+## 境界
+- 常に行う:
+  - worktree 作成は repo 外 sibling container に集約する
+  - linked worktree から実行された場合も、main worktree を基準に container と repo basename を決める
+  - current branch を基点に initial branch 名を合成する
+  - Git が管理する linked worktree として作成する
+  - `make init` は project-local bootstrap interface として扱い、存在しない / 失敗する場合でも作成済み worktree を残す
+  - operator が path / branch / bootstrap 状態を読める output を出す
+  - provider-side runtime architecture の layer 境界に沿って実装する
+- 判断が必要:
+  - `make init` target existence をどの方法で判定するか
+  - Git failure / partial state をどの structured result で表すか
+- 行わない:
+  - nested checkout を repo 内に作らない
+  - cleanup / remove を作成 command の副作用として実行しない
+  - detached HEAD から branch 名を推測して作成しない
+  - secret-bearing env file を新 worktree へ copy しない
+  - Codex-managed `$CODEX_HOME/worktrees` をこの command の管理対象にしない
+
+## 非機能要件
+- 性能:
+  - suffix collision retry は通常利用で体感遅延を生まないこと。
+  - 既存 `sync` / `validate` / `active` / `issue` command の性能に影響しないこと。
+- 信頼性 / 一貫性:
+  - directory / branch / worktree record の衝突を同じ id generation contract で扱うこと。
+  - Git command が未知の失敗を返した場合は、作成成功に見せないこと。
+  - 作成後 bootstrap の成否は worktree 作成結果と区別すること。
+- セキュリティ:
+  - label validation により path traversal、shell injection、unexpected ref name を防ぐこと。
+  - `make init` は作成された worktree root だけで実行し、任意 path の command 実行機構にしないこと。
+  - secret / env file copy は scope 外とし、worktree 作成 command が secret-bearing file を複製しないこと。
+- 運用:
+  - long-lived manual worktree と Codex-managed short-lived worktree の役割差が docs から分かること。
+  - created path / branch / bootstrap warning が operator の次行動に十分な情報を持つこと。
+  - `spec-dock` 自身の dogfooding repo でも作成 command を検証できること。
+
+## 依存 / 影響範囲
+- 影響する component:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/`
+  - `src/spec_dock/assets/spec_dock/docs/`
+  - `tests/cli_runtime/`
+  - `tests/domain_runtime/` または `tests/presentation_runtime/`（分離した naming / output logic がある場合）
+  - dogfooding workspace `spec-dock/`
+- 外部依存:
+  - Git CLI
+  - `make`（optional bootstrap のみ）
+  - project-local `Makefile` / `make init` target（存在する場合のみ）
+- 互換性:
+  - additive command として追加し、既存 `new` / `active` / `issue` / `sync` / `validate` / `update` の contract を壊さない。
+  - 既存 repo に `make init` がない場合でも worktree 作成を利用できる。
+  - 既存 Codex-managed worktree behavior と競合しない。
+
+## 決定事項
+- Q-001:
+  - 質問:
+    - CLI shape は top-level `worktree [LABEL]` と subcommand family `worktree create [LABEL]` のどちらにするか。
+  - 選択肢:
+    - A:
+      - `spec-dock worktree [LABEL]`
+      - 参照プロダクトの `make worktree <optional-label>` に最も近く、作成専用 command として短い。
+    - B:
+      - `spec-dock worktree create [LABEL]`
+      - 将来 `list` / `remove` / `status` を同じ family に足しやすい。
+  - 推奨案:
+    - B。今回の epic は create のみだが、command family として予約しておく方が将来拡張と help 構造が自然である。
+  - 決定:
+    - B を採用する。
+    - worktree 作成 command の CLI shape は `spec-dock worktree create [LABEL]` を基本とする。
+  - 影響範囲:
+    - CLI parser
+    - docs
+    - tests
+- Q-002:
+  - 質問:
+    - output に absolute path と relative path のどちらを主表示するか。
+  - 選択肢:
+    - A:
+      - absolute path を主表示し、operator がどの checkout からでも迷わないようにする。
+    - B:
+      - current checkout からの relative path を主表示し、短い output にする。
+  - 推奨案:
+    - A。linked worktree から実行しても main worktree 基準へ正規化するため、absolute path のほうが誤読が少ない。
+  - 決定:
+    - A を採用する。
+    - command output は absolute path を主表示する。
+  - 影響範囲:
+    - CLI output
+    - tests
