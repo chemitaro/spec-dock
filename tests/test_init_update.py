@@ -2065,7 +2065,9 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertEqual(parsed.get("model_reasoning_effort"), "high")
         self.assertEqual(parsed.get("web_search"), "disabled")
         self.assertEqual(parsed.get("approval_policy"), "never")
-        self.assertEqual(parsed.get("sandbox_mode"), "read-only")
+        self.assertNotIn("sandbox_mode", parsed)
+        self.assertIsInstance(parsed.get("default_permissions"), str)
+        self.assertIn(parsed["default_permissions"], parsed.get("permissions", {}))
         self.assertEqual(parsed.get("features", {}).get("shell_tool"), True)
         self.assertIsInstance(parsed.get("developer_instructions"), str)
         self.assertIn(f'name = "{agent_name}"', text, f"delegated author adapter missing name ({shim_label})")
@@ -2078,13 +2080,27 @@ class TestInitUpdate(CliRuntimeHarness):
             "intentionally thin",
             "source of",
             f"delegated draft {draft_kind} evidence only",
-            "Do not edit canonical spec artifacts or implementation files",
+            "guardrail for future write-scoped task",
+            "proposal-only mode and do not write",
+            "Never edit implementation files",
             "Do not promote phases",
             "claim reviewer",
             "write-capable delegation",
             "runtime validation",
             "role registry",
             ".github/agents",
+            "default_permissions = ",
+            "[permissions.",
+            '":minimal" = "read"',
+            '"." = "read"',
+            '"spec-dock/initiatives" = "write"',
+            '"src" = "read"',
+            '"tests" = "read"',
+            '".env" = "deny"',
+            "network]",
+            "enabled = false",
+            "proposal-only mode",
+            "fail-open probe evidence",
             "Manual spec authoring remains valid",
             "fresh `spec-reviewer` pass remains required",
         ):
@@ -2101,7 +2117,12 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         self.assertIn('web_search = "disabled"', text, f"delegated author adapter missing web setting ({shim_label})")
         self.assertIn('approval_policy = "never"', text, f"delegated author adapter missing approval policy ({shim_label})")
-        self.assertIn('sandbox_mode = "read-only"', text, f"delegated author adapter missing read-only sandbox ({shim_label})")
+        self.assertNotIn("sandbox_mode =", text, f"delegated author adapter must use Permission Profiles ({shim_label})")
+        self.assertNotIn(
+            "[sandbox_workspace_write]",
+            text,
+            f"delegated author adapter must not mix legacy sandbox settings with Permission Profiles ({shim_label})",
+        )
         self.assertIn("[features]", text, f"delegated author adapter missing features table ({shim_label})")
         self.assertIn("shell_tool = true", text, f"delegated author adapter missing shell tool enable ({shim_label})")
         self.assertNotIn(
