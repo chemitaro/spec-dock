@@ -180,9 +180,9 @@ ID: "iss-00120"
 - 対象ファイル:
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/report.md
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/discussions/
-      - spec-dock/docs/ (inspection only)
-      - spec-dock/templates/ (inspection only)
-      - spec-dock/system/active-none/ (inspection only)
+      - spec-dock/docs/ (tool-generated dogfooding parity update by `spec-dock update .`, then inspection)
+      - spec-dock/templates/ (tool-generated dogfooding parity update by `spec-dock update .`, then inspection)
+      - spec-dock/system/active-none/ (tool-generated dogfooding parity update by `spec-dock update .`, then inspection)
 - 閉じる closure id: tc-090
 - 計画済み契約:
   - scope: listed allowed paths only.
@@ -196,12 +196,13 @@ ID: "iss-00120"
 - allowed changes:
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/report.md
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/discussions/
-      - spec-dock/docs/ (inspection only)
-      - spec-dock/templates/ (inspection only)
-      - spec-dock/system/active-none/ (inspection only)
+      - spec-dock/docs/ (tool-generated dogfooding parity update by `spec-dock update .`, then inspection)
+      - spec-dock/templates/ (tool-generated dogfooding parity update by `spec-dock update .`, then inspection)
+      - spec-dock/system/active-none/ (tool-generated dogfooding parity update by `spec-dock update .`, then inspection)
 - forbidden changes:
       - provider source changes during S90; put them in an implementation step with code-reviewer/spec-reviewer mapping
       - runtime/test/scaffold behavior changes under a spec-reviewer-only gate
+      - manual edits to dogfooding docs/templates/system active-none outside the generated `spec-dock update .` parity refresh
 - required verification: tc-090: Run spec-dock sync/validate or inspect generated dogfooding copies for provider/consumer parity.
 - reviewer focus: spec-reviewer
 - output required: changed files, verification result for each closure id, unresolved risks, Ledger Note or no-material-decision statement.
