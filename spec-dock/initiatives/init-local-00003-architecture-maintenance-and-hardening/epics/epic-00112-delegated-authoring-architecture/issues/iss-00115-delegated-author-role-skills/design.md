@@ -24,7 +24,7 @@ ID: "iss-00115"
 - 目的:
   - spec-dock-system-architect と spec-dock-implementation-planner の provider-first role skills を追加する。
 - 必須 / 禁止:
-  - 必須: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md; .agents/skills mirrors; tests/test_init_update.py as needed` を対象に、親 Epic の該当 contract を実装可能な形にする。
+  - 必須: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md` を provider source として更新し、`.agents/skills` mirrors and managed asset tests are parity/verification surfaces.
   - 禁止: write-capable delegation / runtime validation / `.github/agents` support の導入。
 - 前提:
   - Depends on: iss-00113, iss-00114
@@ -42,7 +42,7 @@ ID: "iss-00115"
 - 採用しないもの:
   - runtime enforcement first、host-specific long instruction duplication。
 - 影響範囲:
-  - src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md; .agents/skills mirrors; tests/test_init_update.py as needed
+  - src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md; .agents/skills mirrors; tests/test_init_update.py managed asset parity coverage
 
 ## 採用方針 / トレードオフ
 - 論点:

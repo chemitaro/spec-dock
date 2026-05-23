@@ -97,6 +97,14 @@ Pilot --> Tests : "reviewable evidence"
   - No public runtime API change unless explicitly discovered during implementation.
   - Contract surface is Markdown / skill / host adapter content.
 
+## Pilot Target Contract
+- Before executing the pilot, `report.md` must name:
+  - target active node
+  - previous phase reviewer-pass evidence
+  - invocation path: direct role skill or Codex host adapter
+  - integration / rejection report location
+- If `iss-00117` closes as `adapter_contract_only`, the pilot may proceed through shipped role skills and documented invocation contracts, but must record `host_invocation_verified=false` and must not claim verified Codex host callability.
+
 ## ディレクトリ / ファイル変更計画
 ```text
 .
@@ -111,6 +119,7 @@ Pilot --> Tests : "reviewable evidence"
 - AC-003 -> final `spec-reviewer` pass.
 - EC-001 -> documented uncertainty / approved no-op path.
 - EC-002 -> provider/consumer parity handling.
+- E-AC-009 -> negative / blocked case exercise.
 
 ## テスト戦略
 - 単体:

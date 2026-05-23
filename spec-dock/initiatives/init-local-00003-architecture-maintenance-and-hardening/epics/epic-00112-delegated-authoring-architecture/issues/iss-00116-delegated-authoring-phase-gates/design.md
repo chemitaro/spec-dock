@@ -24,7 +24,7 @@ ID: "iss-00116"
 - 目的:
   - phase_design / phase_plan / phase_plan_epic / phase_plan_issue に delegated authoring gates と reviewer criteria を組み込む。
 - 必須 / 禁止:
-  - 必須: `src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md; dogfooding mirrors` を対象に、親 Epic の該当 contract を実装可能な形にする。
+  - 必須: `src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md` を provider source として更新し、dogfooding mirrors は parity surface として確認する。
   - 禁止: write-capable delegation / runtime validation / `.github/agents` support の導入。
 - 前提:
   - Depends on: iss-00113, iss-00114, iss-00115
@@ -42,7 +42,7 @@ ID: "iss-00116"
 - 採用しないもの:
   - runtime enforcement first、host-specific long instruction duplication。
 - 影響範囲:
-  - src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md; dogfooding mirrors
+  - src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md; actual `spec-reviewer` invocation surface evidence; dogfooding mirrors
 
 ## 採用方針 / トレードオフ
 - 論点:
@@ -103,10 +103,20 @@ Tests --> Consumer : "assert or inspect parity"
 `-- tests/...                  # 変更/確認: managed asset or content assertion as needed
 ```
 
+## Reviewer Execution Surface Design
+- The phase docs are the provider-side authority for phase gate wording.
+- Implementation must verify whether the actual `spec-reviewer` skill / reviewer prompt / reviewer authority surface consumes those phase docs.
+- If reviewer consumption is not guaranteed, this Issue owns the smallest concrete update needed so delegated draft provenance, stale/superseded status, traceability, scope creep, and phase gate bypass can affect reviewer verdicts.
+- Report evidence must distinguish:
+  - `phase_docs_authority_verified`
+  - `reviewer_surface_updated`
+  - `reviewer_surface_uncertain_follow_up`
+
 ## 要件 → 設計マッピング
 - AC-001 -> provider source of truth update and target file diff.
 - AC-002 -> validate / sync / parity evidence.
 - AC-003 -> final `spec-reviewer` pass.
+- AC-004 -> actual reviewer execution surface verification or update.
 - EC-001 -> documented uncertainty / approved no-op path.
 - EC-002 -> provider/consumer parity handling.
 

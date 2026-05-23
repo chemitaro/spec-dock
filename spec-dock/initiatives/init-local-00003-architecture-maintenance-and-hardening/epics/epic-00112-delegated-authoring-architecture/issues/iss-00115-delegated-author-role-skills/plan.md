@@ -39,14 +39,14 @@ ID: "iss-00115"
   - 観測可能な振る舞い: `Role skills` contract exists in provider-side source of truth.
   - 依存: iss-00113, iss-00114
   - unblock: S02
-  - 対象ファイル: src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md; .agents/skills mirrors; tests/test_init_update.py as needed
+  - 対象ファイル: src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md
   - 閉じる要件: AC-001
   - レビューゲート: spec-reviewer for docs/skill/template alignment, code-reviewer if tests/runtime are touched.
 - S02:
   - 観測可能な振る舞い: dogfooding mirror and verification evidence reflect provider change.
   - 依存: S01
   - unblock: S90, S99
-  - 対象ファイル: dogfooding mirrors / tests as applicable
+  - 対象ファイル: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests as applicable
   - 閉じる要件: AC-002, EC-002
   - レビューゲート: reviewer matching changed surface.
 - S90:
@@ -67,7 +67,7 @@ ID: "iss-00115"
 | id | step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
 | tc-001 | S01 | provider contract | acceptance | AC-001 | Provider source contains the Role skills contract. | target provider files | missing shipped contract | yes | inspect-only | report step closure |
-| tc-002 | S02 | parity | acceptance | AC-002 | Dogfooding mirror/tests/validation reflect provider change or document intended no-op. | diff + command output | provider/consumer drift | yes | inspect-only | report step closure |
+| tc-002 | S02 | managed asset parity | acceptance | AC-002 | Dogfooding mirror reflects provider role skills and `tests/test_init_update.py` or equivalent targeted test proves managed asset parity. | test output + diff + command output | untested shipped role skill drift | yes | test-required | report step closure |
 | tc-003 | S99 | final review | acceptance | AC-003 | Final reviewer confirms issue docs/report/diff alignment. | reviewer output | spec drift | yes | manual-required | report final gate |
 | tc-004 | S90 | documented uncertainty | exception | EC-001 | If host/path/target uncertainty blocks verified implementation, the issue records uncertainty and does not claim false success. | report exception evidence | false verified claim | yes | inspect-only | report S90 closure |
 | tc-005 | S02 | parity drift | exception | EC-002 | Provider/consumer drift is either corrected or explicitly documented as intended. | provider/consumer diff | silent drift | yes | inspect-only | report S02 closure |
@@ -94,13 +94,14 @@ ID: "iss-00115"
 - design 参照:
   - `design.md` file change plan and parent Epic design.
 - 対象ファイル:
-  - src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md; .agents/skills mirrors; tests/test_init_update.py as needed
+  - src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md
 - planned contract:
   - test obligation:
     - closure id: tc-001
     - coverage rationale: docs/skill/template contract can be closed by inspection plus content assertions if available.
   - implementation scope:
     - allowed paths: target provider files listed above.
+    - forbidden paths: `.agents/skills` dogfooding mirrors and generated consumer copies; they are validated in S02.
     - forbidden changes: runtime validation, write-capable delegation, `.github/agents` support.
   - Green verification:
     - inspect diff and run targeted tests if tests are changed.
@@ -111,7 +112,9 @@ ID: "iss-00115"
 
 #### delegation contract
 - delegated role: doc-writer by default; dev-coder only if tests/runtime are changed.
-- allowed paths: target provider files and related tests.
+- allowed paths: target provider files listed above only.
+- forbidden paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests; they are handled in S02 unless an approved plan amendment moves them.
+
 - forbidden changes: parent Epic non-scope.
 - required verification: diff inspection and targeted tests if applicable.
 - output required: changed files, verification result, unresolved risks.
@@ -132,31 +135,32 @@ ID: "iss-00115"
 - behavior goal:
   - Consumer/dogfooding workspace and tests reflect the provider change.
 - 対象ファイル:
-  - dogfooding mirrors and tests as applicable.
+  - `.agents/skills` dogfooding mirrors and `tests/test_init_update.py` managed asset parity coverage.
 - planned contract:
   - test obligation:
     - closure id: tc-002
   - implementation scope:
-    - allowed paths: dogfooding mirrors, tests, report evidence.
+    - allowed paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, managed asset parity tests when applicable, and report evidence.
+
     - forbidden changes: unrelated implementation refactor.
   - Green verification:
     - `./spec-dock/scripts/spec-dock validate`
     - `./spec-dock/scripts/spec-dock sync`
-    - targeted tests if changed.
+    - managed asset parity test in `tests/test_init_update.py` or an equivalent targeted test.
   - report evidence destination:
     - `report.md` Step Contract Closure S02.
 
 #### delegation contract
 - delegated role: doc-writer / dev-coder depending on changed surface.
-- required verification: validate/sync and targeted tests if applicable.
+- required verification: validate/sync and managed asset parity test in `tests/test_init_update.py` or an equivalent targeted test.
 - stop conditions: validation failure unrelated to this Issue needs triage before continuing.
 
 #### 具体テストケース一覧
-- `tc-s02-001` inspect-only: provider/consumer parity
+- `tc-s02-001` test-required: managed asset provider/consumer parity
   - 前提: provider update is complete.
-  - 操作: inspect dogfooding mirror / run sync or validate.
-  - 期待結果: no unintended drift.
-  - 検証方法: diff + command evidence.
+  - 操作: inspect dogfooding mirror and run managed asset parity test.
+  - 期待結果: no unintended drift and test output proves role skills are shipped/copied as expected.
+  - 検証方法: diff + command evidence + `tests/test_init_update.py` or equivalent targeted test output.
   - 関連 closure id: tc-002
 
 #### step closure contract
@@ -178,7 +182,7 @@ ID: "iss-00115"
 - 必須 validation:
   - `./spec-dock/scripts/spec-dock validate`
   - `./spec-dock/scripts/spec-dock sync`
-  - targeted tests if applicable
+  - managed asset parity test in `tests/test_init_update.py` or an equivalent targeted test
 - final spec review ゲート:
   - reviewer: spec-reviewer
   - 範囲: requirement / design / plan / report / diff alignment

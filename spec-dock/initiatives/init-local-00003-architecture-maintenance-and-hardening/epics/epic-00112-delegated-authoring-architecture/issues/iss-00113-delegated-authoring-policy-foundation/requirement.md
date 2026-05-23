@@ -32,7 +32,7 @@ ID: "iss-00113"
 
 ## スコープ
 - 必須:
-  - 対象成果物: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; spec-dock/docs/workflow_spec_authoring.md`
+  - 対象成果物: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
   - Provider-side source of truth を先に更新し、dogfooding workspace の parity を確認する。
   - `report.md` に変更対象、検証、reviewer 結果を記録できる状態にする。
 - 禁止:
@@ -79,6 +79,15 @@ ID: "iss-00113"
   - 操作: Issue final spec review を行う。
   - 期待結果: 親 Epic の該当 E-RQ/E-AC と矛盾せず `review_status: pass`。
   - 観測点: reviewer result。
+
+## Issue-Specific Acceptance Lock
+- AC-001 must explicitly prove:
+  - main orchestrator owns canonical artifacts and phase promotion
+  - delegated authoring is draft-only evidence
+  - explicit consent / invocation scope is required
+  - delegated roles cannot edit canonical artifacts, implementation code, GitHub state, or reviewer results
+  - manual authoring remains valid when delegation is unavailable or skipped
+- AC-002 must prove dogfooding parity only after provider source is updated.
 
 ## 例外・エッジケース
 - EC-001:
