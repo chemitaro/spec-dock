@@ -136,7 +136,7 @@ git diff --check
 #### Parent Implementation Exception
 | step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | not used; implementation was delegated to doc-writer | N/A | N/A | N/A | revert S01 commit if needed | `git diff --check` and spec-reviewer pass | spec-reviewer passed | no waiver / denied / unavailable state used |
 
 #### Reviewer Gate Status
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
@@ -156,7 +156,7 @@ git diff --check
 - `9ca240b` docs(delegated-authoring): policy foundationを追加
 
 #### メモ
-- ...
+- S01 was already committed before S02 execution continued.
 
 ---
 
@@ -213,18 +213,21 @@ git diff --check
 #### Step Contract Closure
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
-| S02 | tc-002, tc-005 | parity/verification evidence is recorded | dogfooding mirror matches provider; targeted tests, validate, sync, diff-check pass | pass | Waiting on fresh S02 reviewer before commit. |
+| S02 | tc-002, tc-005 | parity/verification evidence is recorded | dogfooding mirror matches provider; targeted tests, validate, sync, diff-check pass; fresh S02 `code-reviewer` returned `review_status: pass` | pass | S02 committed as `027b84b`. |
+| S90 | tc-004 | documented uncertainty path is closed or explicitly not triggered | target provider path, dogfooding mirror path, and test surface were all confirmed; no host/path/target uncertainty remained. | pass | EC-001 closed as not triggered, with verified paths recorded in S01/S02/S90 evidence. |
 
 #### Test Contract Closure
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
 |---|---|---|---|---|---|---|---|
 | tc-002 | S02 | yes | inspect-only | provider/dogfooding mirror parity and targeted assertion need verification | targeted unittests, validate, sync | pass | Test assertions cover representative policy foundation terms. |
-| tc-005 | S02 | yes | inspect-only | potential provider/consumer drift | `cmp -s ...`; parity unittest | pass | no unintended drift |
+| tc-004 | S90 | yes | inspect-only | target provider / mirror / test paths could have been uncertain | confirmed paths in issue docs and diff: provider doc, dogfooding mirror, targeted test | pass | EC-001 not triggered; no documented uncertainty or follow-up needed. |
+| tc-005 | S02 | yes | inspect-only | potential provider/consumer drift | `cmp -s src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md spec-dock/docs/workflow_spec_authoring.md`; parity unittest | pass | no unintended drift |
 
 #### Closure Coverage
 | closure id | step | verification evidence | observed result | notes |
 |---|---|---|---|---|
 | tc-002 | S02 | mirror diff + targeted unittests + validate/sync | pass | AC-002 closed for S02. |
+| tc-004 | S90 | confirmed provider, mirror, and test paths; no unresolved host/path/target uncertainty | pass | EC-001 not triggered. |
 | tc-005 | S02 | provider/consumer parity check | pass | EC-002 closed with no drift. |
 
 #### Closure Delta
@@ -241,7 +244,7 @@ git diff --check
 #### Delegated Worker Evidence
 | step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
-| S02 | dev-coder | Added representative workflow_spec_authoring policy assertions and confirmed mirror parity. | `spec-dock/docs/workflow_spec_authoring.md`, `tests/test_init_update.py` | two targeted unittests -> OK; validate -> pass; diff-check -> pass | pending S02 reviewer | sync was not run by worker; parent ran sync successfully | accepted |
+| S02 | dev-coder | Added representative workflow_spec_authoring policy assertions and confirmed mirror parity. | `spec-dock/docs/workflow_spec_authoring.md`, `tests/test_init_update.py` | two targeted unittests -> OK; validate -> pass; diff-check -> pass | code-reviewer pass | sync was not run by worker; parent ran sync successfully | accepted |
 
 #### Reviewer Gate Status
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
@@ -251,7 +254,7 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | dogfooding mirror + targeted test + issue report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | dogfooding mirror + targeted test + issue report evidence | `027b84b` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `spec-dock/docs/workflow_spec_authoring.md` - dogfooding mirror parity for delegated authoring policy foundation.
@@ -265,14 +268,15 @@ git diff --check
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| provider workflow docs | already updated | doc-writer | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` contains policy foundation | pending final spec-reviewer |
-| dogfooding workflow docs | yes, updated by local provider update | approved-local-execution | `spec-dock/docs/workflow_spec_authoring.md` mirrors provider section | pending final spec-reviewer |
-| templates / README / skills / migration notes | no | N/A | Issue scope is workflow policy foundation only; no template/skill/runtime contract change in iss-00113 | pending final spec-reviewer |
+| provider workflow docs | already updated | doc-writer | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` contains policy foundation | pass |
+| dogfooding workflow docs | yes, updated by local provider update | dev-coder / local update | `spec-dock/docs/workflow_spec_authoring.md` mirrors provider section; parity test passed | pass |
+| templates / README / skills / migration notes | no | N/A | Issue scope is workflow policy foundation only; no template/skill/runtime contract change in iss-00113 | pass |
+| EC-001 documented uncertainty path | no uncertainty triggered | orchestrator | provider path, mirror path, and targeted test path were all verified; no false-success uncertainty remains | pass |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | targeted docs content assertion added; no broader integration test expected unless QA requests it | targeted unittests, validate, sync | pending |
+| qa-reviewer | whole issue obligation coverage | targeted docs content assertion and provider/mirror parity tests are sufficient; no broader integration test required for this docs/scaffold-content issue | QA reviewer confirmed coverage is adequate and no broader integration test is required. | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
@@ -282,22 +286,22 @@ git diff --check
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / docs alignment | pending | 0 | pending |
+| spec-reviewer | requirement / design / plan / report / docs alignment | findings: none; final re-review confirmed AC-001..AC-003 and EC-001..EC-002 are sufficiently evidenced and no blocking stale gate or scope creep remains | 2 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| S01/S02 evidence recorded; final reviewer pending | `spec-dock/docs/workflow_spec_authoring.md`, `tests/test_init_update.py`, and report evidence | final response / Epic PR / GitHub issue lifecycle | pending |
+| S01/S02 evidence recorded; final QA, code review, and final spec review passed | report-only final gate evidence update | final response / Epic PR / GitHub issue lifecycle | ready for report commit and issue finish |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final spec review で Final QA Gate の pending 表記と tc-004/EC-001 closure 不足が指摘された。
+  - 解決: QA pass evidence と EC-001 not-triggered closure を report に明示した。
 
 ## 学んだこと (任意)
-- ...
+- Docs-only issue でも required closure id は not-triggered の場合に明示的な closure evidence が必要。
 
 ## 今後の推奨事項 (任意)
-- ...
+- 後続 Issue でも EC closure rows を S90 に必ず明示する。
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- EC-001 は対象 path / host uncertainty が発生しなかったため、not-triggered closure として S90 に記録した。
