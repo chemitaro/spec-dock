@@ -22,6 +22,8 @@ description: Entry skill that routes work to the correct spec-dock leaf workflow
 - `spec-dock-initiative-planning`: initiative-level requirement/design/plan planning.
 - `spec-dock-epic-planning`: epic-level requirement/design/plan planning.
 - `spec-dock-issue-execution`: issue-level TDD execution and report updates.
+- `spec-dock-system-architect`: draft-only system architecture proposal for the main orchestrator.
+- `spec-dock-implementation-planner`: draft-only implementation plan proposal for the main orchestrator.
 - `spec-dock-adr-facilitation`: ADR drafting/decision facilitation linked to the current workflow.
 
 ## Direct references
