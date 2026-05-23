@@ -91,6 +91,24 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 - preflight reviewer output は設計・計画の改善 input として扱い、final fresh reviewer pass とは分離する
 - reviewer independence: final `spec-reviewer` / `code-reviewer` / `qa-reviewer` は、同じ artifact を作成した authoring specialist や leaf-only evidence producer の代替ではない fresh gate として実行する
 
+## Task Manifest / Permission Profile Gate
+
+Write-scoped delegated authoring は、role-scoped Permission Profile と task manifest の両方が検証済みの場合だけ有効にできます。manifest は raw intention ではなく、実行直前に解決済みの path と revision を固定する fail-closed contract として `report.md` または issue-local `discussions/` に残します。
+
+Task manifest は少なくとも次を含めます。
+
+- `resolved target`: canonical artifact または evidence artifact の解決済み path。`spec-dock/active/*` symlink ではなく実体 path を記録する
+- `input revision`: 読み込んだ upstream requirement / design / plan / report の revision、hash、または commit
+- `allowed paths`: positive probe が write できる artifact / evidence path
+- `forbidden paths`: implementation code、tests、package/config、`.env*` など write してはならない path
+- `probe commands`: positive probe と negative probe の exact command、target path、cleanup command
+- `fallback`: fail-open、probe unavailable、Desktop/CLI divergent、または host enforcement 不明時に write-scoped delegation を disabled / proposal-only に戻す判断
+- `default_permissions` / `[permissions]`: role-scoped Permission Profile 名と read/write/deny の要約
+
+Positive write probe は allowed artifact / evidence path だけに成功しなければなりません。Negative write probe は forbidden implementation / config / test path で失敗しなければなりません。forbidden path への write が成功した場合、または host が enforcement を証明できない場合は fail-open と扱い、write-scoped delegation を有効化してはなりません。
+
+`sandbox_mode` / `sandbox_workspace_write` による workspace 全体 write と、Permission Profile による role-scoped write contract を混在させてはなりません。混在、Desktop/CLI divergent、probe unavailable、unreproducible result は `blocked` または `disabled` として記録し、v0 proposal-only authoring path に戻します。
+
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
 |---|---|---|---|---|
 | missing consent（同意欠落） | blocked / incomplete | obtain scoped consent or use manual authoring（scope 付き同意を取得する、または手動 authoring を使う） | Delegated Draft Evidence | ineligible |
