@@ -15,6 +15,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
+
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
     _EXPECTED_MANAGED_SKILL_NAMES,
@@ -186,7 +191,13 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/prompts/execute-initiative.md": (
             "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
         ),
+        ".codex/agents/implementation-planner.toml": (
+            "src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml"
+        ),
         ".codex/agents/spec-manager.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
+        ".codex/agents/system-architect.toml": (
+            "src/spec_dock/assets/install_root/.codex/agents/system-architect.toml"
+        ),
         ".github/agents/orchestrator.agent.md": (
             "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md"
         ),
@@ -474,11 +485,13 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/agents/dev-coder.toml",
         ".codex/agents/doc-writer.toml",
         ".codex/agents/explorer.toml",
+        ".codex/agents/implementation-planner.toml",
         ".codex/agents/pr-monitor.toml",
         ".codex/agents/qa-reviewer.toml",
         ".codex/agents/repo-analyst.toml",
         ".codex/agents/researcher.toml",
         ".codex/agents/spark-worker.toml",
+        ".codex/agents/system-architect.toml",
         ".codex/agents/spec-manager.toml",
         ".codex/agents/spec-reviewer.toml",
         ".codex/agents/utility-worker.toml",
@@ -530,11 +543,13 @@ class TestInitUpdate(CliRuntimeHarness):
             ".codex/agents/dev-coder.toml",
             ".codex/agents/doc-writer.toml",
             ".codex/agents/explorer.toml",
+            ".codex/agents/implementation-planner.toml",
             ".codex/agents/pr-monitor.toml",
             ".codex/agents/qa-reviewer.toml",
             ".codex/agents/repo-analyst.toml",
             ".codex/agents/researcher.toml",
             ".codex/agents/spark-worker.toml",
+            ".codex/agents/system-architect.toml",
             ".codex/agents/spec-manager.toml",
             ".codex/agents/spec-reviewer.toml",
             ".codex/agents/utility-worker.toml",
@@ -700,11 +715,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.codex/agents/dev-coder.toml",
         "spec_dock/assets/install_root/.codex/agents/doc-writer.toml",
         "spec_dock/assets/install_root/.codex/agents/explorer.toml",
+        "spec_dock/assets/install_root/.codex/agents/implementation-planner.toml",
         "spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
         "spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml",
         "spec_dock/assets/install_root/.codex/agents/repo-analyst.toml",
         "spec_dock/assets/install_root/.codex/agents/researcher.toml",
         "spec_dock/assets/install_root/.codex/agents/spark-worker.toml",
+        "spec_dock/assets/install_root/.codex/agents/system-architect.toml",
         "spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
         "spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml",
         "spec_dock/assets/install_root/.codex/agents/utility-worker.toml",
@@ -1540,6 +1557,66 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn('sandbox_mode = "workspace-write"', text, f"codex doc-writer missing sandbox mode ({shim_label})")
         self.assertIn("[features]", text, f"codex doc-writer missing features table ({shim_label})")
         self.assertIn("shell_tool = true", text, f"codex doc-writer missing shell tool enable ({shim_label})")
+
+    def _assert_codex_delegated_author_adapter_contract(
+        self,
+        *,
+        text: str,
+        shim_label: str,
+        agent_name: str,
+        skill_name: str,
+        draft_kind: str,
+    ) -> None:
+        parsed = tomllib.loads(text)
+        self.assertEqual(parsed.get("name"), agent_name)
+        self.assertEqual(parsed.get("model"), "gpt-5.5")
+        self.assertEqual(parsed.get("model_reasoning_effort"), "high")
+        self.assertEqual(parsed.get("web_search"), "disabled")
+        self.assertEqual(parsed.get("approval_policy"), "never")
+        self.assertEqual(parsed.get("sandbox_mode"), "read-only")
+        self.assertEqual(parsed.get("features", {}).get("shell_tool"), True)
+        self.assertIsInstance(parsed.get("developer_instructions"), str)
+        self.assertIn(f'name = "{agent_name}"', text, f"delegated author adapter missing name ({shim_label})")
+        self.assertIn(
+            f".agents/skills/{skill_name}/SKILL.md",
+            text,
+            f"delegated author adapter missing canonical role skill reference ({shim_label})",
+        )
+        for fragment in (
+            "intentionally thin",
+            "source of",
+            f"delegated draft {draft_kind} evidence only",
+            "Do not edit canonical spec artifacts or implementation files",
+            "Do not promote phases",
+            "claim reviewer",
+            "write-capable delegation",
+            "runtime validation",
+            "role registry",
+            ".github/agents",
+            "Manual spec authoring remains valid",
+            "fresh `spec-reviewer` pass remains required",
+        ):
+            self.assertIn(
+                fragment,
+                text,
+                f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}",
+            )
+        self.assertIn('model = "gpt-5.5"', text, f"delegated author adapter missing model ({shim_label})")
+        self.assertIn(
+            'model_reasoning_effort = "high"',
+            text,
+            f"delegated author adapter missing reasoning effort ({shim_label})",
+        )
+        self.assertIn('web_search = "disabled"', text, f"delegated author adapter missing web setting ({shim_label})")
+        self.assertIn('approval_policy = "never"', text, f"delegated author adapter missing approval policy ({shim_label})")
+        self.assertIn('sandbox_mode = "read-only"', text, f"delegated author adapter missing read-only sandbox ({shim_label})")
+        self.assertIn("[features]", text, f"delegated author adapter missing features table ({shim_label})")
+        self.assertIn("shell_tool = true", text, f"delegated author adapter missing shell tool enable ({shim_label})")
+        self.assertNotIn(
+            "sandbox_mode = \"workspace-write\"",
+            text,
+            f"delegated author adapter must not be write-capable ({shim_label})",
+        )
 
     def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
@@ -8809,6 +8886,47 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             text=copilot_text,
             shim_label="bundled copilot orchestrator",
         )
+
+    def test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers(self) -> None:
+        import spec_dock.cli as cli
+
+        adapters = {
+            "system architect": {
+                "path": Path(".codex/agents/system-architect.toml"),
+                "agent_name": "system-architect",
+                "skill_name": "spec-dock-system-architect",
+                "draft_kind": "architecture",
+            },
+            "implementation planner": {
+                "path": Path(".codex/agents/implementation-planner.toml"),
+                "agent_name": "implementation-planner",
+                "skill_name": "spec-dock-implementation-planner",
+                "draft_kind": "planning",
+            },
+        }
+
+        with cli._assets_dir() as assets_dir:
+            install_root = assets_dir / "install_root"
+            for label, expected in adapters.items():
+                with self.subTest(adapter=label, surface="provider"):
+                    provider_path = install_root / expected["path"]
+                    self.assertTrue(provider_path.is_file(), f"missing provider Codex adapter: {provider_path}")
+                    self._assert_codex_delegated_author_adapter_contract(
+                        text=provider_path.read_text(encoding="utf-8"),
+                        shim_label=f"provider {label}",
+                        agent_name=expected["agent_name"],
+                        skill_name=expected["skill_name"],
+                        draft_kind=expected["draft_kind"],
+                    )
+
+                with self.subTest(adapter=label, surface="dogfooding"):
+                    checked_in_path = Path(__file__).resolve().parents[1] / expected["path"]
+                    self.assertTrue(checked_in_path.is_file(), f"missing dogfooding Codex adapter: {checked_in_path}")
+                    self.assertEqual(
+                        checked_in_path.read_bytes(),
+                        provider_path.read_bytes(),
+                        f"dogfooding Codex adapter drifted from provider asset: {expected['path']}",
+                    )
 
     def test_issue_102_agentic_tdd_contract_assets(self) -> None:
         import spec_dock.cli as cli
