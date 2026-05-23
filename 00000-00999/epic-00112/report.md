@@ -206,10 +206,10 @@ ID: "epic-00112"
   - Run only after `iss-00120`〜`iss-00125` complete raw implementation and issue-local closure evidence.
   - Run before updating, pushing, or refreshing Epic PR #119.
 - reviewers:
-  - Fresh `deep-consultant`: first review failed; findings fixed; re-review pending.
-  - Fresh `spec-reviewer`: first review failed; findings fixed; re-review pending.
+  - Fresh `deep-consultant`: first review failed; findings fixed; first re-review passed with Planck the 2nd.
+  - Fresh `spec-reviewer`: first review failed; first re-review failed on endpoint/scope alignment; fixes pending second re-review.
 - review scope:
-  - Full delta from captured Epic PR #119 `baseRefOid` to completed v1 implementation endpoint `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`.
+  - Full delta from captured Epic PR #119 `baseRefOid` to the clean local `HEAD` that will update PR #119.
   - Provider source, dogfooding workspace parity, runtime/test/docs/templates/skills/agent assets, active reports, validation/sync evidence, and PR rollout evidence.
 - pass condition:
   - Every finding from either reviewer receives disposition `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance`.
@@ -219,22 +219,25 @@ ID: "epic-00112"
   - base_ref_name: `main`.
   - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`.
   - head_ref_name: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`.
-  - implementation_head_oid_after_g10_fixes: `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`.
-  - evidence_artifact_commit_oid: use clean `git rev-parse HEAD` at reviewer handoff; this avoids self-referential evidence hashes.
+  - final_pr_update_head: clean `HEAD` at reviewer handoff; this intentionally avoids self-referential evidence hashes.
   - shared_diff_artifact: `discussions/20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate.md`.
   - full_name_status_artifact: `discussions/20260523t204806z-disc-g10-full-name-status.md`.
-  - diff_stat_command: `git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
-  - diff_name_status_command: `git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
+  - diff_stat_command: `git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
+  - diff_stat_result: `269 files changed`, `23105 insertions(+)`, `895 deletions(-)`.
+  - diff_name_status_command: `git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
+  - diff_name_status_result: full artifact records `269` entries.
   - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`, `python -m unittest discover -v`.
   - validation_results: `spec-dock: ok (validate) nodes=63`; `git diff --check` pass; active not set with active-none fallback; `python -m unittest discover -v` ran 847 tests in 415.583s and passed.
-  - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings pending re-review.
-  - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; fixed findings pending re-review.
+  - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings re-reviewed by `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`) as `pass`.
+  - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; first re-review by `Galileo the 2nd` (`019e56b3-39e3-7ca2-9af5-8523229256bb`) still `fail`; endpoint/scope fix pending second re-review.
   - findings_disposition_table:
     - `DC-P1-close-bypass`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` (`close_node` issue-target authority gate plus regression tests).
     - `DC-P1-missing-full-name-status`: fixed by `20260523t204806z-disc-g10-full-name-status.md`.
-    - `SR-P1-dirty-endpoint`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and refreshed G10 endpoint evidence.
+    - `SR-P1-dirty-endpoint`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and then superseded by final `base...HEAD` G10 scope alignment.
     - `SR-P1-stale-issue-report-wording`: fixed by additive final closure addenda in `iss-00124` and `iss-00125` reports.
-  - re_review_verdicts: pending.
+    - `SR-P1-final-head-scope`: fixed locally by regenerating G10 evidence and name-status artifacts against `base...HEAD`; pending second spec-reviewer re-review.
+    - `SR-P1-deep-consultant-pass-not-recorded`: fixed locally by recording Planck the 2nd's `consultant_status: pass`; pending second spec-reviewer re-review.
+  - re_review_verdicts: deep-consultant pass; spec-reviewer pending second re-review.
   - pr_update_push_evidence: pending.
 - current status:
   - Running; all v1 Issues are closed, first-round G10 findings are fixed in local evidence, and PR #119 update remains blocked until fresh re-review passes.
