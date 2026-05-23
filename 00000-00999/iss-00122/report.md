@@ -13,9 +13,9 @@ ID: "iss-00122"
 # iss-00122 Evidence Adoption Ledger and Bounded Depth2 Delegation — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01 provider docs/templates ledger schema implementation and spec-reviewer gate are passed.
-- 未完了: S02, S90, and S99.
-- 次のマイルストーン: implement S02 bounded depth=2 role graph and managed asset assertions.
+- 現在地: S01 passed; S02 bounded depth=2 role graph and managed asset assertions are implemented and awaiting code-reviewer gate.
+- 未完了: S02 code-reviewer gate, S90, and S99.
+- 次のマイルストーン: run S02 code-reviewer, fix findings, then continue to S90.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -129,6 +129,64 @@ ID: "iss-00122"
   - final reviewer gate:
     - Nash (`019e5613-b432-7c61-a7db-4af725486a01`) `review_status: pass`.
     - reason: plan tc-001, report evidence, AC-001, and implemented Evidence Adoption Ledger schema now use `partially_adopted`; changed files remain limited to S01 provider docs/templates plus active issue plan/report.
+- S02 bounded depth=2 role graph and managed asset assertions:
+  - changed files:
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md`
+    - `tests/test_init_update.py`
+  - implementation summary:
+    - Added allowed depth=2 graph: main orchestrator -> authoring specialist -> leaf-only evidence producer.
+    - Added forbidden depth=3 / grandchild delegation rule.
+    - Added child canonical edit, implementation edit, final authority, reviewer-pass, phase promotion, issue ready, and issue finish prohibitions.
+    - Added reviewer independence language separating preflight reviewer output from final fresh reviewer pass.
+    - Added managed asset assertions in `test_bundled_skill_routing_contract`.
+  - tc-003 commands:
+    - `rg -n 'depth=2|depth 2|leaf-only|child specialist|reviewer independence|final reviewer' src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs`
+    - result: pass; skills/docs expose allowed depth=2, leaf-only evidence, reviewer independence, and final reviewer semantics.
+    - `uv run pytest tests/test_init_update.py`
+    - result: unavailable; failed to spawn `pytest` with `No such file or directory (os error 2)`.
+    - disposition: plan amended to record this local-runtime fallback condition; the same managed asset assertion gate is executed through unittest below.
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract`
+    - result: pass; `Ran 1 test ... OK`.
+  - tc-004 commands:
+    - `rg -n 'depth=3|grandchild|canonical edit|promotion claim|final authority|forbidden' src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs`
+    - result: pass; skills/docs expose forbidden depth=3, grandchild delegation, canonical edit, promotion/final authority constraints.
+    - `uv run pytest tests/test_init_update.py`
+    - result: unavailable; failed to spawn `pytest` with `No such file or directory (os error 2)`.
+    - disposition: plan amended to record this local-runtime fallback condition; the same managed asset assertion gate is executed through unittest below.
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract`
+    - result: pass; `Ran 1 test ... OK`.
+  - guardrail:
+    - `git diff --check`
+    - result: pass.
+  - reviewer gate:
+    - Chandrasekhar (`019e5619-187e-7ac0-a6a9-536bad87e553`) `review_status: fail`.
+    - finding 1: P1, current uncommitted tree contained generated dogfooding parity writes under `.agents/skills/`, `spec-dock/docs/`, and `spec-dock/templates/` while S02 changed-file evidence listed only provider docs/managed assets/tests.
+    - disposition 1: plan amended to make S90 explicitly own generated dogfooding parity output and inspection evidence; S02 changed-file evidence remains provider docs/managed assets/tests only.
+    - finding 2: P1, planned `uv run pytest tests/test_init_update.py` gate was not recorded.
+    - disposition 2: attempted the planned command and recorded its local `pytest` spawn failure; plan amended to permit the unittest managed-asset assertion fallback when pytest is unavailable.
+    - re-review: pass.
+    - final reviewer gate:
+      - Chandrasekhar (`019e5619-187e-7ac0-a6a9-536bad87e553`) `review_status: pass`.
+      - reason: no remaining findings; prior P1s are addressed by recorded pytest-unavailable fallback evidence and by moving generated dogfooding parity output into an explicit S90 contract.
+- S90 dogfooding-visible parity evidence:
+  - status: generated parity output has been produced; spec-reviewer gate not started.
+  - generated parity command:
+    - `uv run python -m spec_dock.cli update .`
+    - result: pass with warning only; `repo-root shortcut already exists (skipped): .../spec`, followed by `spec-dock: ok (update) -> ...`.
+  - generated dogfooding parity files:
+    - `.agents/skills/spec-dock-epic-planning/SKILL.md`
+    - `.agents/skills/spec-dock-implementation-planner/SKILL.md`
+    - `.agents/skills/spec-dock-system-architect/SKILL.md`
+    - `spec-dock/docs/workflow_spec_authoring.md`
+    - `spec-dock/templates/epic/report.md`
+    - `spec-dock/templates/initiative/report.md`
+    - `spec-dock/templates/issue/report.md`
+  - scope note:
+    - These dogfooding-visible files are generated parity output owned by S90 evidence. Provider behavior ownership remains with S01/S02, and S90 must not introduce provider/runtime/test edits.
 
 ## ブロッカー / 未完了
-- S02/S90/S99 not started.
+- S02 code-reviewer re-review pending.
+- S90/S99 not started.

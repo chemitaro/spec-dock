@@ -151,16 +151,18 @@ ID: "iss-00122"
 - `tc-003`: Inspect skills/docs and run managed asset assertions for allowed depth=2 graph.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
   - 操作: `rg -n 'depth=2|depth 2|leaf-only|child specialist|reviewer independence|final reviewer' src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs` と `uv run pytest tests/test_init_update.py` を実行する。
+  - 追加フォールバック条件: local runtime に `pytest` 実行ファイルが存在せず `uv run pytest tests/test_init_update.py` が起動不能な場合は、その失敗を `report.md` に記録したうえで、同一 managed asset assertion を含む `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract` を代替ゲートとして実行する。
   - 期待結果: bounded depth=2 graph is documented in skills/docs and managed asset assertions pass.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: rg evidence, pytest result, and allowed graph summaryを `report.md` に記録する。
+  - 検証方法: rg evidence, pytest result or recorded pytest-unavailable fallback result, and allowed graph summaryを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 - `tc-004`: Inspect skills/docs and run managed asset assertions forbidding depth=3 and child canonical edit/promotion.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
   - 操作: `rg -n 'depth=3|grandchild|canonical edit|promotion claim|final authority|forbidden' src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs` と `uv run pytest tests/test_init_update.py` を実行する。
+  - 追加フォールバック条件: local runtime に `pytest` 実行ファイルが存在せず `uv run pytest tests/test_init_update.py` が起動不能な場合は、その失敗を `report.md` に記録したうえで、同一 managed asset assertion を含む `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract` を代替ゲートとして実行する。
   - 期待結果: depth=3, child canonical edit, and child promotion/final-review authority are forbidden by docs/skills/assertions.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: forbidden graph evidence and pytest resultを `report.md` に記録する。
+  - 検証方法: forbidden graph evidence and pytest result or recorded pytest-unavailable fallback resultを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 
 #### ステップ完了契約
@@ -178,9 +180,9 @@ ID: "iss-00122"
 - 対象ファイル:
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/report.md
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/discussions/
-      - spec-dock/docs/ (inspection only)
-      - spec-dock/templates/ (inspection only)
-      - .agents/skills/ (inspection only)
+      - spec-dock/docs/ (generated dogfooding parity output and inspection only)
+      - spec-dock/templates/ (generated dogfooding parity output and inspection only)
+      - .agents/skills/ (generated dogfooding parity output and inspection only)
 - 閉じる closure id: tc-090
 - 計画済み契約:
   - scope: listed allowed paths only.
@@ -194,9 +196,9 @@ ID: "iss-00122"
 - allowed changes:
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/report.md
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/discussions/
-      - spec-dock/docs/ (inspection only)
-      - spec-dock/templates/ (inspection only)
-      - .agents/skills/ (inspection only)
+      - spec-dock/docs/ (generated dogfooding parity output and inspection only)
+      - spec-dock/templates/ (generated dogfooding parity output and inspection only)
+      - .agents/skills/ (generated dogfooding parity output and inspection only)
 - forbidden changes:
       - provider source changes during S90; put them in an implementation step with code-reviewer/spec-reviewer mapping
       - runtime/test/scaffold behavior changes under a spec-reviewer-only gate
@@ -208,10 +210,10 @@ ID: "iss-00122"
 #### 具体テストケース一覧
 - `tc-090`: Inspect dogfooding-visible .agents/skills and docs/template evidence after validate; provider install_root parity belongs to S01/S02.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `./spec-dock/scripts/spec-dock validate` を実行し、`rg -n 'adopted|depth=2|reviewer independence|blocked' spec-dock/docs spec-dock/templates spec-dock/system/active-none .agents/skills` を dogfooding inspection only で実行する。
-  - 期待結果: dogfooding-visible docs/skills expose ledger/depth semantics; provider install_root is not inspected as an S90 write scope.
+  - 操作: `uv run python -m spec_dock.cli update .` で provider 由来の dogfooding parity output を生成し、`./spec-dock/scripts/spec-dock validate` を実行し、`rg -n 'adopted|depth=2|reviewer independence|blocked' spec-dock/docs spec-dock/templates spec-dock/system/active-none .agents/skills` を dogfooding inspection で実行する。
+  - 期待結果: dogfooding-visible docs/skills expose ledger/depth semantics; generated dogfooding parity files mirror provider assets; provider install_root remains owned by S01/S02 rather than S90.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: validate output, dogfooding rg evidence, and S90 no provider/runtime/test edits statementを `report.md` に記録する。
+  - 検証方法: update output, validate output, dogfooding rg evidence, and S90 no provider/runtime/test edits statementを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 
 #### ステップ完了契約
