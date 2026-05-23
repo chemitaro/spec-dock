@@ -20,7 +20,7 @@ reflected_to: []
 
 ## Source basis
 
-本メモは、添付された epic-00112 分析依頼の文脈だけを根拠にする。添付4点は内容上同一の分析依頼として扱った。   
+本メモは、添付された epic-00112 分析依頼の文脈だけを根拠にする。添付4点は内容上同一の分析依頼として扱った。
 
 現行前提として、`requirement.md` は main orchestrator + human が所有し、`design.md` draft は `system-architect`、`plan.md` draft は `implementation-planner` が一次作成してよい。ただし canonical artifact ownership、user dialogue、canonical integration、phase promotion、report evidence は main orchestrator が持ち続け、delegated draft は spec-reviewer pass の代替ではない。
 

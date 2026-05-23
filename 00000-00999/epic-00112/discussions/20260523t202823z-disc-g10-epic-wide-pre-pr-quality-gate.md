@@ -51,7 +51,7 @@ ID: "20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate"
 - `./spec-dock/scripts/spec-dock active show`: active not set; fallback points to `spec-dock/system/active-none/{initiative,epic,issue}`.
 - `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=63`.
 - `git diff --check`: pass.
-- `python -m unittest discover -v`: `Ran 847 tests in 415.583s` / `OK`.
+- `python -m unittest discover -v`: `Ran 847 tests in 400.478s` / `OK`.
 - `./spec-dock/scripts/spec-dock issue finish` for `iss-00125`: succeeded and ran `issue finish auto-sync`.
 
 Manual `sync` is intentionally not re-run in this G10 evidence step because issue finish already ran auto-sync and active is currently cleared. This avoids reintroducing branch-derived active state during final PR gating.
@@ -66,9 +66,9 @@ git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD
 
 Summary:
 
-- `269 files changed`
-- `23105 insertions(+)`
-- `895 deletions(-)`
+- `270 files changed`
+- `23075 insertions(+)`
+- `898 deletions(-)`
 
 High-level changed surfaces:
 
@@ -120,7 +120,7 @@ The full name-status output is captured in sibling evidence artifact:
 
 - `discussions/20260523t204806z-disc-g10-full-name-status.md`
 - endpoint: `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
-- entry count: `269`
+- entry count: `270`
 
 Reviewers must treat that full name-status artifact as the authoritative file-level scope list for the G10 review.
 
@@ -133,7 +133,7 @@ Reviewers must treat that full name-status artifact as the authoritative file-le
     - P1: `spec-dock close <issue>` bypassed the authority gate that `issue finish` enforced.
     - P1: shared G10 evidence omitted the full `git diff --name-status` output.
   - disposition:
-    - close bypass: fixed by adding issue-target authority evaluation to `close_node`, fail-closed regression coverage in `tests/cli_runtime/test_runtime_close_s12.py`, and CLI integration alignment in `tests/cli_runtime/test_close.py`.
+    - close bypass: superseded by the explicit close-vs-finish responsibility split. `spec-dock close <target>` is restored as an explicit GitHub issue maintenance close / already-closed check that does not claim lifecycle completion, active clear, or `issue_finish` authority. `spec-dock issue finish` remains the authority-gated lifecycle closure path, with regression coverage in `tests/cli_runtime/test_issue_lifecycle.py`, `tests/domain_runtime/test_authority.py`, `tests/cli_runtime/test_close.py`, and `tests/cli_runtime/test_runtime_close_s12.py`.
     - missing full name-status: fixed by adding `20260523t204806z-disc-g10-full-name-status.md`.
   - first re-reviewer: `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`)
   - first_re_review_status: pass; previous findings resolved under the final `base...HEAD` scope.
@@ -155,7 +155,7 @@ Reviewers must treat that full name-status artifact as the authoritative file-le
     - P1: G10 scope still pointed at `fc80c94...` while the PR-bound clean HEAD also included G10 evidence and executable test-alignment changes.
     - P1: PR remains blocked until deep-consultant re-review pass is recorded.
   - second disposition:
-    - final scope alignment: fixed by using `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD` as the authoritative PR-bound G10 diff scope and regenerating the full name-status artifact to 269 entries.
+    - final scope alignment: fixed by using `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD` as the authoritative PR-bound G10 diff scope and regenerating the full name-status artifact to 270 entries.
     - deep-consultant pass recording: fixed by recording Planck the 2nd's pass above.
   - second re-reviewer: `Boyle the 2nd` (`019e56b9-f454-7e82-a3d7-737fb5ee9821`)
   - second_re_review_status: pass; no specification finding remains and PR #119 is not blocked from the spec-reviewer lane.
@@ -177,3 +177,11 @@ Findings with disposition `open`, `pending`, or `unresolved` block PR update. Fi
 - `spec-reviewer`: pass.
 - unresolved findings: none.
 - PR #119 update gate: unblocked.
+
+## Post-PR automated review disposition
+
+- `Codex-P2-tomli-python310`: fixed by declaring `tomli>=2.0.1` for Python `<3.11` and updating `uv.lock`.
+- `Codex-P1-close-active-coupling`: fixed by restoring explicit `spec-dock close <target>` as a GitHub issue maintenance command independent of active issue lifecycle state, while preserving `issue finish` as the authority-gated lifecycle closure path.
+- targeted verification:
+  - `python -m unittest tests.cli_runtime.test_close tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_issue_lifecycle tests.domain_runtime.test_authority -v` -> `Ran 55 tests` / `OK`.
+  - `git diff --check` -> pass.

@@ -236,4 +236,3 @@ No-Go 条件:
 最小安全ハーネスがないなら、read-only adviser 継続が正しい。ただし、この場合でも出力契約を `design.candidate.md` / `plan.candidate.md` 形式に寄せれば、consultant との差は維持できる。
 
 権限を広げるのは、manifest、path、diff、review、rollback が揃ってからで十分である。
-

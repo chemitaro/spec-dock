@@ -159,4 +159,3 @@ write-capable を試すなら:
 5. 小さい issue で pilot し、認知負荷が本当に下がったか測る。
 
 結論として、当初構想が「main=requirement、architect=design、planner=plan」だったとしても、それをそのまま canonical write 権限として実装するのは危険である。より堅い設計は、専門 agent は high-quality draft author、main orchestrator は canonical integrator、reviewer / consultant は独立検査者という分離である。
-

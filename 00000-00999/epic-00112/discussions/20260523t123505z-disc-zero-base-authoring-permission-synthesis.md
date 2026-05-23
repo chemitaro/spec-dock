@@ -26,7 +26,7 @@ inputs:
 
 最適な定義は次。
 
-> `system-architect` / `implementation-planner` は、`design.md` / `plan.md` の一次候補著者である。  
+> `system-architect` / `implementation-planner` は、`design.md` / `plan.md` の一次候補著者である。
 > ただし、canonical artifact の直接編集者・所有者・昇格責任者ではない。
 
 つまり、核心は「read-only か write-capable か」ではなく、次の分離である。
