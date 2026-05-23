@@ -21,6 +21,25 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、次 phase へ進む前にユーザーへヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 
+## Authority metadata / grants / Promotion Record
+
+Delegated canonical draft authoring を使う場合、artifact や report evidence は次の authority metadata を明示します。
+
+- `status`: `draft` / `reviewed` / `approved` / `blocked` / `stale` / `superseded`
+- `authority`: `proposed` / `approved` / `historical`
+- `owner_role`: canonical artifact と phase promotion を所有する role。通常は main orchestrator。
+- `draft_author_role`: delegated draft を作成した role。未使用時は `N/A`。
+- `approval`: reviewer gate と main orchestrator promotion の evidence reference。未承認なら `none`。
+- `source_revision`: delegated draft が読んだ upstream artifact revision。
+- `approved_revision`: promotion された canonical artifact revision。未承認なら `none`。
+- `approved_hash`: promotion された canonical content hash。未承認なら `none`。
+
+Grant keys は明示的かつ完全一致で扱います。許可される key set は `can_write_requirement`, `can_write_design`, `can_write_plan`, `can_write_report`, `can_write_discussions`, `can_write_implementation`, `can_mark_issue_ready`, `can_finish_issue`, `can_complete_phase` です。role 名、scope 名、workflow consent、または reviewer pass から暗黙の write 権限を推定してはなりません。
+
+Wildcard grant semantics はありません。`*`, `can_write_*`, `all`, `admin`, `owner`, broad role authority のような包括 grant は無効として扱い、必要な exact key がない操作は blocked / incomplete にします。Requirement / design / plan / report / discussions の編集、implementation edit、issue ready、issue finish、phase completion はそれぞれ対応する grant key が必要です。
+
+Promotion Record は delegated draft や reviewer output を canonical authority に昇格した事実だけを記録します。`promotion_record` は少なくとも `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision` を持ちます。`reviewer_target_hash` と `approved_hash` が一致しない場合、または `source_revision` / `approved_revision` が stale な場合、その promotion は invalid であり downstream authority には使えません。Mismatch / stale を発見した場合は report に reason と next action を残し、fresh reviewer gate と Promotion Record の再作成まで block します。
+
 ## ワークフロー単位の委任同意（workflow-scoped delegation consent）
 
 - Issue scope の spec authoring では、reviewer / read-only specialist sub-agent を使う前に、current repo/worktree、active issue、session、named role に限定した issue-scoped workflow delegation consent を確認し、`report.md` に記録する。
