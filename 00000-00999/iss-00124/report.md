@@ -13,9 +13,10 @@ ID: "iss-00124"
 # iss-00124 Canonical Draft Authoring Role Rewrite — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: Issue scaffold created from epic-00112 v1 amendment; requirement/design/plan passed fresh spec-reviewer gate and are approved for execution.
-- 未完了: implementation has not started.
-- 次のマイルストーン: issue execution, only after the user intentionally starts each issue.
+- 現在地: S01/S02/S03 implementation draft is complete; step reviewer gates are pending.
+- 完了済みドラフト: system-architect / implementation-planner skill rewrite, phase docs rewrite, managed content assertions update.
+- 未完了: S01/S02 spec-reviewer gate, S03 code-reviewer gate, S90 dogfooding parity, S99 final QA/code/spec gates, commits, issue finish.
+- 次のマイルストーン: run step reviewer gates, fix findings, then commit each accepted behavior slice.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -69,6 +70,19 @@ ID: "iss-00124"
   - Decision: final authority and phase promotion remain with main orchestrator plus fresh reviewer gates.
   - Disposition: promoted_to_requirement_design_plan
   - Evidence: requirement constraints and design interface contract.
+- D-003:
+  - Status: resolved
+  - Type: verification
+  - Decision: Planned `uv run pytest tests/test_init_update.py` remains the named closure command for tc-004, but this environment cannot spawn `pytest`; the corrected unittest alternative must include the scaffold creation assertion plus the delegated authoring / bundled skill / adapter assertions.
+  - Disposition: superseded_initial_three_test_alternative
+  - Evidence: `uv run pytest tests/test_init_update.py` -> `Failed to spawn: pytest / os error 2`; initial three-test alternative was insufficient because it missed `test_init_creates_expected_structure`; corrected command `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` -> `Ran 4 tests ... OK`.
+
+## Evidence Adoption Ledger
+| ID | adoption_status | source | target | rationale | evidence | next_action |
+|---|---|---|---|---|---|---|
+| EAL-001 | adopted | doc-writer Ampere | S01/S02 provider skills and phase docs | Reinforced narrow verified-write exception, fail-closed fallback, no previous-phase rewrite, and no final authority. | subagent notification in current thread; diff in provider skills/docs | no further action; step reviewers verify canonical text |
+| EAL-002 | adopted | spec-reviewer Socrates | `phase_design.md` and S01/S02 report evidence | Fixed a P1 ambiguity where verified `design.md` draft writes were allowed while broad canonical artifact edits were also forbidden; added line-level source/probe evidence to make tc-001/tc-002 auditable. | Socrates `review_status: fail`; `phase_design.md:82-84`; `workflow_spec_authoring.md:101-111`; role skill snippets listed in Step/Test Closure | rerun S01/S02 spec-reviewer |
+| EAL-003 | adopted | code-reviewer Godel | `tests/test_init_update.py`, `phase_design.md`, S03 report evidence | Fixed a P1 stale managed-content assertion caught by `test_init_creates_expected_structure`; removed the broad `canonical artifact edit` phrase from design gate and updated assertions to pin the narrow verified target-draft exception. | Godel `review_status: fail`; `uv run python -m unittest ...test_init_creates_expected_structure ...` first failed, then targeted 4-test rerun passed | rerun S03 code-reviewer |
 
 ## Spec Authoring Gate
 - Requirement Gate:
@@ -96,13 +110,101 @@ ID: "iss-00124"
 - Heisenberg (`019e5570-9ebf-72f0-bdfc-762f906a2c7a`): `review_status: pass`
   - findings: none.
   - rationale: prior findings closed; no P0/P1 blockers in reviewed scope.
+- Socrates (`019e564e-e225-78c1-bb5f-9a05dabd7565`): `review_status: fail`
+  - scope: S01/S02 step reviewer gate.
+  - findings:
+    - P1: `phase_design.md` allowed verified `design.md` draft writes while also broadly forbidding canonical artifact edits.
+    - P2: S01/S02 report evidence summarized probe/source-revision conditions without exact line-level evidence.
+  - disposition:
+    - P1 fixed by narrowing the forbidden canonical edit statement to edits outside the verified target `design.md` draft.
+    - P2 fixed by adding source_revision / positive probe / negative probe / exact path evidence in Step/Test Closure.
+- Godel (`019e564e-e2ae-7241-b8c2-f7128da17012`): `review_status: fail`
+  - scope: S03 code-reviewer gate.
+  - findings:
+    - P1: `test_init_creates_expected_structure` still pinned the old `Delegated authoring は draft-only evidence` text and failed against the new scaffold output.
+    - P2: `phase_design.md` still used the broad `canonical artifact edit` phrase in the forbidden action bullet.
+  - disposition:
+    - P1 fixed by updating the scaffold assertion to require `Delegated authoring は authority: proposed / status: draft の draft-only evidence` and previous-phase / implementation/test/config forbidden wording.
+    - P2 fixed by replacing the broad phrase with `対象 design.md draft 更新以外の requirement/design/plan/report 正本編集`.
+    - verification: `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` -> `Ran 4 tests in 0.079s / OK`.
+- Socrates (`019e564e-e225-78c1-bb5f-9a05dabd7565`): `review_status: pass`
+  - scope: S01/S02 re-review gate.
+  - findings: none.
+  - rationale: prior P1/P2 findings closed; tc-001/tc-002 have verified target-draft exception, source_revision/probe evidence, and no final-authority/promotion bypass.
+- Godel (`019e564e-e2ae-7241-b8c2-f7128da17012`): `review_status: pass`
+  - scope: S03 re-review gate.
+  - findings: P2 cleanup only, non-blocking.
+  - disposition: D-003 updated to supersede the insufficient three-test alternative and name the corrected four-test command.
+  - rationale: no remaining P0/P1 findings; scaffold assertion and broad design-gate contradiction fixed.
 
 ## 受け入れ条件の現在状況
-- status: pending implementation; specs are approved and implementation has not started.
+- status: S01/S02/S03 draft implementation evidence recorded; reviewer gates pending.
 - required evidence: see `plan.md` Spec-Locked Closure Index and final completion conditions.
 
 ## 実行証跡
-- Not started.
+- S01 implementation:
+  - changed files:
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+    - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
+  - result: system-architect role now allows bounded draft `design.md` updates only when a verified task manifest, role-scoped Permission Profile, exact target path/revision, and positive/negative probe evidence exist.
+  - guardrails: `status: draft`, `authority: proposed`, main orchestrator ownership, no phase promotion, no reviewer-pass claim, no user-dialogue ownership, no previous phase rewrite, and proposal-only fallback on unverified/fail-open/stale host evidence.
+  - verification: `rg -n 'system-architect|design.md|authority: proposed|draft|must not promote|final reviewer|previous phase|Permission Profile|proposal-only' src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md src/spec_dock/assets/spec_dock/docs` confirmed the required fragments.
+  - reviewer-fix evidence:
+    - `src/spec_dock/assets/spec_dock/docs/phase_design.md:82`: allows write-scoped design authoring only for the verified task manifest / role-scoped Permission Profile target `design.md` with `authority: proposed` / `status: draft`.
+    - `src/spec_dock/assets/spec_dock/docs/phase_design.md:83`: forbids requirement/design/plan/report canonical edits outside the verified target `design.md` draft.
+    - `src/spec_dock/assets/spec_dock/docs/phase_design.md:84`: forbids `requirement.md` / `plan.md` / `report.md` / previous phase artifact rewrites and implementation/test/config edits.
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md:101-107`: requires resolved target, input revision, allowed paths, forbidden paths, positive/negative probe commands, fallback, and Permission Profile summary in the task manifest.
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md:109-111`: requires positive probe success only on allowed artifact/evidence paths and negative probe failure on forbidden implementation/config/test paths; design probe is limited to target `design.md` or allowed design evidence path.
+- S02 implementation:
+  - changed files:
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
+    - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+    - `src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md`
+    - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
+  - result: implementation-planner role now allows bounded draft `plan.md` updates only when a verified task manifest, role-scoped Permission Profile, approved requirement/design revisions, exact target path/revision, and positive/negative probe evidence exist.
+  - guardrails: `status: draft`, `authority: proposed`, main orchestrator ownership, no phase promotion, no reviewer-pass claim, no implementation-readiness claim, no previous phase rewrite, no completed issue plan/report rewrite, and proposal-only fallback on unverified/fail-open/stale host evidence.
+  - verification: `rg -n 'implementation-planner|plan.md|authority: proposed|draft|must not promote|final reviewer|design input|Permission Profile|proposal-only|previous phase|completed issue' src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md src/spec_dock/assets/spec_dock/docs` confirmed the required fragments.
+  - reviewer-fix evidence:
+    - `src/spec_dock/assets/spec_dock/docs/phase_plan.md:73`: allows write-scoped plan authoring only for the verified task manifest / role-scoped Permission Profile target `plan.md` with `authority: proposed` / `status: draft`.
+    - `src/spec_dock/assets/spec_dock/docs/phase_plan.md:74`: forbids `requirement.md` / `design.md` / `report.md` / previous phase artifact rewrites, completed issue `plan.md` / `report.md` edits, implementation/test/config edits, promotion, reviewer-pass claims, and implementation-readiness claims.
+    - `src/spec_dock/assets/spec_dock/docs/phase_plan.md:76`: falls back to proposal-only / discussions path if Permission Profile / host probe / source revision is unverified, fail-open, Desktop/CLI divergent, or stale.
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md:101-111`: provides shared source_revision, allowed/forbidden path, positive/negative probe, and target-phase probe requirements.
+- S03 implementation:
+  - changed files:
+    - `tests/test_init_update.py`
+  - result: managed content assertions now require the delegated authoring docs/skills to expose `authority: proposed`, `status: draft`, Permission Profile / host probe fallback, no previous-phase rewrite, and no completed issue plan/report rewrite.
+  - planned command result: `uv run pytest tests/test_init_update.py` failed because `pytest` is not installed/spawnable in this environment: `Failed to spawn: pytest / os error 2`.
+  - alternative verification: `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` -> `Ran 3 tests in 0.002s / OK`.
+  - reviewer-fix verification: after Godel's P1 finding, `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` -> `Ran 4 tests in 0.079s / OK`.
+
+## Step Contract Closure
+| step | closure id | status | evidence |
+|---|---|---|---|
+| S01 | tc-001 | pass | `spec-dock-system-architect/SKILL.md:30` permits target `design.md` updates only with verified task manifest / Permission Profile / path revision; `:38-39` forbid all outside-manifest paths and unverified `design.md` writes; `:53-58` require `status: draft`, `authority: proposed`, and `source_revision`; `:64` falls back to proposal-only if requirement revision/profile/probe is missing or stale; `phase_design.md:82-86` clarifies the verified design draft exception and fallback; Socrates re-review pass. |
+| S02 | tc-002 | pass | `spec-dock-implementation-planner/SKILL.md:34` permits target `plan.md` updates only with verified task manifest / Permission Profile / approved requirement-design revisions / path revision; `:42-44` forbid outside-manifest paths, unverified `plan.md` writes, previous phase rewrites, and completed issue plan/report rewrites; `:58-63` require `status: draft`, `authority: proposed`, and `source_revision`; `:69` falls back to proposal-only if design evidence/revisions/profile/probe are missing or stale; `phase_plan.md:73-76` records the same plan gate; Socrates re-review pass. |
+| S03 | tc-003 | pass | rg inspection confirms adoption/promotion ownership, proposed draft status, narrow verified target-draft exception, and no final authority / reviewer-pass claim boundaries; Godel re-review pass with no P0/P1 findings. |
+| S03 | tc-004 | pass | pytest unavailable was recorded; reviewer-identified missing scaffold assertion was added to the unittest alternative, the targeted 4-test unittest command passed, and D-003 supersedes the initial insufficient alternative; Godel re-review pass. |
+
+## Test Contract Closure
+| test id | planned command / evidence | observed result | status |
+|---|---|---|---|
+| tc-001 | `rg -n 'source_revision|positive|negative|probe|Permission Profile|task manifest|authority: proposed|status: draft|previous phase' ...`; `nl -ba .../spec-dock-system-architect/SKILL.md`; `nl -ba .../phase_design.md`; `nl -ba .../workflow_spec_authoring.md` | exact evidence: role skill lines 30, 38-39, 53-58, 64; phase design lines 82-86; workflow gate lines 101-111; Socrates pass | pass |
+| tc-002 | `rg -n 'source_revision|positive|negative|probe|Permission Profile|task manifest|authority: proposed|status: draft|previous phase|completed issue|implementation-readiness' ...`; `nl -ba .../spec-dock-implementation-planner/SKILL.md`; `nl -ba .../phase_plan.md`; `nl -ba .../workflow_spec_authoring.md` | exact evidence: role skill lines 34, 42-44, 58-63, 69; phase plan lines 73-76; workflow gate lines 101-111; Socrates pass | pass |
+| tc-003 | `rg -n 'adoption ledger|evidence adoption|proposed|promotion record|final reviewer|owner|authority: proposed|status: draft|previous phase|completed issue|implementation-readiness' ...`; `rg -n 'canonical artifact edit|Delegated authoring は draft-only evidence' ...` | required handoff/adoption/forbidden-authority fragments present; obsolete broad/old fragments absent; Godel pass | pass |
+| tc-004 | `uv run pytest tests/test_init_update.py`; corrected alternative `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` | pytest spawn unavailable; corrected 4-test alternative passed; Godel pass | pass |
+
+## Closure Coverage
+| AC / EC | covered by | current evidence |
+|---|---|---|
+| AC-001 / EC-001 | S01 / tc-001 | system-architect can author only proposed draft design under verified manifest/profile; otherwise proposal-only fallback. |
+| AC-002 / EC-002 | S02 / tc-002 | implementation-planner can author only proposed draft plan under verified manifest/profile and approved requirement/design inputs; otherwise proposal-only fallback. |
+| AC-003 / EC-003 | S01/S02/S03 / tc-003 | docs and tests preserve main orchestrator final ownership, no phase promotion, no reviewer-pass claim, no user dialogue ownership, and no implementation changes. |
+| AC-004 | S01/S02/S03 / tc-004 | docs and tests preserve fail-closed Permission Profile / task manifest gate, no previous-phase rewrite, and no completed issue plan/report rewrite. |
+
+## Closure Delta
+- `tc-004`: planned pytest command is unavailable in this environment. Initial alternative unittest coverage was insufficient because it missed `test_init_creates_expected_structure`; the corrected 4-test unittest alternative passed and was accepted by the S03 code-reviewer re-review.
 
 ## ブロッカー / 未完了
-- Implementation is intentionally not started in this authoring turn; issue execution must be started separately after this approved spec gate.
+- Step reviewer gates are not yet run.
+- S90 dogfooding parity and S99 final quality gates are not yet run.
