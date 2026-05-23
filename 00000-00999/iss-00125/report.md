@@ -13,9 +13,9 @@ ID: "iss-00125"
 # iss-00125 Authority Aware Delegated Authoring Dogfooding Pilot — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01/S02 evidence committed; S03 lifecycle/context-pack fallback verification and S90 docs impact no-op have fresh spec-reviewer pass.
-- 未完了: S03/S90 report commit, S99 final QA/code/spec gates, final report commit, and issue finish.
-- 次のマイルストーン: commit S03/S90 report-only evidence, then proceed to S99 final quality.
+- 現在地: S01/S02/S03/S90 evidence is committed, and S99 final QA/code/spec re-review has passed after report-ledger fixes.
+- 未完了: final report commit and issue finish.
+- 次のマイルストーン: commit final report, then run `spec-dock issue finish`.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -124,10 +124,37 @@ ID: "iss-00125"
   - scope: S90 docs impact no-op review.
   - findings: none.
   - rationale: validate passes, diff is report-only, the pilot discovered no provider/dogfooding docs defect, and existing docs/skills/adapters already cover task manifest, Permission Profile fail-closed behavior, proposal-only fallback, and `authority: proposed`.
+- Bohr the 2nd (`019e567e-7d1c-7f62-b7d9-e218bd21f7d3`): `review_status: fail`
+  - scope: S99 final QA gate.
+  - findings:
+    - P1: S99 final validate/sync/diff/clean and QA/code/spec gate evidence was described to reviewer but not recorded in the authoritative report ledger.
+  - disposition: fixed by adding the S99 final quality section, `tc-099` Step/Test Closure rows, Closure Coverage row, and explicit final command / reviewer finding disposition evidence below.
+- Socrates the 2nd (`019e567e-7ddf-7373-9e51-581b6999df03`): `review_status: pass`
+  - scope: S99 issue-wide code/diff review.
+  - findings:
+    - P2: stale blocker wording said S03/S90 report-only evidence commit was pending after commit `f2d865a`.
+  - disposition: fixed in this report update by marking S03/S90 committed and replacing stale blockers with S99 re-review/final commit/issue finish.
+- Laplace the 2nd (`019e567e-7e78-77c0-bc4e-c5d0d9d98250`): `review_status: fail`
+  - scope: S99 final spec review.
+  - findings:
+    - P1: S99 / `tc-099` closure ledger was missing, stale incomplete status remained, and final command/gate evidence was not in the report.
+  - disposition: fixed by adding S99 final command evidence, QA/code/spec reviewer evidence and dispositions, `tc-099` closure rows, and updated acceptance / blocker summaries.
+- Bohr the 2nd (`019e567e-7d1c-7f62-b7d9-e218bd21f7d3`): `review_status: pass`
+  - scope: S99 final QA re-review.
+  - findings: none.
+  - rationale: prior S99 report-ledger evidence gap is fixed; no remaining P0/P1 test or evidence adequacy findings.
+- Socrates the 2nd (`019e567e-7ddf-7373-9e51-581b6999df03`): `review_status: pass`
+  - scope: S99 issue-wide code/diff re-review.
+  - findings: none.
+  - rationale: stale S03/S90 blocker wording is fixed, diff remains report-only, no forbidden product/runtime/provider/test/config files changed, and no canonical write verification is over-claimed.
+- Laplace the 2nd (`019e567e-7e78-77c0-bc4e-c5d0d9d98250`): `review_status: pass`
+  - scope: S99 final spec re-review.
+  - findings: none.
+  - rationale: S99 final command evidence, reviewer finding dispositions, and `tc-099` rows are recorded across Step Contract Closure, Test Contract Closure, Closure Coverage, and Closure Delta.
 
 ## 受け入れ条件の現在状況
-- status: S01/S02 committed; S03 and S90 reviewer gates passed as approved no-op / docs no-op and report-only commit is pending.
-- required evidence: S01 covers tc-001 / tc-002 with reviewer pass; S02 covers tc-003 / tc-004 with reviewer pass; remaining closure ids are open.
+- status: S01/S02/S03/S90 are committed and reviewer-passed; S99 final QA/code/spec re-review passed.
+- required evidence: tc-001〜tc-006, tc-090, and tc-099 are pass.
 
 ## 実行証跡
 - S01 pilot preflight:
@@ -278,6 +305,39 @@ ID: "iss-00125"
     - review_status: pass
     - findings: none.
     - closure state: `approved-no-op` for docs changes; report-only evidence commit pending.
+- S03/S90 commit:
+  - commit: `f2d865a docs(issue): iss-00125 S03-S90証跡を記録`
+  - scope: issue-local `report.md` only.
+  - post-commit clean check: `git status --short` returned empty before S99 final command execution.
+  - S99 final quality gate:
+  - final command evidence before this S99 report update:
+    - `git status --short` -> empty.
+    - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`.
+    - `./spec-dock/scripts/spec-dock sync` -> `active unchanged (matched id in branch: iss-00125)` and wrote index/tree/deps/dashboard artifacts.
+    - `git diff --check` -> pass.
+    - `git status --short` after sync -> empty.
+  - QA review attempt:
+    - reviewer: Bohr the 2nd (`019e567e-7d1c-7f62-b7d9-e218bd21f7d3`)
+    - review_status: fail
+    - finding: P1 missing S99 report-ledger closure evidence.
+    - disposition: fixed by recording this S99 final quality gate section and `tc-099` closure rows.
+  - issue-wide code review:
+    - reviewer: Socrates the 2nd (`019e567e-7ddf-7373-9e51-581b6999df03`)
+    - review_status: pass
+    - finding: P2 stale S03/S90 pending status.
+    - disposition: fixed by replacing stale progress/blocker wording and recording S03/S90 commit `f2d865a`.
+  - final spec review attempt:
+    - reviewer: Laplace the 2nd (`019e567e-7e78-77c0-bc4e-c5d0d9d98250`)
+    - review_status: fail
+    - finding: P1 missing S99 / `tc-099` closure ledger and stale incomplete status.
+    - disposition: fixed by recording S99 final command evidence, reviewer findings/dispositions, `tc-099` closure rows, and updated acceptance / blocker summaries.
+  - changed files since S90 commit:
+    - `report.md` only.
+  - re-review status:
+    - qa-reviewer Bohr the 2nd: `review_status: pass`.
+    - code-reviewer Socrates the 2nd: `review_status: pass`.
+    - spec-reviewer Laplace the 2nd: `review_status: pass`.
+  - closure state: pass; final report commit pending.
 
 ## Step Contract Closure
 | step | closure id | status | evidence |
@@ -289,6 +349,7 @@ ID: "iss-00125"
 | S03 | tc-005 | pass | active/context-pack/index/dashboard inspection has no fallback draft artifact matches; proposed drafts remain evidence only and are not downstream authority; Averroes the 2nd review passed. |
 | S03 | tc-006 | pass | `git diff --name-status` was empty before S03 report update; S02 commit touched only issue-local report/discussion artifacts; no provider defect discovered; Averroes the 2nd review passed. |
 | S90 | tc-090 | pass | docs impact classified as no-op; validate passes and docs/skills/adapters already expose fallback / Permission Profile / `authority: proposed` guidance; Mendel the 2nd review passed. |
+| S99 | tc-099 | pass | final validate/sync/diff-check/clean evidence is recorded; initial QA/spec P1 findings and code P2 finding are dispositioned; QA/code/spec re-reviews passed. |
 
 ## Test Contract Closure
 | test id | planned command / evidence | observed result | status |
@@ -300,6 +361,7 @@ ID: "iss-00125"
 | tc-005 | `active show`, `validate`, active/context/index/dashboard fallback-name `rg` | active remains `iss-00125`; validate nodes=63; no fallback draft artifact names appear in active/context-pack/index/dashboard authority surfaces; reviewer pass | pass |
 | tc-006 | `git diff --name-status`; `git show --name-status --oneline --no-renames HEAD` | no current diff before S03 report update; S02 commit changed only issue-local report/discussion artifacts; no provider defect discovered; reviewer pass | pass |
 | tc-090 | `validate`; docs/skills/adapters/report fallback guidance `rg` | validate nodes=63; relevant surfaces expose task manifest / Permission Profile / proposal-only fallback / `authority: proposed`; no docs edit required; reviewer pass | pass |
+| tc-099 | `git status --short`; `validate`; `sync`; `git diff --check`; S99 QA/code/spec reviews | clean before S99 report update; validate nodes=63; sync active unchanged; diff-check pass; QA/spec initial P1 and code P2 are dispositioned; QA/code/spec re-reviews passed | pass |
 
 ## Closure Coverage
 | AC / EC | covered by | current evidence |
@@ -310,6 +372,7 @@ ID: "iss-00125"
 | AC-003 / EC-001 | S03 / tc-005 | fallback discussion drafts are absent from active/context-pack/index/dashboard authority surfaces; validate passes. |
 | AC-004 / EC-002 | S03 / tc-006 | no provider/runtime/test/config diff or silent provider fix exists; no provider defect discovered in S03. |
 | AC-004 / EC-003 | S90 / tc-090 | host invocation remains unverified and is recorded without over-claiming; existing docs/skills/adapters already cover fallback behavior; no docs update required. |
+| Final quality | S99 / tc-099 | final command evidence is recorded; initial reviewer findings are dispositioned; QA/code/spec re-reviews passed before final commit / issue finish. |
 
 ## Closure Delta
 - `tc-001`: no closure id changed. Evidence includes an explicit caveat because `iss-00124/report.md:16-19` retains stale pending wording despite final pass/closure evidence at `iss-00124/report.md:277-308` and GitHub #124 closed state.
@@ -319,7 +382,8 @@ ID: "iss-00125"
 - `tc-005`: no closure id changed. Evidence is an absence check; fallback draft artifact names are intentionally absent from active/context-pack/index/dashboard authority surfaces.
 - `tc-006`: no closure id changed. Evidence is no-op/provider-defect-disposition; no provider defect was found and no provider source was changed.
 - `tc-090`: no closure id changed. Docs impact is no-op because current docs/skills/adapters already cover the fallback behavior exercised by this pilot; S90 spec-reviewer passed.
+- `tc-099`: no closure id changed. S99 final command evidence and reviewer finding dispositions were added after initial QA/spec fail and code P2 feedback; QA/code/spec re-reviews passed.
 
 ## ブロッカー / 未完了
-- S03/S90 report-only evidence commit is pending.
-- S99 remains open.
+- Final report commit is pending.
+- Issue finish remains open.
