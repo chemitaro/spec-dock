@@ -19,8 +19,7 @@ ID: "epic-00112"
   - Child Issues #113..#118 are implemented, committed, and closed.
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
 - 次のマイルストーン:
-  - Create the Epic-level PR from the accumulated implementation branch.
-  - Prepare PR review/CI follow-up before merge.
+  - Monitor Epic PR #119 CI and review status before merge.
 - ブロッカー:
   - None for Epic implementation closure.
 
@@ -41,7 +40,7 @@ ID: "epic-00112"
 - #116 Delegated Authoring Phase Gates: CLOSED.
 - #117 Codex Delegated Author Adapters: CLOSED.
 - #118 Delegated Authoring Dogfooding Pilot: CLOSED.
-- Epic PR: pending creation.
+- Epic PR #119 Delegated Authoring Architectureを導入: OPEN, non-draft, mergeable at creation-time audit.
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - E-AC-001: pass
