@@ -85,7 +85,7 @@ ID: "iss-00124"
 | EAL-003 | adopted | code-reviewer Godel | `tests/test_init_update.py`, `phase_design.md`, S03 report evidence | Fixed a P1 stale managed-content assertion caught by `test_init_creates_expected_structure`; removed the broad `canonical artifact edit` phrase from design gate and updated assertions to pin the narrow verified target-draft exception. | Godel `review_status: fail`; `uv run python -m unittest ...test_init_creates_expected_structure ...` first failed, then targeted 4-test rerun passed | rerun S03 code-reviewer |
 | EAL-004 | adopted | `uv run python -m spec_dock.cli update .` | dogfooding `.agents/skills` and `spec-dock/docs` | S90 synced provider changes into dogfooding-visible installed assets and docs without provider/runtime/test edits. | update command ok; `./spec-dock/scripts/spec-dock validate` -> `nodes=63`; dogfooding `rg` output lists authority/proposal/fallback fragments | run S90 spec-reviewer |
 | EAL-005 | adopted | spec-reviewer Descartes | S01/S02 provider `workflow_spec_authoring.md` corrective follow-up, dogfooding `workflow_spec_authoring.md`, report summary | Fixed a P1 contradiction discovered during S90 where bounded depth=2 text broadly forbade `canonical edit` while verified target draft updates were allowed elsewhere; provider source fix is classified as an S01/S02 corrective follow-up, and S90 will retain only generated dogfooding parity plus report evidence after that corrective commit. | Descartes `review_status: fail`; provider line narrowed; dogfooding re-synced with `uv run python -m spec_dock.cli update .` | commit provider corrective fix, then rerun S90 dogfooding-only review |
-| EAL-006 | adopted | spec-reviewer Descartes | S90 scope separation | Accepted S90 reviewer finding that provider source edits cannot be claimed as S90 dogfooding-only work; corrective provider change is separated from S90 parity. | Descartes re-review `review_status: fail` with P1 scope finding | stage provider corrective commit separately from dogfooding-only S90 diff |
+| EAL-006 | adopted | spec-reviewer Descartes | S90 scope separation | Accepted S90 reviewer finding that provider source edits cannot be claimed as S90 dogfooding-only work; corrective provider change was separated from S90 parity. | Descartes re-review `review_status: fail` with P1 scope finding; corrective commit `99d633b`; final S90 diff limited to `.agents/skills` and `spec-dock/docs` plus this report evidence | no further action |
 
 ## Spec Authoring Gate
 - Requirement Gate:
@@ -153,8 +153,13 @@ ID: "iss-00124"
     - P1: provider source edit was mixed into S90 even though S90 plan forbids provider source changes.
     - P2: post-fix S90 validate / rg / diff-check evidence needed to be recorded after the canonical-edit wording change.
   - disposition:
-    - P1 accepted. Provider `workflow_spec_authoring.md` fix is reclassified as S01/S02 corrective follow-up discovered during S90 and will be committed separately before S90 dogfooding-only parity.
+    - P1 accepted. Provider `workflow_spec_authoring.md` fix is reclassified as S01/S02 corrective follow-up discovered during S90 and was committed separately as `99d633b` before S90 dogfooding-only parity.
     - P2 fixed by recording post-fix validate / rg / diff-check evidence below.
+- Descartes (`019e5656-d5ec-75e1-a4df-1c4e67e54867`): `review_status: pass`
+  - scope: S90 dogfooding parity re-review after provider corrective separation.
+  - findings: P2 evidence polish only, non-blocking.
+  - disposition: report updated to name corrective commit `99d633b` and final dogfooding-only diff scope.
+  - rationale: provider-source correction is committed separately; remaining S90 diff is generated `.agents/skills` and `spec-dock/docs` plus report evidence only.
 
 ## 受け入れ条件の現在状況
 - status: S01/S02/S03 draft implementation evidence recorded; reviewer gates pending.
@@ -219,10 +224,16 @@ ID: "iss-00124"
   - reason: S90 spec-reviewer found that bounded depth=2 text still broadly forbade `canonical edit`, conflicting with verified target `design.md` / `plan.md` draft updates.
   - result: provider wording now forbids canonical edits outside verified target `design.md` / `plan.md` draft updates and keeps leaf-only evidence producers canonical-edit-free.
   - scope disposition: this provider change is not claimed as S90 dogfooding-only work; it is a corrective follow-up to S01/S02 source docs, to be committed separately before S90 parity.
+  - commit: `99d633b fix(authoring): depth2委任の正本編集境界を狭める`
   - post-fix validation:
     - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`
     - `rg -n 'authority: proposed|status: draft|final reviewer|adoption ledger|Permission Profile|proposal-only|previous phase|completed issue|implementation-readiness|canonical edit' .agents/skills spec-dock/docs src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` -> found provider and dogfooding narrowed canonical edit boundary plus delegated draft guardrails.
     - `git diff --check` -> pass.
+- S90 final dogfooding-only re-review:
+  - remaining diff after corrective commit: `.agents/skills/spec-dock-implementation-planner/SKILL.md`, `.agents/skills/spec-dock-system-architect/SKILL.md`, `spec-dock/docs/phase_design.md`, `spec-dock/docs/phase_plan.md`, `spec-dock/docs/phase_plan_epic.md`, `spec-dock/docs/phase_plan_issue.md`, `spec-dock/docs/workflow_spec_authoring.md`, plus this issue `report.md`.
+  - validation: `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`.
+  - whitespace: `git diff --check` -> pass.
+  - reviewer: Descartes `review_status: pass` with no P0/P1 findings.
 
 ## Step Contract Closure
 | step | closure id | status | evidence |
@@ -231,7 +242,7 @@ ID: "iss-00124"
 | S02 | tc-002 | pass | `spec-dock-implementation-planner/SKILL.md:34` permits target `plan.md` updates only with verified task manifest / Permission Profile / approved requirement-design revisions / path revision; `:42-44` forbid outside-manifest paths, unverified `plan.md` writes, previous phase rewrites, and completed issue plan/report rewrites; `:58-63` require `status: draft`, `authority: proposed`, and `source_revision`; `:69` falls back to proposal-only if design evidence/revisions/profile/probe are missing or stale; `phase_plan.md:73-76` records the same plan gate; Socrates re-review pass. |
 | S03 | tc-003 | pass | rg inspection confirms adoption/promotion ownership, proposed draft status, narrow verified target-draft exception, and no final authority / reviewer-pass claim boundaries; Godel re-review pass with no P0/P1 findings. |
 | S03 | tc-004 | pass | pytest unavailable was recorded; reviewer-identified missing scaffold assertion was added to the unittest alternative, the targeted 4-test unittest command passed, and D-003 supersedes the initial insufficient alternative; Godel re-review pass. |
-| S90 | tc-090 | pending re-review | `uv run python -m spec_dock.cli update .`, `./spec-dock/scripts/spec-dock validate`, and dogfooding `rg` inspection confirm generated skill/docs surfaces expose the role rewrite semantics; provider corrective change has been separated from S90 scope and S90 awaits dogfooding-only spec-reviewer re-review. |
+| S90 | tc-090 | pass | `uv run python -m spec_dock.cli update .`, `./spec-dock/scripts/spec-dock validate`, and dogfooding `rg` inspection confirm generated skill/docs surfaces expose the role rewrite semantics; provider corrective change was separated into `99d633b`; Descartes dogfooding-only re-review passed. |
 
 ## Test Contract Closure
 | test id | planned command / evidence | observed result | status |
@@ -240,7 +251,7 @@ ID: "iss-00124"
 | tc-002 | `rg -n 'source_revision|positive|negative|probe|Permission Profile|task manifest|authority: proposed|status: draft|previous phase|completed issue|implementation-readiness' ...`; `nl -ba .../spec-dock-implementation-planner/SKILL.md`; `nl -ba .../phase_plan.md`; `nl -ba .../workflow_spec_authoring.md` | exact evidence: role skill lines 34, 42-44, 58-63, 69; phase plan lines 73-76; workflow gate lines 101-111; Socrates pass | pass |
 | tc-003 | `rg -n 'adoption ledger|evidence adoption|proposed|promotion record|final reviewer|owner|authority: proposed|status: draft|previous phase|completed issue|implementation-readiness' ...`; `rg -n 'canonical artifact edit|Delegated authoring は draft-only evidence' ...` | required handoff/adoption/forbidden-authority fragments present; obsolete broad/old fragments absent; Godel pass | pass |
 | tc-004 | `uv run pytest tests/test_init_update.py`; corrected alternative `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` | pytest spawn unavailable; corrected 4-test alternative passed; Godel pass | pass |
-| tc-090 | `./spec-dock/scripts/spec-dock validate`; `rg -n 'authority: proposed|status: draft|final reviewer|adoption ledger|Permission Profile|proposal-only|previous phase|completed issue|implementation-readiness|canonical edit' .agents/skills spec-dock/docs` | post-fix validate passed with nodes=63; dogfooding generated surfaces expose delegated draft authority, Permission Profile fallback, no previous-phase rewrite, completed issue plan/report, implementation-readiness guardrails, and narrowed canonical edit boundary | pending re-review |
+| tc-090 | `./spec-dock/scripts/spec-dock validate`; `rg -n 'authority: proposed|status: draft|final reviewer|adoption ledger|Permission Profile|proposal-only|previous phase|completed issue|implementation-readiness|canonical edit' .agents/skills spec-dock/docs` | post-fix validate passed with nodes=63; dogfooding generated surfaces expose delegated draft authority, Permission Profile fallback, no previous-phase rewrite, completed issue plan/report, implementation-readiness guardrails, and narrowed canonical edit boundary; Descartes pass | pass |
 
 ## Closure Coverage
 | AC / EC | covered by | current evidence |
@@ -255,5 +266,4 @@ ID: "iss-00124"
 - `tc-004`: planned pytest command is unavailable in this environment. Initial alternative unittest coverage was insufficient because it missed `test_init_creates_expected_structure`; the corrected 4-test unittest alternative passed and was accepted by the S03 code-reviewer re-review.
 
 ## ブロッカー / 未完了
-- S90 spec-reviewer re-review is not yet run.
 - S99 final quality gates are not yet run.

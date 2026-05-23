@@ -72,16 +72,18 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 
 ## 委任 design authoring ゲート（delegated design authoring gate）
 
-Delegated design authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は fresh `spec-reviewer` pass の代替ではありません。
+Delegated design authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は `authority: proposed` / `status: draft` であり、fresh `spec-reviewer` pass の代替ではありません。
 
 Delegated design draft を使う場合、orchestrator は draft 生成前に次を確認します。
 
 - fresh requirement reviewer pass があり、pass 対象の `requirement.md` revision を特定できる
 - active node、scope、parent boundary、non-scope が確認済み
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
-- allowed actions は read-only analysis と draft proposal に限定される
-- forbidden actions は canonical artifact edit、implementation edit、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
+- allowed actions は、通常は read-only analysis と draft proposal に限定される。write-scoped delegated design authoring を使う場合だけ、検証済み task manifest と role-scoped Permission Profile が許可した対象 `design.md` を `authority: proposed` / `status: draft` として作成・更新できる
+- forbidden actions は、検証済み task manifest が許可した対象 `design.md` draft 更新以外の requirement/design/plan/report 正本編集、implementation edit、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
+- forbidden actions は `requirement.md` / `plan.md` / `report.md` / previous phase artifact の書き換え、実装・テスト・設定変更、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
 - required design draft output contract が、requirement coverage、existing context findings、design decisions、alternatives、boundary / contract model、dependency analysis、SoR、file/module plan、migration/compatibility/rollback、observability、test strategy、ADR candidates、risks、Requirement Clarification Requests、Integration Notes を含む
+- Permission Profile / host probe / source revision が未検証、fail-open、Desktop/CLI divergent、または stale の場合は `design.md` を編集せず、proposal-only / discussions path に戻る
 
 Delegated design draft を統合する場合、`report.md` に delegated draft evidence を残します。少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を記録します。
 
