@@ -30,7 +30,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | adopted / partially_adopted / rejected / deferred / stale / blocked | sub-agent / reviewer / discussion / command / research | artifact / issue / follow-up | ... | `path` / command / reviewer finding | none / follow-up / re-review / revisit condition |
+| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -49,7 +49,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
   - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash
 - grant keys:
   - review_input, planning_input, design_baseline, implementation_start, issue_ready, issue_finish, phase_completion
-  - wildcard grant semantics are not supported; `*`, `grants.*`, `all`, and broad role authority are invalid
+  - ワイルドカード grant semantics は非対応。`*`、`grants.*`、`all`、広すぎる role authority は invalid とする。
 - Promotion Record / promotion_record field:
   - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, reviewer_target_hash, promoted_at, promoted_by, promotion_decision
   - reviewer_target_hash / approved_hash mismatch or stale source_revision / approved_revision blocks promotion and downstream authority

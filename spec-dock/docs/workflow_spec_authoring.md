@@ -21,7 +21,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、次 phase へ進む前にユーザーへヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 
-## Authority metadata / grants / Promotion Record
+## 権限メタデータ（Authority metadata / grants / Promotion Record）
 
 Delegated canonical draft authoring を使う場合、artifact や report evidence は次の authority metadata を明示します。
 
@@ -69,7 +69,7 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 - Required failure modes は missing consent、missing/stale previous reviewer pass、requirement gap during design、design gap during plan、role unavailable、forbidden action attempt、stale draft、superseded draft、missing draft evidence when delegated use is claimed、reviewer unavailable/denied/waived/provisional を含む。
 - Delegated draft evidence を使った場合、対象 scope の `report.md` は delegated draft evidence table と failure-mode table を持つ。使わなかった場合は manual authoring / not used として、promotion evidence に delegated draft を使っていないことを短く記録する。
 
-## Evidence Adoption Ledger
+## 証跡採用台帳（Evidence Adoption Ledger）
 
 Delegated draft、worker note、research、reviewer finding、外部調査結果などの証跡を canonical artifact や実装判断へ取り込む場合、`report.md` に Evidence Adoption Ledger を残します。この台帳は raw transcript ではなく、orchestrator が検証した採否判断を記録します。
 
@@ -82,7 +82,7 @@ Delegated draft、worker note、research、reviewer finding、外部調査結果
 
 `blocked` または `stale` の entry が未解決のまま残っている場合、phase promotion、implementation start、issue ready、issue finish、phase completion に進めません。`deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せます。Evidence Adoption Ledger を使わずに delegated evidence の採用を主張してはなりません。
 
-## Bounded Depth=2 Delegation
+## 深さ2までの委任（Bounded Depth=2 Delegation）
 
 Main orchestrator が canonical artifact と final reviewer gate を所有します。System architect や implementation planner などの authoring specialist は、depth=2 の範囲で leaf-only evidence producer を呼び出せます。leaf-only evidence producer は repo analysis、research、consultation、QA-style evidence などの補助証跡を返すだけで、さらに子エージェントを呼び出して depth=3 / grandchild delegation を作ってはなりません。
 
@@ -92,7 +92,7 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 - preflight reviewer output は設計・計画の改善 input として扱い、final fresh reviewer pass とは分離する
 - reviewer independence: final `spec-reviewer` / `code-reviewer` / `qa-reviewer` は、同じ artifact を作成した authoring specialist や leaf-only evidence producer の代替ではない fresh gate として実行する
 
-## Task Manifest / Permission Profile Gate
+## タスクマニフェストと権限ゲート（Task Manifest / Permission Profile Gate）
 
 Write-scoped delegated authoring は、role-scoped Permission Profile と task manifest の両方が検証済みの場合だけ有効にできます。manifest は raw intention ではなく、実行直前に解決済みの path と revision を固定する fail-closed contract として `report.md` または issue-local `discussions/` に残します。検証済みでない場合、delegated role は proposal-only / discussions path に戻り、canonical `design.md` / `plan.md` を編集してはなりません。
 

@@ -13,9 +13,9 @@ ID: "iss-00125"
 # iss-00125 Authority Aware Delegated Authoring Dogfooding Pilot — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01/S02/S03/S90 evidence is committed, and S99 final QA/code/spec re-review has passed after report-ledger fixes.
-- 未完了: final report commit and issue finish.
-- 次のマイルストーン: commit final report, then run `spec-dock issue finish`.
+- 現在地: S01/S02/S03/S90 evidence, S99 final QA/code/spec re-review, final report commit, and issue finish are complete.
+- 未完了: none for this Issue.
+- 次のマイルストーン: use this Issue as completed v1 amendment evidence in the Epic-wide G10 pre-PR quality gate.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -354,7 +354,7 @@ ID: "iss-00125"
 ## Test Contract Closure
 | test id | planned command / evidence | observed result | status |
 |---|---|---|---|
-| tc-001 | prerequisite report `rg`, `nl -ba iss-00124/report.md`, plus `gh issue view 120..125` | prerequisite evidence sufficient with line-cited stale-report caveat for `iss-00124`; #120〜#124 closed, #125 open; reviewer pass | pass |
+| tc-001 | prerequisite report `rg`, `nl -ba iss-00124/report.md`, plus `gh issue view 120..125` | prerequisite evidence sufficient with line-cited stale-report caveat for `iss-00124`; #120〜#125 are now closed; reviewer pass | pass |
 | tc-002 | `active show`, `validate`, `sync`, permission/profile inspection, clean check | active `iss-00125`; validate nodes=63; sync active unchanged; clean status; write-scoped canonical pilot disabled/fallback locked with source hash; reviewer pass | pass |
 | tc-003 | locked system-architect discussion draft path inspection | fallback design draft file exists with `authority: proposed`, source hash, rejected canonical write scope, and no final authority claim; reviewer pass | pass |
 | tc-004 | locked implementation-planner discussion draft path inspection | fallback plan draft file exists with `authority: proposed`, source hash, rejected canonical write / implementation-readiness scope, and no final authority claim; reviewer pass | pass |
@@ -385,5 +385,9 @@ ID: "iss-00125"
 - `tc-099`: no closure id changed. S99 final command evidence and reviewer finding dispositions were added after initial QA/spec fail and code P2 feedback; QA/code/spec re-reviews passed.
 
 ## ブロッカー / 未完了
-- Final report commit is pending.
-- Issue finish remains open.
+- None for this Issue.
+
+## Final Closure Addendum
+- final report commit: `2a7dbec2fc7000d4e596d2080312a5c83322c13d` (`docs(issue): iss-00125 S99品質ゲートを記録`) records the final S99 command evidence, finding dispositions, and reviewer pass results.
+- issue finish: completed; GitHub #125 closed at `2026-05-23T20:25:37Z`.
+- stale wording disposition: earlier pending statements in this report were superseded by the S99 closure ledger, final report commit, issue finish, and this addendum. Epic G10 may treat `iss-00125` as closed evidence, not pending work.
