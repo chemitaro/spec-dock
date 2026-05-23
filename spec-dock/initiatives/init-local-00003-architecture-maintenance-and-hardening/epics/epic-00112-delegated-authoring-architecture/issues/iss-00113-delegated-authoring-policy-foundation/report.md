@@ -50,9 +50,12 @@ Disposition required evidence:
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | operation | doc-writer | S01 docs-only provider update followed the approved plan without material interpretation changes | follow plan; broaden scope | No material implementation decisions beyond the approved plan. | The worker changed only the provider workflow doc allowed by S01. | no_action | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`; worker result | none; issue-local evidence only |
+| D-002 | resolved | test-strategy | dev-coder | S02 worker found representative policy terms were not locked by existing content assertions | leave inspect-only; add targeted assertions | Add targeted `workflow_spec_authoring` assertions for representative delegated authoring policy terms. | The Issue plan allows tests as applicable, and assertions protect the shipped docs contract from regression. | applied | `tests/test_init_update.py`; targeted unittest results | none; issue-local test coverage |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Provider-side `workflow_spec_authoring.md` already contains the delegated authoring policy foundation.
+- This execution completed dogfooding parity by refreshing `spec-dock/docs/workflow_spec_authoring.md` from the local provider checkout and verifying the mirrored policy section.
+- The Issue remains docs-only and does not introduce runtime validation, write-capable delegation, role registry, or GitHub/Copilot agent support.
 
 ## 実装記録（セッションログ） (必須)
 
@@ -143,28 +146,117 @@ git diff --check
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | provider workflow doc + report S01 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | provider workflow doc + report S01 evidence | `9ca240b` | `git status --short` showed only S02 mirror diff after commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` - provider-side delegated authoring policy foundation.
 - `spec-dock/active/issue/report.md` - S01 observed evidence ledger.
 
 #### コミット
-- <hash> <message>
+- `9ca240b` docs(delegated-authoring): policy foundationを追加
 
 #### メモ
 - ...
 
 ---
 
-### 2026-05-23 HH:MM - HH:MM
+### 2026-05-23 S02 Dogfooding Parity and Verification
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02
+- AC/EC: AC-002, EC-002
+- Planned source:
+  - `plan.md` section: `S02 — Dogfooding parity and verification`
+  - closure ids: tc-002, tc-005
 
 #### 実施内容
-- ...
+- `dev-coder` に dogfooding mirror parity と targeted assertion update を委任した。
+- `spec-dock/docs/workflow_spec_authoring.md` が provider source と一致していることを確認した。
+- `tests/test_init_update.py` に delegated authoring policy foundation の代表文言 assertion を追加した。
+- 親 orchestrator が追加で `./spec-dock/scripts/spec-dock sync` を実行し、active / generated index の同期成功を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure -v
+
+OK
+
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets -v
+
+OK
+
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=57
+
+./spec-dock/scripts/spec-dock sync
+
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+git diff --check
+
+# pass
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | alternative | inspect-only parity evidence | Provider and dogfooding workflow docs are byte-identical after S01 mirror propagation. | `cmp -s src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md spec-dock/docs/workflow_spec_authoring.md` -> exit 0 | pass | Existing parity map covers this docs mirror. |
+| S02 | Green | dogfooding mirror and tests reflect provider change | Mirror contains the policy foundation section; targeted content assertions added. | two targeted unittests -> OK | pass | Assertions cover representative AC-001 policy terms. |
+| S02 | Refactor | guardrail satisfied / no refactor needed | Scope limited to mirror doc and targeted test. | `git diff --check`; `./spec-dock/scripts/spec-dock validate`; `./spec-dock/scripts/spec-dock sync` | pass | No unrelated runtime refactor. |
+
+#### Discovered Tests
+| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
+|---|---|---|---|---|---|---|
+| S02 | representative content assertion for delegated authoring policy terms | implementation | added test assertions | tc-002 | no | `tests/test_init_update.py` workflow_spec_authoring assertions |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | tc-002, tc-005 | parity/verification evidence is recorded | dogfooding mirror matches provider; targeted tests, validate, sync, diff-check pass | pass | Waiting on fresh S02 reviewer before commit. |
+
+#### Test Contract Closure
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc-002 | S02 | yes | inspect-only | provider/dogfooding mirror parity and targeted assertion need verification | targeted unittests, validate, sync | pass | Test assertions cover representative policy foundation terms. |
+| tc-005 | S02 | yes | inspect-only | potential provider/consumer drift | `cmp -s ...`; parity unittest | pass | no unintended drift |
+
+#### Closure Coverage
+| closure id | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| tc-002 | S02 | mirror diff + targeted unittests + validate/sync | pass | AC-002 closed for S02. |
+| tc-005 | S02 | provider/consumer parity check | pass | EC-002 closed with no drift. |
+
+#### Closure Delta
+| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
+|---|---|---|---|---|---|---|
+| none | tc-002 | tc-s02-001 | tc-002 | no closure contract change | no | no |
+| none | tc-005 | tc-s02-001 | tc-005 | no closure contract change | no | no |
+
+#### Implementation Delegation Gate
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | dogfooding mirror and targeted test assertion | dev-coder | mirror parity and targeted workflow docs assertions | active issue requirement/design/plan; S01 commit `9ca240b` | `spec-dock/docs/workflow_spec_authoring.md`, `tests/test_init_update.py` | provider source, runtime/code except tests, report.md | narrow unittests, validate, diff-check | drift or scope expansion | changed files, tests, risks, ledger note | pass |
+
+#### Delegated Worker Evidence
+| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added representative workflow_spec_authoring policy assertions and confirmed mirror parity. | `spec-dock/docs/workflow_spec_authoring.md`, `tests/test_init_update.py` | two targeted unittests -> OK; validate -> pass; diff-check -> pass | pending S02 reviewer | sync was not run by worker; parent ran sync successfully | accepted |
+
+#### Reviewer Gate Status
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to S02 commit after final gates | No findings; reviewer confirmed S02 diff stays within dogfooding parity / targeted assertion scope. |
+
+#### Step Commit Gate
+| step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | dogfooding mirror + targeted test + issue report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `spec-dock/docs/workflow_spec_authoring.md` - dogfooding mirror parity for delegated authoring policy foundation.
+- `tests/test_init_update.py` - content assertions for delegated authoring policy foundation.
+- `spec-dock/active/issue/report.md` - S02 observed evidence ledger.
 
 ---
 
@@ -173,27 +265,29 @@ git diff --check
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider workflow docs | already updated | doc-writer | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` contains policy foundation | pending final spec-reviewer |
+| dogfooding workflow docs | yes, updated by local provider update | approved-local-execution | `spec-dock/docs/workflow_spec_authoring.md` mirrors provider section | pending final spec-reviewer |
+| templates / README / skills / migration notes | no | N/A | Issue scope is workflow policy foundation only; no template/skill/runtime contract change in iss-00113 | pending final spec-reviewer |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | targeted docs content assertion added; no broader integration test expected unless QA requests it | targeted unittests, validate, sync | pending |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | no findings; S02 diff stays within mirror parity / targeted assertion scope | 0 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / docs alignment | pending | 0 | pending |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01/S02 evidence recorded; final reviewer pending | `spec-dock/docs/workflow_spec_authoring.md`, `tests/test_init_update.py`, and report evidence | final response / Epic PR / GitHub issue lifecycle | pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

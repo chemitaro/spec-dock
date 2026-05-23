@@ -2090,6 +2090,16 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("docs/authoring/<scope>-<phase>.md", workflow_spec_authoring)
             self.assertIn("docs/authoring/issue-plan.md", workflow_spec_authoring)
             self.assertIn("具体テストケース一覧", workflow_spec_authoring)
+            for fragment in (
+                "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "Delegated authoring は draft-only evidence",
+                "invocation ごとに `node + phase + role + artifact`",
+                "workflow-wide blanket consent は draft-only authoring delegation の根拠にしない",
+                "canonical artifact、implementation code、GitHub state、reviewer result",
+                "manual authoring path は有効",
+                "Delegated draft は fresh `spec-reviewer` pass の代替ではない",
+            ):
+                self.assertIn(fragment, workflow_spec_authoring)
             self.assertIn("カード型のネストリスト", issue_plan_authoring)
             self.assertIn("横長テーブルに押し込まない", issue_plan_authoring)
             self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan_authoring)
