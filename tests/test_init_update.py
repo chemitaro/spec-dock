@@ -1535,6 +1535,16 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             self.assertIn(field, text, f"{source}: missing authority metadata field {field}")
         for grant_key in (
+            "review_input",
+            "planning_input",
+            "design_baseline",
+            "implementation_start",
+            "issue_ready",
+            "issue_finish",
+            "phase_completion",
+        ):
+            self.assertIn(grant_key, text, f"{source}: missing explicit grant key {grant_key}")
+        for retired_grant_key in (
             "can_write_requirement",
             "can_write_design",
             "can_write_plan",
@@ -1545,7 +1555,11 @@ class TestInitUpdate(CliRuntimeHarness):
             "can_finish_issue",
             "can_complete_phase",
         ):
-            self.assertIn(grant_key, text, f"{source}: missing explicit grant key {grant_key}")
+            self.assertNotIn(
+                retired_grant_key,
+                text,
+                f"{source}: retired grant key must not appear in authority schema {retired_grant_key}",
+            )
         for fragment in (
             "Promotion Record",
             "promotion_record",
@@ -1566,7 +1580,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             f"{source}: missing explicit wildcard grant denial",
         )
-        for invalid_wildcard in ("`*`", "`can_write_*`", "`all`"):
+        for invalid_wildcard in ("`*`", "`grants.*`", "`all`"):
             self.assertIn(invalid_wildcard, text, f"{source}: missing invalid wildcard token {invalid_wildcard}")
         for field, alternatives in (
             ("expected verdict", ("expected verdict", "期待される判定")),

@@ -67,8 +67,8 @@ Disposition ごとの必須証跡:
 - authority metadata field:
   - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash
 - grant keys:
-  - can_write_requirement, can_write_design, can_write_plan, can_write_report, can_write_discussions, can_write_implementation, can_mark_issue_ready, can_finish_issue, can_complete_phase
-  - wildcard grant semantics are not supported; `*`, `can_write_*`, `all`, and broad role authority are invalid
+  - review_input, planning_input, design_baseline, implementation_start, issue_ready, issue_finish, phase_completion
+  - wildcard grant semantics are not supported; `*`, `grants.*`, `all`, and broad role authority are invalid
 - Promotion Record / promotion_record field:
   - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, reviewer_target_hash, promoted_at, promoted_by, promotion_decision
   - reviewer_target_hash / approved_hash mismatch or stale source_revision / approved_revision blocks promotion and downstream authority
