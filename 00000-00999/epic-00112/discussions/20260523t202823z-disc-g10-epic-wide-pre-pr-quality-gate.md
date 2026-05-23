@@ -136,7 +136,9 @@ Reviewers must treat that full name-status artifact as the authoritative file-le
     - close bypass: fixed by adding issue-target authority evaluation to `close_node`, fail-closed regression coverage in `tests/cli_runtime/test_runtime_close_s12.py`, and CLI integration alignment in `tests/cli_runtime/test_close.py`.
     - missing full name-status: fixed by adding `20260523t204806z-disc-g10-full-name-status.md`.
   - first re-reviewer: `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`)
-  - first_re_review_status: pass; previous findings resolved, but PR update remains blocked until the spec-reviewer lane passes the same final `base...HEAD` scope.
+  - first_re_review_status: pass; previous findings resolved under the final `base...HEAD` scope.
+  - final re-reviewer: `Nash the 2nd` (`019e56b9-f3cd-7ca2-b721-0a9022957699`)
+  - final_re_review_status: pass; no blocking finding remains in the deep-consultant lane.
   - scope: architecture/workflow risk, hidden coupling, fallback adequacy, rollout quality, and product-quality gaps across the full diff.
 - Fresh `spec-reviewer`:
   - first reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`)
@@ -155,7 +157,8 @@ Reviewers must treat that full name-status artifact as the authoritative file-le
   - second disposition:
     - final scope alignment: fixed by using `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD` as the authoritative PR-bound G10 diff scope and regenerating the full name-status artifact to 269 entries.
     - deep-consultant pass recording: fixed by recording Planck the 2nd's pass above.
-  - second_re_review_status: pending.
+  - second re-reviewer: `Boyle the 2nd` (`019e56b9-f454-7e82-a3d7-737fb5ee9821`)
+  - second_re_review_status: pass; no specification finding remains and PR #119 is not blocked from the spec-reviewer lane.
   - scope: requirement/design/plan/report alignment, issue closure evidence, additive v1 preservation of v0 history, and whether PR update is blocked by unresolved findings.
 
 ## Finding disposition rule
@@ -167,3 +170,10 @@ PR update / push remains blocked until every finding from both reviewers has one
 - `explicitly_deferred_with_user_acceptance`
 
 Findings with disposition `open`, `pending`, or `unresolved` block PR update. Fixed or superseded findings require revalidation and fresh re-review against the same G10 scope before PR update.
+
+## Final G10 verdict
+
+- `deep-consultant`: pass.
+- `spec-reviewer`: pass.
+- unresolved findings: none.
+- PR #119 update gate: unblocked.
