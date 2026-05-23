@@ -28,6 +28,15 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - consent がある場合、orchestrator は requirement / design / plan の各 phase ごとに再確認せず、必要な `spec-reviewer` や read-only specialist を起動してよい。
 - consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation を許可しない。scope が変わる場合は再確認する。
 
+## delegated authoring policy foundation
+
+- Main orchestrator は canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、user dialogue、canonical integration、phase promotion を所有する。
+- Delegated authoring は draft-only evidence であり、canonical artifact の authority ではない。delegated output は main orchestrator が統合し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
+- Delegated authoring を使う場合は、invocation ごとに `node + phase + role + artifact`、scope、source artifacts、allowed actions、forbidden actions、output expectation、stop / invalidation condition を明示し、`report.md` に残す。workflow-wide blanket consent は draft-only authoring delegation の根拠にしない。
+- Delegated role は canonical artifact、implementation code、GitHub state、reviewer result を編集・確定・上書きしてはならない。write-capable delegation、destructive action、external publishing、credentialed access、`.github/agents` / Copilot support はこの workflow の delegated authoring policy では許可しない。
+- Delegated draft が unavailable / skipped / blocked / stale / rejected / superseded の場合でも、manual authoring path は有効である。ただし delegated authoring を使った evidence として扱ってはならない。
+- Delegated draft は fresh `spec-reviewer` pass の代替ではない。`spec-reviewer` は draft 自体ではなく、main orchestrator が統合した canonical artifact と evidence を review する。
+
 ## authoring lifecycle
 
 1. 対象 scope と既存 node を確認する。
