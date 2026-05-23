@@ -13,15 +13,19 @@ ID: "epic-00112"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
+  - v0 delegated authoring implementation is complete as historical work.
   - Requirement phase completed with fresh `spec-reviewer` pass.
   - Design phase completed with fresh `spec-reviewer` pass.
   - Plan phase completed with fresh `spec-reviewer` pass.
   - Child Issues #113..#118 are implemented, committed, and closed.
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
+  - v1 amendment requirement/design/plan authoring is review-passed and ready for additive Issue creation; v1 Issue 007〜012 are not yet executed.
 - 次のマイルストーン:
-  - Monitor Epic PR #119 CI and review status before merge.
+  - Create and execute additive v1 Issues 007〜012 before claiming authority-aware delegated authoring closure.
+  - Treat Epic PR #119 monitoring as v0 historical rollout work unless it is explicitly superseded by the v1 amendment rollout.
 - ブロッカー:
-  - None for Epic implementation closure.
+  - None for v0 historical implementation closure.
+  - v1 authority-aware delegated authoring closure remains pending until additive Issues 007〜012 complete or record explicit fallback evidence.
 
 ## 決定事項（ADRリンク） (必須)
 - No ADR was created in this Epic.
@@ -33,6 +37,29 @@ ID: "epic-00112"
   - `.github/agents` / Copilot support, write-capable delegation, runtime validation, and role registry expansion remain deferred.
   - `iss-00117` closed as `adapter_contract_only`; live Codex host callability is not claimed.
 
+## Spec Interpretation / Decision Ledger
+
+- v1 amendment status model:
+  - decision: Separate `status`, `authority`, normative `grants`, and lifecycle handoff readiness.
+  - disposition: accepted.
+  - evidence: Requirement / Design Amendment Gate passed by Deep Consultant `Ptolemy` and Spec Reviewer `Meitner`.
+- v1 delegated canonical draft authoring:
+  - decision: `system-architect` and `implementation-planner` may author draft `design.md` / `plan.md`, but final authority and promotion remain with the main orchestrator plus reviewer gates.
+  - disposition: accepted.
+  - evidence: Requirement / Design Amendment Gate promotion scope.
+- v1 additive planning:
+  - decision: Preserve v0 Issue 001〜006 / #113..#118 as historical work and add v1 Issue 007〜012 for authority-aware delegated authoring.
+  - disposition: accepted.
+  - evidence: Plan Amendment Gate passed by Spec Reviewer `Beauvoir`; historical contract note added to `plan.md`.
+- v1 reviewer findings:
+  - decision: Per-issue rollout / fallback contracts and concrete Issue 011 provider docs paths are required.
+  - disposition: resolved.
+  - evidence: `plan.md` v1 Issue 007〜012 include provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
+- v1 execution state:
+  - decision: v1 amendment is ready for additive Issue creation, not final Epic closure.
+  - disposition: pending implementation.
+  - evidence: v1 Issue 007〜012 remain planned work.
+
 ## 完了した Issue / PR / Release (必須)
 - #113 Delegated Authoring Policy Foundation: CLOSED.
 - #114 Delegated Draft Evidence Schema: CLOSED.
@@ -42,7 +69,10 @@ ID: "epic-00112"
 - #118 Delegated Authoring Dogfooding Pilot: CLOSED.
 - Epic PR #119 Delegated Authoring Architectureを導入: OPEN, non-draft, mergeable at creation-time audit.
 
-## 受け入れ条件（E-AC）の達成状況 (必須)
+## v0 受け入れ条件（E-AC）の履歴達成状況 (必須)
+
+この節は、完了済み Issue #113..#118 / plan Issue 001〜006 に対する historical v0 evidence です。v1 amendment 後の E-AC 達成状況は次節を正とし、v1 Issue 007〜012 の実装証跡が揃うまで pass 扱いにしません。
+
 - E-AC-001: pass
   - Evidence: #113 added delegated-authoring policy foundation and completed review/finish.
 - E-AC-002: pass
@@ -61,6 +91,33 @@ ID: "epic-00112"
   - Evidence: #118 recorded pilot metrics and `write-capable delegation remains deferred`.
 - E-AC-009: pass
   - Evidence: #118 exercised the real `adapter_contract_only` fallback as negative/blocked-case evidence with `host_invocation_verified=false`.
+
+## v1 Amendment 受け入れ条件（E-AC）の現在状況
+
+- E-AC-001: pending
+  - Required evidence: v1 Issue 007 authority metadata / promotion record schema implementation.
+- E-AC-002: pending
+  - Required evidence: v1 Issue 008 proposed-artifact blocking in context-pack and lifecycle gates.
+- E-AC-003: pending
+  - Required evidence: v1 Issue 011 `system-architect` draft `design.md` authoring with `authority: proposed` and no promotion authority.
+- E-AC-004: pending
+  - Required evidence: v1 Issue 011 `implementation-planner` draft `plan.md` authoring with approved design revision reference, `authority: proposed`, and no promotion authority.
+- E-AC-005: pending
+  - Required evidence: v1 Issue 007 / 008 / 012 promotion record and lifecycle handoff evidence.
+- E-AC-006: pending
+  - Required evidence: v1 Issue 009 evidence adoption ledger with disposition, reflected target, rejected reason, or pending state.
+- E-AC-007: pending
+  - Required evidence: v1 Issue 009 bounded depth=2 graph proving child specialists remain leaf-only evidence producers.
+- E-AC-008: pending
+  - Required evidence: v1 Issue 010 role-scoped Permission Profile / task manifest probe evidence.
+- E-AC-009: pending
+  - Required evidence: v1 Issue 009 / 011 / 012 final fresh reviewer evidence proving preflight review is not treated as final pass.
+- E-AC-010: pending
+  - Required evidence: v1 Issue 012 rollout evidence showing completed Issue 001〜006 / #113..#118 plans and reports were not rewritten, and v1 requirements are closed by additive Issues.
+- E-AC-011: pending
+  - Required evidence: v1 Issue 010 / 012 provider-first rollout and parity evidence for docs, role skills, host adapter assets, runtime gates, templates, and report scaffolds.
+- E-AC-012: pending
+  - Required evidence: v1 Issue 007 / 008 / 012 requirement authority prerequisite and lifecycle gate evidence.
 
 ## Spec Authoring Gate
 
@@ -93,6 +150,40 @@ ID: "epic-00112"
 - verdict: passed
 - promotion:
   - Epic proceeded to Issue decomposition and implementation.
+
+## v1 Amendment Spec Authoring Gate（2026-05-23）
+
+この節は、完了済み Issue #113..#118 / plan Issue 001〜006 を上書きしない追加修正ゲート記録です。v1 amendment は、既存実装の履歴を保持したまま、追加 Issue として authority-aware delegated authoring を具体化します。
+
+### Requirement / Design Amendment Gate
+- phase: requirement / design amendment
+- reviewer / consultant:
+  - Deep Consultant `Ptolemy` (`019e551d-b9d8-7411-ad67-313c0961af7b`): `consultant_status: approve`
+  - Spec Reviewer `Meitner` (`019e5526-a89f-76b3-b4fb-5a7d74244630`): `review_status: pass`
+- verdict: passed
+- promotion:
+  - v1 requirement / design amendment promoted to additive plan amendment.
+- promotion scope:
+  - `status` / `authority` / `grants` を分離する。
+  - `system-architect` と `implementation-planner` は canonical draft author になれるが、final authority / promotion authority は持たない。
+  - implementation / issue ready / issue finish / phase completion は `authority: approved` と対応 grant を必要とする。
+  - Permission Profile / task manifest / provider-first rollout / requirement authority prerequisite を gate として扱う。
+
+### Plan Amendment Gate
+- phase: plan amendment
+- reviewer:
+  - Spec Reviewer `Rawls` (`019e552a-3779-71a0-b4d9-a6a5df7986d4`): `review_status: fail`
+    - finding: per-issue rollout and fallback contracts were missing.
+  - Spec Reviewer `Beauvoir` (`019e552f-f20f-7bf2-96d9-983e3165e4bd`): `review_status: pass`
+    - finding: P2 path precision gap for v1 Issue 011 provider docs.
+    - resolution: v1 Issue 011 provider source now names the concrete provider doc paths under `src/spec_dock/assets/spec_dock/docs/`.
+- verdict: passed
+- promotion:
+  - v1 plan amendment is ready for additive Issue creation.
+- promotion scope:
+  - Original plan Issue 001〜006 remains historical v0 work and is not rewritten.
+  - v1 Issue 007〜012 are additive update / fix Issues.
+  - Each v1 Issue records provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
