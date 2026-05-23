@@ -120,4 +120,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
 - AC / EC と step の対応が取れている
 - docs impact と final quality gate が計画に埋め込まれ、`doc-writer` による必要 docs 更新、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review が追跡できる
+- delegated plan draft を使う場合、draft provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
+- delegated draft を fresh `spec-reviewer` pass、step reviewer gate、final QA/code/spec gate の代替にしていない
+- delegated authoring unavailable / skipped の場合も manual authoring path が有効である
 - reviewer が「この plan で実装してよい」と判断できる

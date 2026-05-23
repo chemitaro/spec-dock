@@ -48,3 +48,6 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - integration checkpoint がある
 - rollout / docs impact が露出している
 - issue handoff に必要な readiness がある
+- delegated plan draft を使う場合、draft provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
+- delegated draft を fresh `spec-reviewer` pass の代替にしていない
+- delegated authoring unavailable / skipped の場合も manual authoring path が有効である
