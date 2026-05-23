@@ -60,6 +60,10 @@ ID: "epic-00112"
   - decision: v1 amendment Issues are created and approved, but execution must wait for the refreshed Epic plan gate to pass.
   - disposition: pending implementation.
   - evidence: `iss-00120`〜`iss-00125` / #120〜#125 exist as additive v1 Issues; v1 implementation evidence remains pending.
+- v1 Epic-wide pre-PR quality gate:
+  - decision: After all v1 Issues complete raw implementation and before Epic PR #119 is updated, run fresh `deep-consultant` and `spec-reviewer` gates over the full development-baseline-to-final-implementation delta.
+  - disposition: accepted.
+  - evidence: user follow-up on 2026-05-24; `plan.md` now defines G10 Epic-wide pre-PR quality gate and final exit contract.
 
 ## 完了した Issue / PR / Release (必須)
 - #113 Delegated Authoring Policy Foundation: CLOSED.
@@ -188,6 +192,45 @@ ID: "epic-00112"
   - Original plan Issue 001〜006 remains historical v0 work and is not rewritten.
   - v1 Issue 007〜012 correspond to `iss-00120`〜`iss-00125` / #120〜#125 and are additive update / fix Issues.
   - Each v1 Issue records provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
+
+### Epic-wide Pre-PR Quality Gate
+- phase: pre-PR update / final amendment rollout
+- amendment reviewer:
+  - Fermat (`019e55c0-c71f-7302-bcd1-97a3097b1f20`) `review_status: fail`.
+    - findings: baseline/final endpoints were not pinned; non-blocking findings could remain unresolved; report evidence fields were incomplete.
+    - disposition: fixed by pinning PR #119 `baseRefOid...HEAD`, requiring disposition for every finding, and adding G10 evidence fields.
+  - Huygens (`019e55c4-4735-7540-a831-936cc9f47d50`) `review_status: pass`.
+    - finding: none.
+    - reason: G10 now defines shared diff endpoints/evidence and blocks PR update until all findings have accepted dispositions.
+- timing:
+  - Run only after `iss-00120`〜`iss-00125` complete raw implementation and issue-local closure evidence.
+  - Run before updating, pushing, or refreshing Epic PR #119.
+- reviewers:
+  - Fresh `deep-consultant`: pending.
+  - Fresh `spec-reviewer`: pending.
+- review scope:
+  - Full delta from captured Epic PR #119 `baseRefOid` to completed v1 implementation local `HEAD`.
+  - Provider source, dogfooding workspace parity, runtime/test/docs/templates/skills/agent assets, active reports, validation/sync evidence, and PR rollout evidence.
+- pass condition:
+  - Every finding from either reviewer receives disposition `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance`.
+  - Fixed or superseded findings are revalidated and re-reviewed until the shared G10 evidence has no unresolved findings.
+  - PR update / push is blocked while any finding has disposition `open`, `pending`, or `unresolved`.
+- evidence fields to fill at G10:
+  - base_ref_name: pending.
+  - base_ref_oid: pending.
+  - head_ref_name: pending.
+  - head_oid_before_pr_update: pending.
+  - shared_diff_artifact: pending.
+  - diff_stat_command: `git diff --stat <baseRefOid>...HEAD`
+  - diff_name_status_command: `git diff --name-status <baseRefOid>...HEAD`
+  - validation_commands: pending.
+  - deep_consultant_reviewer: pending.
+  - spec_reviewer: pending.
+  - findings_disposition_table: pending.
+  - re_review_verdicts: pending.
+  - pr_update_push_evidence: pending.
+- current status:
+  - Planned; not yet runnable because v1 Issues are still in execution.
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
