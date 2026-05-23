@@ -53,10 +53,11 @@ shell_tool = true
 
 [permissions.spec_dock_implementation_planner_draft_authoring.filesystem.":workspace_roots"]
 "." = "read"
-"spec-dock/initiatives" = "write"
+"spec-dock/initiatives" = "read"
 "spec-dock/system/active-none" = "read"
 "src" = "read"
 "tests" = "read"
+".codex/permission-probe-evidence" = "write"
 ".codex" = "read"
 ".agents" = "read"
 ".env" = "deny"

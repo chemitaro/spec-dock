@@ -2068,6 +2068,22 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("sandbox_mode", parsed)
         self.assertIsInstance(parsed.get("default_permissions"), str)
         self.assertIn(parsed["default_permissions"], parsed.get("permissions", {}))
+        filesystem_rules = parsed["permissions"][parsed["default_permissions"]]["filesystem"]
+        workspace_rules = filesystem_rules[":workspace_roots"]
+        write_roots = {path for path, permission in workspace_rules.items() if permission == "write"}
+        self.assertEqual(
+            write_roots,
+            {".codex/permission-probe-evidence"},
+            f"delegated author adapter write roots must be probe-evidence only ({shim_label})",
+        )
+        for read_only_path in ("spec-dock/initiatives", "src", "tests", ".codex", ".agents"):
+            self.assertEqual(
+                workspace_rules.get(read_only_path),
+                "read",
+                f"delegated author adapter must keep {read_only_path} read-only ({shim_label})",
+            )
+        self.assertEqual(workspace_rules.get(".env"), "deny")
+        self.assertEqual(workspace_rules.get(".env.*"), "deny")
         self.assertEqual(parsed.get("features", {}).get("shell_tool"), True)
         self.assertIsInstance(parsed.get("developer_instructions"), str)
         self.assertIn(f'name = "{agent_name}"', text, f"delegated author adapter missing name ({shim_label})")
@@ -2093,7 +2109,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "[permissions.",
             '":minimal" = "read"',
             '"." = "read"',
-            '"spec-dock/initiatives" = "write"',
+            '"spec-dock/initiatives" = "read"',
+            '".codex/permission-probe-evidence" = "write"',
             '"src" = "read"',
             '"tests" = "read"',
             '".env" = "deny"',
