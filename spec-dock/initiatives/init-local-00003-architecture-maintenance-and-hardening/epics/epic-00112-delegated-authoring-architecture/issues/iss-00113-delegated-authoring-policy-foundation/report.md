@@ -49,84 +49,86 @@ Disposition required evidence:
 
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | open / resolved / superseded | interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up | orchestrator / reviewer / worker source | plan ambiguity / implementation constraint / reviewer finding / discovered risk | option A; option B; no action | ... | ... | applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded | `path` / command / reviewer finding / discussion | target artifact / issue / discussion / replacement entry / none with reason |
+| D-001 | resolved | operation | doc-writer | S01 docs-only provider update followed the approved plan without material interpretation changes | follow plan; broaden scope | No material implementation decisions beyond the approved plan. | The worker changed only the provider workflow doc allowed by S01. | no_action | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`; worker result | none; issue-local evidence only |
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
 
 ## 実装記録（セッションログ） (必須)
 
-### 2026-05-23 HH:MM - HH:MM
+### 2026-05-23 S01 Provider Policy Foundation
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001
 - Planned source:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `S01 — Provider source update`
+  - closure ids: tc-001
 
 #### 実施内容
-- ...
+- `doc-writer` に S01 provider-side docs update を委任した。
+- `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` に `delegated authoring policy foundation` section を追加した。
+- contract には canonical ownership、draft-only evidence、invocation scope / consent、forbidden actions、manual authoring validity、fresh `spec-reviewer` pass の独立性を含めた。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git diff --check
 
-<result>
+# pass
 ```
 
 #### Red/Green/Refactor Evidence
 | step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
 |---|---|---|---|---|---|---|
-| S01 | Red / alternative | red-required / covered-existing / inspect-only / manual-required | ... | `command` / docs inspection / manual record | pass / approved-no-op / fail / blocked | ... |
-| S01 | Green | ... | ... | `command` / inspection / manual record | pass / fail / blocked | ... |
-| S01 | Refactor | guardrail satisfied / no refactor needed | ... | diff inspection / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | alternative | inspect-only | Existing provider doc lacked a delegated authoring policy foundation section with the Issue-specific lock terms. | `rg -n "delegat|draft-only|consent|forbidden|canonical" src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` before change | pass | S01 is docs-only; no red test was required. |
+| S01 | Green | provider source contains Policy foundation contract | Added provider doc section with all AC-001 lock terms. | `git diff -- src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | pass | Dogfooding mirror intentionally left for S02. |
+| S01 | Refactor | guardrail satisfied / no refactor needed | Only the provider workflow doc changed. | `git diff --check` | pass | No tidy change needed. |
 
 #### Discovered Tests
 | step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | none | implementation | recorded | tc-001 | no | docs-only inspect evidence is sufficient for S01; S02 owns parity/tests. |
 
 #### Step Contract Closure
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001 | target provider source is updated and inspected | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` contains the policy foundation section; fresh S01 `spec-reviewer` returned `review_status: pass`. | pass | Ready for S01 commit. |
 
 #### Test Contract Closure
 | closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | yes | inspect-only | Provider doc did not contain the Issue-specific delegated authoring policy foundation terms as a dedicated contract. | `git diff -- src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`; fresh S01 `spec-reviewer` | pass | Reviewer passed with no findings. |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### Closure Coverage
 | closure id | step | verification evidence | observed result | notes |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | provider doc diff + S01 reviewer | pass | S01 closes AC-001 only; S02 remains open. |
 
 #### Closure Delta
 | change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001 | tc-s01-001 | tc-001 | no closure contract change | no | no |
 
 #### Workflow Delegation Consent
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00113 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user objective to execute all Epic issues with referenced issue-execution workflow | current repo/worktree | iss-00113 | current session | doc-writer, spec-reviewer, code-reviewer, qa-reviewer | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
 
 #### Implementation Delegation Gate
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped provider docs change | doc-writer | provider workflow docs only | active issue requirement/design/plan and parent Epic docs | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | dogfooding mirror, tests, runtime/code, generated files, GitHub state, write-capable delegation, `.github/agents` support | diff inspection, `git diff --check` | scope expansion or contradiction with existing workflow | changed files, verification, risks, ledger note | pass |
 
 #### Delegated Worker Evidence
 | step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | doc-writer | Added provider-side delegated authoring policy foundation section. | `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | `git diff --check` -> pass; docs-only diff inspection -> pass | pass | dogfooding mirror remains S02 work | accepted |
 
 #### Parent Implementation Exception
 | step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |
@@ -136,16 +138,16 @@ Disposition required evidence:
 #### Reviewer Gate Status
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | spec-reviewer | fresh | passed | N/A | proceed to S01 commit | No findings; reviewer confirmed AC-001/tc-001 and non-scope boundaries. |
 
 #### Step Commit Gate
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | provider workflow doc + report S01 evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` - provider-side delegated authoring policy foundation.
+- `spec-dock/active/issue/report.md` - S01 observed evidence ledger.
 
 #### コミット
 - <hash> <message>
