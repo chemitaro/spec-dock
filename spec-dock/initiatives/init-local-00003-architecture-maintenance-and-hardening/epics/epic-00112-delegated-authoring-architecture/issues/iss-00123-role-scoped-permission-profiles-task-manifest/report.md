@@ -13,9 +13,9 @@ ID: "iss-00123"
 # iss-00123 Role Scoped Permission Profiles and Task Manifest Probes — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01 committed; S02 role-scoped Permission Profile assets, assertions, and probe evidence implemented.
-- 未完了: S02 code-reviewer gate, S90, S99.
-- 次のマイルストーン: run S02 code-reviewer, fix findings, then commit S02.
+- 現在地: S01/S02 committed; S90 dogfooding fallback/probe placement evidence recorded.
+- 未完了: S90 spec-reviewer gate and S99.
+- 次のマイルストーン: run S90 spec-reviewer, fix findings, then commit or approved-no-op S90.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -245,6 +245,34 @@ ID: "iss-00123"
     - final reviewer gate:
       - Goodall (`019e5634-40ca-72e2-8136-f967f7b66e1f`) `review_status: pass`.
       - reason: prior closure-evidence, fallback-ledger, and adapter/skill contradiction findings are addressed; no remaining S02 defects.
+- S90 host fallback and dogfooding probe evidence placement:
+  - changed files:
+    - `report.md` only.
+  - validation command:
+    - `./spec-dock/scripts/spec-dock validate`
+    - result: pass; `spec-dock: ok (validate) nodes=63`.
+  - dogfooding inspection command:
+    - `rg -n 'default_permissions|task manifest|probe|fallback' .codex/agents .codex/AGENTS.md spec-dock/docs`
+    - result: pass; dogfooding-visible `.codex/AGENTS.md`, `.codex/agents/system-architect.toml`, `.codex/agents/implementation-planner.toml`, and `spec-dock/docs/workflow_spec_authoring.md` expose task manifest, probe, fallback, and `default_permissions` placement.
+  - no provider/runtime/test edit statement:
+    - S90 introduced no provider source, runtime, or test changes after S02 commit.
+  - Ledger Note:
+    - no new material decision in S90. S90 relies on D-003 as the current fallback decision: role-scoped Permission Profile guardrails exist, but write-scoped delegation remains disabled / proposal-only until a future task manifest, canonical role skill contract, and host probe all explicitly pass.
+  - Step Contract Closure:
+    - tc-090: pass.
+    - `.codex/AGENTS.md:59-63`: task manifest, `default_permissions` / `[permissions]`, positive/negative probe, and fallback decision guidance are visible in dogfooding bootstrap guidance.
+    - `.codex/agents/system-architect.toml:11` and `.codex/agents/implementation-planner.toml:11`: dogfooding adapters expose role-scoped `default_permissions`.
+    - `.codex/agents/system-architect.toml:28-35` and `.codex/agents/implementation-planner.toml:28-35`: dogfooding adapters expose proposal-only / fail-closed fallback when canonical skill, issue contract, or host probe is not verified.
+    - `spec-dock/docs/workflow_spec_authoring.md:96-110`: dogfooding docs expose task manifest fields, positive/negative probe requirements, and disabled/proposal-only fallback on fail-open/unavailable/divergent behavior.
+  - Test Contract Closure:
+    - tc-090: pass by validate and dogfooding inspection evidence.
+  - Closure Coverage:
+    - AC-004: covered by dogfooding-visible fallback and disabled/proposal-only guidance.
+    - provider-first parity: covered by S02 `uv run python -m spec_dock.cli update .` and S90 dogfooding inspection.
+  - reviewer gate:
+    - Raman (`019e563b-4437-7623-a408-e7e0e45f2c68`) `review_status: pass`.
+    - finding: P2, S90 should explicitly record ledger/no-new-decision disposition.
+    - disposition: added S90 Ledger Note referencing D-003 and confirming no new material decision.
 
 ## ブロッカー / 未完了
-- S90 and S99 remain.
+- S99 remains.
