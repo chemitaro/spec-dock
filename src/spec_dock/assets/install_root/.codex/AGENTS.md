@@ -54,6 +54,14 @@ For SpecDock usage and workflow details, start here:
 - Run `./spec-dock/scripts/spec-dock validate` after structural changes and before handoff.
 - Use `./spec-dock/scripts/spec-dock sync` only to regenerate CLI-managed views, pointers, or exported state. Do not use it as a general repair step.
 
+## Task Manifest / Permission Profile Gate
+
+Use write-scoped delegated authoring only when the active issue contract explicitly permits it and a task manifest has been recorded. The manifest must name the resolved target, input revision or hash, allowed paths, forbidden paths, positive probe command, negative probe command, cleanup, fallback, and the role-scoped `default_permissions` / `[permissions]` profile being tested.
+
+Positive probe evidence must write only the allowed artifact or evidence path named in the manifest. Negative probe evidence must show that forbidden implementation, test, config, or secret paths are blocked. If the probe is unavailable, divergent between Desktop and CLI, unreproducible, or fail-open, disable write-scoped delegation and use the proposal-only fallback path.
+
+Do not mix role-scoped Permission Profiles with broad `sandbox_mode` / `sandbox_workspace_write` assumptions. Treat unresolved profile behavior as blocked until `report.md` records the probe result and fallback decision.
+
 ## Source Boundaries
 - `spec-dock/active/*`: current task contract
 - Repository root `AGENTS.md`: repo, product, and domain rules
