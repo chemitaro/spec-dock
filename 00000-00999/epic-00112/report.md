@@ -21,7 +21,7 @@ ID: "epic-00112"
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
   - v1 amendment requirement/design/plan authoring is review-passed, and additive Issues `iss-00120`〜`iss-00125` / #120〜#125 are created with approved specs.
   - Additive v1 Issues `iss-00120`〜`iss-00125` / #120〜#125 are implemented, issue-finished, and closed.
-  - G10 Epic-wide pre-PR quality gate is now running against the full `main` baseline to final local `HEAD` delta before PR #119 is updated.
+  - G10 Epic-wide pre-PR quality gate is now running against the full `main` baseline to fixed implementation endpoint delta before PR #119 is updated.
 - 次のマイルストーン:
   - Complete fresh `deep-consultant` and `spec-reviewer` review for G10, resolve all findings, re-review as needed, then update Epic PR #119.
 - ブロッカー:
@@ -59,7 +59,7 @@ ID: "epic-00112"
 - v1 execution state:
   - decision: v1 amendment Issues are created, approved, implemented, issue-finished, and closed.
   - disposition: accepted.
-  - evidence: `iss-00120`〜`iss-00125` / #120〜#125 closure plus issue-local reports and commits through `2a7dbec2fc7000d4e596d2080312a5c83322c13d`.
+  - evidence: `iss-00120`〜`iss-00125` / #120〜#125 closure plus issue-local reports and implementation commits through `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`.
 - v1 Epic-wide pre-PR quality gate:
   - decision: After all v1 Issues complete raw implementation and before Epic PR #119 is updated, run fresh `deep-consultant` and `spec-reviewer` gates over the full development-baseline-to-final-implementation delta.
   - disposition: accepted.
@@ -206,10 +206,10 @@ ID: "epic-00112"
   - Run only after `iss-00120`〜`iss-00125` complete raw implementation and issue-local closure evidence.
   - Run before updating, pushing, or refreshing Epic PR #119.
 - reviewers:
-  - Fresh `deep-consultant`: pending.
-  - Fresh `spec-reviewer`: pending.
+  - Fresh `deep-consultant`: first review failed; findings fixed; re-review pending.
+  - Fresh `spec-reviewer`: first review failed; findings fixed; re-review pending.
 - review scope:
-  - Full delta from captured Epic PR #119 `baseRefOid` to completed v1 implementation local `HEAD`.
+  - Full delta from captured Epic PR #119 `baseRefOid` to completed v1 implementation endpoint `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`.
   - Provider source, dogfooding workspace parity, runtime/test/docs/templates/skills/agent assets, active reports, validation/sync evidence, and PR rollout evidence.
 - pass condition:
   - Every finding from either reviewer receives disposition `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance`.
@@ -219,18 +219,25 @@ ID: "epic-00112"
   - base_ref_name: `main`.
   - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`.
   - head_ref_name: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`.
-  - head_oid_before_pr_update: `2a7dbec2fc7000d4e596d2080312a5c83322c13d`.
+  - implementation_head_oid_after_g10_fixes: `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`.
+  - evidence_artifact_commit_oid: use clean `git rev-parse HEAD` at reviewer handoff; this avoids self-referential evidence hashes.
   - shared_diff_artifact: `discussions/20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate.md`.
-  - diff_stat_command: `git diff --stat <baseRefOid>...HEAD`
-  - diff_name_status_command: `git diff --name-status <baseRefOid>...HEAD`
-  - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`.
-  - deep_consultant_reviewer: pending.
-  - spec_reviewer: pending.
-  - findings_disposition_table: pending.
+  - full_name_status_artifact: `discussions/20260523t204806z-disc-g10-full-name-status.md`.
+  - diff_stat_command: `git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
+  - diff_name_status_command: `git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
+  - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`, `python -m unittest discover -v`.
+  - validation_results: `spec-dock: ok (validate) nodes=63`; `git diff --check` pass; active not set with active-none fallback; `python -m unittest discover -v` ran 847 tests in 415.583s and passed.
+  - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings pending re-review.
+  - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; fixed findings pending re-review.
+  - findings_disposition_table:
+    - `DC-P1-close-bypass`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` (`close_node` issue-target authority gate plus regression tests).
+    - `DC-P1-missing-full-name-status`: fixed by `20260523t204806z-disc-g10-full-name-status.md`.
+    - `SR-P1-dirty-endpoint`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and refreshed G10 endpoint evidence.
+    - `SR-P1-stale-issue-report-wording`: fixed by additive final closure addenda in `iss-00124` and `iss-00125` reports.
   - re_review_verdicts: pending.
   - pr_update_push_evidence: pending.
 - current status:
-  - Running; all v1 Issues are closed and G10 shared diff evidence is captured. PR #119 update remains blocked until reviewer findings are resolved.
+  - Running; all v1 Issues are closed, first-round G10 findings are fixed in local evidence, and PR #119 update remains blocked until fresh re-review passes.
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
