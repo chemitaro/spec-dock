@@ -92,8 +92,8 @@ read-only でも次を返すなら、初期意図と整合する。
 
 修正後の intent statement は次。
 
-> `system-architect` は、approved `requirement.md` を入力として、canonical `design.md` を直接編集せずに、promotion-ready `design.md` draft candidate を一次作成する。  
-> `implementation-planner` は、approved `requirement.md` と approved / candidate `design.md` を入力として、canonical `plan.md` を直接編集せずに、promotion-ready `plan.md` draft candidate を一次作成する。  
+> `system-architect` は、approved `requirement.md` を入力として、canonical `design.md` を直接編集せずに、promotion-ready `design.md` draft candidate を一次作成する。
+> `implementation-planner` は、approved `requirement.md` と approved / candidate `design.md` を入力として、canonical `plan.md` を直接編集せずに、promotion-ready `plan.md` draft candidate を一次作成する。
 > delegated draft candidate は authority ではなく auditable evidence であり、main orchestrator が検証・統合・必要なユーザー確認・canonical 反映を行うまで source of truth ではない。
 
 短く言うなら:
@@ -116,4 +116,3 @@ read-only でも次を返すなら、初期意図と整合する。
 2. ただし role contract を adviser から candidate author に強化する。
 3. subagent output format を厳格化する。
 4. 将来的には non-canonical writable draft path を検討してよい。
-

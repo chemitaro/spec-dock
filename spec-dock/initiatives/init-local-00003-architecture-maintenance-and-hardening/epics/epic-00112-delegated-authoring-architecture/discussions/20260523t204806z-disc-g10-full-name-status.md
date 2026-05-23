@@ -15,7 +15,7 @@ ID: "20260523t204806z-disc-g10-full-name-status"
 - base_ref_name: `main`
 - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`
 - final_pr_update_head: clean `HEAD` at reviewer handoff; this intentionally avoids self-referential evidence hashes.
-- entry_count: `269`
+- entry_count: `270`
 
 ## Command
 
@@ -34,6 +34,7 @@ M	.codex/AGENTS.md
 A	.codex/agents/implementation-planner.toml
 M	.codex/agents/spec-reviewer.toml
 A	.codex/agents/system-architect.toml
+M	pyproject.toml
 M	spec-dock/docs/README.md
 M	spec-dock/docs/authoring/issue-plan.md
 M	spec-dock/docs/github.md
@@ -289,10 +290,10 @@ M	src/spec_dock/assets/spec_dock/templates/issue/requirement.md
 M	src/spec_dock/cli.py
 M	tests/cli_runtime/harness.py
 M	tests/cli_runtime/test_active.py
-M	tests/cli_runtime/test_close.py
 M	tests/cli_runtime/test_issue_lifecycle.py
 M	tests/cli_runtime/test_runtime_active_s05.py
 M	tests/cli_runtime/test_runtime_close_s12.py
 A	tests/domain_runtime/test_authority.py
 M	tests/test_init_update.py
+M	uv.lock
 ```

@@ -223,21 +223,25 @@ ID: "epic-00112"
   - shared_diff_artifact: `discussions/20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate.md`.
   - full_name_status_artifact: `discussions/20260523t204806z-disc-g10-full-name-status.md`.
   - diff_stat_command: `git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
-  - diff_stat_result: `269 files changed`, `23105 insertions(+)`, `895 deletions(-)`.
+  - diff_stat_result: `270 files changed`, `23075 insertions(+)`, `898 deletions(-)`.
   - diff_name_status_command: `git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
-  - diff_name_status_result: full artifact records `269` entries.
+  - diff_name_status_result: full artifact records `270` entries.
   - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`, `python -m unittest discover -v`.
-  - validation_results: `spec-dock: ok (validate) nodes=63`; `git diff --check` pass; active not set with active-none fallback; `python -m unittest discover -v` ran 847 tests in 415.583s and passed.
+  - validation_results: `spec-dock: ok (validate) nodes=63`; `git diff --check` pass; active not set with active-none fallback; `python -m unittest discover -v` ran 847 tests in 400.478s and passed.
   - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings re-reviewed by `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`) as `pass`; final `base...HEAD` re-review by `Nash the 2nd` (`019e56b9-f3cd-7ca2-b721-0a9022957699`) as `pass`.
   - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; first re-review by `Galileo the 2nd` (`019e56b3-39e3-7ca2-9af5-8523229256bb`) still `fail`; final `base...HEAD` re-review by `Boyle the 2nd` (`019e56b9-f454-7e82-a3d7-737fb5ee9821`) as `pass`.
   - findings_disposition_table:
-    - `DC-P1-close-bypass`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` (`close_node` issue-target authority gate plus regression tests).
+    - `DC-P1-close-bypass`: superseded by preserving `issue finish` as the authority-gated lifecycle closure path and restoring explicit `spec-dock close <target>` as a GitHub issue maintenance command that does not claim lifecycle completion or active clear.
     - `DC-P1-missing-full-name-status`: fixed by `20260523t204806z-disc-g10-full-name-status.md`.
     - `SR-P1-dirty-endpoint`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and then superseded by final `base...HEAD` G10 scope alignment.
     - `SR-P1-stale-issue-report-wording`: fixed by additive final closure addenda in `iss-00124` and `iss-00125` reports.
     - `SR-P1-final-head-scope`: fixed by regenerating G10 evidence and name-status artifacts against `base...HEAD`; final spec-reviewer re-review passed.
     - `SR-P1-deep-consultant-pass-not-recorded`: fixed by recording Planck the 2nd's and Nash the 2nd's `consultant_status: pass`; final spec-reviewer re-review passed.
   - re_review_verdicts: deep-consultant pass; spec-reviewer pass.
+  - post_pr_automated_review_disposition:
+    - `Codex-P2-tomli-python310`: fixed by declaring `tomli>=2.0.1` for Python `<3.11` and updating `uv.lock`.
+    - `Codex-P1-close-active-coupling`: fixed by restoring explicit close maintenance flow without active issue coupling and documenting the command/lifecycle separation in provider and dogfooding workflow docs.
+    - targeted verification: `python -m unittest tests.cli_runtime.test_close tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_issue_lifecycle tests.domain_runtime.test_authority -v` -> 55 tests OK; `git diff --check` pass.
   - pr_update_push_evidence: pending.
 - current status:
   - G10 passed; all v1 Issues are closed and PR #119 update gate is unblocked.
