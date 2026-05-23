@@ -13,9 +13,9 @@ ID: "iss-00125"
 # iss-00125 Authority Aware Delegated Authoring Dogfooding Pilot — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01 spec-reviewer gate passed after fixes, and S02 fallback system-architect / implementation-planner discussion drafts passed fresh spec-reviewer gate with `authority: proposed`.
-- 未完了: S01/S02 evidence commit, S03 lifecycle/fallback verification, S90 docs impact, S99 final QA/code/spec gates, final report commit, and issue finish.
-- 次のマイルストーン: commit S01/S02 evidence, then proceed to S03 lifecycle/context-pack fallback verification.
+- 現在地: S01/S02 evidence committed, and S03 lifecycle/context-pack fallback verification has fresh spec-reviewer pass as approved no-op.
+- 未完了: S03 report commit, S90 docs impact, S99 final QA/code/spec gates, final report commit, and issue finish.
+- 次のマイルストーン: commit S03 report-only evidence, then proceed to S90 docs impact.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -116,9 +116,13 @@ ID: "iss-00125"
   - scope: S02 post-review discussion naming/path correction re-review.
   - findings: none.
   - rationale: duplicate timestamp-slot validation failure was fixed by renaming the two discussion artifacts to `20260524t000000z-01-*` and `20260524t000000z-02-*`; report paths are consistent, `validate` and `git diff --check` pass, and changed scope remains issue-local report/discussions only.
+- Averroes the 2nd (`019e5679-252e-7081-a21c-068e6b733597`): `review_status: pass`
+  - scope: S03 lifecycle/context-pack fallback verification and provider defect disposition.
+  - findings: none.
+  - rationale: `tc-005` records active issue / validate evidence and absence of fallback draft artifact names from lifecycle/context-pack authority surfaces; `tc-006` records no provider defect and no provider/runtime/test/config diff. Current unstaged diff is report-only.
 
 ## 受け入れ条件の現在状況
-- status: S01 and S02 reviewer gates passed; S01/S02 evidence commit is pending.
+- status: S01/S02 committed; S03 reviewer gate passed as approved no-op and report-only commit is pending.
 - required evidence: S01 covers tc-001 / tc-002 with reviewer pass; S02 covers tc-003 / tc-004 with reviewer pass; remaining closure ids are open.
 
 ## 実行証跡
@@ -217,6 +221,38 @@ ID: "iss-00125"
     - S01 spec-reviewer Kuhn the 2nd: pass.
     - S02 spec-reviewer Tesla the 2nd: pass, including post-review naming/path correction re-review.
   - closure state: commit pending.
+- S01/S02 commit:
+  - commit: `59e2a89 docs(issue): iss-00125 S01-S02証跡を記録`
+  - scope: issue-local `report.md` and two fallback discussion draft artifacts.
+  - post-commit clean check: `git status --short` returned empty before S3 execution.
+- S03 lifecycle/context-pack fallback verification:
+  - Implementation Delegation Gate:
+    - step: S03
+    - decision: `approved-local-orchestration-metadata`
+    - rationale: S03 is inspect-only validation of lifecycle/context-pack surfaces and git diff scope after S02; no provider source, runtime, tests, shipped docs, templates, skills, or scaffold behavior is edited.
+    - allowed changes used: this `report.md` only.
+    - forbidden changes respected: no provider source edits, no v0/prerequisite report rewrites, no canonical draft promotion, no GitHub mutation.
+    - Ledger Note: No material implementation decisions beyond the approved plan.
+  - tc-005 proposed artifact lifecycle/context-pack block:
+    - active command: `./spec-dock/scripts/spec-dock active show`
+    - active result: active initiative `init-local-00003`, epic `epic-00112`, issue `iss-00125`.
+    - validate command: `./spec-dock/scripts/spec-dock validate`
+    - validate result: `spec-dock: ok (validate) nodes=63`.
+    - lifecycle/context-pack inspection command: `rg -n "20260524t000000z|fallback-system-architect|fallback-implementation-planner" spec-dock/active/context-pack.md spec-dock/.agent/active.json spec-dock/.agent/index.json spec-dock/dashboard.md`
+    - lifecycle/context-pack inspection result: no matches; the two fallback discussion draft artifacts are not included as active authoritative context-pack / active manifest / index / dashboard authority.
+    - conclusion: proposed fallback discussion drafts remain evidence artifacts only and do not become downstream implementation / issue finish authority.
+  - tc-006 provider defect disposition:
+    - working tree scope command after S02 commit and S03 inspection: `git diff --name-status`
+    - result: empty before this S03 report update; no provider/runtime/test/config diff exists.
+    - S02 commit scope command: `git show --name-status --oneline --no-renames HEAD`
+    - S02 commit scope result: only issue-local `report.md` and the two fallback discussion draft artifacts changed.
+    - provider defect disposition: no provider defect discovered in S03; no follow-up/amendment required for this step.
+- S03 reviewer/no-op gate:
+  - reviewer: Averroes the 2nd (`019e5679-252e-7081-a21c-068e6b733597`)
+  - review_status: pass
+  - findings: none.
+  - closure state: `approved-no-op` for product/runtime/provider changes; report-only evidence commit pending.
+  - rationale: S03 required inspection evidence only; no provider/runtime/test/config changes were required or made.
 
 ## Step Contract Closure
 | step | closure id | status | evidence |
@@ -225,6 +261,8 @@ ID: "iss-00125"
 | S01 | tc-002 | pass | active scope, validate, sync, clean status, permission/profile state, and S02 Task Manifest Lock with pinned source hash recorded; Kuhn the 2nd re-review passed. |
 | S02 | tc-003 | pass | system-architect fallback design discussion draft produced at locked path with `authority: proposed`; no canonical write verification or final authority claim; Tesla the 2nd review passed. |
 | S02 | tc-004 | pass | implementation-planner fallback plan discussion draft produced at locked path with `authority: proposed`; no canonical write verification, implementation-readiness, or final authority claim; Tesla the 2nd review passed. |
+| S03 | tc-005 | pass | active/context-pack/index/dashboard inspection has no fallback draft artifact matches; proposed drafts remain evidence only and are not downstream authority; Averroes the 2nd review passed. |
+| S03 | tc-006 | pass | `git diff --name-status` was empty before S03 report update; S02 commit touched only issue-local report/discussion artifacts; no provider defect discovered; Averroes the 2nd review passed. |
 
 ## Test Contract Closure
 | test id | planned command / evidence | observed result | status |
@@ -233,6 +271,8 @@ ID: "iss-00125"
 | tc-002 | `active show`, `validate`, `sync`, permission/profile inspection, clean check | active `iss-00125`; validate nodes=63; sync active unchanged; clean status; write-scoped canonical pilot disabled/fallback locked with source hash; reviewer pass | pass |
 | tc-003 | locked system-architect discussion draft path inspection | fallback design draft file exists with `authority: proposed`, source hash, rejected canonical write scope, and no final authority claim; reviewer pass | pass |
 | tc-004 | locked implementation-planner discussion draft path inspection | fallback plan draft file exists with `authority: proposed`, source hash, rejected canonical write / implementation-readiness scope, and no final authority claim; reviewer pass | pass |
+| tc-005 | `active show`, `validate`, active/context/index/dashboard fallback-name `rg` | active remains `iss-00125`; validate nodes=63; no fallback draft artifact names appear in active/context-pack/index/dashboard authority surfaces; reviewer pass | pass |
+| tc-006 | `git diff --name-status`; `git show --name-status --oneline --no-renames HEAD` | no current diff before S03 report update; S02 commit changed only issue-local report/discussion artifacts; no provider defect discovered; reviewer pass | pass |
 
 ## Closure Coverage
 | AC / EC | covered by | current evidence |
@@ -240,13 +280,17 @@ ID: "iss-00125"
 | AC-001 / EC-002 | S01 / tc-001 | prerequisite closure/fallback state recorded before pilot authoring; stale prerequisite wording is carried as caveat instead of rewriting completed issue reports. |
 | AC-001 / EC-001 / EC-003 | S01 / tc-002 | active scope, baseline validate/sync, permission fallback state, and S02 fallback manifest lock recorded. |
 | AC-002 | S02 / tc-003, tc-004 | actual delegated design and plan draft evidence is produced as fallback `discussions/` artifacts with `authority: proposed`; no canonical write, final authority, promotion, reviewer-pass, or implementation-readiness claim. |
+| AC-003 / EC-001 | S03 / tc-005 | fallback discussion drafts are absent from active/context-pack/index/dashboard authority surfaces; validate passes. |
+| AC-004 / EC-002 | S03 / tc-006 | no provider/runtime/test/config diff or silent provider fix exists; no provider defect discovered in S03. |
 
 ## Closure Delta
 - `tc-001`: no closure id changed. Evidence includes an explicit caveat because `iss-00124/report.md:16-19` retains stale pending wording despite final pass/closure evidence at `iss-00124/report.md:277-308` and GitHub #124 closed state.
 - `tc-002`: no closure id changed. S02 is locked to fallback discussion drafts because no safe canonical pilot target exists and host/profile positive write enablement is not verified. The stale-if source hash is pinned to `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b`.
 - `tc-003`: no closure id changed. Closed by fallback discussion draft evidence only, not by canonical design write verification.
 - `tc-004`: no closure id changed. Closed by fallback discussion draft evidence only, not by canonical plan write verification or implementation-readiness.
+- `tc-005`: no closure id changed. Evidence is an absence check; fallback draft artifact names are intentionally absent from active/context-pack/index/dashboard authority surfaces.
+- `tc-006`: no closure id changed. Evidence is no-op/provider-defect-disposition; no provider defect was found and no provider source was changed.
 
 ## ブロッカー / 未完了
-- S01/S02 evidence commit is pending.
-- S03/S90/S99 remain open.
+- S03 report-only evidence commit is pending.
+- S90/S99 remain open.
