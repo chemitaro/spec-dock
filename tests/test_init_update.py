@@ -2889,10 +2889,10 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("具体テストケース一覧", workflow_spec_authoring)
             for fragment in (
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
-                "Delegated authoring は draft-only evidence",
+                "Delegated authoring は `authority: proposed` / `status: draft` の draft-only evidence",
                 "invocation ごとに `node + phase + role + artifact`",
                 "workflow-wide blanket consent は draft-only authoring delegation の根拠にしない",
-                "canonical artifact、implementation code、GitHub state、reviewer result",
+                "previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result",
                 "manual authoring path は有効",
                 "Delegated draft は fresh `spec-reviewer` pass の代替ではない",
             ):
@@ -4398,7 +4398,8 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("fresh requirement reviewer pass", phase_design)
         self.assertIn("delegated draft provenance", phase_design)
         self.assertIn("stale / superseded / rejected / blocked", phase_design)
-        self.assertIn("Delegated draft は fresh `spec-reviewer` pass の代替ではありません", phase_design)
+        self.assertIn("`authority: proposed` / `status: draft`", phase_design)
+        self.assertIn("fresh `spec-reviewer` pass の代替ではありません", phase_design)
         self.assertIn("## 課題依存と file-change planning（Issue dependency and file-change planning）", phase_design)
         self.assertIn("Module Dependency Diagram", phase_design)
         self.assertIn("ディレクトリ / ファイル変更計画", phase_design)
@@ -4457,6 +4458,8 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("三者最終品質ゲート（final quality gate）", phase_plan_issue)
         self.assertIn("delegated plan draft", phase_plan_issue)
         self.assertIn("phase gate preservation", phase_plan_issue)
+        self.assertIn("authority: proposed", phase_plan_issue)
+        self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_issue)
         self.assertIn("manual authoring path が有効", phase_plan_issue)
 
         phase_plan = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md").read_text(
@@ -4467,12 +4470,16 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("Plan Summary", phase_plan)
         self.assertIn("plan blocker", phase_plan)
         self.assertIn("phase gate bypass", phase_plan)
+        self.assertIn("authority: proposed", phase_plan)
+        self.assertIn("Permission Profile / host probe / source revision が未検証", phase_plan)
 
         phase_plan_epic = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
         ).read_text(encoding="utf-8")
         self.assertIn("delegated plan draft", phase_plan_epic)
         self.assertIn("fresh requirement/design reviewer pass", phase_plan_epic)
+        self.assertIn("authority: proposed", phase_plan_epic)
+        self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_epic)
         self.assertIn("manual authoring path が有効", phase_plan_epic)
 
         workflow_issue = (
@@ -9913,8 +9920,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "fresh requirement reviewer pass",
                 "invocation contract",
                 "read-only analysis と draft proposal",
-                "canonical artifact edit",
-                "implementation edit",
+                "authority: proposed",
+                "status: draft",
+                "対象 `design.md` draft 更新以外の requirement/design/plan/report 正本編集",
+                "実装・テスト・設定変更",
                 "GitHub mutation",
                 "phase promotion",
                 "reviewer-pass claim",
@@ -9933,8 +9942,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "fresh design reviewer pass",
                 "design dependency analysis",
                 "read-only analysis と draft proposal",
-                "canonical artifact edit",
-                "implementation edit",
+                "authority: proposed",
+                "status: draft",
+                "Permission Profile / host probe / source revision が未検証",
+                "完了済み issue `plan.md` / `report.md` の修正",
+                "実装・テスト・設定変更",
                 "GitHub mutation",
                 "phase promotion",
                 "reviewer-pass claim",
@@ -9951,6 +9963,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "delegated plan draft",
                 "stale / superseded handling",
                 "phase gate preservation",
+                "authority: proposed",
+                "完了済み issue plan/report の修正を含まない",
                 "delegated draft を fresh `spec-reviewer` pass の代替にしていない",
                 "manual authoring path",
             ),
@@ -9960,6 +9974,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "phase gate preservation",
                 "step reviewer gate",
                 "final QA/code/spec gate",
+                "authority: proposed",
+                "完了済み issue plan/report の修正を含まない",
                 "manual authoring path",
             ),
             "codex spec-reviewer agent": (
@@ -10079,7 +10095,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Integration Notes for Main Orchestrator",
             "return a blocker to the main orchestrator",
             "Do not ask the user directly",
-            "edit canonical spec artifacts or implementation files",
+            "create or update the target `design.md` only when",
+            "verified role-scoped Permission Profile evidence",
+            "authority: proposed",
+            "status: draft",
+            "previous phase artifacts edited: `none`",
             "close, update, or mutate GitHub issues",
             "run destructive commands",
             "promote phases or mark work complete",
@@ -10111,7 +10131,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "issue lifecycle, execution, validation, reviewer, and completion policy",
             "return `Plan Blocked`",
             "Do not ask the user directly",
-            "edit canonical spec artifacts or implementation files",
+            "create or update the target `plan.md` only when",
+            "verified role-scoped Permission Profile evidence",
+            "authority: proposed",
+            "status: draft",
+            "rewrite previous phase artifacts or completed issue `plan.md` / `report.md` artifacts",
             "close, update, or mutate GitHub issues",
             "run destructive commands",
             "promote phases or mark work complete",

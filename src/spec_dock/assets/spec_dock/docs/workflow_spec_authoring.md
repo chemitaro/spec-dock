@@ -51,10 +51,11 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 
 ## 委任 authoring policy foundation（delegated authoring policy foundation）
 
-- Main orchestrator は canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、user dialogue、canonical integration、phase promotion を所有する。
-- Delegated authoring は draft-only evidence であり、canonical artifact の authority ではない。delegated output は main orchestrator が統合し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
+- Main orchestrator は canonical `requirement.md` / `design.md` / `plan.md` / `report.md` の最終 ownership、user dialogue、canonical integration、Evidence Adoption Ledger、Promotion Record、phase promotion を所有する。
+- Delegated authoring は `authority: proposed` / `status: draft` の draft-only evidence であり、final canonical authority ではない。delegated output は main orchestrator が採否を判断し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
 - Delegated authoring を使う場合は、invocation ごとに `node + phase + role + artifact`、scope、source artifacts、allowed actions、forbidden actions、output expectation、stop / invalidation condition を明示し、`report.md` に残す。workflow-wide blanket consent は draft-only authoring delegation の根拠にしない。
-- Delegated role は canonical artifact、implementation code、GitHub state、reviewer result を編集・確定・上書きしてはならない。write-capable delegation、destructive action、external publishing、credentialed access、`.github/agents` / Copilot support はこの workflow の delegated authoring policy では許可しない。
+- Delegated role は task manifest が明示し、Permission Profile / host probe が検証した draft artifact だけを更新できる。System architect は approved requirement を入力にした `design.md` draft、implementation planner は approved requirement/design を入力にした `plan.md` draft に限定される。
+- Delegated role は previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result を編集・確定・上書きしてはならない。destructive action、external publishing、credentialed access、`.github/agents` / Copilot support はこの workflow の delegated authoring policy では許可しない。
 - Delegated draft が unavailable / skipped / blocked / stale / rejected / superseded の場合でも、manual authoring path は有効である。ただし delegated authoring を使った evidence として扱ってはならない。
 - Delegated draft は fresh `spec-reviewer` pass の代替ではない。`spec-reviewer` は draft 自体ではなく、main orchestrator が統合した canonical artifact と evidence を review する。
 
@@ -93,7 +94,7 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 
 ## Task Manifest / Permission Profile Gate
 
-Write-scoped delegated authoring は、role-scoped Permission Profile と task manifest の両方が検証済みの場合だけ有効にできます。manifest は raw intention ではなく、実行直前に解決済みの path と revision を固定する fail-closed contract として `report.md` または issue-local `discussions/` に残します。
+Write-scoped delegated authoring は、role-scoped Permission Profile と task manifest の両方が検証済みの場合だけ有効にできます。manifest は raw intention ではなく、実行直前に解決済みの path と revision を固定する fail-closed contract として `report.md` または issue-local `discussions/` に残します。検証済みでない場合、delegated role は proposal-only / discussions path に戻り、canonical `design.md` / `plan.md` を編集してはなりません。
 
 Task manifest は少なくとも次を含めます。
 
@@ -106,6 +107,8 @@ Task manifest は少なくとも次を含めます。
 - `default_permissions` / `[permissions]`: role-scoped Permission Profile 名と read/write/deny の要約
 
 Positive write probe は allowed artifact / evidence path だけに成功しなければなりません。Negative write probe は forbidden implementation / config / test path で失敗しなければなりません。forbidden path への write が成功した場合、または host が enforcement を証明できない場合は fail-open と扱い、write-scoped delegation を有効化してはなりません。
+
+Draft artifact probe は target phase に対応していなければなりません。System architect の positive probe は対象 `design.md` または manifest で許可された design draft evidence path だけ、implementation planner の positive probe は対象 `plan.md` または manifest で許可された plan draft evidence path だけに限定します。Previous phase artifact への write probe 成功、または implementation/test/config path への write 成功は invalid です。
 
 `sandbox_mode` / `sandbox_workspace_write` による workspace 全体 write と、Permission Profile による role-scoped write contract を混在させてはなりません。混在、Desktop/CLI divergent、probe unavailable、unreproducible result は `blocked` または `disabled` として記録し、v0 proposal-only authoring path に戻します。
 
