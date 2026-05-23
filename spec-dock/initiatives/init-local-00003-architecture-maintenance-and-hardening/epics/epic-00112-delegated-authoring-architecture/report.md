@@ -19,9 +19,10 @@ ID: "epic-00112"
   - Plan phase completed with fresh `spec-reviewer` pass.
   - Child Issues #113..#118 are implemented, committed, and closed.
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
-  - v1 amendment requirement/design/plan authoring is review-passed and ready for additive Issue creation; v1 Issue 007〜012 are not yet executed.
+  - v1 amendment requirement/design/plan authoring is review-passed, and additive Issues `iss-00120`〜`iss-00125` / #120〜#125 are created with approved specs.
+  - v1 Issue execution is paused until the refreshed Epic plan review gate passes; `iss-00120` has preliminary uncommitted work that must be treated as pending issue execution, not Epic plan closure evidence.
 - 次のマイルストーン:
-  - Create and execute additive v1 Issues 007〜012 before claiming authority-aware delegated authoring closure.
+  - Complete the refreshed Epic plan review gate, then execute additive v1 Issues `iss-00120`〜`iss-00125` in dependency order before claiming authority-aware delegated authoring closure.
   - Treat Epic PR #119 monitoring as v0 historical rollout work unless it is explicitly superseded by the v1 amendment rollout.
 - ブロッカー:
   - None for v0 historical implementation closure.
@@ -56,9 +57,9 @@ ID: "epic-00112"
   - disposition: resolved.
   - evidence: `plan.md` v1 Issue 007〜012 include provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
 - v1 execution state:
-  - decision: v1 amendment is ready for additive Issue creation, not final Epic closure.
+  - decision: v1 amendment Issues are created and approved, but execution must wait for the refreshed Epic plan gate to pass.
   - disposition: pending implementation.
-  - evidence: v1 Issue 007〜012 remain planned work.
+  - evidence: `iss-00120`〜`iss-00125` / #120〜#125 exist as additive v1 Issues; v1 implementation evidence remains pending.
 
 ## 完了した Issue / PR / Release (必須)
 - #113 Delegated Authoring Policy Foundation: CLOSED.
@@ -177,12 +178,15 @@ ID: "epic-00112"
   - Spec Reviewer `Beauvoir` (`019e552f-f20f-7bf2-96d9-983e3165e4bd`): `review_status: pass`
     - finding: P2 path precision gap for v1 Issue 011 provider docs.
     - resolution: v1 Issue 011 provider source now names the concrete provider doc paths under `src/spec_dock/assets/spec_dock/docs/`.
+  - Spec Reviewer `Hilbert` (`019e55ae-7729-7871-af30-7be1cfc03d05`): `review_status: pass`
+    - finding: none.
+    - reason: v0 Issue 001〜006 / #113〜#118 are preserved as historical work, v1 Issue 007〜012 are mapped to `iss-00120`〜`iss-00125` / #120〜#125 as additive amendment work, and preliminary `iss-00120` work is excluded from Epic plan closure evidence.
 - verdict: passed
 - promotion:
-  - v1 plan amendment is ready for additive Issue creation.
+  - v1 plan amendment is ready for additive Issue execution after the refreshed Epic plan review gate.
 - promotion scope:
   - Original plan Issue 001〜006 remains historical v0 work and is not rewritten.
-  - v1 Issue 007〜012 are additive update / fix Issues.
+  - v1 Issue 007〜012 correspond to `iss-00120`〜`iss-00125` / #120〜#125 and are additive update / fix Issues.
   - Each v1 Issue records provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
 
 ## ロールアウト結果（必要なら） (任意)
