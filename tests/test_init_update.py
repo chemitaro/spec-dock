@@ -156,6 +156,12 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
+        ".agents/skills/spec-dock-system-architect/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-implementation-planner/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md"
+        ),
         ".agents/skills/github-pr-merge-preparer/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
         ),
@@ -451,6 +457,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-system-architect/SKILL.md",
+        ".agents/skills/spec-dock-implementation-planner/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ".codex/AGENTS.md",
@@ -506,6 +514,8 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-system-architect/SKILL.md",
+            ".agents/skills/spec-dock-implementation-planner/SKILL.md",
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
             ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ),
@@ -602,6 +612,22 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
+            ),
+        },
+        "spec-dock-system-architect skill": {
+            "search_globs": (
+                "**/spec-dock-system-architect/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md",
+            ),
+        },
+        "spec-dock-implementation-planner skill": {
+            "search_globs": (
+                "**/spec-dock-implementation-planner/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md",
             ),
         },
         "spec-dock-codex-adapter skill": {
@@ -9094,6 +9120,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+            system_architect_text = (skills_dir / "spec-dock-system-architect" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            implementation_planner_text = (
+                skills_dir / "spec-dock-implementation-planner" / "SKILL.md"
+            ).read_text(encoding="utf-8")
             adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
             codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(
                 encoding="utf-8"
@@ -9112,6 +9144,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         self.assertIn(
             "`spec-dock-issue-execution`: issue-level TDD execution and report updates.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-system-architect`: draft-only system architecture proposal for the main orchestrator.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-implementation-planner`: draft-only implementation plan proposal for the main orchestrator.",
             hub_text,
         )
         self.assertIn(
@@ -9147,6 +9187,60 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Parent direct fixes require a documented Parent Implementation Exception",
         ):
             self.assertIn(fragment, issue_text)
+
+        for fragment in (
+            "Requirement Coverage",
+            "Existing Context Findings",
+            "Design Decisions",
+            "Alternatives Considered",
+            "Boundary / Contract Model",
+            "Dependency Analysis",
+            "Source of Record",
+            "Data Flow / Domain Model / Interface Contract",
+            "File / Module Change Plan",
+            "Migration / Compatibility / Rollback",
+            "Observability",
+            "Test Strategy",
+            "ADR Candidates",
+            "Risks",
+            "Requirement Clarification Requests",
+            "Integration Notes for Main Orchestrator",
+            "return a blocker to the main orchestrator",
+            "Do not ask the user directly",
+            "edit canonical spec artifacts or implementation files",
+            "close, update, or mutate GitHub issues",
+            "run destructive commands",
+            "promote phases or mark work complete",
+            "claim `spec-reviewer` pass",
+        ):
+            self.assertIn(fragment, system_architect_text)
+
+        for fragment in (
+            "Plan Summary",
+            "Requirement / Design Traceability",
+            "Milestones",
+            "Dependency-Derived Execution Order",
+            "Issue / Step Slicing",
+            "Test Strategy Mapping",
+            "Review Gates",
+            "Rollback / Compatibility",
+            "Docs Impact",
+            "Final Quality Gate",
+            "Plan Blockers",
+            "Integration Notes for Main Orchestrator",
+            "`spec-dock/docs/workflow_issue.md`",
+            "`spec-dock/docs/authoring/issue-plan.md`",
+            "issue plan field semantics",
+            "issue lifecycle, execution, validation, reviewer, and completion policy",
+            "return `Plan Blocked`",
+            "Do not ask the user directly",
+            "edit canonical spec artifacts or implementation files",
+            "close, update, or mutate GitHub issues",
+            "run destructive commands",
+            "promote phases or mark work complete",
+            "claim `spec-reviewer` pass",
+        ):
+            self.assertIn(fragment, implementation_planner_text)
         self._assert_issue_execution_runtime_command_reminders(
             issue_text,
             source="bundled issue-execution skill",
