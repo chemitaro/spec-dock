@@ -81,6 +81,16 @@ Delegated draft、worker note、research、reviewer finding、外部調査結果
 
 `blocked` または `stale` の entry が未解決のまま残っている場合、phase promotion、implementation start、issue ready、issue finish、phase completion に進めません。`deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せます。Evidence Adoption Ledger を使わずに delegated evidence の採用を主張してはなりません。
 
+## Bounded Depth=2 Delegation
+
+Main orchestrator が canonical artifact と final reviewer gate を所有します。System architect や implementation planner などの authoring specialist は、depth=2 の範囲で leaf-only evidence producer を呼び出せます。leaf-only evidence producer は repo analysis、research、consultation、QA-style evidence などの補助証跡を返すだけで、さらに子エージェントを呼び出して depth=3 / grandchild delegation を作ってはなりません。
+
+- allowed depth=2: main orchestrator -> authoring specialist -> leaf-only evidence producer
+- forbidden depth=3: main orchestrator -> authoring specialist -> leaf producer -> grandchild
+- authoring specialist と leaf-only evidence producer は canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない
+- preflight reviewer output は設計・計画の改善 input として扱い、final fresh reviewer pass とは分離する
+- reviewer independence: final `spec-reviewer` / `code-reviewer` / `qa-reviewer` は、同じ artifact を作成した authoring specialist や leaf-only evidence producer の代替ではない fresh gate として実行する
+
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
 |---|---|---|---|---|
 | missing consent（同意欠落） | blocked / incomplete | obtain scoped consent or use manual authoring（scope 付き同意を取得する、または手動 authoring を使う） | Delegated Draft Evidence | ineligible |

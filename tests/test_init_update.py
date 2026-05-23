@@ -10045,6 +10045,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "close, update, or mutate GitHub issues",
             "run destructive commands",
             "promote phases or mark work complete",
+            "bounded depth=2 leaf-only evidence",
+            "depth=3 / grandchild delegation",
+            "leaf-only evidence producer",
+            "final fresh reviewer gate remains independent",
+            "claim final authority, issue ready, issue finish, or phase completion",
             "claim `spec-reviewer` pass",
         ):
             self.assertIn(fragment, system_architect_text)
@@ -10072,9 +10077,21 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "close, update, or mutate GitHub issues",
             "run destructive commands",
             "promote phases or mark work complete",
+            "bounded depth=2 leaf-only evidence",
+            "depth=3 / grandchild delegation",
+            "leaf-only evidence producer",
+            "final fresh reviewer gate remains independent",
+            "claim final authority, issue ready, issue finish, or phase completion",
             "claim `spec-reviewer` pass",
         ):
             self.assertIn(fragment, implementation_planner_text)
+        for fragment in (
+            "Bounded depth=2 delegation",
+            "Depth=3 / grandchild delegation is forbidden",
+            "Leaf-only evidence producers must not edit canonical artifacts",
+            "final fresh reviewer pass remains independent",
+        ):
+            self.assertIn(fragment, epic_text)
         self._assert_issue_execution_runtime_command_reminders(
             issue_text,
             source="bundled issue-execution skill",
