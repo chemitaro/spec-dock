@@ -63,16 +63,17 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 
 ## 委任 plan authoring ゲート（delegated plan authoring gate）
 
-Delegated plan authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は fresh `spec-reviewer` pass の代替ではありません。
+Delegated plan authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は `authority: proposed` / `status: draft` であり、fresh `spec-reviewer` pass の代替ではありません。
 
 Delegated plan draft を使う場合、orchestrator は draft 生成前に次を確認します。
 
 - fresh requirement reviewer pass と fresh design reviewer pass があり、pass 対象 revision を特定できる
 - design dependency analysis、file/module change plan、verification strategy、rollback / compatibility が plan 入力として確認できる
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
-- allowed actions は read-only analysis と draft proposal に限定される
-- forbidden actions は canonical artifact edit、implementation edit、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
+- allowed actions は、通常は read-only analysis と draft proposal に限定される。write-scoped delegated plan authoring を使う場合だけ、検証済み task manifest と role-scoped Permission Profile が許可した対象 `plan.md` を `authority: proposed` / `status: draft` として作成・更新できる
+- forbidden actions は `requirement.md` / `design.md` / `report.md` / previous phase artifact の書き換え、完了済み issue `plan.md` / `report.md` の修正、実装・テスト・設定変更、GitHub mutation、phase promotion、reviewer-pass claim、implementation-readiness claim、user への直接質問を含む
 - required plan draft output contract が、計画要約（Plan Summary）、要件 / 設計 traceability（Requirement / Design Traceability）、milestone（Milestones）、依存関係から導く実行順序（Dependency-Derived Execution Order）、Issue / step 分割（Issue / Step Slicing）、テスト戦略 mapping（Test Strategy Mapping）、review gate（Review Gates）、rollback / compatibility（Rollback / Compatibility）、docs impact（Docs Impact）、最終品質ゲート（Final Quality Gate）、plan blocker（Plan Blockers）、integration notes（Integration Notes）を含む
+- Permission Profile / host probe / source revision が未検証、fail-open、Desktop/CLI divergent、または stale の場合は `plan.md` を編集せず、proposal-only / discussions path に戻る
 
 Delegated plan draft を統合する場合、`report.md` に delegated draft evidence を残します。少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を記録します。
 

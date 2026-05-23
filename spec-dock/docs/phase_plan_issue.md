@@ -122,5 +122,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - docs impact と最終品質ゲート（final quality gate）が計画に埋め込まれ、`doc-writer` による必要 docs 更新、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review が追跡できる
 - delegated plan draft を使う場合、draft provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
 - delegated draft を fresh `spec-reviewer` pass、step reviewer gate、final QA/code/spec gate の代替にしていない
+- implementation planner が write-scoped draft authoring を使う場合でも、権限は検証済み task manifest の対象 `plan.md` に限られ、`authority: proposed` / `status: draft` を超えた final authority、phase promotion、reviewer-pass claim、requirement/design rewrite、implementation-readiness claim、完了済み issue plan/report の修正を含まない
+- Permission Profile / host probe / source revision が未検証、fail-open、または stale の場合、delegated plan authoring は proposal-only / discussions path に戻っている
 - delegated authoring unavailable / skipped の場合も manual authoring path が有効である
 - reviewer が「この plan で実装してよい」と判断できる
