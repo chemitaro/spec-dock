@@ -61,6 +61,30 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - 分割案や順序案の比較が必要なら `disc` に逃がすと決めた
 - 対象 scope の `phase_plan_<scope>.md` と `workflow_<scope>.md` を確認した
 
+## delegated plan authoring gate
+
+Delegated plan authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は fresh `spec-reviewer` pass の代替ではありません。
+
+Delegated plan draft を使う場合、orchestrator は draft 生成前に次を確認します。
+
+- fresh requirement reviewer pass と fresh design reviewer pass があり、pass 対象 revision を特定できる
+- design dependency analysis、file/module change plan、verification strategy、rollback / compatibility が plan 入力として確認できる
+- invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
+- allowed actions は read-only analysis と draft proposal に限定される
+- forbidden actions は canonical artifact edit、implementation edit、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
+- required plan draft output contract が、Plan Summary、Requirement / Design Traceability、Milestones、Dependency-Derived Execution Order、Issue / Step Slicing、Test Strategy Mapping、Review Gates、Rollback / Compatibility、Docs Impact、Final Quality Gate、Plan Blockers、Integration Notes を含む
+
+Delegated plan draft を統合する場合、`report.md` に delegated draft evidence を残します。少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を記録します。
+
+Reviewer は delegated draft を含む plan を review するとき、次を fail / incomplete 条件として扱います。
+
+- delegated draft provenance が不明
+- draft が stale / superseded / rejected / blocked のまま promotion evidence に使われている
+- approved requirement / design への traceability がない
+- delegated content が scope creep または parent non-scope の破り込みを含む
+- phase gate bypass、reviewer gate bypass、または delegated draft を reviewer pass とみなす記述がある
+- delegated authoring unavailable / skipped のときに manual authoring path が閉じられている
+
 ## shared review / handoff gate
 
 - 順序の理由が説明できる

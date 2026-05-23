@@ -3,7 +3,7 @@
 ID: "iss-00116"
 タイトル: "Delegated Authoring Phase Gates"
 関連GitHub: ["#116"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-05-23"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -12,196 +12,239 @@ ID: "iss-00116"
 
 # iss-00116 Delegated Authoring Phase Gates — 実装報告（Observed Evidence Ledger）
 
-> `report.md` は observed evidence ledger です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、discovered tests、closure delta、reviewer status、commit/no-op evidence を記録する。
-
-## Spec Interpretation / Decision Ledger (必須)
-
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-Completion semantics:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition required evidence:
-- `applied`: changed artifact / implementation evidence and why issue-local application is sufficient.
-- `rejected`: rejected option, reason, and no remaining blocking impact.
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: promoted artifact reference and evidence.
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate reference and blocking / non-blocking classification.
-- `deferred`: scope-out reason, non-blocking rationale, and revisit condition.
-- `no_action`: reason the decision is issue-local and not durable.
-- `superseded`: replacement entry ID and reason for replacement.
+## Spec Interpretation / Decision Ledger
 
 | ID | Status | Type | Raised By | Trigger / Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | open / resolved / superseded | interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up | orchestrator / reviewer / worker source | plan ambiguity / implementation constraint / reviewer finding / discovered risk | option A; option B; no action | ... | ... | applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded | `path` / command / reviewer finding / discussion | target artifact / issue / discussion / replacement entry / none with reason |
+| D-001 | resolved | implementation | orchestrator | AC-004 requires reviewer execution surface evidence, and phase docs alone may not be enough | phase docs only; report evidence only; update concrete spec-reviewer surface | Update the Codex spec-reviewer surface to treat phase docs as authoritative delegated-authoring criteria. | This directly closes reviewer consumption uncertainty without touching `.github/agents`, which is non-scope for this Epic. | applied | `.codex/agents/spec-reviewer.toml`, provider mirror, `test_issue_116_delegated_authoring_phase_gate_contract_assets` | none |
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+## 実装サマリー
 
-## 実装記録（セッションログ） (必須)
+- `phase_design.md` に delegated design authoring gate を追加し、fresh requirement reviewer pass、invocation contract、allowed/forbidden actions、design draft output、reviewer fail criteria を固定した。
+- `phase_plan.md` / `phase_plan_epic.md` / `phase_plan_issue.md` に delegated plan authoring gate と reviewer criteria を追加した。
+- `spec-reviewer` の Codex 実行面に delegated draft provenance、stale/superseded handling、traceability、scope creep、phase gate bypass、manual authoring path の review criteria を追加した。
+- provider/dogfooding parity と targeted content assertions、validate/sync/diff-check を確認した。
 
-### 2026-05-23 HH:MM - HH:MM
+## Delegated Draft Evidence
+
+- delegated authoring use:
+  - not used for this implementation report
+- If not used:
+  - manual implementation path; no delegated draft was used as promotion evidence.
+
+| role | phase | scope | consent | source artifacts | draft artifact path | status | integration result | rejected portions | blockers | reviewer result | promotion decision |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| N/A | implementation | iss-00116 | N/A | active issue docs and parent Epic docs | N/A | not used | manual implementation | N/A | none | code/QA/spec pass | no delegated draft promotion |
+
+## 実装記録（セッションログ）
+
+### 2026-05-23 S01 Provider Phase Gate Contract
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01
+- AC/EC: AC-001
 - Planned source:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `S01 — Provider source update`
+  - closure ids: tc-001
 
 #### 実施内容
-- ...
+- `src/spec_dock/assets/spec_dock/docs/phase_design.md` に delegated design authoring gate を追加した。
+- `src/spec_dock/assets/spec_dock/docs/phase_plan.md` に delegated plan authoring gate を追加した。
+- `src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md` と `phase_plan_issue.md` の review gate に delegated draft criteria を追加した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
-
-<result>
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets -v
+# OK
 ```
 
 #### Red/Green/Refactor Evidence
 | step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
 |---|---|---|---|---|---|---|
-| S01 | Red / alternative | red-required / covered-existing / inspect-only / manual-required | ... | `command` / docs inspection / manual record | pass / approved-no-op / fail / blocked | ... |
-| S01 | Green | ... | ... | `command` / inspection / manual record | pass / fail / blocked | ... |
-| S01 | Refactor | guardrail satisfied / no refactor needed | ... | diff inspection / command | pass / approved-no-op / fail / blocked | ... |
-
-#### Discovered Tests
-| step | discovered test / risk | source | action taken | closure id / new id | plan amendment required | evidence |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | alternative | inspect-only | Phase docs did not contain delegated design/plan gate criteria before this issue. | pre-change doc inspection | pass | docs/scaffold contract issue; no runtime behavior red test needed. |
+| S01 | Green | provider phase docs contain delegated gates | phase docs include fresh reviewer pass prerequisites, invocation contract, allowed/forbidden actions, draft output contract, stale/superseded handling, traceability, scope discipline, phase gate preservation, and manual authoring path. | content assertion test | pass | Covers AC-001 and parent gate/reviewer criteria. |
+| S01 | Refactor | guardrail satisfied | Changes are limited to phase docs and tests; no runtime validation, `.github/agents` change, or write-capable delegation added. | diff inspection | pass | Concrete Codex reviewer surface update is handled under S03. |
 
 #### Step Contract Closure
 | step | closure ids | close condition from plan | observed evidence | result | notes |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | tc-001 | target provider source is updated and inspected | provider phase docs contain delegated authoring gate criteria and tests assert them | pass | code-reviewer, QA, and spec-reviewer pass |
 
-#### Test Contract Closure
-| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+### 2026-05-23 S03 Reviewer Execution Surface
 
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
+#### 対象
+- Step: S03
+- AC/EC: AC-004
+- Planned source:
+  - `plan.md` section: `S03 — Reviewer execution surface verification`
+  - closure ids: tc-006
 
-#### Closure Coverage
+#### 実施内容
+- `src/spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml` に delegated authoring reviewer criteria を追加した。
+- dogfooding mirror `.codex/agents/spec-reviewer.toml` に provider と同内容を反映した。
+- reviewer surface が phase docs を authoritative criteria として読むことを content assertion で固定した。
+
+#### 実行コマンド / 結果
+```bash
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets -v
+# OK
+
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets -v
+# OK
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S03 | alternative | reviewer execution surface visibility | Existing spec-reviewer surfaces did not explicitly list delegated draft provenance, stale/superseded handling, traceability, scope creep, phase gate bypass, or manual authoring path criteria. | pre-change reviewer surface inspection | pass | AC-004 requires concrete reviewer surface evidence, so phase-doc-only authority was insufficient. |
+| S03 | Green | delegated-specific criteria are visible to actual `spec-reviewer` invocation | Codex spec-reviewer surface now points to phase docs authority and lists delegated authoring fail/incomplete criteria. | `test_issue_116_delegated_authoring_phase_gate_contract_assets`; `test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets` | pass | Covers tc-006 and reviewer execution surface update. |
+| S03 | Refactor | guardrail satisfied | Changes are limited to read-only Codex reviewer criteria; no reviewer self-approval, runtime validation, role registry expansion, `.github/agents` change, or write-capable delegation added. | diff inspection | pass | Preserves fresh `spec-reviewer` pass as the only promotion reviewer gate. |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | tc-006 | delegated-specific criteria are visible to actual `spec-reviewer` invocation | Codex spec-reviewer surface explicitly lists delegated authoring criteria and phase docs authority | pass | `reviewer_surface_updated` |
+
+### 2026-05-23 S02 Dogfooding Parity and Verification
+
+#### 対象
+- Step: S02
+- AC/EC: AC-002, EC-002
+- Planned source:
+  - `plan.md` section: `S02 — Dogfooding parity and verification`
+  - closure ids: tc-002, tc-005
+
+#### 実施内容
+- provider docs から `spec-dock/docs/phase_design.md`、`phase_plan.md`、`phase_plan_epic.md`、`phase_plan_issue.md` を更新した。
+- install_root reviewer surface から dogfooding `.codex` mirror を更新した。
+- provider/dogfooding parity と validate/sync を確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets -v
+# OK
+
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets -v
+# OK
+
+uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure -v
+# OK
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=57
+
+./spec-dock/scripts/spec-dock sync
+# spec-dock: ok (sync) wrote generated index/tree/deps/dashboard artifacts
+
+git diff --check
+# pass
+```
+
+#### Red/Green/Refactor Evidence
+| step | phase | planned evidence requirement | observed evidence | command / inspection / manual record | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | alternative | provider/consumer drift handling | Dogfooding phase docs initially diverged from provider after provider edits. | `test_checked_in_dogfooding_mirror_docs_match_provider_assets` failed before mirror refresh | pass | Drift was corrected by refreshing dogfooding docs from provider source. |
+| S02 | Green | dogfooding mirror and verification evidence reflect provider change | Dogfooding docs and agent-tooling mirrors match provider; init structure, validate, sync, and diff-check pass. | targeted parity tests; `validate`; `sync`; `git diff --check` | pass | Covers tc-002 and tc-005. |
+| S02 | Refactor | guardrail satisfied | No unrelated implementation refactor; dogfooding changes are provider mirrors or generated sync artifacts. | diff inspection | pass | Provider remains source of truth. |
+
+#### Step Contract Closure
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | tc-002, tc-005 | parity/verification evidence is recorded | docs parity, agent-tooling parity, init structure, validate, sync, and diff-check pass | pass | code-reviewer, QA, and spec-reviewer pass |
+
+## Closure Coverage
+
 | closure id | step | verification evidence | observed result | notes |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| tc-001 | S01 | provider phase doc diff + content assertion | pass | phase gate contract exists |
+| tc-002 | S02 | dogfooding docs parity, agent-tooling parity, validate/sync | pass | dogfooding mirrors reflect provider change |
+| tc-003 | S99 | final spec-reviewer | pass | final re-review found no P0/P1 blockers |
+| tc-004 | S90 | report exception evidence | pass | no host/path uncertainty; reviewer surface updated rather than left uncertain |
+| tc-005 | S02 | provider/consumer parity tests | pass | no unintended drift |
+| tc-006 | S03 | spec-reviewer surface content assertion | pass | delegated criteria are visible to actual reviewer surfaces |
 
-#### Closure Delta
+## Closure Delta
+
 | change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | tc-001..tc-006 | targeted content/parity tests | tc-001..tc-006 | no closure contract change | no | no |
 
-#### Workflow Delegation Consent
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+## Workflow Delegation Consent
 
 | consent source | repo/worktree | active issue | session | named roles | boundary | expires / invalidation condition | denied / unavailable reason | next action |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00116 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user objective to execute all Epic issues with referenced issue-execution workflow | current repo/worktree | iss-00116 | current session | spec-reviewer, code-reviewer, qa-reviewer | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
 
-#### Implementation Delegation Gate
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+## Implementation Delegation Gate
 
 | step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01/S02/S03 | approved-local-execution | small coherent docs/reviewer-surface/test update | N/A | phase docs and reviewer surfaces | active issue docs and parent Epic docs | provider docs, dogfooding mirrors, spec-reviewer surfaces, tests, report | write-capable delegation, runtime validation, role registry beyond reviewer criteria | targeted tests, validate/sync, reviewer gates | test/review failure | changed files, verification, risks | pass |
 
-#### Delegated Worker Evidence
-| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+## Reviewer Gate Status
 
-#### Parent Implementation Exception
-| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### Reviewer Gate Status
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01/S03 | step reviewer | spec-reviewer | fresh | pass | N/A | proceed to commit and issue finish | no P0/P1 blockers after `.github/agents` non-scope fix |
+| S01/S02/S03 | QA reviewer | qa-reviewer | fresh | pass | N/A | proceed to final review | P2 action-boundary assertion gap fixed |
+| S01/S02/S03/S99 | final reviewer | spec-reviewer | fresh | pass | N/A | proceed to commit and issue finish | no findings; non-scope preserved |
 
-#### Step Commit Gate
+## Step Commit Gate
+
 | step | closure state | commit scope | commit hash / final ledger | post-commit clean check | no-op rationale | no-op checked contracts / files | no-op diff-clean command | no-op read-only confirmation |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01/S02/S03 | ready to commit | phase docs, reviewer surfaces, mirrors, tests, report | pending | pending | N/A | N/A | N/A | N/A |
 
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+## 変更したファイル
 
-#### コミット
-- <hash> <message>
+- `src/spec_dock/assets/spec_dock/docs/phase_design.md` - delegated design authoring gate.
+- `src/spec_dock/assets/spec_dock/docs/phase_plan.md` - delegated plan authoring gate.
+- `src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md` - Epic plan delegated review criteria.
+- `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md` - Issue plan delegated review criteria.
+- `src/spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml` - Codex spec-reviewer delegated criteria.
+- `spec-dock/docs/phase_design.md`, `spec-dock/docs/phase_plan.md`, `spec-dock/docs/phase_plan_epic.md`, `spec-dock/docs/phase_plan_issue.md` - dogfooding doc mirrors.
+- `.codex/agents/spec-reviewer.toml` - dogfooding reviewer mirror.
+- `tests/test_init_update.py` - delegated phase gate/reviewer surface assertions.
+- `spec-dock/active/issue/report.md` - observed evidence ledger.
 
-#### メモ
-- ...
-
----
-
-### 2026-05-23 HH:MM - HH:MM
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
-
-## Final Quality Gate (必須)
+## Final Quality Gate
 
 ### S90 Docs Impact Resolution
 | target | update required | owner | evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| phase docs | yes | approved-local-execution | delegated design/plan gates added | pass |
+| spec-reviewer surfaces | yes | approved-local-execution | reviewer criteria now visible in Codex surface | pass |
+| tests | yes | approved-local-execution | content/parity tests, validate, sync, diff-check pass | pass |
 
 ### Final QA Gate
 | reviewer | scope | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | phase gate and reviewer-surface obligation coverage | targeted content/parity/init/validate tests are proportionate | tests and commands listed above | pass |
 
 ### Final Code Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P1 report evidence findings fixed; re-review found no findings | 2 | pass |
 
 ### Final Spec Review Gate
 | reviewer | scope | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 `.github/agents` non-scope finding fixed; re-review found no findings | 2 | pass |
 
 ### Final Commit
 | final report ledger | final commit scope | post-commit external evidence destination | result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01/S02/S03 evidence recorded; code/QA/spec pass | phase docs, reviewer surfaces, mirrors, tests, report | final response / Epic PR / GitHub issue lifecycle | ready to commit |
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+## 遭遇した問題と解決
+- 問題: provider docs 更新後、dogfooding docs mirror が一時的に drift した。
+  - 解決: provider docs から mirror を更新し、`test_checked_in_dogfooding_mirror_docs_match_provider_assets` で parity を確認した。
 
-## 学んだこと (任意)
-- ...
+## 学んだこと
+- Phase docs だけでなく reviewer 実行面に criteria を入れると、delegated draft の gate が実際の reviewer verdict に届くことを明確にできる。
 
-## 今後の推奨事項 (任意)
-- ...
+## 今後の推奨事項
+- 後続 host adapter Issue では、この reviewer criteria を変更せず、delegated draft の呼び出しと evidence 記録に集中する。
 
-## 省略/例外メモ (必須)
-- 該当なし
+## 省略/例外メモ
+- write-capable delegation、runtime validation、role registry、追加 `.github/agents` support は親 Epic の non-scope のため実装していない。

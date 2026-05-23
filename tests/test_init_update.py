@@ -3689,6 +3689,11 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("図を書く場合は `N/A: reason` を残さない", phase_design)
         self.assertIn("Domain Model Delta", phase_design)
         self.assertIn("PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う", phase_design)
+        self.assertIn("## delegated design authoring gate", phase_design)
+        self.assertIn("fresh requirement reviewer pass", phase_design)
+        self.assertIn("delegated draft provenance", phase_design)
+        self.assertIn("stale / superseded / rejected / blocked", phase_design)
+        self.assertIn("Delegated draft は fresh `spec-reviewer` pass の代替ではありません", phase_design)
         self.assertIn("## Issue dependency and file-change planning", phase_design)
         self.assertIn("Module Dependency Diagram", phase_design)
         self.assertIn("ディレクトリ / ファイル変更計画", phase_design)
@@ -3745,6 +3750,25 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("`S99 final quality gate`", phase_plan_issue)
         self.assertIn("`qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`", phase_plan_issue)
         self.assertIn("三者 final quality gate", phase_plan_issue)
+        self.assertIn("delegated plan draft", phase_plan_issue)
+        self.assertIn("phase gate preservation", phase_plan_issue)
+        self.assertIn("manual authoring path が有効", phase_plan_issue)
+
+        phase_plan = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("## delegated plan authoring gate", phase_plan)
+        self.assertIn("fresh requirement reviewer pass と fresh design reviewer pass", phase_plan)
+        self.assertIn("Plan Summary", phase_plan)
+        self.assertIn("Plan Blockers", phase_plan)
+        self.assertIn("phase gate bypass", phase_plan)
+
+        phase_plan_epic = (
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("delegated plan draft", phase_plan_epic)
+        self.assertIn("fresh requirement/design reviewer pass", phase_plan_epic)
+        self.assertIn("manual authoring path が有効", phase_plan_epic)
 
         workflow_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
@@ -8937,6 +8961,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "closure ids",
                 "report evidence",
                 "reviewer gate status",
+                "For delegated authoring, treat the updated phase docs as authoritative review",
+                "phase_plan_issue.md",
+                "delegated draft provenance",
+                "stale / superseded",
+                "phase gate bypass",
             ),
         }
         for label, fragments in agent_contracts.items():
@@ -9103,6 +9132,102 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "report-only durable",
                 "missing promotion / follow-up",
                 "proposed decision",
+            ),
+        }
+        for label, fragments in expected_fragments.items():
+            text = texts[label]
+            for fragment in fragments:
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+
+    def test_issue_116_delegated_authoring_phase_gate_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            asset_paths = {
+                "phase design docs": assets_dir / "spec_dock" / "docs" / "phase_design.md",
+                "phase plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan.md",
+                "phase epic plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_epic.md",
+                "phase issue plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_issue.md",
+                "codex spec-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-reviewer.toml",
+            }
+            texts = {
+                label: path.read_text(encoding="utf-8")
+                for label, path in asset_paths.items()
+            }
+
+        expected_fragments = {
+            "phase design docs": (
+                "## delegated design authoring gate",
+                "fresh requirement reviewer pass",
+                "invocation contract",
+                "read-only analysis と draft proposal",
+                "canonical artifact edit",
+                "implementation edit",
+                "GitHub mutation",
+                "phase promotion",
+                "reviewer-pass claim",
+                "user への直接質問",
+                "required design draft output contract",
+                "Requirement Clarification Requests",
+                "delegated draft provenance",
+                "stale / superseded / rejected / blocked",
+                "approved requirement への traceability",
+                "scope creep",
+                "manual authoring path",
+            ),
+            "phase plan docs": (
+                "## delegated plan authoring gate",
+                "fresh requirement reviewer pass",
+                "fresh design reviewer pass",
+                "design dependency analysis",
+                "read-only analysis と draft proposal",
+                "canonical artifact edit",
+                "implementation edit",
+                "GitHub mutation",
+                "phase promotion",
+                "reviewer-pass claim",
+                "user への直接質問",
+                "required plan draft output contract",
+                "Plan Blockers",
+                "delegated draft provenance",
+                "approved requirement / design への traceability",
+                "scope creep",
+                "phase gate bypass",
+                "manual authoring path",
+            ),
+            "phase epic plan docs": (
+                "delegated plan draft",
+                "stale / superseded handling",
+                "phase gate preservation",
+                "delegated draft を fresh `spec-reviewer` pass の代替にしていない",
+                "manual authoring path",
+            ),
+            "phase issue plan docs": (
+                "delegated plan draft",
+                "stale / superseded handling",
+                "phase gate preservation",
+                "step reviewer gate",
+                "final QA/code/spec gate",
+                "manual authoring path",
+            ),
+            "codex spec-reviewer agent": (
+                "For delegated authoring",
+                "phase_design.md",
+                "phase_plan.md",
+                "phase_plan_epic.md",
+                "phase_plan_issue.md",
+                "delegated draft provenance",
+                "stale / superseded",
+                "traceability to the",
+                "freshly approved previous phase",
+                "creep or phase gate bypass",
+                "delegated draft is treated as `spec-reviewer` pass",
+                "manual authoring",
             ),
         }
         for label, fragments in expected_fragments.items():
