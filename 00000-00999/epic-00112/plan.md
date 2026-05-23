@@ -334,7 +334,16 @@ I5 --> I6
 
 ## v1 Amendment Plan（追加修正 Issue）
 
-この節は、完了済みの Issue 001〜006 を上書きしない。v0 実装の上に積み上げる追加修正計画として扱う。Issue 番号は既存 GitHub / spec-dock 採番に合わせて作成時に確定するが、ここでは v1 Issue 007〜012 として記述する。
+この節は、完了済みの Issue 001〜006 を上書きしない。v0 実装の上に積み上げる追加修正計画として扱う。v1 Issue 007〜012 は、spec-dock / GitHub 上では次の実IDで作成済みであり、実行はこの対応表と依存順に従う。
+
+| v1計画ID | spec-dock ID | GitHub | title / slug | 実行順序 |
+| --- | --- | --- | --- | --- |
+| v1 Issue 007 | `iss-00120` | `#120` | `Authority Metadata and Promotion Record Schema` / `authority-metadata-and-promotion-record-schema` | 1 |
+| v1 Issue 008 | `iss-00121` | `#121` | `Authority-Aware Context Pack and Lifecycle Gates` / `authority-aware-context-pack-lifecycle-gates` | 2 |
+| v1 Issue 009 | `iss-00122` | `#122` | `Evidence Adoption Ledger and Bounded Depth-2 Delegation` / `evidence-adoption-ledger-depth2-delegation` | 2 |
+| v1 Issue 010 | `iss-00123` | `#123` | `Role-Scoped Permission Profiles and Task Manifest Probes` / `role-scoped-permission-profiles-task-manifest` | 3 |
+| v1 Issue 011 | `iss-00124` | `#124` | `Canonical Draft Authoring Role Rewrite` / `canonical-draft-authoring-role-rewrite` | 4 |
+| v1 Issue 012 | `iss-00125` | `#125` | `Authority-Aware Delegated Authoring Dogfooding Pilot` / `authority-aware-delegated-authoring-dogfooding-pilot` | 5 |
 
 ### Amendment 方針
 
