@@ -92,7 +92,7 @@ ID: "iss-00122"
 #### 具体テストケース一覧
 - `tc-001`: Inspect provider report templates/docs for adopted, partially adopted, rejected, deferred, stale, and blocked ledger dispositions.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `rg -n 'adopted|partially_integrated|rejected|deferred|blocked|stale' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/system/active-none` を実行する。
+  - 操作: `rg -n 'adopted|partially_adopted|rejected|deferred|blocked|stale' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/system/active-none` を実行する。
   - 期待結果: evidence adoption ledger dispositions are defined in provider docs/templates/report scaffolds.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
   - 検証方法: ledger disposition hit lines and coverage判定を `report.md` に記録する。

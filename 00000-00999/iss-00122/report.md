@@ -13,9 +13,9 @@ ID: "iss-00122"
 # iss-00122 Evidence Adoption Ledger and Bounded Depth2 Delegation — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: Issue scaffold created from epic-00112 v1 amendment; requirement/design/plan passed fresh spec-reviewer gate and are approved for execution.
-- 未完了: implementation has not started.
-- 次のマイルストーン: issue execution, only after the user intentionally starts each issue.
+- 現在地: S01 provider docs/templates ledger schema implementation and spec-reviewer gate are passed.
+- 未完了: S02, S90, and S99.
+- 次のマイルストーン: implement S02 bounded depth=2 role graph and managed asset assertions.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -98,11 +98,37 @@ ID: "iss-00122"
   - rationale: prior findings closed; no P0/P1 blockers in reviewed scope.
 
 ## 受け入れ条件の現在状況
-- status: pending implementation; specs are approved and implementation has not started.
+- status: S01 implementation evidence recorded; reviewer gate pending.
 - required evidence: see `plan.md` Spec-Locked Closure Index and final completion conditions.
 
 ## 実行証跡
-- Not started.
+- S01 evidence adoption ledger schema:
+  - changed files:
+    - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+    - `src/spec_dock/assets/spec_dock/templates/initiative/report.md`
+    - `src/spec_dock/assets/spec_dock/templates/epic/report.md`
+    - `src/spec_dock/assets/spec_dock/templates/issue/report.md`
+  - implementation summary:
+    - Added Evidence Adoption Ledger semantics for `adopted`, `partially_adopted`, `rejected`, `deferred`, `stale`, and `blocked`.
+    - Added unresolved `blocked` / `stale` promotion-blocking rule.
+    - Added report template table fields for source, target, rationale, evidence, and next action.
+  - tc-001 command:
+    - `rg -n 'adopted|partially_adopted|rejected|deferred|blocked|stale' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/system/active-none`
+    - result: pass; provider docs/templates now expose adoption status values and active-none already exposes delegated evidence failure states.
+  - tc-002 command:
+    - `rg -n 'unresolved|blocked|promotion|cannot promote|must not promote|stale' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates`
+    - result: pass; workflow docs/templates state that unresolved `blocked` / `stale` Evidence Adoption Ledger entries block promotion / implementation start / issue ready / issue finish / phase completion.
+  - guardrail:
+    - `git diff --check`
+    - result: pass.
+  - reviewer gate:
+    - Nash (`019e5613-b432-7c61-a7db-4af725486a01`) `review_status: fail`.
+    - finding: P1, tc-001 plan command still searched delegated draft lifecycle state `partially_integrated` instead of Evidence Adoption Ledger state `partially_adopted`.
+    - disposition: fixed by amending tc-001 in `plan.md` to search `partially_adopted`, matching requirement AC-001 and the implemented EAL schema.
+    - re-review: pass; no findings.
+  - final reviewer gate:
+    - Nash (`019e5613-b432-7c61-a7db-4af725486a01`) `review_status: pass`.
+    - reason: plan tc-001, report evidence, AC-001, and implemented Evidence Adoption Ledger schema now use `partially_adopted`; changed files remain limited to S01 provider docs/templates plus active issue plan/report.
 
 ## ブロッカー / 未完了
-- Implementation is intentionally not started in this authoring turn; issue execution must be started separately after this approved spec gate.
+- S02/S90/S99 not started.
