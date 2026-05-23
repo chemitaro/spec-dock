@@ -24,7 +24,7 @@ ID: "iss-00114"
 - 目的:
   - delegated draft lifecycle、structured draft artifact、report evidence、report template / active-none surfaces を固定する。
 - 必須 / 禁止:
-  - 必須: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md; dogfooding mirrors` を対象に、親 Epic の該当 contract を実装可能な形にする。
+  - 必須: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md` を provider source として更新し、dogfooding mirrors は parity surface として確認する。
   - 禁止: write-capable delegation / runtime validation / `.github/agents` support の導入。
 - 前提:
   - Depends on: iss-00113

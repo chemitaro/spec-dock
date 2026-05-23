@@ -32,7 +32,7 @@ ID: "iss-00114"
 
 ## スコープ
 - 必須:
-  - 対象成果物: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md; dogfooding mirrors`
+  - 対象成果物: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md`
   - Provider-side source of truth を先に更新し、dogfooding workspace の parity を確認する。
   - `report.md` に変更対象、検証、reviewer 結果を記録できる状態にする。
 - 禁止:
@@ -79,6 +79,15 @@ ID: "iss-00114"
   - 操作: Issue final spec review を行う。
   - 期待結果: 親 Epic の該当 E-RQ/E-AC と矛盾せず `review_status: pass`。
   - 観測点: reviewer result。
+
+## Issue-Specific Acceptance Lock
+- AC-001 must explicitly prove:
+  - lifecycle states `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, and `stale`
+  - promotion-ineligible handling for `stale`, `rejected`, `superseded`, and `blocked`
+  - report evidence fields for role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, and promotion decision
+  - failure-mode table fields: expected verdict, allowed next action, report evidence path, and promotion eligibility
+  - provider report template and active-none report surfaces
+- AC-002 must prove dogfooding parity for generated report surfaces only after provider source is updated.
 
 ## 例外・エッジケース
 - EC-001:

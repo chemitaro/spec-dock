@@ -123,3 +123,9 @@ ID: "iss-00118"
 - Required decision:
   - `write-capable delegation remains deferred` unless a later Epic / Issue explicitly approves it.
 - Pilot must use shipped/documented workflow assets rather than ad hoc prompt-only delegation.
+- Pilot target must be specified before execution:
+  - target active node
+  - prior phase reviewer-pass evidence
+  - invocation path: direct role skill or host adapter
+  - integration / rejection report location
+- If Issue 005 closes as `adapter_contract_only`, the pilot may use role skills and documented invocation contracts, but must not claim verified Codex host callability.

@@ -39,14 +39,14 @@ ID: "iss-00113"
   - 観測可能な振る舞い: `Policy foundation` contract exists in provider-side source of truth.
   - 依存: none
   - unblock: S02
-  - 対象ファイル: src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; spec-dock/docs/workflow_spec_authoring.md
+  - 対象ファイル: src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md
   - 閉じる要件: AC-001
   - レビューゲート: spec-reviewer for docs/skill/template alignment, code-reviewer if tests/runtime are touched.
 - S02:
   - 観測可能な振る舞い: dogfooding mirror and verification evidence reflect provider change.
   - 依存: S01
   - unblock: S90, S99
-  - 対象ファイル: dogfooding mirrors / tests as applicable
+  - 対象ファイル: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests as applicable
   - 閉じる要件: AC-002, EC-002
   - レビューゲート: reviewer matching changed surface.
 - S90:
@@ -94,13 +94,14 @@ ID: "iss-00113"
 - design 参照:
   - `design.md` file change plan and parent Epic design.
 - 対象ファイル:
-  - src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; spec-dock/docs/workflow_spec_authoring.md
+  - src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md
 - planned contract:
   - test obligation:
     - closure id: tc-001
     - coverage rationale: docs/skill/template contract can be closed by inspection plus content assertions if available.
   - implementation scope:
     - allowed paths: target provider files listed above.
+    - forbidden paths: dogfooding mirrors and generated consumer copies; they are validated in S02.
     - forbidden changes: runtime validation, write-capable delegation, `.github/agents` support.
   - Green verification:
     - inspect diff and run targeted tests if tests are changed.
@@ -111,7 +112,9 @@ ID: "iss-00113"
 
 #### delegation contract
 - delegated role: doc-writer by default; dev-coder only if tests/runtime are changed.
-- allowed paths: target provider files and related tests.
+- allowed paths: target provider files listed above only.
+- forbidden paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests; they are handled in S02 unless an approved plan amendment moves them.
+
 - forbidden changes: parent Epic non-scope.
 - required verification: diff inspection and targeted tests if applicable.
 - output required: changed files, verification result, unresolved risks.
@@ -132,12 +135,13 @@ ID: "iss-00113"
 - behavior goal:
   - Consumer/dogfooding workspace and tests reflect the provider change.
 - 対象ファイル:
-  - dogfooding mirrors and tests as applicable.
+  - `spec-dock/docs/workflow_spec_authoring.md` dogfooding mirror and tests as applicable.
 - planned contract:
   - test obligation:
     - closure id: tc-002
   - implementation scope:
-    - allowed paths: dogfooding mirrors, tests, report evidence.
+    - allowed paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, managed asset parity tests when applicable, and report evidence.
+
     - forbidden changes: unrelated implementation refactor.
   - Green verification:
     - `./spec-dock/scripts/spec-dock validate`

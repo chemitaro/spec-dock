@@ -39,14 +39,14 @@ ID: "iss-00114"
   - 観測可能な振る舞い: `Draft evidence schema` contract exists in provider-side source of truth.
   - 依存: iss-00113
   - unblock: S02
-  - 対象ファイル: src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md; dogfooding mirrors
+  - 対象ファイル: src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md
   - 閉じる要件: AC-001
   - レビューゲート: spec-reviewer for docs/skill/template alignment, code-reviewer if tests/runtime are touched.
 - S02:
   - 観測可能な振る舞い: dogfooding mirror and verification evidence reflect provider change.
   - 依存: S01
   - unblock: S90, S99
-  - 対象ファイル: dogfooding mirrors / tests as applicable
+  - 対象ファイル: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests as applicable
   - 閉じる要件: AC-002, EC-002
   - レビューゲート: reviewer matching changed surface.
 - S90:
@@ -71,6 +71,11 @@ ID: "iss-00114"
 | tc-003 | S99 | final review | acceptance | AC-003 | Final reviewer confirms issue docs/report/diff alignment. | reviewer output | spec drift | yes | manual-required | report final gate |
 | tc-004 | S90 | documented uncertainty | exception | EC-001 | If host/path/target uncertainty blocks verified implementation, the issue records uncertainty and does not claim false success. | report exception evidence | false verified claim | yes | inspect-only | report S90 closure |
 | tc-005 | S02 | parity drift | exception | EC-002 | Provider/consumer drift is either corrected or explicitly documented as intended. | provider/consumer diff | silent drift | yes | inspect-only | report S02 closure |
+| tc-006 | S01 | lifecycle states | acceptance | AC-001 | Provider schema lists `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, and `stale`. | provider docs/templates diff | missing lifecycle state | yes | inspect-only | report S01 closure |
+| tc-007 | S01 | promotion-ineligible states | acceptance | AC-001 | `stale`, `rejected`, `superseded`, and `blocked` drafts are explicitly ineligible as promotion evidence. | provider docs/templates diff | invalid draft promoted | yes | inspect-only | report S01 closure |
+| tc-008 | S01 | report evidence fields | acceptance | AC-001 | Report schema requires role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, and promotion decision. | provider report templates diff | incomplete delegated evidence | yes | inspect-only | report S01 closure |
+| tc-009 | S01 | failure-mode table | acceptance | AC-001 | Every required failure mode includes expected verdict, allowed next action, report evidence path, and promotion eligibility. | provider docs/templates diff | ambiguous failure handling | yes | inspect-only | report S01 closure |
+| tc-010 | S01/S02 | report surfaces | acceptance | AC-001 / AC-002 | Provider report templates and active-none reports carry the schema, and dogfooding mirrors reflect it after sync/update. | provider + dogfooding report files | missing report surface | yes | inspect-only | report S01/S02 closure |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
@@ -94,13 +99,14 @@ ID: "iss-00114"
 - design 参照:
   - `design.md` file change plan and parent Epic design.
 - 対象ファイル:
-  - src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md; dogfooding mirrors
+  - src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md; src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md; src/spec_dock/assets/spec_dock/system/active-none/{initiative,epic,issue}/report.md
 - planned contract:
   - test obligation:
-    - closure id: tc-001
-    - coverage rationale: docs/skill/template contract can be closed by inspection plus content assertions if available.
+    - closure ids: tc-001, tc-006, tc-007, tc-008, tc-009, tc-010
+    - coverage rationale: each lifecycle, failure-mode, and report-surface invariant must be inspected independently; a broad provider diff is not sufficient.
   - implementation scope:
     - allowed paths: target provider files listed above.
+    - forbidden paths: dogfooding mirrors and generated consumer copies; they are validated in S02.
     - forbidden changes: runtime validation, write-capable delegation, `.github/agents` support.
   - Green verification:
     - inspect diff and run targeted tests if tests are changed.
@@ -111,7 +117,9 @@ ID: "iss-00114"
 
 #### delegation contract
 - delegated role: doc-writer by default; dev-coder only if tests/runtime are changed.
-- allowed paths: target provider files and related tests.
+- allowed paths: target provider files listed above only.
+- forbidden paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests; they are handled in S02 unless an approved plan amendment moves them.
+
 - forbidden changes: parent Epic non-scope.
 - required verification: diff inspection and targeted tests if applicable.
 - output required: changed files, verification result, unresolved risks.
@@ -123,6 +131,30 @@ ID: "iss-00114"
   - 期待結果: `delegated draft lifecycle、structured draft artifact、report evidence、report template / active-none surfaces を固定する。` is represented without contradicting parent Epic.
   - 検証方法: diff/reviewer inspection.
   - 関連 closure id: tc-001
+- `tc-s01-006` inspect-only: lifecycle states locked
+  - 前提: provider source is edited.
+  - 操作: inspect lifecycle schema.
+  - 期待結果: all eight lifecycle states are present.
+  - 検証方法: diff/reviewer inspection.
+  - 関連 closure id: tc-006
+- `tc-s01-007` inspect-only: promotion-ineligible states locked
+  - 前提: provider source is edited.
+  - 操作: inspect promotion rules.
+  - 期待結果: stale/rejected/superseded/blocked drafts cannot be promotion evidence.
+  - 検証方法: diff/reviewer inspection.
+  - 関連 closure id: tc-007
+- `tc-s01-008` inspect-only: full report evidence fields locked
+  - 前提: report schema surfaces are edited.
+  - 操作: inspect report evidence field list.
+  - 期待結果: all delegated evidence fields required by parent Epic are present.
+  - 検証方法: diff/reviewer inspection.
+  - 関連 closure id: tc-008
+- `tc-s01-009` inspect-only: failure-mode table locked
+  - 前提: provider source is edited.
+  - 操作: inspect failure-mode table.
+  - 期待結果: every required failure mode has verdict, next action, evidence path, and promotion eligibility.
+  - 検証方法: diff/reviewer inspection.
+  - 関連 closure id: tc-009
 
 #### step closure contract
 - close 条件: target provider source is updated and inspected.
@@ -132,12 +164,13 @@ ID: "iss-00114"
 - behavior goal:
   - Consumer/dogfooding workspace and tests reflect the provider change.
 - 対象ファイル:
-  - dogfooding mirrors and tests as applicable.
+  - `spec-dock/docs/workflow_spec_authoring.md`, `spec-dock/templates/{initiative,epic,issue}/report.md`, `spec-dock/system/active-none/{initiative,epic,issue}/report.md` dogfooding mirrors and tests as applicable.
 - planned contract:
   - test obligation:
     - closure id: tc-002
   - implementation scope:
-    - allowed paths: dogfooding mirrors, tests, report evidence.
+    - allowed paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, managed asset parity tests when applicable, and report evidence.
+
     - forbidden changes: unrelated implementation refactor.
   - Green verification:
     - `./spec-dock/scripts/spec-dock validate`
@@ -158,6 +191,12 @@ ID: "iss-00114"
   - 期待結果: no unintended drift.
   - 検証方法: diff + command evidence.
   - 関連 closure id: tc-002
+- `tc-s02-010` inspect-only: report surface parity
+  - 前提: provider report schema surfaces are updated.
+  - 操作: inspect dogfooding report templates / active-none reports after sync or update.
+  - 期待結果: dogfooding mirrors carry the same delegated evidence schema or document intended no-op.
+  - 検証方法: diff + command evidence.
+  - 関連 closure id: tc-010
 
 #### step closure contract
 - close 条件: parity/verification evidence is recorded.

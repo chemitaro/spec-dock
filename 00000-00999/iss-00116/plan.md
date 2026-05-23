@@ -17,6 +17,7 @@ ID: "iss-00116"
   - AC-001 provider source update
   - AC-002 validation / parity evidence
   - AC-003 final spec review
+  - AC-004 reviewer execution surface evidence
 - EC:
   - EC-001 documented uncertainty path
   - EC-002 provider/consumer drift handling
@@ -31,7 +32,8 @@ ID: "iss-00116"
 - step 依存 summary:
   - S01: Provider source update; depends on iss-00113, iss-00114, iss-00115; unblocks S02.
   - S02: Dogfooding parity and tests; depends on S01; unblocks S90/S99.
-  - S90: Docs impact/report update; depends on S02.
+  - S03: Reviewer execution surface verification; depends on S01; unblocks S90/S99.
+  - S90: Docs impact/report update; depends on S02/S03.
   - S99: Final quality gate; depends on S90.
 
 ## ステップ一覧
@@ -39,16 +41,23 @@ ID: "iss-00116"
   - 観測可能な振る舞い: `Phase gates` contract exists in provider-side source of truth.
   - 依存: iss-00113, iss-00114, iss-00115
   - unblock: S02
-  - 対象ファイル: src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md; dogfooding mirrors
+  - 対象ファイル: src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md
   - 閉じる要件: AC-001
   - レビューゲート: spec-reviewer for docs/skill/template alignment, code-reviewer if tests/runtime are touched.
 - S02:
   - 観測可能な振る舞い: dogfooding mirror and verification evidence reflect provider change.
   - 依存: S01
   - unblock: S90, S99
-  - 対象ファイル: dogfooding mirrors / tests as applicable
+  - 対象ファイル: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests as applicable
   - 閉じる要件: AC-002, EC-002
   - レビューゲート: reviewer matching changed surface.
+- S03:
+  - 観測可能な振る舞い: delegated-specific criteria are visible to the actual `spec-reviewer` invocation surface.
+  - 依存: S01
+  - unblock: S90, S99
+  - 対象ファイル: phase docs, concrete `spec-reviewer` skill / reviewer prompt / reviewer authority doc if required, report evidence
+  - 閉じる要件: AC-004
+  - レビューゲート: spec-reviewer.
 - S90:
   - 観測可能な振る舞い: docs impact and report evidence are complete.
   - 閉じる要件: EC-001, docs impact.
@@ -60,6 +69,7 @@ ID: "iss-00116"
 - AC-001 -> S01
 - AC-002 -> S02
 - AC-003 -> S99
+- AC-004 -> S03 / tc-006
 - EC-001 -> S90 / tc-004
 - EC-002 -> S02 / tc-005
 
@@ -71,6 +81,7 @@ ID: "iss-00116"
 | tc-003 | S99 | final review | acceptance | AC-003 | Final reviewer confirms issue docs/report/diff alignment. | reviewer output | spec drift | yes | manual-required | report final gate |
 | tc-004 | S90 | documented uncertainty | exception | EC-001 | If host/path/target uncertainty blocks verified implementation, the issue records uncertainty and does not claim false success. | report exception evidence | false verified claim | yes | inspect-only | report S90 closure |
 | tc-005 | S02 | parity drift | exception | EC-002 | Provider/consumer drift is either corrected or explicitly documented as intended. | provider/consumer diff | silent drift | yes | inspect-only | report S02 closure |
+| tc-006 | S03 | reviewer execution surface | acceptance | AC-004 | Delegated draft review criteria are visible to actual `spec-reviewer` invocation, or the concrete reviewer surface is updated. | phase docs + reviewer surface evidence | unenforced reviewer criteria | yes | manual-required | report S03 closure |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
@@ -94,13 +105,14 @@ ID: "iss-00116"
 - design 参照:
   - `design.md` file change plan and parent Epic design.
 - 対象ファイル:
-  - src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md; dogfooding mirrors
+  - src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md
 - planned contract:
   - test obligation:
     - closure id: tc-001
     - coverage rationale: docs/skill/template contract can be closed by inspection plus content assertions if available.
   - implementation scope:
     - allowed paths: target provider files listed above.
+    - forbidden paths: dogfooding mirrors and generated consumer copies; they are validated in S02.
     - forbidden changes: runtime validation, write-capable delegation, `.github/agents` support.
   - Green verification:
     - inspect diff and run targeted tests if tests are changed.
@@ -111,7 +123,9 @@ ID: "iss-00116"
 
 #### delegation contract
 - delegated role: doc-writer by default; dev-coder only if tests/runtime are changed.
-- allowed paths: target provider files and related tests.
+- allowed paths: target provider files listed above only.
+- forbidden paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, and tests; they are handled in S02 unless an approved plan amendment moves them.
+
 - forbidden changes: parent Epic non-scope.
 - required verification: diff inspection and targeted tests if applicable.
 - output required: changed files, verification result, unresolved risks.
@@ -137,7 +151,8 @@ ID: "iss-00116"
   - test obligation:
     - closure id: tc-002
   - implementation scope:
-    - allowed paths: dogfooding mirrors, tests, report evidence.
+    - allowed paths: dogfooding mirrors, generated consumer copies, parity evidence, validation evidence, managed asset parity tests when applicable, and report evidence.
+
     - forbidden changes: unrelated implementation refactor.
   - Green verification:
     - `./spec-dock/scripts/spec-dock validate`
@@ -162,6 +177,22 @@ ID: "iss-00116"
 #### step closure contract
 - close 条件: parity/verification evidence is recorded.
 - report evidence: Step Contract Closure S02.
+
+### S03 — Reviewer execution surface verification
+- behavior goal:
+  - Confirm delegated-specific reviewer criteria are actually visible to `spec-reviewer` invocation.
+- target evidence:
+  - `phase_docs_authority_verified`, `reviewer_surface_updated`, or `reviewer_surface_uncertain_follow_up` recorded in `report.md`.
+- planned contract:
+  - test obligation:
+    - closure id: tc-006
+  - implementation scope:
+    - allowed paths: phase docs, concrete `spec-reviewer` skill / reviewer prompt / reviewer authority doc if required, report evidence.
+    - forbidden changes: replacing fresh `spec-reviewer` pass with delegated draft self-approval.
+  - required verification:
+    - reviewer can fail/incomplete promotion for stale draft, missing evidence, scope creep, untraceable delegated content, or phase gate bypass.
+  - report evidence destination:
+    - `report.md` Step Contract Closure S03.
 
 ### S90 — docs impact resolution / docs refresh
 - 対象:
@@ -191,11 +222,11 @@ ID: "iss-00116"
 
 ## 最終完了条件
 - AC/EC 達成:
-  - AC-001..AC-003 and EC-001..EC-002 closed in report.
+  - AC-001..AC-004 and EC-001..EC-002 closed in report.
 - docs 影響解決:
   - S90 complete.
 - 全 implementation step 完了:
-  - S01/S02/S90/S99 committed or approved-no-op.
+  - S01/S02/S03/S90/S99 committed or approved-no-op.
 - final quality gate pass:
   - final spec-reviewer pass.
 

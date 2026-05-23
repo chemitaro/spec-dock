@@ -32,8 +32,9 @@ ID: "iss-00117"
 
 ## スコープ
 - 必須:
-  - 対象成果物: `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml; implementation-planner.toml; .codex/agents mirrors; tests/test_init_update.py as needed`
+  - 対象成果物: `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml; implementation-planner.toml`
   - Provider-side source of truth を先に更新し、dogfooding workspace の parity を確認する。
+  - Managed asset parity coverage in `tests/test_init_update.py` or equivalent must be updated; this is not optional for shipped adapter assets.
   - `report.md` に変更対象、検証、reviewer 結果を記録できる状態にする。
 - 禁止:
   - 初期 Epic の非スコープである write-capable delegation、runtime validation、role registry、`.github/agents` / Copilot support を実装しない。
@@ -47,7 +48,7 @@ ID: "iss-00117"
   - 親 Epic の ownership / draft-only / provider-first contract に従う。
   - 変更した provider asset と dogfooding mirror の関係を確認する。
 - 判断が必要:
-  - 既存 tests に content assertion を追加するか、manual parity evidence に留めるか。
+  - `tests/test_init_update.py` に追加するか同等の targeted test にするか。manual parity evidence は補助証跡に限り、test-required parity の代替にしない。
 - 行わない:
   - 親 Epic の scope / non-scope を再定義しない。
 
@@ -112,3 +113,12 @@ ID: "iss-00117"
   - Close only as adapter contract + documented uncertainty / approved no-op, not as verified host integration.
 - Non-scope remains fixed:
   - `.github/agents` / Copilot agent support is not implemented in this Issue.
+
+## Closure Classification
+- `verified_host_adapter`:
+  - Codex host path and TOML schema are verified.
+  - Dogfooding may claim host-callable role invocation.
+- `adapter_contract_only`:
+  - Path or schema remains unverified.
+  - The Issue may close with documented uncertainty.
+  - The Epic and Issue 006 must not claim verified Codex host callability.

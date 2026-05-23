@@ -66,6 +66,10 @@ ID: "iss-00118"
   - 観測可能な振る舞い: pilot metrics and `write-capable delegation remains deferred` decision are recorded.
   - 閉じる要件: E-AC-008.
   - unblock: S90, S99
+- S06:
+  - 観測可能な振る舞い: at least one negative / blocked case is exercised or recorded as simulated evidence.
+  - 閉じる要件: E-AC-009 operational evidence.
+  - unblock: S90, S99
 - S90:
   - 観測可能な振る舞い: docs impact and report evidence are complete.
   - 閉じる要件: EC-001, docs impact.
@@ -81,6 +85,7 @@ ID: "iss-00118"
 - E-AC-004 operational evidence -> S03 / tc-006
 - E-AC-005 operational evidence -> S04 / tc-007
 - E-AC-008 pilot metrics/defer decision -> S05 / tc-008
+- E-AC-009 negative/failure evidence -> S06 / tc-010
 - EC-001 -> S90 / tc-004
 - EC-002 -> S02 / tc-005
 
@@ -96,6 +101,7 @@ ID: "iss-00118"
 | tc-006 | S03 | design draft pilot | acceptance | E-AC-004 / E-RQ-007 | A delegated design draft exists under discussions and `report.md` records role, phase, scope, consent, source artifacts, draft path, status, integration result, rejected portions, blockers, reviewer result, and promotion decision. | design draft artifact + full Design Authoring Delegation report section | fake pilot completion or missing consent/provenance | yes | manual-required | report S03 closure |
 | tc-007 | S04 | plan draft pilot | acceptance | E-AC-005 / E-RQ-007 | A delegated plan draft exists under discussions and `report.md` records role, phase, scope, consent, source artifacts, draft path, status, integration result, rejected portions, blockers, reviewer result, and promotion decision. | plan draft artifact + full Plan Authoring Delegation report section | fake pilot completion or missing consent/provenance | yes | manual-required | report S04 closure |
 | tc-008 | S05 | pilot metrics | acceptance | E-AC-008 | Required pilot metrics and write-capable defer decision are recorded. | metrics summary + defer decision | missing readiness evidence | yes | manual-required | report S05 closure |
+| tc-010 | S06 | negative / blocked case | acceptance | E-AC-009 | Pilot includes at least one RCR, Plan Blocked, stale reconciliation, rejected/partially integrated draft, or host adapter unavailable fallback; simulated evidence is explicitly marked if used. | negative-path artifact + report evidence | untested failure-mode contract | yes | manual-required | report S06 closure |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
@@ -236,6 +242,24 @@ ID: "iss-00118"
 - report evidence destination:
   - `report.md` Step Contract Closure S05.
 
+### S06 — Negative / blocked case exercise
+- behavior goal:
+  - Exercise at least one failure-mode path so the pilot is not success-path-only.
+- acceptable cases:
+  - Requirement Clarification Request
+  - Plan Blocked
+  - stale draft reconciliation
+  - rejected or partially integrated draft
+  - host adapter unavailable fallback
+- simulation rule:
+  - If no case occurs naturally, record a tabletop / controlled exercise and mark it as simulated evidence.
+- host adapter closure rule:
+  - If Issue 005 closes as documented uncertainty rather than verified adapter implementation, the pilot may proceed using shipped role skills and documented invocation contracts, but must not claim verified Codex host callability.
+- closure ids:
+  - tc-010
+- report evidence destination:
+  - `report.md` Step Contract Closure S06.
+
 ### S90 — docs impact resolution / docs refresh
 - 対象:
   - docs / templates / workflow / skill / adapter surfaces listed in this Issue.
@@ -268,7 +292,7 @@ ID: "iss-00118"
 - docs 影響解決:
   - S90 complete.
 - 全 implementation step 完了:
-  - S01/S02/S03/S04/S05/S90/S99 committed or approved-no-op.
+  - S01/S02/S03/S04/S05/S06/S90/S99 committed or approved-no-op.
 - final quality gate pass:
   - final spec-reviewer pass.
 

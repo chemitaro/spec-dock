@@ -102,7 +102,7 @@ ID: "epic-00112"
     - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
     - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
     - Dogfooding `.agents/skills/...` parity.
-    - Managed asset / init-update tests as needed.
+    - Managed asset / init-update tests are mandatory for shipped role skill assets.
   - tranche:
     - T2 Role capability
   - closes:
@@ -115,6 +115,7 @@ ID: "epic-00112"
     - `system-architect` output must include the design draft required sections from `design.md`.
     - `implementation-planner` output must include the plan draft required sections from `design.md`.
     - Both skills must forbid canonical edits, implementation edits, GitHub mutation, destructive command, phase promotion, and reviewer-pass claims.
+    - Must prove managed asset parity through `tests/test_init_update.py` or equivalent targeted coverage.
 
 - Issue 004: phase gate and spec-reviewer integration
   - 目的:
@@ -126,6 +127,7 @@ ID: "epic-00112"
     - Delegated Design Authoring Gate.
     - Delegated Plan Authoring Gate.
     - Reviewer criteria for delegated draft provenance, staleness, traceability, scope discipline, and phase gate preservation.
+    - Actual `spec-reviewer` invocation surface evidence or update.
     - Epic-specific plan handoff updates in `phase_plan_epic.md`, or explicit rationale if shared `phase_plan.md` fully owns the delegated plan gate.
     - Provider / dogfooding docs parity.
   - tranche:
@@ -141,6 +143,7 @@ ID: "epic-00112"
   - Issue readiness:
     - Must state that delegated draft is not reviewer pass.
     - Must preserve manual authoring as valid path when delegation is unavailable or intentionally skipped.
+    - Must prove delegated-specific criteria are visible to `spec-reviewer` invocation, or update the concrete reviewer surface.
 
 - Issue 005: Codex host callable role adapter
   - 目的:
@@ -153,6 +156,7 @@ ID: "epic-00112"
     - Verified or documented `.codex/agents/implementation-planner.toml`.
     - Provider source under `src/spec_dock/assets/install_root/.codex/agents/`.
     - Dogfooding parity under `.codex/agents/`.
+    - Managed asset / init-update tests are mandatory for shipped host adapter assets.
     - Adapter/skill drift prevention note.
   - tranche:
     - T3 Host integration
@@ -166,6 +170,7 @@ ID: "epic-00112"
     - Must not duplicate long-form role instructions.
     - Must explicitly exclude `.github/agents` / Copilot agent implementation.
     - If host syntax is uncertain, close only with documented uncertainty and no verified-integration claim.
+    - Must classify closure as `verified_host_adapter` or `adapter_contract_only`.
 
 - Issue 006: dogfooding parity and validation pilot
   - 目的:
@@ -180,6 +185,7 @@ ID: "epic-00112"
     - Canonical integration evidence in `report.md`.
     - Fresh `spec-reviewer` result for pilot artifacts.
     - Metrics summary and write-capable defer decision.
+    - At least one negative / blocked case exercise or explicitly simulated evidence.
   - tranche:
     - T4 Dogfooding and final evidence
   - closes:
@@ -197,6 +203,7 @@ ID: "epic-00112"
     - Must use shipped / documented workflow assets, not ad hoc prompt-only delegation.
     - Must record pilot metrics for draft count, integration ratio/cost, rejected reasons, traceability defects, scope creep or gate violations, forbidden action attempts, reviewer findings, stale draft events, provider/consumer drift, and implementation deviation if implementation follows.
     - Must record `write-capable delegation remains deferred` unless a later Epic / Issue explicitly approves it.
+    - If Issue 005 closes as `adapter_contract_only`, must record `host_invocation_verified=false` and avoid verified Codex host callability claims.
 
 ## Issue dependency graph
 - タイトル:

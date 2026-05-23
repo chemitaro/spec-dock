@@ -24,7 +24,7 @@ ID: "iss-00117"
 - 目的:
   - .codex/agents に thin callable entrypoints を追加し、role skill を正本にした host adapter boundary を固定する。
 - 必須 / 禁止:
-  - 必須: `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml; implementation-planner.toml; .codex/agents mirrors; tests/test_init_update.py as needed` を対象に、親 Epic の該当 contract を実装可能な形にする。
+  - 必須: `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml; implementation-planner.toml` を provider source として更新し、`.codex/agents` mirrors and managed asset tests are parity/verification surfaces.
   - 禁止: write-capable delegation / runtime validation / `.github/agents` support の導入。
 - 前提:
   - Depends on: iss-00115, iss-00116
@@ -42,7 +42,7 @@ ID: "iss-00117"
 - 採用しないもの:
   - runtime enforcement first、host-specific long instruction duplication。
 - 影響範囲:
-  - src/spec_dock/assets/install_root/.codex/agents/system-architect.toml; implementation-planner.toml; .codex/agents mirrors; tests/test_init_update.py as needed
+  - src/spec_dock/assets/install_root/.codex/agents/system-architect.toml; implementation-planner.toml; .codex/agents mirrors; tests/test_init_update.py managed asset parity coverage
 
 ## 採用方針 / トレードオフ
 - 論点:

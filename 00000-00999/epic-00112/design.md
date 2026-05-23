@@ -125,6 +125,18 @@ Tests --> ProviderCodexAgents : "assert managed asset parity"
 @enduml
 ```
 
+## Authority Hierarchy / Section Ownership
+
+| Surface | Authority for | May reference | Must not own |
+| --- | --- | --- | --- |
+| `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | global delegated-authoring policy: ownership, consent, draft-only status, forbidden actions, manual fallback | phase docs, report templates, role skills | role-specific output details or host-specific adapter syntax |
+| `src/spec_dock/assets/spec_dock/docs/phase_*.md` | phase preconditions and promotion gates for delegated design / plan authoring | workflow policy, report evidence schema, role output contracts | role prompt wording or host adapter syntax |
+| `src/spec_dock/assets/spec_dock/templates/{initiative,epic,issue}/report.md` and active-none reports | report evidence rendering and required ledger fields | workflow policy, draft lifecycle states | canonical phase promotion decisions by themselves |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/` | executable `system-architect` role prompt and design draft output contract | workflow policy, phase gates, draft/report schema | policy source of truth or reviewer pass |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/` | executable `implementation-planner` role prompt and plan draft output contract | workflow policy, phase gates, draft/report schema | policy source of truth or reviewer pass |
+| `src/spec_dock/assets/install_root/.codex/agents/` | Codex host thin adapter entrypoints | role skills | duplicated long role instructions or independent policy |
+| `.agents/`, `.codex/`, `spec-dock/` dogfooding mirrors | consumer-side validation surface | provider source | source of truth for shipped behavior |
+
 ## Domain Model（authoring domain）
 - ユビキタス言語:
   - Canonical artifact: phase promotion の対象となる `requirement.md` / `design.md` / `plan.md` / `report.md`。
@@ -265,6 +277,11 @@ Evidence --> Artifact : "supports integration"
 - created_at:
 - source_artifacts:
 - source_snapshot:
+  - source_revision: commit hash | doc revision | timestamp | unknown
+  - requirement_reviewer_pass_reference:
+  - design_reviewer_pass_reference:
+  - generated_at:
+  - stale_if:
 - consent_reference:
 
 ## Invocation Contract
