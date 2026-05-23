@@ -31,9 +31,8 @@ ID: "20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate"
   - head_ref_oid: `e7741fec10d9548354becb8040913680abd5aa40`
 - final local endpoint before PR update:
   - local_branch: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`
-  - implementation_head_oid_after_g10_fixes: `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
-  - evidence_artifact_commit_oid: use clean `git rev-parse HEAD` at reviewer handoff; this avoids self-referential evidence hashes.
-  - review_scope_note: reviewers should inspect the current clean HEAD for evidence consistency, while treating `421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d` as the fixed implementation delta for G10.
+  - final_pr_update_head: clean `HEAD` at reviewer handoff; this intentionally avoids self-referential evidence hashes.
+  - review_scope_note: reviewers must treat `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD` as the authoritative PR-bound G10 diff scope.
 
 ## Completed v1 issue closure check
 
@@ -62,14 +61,14 @@ Manual `sync` is intentionally not re-run in this G10 evidence step because issu
 Command:
 
 ```bash
-git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d
+git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD
 ```
 
 Summary:
 
-- `266 files changed`
-- `22709 insertions(+)`
-- `889 deletions(-)`
+- `269 files changed`
+- `23105 insertions(+)`
+- `895 deletions(-)`
 
 High-level changed surfaces:
 
@@ -114,14 +113,14 @@ High-level changed surfaces:
 Name-status command:
 
 ```bash
-git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d
+git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD
 ```
 
 The full name-status output is captured in sibling evidence artifact:
 
 - `discussions/20260523t204806z-disc-g10-full-name-status.md`
-- endpoint: `421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
-- entry count: `266`
+- endpoint: `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
+- entry count: `269`
 
 Reviewers must treat that full name-status artifact as the authoritative file-level scope list for the G10 review.
 
@@ -136,7 +135,8 @@ Reviewers must treat that full name-status artifact as the authoritative file-le
   - disposition:
     - close bypass: fixed by adding issue-target authority evaluation to `close_node`, fail-closed regression coverage in `tests/cli_runtime/test_runtime_close_s12.py`, and CLI integration alignment in `tests/cli_runtime/test_close.py`.
     - missing full name-status: fixed by adding `20260523t204806z-disc-g10-full-name-status.md`.
-  - re_review_status: pending.
+  - first re-reviewer: `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`)
+  - first_re_review_status: pass; previous findings resolved, but PR update remains blocked until the spec-reviewer lane passes the same final `base...HEAD` scope.
   - scope: architecture/workflow risk, hidden coupling, fallback adequacy, rollout quality, and product-quality gaps across the full diff.
 - Fresh `spec-reviewer`:
   - first reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`)
@@ -145,9 +145,17 @@ Reviewers must treat that full name-status artifact as the authoritative file-le
     - P1: G10 endpoint was pinned to `2a7dbec...` while the working tree still had uncommitted quality-gate fixes.
     - P1: `iss-00124` / `iss-00125` reports still contained stale pending wording that contradicted Epic E-AC pass claims.
   - disposition:
-    - endpoint mismatch: fixed by committing G10 fixes in `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and refreshing this artifact to the implementation endpoint.
+    - endpoint mismatch: superseded by regenerating this artifact and the full name-status artifact against the PR-bound `base...HEAD` scope.
     - stale issue reports: fixed by additive final closure addenda in the issue-local reports.
-  - re_review_status: pending.
+  - first re-reviewer: `Galileo the 2nd` (`019e56b3-39e3-7ca2-9af5-8523229256bb`)
+  - first_re_review_status: fail.
+  - first re-review findings:
+    - P1: G10 scope still pointed at `fc80c94...` while the PR-bound clean HEAD also included G10 evidence and executable test-alignment changes.
+    - P1: PR remains blocked until deep-consultant re-review pass is recorded.
+  - second disposition:
+    - final scope alignment: fixed by using `421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD` as the authoritative PR-bound G10 diff scope and regenerating the full name-status artifact to 269 entries.
+    - deep-consultant pass recording: fixed by recording Planck the 2nd's pass above.
+  - second_re_review_status: pending.
   - scope: requirement/design/plan/report alignment, issue closure evidence, additive v1 preservation of v0 history, and whether PR update is blocked by unresolved findings.
 
 ## Finding disposition rule

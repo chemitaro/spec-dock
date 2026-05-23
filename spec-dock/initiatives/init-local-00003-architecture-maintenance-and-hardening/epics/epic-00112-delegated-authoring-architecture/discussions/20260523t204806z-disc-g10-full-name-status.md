@@ -14,12 +14,13 @@ ID: "20260523t204806z-disc-g10-full-name-status"
 
 - base_ref_name: `main`
 - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`
-- implementation_head_oid_after_g10_fixes: `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
+- final_pr_update_head: clean `HEAD` at reviewer handoff; this intentionally avoids self-referential evidence hashes.
+- entry_count: `269`
 
 ## Command
 
 ```bash
-git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d
+git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD
 ```
 
 ## Full Output
@@ -94,6 +95,7 @@ A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/
 A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/discussions/20260523t131408z-disc-draft-status-depth2-final-synthesis.md
 A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/discussions/20260523t144246z-disc-v1-issue-authoring-delegated-evidence.md
 A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/discussions/20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate.md
+A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/discussions/20260523t204806z-disc-g10-full-name-status.md
 A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/discussions/rules.md
 A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-delegated-authoring-policy-foundation/.meta.json
 A	spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-delegated-authoring-policy-foundation/design.md
@@ -286,6 +288,8 @@ M	src/spec_dock/assets/spec_dock/templates/issue/report.md
 M	src/spec_dock/assets/spec_dock/templates/issue/requirement.md
 M	src/spec_dock/cli.py
 M	tests/cli_runtime/harness.py
+M	tests/cli_runtime/test_active.py
+M	tests/cli_runtime/test_close.py
 M	tests/cli_runtime/test_issue_lifecycle.py
 M	tests/cli_runtime/test_runtime_active_s05.py
 M	tests/cli_runtime/test_runtime_close_s12.py
