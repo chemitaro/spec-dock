@@ -59,6 +59,19 @@ _INTERVIEW_REQUIRED_LABELS = (
     "回答後フォローアップ",
 )
 
+_DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
+    "missing consent",
+    "missing/stale previous reviewer pass",
+    "requirement gap during design",
+    "design gap during plan",
+    "role unavailable",
+    "forbidden action attempt",
+    "stale draft",
+    "superseded draft",
+    "missing draft evidence when delegated use is claimed",
+    "reviewer unavailable/denied/waived/provisional",
+)
+
 
 class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_PROVIDER_ASSET_MAP = {
@@ -173,6 +186,17 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         ".github/agents/spec-manager.agent.md": (
             "src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md"
+        ),
+    }
+    _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP = {
+        "spec-dock/system/active-none/initiative/report.md": (
+            "src/spec_dock/assets/spec_dock/system/active-none/initiative/report.md"
+        ),
+        "spec-dock/system/active-none/epic/report.md": (
+            "src/spec_dock/assets/spec_dock/system/active-none/epic/report.md"
+        ),
+        "spec-dock/system/active-none/issue/report.md": (
+            "src/spec_dock/assets/spec_dock/system/active-none/issue/report.md"
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
@@ -1028,6 +1052,131 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"{source} concrete case must not use a table row: {case_block}",
             )
 
+    def _assert_delegated_draft_evidence_schema_contract(self, text: str, *, source: str) -> None:
+        for state in (
+            "requested",
+            "produced",
+            "integrated",
+            "partially_integrated",
+            "rejected",
+            "superseded",
+            "blocked",
+            "stale",
+        ):
+            self.assertIn(state, text, f"{source}: missing lifecycle state {state}")
+        ineligible_rule_pattern = re.compile(
+            r"(?:Promotion-ineligible states:[\s\S]{0,160}"
+            r"stale[\s\S]{0,160}rejected[\s\S]{0,160}superseded[\s\S]{0,160}blocked"
+            r"|stale[\s\S]{0,80}rejected[\s\S]{0,80}superseded[\s\S]{0,80}blocked"
+            r"[\s\S]{0,80}promotion evidence に使えない)"
+        )
+        self.assertRegex(
+            text,
+            ineligible_rule_pattern,
+            f"{source}: missing explicit promotion-ineligible rule for stale/rejected/superseded/blocked",
+        )
+        for field in (
+            "role",
+            "phase",
+            "scope",
+            "consent",
+            "source artifacts",
+            "draft artifact path",
+            "status",
+            "integration result",
+            "rejected portions",
+            "blockers",
+            "reviewer result",
+            "promotion decision",
+        ):
+            self.assertIn(field, text, f"{source}: missing delegated evidence field {field}")
+        for field in (
+            "source_revision",
+            "requirement_reviewer_pass_reference",
+            "design_reviewer_pass_reference",
+            "generated_at",
+            "stale_if",
+        ):
+            self.assertIn(field, text, f"{source}: missing source_snapshot field {field}")
+        for field in (
+            "expected verdict",
+            "allowed next action",
+            "report evidence path",
+            "promotion eligibility",
+        ):
+            self.assertIn(field, text, f"{source}: missing failure-mode field {field}")
+        expected_failure_mode_rows = {
+            "missing consent": (
+                "blocked / incomplete",
+                "obtain scoped consent or use manual authoring",
+            ),
+            "missing/stale previous reviewer pass": (
+                "blocked / incomplete",
+                "rerun reviewer gate",
+            ),
+            "requirement gap during design": (
+                "blocked / incomplete",
+                "return to requirement phase",
+            ),
+            "design gap during plan": (
+                "blocked / incomplete",
+                "return to design phase",
+            ),
+            "role unavailable": (
+                "blocked / manual path",
+                "record unavailable and continue manually if valid",
+            ),
+            "forbidden action attempt": (
+                "rejected",
+                "discard draft and record incident",
+            ),
+            "stale draft": (
+                "stale",
+                "regenerate or reconcile",
+            ),
+            "superseded draft": (
+                "superseded",
+                "reference replacement draft",
+            ),
+            "missing draft evidence when delegated use is claimed": (
+                "incomplete",
+                "add evidence or remove delegated-use claim",
+            ),
+            "reviewer unavailable/denied/waived/provisional": (
+                "blocked / incomplete",
+                "obtain fresh passed reviewer or record risk acceptance without promotion",
+            ),
+        }
+        table_rows = {}
+        for line in text.splitlines():
+            if not line.startswith("|") or line.startswith("|---"):
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) == 5:
+                table_rows[cells[0]] = cells
+        for failure_mode, (expected_verdict, expected_next_action) in expected_failure_mode_rows.items():
+            self.assertIn(failure_mode, table_rows, f"{source}: missing failure-mode table row {failure_mode}")
+            cells = table_rows[failure_mode]
+            self.assertEqual(
+                cells[1],
+                expected_verdict,
+                f"{source}: unexpected verdict for failure mode {failure_mode}",
+            )
+            self.assertEqual(
+                cells[2],
+                expected_next_action,
+                f"{source}: unexpected next action for failure mode {failure_mode}",
+            )
+            self.assertTrue(
+                cells[3],
+                f"{source}: missing report evidence path for failure mode {failure_mode}",
+            )
+            self.assertEqual(
+                cells[4],
+                "ineligible",
+                f"{source}: unexpected promotion eligibility for failure mode {failure_mode}",
+            )
+
     def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP.items():
             mirror_path = repo_root / mirror_rel_path
@@ -1038,6 +1187,21 @@ class TestInitUpdate(CliRuntimeHarness):
                 mirror_path.read_text(encoding="utf-8"),
                 asset_path.read_text(encoding="utf-8"),
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}",
+            )
+
+    def _assert_checked_in_dogfooding_active_none_reports_match_provider_assets(
+        self,
+        repo_root: Path,
+    ) -> None:
+        for mirror_rel_path, asset_rel_path in self._DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP.items():
+            mirror_path = repo_root / mirror_rel_path
+            asset_path = repo_root / asset_rel_path
+            self.assertTrue(mirror_path.is_file(), f"missing checked-in active-none report mirror: {mirror_path}")
+            self.assertTrue(asset_path.is_file(), f"missing provider active-none report asset: {asset_path}")
+            self.assertEqual(
+                mirror_path.read_text(encoding="utf-8"),
+                asset_path.read_text(encoding="utf-8"),
+                f"checked-in active-none report mirror diverged from provider asset: {mirror_rel_path}",
             )
 
     def _assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(self, repo_root: Path) -> None:
@@ -2308,6 +2472,19 @@ class TestInitUpdate(CliRuntimeHarness):
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
             self.assertIn("Observed Evidence Ledger", report_text)
+            self.assertIn("## Delegated Draft Evidence", report_text)
+            self._assert_delegated_draft_evidence_schema_contract(
+                workflow_spec_authoring,
+                source="docs/workflow_spec_authoring.md",
+            )
+            for scope in ("initiative", "epic", "issue"):
+                scope_report_text = (target / "spec-dock" / "templates" / scope / "report.md").read_text(
+                    encoding="utf-8"
+                )
+                self._assert_delegated_draft_evidence_schema_contract(
+                    scope_report_text,
+                    source=f"templates/{scope}/report.md",
+                )
             self.assertIn("#### Red/Green/Refactor Evidence", report_text)
             self.assertIn("#### Discovered Tests", report_text)
             self.assertIn("#### Step Contract Closure", report_text)
@@ -2333,6 +2510,16 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("### Final Spec Review Gate", report_text)
             self.assertIn("### Final Commit", report_text)
             self.assertIn("no-op checked contracts / files", report_text)
+
+            for scope in ("initiative", "epic", "issue"):
+                active_none_report = (
+                    target / "spec-dock" / "system" / "active-none" / scope / "report.md"
+                ).read_text(encoding="utf-8")
+                self.assertIn("## Delegated Draft Evidence Schema", active_none_report)
+                self._assert_delegated_draft_evidence_schema_contract(
+                    active_none_report,
+                    source=f"system/active-none/{scope}/report.md",
+                )
             self.assertIn("no-op diff-clean command", report_text)
             self.assertIn("no-op read-only confirmation", report_text)
             self.assertIn("post-commit external evidence destination", report_text)
@@ -3183,6 +3370,10 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
+
+    def test_checked_in_dogfooding_active_none_reports_match_provider_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self._assert_checked_in_dogfooding_active_none_reports_match_provider_assets(repo_root)
 
     def test_spec_document_templates_keep_policy_out_of_scaffold(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

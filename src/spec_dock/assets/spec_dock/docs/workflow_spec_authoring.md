@@ -37,6 +37,29 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - Delegated draft が unavailable / skipped / blocked / stale / rejected / superseded の場合でも、manual authoring path は有効である。ただし delegated authoring を使った evidence として扱ってはならない。
 - Delegated draft は fresh `spec-reviewer` pass の代替ではない。`spec-reviewer` は draft 自体ではなく、main orchestrator が統合した canonical artifact と evidence を review する。
 
+## delegated draft evidence schema
+
+- Delegated draft lifecycle state は `requested` / `produced` / `integrated` / `partially_integrated` / `rejected` / `superseded` / `blocked` / `stale` のいずれかで記録する。
+- `stale`、`rejected`、`superseded`、`blocked` の delegated draft は promotion evidence に使えない。`partially_integrated` は採用部分、rejected portions、blockers、promotion decision を `report.md` に明示した場合だけ採用部分の補助 evidence にできる。
+- Delegated draft evidence record は少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を持つ。
+- `source_snapshot` を記録する場合は source_revision、requirement_reviewer_pass_reference、design_reviewer_pass_reference、generated_at、stale_if を含める。
+- Failure-mode record は expected verdict、allowed next action、report evidence path、promotion eligibility を持つ。
+- Required failure modes は missing consent、missing/stale previous reviewer pass、requirement gap during design、design gap during plan、role unavailable、forbidden action attempt、stale draft、superseded draft、missing draft evidence when delegated use is claimed、reviewer unavailable/denied/waived/provisional を含む。
+- Delegated draft evidence を使った場合、対象 scope の `report.md` は delegated draft evidence table と failure-mode table を持つ。使わなかった場合は manual authoring / not used として、promotion evidence に delegated draft を使っていないことを短く記録する。
+
+| failure mode | expected verdict | allowed next action | report evidence path | promotion eligibility |
+|---|---|---|---|---|
+| missing consent | blocked / incomplete | obtain scoped consent or use manual authoring | Delegated Draft Evidence | ineligible |
+| missing/stale previous reviewer pass | blocked / incomplete | rerun reviewer gate | Spec Authoring Gate / reviewer evidence | ineligible |
+| requirement gap during design | blocked / incomplete | return to requirement phase | decision ledger / gate evidence | ineligible |
+| design gap during plan | blocked / incomplete | return to design phase | decision ledger / gate evidence | ineligible |
+| role unavailable | blocked / manual path | record unavailable and continue manually if valid | Delegated Draft Evidence | ineligible |
+| forbidden action attempt | rejected | discard draft and record incident | Delegated Draft Evidence / decision ledger | ineligible |
+| stale draft | stale | regenerate or reconcile | Delegated Draft Evidence | ineligible |
+| superseded draft | superseded | reference replacement draft | Delegated Draft Evidence | ineligible |
+| missing draft evidence when delegated use is claimed | incomplete | add evidence or remove delegated-use claim | Delegated Draft Evidence | ineligible |
+| reviewer unavailable/denied/waived/provisional | blocked / incomplete | obtain fresh passed reviewer or record risk acceptance without promotion | reviewer gate evidence | ineligible |
+
 ## authoring lifecycle
 
 1. 対象 scope と既存 node を確認する。
