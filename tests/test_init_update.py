@@ -10035,11 +10035,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-system-architect`: draft-only system architecture proposal for the main orchestrator.",
+            "`spec-dock-system-architect`: bounded draft `design.md` authoring with `authority: proposed` when a verified task manifest and role-scoped Permission Profile allow it; otherwise proposal-only architecture evidence.",
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-implementation-planner`: draft-only implementation plan proposal for the main orchestrator.",
+            "`spec-dock-implementation-planner`: bounded draft `plan.md` authoring with `authority: proposed` when a verified task manifest and role-scoped Permission Profile allow it; otherwise proposal-only planning evidence.",
             hub_text,
         )
         self.assertIn(

@@ -13,10 +13,10 @@ ID: "iss-00124"
 # iss-00124 Canonical Draft Authoring Role Rewrite — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S90 dogfooding parity review fixes are applied; S90 spec-reviewer re-review is pending.
-- 完了済み: S01/S02/S03 implementation and reviewer gates; first implementation commit; S90 dogfooding update and inspection evidence.
-- 未完了: S90 spec-reviewer gate, S99 final QA/code/spec gates, S90/S99 commits, issue finish.
-- 次のマイルストーン: run S90 spec-reviewer, fix findings, then continue to S99.
+- 現在地: S99 final verification commands passed; final QA/code/spec reviewer gates are pending.
+- 完了済み: S01/S02/S03 implementation and reviewer gates; S90 dogfooding update and spec-reviewer gate; implementation and dogfooding commits.
+- 未完了: S99 final QA/code/spec gates, final report commit, issue finish.
+- 次のマイルストーン: run S99 final reviewers, fix findings, then commit report closure and finish the issue.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -57,6 +57,20 @@ ID: "iss-00124"
   - reviewer result: Heisenberg `review_status: pass`.
   - promotion decision: not promoted by itself; used as draft planning input only.
 
+## Delegated Failure-Mode Ledger
+| failure mode | observed in this issue | disposition | promotion eligibility |
+|---|---|---|---|
+| missing consent | no | workflow delegation consent recorded for named roles and current issue scope | eligible |
+| missing/stale previous reviewer pass | no | Heisenberg requirement/design/plan gate pass recorded before execution | eligible |
+| requirement gap during design | no | no unresolved requirement blocker remained after authoring gate | eligible |
+| design gap during plan | no | no unresolved design blocker remained after authoring gate | eligible |
+| role unavailable | no | delegated authoring evidence from Lovelace / Mencius / Archimedes was available and integrated as draft evidence only | eligible |
+| forbidden action attempt | no | no delegated worker edited implementation files, previous phase artifacts, GitHub state, or claimed reviewer authority | eligible |
+| stale draft | no | no stale delegated draft was used for promotion; stale/proposal-only constraints are documented in role skills and workflow docs | eligible |
+| superseded draft | no | no superseded delegated draft was used for promotion | eligible |
+| missing draft evidence when delegated use is claimed | no | delegated evidence artifact path and per-role evidence blocks are recorded above | eligible |
+| reviewer unavailable/denied/waived/provisional | no | reviewer gates used recorded pass/fail outcomes; no waiver/provisional result is used as pass | eligible |
+
 ## Spec Interpretation / Decision Ledger
 - D-001:
   - Status: resolved
@@ -76,16 +90,24 @@ ID: "iss-00124"
   - Decision: Planned `uv run pytest tests/test_init_update.py` remains the named closure command for tc-004, but this environment cannot spawn `pytest`; the corrected unittest alternative must include the scaffold creation assertion plus the delegated authoring / bundled skill / adapter assertions.
   - Disposition: superseded_initial_three_test_alternative
   - Evidence: `uv run pytest tests/test_init_update.py` -> `Failed to spawn: pytest / os error 2`; initial three-test alternative was insufficient because it missed `test_init_creates_expected_structure`; corrected command `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` -> `Ran 4 tests ... OK`.
+- D-004:
+  - Status: resolved
+  - Type: plan-deviation
+  - Decision: S99 final QA found that `spec-driven-tdd-workflow` hub routing still described system-architect and implementation-planner as proposal-only; this was a final-gate corrective follow-up outside the original S01/S02/S03 file list and is accepted because it directly protects AC-001/AC-002 at the shipped routing entrypoint.
+  - Disposition: accepted_s99_corrective_followup
+  - Evidence: Bernoulli `review_status: fail` P1; changed `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`, `.agents/skills/spec-driven-tdd-workflow/SKILL.md`, and `tests/test_init_update.py`; Bernoulli re-review `review_status: pass`; Pascal code re-review `review_status: pass`; targeted 4-test unittest OK.
 
 ## Evidence Adoption Ledger
 | ID | adoption_status | source | target | rationale | evidence | next_action |
 |---|---|---|---|---|---|---|
 | EAL-001 | adopted | doc-writer Ampere | S01/S02 provider skills and phase docs | Reinforced narrow verified-write exception, fail-closed fallback, no previous-phase rewrite, and no final authority. | subagent notification in current thread; diff in provider skills/docs | no further action; step reviewers verify canonical text |
-| EAL-002 | adopted | spec-reviewer Socrates | `phase_design.md` and S01/S02 report evidence | Fixed a P1 ambiguity where verified `design.md` draft writes were allowed while broad canonical artifact edits were also forbidden; added line-level source/probe evidence to make tc-001/tc-002 auditable. | Socrates `review_status: fail`; `phase_design.md:82-84`; `workflow_spec_authoring.md:101-111`; role skill snippets listed in Step/Test Closure | rerun S01/S02 spec-reviewer |
-| EAL-003 | adopted | code-reviewer Godel | `tests/test_init_update.py`, `phase_design.md`, S03 report evidence | Fixed a P1 stale managed-content assertion caught by `test_init_creates_expected_structure`; removed the broad `canonical artifact edit` phrase from design gate and updated assertions to pin the narrow verified target-draft exception. | Godel `review_status: fail`; `uv run python -m unittest ...test_init_creates_expected_structure ...` first failed, then targeted 4-test rerun passed | rerun S03 code-reviewer |
-| EAL-004 | adopted | `uv run python -m spec_dock.cli update .` | dogfooding `.agents/skills` and `spec-dock/docs` | S90 synced provider changes into dogfooding-visible installed assets and docs without provider/runtime/test edits. | update command ok; `./spec-dock/scripts/spec-dock validate` -> `nodes=63`; dogfooding `rg` output lists authority/proposal/fallback fragments | run S90 spec-reviewer |
-| EAL-005 | adopted | spec-reviewer Descartes | S01/S02 provider `workflow_spec_authoring.md` corrective follow-up, dogfooding `workflow_spec_authoring.md`, report summary | Fixed a P1 contradiction discovered during S90 where bounded depth=2 text broadly forbade `canonical edit` while verified target draft updates were allowed elsewhere; provider source fix is classified as an S01/S02 corrective follow-up, and S90 will retain only generated dogfooding parity plus report evidence after that corrective commit. | Descartes `review_status: fail`; provider line narrowed; dogfooding re-synced with `uv run python -m spec_dock.cli update .` | commit provider corrective fix, then rerun S90 dogfooding-only review |
+| EAL-002 | adopted | spec-reviewer Socrates | `phase_design.md` and S01/S02 report evidence | Fixed a P1 ambiguity where verified `design.md` draft writes were allowed while broad canonical artifact edits were also forbidden; added line-level source/probe evidence to make tc-001/tc-002 auditable. | Socrates fail then pass; `phase_design.md:82-84`; `workflow_spec_authoring.md:101-111`; role skill snippets listed in Step/Test Closure | none; Socrates re-review passed |
+| EAL-003 | adopted | code-reviewer Godel | `tests/test_init_update.py`, `phase_design.md`, S03 report evidence | Fixed a P1 stale managed-content assertion caught by `test_init_creates_expected_structure`; removed the broad `canonical artifact edit` phrase from design gate and updated assertions to pin the narrow verified target-draft exception. | Godel fail then pass; corrected 4-test unittest passed | none; Godel re-review passed |
+| EAL-004 | adopted | `uv run python -m spec_dock.cli update .` | dogfooding `.agents/skills` and `spec-dock/docs` | S90 synced provider changes into dogfooding-visible installed assets and docs without provider/runtime/test edits. | update command ok; validate nodes=63; dogfooding `rg` output lists authority/proposal/fallback fragments; Descartes final S90 pass | none |
+| EAL-005 | adopted | spec-reviewer Descartes | S01/S02 provider `workflow_spec_authoring.md` corrective follow-up, dogfooding `workflow_spec_authoring.md`, report summary | Fixed a P1 contradiction discovered during S90 where bounded depth=2 text broadly forbade `canonical edit` while verified target draft updates were allowed elsewhere; provider source fix is classified as an S01/S02 corrective follow-up, and S90 retains only generated dogfooding parity plus report evidence after that corrective commit. | Descartes fail then pass; provider line narrowed; dogfooding re-synced; corrective commit `99d633b` | none; corrective commit and S90 pass recorded |
 | EAL-006 | adopted | spec-reviewer Descartes | S90 scope separation | Accepted S90 reviewer finding that provider source edits cannot be claimed as S90 dogfooding-only work; corrective provider change was separated from S90 parity. | Descartes re-review `review_status: fail` with P1 scope finding; corrective commit `99d633b`; final S90 diff limited to `.agents/skills` and `spec-dock/docs` plus this report evidence | no further action |
+| EAL-007 | adopted | final verification commands | S99 final quality gate | Captured final targeted tests, validate, sync, and clean worktree evidence before final reviewers. | targeted unittest OK; validate nodes=63; sync active unchanged; `git status --short` empty before report update | run final QA/code/spec reviewers |
+| EAL-008 | adopted | qa-reviewer Bernoulli | S99 hub routing corrective follow-up | Fixed final QA P1 where `spec-driven-tdd-workflow` still routed system-architect and implementation-planner as proposal-only, weakening AC-001/AC-002 at the workflow entrypoint. | Bernoulli fail then pass; provider/dogfooding hub text updated; `test_bundled_skill_routing_contract` assertion updated; targeted 4-test unittest OK | none; spec re-review required for plan-deviation traceability |
 
 ## Spec Authoring Gate
 - Requirement Gate:
@@ -160,9 +182,32 @@ ID: "iss-00124"
   - findings: P2 evidence polish only, non-blocking.
   - disposition: report updated to name corrective commit `99d633b` and final dogfooding-only diff scope.
   - rationale: provider-source correction is committed separately; remaining S90 diff is generated `.agents/skills` and `spec-dock/docs` plus report evidence only.
+- Bernoulli (`019e565f-2699-7f01-9f4d-7f003202c21a`): `review_status: fail`
+  - scope: S99 final QA gate.
+  - finding: P1 stale hub assertions and provider/dogfooding hub text still described delegated authoring roles as proposal-only.
+  - disposition: fixed by updating provider and dogfooding `spec-driven-tdd-workflow` hub routing plus `test_bundled_skill_routing_contract` assertions to bounded draft `design.md` / `plan.md` authoring with `authority: proposed` under verified task manifest and role-scoped Permission Profile.
+- Bernoulli (`019e565f-2699-7f01-9f4d-7f003202c21a`): `review_status: pass`
+  - scope: S99 QA re-review.
+  - findings: none.
+  - rationale: prior P1 closed; targeted unittest, validate, and diff-check passed.
+- Pascal (`019e565f-272a-7a20-b220-6d7ecf7047d2`): `review_status: pass`
+  - scope: S99 issue-wide code review.
+  - findings: none after P2 acceptance-status cleanup.
+  - rationale: hub text matches bounded draft authoring contract, provider/dogfooding hub surfaces are in parity, and stale acceptance status is fixed.
+- Aristotle the 2nd (`019e565f-27ea-7181-b8f7-7deb4a55ce4c`): `review_status: fail`
+  - scope: S99 final spec-reviewer gate.
+  - findings:
+    - P1: hub-routing provider/test change was outside the planned step file set and lacked report-level traceability to QA/code/spec disposition.
+  - disposition:
+    - fixed by D-004 and EAL-008, which classify the hub routing change as an accepted S99 corrective follow-up tied to AC-001/AC-002 and tc-099.
+- Aristotle the 2nd (`019e565f-27ea-7181-b8f7-7deb4a55ce4c`): `review_status: pass`
+  - scope: S99 final spec re-review.
+  - findings: P2 stale blocker wording only, non-blocking.
+  - disposition: blocker wording updated after this pass.
+  - rationale: D-004 and EAL-008 close the prior P1 traceability gap; QA/code pass dispositions are recorded.
 
 ## 受け入れ条件の現在状況
-- status: S01/S02/S03 draft implementation evidence recorded; reviewer gates pending.
+- status: S01/S02/S03/S90 are implemented, reviewed, and committed; S99 final QA/code/spec re-review is pending after the hub routing fix and ledger cleanup.
 - required evidence: see `plan.md` Spec-Locked Closure Index and final completion conditions.
 
 ## 実行証跡
@@ -234,6 +279,23 @@ ID: "iss-00124"
   - validation: `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`.
   - whitespace: `git diff --check` -> pass.
   - reviewer: Descartes `review_status: pass` with no P0/P1 findings.
+- S90 commit:
+  - commit: `a43997e docs(dogfooding): 委任ドラフト作成契約を同期`
+  - scope: generated `.agents/skills`, generated `spec-dock/docs`, and S90 report evidence.
+- S99 final verification:
+  - targeted tests: `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` -> `Ran 4 tests in 0.117s / OK`.
+  - validate: `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`.
+  - sync: `./spec-dock/scripts/spec-dock sync` -> `active unchanged (matched id in branch: iss-00124)` and wrote index/tree/deps/dashboard artifacts.
+  - post-sync tracked diff: `git status --short` -> empty before this report update.
+- S99 corrective follow-up:
+  - trigger: Bernoulli final QA P1 found stale proposal-only hub routing.
+  - changed files:
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+    - `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
+    - `tests/test_init_update.py`
+  - rationale: the workflow entrypoint must route system-architect and implementation-planner as bounded draft authors when verified task manifest and role-scoped Permission Profile allow `authority: proposed` draft updates; otherwise it can fall back to proposal-only evidence.
+  - verification: targeted 4-test unittest OK; `./spec-dock/scripts/spec-dock validate` -> nodes=63; `git diff --check` -> pass.
+  - reviewer disposition: Bernoulli QA re-review pass; Pascal code re-review pass; Aristotle spec re-review pending after this traceability update.
 
 ## Step Contract Closure
 | step | closure id | status | evidence |
@@ -243,6 +305,7 @@ ID: "iss-00124"
 | S03 | tc-003 | pass | rg inspection confirms adoption/promotion ownership, proposed draft status, narrow verified target-draft exception, and no final authority / reviewer-pass claim boundaries; Godel re-review pass with no P0/P1 findings. |
 | S03 | tc-004 | pass | pytest unavailable was recorded; reviewer-identified missing scaffold assertion was added to the unittest alternative, the targeted 4-test unittest command passed, and D-003 supersedes the initial insufficient alternative; Godel re-review pass. |
 | S90 | tc-090 | pass | `uv run python -m spec_dock.cli update .`, `./spec-dock/scripts/spec-dock validate`, and dogfooding `rg` inspection confirm generated skill/docs surfaces expose the role rewrite semantics; provider corrective change was separated into `99d633b`; Descartes dogfooding-only re-review passed. |
+| S99 | tc-099 | pass | final targeted tests, validate, sync, clean status, QA pass, code pass, S99 hub-routing corrective traceability, and final spec pass are recorded. |
 
 ## Test Contract Closure
 | test id | planned command / evidence | observed result | status |
@@ -252,6 +315,7 @@ ID: "iss-00124"
 | tc-003 | `rg -n 'adoption ledger|evidence adoption|proposed|promotion record|final reviewer|owner|authority: proposed|status: draft|previous phase|completed issue|implementation-readiness' ...`; `rg -n 'canonical artifact edit|Delegated authoring は draft-only evidence' ...` | required handoff/adoption/forbidden-authority fragments present; obsolete broad/old fragments absent; Godel pass | pass |
 | tc-004 | `uv run pytest tests/test_init_update.py`; corrected alternative `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` | pytest spawn unavailable; corrected 4-test alternative passed; Godel pass | pass |
 | tc-090 | `./spec-dock/scripts/spec-dock validate`; `rg -n 'authority: proposed|status: draft|final reviewer|adoption ledger|Permission Profile|proposal-only|previous phase|completed issue|implementation-readiness|canonical edit' .agents/skills spec-dock/docs` | post-fix validate passed with nodes=63; dogfooding generated surfaces expose delegated draft authority, Permission Profile fallback, no previous-phase rewrite, completed issue plan/report, implementation-readiness guardrails, and narrowed canonical edit boundary; Descartes pass | pass |
+| tc-099 | targeted unittest; `./spec-dock/scripts/spec-dock validate`; `./spec-dock/scripts/spec-dock sync`; `git status --short`; final QA/code/spec reviewer gates | targeted unittest passed, validate passed, sync completed, QA re-review passed, code re-review passed, S99 hub-routing corrective traceability is recorded, and final spec re-review passed | pass |
 
 ## Closure Coverage
 | AC / EC | covered by | current evidence |
@@ -261,9 +325,10 @@ ID: "iss-00124"
 | AC-003 / EC-003 | S01/S02/S03 / tc-003 | docs and tests preserve main orchestrator final ownership, no phase promotion, no reviewer-pass claim, no user dialogue ownership, and no implementation changes. |
 | AC-004 | S01/S02/S03 / tc-004 | docs and tests preserve fail-closed Permission Profile / task manifest gate, no previous-phase rewrite, and no completed issue plan/report rewrite. |
 | Dogfooding parity | S90 / tc-090 | generated `.agents/skills` and `spec-dock/docs` expose the same proposed-draft/fail-closed role rewrite semantics. |
+| Final quality | S99 / tc-099 | final command evidence, QA pass, code pass, S99 corrective traceability, and final spec pass are recorded. |
 
 ## Closure Delta
 - `tc-004`: planned pytest command is unavailable in this environment. Initial alternative unittest coverage was insufficient because it missed `test_init_creates_expected_structure`; the corrected 4-test unittest alternative passed and was accepted by the S03 code-reviewer re-review.
 
 ## ブロッカー / 未完了
-- S99 final quality gates are not yet run.
+- Final report commit and `spec-dock issue finish` are pending.
