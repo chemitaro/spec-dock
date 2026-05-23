@@ -88,7 +88,7 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 
 - allowed depth=2: main orchestrator -> authoring specialist -> leaf-only evidence producer
 - forbidden depth=3: main orchestrator -> authoring specialist -> leaf producer -> grandchild
-- authoring specialist と leaf-only evidence producer は canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない
+- authoring specialist と leaf-only evidence producer は、検証済み task manifest が許可した対象 `design.md` / `plan.md` draft 更新以外の canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない。leaf-only evidence producer は常に canonical edit を行わない
 - preflight reviewer output は設計・計画の改善 input として扱い、final fresh reviewer pass とは分離する
 - reviewer independence: final `spec-reviewer` / `code-reviewer` / `qa-reviewer` は、同じ artifact を作成した authoring specialist や leaf-only evidence producer の代替ではない fresh gate として実行する
 
