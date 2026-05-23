@@ -10,6 +10,11 @@
 - 昇格不可 state: `stale`, `rejected`, `superseded`, `blocked`
 - 必須証跡 field: role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
 - source_snapshot field: source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
+- authority metadata field: status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash
+- grant keys: can_write_requirement, can_write_design, can_write_plan, can_write_report, can_write_discussions, can_write_implementation, can_mark_issue_ready, can_finish_issue, can_complete_phase
+- wildcard grant semantics are not supported; `*`, `can_write_*`, `all`, and broad role authority are invalid
+- Promotion Record / promotion_record field: status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, reviewer_target_hash, promoted_at, promoted_by, promotion_decision
+- reviewer_target_hash / approved_hash mismatch or stale source_revision / approved_revision blocks promotion and downstream authority
 - failure-mode field: expected verdict, allowed next action, report evidence path, promotion eligibility
 
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
