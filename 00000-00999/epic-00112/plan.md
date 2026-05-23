@@ -3,7 +3,7 @@
 ID: "epic-00112"
 タイトル: "Delegated Authoring Architecture for Spec Workflow"
 関連GitHub: ["#112"]
-状態: "draft"
+状態: "approved"
 作成者: "Codex"
 最終更新: "2026-05-23"
 依存: ["requirement.md", "design.md"]
@@ -13,6 +13,9 @@ ID: "epic-00112"
 # epic-00112 Delegated Authoring Architecture for Spec Workflow — 計画（Issues / Order）
 
 ## この計画で閉じる E-RQ / E-AC
+
+注記: この節は v0 Issue 001〜006 の historical plan contract として保持する。v1 amendment の追加 closure は後続の `v1 Amendment Plan（追加修正 Issue）` を正とする。
+
 - E-RQ:
   - E-RQ-001 Canonical artifact ownership invariant
   - E-RQ-002 Draft-only delegated authoring mode
@@ -302,6 +305,9 @@ I5 --> I6
   - Any delegated authoring used while authoring the Issue must follow the draft-only evidence contract once implemented; before implementation, manual authoring remains valid.
 
 ## 最終完了条件
+
+注記: この節は v0 Issue 001〜006 の historical completion contract として保持する。v1 amendment 適用後の最終完了条件は `v1 Amendment final exit contract` を正とする。
+
 - E-AC 完了:
   - E-AC-001..E-AC-009 have implementation evidence or explicit non-applicable evidence.
 - 統合 / ロールアウト完了:
@@ -325,3 +331,190 @@ I5 --> I6
   - `.github/agents` / Copilot support remains non-scope.
   - Runtime validation and write-capable delegation remain deferred.
   - Issue 005 fallback for host syntax uncertainty is part of the plan, not an unresolved scope question.
+
+## v1 Amendment Plan（追加修正 Issue）
+
+この節は、完了済みの Issue 001〜006 を上書きしない。v0 実装の上に積み上げる追加修正計画として扱う。Issue 番号は既存 GitHub / spec-dock 採番に合わせて作成時に確定するが、ここでは v1 Issue 007〜012 として記述する。
+
+### Amendment 方針
+
+- v0 issue reports / plans / observed evidence は変更しない。
+- v1 issue は provider source of truth を起点にし、dogfooding workspace は validation / parity surface とする。
+- write-scoped draft authoring は authority-aware gates と Permission Profile probe が揃うまで有効化しない。
+- Permission Profile が fail-open する場合は write-scoped authoring を無効化し、v0 discussions proposal path を継続する。
+
+### v1 Issue 007: authority metadata and promotion record schema
+
+- title / slug:
+  - `Authority Metadata and Promotion Record Schema`
+  - `authority-metadata-and-promotion-record-schema`
+- 目的:
+  - `status` / `authority` / normative `grants` / `approval` / requirement authority source / promotion candidate hash / promotion record を provider docs と report scaffolds に定義する。
+- provider source:
+  - `src/spec_dock/assets/spec_dock/docs/`
+  - `src/spec_dock/assets/spec_dock/templates/`
+  - `src/spec_dock/assets/spec_dock/system/active-none/`
+- dogfooding validation surface:
+  - `spec-dock/docs/`
+  - `spec-dock/templates/`
+  - `spec-dock/system/active-none/`
+- test surface:
+  - `tests/` content assertions and managed scaffold parity tests.
+- rollback / fallback:
+  - Revert schema docs/templates and keep v0 draft-only evidence workflow active.
+- closes:
+  - E-RQ-001, E-RQ-003, E-RQ-004, E-RQ-012
+  - E-AC-001, E-AC-005, E-AC-012
+
+### v1 Issue 008: authority-aware context-pack and lifecycle gates
+
+- title / slug:
+  - `Authority-Aware Context Pack and Lifecycle Gates`
+  - `authority-aware-context-pack-lifecycle-gates`
+- 目的:
+  - proposed artifact が implementation / issue ready / issue finish / phase completion に混入しない runtime gate を追加する。
+- provider source:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`
+  - related docs under `src/spec_dock/assets/spec_dock/docs/`
+- dogfooding validation surface:
+  - `spec-dock/scripts/spec_dock_runtime/`
+  - `spec-dock/docs/`
+- test surface:
+  - runtime tests under `tests/cli_runtime/`, `tests/domain_runtime/`, or nearest existing validation/context-pack tests.
+- rollback / fallback:
+  - Disable authority-aware runtime handoff for write-scoped drafts and continue v0 discussions proposal / manual integration path.
+- closes:
+  - E-RQ-003, E-RQ-005, E-RQ-012
+  - E-AC-002, E-AC-005
+
+### v1 Issue 009: evidence adoption ledger and bounded depth-2 delegation
+
+- title / slug:
+  - `Evidence Adoption Ledger and Bounded Depth-2 Delegation`
+  - `evidence-adoption-ledger-depth2-delegation`
+- 目的:
+  - child specialist output を ledger 経由で採用 / 部分採用 / 棄却 / 保留できるようにし、depth=2 の許可 graph と cap を固定する。
+- provider source:
+  - `src/spec_dock/assets/spec_dock/docs/`
+  - `src/spec_dock/assets/spec_dock/templates/`
+  - `src/spec_dock/assets/install_root/.agents/skills/`
+- dogfooding validation surface:
+  - `spec-dock/docs/`
+  - `spec-dock/templates/`
+  - `.agents/skills/`
+- test surface:
+  - managed asset tests and content assertions for ledger fields, allowed graph, forbidden graph, and reviewer independence.
+- rollback / fallback:
+  - Keep child specialist use read-only and require main orchestrator to integrate evidence manually without depth=2 write delegation.
+- closes:
+  - E-RQ-006, E-RQ-007, E-RQ-009, E-RQ-012
+  - E-AC-006, E-AC-007, E-AC-009
+
+### v1 Issue 010: role-scoped Permission Profiles and task manifest probes
+
+- title / slug:
+  - `Role-Scoped Permission Profiles and Task Manifest Probes`
+  - `role-scoped-permission-profiles-task-manifest`
+- 目的:
+  - role-specific write scope を Permission Profile、task manifest、resolved path allowlist、positive / negative write probe、fallback policy として導入する。
+- provider source:
+  - `src/spec_dock/assets/install_root/.codex/agents/`
+  - related provider docs under `src/spec_dock/assets/spec_dock/docs/`
+- dogfooding validation surface:
+  - `.codex/agents/`
+  - local probe evidence recorded under the active epic / issue report.
+- test surface:
+  - managed asset parity tests plus CLI/Desktop probe evidence where available.
+- rollback / fallback:
+  - Mark host profile as unverified, disable write-scoped delegation, and use v0 proposal path or directory-write fallback only when probes are closed-safe.
+- closes:
+  - E-RQ-008, E-RQ-010, E-RQ-012
+  - E-AC-008, E-AC-011
+
+### v1 Issue 011: canonical draft authoring role rewrite
+
+- title / slug:
+  - `Canonical Draft Authoring Role Rewrite`
+  - `canonical-draft-authoring-role-rewrite`
+- 目的:
+  - `system-architect` / `implementation-planner` を v0 read-only evidence producer から v1 draft canonical author に更新する。ただし final authority は持たせない。
+- provider source:
+  - `src/spec_dock/assets/install_root/.agents/skills/`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
+- dogfooding validation surface:
+  - `.agents/skills/`
+  - `spec-dock/docs/`
+  - draft authoring evidence in the target scope.
+- test surface:
+  - managed asset tests, role instruction content assertions, and negative checks for forbidden promotion / previous-phase writes.
+- rollback / fallback:
+  - Revert role skills to v0 read-only proposal mode and require main orchestrator canonical integration.
+- closes:
+  - E-RQ-001, E-RQ-002, E-RQ-004, E-RQ-008, E-RQ-009
+  - E-AC-003, E-AC-004, E-AC-009
+
+### v1 Issue 012: authority-aware delegated authoring dogfooding pilot
+
+- title / slug:
+  - `Authority-Aware Delegated Authoring Dogfooding Pilot`
+  - `authority-aware-delegated-authoring-dogfooding-pilot`
+- 目的:
+  - v1 workflow を dogfooding し、actual `design.md` draft と `plan.md` draft、promotion gate、context-pack / lifecycle blocks、Permission Profile fallback を実地検証する。
+- provider source:
+  - no new provider source by default; any discovered provider defect must open a follow-up or amend the relevant provider issue.
+- dogfooding validation surface:
+  - current dogfooding workspace
+  - active epic / issue reports
+  - `spec-dock validate`
+  - `spec-dock sync`
+- test surface:
+  - dogfooding execution evidence, reviewer verdicts, validation/sync output, permission probe records.
+- rollback / fallback:
+  - Mark pilot as fallback or disabled for write-scoped authoring, keep v0 workflow active, and do not claim verified v1 operation.
+- closes:
+  - E-RQ-010, E-RQ-011, E-RQ-012
+  - E-AC-010, E-AC-011, E-AC-012
+  - operational evidence for E-AC-001..E-AC-009
+
+### v1 Amendment dependency graph
+
+```plantuml
+@startuml
+skinparam monochrome true
+left to right direction
+
+rectangle "v0 completed\nIssue 001-006" as V0
+rectangle "v1 Issue 007\nAuthority metadata / promotion schema" as I7
+rectangle "v1 Issue 008\nContext-pack / lifecycle gates" as I8
+rectangle "v1 Issue 009\nLedger / depth=2 policy" as I9
+rectangle "v1 Issue 010\nPermission profiles / task manifest" as I10
+rectangle "v1 Issue 011\nCanonical draft role rewrite" as I11
+rectangle "v1 Issue 012\nDogfooding pilot / parity" as I12
+
+V0 --> I7
+I7 --> I8
+I7 --> I9
+I7 --> I10
+I9 --> I10
+I8 --> I11
+I9 --> I11
+I10 --> I11
+I7 --> I12
+I8 --> I12
+I9 --> I12
+I10 --> I12
+I11 --> I12
+@enduml
+```
+
+### v1 Amendment final exit contract
+
+- E-AC-001..E-AC-012 are closed by implementation evidence or explicit fallback evidence.
+- Issue 001〜006 remain historical v0 work and are not rewritten.
+- Provider / consumer parity is verified for each v1 issue that changes shipped assets.
+- `spec-dock validate` and `spec-dock sync` evidence is recorded after the amendment rollout.
+- Final fresh `spec-reviewer` confirms updated requirement / design / plan / report alignment.
