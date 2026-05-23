@@ -1524,6 +1524,50 @@ class TestInitUpdate(CliRuntimeHarness):
             "stale_if",
         ):
             self.assertIn(field, text, f"{source}: missing source_snapshot field {field}")
+        for field in (
+            "authority metadata",
+            "authority",
+            "owner_role",
+            "draft_author_role",
+            "approval",
+            "approved_revision",
+            "approved_hash",
+        ):
+            self.assertIn(field, text, f"{source}: missing authority metadata field {field}")
+        for grant_key in (
+            "can_write_requirement",
+            "can_write_design",
+            "can_write_plan",
+            "can_write_report",
+            "can_write_discussions",
+            "can_write_implementation",
+            "can_mark_issue_ready",
+            "can_finish_issue",
+            "can_complete_phase",
+        ):
+            self.assertIn(grant_key, text, f"{source}: missing explicit grant key {grant_key}")
+        for fragment in (
+            "Promotion Record",
+            "promotion_record",
+            "reviewer_target_hash",
+            "mismatch",
+            "stale",
+        ):
+            self.assertIn(
+                fragment.casefold(),
+                text.casefold(),
+                f"{source}: missing promotion/grant contract fragment {fragment}",
+            )
+        lower_text = text.casefold()
+        self.assertTrue(
+            (
+                "wildcard grant semantics are not supported" in lower_text
+                or "wildcard grant semantics はありません" in lower_text
+            ),
+            f"{source}: missing explicit wildcard grant denial",
+        )
+        for invalid_wildcard in ("`*`", "`can_write_*`", "`all`"):
+            self.assertIn(invalid_wildcard, text, f"{source}: missing invalid wildcard token {invalid_wildcard}")
         for field, alternatives in (
             ("expected verdict", ("expected verdict", "期待される判定")),
             ("allowed next action", ("allowed next action", "許可される次アクション")),
