@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import cast
 
 from ..domain.active import resolve_branch_decision
+from ..domain.authority import AUTHORITY_APPROVED, approved_runtime_grants, approved_runtime_promotion_record
 from ..domain.deps import evaluate_readiness, validate_deps_cycles
 from ..domain.ids import format_id, parse_id
 from ..domain.models import ActiveSelection, BranchDecision, NodeId, SpecGraph, SpecNodeKind, SpecNodeSeed
@@ -186,7 +187,7 @@ def _load_cached_issue_last_sync_at_by_id(ports: Ports, specdock_dir: Path) -> d
     return out
 
 
-def _build_context_pack_text(manifest: ActiveManifest) -> str:
+def build_context_pack_text(manifest: ActiveManifest) -> str:
     has_init = manifest.initiative is not None
     has_epic = manifest.epic is not None
     has_issue = manifest.issue is not None
@@ -201,6 +202,21 @@ def _build_context_pack_text(manifest: ActiveManifest) -> str:
     lines.append(f"- initiative: {init_id}")
     lines.append(f"- epic: {epic_id}")
     lines.append(f"- issue: {issue_id}")
+    lines.append("")
+    lines.append("## Authority")
+    lines.append("- source: `spec-dock/.agent/active.json`")
+    lines.append("- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion.")
+    for label, entry in (
+        ("initiative", manifest.initiative if has_init else None),
+        ("epic", manifest.epic if has_epic else None),
+        ("issue", manifest.issue if has_issue else None),
+    ):
+        if entry is None:
+            lines.append(f"- {label}: authority=(none), grants=[]")
+            continue
+        authority = entry.authority or "missing"
+        grants = ", ".join(entry.grants) if entry.grants else ""
+        lines.append(f"- {label}: authority={authority}, grants=[{grants}]")
     lines.append("")
     lines.append("## Generated state")
     lines.append("- entry: `spec-dock/.agent/active.json`")
@@ -245,6 +261,10 @@ def _build_context_pack_text(manifest: ActiveManifest) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _build_context_pack_text(manifest: ActiveManifest) -> str:
+    return build_context_pack_text(manifest)
+
+
 def show_active(req: ShowActiveRequest, ports: Ports) -> ActiveViewResult:
     del req
     if ports.active_state_store is None:
@@ -272,6 +292,9 @@ def build_active_manifest(selection: ActiveSelection, graph: SpecGraph, *, repo_
         return ActiveManifestEntry(
             id=node.id,
             path=_to_repo_relative_specdock_path(node.path, repo_root=repo_root),
+            authority=AUTHORITY_APPROVED,
+            grants=approved_runtime_grants(),
+            promotion_record=approved_runtime_promotion_record(node_id=node.id),
         )
 
     return ActiveManifest(

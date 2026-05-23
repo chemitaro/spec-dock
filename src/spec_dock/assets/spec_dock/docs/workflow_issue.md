@@ -51,6 +51,7 @@ Issue は実装の最小単位です。
 - `issue start` は unfinished active issue branch 上で別 issue を始めようとした場合だけ default で block する。`main` / `master` / `develop` / `staging` や non-issue branch からの start は block しない
 - `./spec-dock/scripts/spec-dock issue start <target> -f` / `--force` は unfinished active issue guard だけを bypass する。依存未解決や他の readiness check は bypass しない
 - 通常の issue 完了は `./spec-dock/scripts/spec-dock issue finish` を primary path とする。active issue の linked GitHub issue を close し、already-closed も success として扱い、その確認後に active state を解除する
+- `issue finish` は active manifest の issue entry が `authority=approved` で、`promotion_record` が fresh で、exact grant `issue_finish` を持つ場合だけ lifecycle closure を進める。`authority=proposed`、authority metadata 欠落、wildcard/broad grant、stale `approved_hash` / `reviewer_target_hash` mismatch、または `source_revision` / `approved_revision` mismatch は fail-closed とし、GitHub close や active clear の前に block する
 - `issue finish` は delivery completion に対する lifecycle closure 専用です。linked GitHub issue を close または already-closed と確認し、active state を解除してから lifecycle-owned post-mutation sync を実行しますが、commit、push、PR、merge、validate、test、review、final delivery completion は保証しません。delivery completion には tests、reviews、reports、PR/merge workflow の別証跡が必要です。
 - delivery completion の判定と required evidence の記録・確認は、`issue finish` の前に、active issue が set され対象 issue を確認できる状態で `spec-dock/active/issue/report.md` に対して行う
 - `issue finish` 後は active issue が clear されていてよく、active issue が残っていること自体を `complete` condition にしてはならない

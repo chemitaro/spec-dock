@@ -92,7 +92,7 @@ ID: "iss-00121"
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-* through iss-00118-* report/plan rewrites
       - unrelated provider/runtime files outside the listed allowed paths
       - final authority, reviewer pass, or promotion claims
-- required verification: tc-001: Run targeted runtime/domain tests proving missing authority metadata fails closed., tc-002: Run targeted runtime/domain tests proving invalid authority state or stale promotion record fails closed.
+- required verification: tc-001/tc-002: attempt the planned pytest commands; if pytest is unavailable because this repo has no pytest dependency, run `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle tests.cli_runtime.test_runtime_active_s05` as the approved fallback for the authority gate/runtime assertions added in this issue.
 - reviewer focus: code-reviewer
 - output required: changed files, verification result for each closure id, unresolved risks, Ledger Note or no-material-decision statement.
 - stop conditions: input docs conflict, path outside allowed scope, forbidden v0 rewrite, verification cannot run, or acceptance cannot be met.
@@ -100,17 +100,17 @@ ID: "iss-00121"
 #### 具体テストケース一覧
 - `tc-001`: Run targeted runtime/domain tests proving missing authority metadata fails closed.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `uv run pytest tests/domain_runtime tests/cli_runtime -k 'authority or grants or metadata'` を実行する。
+  - 操作: `uv run pytest tests/domain_runtime tests/cli_runtime -k 'authority or grants or metadata'` を実行する。`pytest` executable が unavailable の場合、この repository は `unittest` を標準 test runner としているため、fallback として `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle tests.cli_runtime.test_runtime_active_s05` を実行する。
   - 期待結果: missing authority metadata fails closed in targeted domain/runtime tests.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: pytest command and failing-closed test names/resultを `report.md` に記録する。
+  - 検証方法: pytest attempt result, fallback unittest command/pass summary, and failing-closed test names/resultを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 - `tc-002`: Run targeted runtime/domain tests proving invalid authority state or stale promotion record fails closed.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `uv run pytest tests/domain_runtime tests/cli_runtime -k 'stale or promotion or authority'` を実行する。
+  - 操作: `uv run pytest tests/domain_runtime tests/cli_runtime -k 'stale or promotion or authority'` を実行する。`pytest` executable が unavailable の場合、この repository は `unittest` を標準 test runner としているため、fallback として `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle tests.cli_runtime.test_runtime_active_s05` を実行する。
   - 期待結果: invalid authority state and stale promotion record are rejected, not silently accepted.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: pytest command, selected test names, and rejection evidenceを `report.md` に記録する。
+  - 検証方法: pytest attempt result, fallback unittest command/pass summary, selected test names, and rejection evidenceを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 
 #### ステップ完了契約
@@ -155,7 +155,7 @@ ID: "iss-00121"
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-* through iss-00118-* report/plan rewrites
       - unrelated provider/runtime files outside the listed allowed paths
       - final authority, reviewer pass, or promotion claims
-- required verification: tc-003: Run CLI/runtime tests proving proposed artifacts are excluded or block implementation/ready/finish contexts., tc-004: Run CLI/runtime tests proving approved artifacts require the exact grant for the requested lifecycle purpose.
+- required verification: tc-003/tc-004: attempt the planned pytest commands; if pytest is unavailable because this repo has no pytest dependency, run `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle tests.cli_runtime.test_runtime_active_s05` as the approved fallback for the context-pack and lifecycle gate assertions added in this issue.
 - reviewer focus: code-reviewer
 - output required: changed files, verification result for each closure id, unresolved risks, Ledger Note or no-material-decision statement.
 - stop conditions: input docs conflict, path outside allowed scope, forbidden v0 rewrite, verification cannot run, or acceptance cannot be met.
@@ -163,17 +163,17 @@ ID: "iss-00121"
 #### 具体テストケース一覧
 - `tc-003`: Run CLI/runtime tests proving proposed artifacts are excluded or block implementation/ready/finish contexts.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `uv run pytest tests/cli_runtime -k 'context_pack or lifecycle or proposed'` を実行し、必要なら `./spec-dock/scripts/spec-dock active show` と context-pack出力を添付確認する。
+  - 操作: `uv run pytest tests/cli_runtime -k 'context_pack or lifecycle or proposed'` を実行し、必要なら `./spec-dock/scripts/spec-dock active show` と context-pack出力を添付確認する。`pytest` executable が unavailable の場合、この repository は `unittest` を標準 test runner としているため、fallback として `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle tests.cli_runtime.test_runtime_active_s05` を実行する。
   - 期待結果: proposed artifacts are excluded from implementation/ready/finish context or block those lifecycle paths with an explicit diagnostic.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: CLI/runtime test output and context-pack/lifecycle diagnostic evidenceを `report.md` に記録する。
+  - 検証方法: pytest attempt result, fallback unittest output, and context-pack/lifecycle diagnostic evidenceを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 - `tc-004`: Run CLI/runtime tests proving approved artifacts require the exact grant for the requested lifecycle purpose.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `uv run pytest tests/cli_runtime tests/domain_runtime -k 'grant or lifecycle or approved'` を実行する。
+  - 操作: `uv run pytest tests/cli_runtime tests/domain_runtime -k 'grant or lifecycle or approved'` を実行する。`pytest` executable が unavailable の場合、この repository は `unittest` を標準 test runner としているため、fallback として `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_issue_lifecycle tests.cli_runtime.test_runtime_active_s05` を実行する。
   - 期待結果: approved artifacts require the exact grant for the requested lifecycle purpose; unrelated or missing grants fail closed.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: grant-purpose test output and exact grant mapping evidenceを `report.md` に記録する。
+  - 検証方法: pytest attempt result, fallback unittest output, grant-purpose test output, and exact grant mapping evidenceを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 
 #### ステップ完了契約
@@ -193,7 +193,8 @@ ID: "iss-00121"
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/discussions/
       - spec-dock/active/context-pack.md (inspection only)
       - spec-dock/.agent/active.json (inspection only)
-      - spec-dock/docs/ (inspection only)
+      - spec-dock/docs/ (generated dogfooding docs parity output and inspection only; provider docs behavior ownership remains S01/S02)
+      - spec-dock/scripts/spec_dock_runtime/ (generated dogfooding parity output only; behavior ownership remains S01/S02)
 - 閉じる closure id: tc-090
 - 計画済み契約:
   - scope: listed allowed paths only.
@@ -209,10 +210,11 @@ ID: "iss-00121"
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/discussions/
       - spec-dock/active/context-pack.md (inspection only)
       - spec-dock/.agent/active.json (inspection only)
-      - spec-dock/docs/ (inspection only)
+      - spec-dock/docs/ (generated dogfooding docs parity output and inspection only; provider docs behavior ownership remains S01/S02)
+      - spec-dock/scripts/spec_dock_runtime/ (generated dogfooding parity output only; behavior ownership remains S01/S02)
 - forbidden changes:
       - provider source changes during S90; put them in an implementation step with code-reviewer/spec-reviewer mapping
-      - runtime/test/scaffold behavior changes under a spec-reviewer-only gate
+      - runtime/test/scaffold behavior changes under a spec-reviewer-only gate; generated dogfooding parity copies may be inspected/recorded here only when the provider behavior change is already owned by S01/S02 code-reviewer scope
 - required verification: tc-090: Inspect workflow docs and dogfooding runtime copies for matching lifecycle semantics.
 - reviewer focus: spec-reviewer
 - output required: changed files, verification result for each closure id, unresolved risks, Ledger Note or no-material-decision statement.
