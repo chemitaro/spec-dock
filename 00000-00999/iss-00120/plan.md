@@ -49,7 +49,7 @@ ID: "iss-00120"
 | tc-001 | S01 | Define authority metadata, grants, approval, and promotion record schema | acceptance | AC-001 / EC-001 | Inspect provider docs/templates for status, authority, owner_role, draft_author_role, approval, and source revision fields using rg. | exact command or inspection target named in the test case below | vague evidence or scope drift | yes | exact command output or named inspection evidence | report Step/Test Closure |
 | tc-002 | S01 | Define authority metadata, grants, approval, and promotion record schema | acceptance | AC-003 / EC-002 | Inspect provider docs for the exact normative grant key set and no wildcard grant semantics. | exact command or inspection target named in the test case below | vague evidence or scope drift | yes | exact command output or named inspection evidence | report Step/Test Closure |
 | tc-003 | S01 | Define authority metadata, grants, approval, and promotion record schema | acceptance | AC-002 / AC-004 / EC-003 | Inspect report/template docs for promotion record fields, approved hash/revision, reviewer target hash, and mismatch handling. | exact command or inspection target named in the test case below | vague evidence or scope drift | yes | exact command output or named inspection evidence | report Step/Test Closure |
-| tc-004 | S02 | Add managed scaffold/content assertions for the schema | acceptance | AC-001..AC-004 | Run uv run pytest tests/test_init_update.py for managed scaffold/content assertions added in this issue. | exact command or inspection target named in the test case below | vague evidence or scope drift | yes | exact command output or named inspection evidence | report Step/Test Closure |
+| tc-004 | S02 | Add managed scaffold/content assertions for the schema | acceptance | AC-001..AC-004 | Run the repo-supported unittest target for managed scaffold/content assertions; attempt the originally listed pytest command first and record fallback when pytest is unavailable. | exact command or inspection target named in the test case below | vague evidence or scope drift | yes | exact command output or named inspection evidence | report Step/Test Closure |
 | tc-090 | S90 | Refresh dogfooding parity and docs impact evidence | acceptance | AC-001..AC-004 / EC-001..EC-003 | Run spec-dock sync/validate or inspect generated dogfooding copies for provider/consumer parity. | exact command or inspection target named in the test case below | vague evidence or scope drift | yes | exact command output or named inspection evidence | report Step/Test Closure |
 | tc-099 | S99 | final quality | acceptance | all AC/EC | final QA/code/spec gates pass and report ledger closes every required row | final integrated issue state | false completion | yes | reviewer evidence | final report evidence |
 
@@ -151,18 +151,18 @@ ID: "iss-00120"
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-* through iss-00118-* report/plan rewrites
       - unrelated provider/runtime files outside the listed allowed paths
       - final authority, reviewer pass, or promotion claims
-- required verification: tc-004: Run uv run pytest tests/test_init_update.py for managed scaffold/content assertions added in this issue.
+- required verification: tc-004: attempt `uv run pytest tests/test_init_update.py`; if pytest is unavailable because this repo has no pytest dependency, run `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure` as the approved fallback for the managed scaffold/content assertions added in this issue.
 - reviewer focus: code-reviewer
 - output required: changed files, verification result for each closure id, unresolved risks, Ledger Note or no-material-decision statement.
 - stop conditions: input docs conflict, path outside allowed scope, forbidden v0 rewrite, verification cannot run, or acceptance cannot be met.
 
 #### 具体テストケース一覧
-- `tc-004`: Run uv run pytest tests/test_init_update.py for managed scaffold/content assertions added in this issue.
+- `tc-004`: Run managed scaffold/content assertions for the schema.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `uv run pytest tests/test_init_update.py` を実行する。
+  - 操作: `uv run pytest tests/test_init_update.py` を実行する。`pytest` executable が unavailable の場合、この repository は `unittest` を標準 test runner としているため、fallback として `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure` を実行する。
   - 期待結果: managed scaffold/content assertions covering authority metadata and promotion record contract pass.
-  - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
-  - 検証方法: pytest command, pass/fail summary, and any added assertion namesを `report.md` に記録する。
+  - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, outside the allowed paths, or both the planned pytest attempt and approved unittest fallback fail; in that case the closure id remains open and the step cannot claim pass.
+  - 検証方法: pytest attempt result, fallback unittest command/pass summary, and any added assertion namesを `report.md` に記録する。
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 
 #### ステップ完了契約
