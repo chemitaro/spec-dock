@@ -129,4 +129,3 @@ writer 方式では、ユーザーは artifact diff を見られる。これは�
 - Permission Profile / diff gate は補助輪であり、責任境界と transaction 設計を主防御にする。
 
 この方式が、専門 subagent の価値を最大化しつつ、spec-dock の source of truth と review independence を壊しにくい。
-

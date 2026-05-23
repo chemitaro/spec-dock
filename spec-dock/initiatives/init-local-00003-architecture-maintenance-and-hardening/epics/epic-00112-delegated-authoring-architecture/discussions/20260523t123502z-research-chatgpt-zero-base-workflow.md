@@ -117,4 +117,3 @@ ChatGPT Pro の best practice は、「read-only adviser ではなく non-canoni
 最終的な best practice は、read-only adviser ではなく non-canonical delegated draft writer。ただし canonical `design.md` / `plan.md` の直接編集権限は main orchestrator に残す、という設計である。
 
 この判断は architecture 上の推論であり、実運用で確定するには、同一 requirement に対して adviser-only と draft-writer を比較し、orchestrator 編集時間、review findings 数、human clarification 数、後続 implementation defect 数を測るのがよい。
-

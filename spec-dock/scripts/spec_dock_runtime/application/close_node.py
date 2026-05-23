@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from ..domain.authority import GRANT_ISSUE_FINISH, evaluate_authority_gate
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNodeSeed, SpecNodeKind
 from ..domain.tree import build_graph
@@ -124,51 +123,6 @@ def _resolve_target_node_id(graph: SpecGraph, target: TargetRef, *, current_repo
     return node.id
 
 
-def _require_issue_close_authority(*, node_id: str, ports: Ports) -> None:
-    if ports.active_state_store is None:
-        raise RuntimeError("close blocked: authority gate failed\n- reason: missing_active_state_store")
-    active_load = ports.active_state_store.load_active_manifest(_resolve_specdock_dir(ports))
-    manifest = active_load.manifest
-    active_issue = manifest.issue if manifest is not None else None
-    if active_issue is None or active_issue.id != node_id:
-        active_id = active_issue.id if active_issue is not None else "none"
-        raise RuntimeError(
-            "\n".join(
-                [
-                    "close blocked: authority gate failed",
-                    "- reason: target_issue_is_not_active",
-                    f"- target_issue: {node_id}",
-                    f"- active_issue: {active_id}",
-                    "Recovery: use `spec-dock/scripts/spec-dock issue start <issue>` before closing issue lifecycle work.",
-                ]
-            )
-        )
-
-    expected_revision = f"active:{node_id}"
-    result = evaluate_authority_gate(
-        authority=active_issue.authority,
-        grants=active_issue.grants,
-        promotion_record=active_issue.promotion_record,
-        required_grant=GRANT_ISSUE_FINISH,
-        purpose="close_issue",
-        expected_revision=expected_revision,
-    )
-    if result.ok:
-        return
-    details = " ".join(result.details)
-    raise RuntimeError(
-        "\n".join(
-            [
-                "close blocked: authority gate failed",
-                f"- reason: {result.reason}",
-                f"- required_grant: {GRANT_ISSUE_FINISH}",
-                f"- details: {details}" if details else "- details: none",
-                "Recovery: refresh active state with `spec-dock/scripts/spec-dock issue start <issue>` or obtain a fresh approved promotion record.",
-            ]
-        )
-    )
-
-
 def close_node(req: CloseNodeRequest, ports: Ports) -> CloseNodeResult:
     issue_gateway = _resolve_issue_gateway(ports)
     repo_root = _resolve_repo_root(ports)
@@ -185,9 +139,6 @@ def close_node(req: CloseNodeRequest, ports: Ports) -> CloseNodeResult:
         raise RuntimeError(f"Node not found: {target_id}")
     if node.github_issue_number is None:
         raise RuntimeError(f"Node is not linked to a GitHub issue: {node.id}")
-    if node.kind == "issue":
-        _require_issue_close_authority(node_id=node.id, ports=ports)
-
     issue_number = int(node.github_issue_number)
     repo_slug = normalize_repo_slug(node.github_repo_owner, node.github_repo_name) or current_repo_slug
 

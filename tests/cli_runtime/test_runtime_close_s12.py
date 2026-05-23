@@ -257,7 +257,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
         self.assertEqual(issue_gateway.view_calls, [])
         self.assertEqual(issue_gateway.close_calls, [])
 
-    def test_close_node_blocks_issue_target_when_authority_is_proposed(self) -> None:
+    def test_close_node_allows_explicit_issue_target_when_authority_is_proposed(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
         repo_root = Path("/repo")
         records = [
@@ -286,20 +286,19 @@ class TestRuntimeCloseS12(unittest.TestCase):
             active_issue_authority="proposed",
         )
 
-        with self.assertRaises(RuntimeError) as raised:
-            app_close_node.close_node(
-                app_contracts.CloseNodeRequest(
-                    target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
-                ),
-                ports,
-            )
+        result = app_close_node.close_node(
+            app_contracts.CloseNodeRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+            ),
+            ports,
+        )
 
-        self.assertIn("close blocked: authority gate failed", str(raised.exception))
-        self.assertIn("authority_not_approved", str(raised.exception))
-        self.assertEqual(issue_gateway.view_calls, [])
-        self.assertEqual(issue_gateway.close_calls, [])
+        self.assertEqual(result.node_id, "iss-local-00001")
+        self.assertFalse(result.already_closed)
+        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
 
-    def test_close_node_blocks_issue_target_when_promotion_record_is_stale(self) -> None:
+    def test_close_node_allows_explicit_issue_target_when_promotion_record_is_stale(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
         repo_root = Path("/repo")
         stale_record = {
@@ -337,20 +336,19 @@ class TestRuntimeCloseS12(unittest.TestCase):
             active_promotion_record=stale_record,
         )
 
-        with self.assertRaises(RuntimeError) as raised:
-            app_close_node.close_node(
-                app_contracts.CloseNodeRequest(
-                    target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
-                ),
-                ports,
-            )
+        result = app_close_node.close_node(
+            app_contracts.CloseNodeRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+            ),
+            ports,
+        )
 
-        self.assertIn("close blocked: authority gate failed", str(raised.exception))
-        self.assertIn("promotion_record_not_bound_to_active_entry", str(raised.exception))
-        self.assertEqual(issue_gateway.view_calls, [])
-        self.assertEqual(issue_gateway.close_calls, [])
+        self.assertEqual(result.node_id, "iss-local-00001")
+        self.assertFalse(result.already_closed)
+        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
 
-    def test_close_node_blocks_issue_target_when_target_is_not_active(self) -> None:
+    def test_close_node_allows_explicit_issue_target_when_target_is_not_active(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
         repo_root = Path("/repo")
         records = [
@@ -379,17 +377,17 @@ class TestRuntimeCloseS12(unittest.TestCase):
             active_issue_id="iss-local-00002",
         )
 
-        with self.assertRaises(RuntimeError) as raised:
-            app_close_node.close_node(
-                app_contracts.CloseNodeRequest(
-                    target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
-                ),
-                ports,
-            )
+        result = app_close_node.close_node(
+            app_contracts.CloseNodeRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+            ),
+            ports,
+        )
 
-        self.assertIn("target_issue_is_not_active", str(raised.exception))
-        self.assertEqual(issue_gateway.view_calls, [])
-        self.assertEqual(issue_gateway.close_calls, [])
+        self.assertEqual(result.node_id, "iss-local-00001")
+        self.assertFalse(result.already_closed)
+        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
 
     def test_close_node_gh_failure_leaves_local_tree_unchanged(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
