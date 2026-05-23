@@ -264,6 +264,17 @@ I5 --> I6
 - G9 Final dogfooding / Epic closure:
   - Issue 006 complete.
   - Provider/consumer parity, validation, sync, reviewer, and pilot metrics are recorded.
+- G10 Epic-wide pre-PR quality gate:
+  - All v1 Issues `iss-00120`〜`iss-00125` complete raw implementation and record issue-local closure evidence first.
+  - Before updating Epic PR #119, run an Epic-scope diff review from the development baseline to the fully implemented state.
+  - Baseline endpoint is the resolved base of Epic PR #119 at G10 execution time, captured by `gh pr view 119 --json baseRefName,baseRefOid,headRefName,headRefOid`. Current expected base branch is `main`; the actual `baseRefOid` captured at G10 is authoritative.
+  - Final endpoint is local `HEAD` after all v1 Issue commits and final validation/sync are complete, before push/PR update.
+  - Shared diff evidence must record base ref/name/OID, final head ref/OID, `git diff --stat <baseRefOid>...HEAD`, `git diff --name-status <baseRefOid>...HEAD`, validation/sync commands, and any saved analysis artifact path under the Epic `discussions/`.
+  - Required reviewers are a fresh `deep-consultant` and a fresh `spec-reviewer`; both must review the whole Epic delta, not only the last Issue.
+  - Both reviewers must cite the same shared diff evidence and the captured base/head endpoints.
+  - Scope includes provider source, dogfooding workspace parity, runtime/test/docs/templates/skills/agent assets, active reports, and final rollout evidence.
+  - Every deep-consultant and spec-reviewer finding, including P2/non-blocking findings, must receive a recorded disposition before PR update. Acceptable dispositions are `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance`; unresolved findings block PR update / push.
+  - Any fixed or superseded finding requires revalidation and re-review against the same G10 scope before PR update / push.
 
 ## 品質ゲート
 - test:
@@ -277,6 +288,13 @@ I5 --> I6
 - docs:
   - Provider docs and dogfooding docs are updated together or dogfooding refresh evidence explains intended differences.
   - Report templates and active-none report scaffolds include delegated evidence sections.
+- epic-wide pre-PR:
+  - After all v1 Issues are implemented and before PR update, compare the final implementation state against the development baseline.
+  - Capture the development baseline from Epic PR #119 with `gh pr view 119 --json baseRefName,baseRefOid,headRefName,headRefOid`; use the captured `baseRefOid` as the diff base and local `HEAD` as the final endpoint.
+  - Record `git diff --stat <baseRefOid>...HEAD` and `git diff --name-status <baseRefOid>...HEAD` in the Epic report or a referenced Epic discussion artifact.
+  - A fresh `deep-consultant` analyzes architecture/workflow risk, hidden coupling, fallback adequacy, and product-quality gaps across the whole Epic delta.
+  - A fresh `spec-reviewer` reviews requirement/design/plan/report alignment, closure evidence, and whether completed v0 Issue 001〜006 / #113〜#118 remain historical rather than rewritten.
+  - PR update is blocked until all findings from both reviews have disposition `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance`; fixed/superseded findings must be revalidated and re-reviewed.
 
 ## ロールアウト / docs impact
 - ロールアウト順序:
@@ -527,3 +545,4 @@ I11 --> I12
 - Provider / consumer parity is verified for each v1 issue that changes shipped assets.
 - `spec-dock validate` and `spec-dock sync` evidence is recorded after the amendment rollout.
 - Final fresh `spec-reviewer` confirms updated requirement / design / plan / report alignment.
+- Before updating Epic PR #119, Epic-wide `deep-consultant` and `spec-reviewer` gates review the full captured `baseRefOid...HEAD` delta; every finding receives `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance` disposition, and fixed/superseded findings are revalidated and re-reviewed before push/PR update.
