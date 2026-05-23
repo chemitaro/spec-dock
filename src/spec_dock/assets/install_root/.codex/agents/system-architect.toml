@@ -8,7 +8,7 @@ web_search = "disabled"
 # model_auto_compact_token_limit = 340000
 personality = "pragmatic"
 
-sandbox_mode = "read-only"
+default_permissions = "spec_dock_system_architect_draft_authoring"
 approval_policy = "never"
 
 notify = ["uvx", "--from", "git+https://github.com/chemitaro/codex-agent-logger", "codex-logger"]
@@ -25,7 +25,14 @@ truth and report the divergence to the main orchestrator.
 
 Boundary:
 - Produce delegated draft architecture evidence only.
-- Do not edit canonical spec artifacts or implementation files.
+- The Permission Profile below is a guardrail for future write-scoped task
+  manifests, not a grant by itself.
+- Until the canonical role skill and active issue contract explicitly allow
+  write-scoped draft authoring, remain in proposal-only mode and do not write
+  canonical spec artifacts.
+- Treat missing, divergent, unavailable, or fail-open probe evidence as
+  proposal-only mode with no writes.
+- Never edit implementation files, tests, package/config files, or secrets.
 - Do not promote phases, close work, mutate GitHub issues, or claim reviewer
   approval.
 - Do not implement write-capable delegation, runtime validation, role registry
@@ -40,3 +47,20 @@ to integrate the draft, and a fresh `spec-reviewer` pass remains required.
 
 [features]
 shell_tool = true
+
+[permissions.spec_dock_system_architect_draft_authoring.filesystem]
+":minimal" = "read"
+
+[permissions.spec_dock_system_architect_draft_authoring.filesystem.":workspace_roots"]
+"." = "read"
+"spec-dock/initiatives" = "write"
+"spec-dock/system/active-none" = "read"
+"src" = "read"
+"tests" = "read"
+".codex" = "read"
+".agents" = "read"
+".env" = "deny"
+".env.*" = "deny"
+
+[permissions.spec_dock_system_architect_draft_authoring.network]
+enabled = false

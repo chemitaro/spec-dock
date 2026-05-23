@@ -114,6 +114,9 @@ ID: "iss-00123"
       - src/spec_dock/assets/install_root/.codex/AGENTS.md
       - src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md
       - tests/test_init_update.py
+      - .codex/agents/ (generated dogfooding parity output required by managed asset assertions)
+      - .codex/AGENTS.md (generated dogfooding parity output when provider bootstrap guidance changes)
+      - spec-dock/docs/ (generated dogfooding parity output when provider workflow docs change)
       - manual CLI/Desktop write probe evidence
 - 閉じる closure id: tc-002, tc-003, tc-004
 - 計画済み契約:
@@ -130,6 +133,9 @@ ID: "iss-00123"
       - src/spec_dock/assets/install_root/.codex/AGENTS.md
       - src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md
       - tests/test_init_update.py
+      - .codex/agents/ (generated dogfooding parity output required by managed asset assertions)
+      - .codex/AGENTS.md (generated dogfooding parity output when provider bootstrap guidance changes)
+      - spec-dock/docs/ (generated dogfooding parity output when provider workflow docs change)
       - manual CLI/Desktop write probe evidence
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/report.md
       - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/discussions/
@@ -146,6 +152,7 @@ ID: "iss-00123"
 - `tc-002`: Run or document positive write probe evidence for allowed artifact/evidence paths only.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
   - 操作: `rg -n 'default_permissions|permissions\.|write|read|deny|positive probe|allowed artifact|discussions' src/spec_dock/assets/install_root/.codex src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` と `uv run pytest tests/test_init_update.py` を実行したうえで、hermetic probe または CLI probe を `report.md` に固定された safe target（例: issue-local `report.md` への marker 追記または `discussions/__permission_probe_allowed__.md` 作成）へ実行し、probe 後に cleanup する。
+  - 追加フォールバック条件: local runtime に `pytest` 実行ファイルが存在せず `uv run pytest tests/test_init_update.py` が起動不能な場合は、その失敗を `report.md` に記録したうえで、同一 managed asset assertion を含む `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` を代替ゲートとして実行する。Issue-local `discussions/__permission_probe_allowed__.md` は cleanup せず evidence artifact として保持してよい。
   - 期待結果: positive write probe contract exists, managed asset assertions pass, and the recorded probe writes only the allowed artifact/evidence path named in the Task Manifest; no implementation/config/test path diff is created.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
   - 検証方法: profile/probe rg evidence, pytest result, exact allowed probe command, target path, cleanup result, and `git diff -- <allowed-target>` / no unexpected diff evidenceを `report.md` に記録する。
@@ -153,6 +160,7 @@ ID: "iss-00123"
 - `tc-003`: Run or document negative write probe evidence proving forbidden implementation/config paths are blocked.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
   - 操作: `rg -n 'negative probe|forbidden path|implementation code|tests/|package.json|pyproject|deny|blocked' src/spec_dock/assets/install_root/.codex src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` と `uv run pytest tests/test_init_update.py` を実行したうえで、hermetic probe または CLI probe を forbidden target（例: `src/spec_dock/__codex_permission_probe_forbidden__.txt`, `tests/__codex_permission_probe_forbidden__.txt`, or `.codex/__codex_permission_probe_forbidden__.txt`）へ実行し、成功した場合は即 fail として cleanup する。
+  - 追加フォールバック条件: local runtime に `pytest` 実行ファイルが存在せず `uv run pytest tests/test_init_update.py` が起動不能な場合は、その失敗を `report.md` に記録したうえで、同一 managed asset assertion を含む `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers` を代替ゲートとして実行する。host CLI/Desktop enforcement を実行できない場合は、hermetic profile resolver の negative result と fail-closed disable decision を記録し、write-scoped delegation を verified と主張しない。
   - 期待結果: negative write probe contract exists, managed asset assertions pass, and the recorded probe fails closed for forbidden implementation/config/test paths; if the host cannot enforce or cannot run the probe, write-scoped delegation is disabled and fallback/proposal-only mode is recorded instead of pass.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
   - 検証方法: negative-probe command, forbidden target path, blocked/error output, cleanup status, pytest result, and fallback-disable evidenceを `report.md` に記録する。
