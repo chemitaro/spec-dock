@@ -1,4 +1,4 @@
-# phase playbook: design
+# 設計フェーズ playbook（phase playbook: design）
 
 Initiative / Epic / Issue に共通する design の shared playbook です。
 scope 固有の entry / quality gate は `workflow_*.md` が additive に定義します。議論資料の置き方は対象 scope 配下の `discussions/rules.md`、命名は [reference_naming.md](reference_naming.md) を参照してください。
@@ -9,17 +9,17 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - 議論資料の置き方と命名: 対象 scope 配下の `discussions/rules.md`, [reference_naming.md](reference_naming.md)
 
-## phase contract
+## フェーズ契約（phase contract）
 
 - 位置: 全体 workflow の `調査分析 → requirement → design → plan → 実装/品質ゲート` の `design`
-- 責務: requirement で固定した `WHAT / WHY` を、実装可能な HOW / guardrails に落とす
+- 責務: requirement で固定した `何を / なぜ（WHAT / WHY）` を、実装可能な `どう実現するか / ガードレール（HOW / guardrails）` に落とす
 - 前提入力: reviewer 承認レベルの `requirement.md`、既存実装 / docs / ADR、設計で閉じる論点
 - 固定すること: 方針、境界 / 契約、SoR / 依存、依存関係分析、移行、観測性、テスト戦略
 - 出力: reviewer が plan へ送れる `design.md` と必要な `research` / `disc` / `adr`
 - 非ゴール: requirement の不足のごまかし、比較表の本文への押し込み、実装手順の plan 化
 - 正本参照: この playbook の `review / handoff gate` が shared minimum gate。scope 固有 gate は `workflow_*.md` が additive に定義する
 
-## scope ownership
+## 範囲所有（scope ownership）
 
 - Initiative design:
   - 所有する判断:
@@ -49,7 +49,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 5. `design.md` を固めて fresh `spec-reviewer` loop を `review_status: pass` まで回す
 6. 関連 docs を束ねて plan へ handoff する
 
-## entry checklist
+## 入場 checklist（entry checklist）
 
 - `requirement.md` が reviewer 承認レベルにある
 - `requirement.md` が `workflow_spec_authoring.md` の requirement gate を pass している
@@ -70,7 +70,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
   - 不要な placeholder や該当しない節は削ってよいが、要件、設計判断、検証可能性、人間の理解に必要な情報は削らない
 
-## delegated design authoring gate
+## 委任 design authoring ゲート（delegated design authoring gate）
 
 Delegated design authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は fresh `spec-reviewer` pass の代替ではありません。
 
@@ -94,7 +94,7 @@ Reviewer は delegated draft を含む design を review するとき、次を f
 - delegated draft を fresh `spec-reviewer` pass の代替として扱っている
 - delegated authoring unavailable / skipped のときに manual authoring path が閉じられている
 
-## design checklist
+## 設計 checklist（design checklist）
 
 - 既存パターンに乗れるかを最初に確認し、新しい概念は「既存で足りない理由」を残す
 - 先に押さえる:
@@ -115,9 +115,9 @@ Reviewer は delegated draft を含む design を review するとき、次を f
 - 先に埋める節:
   - Initiative: `アーキテクチャ上の狙い`, `現状と目指す姿`, `System Context`, `ドメイン境界 / ユビキタス言語`, `対象境界 / 依存`, `ガードレール`, `ロールアウト原則`, `観測性 / NFR 原則`, `主要リスク`
   - Epic: `全体像`, `Component / Module View`, `Package Dependency`, `Domain Model（DDD 必要時）`, `契約`, `データモデル`, `主要フロー`, `State / Activity（必要時）`, `失敗設計`, `移行戦略`, `観測性 / セキュリティ`, `テスト戦略`
-  - Issue: `Parent Diagram References`, `既存実装 / 規約の理解`, `依存関係分析`, `Module Dependency Diagram`, `ディレクトリ / ファイル変更計画`, `インターフェース契約`, `Sequence Delta（必要時）`, `Domain Model Delta（必要時）`, `採用方針 / トレードオフ`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> verification mapping`
+  - Issue: `親図（Diagram）参照`, `既存実装 / 規約の理解`, `依存関係分析`, `モジュール依存図（Module Dependency Diagram）`, `ディレクトリ / ファイル変更計画`, `インターフェース契約`, `シーケンス差分（Sequence Delta / 必要時）`, `ドメインモデル差分（Domain Model Delta / 必要時）`, `採用方針 / トレードオフ`, `要件 → 設計マッピング`, `テスト戦略`, `要件 / 例外 -> 検証マッピング`
 
-## PlantUML / UML usage policy
+## 図表での PlantUML / UML 利用方針（PlantUML / UML usage policy）
 
 - Purpose:
   - design.md は、人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書にする
@@ -149,7 +149,7 @@ Reviewer は delegated draft を含む design を review するとき、次を f
   - requirement の価値説明だけを表す図
   - すぐ古くなる generated call graph
 
-## optional diagram catalog
+## 任意 diagram catalog（optional diagram catalog）
 
 テンプレートから削った図表は「不要になった情報」ではなく、必要時に追加する候補です。
 agent はこの一覧から、設計上の誤読を減らすものだけを選び、必要ならここにない図表も追加してよいです。
@@ -205,7 +205,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
   - plan の理解補助として、実装順、検証範囲、rollback path を示す
   - 新しい design decision や未承認 requirement は追加しない
 
-## diagram selection rules
+## 図表選択ルール（diagram selection rules）
 
 - Initiative:
   - 標準:
@@ -255,7 +255,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
     - full Domain Model
     - full Deployment diagram
 
-## Issue dependency and file-change planning
+## 課題依存と file-change planning（Issue dependency and file-change planning）
 
 - Issue design は、実装前レビューで人間が確認できる粒度で依存関係と変更対象を固定する
 - `依存関係分析` は module / class / function / file dependency を必要な範囲で分けて書く
@@ -267,7 +267,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
 - path が未確定の場合は `TBD` で放置せず、調査 step または `未確定事項` に分離する
 - 実装順そのものは plan の責務だが、plan が参照する依存関係と変更対象は design で固定する
 
-## DDD diagram guidance
+## ドメイン駆動設計図表指針（DDD diagram guidance）
 
 - Initiative:
   - bounded context、core / supporting / generic domain、ubiquitous language の境界を扱う
@@ -282,7 +282,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
   - full domain model を再掲しない
   - invariant や ownership を誤解しやすい場合だけ object diagram で具体例を補う
 
-## UML review gate
+## 図表レビューゲート（UML review gate）
 
 - Diagram necessity:
   - 図が named design question に答えている
@@ -309,7 +309,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
   - State は event、guard、terminal state を必要時に含む
   - ER / DB schema は永続化設計であり、domain model の代替にしない
 
-## diagram guidance
+## 図表指針（diagram guidance）
 
 この節は後方互換の入口です。図表の選択は `diagram selection rules`、記法と review 条件は `PlantUML / UML usage policy` と `UML review gate`、DDD 図は `DDD diagram guidance` を正本にします。
 
@@ -338,7 +338,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
   - 代替案を比較したうえで 1 案を明示的に選ぶ
   - 将来の変更者が「なぜこうしたか」を参照する必要がある
 
-## review / handoff gate
+## レビュー / 引き継ぎゲート（review / handoff gate）
 
 この節は shared minimum gate です。通過後も scope 固有 gate は対応する `workflow_*.md` に追加で従います。
 
@@ -353,7 +353,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
 - `design.md` と必要な `research` / `disc` / `adr` を束で渡せる
 - reviewer が「plan へ進めてよい」と判断できる
 
-## short rules
+## 短縮ルール要約（short rules）
 
 - subagent は `researcher / consultant = 比較と事例収集`, `doc writer = 本文と図の整合`, `reviewer = layering / guardrails / テスト戦略の検出` で使い分ける
 - subagent には `対象範囲 / 比較したい論点 / 採用判断に必要な観点` を渡す

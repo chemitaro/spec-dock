@@ -1,4 +1,4 @@
-# workflow: initiative
+# イニシアチブワークフロー（workflow: initiative）
 
 Initiative は投資単位です。
 この workflow は、Initiative 固有の再利用判定、作成、Epic 分解、品質ゲートを正本として扱います。

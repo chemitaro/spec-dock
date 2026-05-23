@@ -1,4 +1,4 @@
-# spec-dock/templates
+# テンプレート一覧（spec-dock/templates）
 
 このディレクトリは、ローカルスクリプト `./spec-dock/scripts/spec-dock new ...` が
 新規ノードを作成する際に参照するテンプレート群です。

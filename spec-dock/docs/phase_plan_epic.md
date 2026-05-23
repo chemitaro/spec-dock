@@ -1,9 +1,9 @@
-# phase playbook: plan (epic)
+# エピック計画フェーズ playbook（phase playbook: plan / epic）
 
 Epic plan の playbook です。
 shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governance は [workflow_epic.md](workflow_epic.md) を参照します。
 
-## scope contract
+## 範囲契約（scope contract）
 
 - plan の単位: issue tranche / integration checkpoint / rollout tranche
 - plan の責務: epic requirement / design を、issue 分割、統合順、ロールアウト準備、issue handoff へ変換する
@@ -19,13 +19,13 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
   - TDD cadence
   - commit rhythm
 
-## entry focus
+## 入場 focus（entry focus）
 
 - E-RQ / E-AC が requirement で固定されている
 - 契約 / 移行 / 観測性 / rollback が design にある
 - integration risk が見えている
 
-## authoring checklist
+## 作成 checklist 項目（authoring checklist）
 
 - `この計画で閉じる E-RQ / E-AC` を先に置く
 - `Issue 分割方針` を置く
@@ -36,13 +36,13 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - `Issue readiness contract` を置く
 - `final exit contract` を置く
 
-## diagram / trace guidance
+## 図表 / trace 指針（diagram / trace guidance）
 
 - 必要な場合だけ Issue dependency graph、tranche / rollout map、Closure matrix を置く
 - 図表は E-RQ / E-AC、design decision、Issue、verification の対応を確認する用途に限定する
 - Issue 内 step、TDD cadence、commit rhythm は図表化しない
 
-## review gate
+## レビューゲート（review gate）
 
 - issue 群で E-AC を閉じられる説明がある
 - integration checkpoint がある
