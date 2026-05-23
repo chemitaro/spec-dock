@@ -21,12 +21,12 @@ ID: "epic-00112"
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
   - v1 amendment requirement/design/plan authoring is review-passed, and additive Issues `iss-00120`〜`iss-00125` / #120〜#125 are created with approved specs.
   - Additive v1 Issues `iss-00120`〜`iss-00125` / #120〜#125 are implemented, issue-finished, and closed.
-  - G10 Epic-wide pre-PR quality gate is now running against the full `main` baseline to fixed implementation endpoint delta before PR #119 is updated.
+  - G10 Epic-wide pre-PR quality gate passed against the full `main` baseline to PR-bound clean `HEAD` delta before PR #119 update.
 - 次のマイルストーン:
-  - Complete fresh `deep-consultant` and `spec-reviewer` review for G10, resolve all findings, re-review as needed, then update Epic PR #119.
+  - Update Epic PR #119 after the completed G10 pass.
 - ブロッカー:
   - None for v0 historical implementation closure.
-  - PR #119 update is blocked until G10 has no unresolved `deep-consultant` / `spec-reviewer` findings.
+  - None for G10; PR #119 update gate is unblocked.
 
 ## 決定事項（ADRリンク） (必須)
 - No ADR was created in this Epic.
@@ -206,8 +206,8 @@ ID: "epic-00112"
   - Run only after `iss-00120`〜`iss-00125` complete raw implementation and issue-local closure evidence.
   - Run before updating, pushing, or refreshing Epic PR #119.
 - reviewers:
-  - Fresh `deep-consultant`: first review failed; findings fixed; first re-review passed with Planck the 2nd.
-  - Fresh `spec-reviewer`: first review failed; first re-review failed on endpoint/scope alignment; fixes pending second re-review.
+  - Fresh `deep-consultant`: first review failed; findings fixed; final re-review passed with Nash the 2nd.
+  - Fresh `spec-reviewer`: first review failed; first re-review failed on endpoint/scope alignment; final re-review passed with Boyle the 2nd.
 - review scope:
   - Full delta from captured Epic PR #119 `baseRefOid` to the clean local `HEAD` that will update PR #119.
   - Provider source, dogfooding workspace parity, runtime/test/docs/templates/skills/agent assets, active reports, validation/sync evidence, and PR rollout evidence.
@@ -228,19 +228,19 @@ ID: "epic-00112"
   - diff_name_status_result: full artifact records `269` entries.
   - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`, `python -m unittest discover -v`.
   - validation_results: `spec-dock: ok (validate) nodes=63`; `git diff --check` pass; active not set with active-none fallback; `python -m unittest discover -v` ran 847 tests in 415.583s and passed.
-  - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings re-reviewed by `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`) as `pass`.
-  - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; first re-review by `Galileo the 2nd` (`019e56b3-39e3-7ca2-9af5-8523229256bb`) still `fail`; endpoint/scope fix pending second re-review.
+  - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings re-reviewed by `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`) as `pass`; final `base...HEAD` re-review by `Nash the 2nd` (`019e56b9-f3cd-7ca2-b721-0a9022957699`) as `pass`.
+  - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; first re-review by `Galileo the 2nd` (`019e56b3-39e3-7ca2-9af5-8523229256bb`) still `fail`; final `base...HEAD` re-review by `Boyle the 2nd` (`019e56b9-f454-7e82-a3d7-737fb5ee9821`) as `pass`.
   - findings_disposition_table:
     - `DC-P1-close-bypass`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` (`close_node` issue-target authority gate plus regression tests).
     - `DC-P1-missing-full-name-status`: fixed by `20260523t204806z-disc-g10-full-name-status.md`.
     - `SR-P1-dirty-endpoint`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and then superseded by final `base...HEAD` G10 scope alignment.
     - `SR-P1-stale-issue-report-wording`: fixed by additive final closure addenda in `iss-00124` and `iss-00125` reports.
-    - `SR-P1-final-head-scope`: fixed locally by regenerating G10 evidence and name-status artifacts against `base...HEAD`; pending second spec-reviewer re-review.
-    - `SR-P1-deep-consultant-pass-not-recorded`: fixed locally by recording Planck the 2nd's `consultant_status: pass`; pending second spec-reviewer re-review.
-  - re_review_verdicts: deep-consultant pass; spec-reviewer pending second re-review.
+    - `SR-P1-final-head-scope`: fixed by regenerating G10 evidence and name-status artifacts against `base...HEAD`; final spec-reviewer re-review passed.
+    - `SR-P1-deep-consultant-pass-not-recorded`: fixed by recording Planck the 2nd's and Nash the 2nd's `consultant_status: pass`; final spec-reviewer re-review passed.
+  - re_review_verdicts: deep-consultant pass; spec-reviewer pass.
   - pr_update_push_evidence: pending.
 - current status:
-  - Running; all v1 Issues are closed, first-round G10 findings are fixed in local evidence, and PR #119 update remains blocked until fresh re-review passes.
+  - G10 passed; all v1 Issues are closed and PR #119 update gate is unblocked.
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
