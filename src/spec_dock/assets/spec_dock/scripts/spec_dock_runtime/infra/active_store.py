@@ -27,7 +27,23 @@ def _normalize_entry(entry: Any) -> ActiveManifestEntry | None:
         return None
     raw_path = entry.get("path")
     path_value = raw_path if isinstance(raw_path, str) and raw_path.strip() else None
-    return ActiveManifestEntry(id=raw_id.strip(), path=path_value)
+    raw_authority = entry.get("authority")
+    authority = raw_authority.strip() if isinstance(raw_authority, str) and raw_authority.strip() else None
+    raw_grants = entry.get("grants")
+    grants: tuple[str, ...] = ()
+    if isinstance(raw_grants, list):
+        normalized_grants = [grant.strip() for grant in raw_grants if isinstance(grant, str) and grant.strip()]
+        if len(normalized_grants) == len(raw_grants):
+            grants = tuple(normalized_grants)
+    raw_promotion_record = entry.get("promotion_record")
+    promotion_record = raw_promotion_record if isinstance(raw_promotion_record, dict) else None
+    return ActiveManifestEntry(
+        id=raw_id.strip(),
+        path=path_value,
+        authority=authority,
+        grants=grants,
+        promotion_record=promotion_record,
+    )
 
 
 def _normalize_manifest(current: Any) -> ActiveManifest | None:
@@ -44,12 +60,18 @@ def _normalize_manifest(current: Any) -> ActiveManifest | None:
 
 
 def _manifest_to_json_obj(manifest: ActiveManifest | None) -> dict[str, Any]:
-    def _entry(entry: ActiveManifestEntry | None) -> dict[str, str] | None:
+    def _entry(entry: ActiveManifestEntry | None) -> dict[str, Any] | None:
         if entry is None:
             return None
-        out: dict[str, str] = {"id": entry.id}
+        out: dict[str, Any] = {"id": entry.id}
         if entry.path:
             out["path"] = entry.path
+        if entry.authority:
+            out["authority"] = entry.authority
+        if entry.grants:
+            out["grants"] = list(entry.grants)
+        if entry.promotion_record is not None:
+            out["promotion_record"] = entry.promotion_record
         return out
 
     return {
@@ -128,6 +150,21 @@ def _render_context_pack(manifest: ActiveManifest | None) -> str:
     lines.append(f"- initiative: {init_id}")
     lines.append(f"- epic: {epic_id}")
     lines.append(f"- issue: {issue_id}")
+    lines.append("")
+    lines.append("## Authority")
+    lines.append("- source: `spec-dock/.agent/active.json`")
+    lines.append("- rule: proposed or missing authority cannot authorize implementation, issue ready, issue finish, or phase completion.")
+    for label, entry in (
+        ("initiative", manifest.initiative if has_init and manifest is not None else None),
+        ("epic", manifest.epic if has_epic and manifest is not None else None),
+        ("issue", manifest.issue if has_issue and manifest is not None else None),
+    ):
+        if entry is None:
+            lines.append(f"- {label}: authority=(none), grants=[]")
+            continue
+        authority = entry.authority or "missing"
+        grants = ", ".join(entry.grants) if entry.grants else ""
+        lines.append(f"- {label}: authority={authority}, grants=[{grants}]")
     lines.append("")
     lines.append("## Generated state")
     lines.append("- entry: `spec-dock/.agent/active.json`")

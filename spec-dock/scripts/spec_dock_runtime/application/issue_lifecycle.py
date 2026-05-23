@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import cast
 
 from ..domain.active import infer_active_node_from_branch
+from ..domain.authority import GRANT_ISSUE_FINISH, evaluate_authority_gate
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
@@ -192,6 +193,51 @@ def _finish_active_clear_failure_guidance(
     )
 
 
+def require_lifecycle_authority(
+    entry: object,
+    *,
+    required_grant: str,
+    purpose: str,
+    command_label: str,
+) -> None:
+    entry_id = getattr(entry, "id", None)
+    authority = getattr(entry, "authority", None)
+    grants = getattr(entry, "grants", None)
+    promotion_record = getattr(entry, "promotion_record", None)
+    expected_revision = f"active:{entry_id}" if isinstance(entry_id, str) and entry_id.strip() else None
+    result = evaluate_authority_gate(
+        authority=authority,
+        grants=grants,
+        promotion_record=promotion_record,
+        required_grant=required_grant,
+        purpose=purpose,
+        expected_revision=expected_revision,
+    )
+    if result.ok:
+        return
+    details = " ".join(result.details)
+    raise RuntimeError(
+        "\n".join(
+            [
+                f"{command_label} blocked: authority gate failed",
+                f"- reason: {result.reason}",
+                f"- required_grant: {required_grant}",
+                f"- details: {details}" if details else "- details: none",
+                "Recovery: refresh active state with `spec-dock/scripts/spec-dock issue start <issue>` or obtain a fresh approved promotion record.",
+            ]
+        )
+    )
+
+
+def _require_issue_finish_authority(entry: object) -> None:
+    require_lifecycle_authority(
+        entry,
+        required_grant=GRANT_ISSUE_FINISH,
+        purpose="issue_finish",
+        command_label="issue finish",
+    )
+
+
 def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
     if ports.active_state_store is None:
         raise RuntimeError("active_state_store is required")
@@ -271,6 +317,9 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
         raise RuntimeError(
             "issue finish requires an active issue. Recovery: run issue start <issue> or active set <issue> --checkout."
         )
+    if active_load.manifest is None or active_load.manifest.issue is None:
+        raise RuntimeError("issue finish requires an active issue manifest entry.")
+    _require_issue_finish_authority(active_load.manifest.issue)
 
     try:
         close_result = close_node(
