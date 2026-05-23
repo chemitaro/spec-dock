@@ -2,9 +2,9 @@
 種別: レポート（Epic）
 ID: "epic-00112"
 タイトル: "Delegated Authoring Architecture for Spec Workflow"
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-22"
+最終更新: "2026-05-23"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
 ---
@@ -16,19 +16,18 @@ ID: "epic-00112"
   - Requirement phase completed with fresh `spec-reviewer` pass.
   - Design phase completed with fresh `spec-reviewer` pass.
   - Plan phase completed with fresh `spec-reviewer` pass.
-  - Issue decomposition is ready; child Issues are not yet created.
+  - Child Issues #113..#118 are created with requirement/design/plan docs.
+  - Deep-consultant and ChatGPT Pro architecture/workflow reviews returned `conditional_pass`; their P1/P2 corrections have been incorporated into the Epic/Issue docs and are under final re-review.
 - 次のマイルストーン:
-  - Create the six child Issues and author their requirement/design/plan docs.
+  - Obtain fresh `spec-reviewer`, deep-consultant, and ChatGPT Pro pass after review-driven corrections, then begin Issue 001 implementation.
 - ブロッカー:
-  - None at requirement gate.
+  - Implementation remains blocked until this final re-review cycle passes.
 
 ## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- None.
 
 ## 完了した Issue / PR / Release (必須)
-- iss-xxxx-...: Done（PR: ...）
-- ...
+- None. Child Issues #113..#118 are created but not implemented.
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - E-AC-001..E-AC-009: Not yet implemented; requirement defines target acceptance criteria.
@@ -150,11 +149,11 @@ ID: "epic-00112"
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
-  - ...
+  - Not yet applicable; this Epic is still pre-implementation.
 - 監視値（エラー率/レイテンシなど）:
-  - ...
+  - Not yet applicable.
 - 障害/アラート:
-  - ...
+  - None.
 
 ## フォローアップ（別Issue化） (必須)
 - Issue decomposition:

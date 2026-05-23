@@ -32,7 +32,7 @@ ID: "iss-00116"
 
 ## スコープ
 - 必須:
-  - 対象成果物: `src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md; dogfooding mirrors`
+  - 対象成果物: `src/spec_dock/assets/spec_dock/docs/phase_design.md; phase_plan.md; phase_plan_epic.md; phase_plan_issue.md`
   - Provider-side source of truth を先に更新し、dogfooding workspace の parity を確認する。
   - `report.md` に変更対象、検証、reviewer 結果を記録できる状態にする。
 - 禁止:
@@ -79,6 +79,12 @@ ID: "iss-00116"
   - 操作: Issue final spec review を行う。
   - 期待結果: 親 Epic の該当 E-RQ/E-AC と矛盾せず `review_status: pass`。
   - 観測点: reviewer result。
+- AC-004:
+  - アクター: maintainer / reviewer operator
+  - 前提: delegated authoring gate criteria が phase docs に追加済み。
+  - 操作: actual `spec-reviewer` invocation surface が delegated draft provenance / stale / superseded / traceability / scope creep / phase gate bypass criteria を読めることを確認する。
+  - 期待結果: phase docs だけで十分ならその authority chain が report に記録され、不十分なら concrete `spec-reviewer` skill / reviewer prompt / reviewer authority doc が更新対象に含まれる。
+  - 観測点: reviewer execution surface evidence, report evidence。
 
 ## 例外・エッジケース
 - EC-001:
@@ -125,3 +131,9 @@ ID: "iss-00116"
   - `phase_plan.md`
   - `phase_plan_epic.md`
   - `phase_plan_issue.md`
+
+## Reviewer Execution Surface
+- The implementation must either:
+  - update the concrete `spec-reviewer` skill / reviewer authority surface that governs final phase review, or
+  - record evidence that `spec-reviewer` always treats the updated phase docs as authoritative review criteria.
+- Phase docs alone are not sufficient unless reviewer consumption of those docs is verified.

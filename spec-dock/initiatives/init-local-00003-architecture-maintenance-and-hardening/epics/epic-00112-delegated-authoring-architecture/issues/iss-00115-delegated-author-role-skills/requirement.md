@@ -32,7 +32,8 @@ ID: "iss-00115"
 
 ## スコープ
 - 必須:
-  - 対象成果物: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md; .agents/skills mirrors; tests/test_init_update.py as needed`
+  - 対象成果物: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md; src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
+  - Managed asset parity coverage in `tests/test_init_update.py` or equivalent must be updated; this is not optional for shipped role skill assets.
   - Provider-side source of truth を先に更新し、dogfooding workspace の parity を確認する。
   - `report.md` に変更対象、検証、reviewer 結果を記録できる状態にする。
 - 禁止:
@@ -47,7 +48,7 @@ ID: "iss-00115"
   - 親 Epic の ownership / draft-only / provider-first contract に従う。
   - 変更した provider asset と dogfooding mirror の関係を確認する。
 - 判断が必要:
-  - 既存 tests に content assertion を追加するか、manual parity evidence に留めるか。
+  - `tests/test_init_update.py` に追加するか同等の targeted test にするか。manual parity evidence は補助証跡に限り、test-required parity の代替にしない。
 - 行わない:
   - 親 Epic の scope / non-scope を再定義しない。
 
@@ -79,6 +80,14 @@ ID: "iss-00115"
   - 操作: Issue final spec review を行う。
   - 期待結果: 親 Epic の該当 E-RQ/E-AC と矛盾せず `review_status: pass`。
   - 観測点: reviewer result。
+
+## Issue-Specific Acceptance Lock
+- AC-001 must explicitly prove:
+  - `spec-dock-system-architect` required output sections are present, including requirement coverage, context findings, decisions, alternatives, boundaries, dependencies, SoR, file/module plan, migration/compatibility, observability, tests, ADR candidates, risks, RCR, and integration notes
+  - `spec-dock-implementation-planner` required output sections are present, including traceability, milestones, dependency order, slicing, test/review gates, rollback/compatibility, docs impact, final quality gate, Plan Blocked, and integration notes
+  - both roles return blockers to the orchestrator instead of asking the user directly
+  - both roles forbid canonical edits, implementation edits, GitHub mutation, phase promotion, and reviewer-pass claims
+- AC-002 must prove provider role skills are copied/visible in dogfooding mirrors through managed asset parity coverage.
 
 ## 例外・エッジケース
 - EC-001:
