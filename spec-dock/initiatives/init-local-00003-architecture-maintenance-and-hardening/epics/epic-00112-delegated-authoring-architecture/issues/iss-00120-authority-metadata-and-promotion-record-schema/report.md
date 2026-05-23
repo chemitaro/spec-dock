@@ -13,9 +13,9 @@ ID: "iss-00120"
 # iss-00120 Authority Metadata and Promotion Record Schema — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S90 dogfooding parity evidence completed after provider S01/S02; S01/S02 reviewer gates are passed.
-- 未完了: S90 spec-reviewer gate and S99 remain pending in committed issue evidence.
-- 次のマイルストーン: S90 spec-reviewer gate, then S99 final QA/code/spec gates.
+- 現在地: S01/S02/S90/S99 reviewer gates are passed after final grant-schema/design/report corrections.
+- 未完了: none for iss-00120 implementation scope; PR update is reserved for the parent Epic after all v1 issues finish.
+- 次のマイルストーン: commit the S99 correction slice and finish iss-00120 before starting dependent v1 issues.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -73,19 +73,19 @@ ID: "iss-00120"
   - Status: resolved
   - Type: implementation-time interpretation
   - Source-agent: doc-writer `Parfit`
-  - Topic: S01 explicit grant key spelling
-  - Trigger: S01 required an explicit grant key set including write grants and lifecycle grants.
-  - Ambiguity / constraint: approved plan names `can_write_requirement` etc. and requires implementation/ready/finish/phase completion grants, but not every lifecycle key spelling was pre-enumerated.
-  - Observed facts: AC-003 requires exact grants; S01 closure requires no wildcard semantics; forbidden scope excludes runtime/tests.
-  - Options considered: only document five `can_write_*` keys; add lifecycle keys using explicit names; defer lifecycle key names.
-  - Decision: Document `can_write_implementation`, `can_mark_issue_ready`, `can_finish_issue`, and `can_complete_phase` alongside the five requested write keys.
-  - Rationale: This keeps AC-003 exact and fail-closed without adding runtime behavior.
+  - Topic: S01 explicit grant key spelling and Epic traceability
+  - Trigger: S99 final spec review found the implemented `can_write_*` / lifecycle grant names did not match the approved parent Epic v1 normative grant key set.
+  - Ambiguity / constraint: S01 originally treated write-scope action names as normative grants, while parent Epic requirement/design define downstream authority grants as `review_input`, `planning_input`, `design_baseline`, `implementation_start`, `issue_ready`, `issue_finish`, and `phase_completion`.
+  - Observed facts: AC-003 requires exact grants; parent Epic requirement fixes the normative grant keys; S01/S02/S90 provider and dogfooding contracts must trace to that parent schema.
+  - Options considered: amend the parent Epic schema to accept `can_write_*` keys; keep both key sets; replace implementation/tests with the approved parent Epic key set.
+  - Decision: Replace the implemented normative grant key set with the approved parent Epic keys: `review_input`, `planning_input`, `design_baseline`, `implementation_start`, `issue_ready`, `issue_finish`, and `phase_completion`.
+  - Rationale: This preserves Epic v1 traceability and avoids introducing a second grant taxonomy in S01.
   - Affected files: `workflow_spec_authoring.md`, report templates, and active-none report placeholders.
-  - Affected tests: none edited in S01; docs-only rg inspections passed.
-  - Risk if wrong: later S02/runtime assertions may need different key names.
-  - Rollback or revisit: revise key spelling during S01 spec-reviewer gate before S02 assertions.
+  - Affected tests: `tests/test_init_update.py` managed scaffold/content assertions.
+  - Risk if wrong: later Permission Profile work may need a separate file-write permission vocabulary, but it must not be confused with downstream authority grants.
+  - Rollback or revisit: create a separate, explicitly named permission-scope key set in the future if write permissions require it.
   - Disposition: applied
-  - Evidence: `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`, report templates, active-none report placeholders, S01 tc-001〜tc-003 rg evidence below, and Carson S01 `review_status: pass`.
+  - Evidence: parent Epic requirement/design grant schema, `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`, report templates, active-none report placeholders, S02 assertions, and S99 final spec review finding disposition.
 - D-004:
   - Status: resolved
   - Type: implementation-time plan amendment
@@ -132,8 +132,8 @@ ID: "iss-00120"
   - rationale: prior findings closed; no P0/P1 blockers in reviewed scope.
 
 ## 受け入れ条件の現在状況
-- status: S01 and S02 implementation evidence recorded; S90/S99 and S02 code-reviewer gate remain pending.
-- required evidence: see `plan.md` Spec-Locked Closure Index and final completion conditions.
+- status: passed for iss-00120 implementation scope.
+- required evidence: S01/S02/S90/S99 closure rows below cover the `plan.md` Spec-Locked Closure Index and final completion conditions.
 
 ## 実行証跡
 - S01 docs-only implementation:
@@ -149,7 +149,7 @@ ID: "iss-00120"
     - `rg -n 'status|authority|owner_role|draft_author_role|approval|source_revision|approved_revision|approved_hash' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/system/active-none`
     - result: pass; required authority metadata fields appear in provider docs, report templates, and active-none report placeholders.
   - tc-002 command:
-    - `rg -n 'can_write_requirement|can_write_design|can_write_plan|can_write_report|can_write_discussions|wildcard|\*' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates`
+    - `rg -n 'review_input|planning_input|design_baseline|implementation_start|issue_ready|issue_finish|phase_completion|wildcard|\*' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates`
     - result: pass; explicit grant keys appear in `workflow_spec_authoring.md` and report templates, and wildcard grant semantics are denied.
   - tc-003 command:
     - `rg -n 'Promotion Record|promotion_record|approved_hash|approved_revision|reviewer_target_hash|mismatch|stale|promotion' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates src/spec_dock/assets/spec_dock/system/active-none`
@@ -198,7 +198,7 @@ ID: "iss-00120"
   - third reviewer gate:
     - Locke (`019e55bc-6848-74f1-ae44-d960b90d3c71`) `review_status: pass`.
     - finding: P2, invalid wildcard token checks should match exact token forms instead of raw substring `*` or `all`.
-    - disposition: fixed by requiring backtick-delimited denied tokens `` `*` ``, `` `can_write_*` ``, and `` `all` ``.
+    - disposition: fixed by requiring backtick-delimited denied tokens `` `*` ``, `` `grants.*` ``, and `` `all` ``.
   - final reviewer gate:
     - Hume (`019e55be-5c31-7a13-bd79-e85512a9ad2c`) `review_status: pass`.
     - finding: none.
@@ -238,6 +238,64 @@ ID: "iss-00120"
     - finding: none.
     - reason: prior P1/P2 are closed; dogfooding parity update is tool-generated by `spec-dock update .`, manual dogfooding edits remain forbidden, and no-material-decision is recorded.
   - reviewer gate: passed.
+- S99 final quality gates:
+  - validation commands:
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_init_creates_expected_structure`
+    - result: pass; `Ran 1 test ... OK`.
+    - `./spec-dock/scripts/spec-dock sync`
+    - result: pass; generated state/dashboard refreshed.
+    - `./spec-dock/scripts/spec-dock validate`
+    - result: pass; `spec-dock: ok (validate) nodes=63`.
+    - `git diff --check`
+    - result: pass.
+  - first QA gate:
+    - Hubble (`019e55cc-f520-7a32-9461-c59fa2ec14f3`) `review_status: fail`.
+    - finding: P1, report ledger still marked S90/S99 as pending and did not close final gate evidence.
+    - disposition: fixed by refreshing the progress/acceptance summaries and adding this S99 final quality gate ledger.
+  - second QA gate:
+    - Dirac (`019e55d3-06f1-74f2-a62e-65bdefee3d3b`) `review_status: pass`.
+    - finding: P2, managed scaffold assertion should also prove retired `can_write_*` grant taxonomy is absent.
+    - disposition: fixed by adding negative assertions for retired `can_write_*` / lifecycle grant keys in `tests/test_init_update.py`.
+  - final QA re-review gate:
+    - Popper (`019e55d8-0461-7ee0-8919-9a352313360c`) `review_status: pass`.
+    - finding: none.
+    - reason: managed scaffold tests cover the Epic-approved grant keys, retired taxonomy rejection, and targeted unittest / diff / retired-key inspections pass.
+  - first code review gate:
+    - Peirce (`019e55cd-13fc-7493-97f9-79658e5b1c0a`) `review_status: pass`.
+    - findings:
+      - P2: S90 plan amendment should be reconciled with approved design.
+      - P2: report current-status summary was stale.
+    - disposition:
+      - design fixed to permit only tool-generated `spec-dock update .` dogfooding parity updates while forbidding manual dogfooding edits.
+      - report summary refreshed.
+  - final code review gate:
+    - Schrodinger (`019e55d8-4510-7453-8897-874faf0c894d`) `review_status: pass`.
+    - finding: none.
+    - reason: provider scaffold, dogfooding parity, and `tests/test_init_update.py` changes are consistent with the approved grant schema and local checks.
+  - first final spec review gate:
+    - Tesla (`019e55cd-30bd-7083-b967-f88f82e075bf`) `review_status: fail`.
+    - findings:
+      - P1: parent Epic amendment commits must remain separate from iss-00120 closure evidence.
+      - P1: implemented grant keys conflicted with the approved parent Epic grant schema.
+      - P1: S99 QA/code gates were not yet recorded.
+      - P2: report current-status summary was stale.
+    - disposition:
+      - parent Epic amendment commits `896cf62` and `db55e15` are recorded as separate Epic-level amendments with their own spec-review gates; iss-00120 closure evidence is limited to issue-scoped provider/test/dogfooding/report changes after those gates.
+      - grant schema fixed to the approved parent Epic normative keys: `review_input`, `planning_input`, `design_baseline`, `implementation_start`, `issue_ready`, `issue_finish`, `phase_completion`.
+      - S99 gate evidence is recorded here and passed final re-review.
+  - final spec re-review gate:
+    - Averroes (`019e55d8-6042-7723-a1b4-4ed77ceecf96`) `review_status: pass`.
+    - finding: none.
+    - reason: grant schema matches the parent Epic-approved keys, retired keys are excluded from provider/dogfooding schema surfaces, S90 parity allowance is reflected in design/plan/report, and final S99 closure evidence is recorded.
+  - step commit / delegation closure evidence:
+    - S01: delegated to doc-writer `Parfit`; committed as `3f6c86e` (`docs(authority): authority metadata契約を追加`); post-commit checks included `git diff --check` and `spec-dock validate`.
+    - S02: delegated to dev-coder `Herschel`; committed as `c75b020` (`test(authority): scaffold schema assertionsを追加`); post-commit checks included targeted unittest, `git diff --check`, and `spec-dock validate`.
+    - S90: generated dogfooding parity via `spec-dock update .`; committed as `8dcbd33` (`docs(authority): dogfooding schema parityを反映`); post-commit checks included `spec-dock sync`, `spec-dock validate`, and dogfooding rg inspection.
+    - Epic amendments: `896cf62` and `db55e15` are Epic-level plan/report amendments, not iss-00120 implementation slices; they are retained in the branch history with their own spec-review gate evidence.
+    - S99 correction commit: pending; will include final grant-schema correction, S90 design alignment, final report closure, and reviewer re-review evidence.
+  - tc-099 closure:
+    - status: passed.
+    - evidence: Popper QA pass, Schrodinger code-review pass, Averroes spec-review pass, targeted unittest pass, `spec-dock validate` pass, and `git diff --check` pass.
 
 ## ブロッカー / 未完了
-- S99 is still pending in committed issue evidence.
+- なし。

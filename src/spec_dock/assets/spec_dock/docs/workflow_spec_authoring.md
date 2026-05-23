@@ -34,9 +34,9 @@ Delegated canonical draft authoring を使う場合、artifact や report eviden
 - `approved_revision`: promotion された canonical artifact revision。未承認なら `none`。
 - `approved_hash`: promotion された canonical content hash。未承認なら `none`。
 
-Grant keys は明示的かつ完全一致で扱います。許可される key set は `can_write_requirement`, `can_write_design`, `can_write_plan`, `can_write_report`, `can_write_discussions`, `can_write_implementation`, `can_mark_issue_ready`, `can_finish_issue`, `can_complete_phase` です。role 名、scope 名、workflow consent、または reviewer pass から暗黙の write 権限を推定してはなりません。
+Grant keys は明示的かつ完全一致で扱います。許可される key set は `review_input`, `planning_input`, `design_baseline`, `implementation_start`, `issue_ready`, `issue_finish`, `phase_completion` です。role 名、scope 名、workflow consent、または reviewer pass から暗黙の write 権限を推定してはなりません。
 
-Wildcard grant semantics はありません。`*`, `can_write_*`, `all`, `admin`, `owner`, broad role authority のような包括 grant は無効として扱い、必要な exact key がない操作は blocked / incomplete にします。Requirement / design / plan / report / discussions の編集、implementation edit、issue ready、issue finish、phase completion はそれぞれ対応する grant key が必要です。
+Wildcard grant semantics はありません。`*`, `grants.*`, `all`, `admin`, `owner`, broad role authority のような包括 grant は無効として扱い、必要な exact key がない操作は blocked / incomplete にします。review input、planning input、design baseline、implementation start、issue ready、issue finish、phase completion はそれぞれ対応する grant key が必要です。
 
 Promotion Record は delegated draft や reviewer output を canonical authority に昇格した事実だけを記録します。`promotion_record` は少なくとも `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision` を持ちます。`reviewer_target_hash` と `approved_hash` が一致しない場合、または `source_revision` / `approved_revision` が stale な場合、その promotion は invalid であり downstream authority には使えません。Mismatch / stale を発見した場合は report に reason と next action を残し、fresh reviewer gate と Promotion Record の再作成まで block します。
 

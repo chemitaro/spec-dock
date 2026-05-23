@@ -92,7 +92,7 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 ```
 - S01 は provider docs/templates/system active-none と issue-local report/discussions のみを編集対象にする。
 - S02 は managed scaffold/content assertion のため `tests/test_init_update.py` を編集対象に含める。
-- S90 は dogfooding側を inspection only とし、provider source や tests は編集しない。
+- S90 は provider source や tests を編集しない。dogfooding docs/templates/system active-none は手動編集せず、`spec-dock update .` による tool-generated parity update のみ許可し、その後 inspection で provider/consumer parity を確認する。
 
 ## 要件 → 設計マッピング
 - AC-001 -> provider contract, dogfooding evidence, and reviewer gate for iss-00120.
