@@ -1021,6 +1021,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00116-delegated-authoring-phase-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00117-codex-delegated-author-adapters/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00118-delegated-authoring-dogfooding-pilot/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00124-canonical-draft-authoring-role-rewrite/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1124,6 +1130,29 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00116",
             "iss-00117",
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/.meta.json": [
+            "iss-00120"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/.meta.json": [
+            "iss-00120"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/.meta.json": [
+            "iss-00120",
+            "iss-00122",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00124-canonical-draft-authoring-role-rewrite/.meta.json": [
+            "iss-00121",
+            "iss-00122",
+            "iss-00123",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/.meta.json": [
+            "iss-00120",
+            "iss-00121",
+            "iss-00122",
+            "iss-00123",
+            "iss-00124",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1140,6 +1169,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00116": ["iss-00113", "iss-00114", "iss-00115"],
         "iss-00117": ["iss-00115", "iss-00116"],
         "iss-00118": ["iss-00113", "iss-00114", "iss-00115", "iss-00116", "iss-00117"],
+        "iss-00121": ["iss-00120"],
+        "iss-00122": ["iss-00120"],
+        "iss-00123": ["iss-00120", "iss-00122"],
+        "iss-00124": ["iss-00121", "iss-00122", "iss-00123"],
+        "iss-00125": ["iss-00120", "iss-00121", "iss-00122", "iss-00123", "iss-00124"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -1560,16 +1594,15 @@ class TestInitUpdate(CliRuntimeHarness):
                 text,
                 f"{source}: retired grant key must not appear in authority schema {retired_grant_key}",
             )
-        for fragment in (
-            "Promotion Record",
-            "promotion_record",
-            "reviewer_target_hash",
-            "mismatch",
-            "stale",
+        for fragment, alternatives in (
+            ("Promotion Record", ("Promotion Record",)),
+            ("promotion_record", ("promotion_record",)),
+            ("reviewer_target_hash", ("reviewer_target_hash",)),
+            ("mismatch", ("mismatch", "不一致")),
+            ("stale", ("stale",)),
         ):
-            self.assertIn(
-                fragment.casefold(),
-                text.casefold(),
+            self.assertTrue(
+                any(alternative.casefold() in text.casefold() for alternative in alternatives),
                 f"{source}: missing promotion/grant contract fragment {fragment}",
             )
         lower_text = text.casefold()
@@ -1577,6 +1610,7 @@ class TestInitUpdate(CliRuntimeHarness):
             (
                 "wildcard grant semantics are not supported" in lower_text
                 or "wildcard grant semantics はありません" in lower_text
+                or "ワイルドカード grant semantics は非対応" in lower_text
             ),
             f"{source}: missing explicit wildcard grant denial",
         )

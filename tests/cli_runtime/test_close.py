@@ -7,6 +7,14 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestCliClose(CliRuntimeHarness):
+    def _activate_issue_for_close(self, target: Path, env: dict[str, str], issue_id: str = "iss-00055") -> None:
+        active = self._run_runtime_capture(target, ["active", "set", "--id", issue_id, "--force"], env=env)
+        self.assertEqual(active.returncode, 0, active.stdout + active.stderr)
+        self.assertIn("spec-dock: ok (active set)", active.stdout)
+        log_path = target / ".bin" / "gh-calls.log"
+        if log_path.exists():
+            log_path.write_text("", encoding="utf-8")
+
     def _make_gh_issue_close_stub(
         self,
         bin_dir: Path,
@@ -101,6 +109,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             state_path = self._make_gh_issue_close_stub(bin_dir, issue_number=55)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             p = self._run_runtime_capture(target, ["close", "--id", "iss-00055"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -125,6 +134,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_close_stub(bin_dir, issue_number=55)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             p = self._run_runtime_capture(target, ["close", "--github-issue", "55"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -144,6 +154,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_close_stub(bin_dir, issue_number=55)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             p = self._run_runtime_capture(target, ["close", "55"], env=test_env)
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
@@ -163,6 +174,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_close_stub(bin_dir, issue_number=55)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             p = self._run_runtime_capture(
                 target,
@@ -191,6 +203,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_close_stub(bin_dir, issue_number=55)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             close_result = self._run_runtime_capture(target, ["close", "55"], env=test_env)
             self.assertEqual(close_result.returncode, 0, close_result.stdout + close_result.stderr)
@@ -216,6 +229,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_close_stub(bin_dir, issue_number=55, initial_state="CLOSED")
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             close_result = self._run_runtime_capture(target, ["close", "55"], env=test_env)
             self.assertEqual(close_result.returncode, 0, close_result.stdout + close_result.stderr)
@@ -237,6 +251,7 @@ class TestCliClose(CliRuntimeHarness):
             bin_dir.mkdir(parents=True, exist_ok=True)
             self._make_gh_issue_close_stub(bin_dir, issue_number=55, fail_close=True)
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+            self._activate_issue_for_close(target, test_env)
 
             p = self._run_runtime_capture(target, ["close", "55"], env=test_env)
 

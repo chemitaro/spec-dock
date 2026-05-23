@@ -31,7 +31,9 @@ ID: "20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate"
   - head_ref_oid: `e7741fec10d9548354becb8040913680abd5aa40`
 - final local endpoint before PR update:
   - local_branch: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`
-  - local_head_oid: `2a7dbec2fc7000d4e596d2080312a5c83322c13d`
+  - implementation_head_oid_after_g10_fixes: `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
+  - evidence_artifact_commit_oid: use clean `git rev-parse HEAD` at reviewer handoff; this avoids self-referential evidence hashes.
+  - review_scope_note: reviewers should inspect the current clean HEAD for evidence consistency, while treating `421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d` as the fixed implementation delta for G10.
 
 ## Completed v1 issue closure check
 
@@ -50,6 +52,7 @@ ID: "20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate"
 - `./spec-dock/scripts/spec-dock active show`: active not set; fallback points to `spec-dock/system/active-none/{initiative,epic,issue}`.
 - `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=63`.
 - `git diff --check`: pass.
+- `python -m unittest discover -v`: `Ran 847 tests in 415.583s` / `OK`.
 - `./spec-dock/scripts/spec-dock issue finish` for `iss-00125`: succeeded and ran `issue finish auto-sync`.
 
 Manual `sync` is intentionally not re-run in this G10 evidence step because issue finish already ran auto-sync and active is currently cleared. This avoids reintroducing branch-derived active state during final PR gating.
@@ -59,14 +62,14 @@ Manual `sync` is intentionally not re-run in this G10 evidence step because issu
 Command:
 
 ```bash
-git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD
+git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d
 ```
 
 Summary:
 
-- `262 files changed`
-- `22239 insertions(+)`
-- `887 deletions(-)`
+- `266 files changed`
+- `22709 insertions(+)`
+- `889 deletions(-)`
 
 High-level changed surfaces:
 
@@ -111,18 +114,40 @@ High-level changed surfaces:
 Name-status command:
 
 ```bash
-git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD
+git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d
 ```
 
-The full name-status output is intentionally not pasted here because it contains 262 entries. Reviewers must use the command above as the authoritative scope list; this artifact records the endpoint and surface summary so both reviews share the same base.
+The full name-status output is captured in sibling evidence artifact:
+
+- `discussions/20260523t204806z-disc-g10-full-name-status.md`
+- endpoint: `421fd4c02fd2649b8c29ec9549a961b7824b9149...fc80c94bb97995e1c9e963bcb7886f53f43fa47d`
+- entry count: `266`
+
+Reviewers must treat that full name-status artifact as the authoritative file-level scope list for the G10 review.
 
 ## Required G10 reviews
 
 - Fresh `deep-consultant`:
-  - review_status: pending.
+  - first reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`)
+  - consultant_status: fail.
+  - initial findings:
+    - P1: `spec-dock close <issue>` bypassed the authority gate that `issue finish` enforced.
+    - P1: shared G10 evidence omitted the full `git diff --name-status` output.
+  - disposition:
+    - close bypass: fixed by adding issue-target authority evaluation to `close_node`, fail-closed regression coverage in `tests/cli_runtime/test_runtime_close_s12.py`, and CLI integration alignment in `tests/cli_runtime/test_close.py`.
+    - missing full name-status: fixed by adding `20260523t204806z-disc-g10-full-name-status.md`.
+  - re_review_status: pending.
   - scope: architecture/workflow risk, hidden coupling, fallback adequacy, rollout quality, and product-quality gaps across the full diff.
 - Fresh `spec-reviewer`:
-  - review_status: pending.
+  - first reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`)
+  - review_status: fail.
+  - initial findings:
+    - P1: G10 endpoint was pinned to `2a7dbec...` while the working tree still had uncommitted quality-gate fixes.
+    - P1: `iss-00124` / `iss-00125` reports still contained stale pending wording that contradicted Epic E-AC pass claims.
+  - disposition:
+    - endpoint mismatch: fixed by committing G10 fixes in `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and refreshing this artifact to the implementation endpoint.
+    - stale issue reports: fixed by additive final closure addenda in the issue-local reports.
+  - re_review_status: pending.
   - scope: requirement/design/plan/report alignment, issue closure evidence, additive v1 preservation of v0 history, and whether PR update is blocked by unresolved findings.
 
 ## Finding disposition rule
