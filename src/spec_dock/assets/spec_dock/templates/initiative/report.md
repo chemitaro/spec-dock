@@ -31,6 +31,14 @@ ID: "<INIT_ID>"
   - role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
 - source_snapshot field:
   - source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
+- authority metadata field:
+  - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash
+- grant keys:
+  - can_write_requirement, can_write_design, can_write_plan, can_write_report, can_write_discussions, can_write_implementation, can_mark_issue_ready, can_finish_issue, can_complete_phase
+  - wildcard grant semantics are not supported; `*`, `can_write_*`, `all`, and broad role authority are invalid
+- Promotion Record / promotion_record field:
+  - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, reviewer_target_hash, promoted_at, promoted_by, promotion_decision
+  - reviewer_target_hash / approved_hash mismatch or stale source_revision / approved_revision blocks promotion and downstream authority
 
 | ロール（role） | フェーズ（phase） | 範囲（scope） | 同意（consent） | 参照元 artifact（source artifacts） | ドラフト artifact path（draft artifact path） | 状態（status） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
