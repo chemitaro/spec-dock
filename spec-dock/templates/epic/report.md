@@ -19,6 +19,19 @@ ID: "<EPIC_ID>"
 - ブロッカー:
   - ...
 
+## 証跡採用台帳（Evidence Adoption Ledger / 必須）
+
+Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact やEpic判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
+
+- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
+- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
+- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
+- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
+
+| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+|---|---|---|---|---|---|---|
+| EAL-001 | adopted / partially_adopted / rejected / deferred / stale / blocked | sub-agent / reviewer / discussion / command / research | artifact / issue / follow-up | ... | `path` / command / reviewer finding | none / follow-up / re-review / revisit condition |
+
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
   - used / not used

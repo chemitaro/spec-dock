@@ -13,9 +13,9 @@ ID: "iss-00122"
 # iss-00122 Evidence Adoption Ledger and Bounded Depth2 Delegation — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01 passed; S02 bounded depth=2 role graph and managed asset assertions are implemented and awaiting code-reviewer gate.
-- 未完了: S02 code-reviewer gate, S90, and S99.
-- 次のマイルストーン: run S02 code-reviewer, fix findings, then continue to S90.
+- 現在地: S01 and S02 are implemented, reviewed, and committed; S90 dogfooding-visible parity output is generated and under spec-reviewer cleanup.
+- 未完了: S90 non-blocking audit cleanup/re-review and S99 final QA/code/spec gates.
+- 次のマイルストーン: resolve S90 reviewer cleanup items, re-run S90 spec-reviewer, then continue to S99.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -69,6 +69,12 @@ ID: "iss-00122"
   - Decision: final authority and phase promotion remain with main orchestrator plus fresh reviewer gates.
   - Disposition: promoted_to_requirement_design_plan
   - Evidence: requirement constraints and design interface contract.
+- D-003:
+  - Status: resolved
+  - Type: scope
+  - Decision: S90 may include generated dogfooding parity output under `.agents/skills/`, `spec-dock/docs/`, and `spec-dock/templates/` when produced from provider assets by `uv run python -m spec_dock.cli update .`; provider/runtime/test behavior changes remain owned by S01/S02 or a separately amended implementation step.
+  - Disposition: promoted_to_plan
+  - Evidence: Chandrasekhar S02 P1 finding on out-of-scope dogfooding writes; amended S90 contract in `plan.md`; S90 generated parity command and validation evidence below.
 
 ## Spec Authoring Gate
 - Requirement Gate:
@@ -98,7 +104,7 @@ ID: "iss-00122"
   - rationale: prior findings closed; no P0/P1 blockers in reviewed scope.
 
 ## 受け入れ条件の現在状況
-- status: S01 implementation evidence recorded; reviewer gate pending.
+- status: S01/S02/S90 closure evidence recorded and reviewer gates passed; S99 final QA/code/spec gates remain.
 - required evidence: see `plan.md` Spec-Locked Closure Index and final completion conditions.
 
 ## 実行証跡
@@ -172,7 +178,7 @@ ID: "iss-00122"
       - Chandrasekhar (`019e5619-187e-7ac0-a6a9-536bad87e553`) `review_status: pass`.
       - reason: no remaining findings; prior P1s are addressed by recorded pytest-unavailable fallback evidence and by moving generated dogfooding parity output into an explicit S90 contract.
 - S90 dogfooding-visible parity evidence:
-  - status: generated parity output has been produced; spec-reviewer gate not started.
+  - status: generated parity output has been produced; spec-reviewer gate pending.
   - generated parity command:
     - `uv run python -m spec_dock.cli update .`
     - result: pass with warning only; `repo-root shortcut already exists (skipped): .../spec`, followed by `spec-dock: ok (update) -> ...`.
@@ -186,7 +192,17 @@ ID: "iss-00122"
     - `spec-dock/templates/issue/report.md`
   - scope note:
     - These dogfooding-visible files are generated parity output owned by S90 evidence. Provider behavior ownership remains with S01/S02, and S90 must not introduce provider/runtime/test edits.
+  - tc-090 commands:
+    - `./spec-dock/scripts/spec-dock validate`
+    - result: pass; `spec-dock: ok (validate) nodes=63`.
+    - `rg -n 'adopted|depth=2|reviewer independence|blocked' spec-dock/docs spec-dock/templates spec-dock/system/active-none .agents/skills`
+    - result: pass; dogfooding-visible docs/templates/skills expose Evidence Adoption Ledger status values, blocked/stale promotion constraints, bounded depth=2 delegation, and reviewer independence language.
+  - guardrail:
+    - `git diff --check`
+    - result: pass.
+  - reviewer gate:
+    - pending spec-reviewer.
 
 ## ブロッカー / 未完了
-- S02 code-reviewer re-review pending.
-- S90/S99 not started.
+- S90 spec-reviewer gate pending.
+- S99 not started.
