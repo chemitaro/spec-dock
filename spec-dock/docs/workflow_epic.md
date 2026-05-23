@@ -1,4 +1,4 @@
-# workflow: epic
+# エピックワークフロー（workflow: epic）
 
 Epic は設計の背骨です。
 この workflow は、Epic 固有の再利用判定、作成、Issue 分割、品質ゲートを正本として扱います。

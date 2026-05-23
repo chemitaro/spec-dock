@@ -19,37 +19,37 @@ ID: "<EPIC_ID>"
 - ブロッカー:
   - ...
 
-## Delegated Draft Evidence (必須)
-- delegated authoring use:
+## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
+- 委任 authoring の使用:
   - used / not used
-- If not used:
-  - manual authoring path / no delegated draft was used as promotion evidence.
-- Lifecycle states:
+- 未使用の場合:
+  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+- lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- Promotion-ineligible states:
+- 昇格不可 state:
   - `stale`, `rejected`, `superseded`, `blocked`
-- Required evidence fields:
+- 必須証跡 field:
   - role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- source_snapshot fields:
+- source_snapshot field:
   - source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
 
-| role | phase | scope | consent | source artifacts | draft artifact path | status | integration result | rejected portions | blockers | reviewer result | promotion decision |
+| ロール（role） | フェーズ（phase） | 範囲（scope） | 同意（consent） | 参照元 artifact（source artifacts） | ドラフト artifact path（draft artifact path） | 状態（status） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | N/A | N/A | N/A | N/A | N/A | N/A | not used | manual authoring | N/A | none | N/A | no delegated draft promotion |
 
-### Delegated Draft Failure Modes
-| failure mode | expected verdict | allowed next action | report evidence path | promotion eligibility |
+### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
+| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
 |---|---|---|---|---|
-| missing consent | blocked / incomplete | obtain scoped consent or use manual authoring | this section | ineligible |
-| missing/stale previous reviewer pass | blocked / incomplete | rerun reviewer gate | Spec Authoring Gate / reviewer evidence | ineligible |
-| requirement gap during design | blocked / incomplete | return to requirement phase | decision ledger / gate evidence | ineligible |
-| design gap during plan | blocked / incomplete | return to design phase | decision ledger / gate evidence | ineligible |
-| role unavailable | blocked / manual path | record unavailable and continue manually if valid | this section | ineligible |
-| forbidden action attempt | rejected | discard draft and record incident | this section / decision ledger | ineligible |
-| stale draft | stale | regenerate or reconcile | this section | ineligible |
-| superseded draft | superseded | reference replacement draft | this section | ineligible |
-| missing draft evidence when delegated use is claimed | incomplete | add evidence or remove delegated-use claim | this section | ineligible |
-| reviewer unavailable/denied/waived/provisional | blocked / incomplete | obtain fresh passed reviewer or record risk acceptance without promotion | reviewer gate evidence | ineligible |
+| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | この section | ineligible |
+| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | Spec Authoring Gate / reviewer evidence | ineligible |
+| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 判断台帳 / ゲート証跡（decision ledger / gate evidence） | ineligible |
+| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 判断台帳 / ゲート証跡（decision ledger / gate evidence） | ineligible |
+| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
+| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
+| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
+| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
+| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
+| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（reviewer gate evidence） | ineligible |
 
 ## 決定事項（ADRリンク） (必須)
 - adr-xxxx-...: <1行要約>

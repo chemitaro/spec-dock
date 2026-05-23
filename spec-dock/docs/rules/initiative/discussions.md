@@ -1,4 +1,4 @@
-# discussions/rules.md
+# 議論ルール（discussions/rules.md）
 
 このディレクトリには initiative に紐づく議論資料を置きます。
 

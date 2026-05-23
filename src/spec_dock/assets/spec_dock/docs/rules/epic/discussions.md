@@ -1,4 +1,4 @@
-# discussions/rules.md
+# 議論ルール（discussions/rules.md）
 
 このディレクトリには epic に紐づく議論資料を置きます。
 

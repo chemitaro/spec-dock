@@ -1,4 +1,4 @@
-# phase playbook: plan
+# 計画フェーズ playbook（phase playbook: plan）
 
 Initiative / Epic / Issue に共通する plan の shared axiom です。
 scope 固有の plan authoring rule は `phase_plan_<scope>.md` を参照してください。
@@ -10,7 +10,7 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Scope plan playbook: [phase_plan_initiative.md](phase_plan_initiative.md), [phase_plan_epic.md](phase_plan_epic.md), [phase_plan_issue.md](phase_plan_issue.md)
 
-## phase contract
+## フェーズ契約（phase contract）
 
 - 位置: `調査分析 → requirement → design → plan → 実装/品質ゲート` の `plan`
 - 責務: 確定した requirement / design を、実行可能な分解・順序・停止点・品質ゲートへ変換する
@@ -25,7 +25,7 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - 出力: reviewer が handoff できる `plan.md` と必要な `disc` / `research` / `adr`
 - 非ゴール: requirement / design の再議論、設計不足の隠蔽、将来作業の過剰先読み
 
-## scope ownership
+## 範囲所有（scope ownership）
 
 - Initiative plan:
   - 所有する判断:
@@ -46,13 +46,13 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
   - 各 plan item は requirement item または design decision に紐づける
   - trace できない step / issue / epic は scope creep として削るか、前 phase に戻す
 
-## shared terminology
+## 共有 terminology（shared terminology）
 
 - `shared minimum gate`: 全 scope に共通して満たす最小 gate
 - `scope-specific readiness contract`: 次の実行単位へ handoff するために対象 scope が追加で満たす条件
 - `final exit contract`: この plan が閉じたと判断する最終条件
 
-## shared entry checklist
+## 共有 entry checklist（shared entry checklist）
 
 - `requirement.md` と `design.md` が reviewer 承認レベルにある
 - `requirement.md` と `design.md` が `workflow_spec_authoring.md` の promotion gate を pass している
@@ -61,7 +61,7 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - 分割案や順序案の比較が必要なら `disc` に逃がすと決めた
 - 対象 scope の `phase_plan_<scope>.md` と `workflow_<scope>.md` を確認した
 
-## delegated plan authoring gate
+## 委任 plan authoring ゲート（delegated plan authoring gate）
 
 Delegated plan authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は fresh `spec-reviewer` pass の代替ではありません。
 
@@ -72,7 +72,7 @@ Delegated plan draft を使う場合、orchestrator は draft 生成前に次を
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
 - allowed actions は read-only analysis と draft proposal に限定される
 - forbidden actions は canonical artifact edit、implementation edit、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
-- required plan draft output contract が、Plan Summary、Requirement / Design Traceability、Milestones、Dependency-Derived Execution Order、Issue / Step Slicing、Test Strategy Mapping、Review Gates、Rollback / Compatibility、Docs Impact、Final Quality Gate、Plan Blockers、Integration Notes を含む
+- required plan draft output contract が、計画要約（Plan Summary）、要件 / 設計 traceability（Requirement / Design Traceability）、milestone（Milestones）、依存関係から導く実行順序（Dependency-Derived Execution Order）、Issue / step 分割（Issue / Step Slicing）、テスト戦略 mapping（Test Strategy Mapping）、review gate（Review Gates）、rollback / compatibility（Rollback / Compatibility）、docs impact（Docs Impact）、最終品質ゲート（Final Quality Gate）、plan blocker（Plan Blockers）、integration notes（Integration Notes）を含む
 
 Delegated plan draft を統合する場合、`report.md` に delegated draft evidence を残します。少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を記録します。
 
@@ -85,7 +85,7 @@ Reviewer は delegated draft を含む plan を review するとき、次を fai
 - phase gate bypass、reviewer gate bypass、または delegated draft を reviewer pass とみなす記述がある
 - delegated authoring unavailable / skipped のときに manual authoring path が閉じられている
 
-## shared review / handoff gate
+## 共有 review / handoff gate（shared review / handoff gate）
 
 - 順序の理由が説明できる
 - 粒度が対象 scope に対して妥当である
@@ -96,7 +96,7 @@ Reviewer は delegated draft を含む plan を review するとき、次を fai
 - reviewer が「この計画で次へ進める」と判断できる
 - `report.md` の `Spec Authoring Gate` に調査、ヒアリング、review、修正、promotion evidence が残っている
 
-## diagram guidance
+## 図表指針（diagram guidance）
 
 - Initiative:
   - 推奨:
@@ -111,13 +111,13 @@ Reviewer は delegated draft を含む plan を review するとき、次を fai
 - Issue:
   - 推奨:
     - step dependency graph
-    - Spec-Locked Closure Index（AC / EC / constraint / step-local closure contract の仕様ロック索引）
+    - 仕様固定クロージャ索引（Spec-Locked Closure Index。AC / EC / constraint / step-local closure contract の索引）
     - rollback map
 - review:
   - 図表の依存関係が本文の順序・depends on・gate と一致している
   - 図表だけにしか存在しない作業や gate がない
 
-## escape hatch
+## 退避手順（escape hatch）
 
 - 分割案 / 順序案 / gate 案の比較は `disc`
 - 外部制約や運用条件は `research`
