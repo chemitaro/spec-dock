@@ -101,7 +101,7 @@ ID: "iss-00120"
   - 記録先: Step Contract Closure / Test Contract Closure / Closure Coverage.
 - `tc-002`: Inspect provider docs for the exact normative grant key set and no wildcard grant semantics.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `rg -n 'can_write_requirement|can_write_design|can_write_plan|can_write_report|can_write_discussions|wildcard|\*' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates` を実行する。
+  - 操作: `rg -n 'review_input|planning_input|design_baseline|implementation_start|issue_ready|issue_finish|phase_completion|wildcard|\*' src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates` を実行する。
   - 期待結果: normative grant keys are explicit, wildcard grant semantics are denied or absent, and no prose implies broad role write authority.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
   - 検証方法: grant key list and wildcard denial/absence evidenceを `report.md` に記録する。
@@ -211,7 +211,7 @@ ID: "iss-00120"
 #### 具体テストケース一覧
 - `tc-090`: Run spec-dock sync/validate or inspect generated dogfooding copies for provider/consumer parity.
   - 前提: parent Epic v1 amendment and this Issue requirement/design are approved.
-  - 操作: `./spec-dock/scripts/spec-dock sync` と `./spec-dock/scripts/spec-dock validate` を実行し、必要に応じて `rg -n 'authority|promotion|owner_role|draft_author_role' spec-dock/docs spec-dock/templates spec-dock/system/active-none` で dogfooding copies を inspection only で確認する。
+  - 操作: `uv run python -m spec_dock.cli update .` で tool-generated dogfooding parity update を行い、`./spec-dock/scripts/spec-dock sync` と `./spec-dock/scripts/spec-dock validate` を実行し、必要に応じて `rg -n 'authority|promotion|owner_role|draft_author_role' spec-dock/docs spec-dock/templates spec-dock/system/active-none` で dogfooding copies を確認する。
   - 期待結果: sync/validate succeed or a documented no-op/fallback is recorded; dogfooding copies expose the same authority/promotion contract without S90 provider/test edits.
   - 失敗検出: required field, command output, inspection result, manual evidence, or reviewer evidence is missing, contradictory, stale, or outside the allowed paths; in that case the closure id remains open and the step cannot claim pass.
   - 検証方法: sync/validate output and dogfooding inspection resultを `report.md` に記録する。
@@ -227,7 +227,7 @@ ID: "iss-00120"
 - commit / no-op gate: one behavior slice, committed or justified approved-no-op only after reviewer pass.
 
 ### ドキュメント影響の解消ステップ S90
-- 対象: docs impact, dogfooding parity inspection, report/discussion evidence only. Provider/runtime/test changes discovered here require a prior implementation step or plan amendment with the correct reviewer gate.
+- 対象: docs impact, tool-generated dogfooding parity update, dogfooding parity inspection, report/discussion evidence only. Provider/runtime/test changes discovered here require a prior implementation step or plan amendment with the correct reviewer gate.
 - owner: doc-writer when updates are required.
 - pass 条件: docs/spec alignment `spec-reviewer` pass and no unresolved docs impact.
 
