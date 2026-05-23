@@ -13,9 +13,9 @@ ID: "iss-00122"
 # iss-00122 Evidence Adoption Ledger and Bounded Depth2 Delegation — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01 and S02 are implemented, reviewed, and committed; S90 dogfooding-visible parity output is generated and under spec-reviewer cleanup.
-- 未完了: S90 non-blocking audit cleanup/re-review and S99 final QA/code/spec gates.
-- 次のマイルストーン: resolve S90 reviewer cleanup items, re-run S90 spec-reviewer, then continue to S99.
+- 現在地: S01/S02/S90/S99 are implemented, reviewed, and ready for issue finish.
+- 未完了: issue finish.
+- 次のマイルストーン: run `./spec-dock/scripts/spec-dock issue finish`.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -55,6 +55,19 @@ ID: "iss-00122"
   - blockers: none after canonical docs were rewritten.
   - reviewer result: Heisenberg `review_status: pass`.
   - promotion decision: not promoted by itself; used as draft planning input only.
+
+## 証跡採用台帳（Evidence Adoption Ledger / 必須）
+
+Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
+
+| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+|---|---|---|---|---|---|---|
+| EAL-001 | adopted | system-architect `Lovelace` delegated draft | `requirement.md`, `design.md` | AC/EC、non-scope、provider/test/rollback guidance が issue 要件・設計へ反映され、fresh spec-reviewer が pass したため採用。 | `discussions/20260523t144246z-disc-v1-issue-authoring-delegated-evidence.md`; Heisenberg `review_status: pass` | none |
+| EAL-002 | adopted | repo-analyst `Mencius` delegated draft | `design.md`, `plan.md` | provider source、dogfooding surface、test surface、risk が design/plan の対象ファイル・検証方針へ反映され、canonical docs review が pass したため採用。 | `discussions/20260523t144246z-disc-v1-issue-authoring-delegated-evidence.md`; Heisenberg `review_status: pass` | none |
+| EAL-003 | partially_adopted | implementation-planner `Archimedes` delegated draft | `plan.md` | step slicing、closure id、reviewer mapping は採用したが、original scaffold plan を implementation-ready と扱う部分は却下して canonical execution contract へ再構成したため部分採用。 | `discussions/20260523t144246z-disc-v1-issue-authoring-delegated-evidence.md`; Heisenberg `review_status: pass` | none |
+| EAL-004 | adopted | code-reviewer `Chandrasekhar` S02 finding | `plan.md`, `report.md` | S02 の dogfooding 生成物スコープと pytest 不在時フォールバックが曖昧だったため、S90 contract と tc-003/tc-004 fallback を追記した。 | Chandrasekhar P1 findings; amended `plan.md`; S02 report evidence | none |
+| EAL-005 | adopted | spec-reviewer `Helmholtz` S90 finding | `report.md` | S90 scope amendment を判断台帳へ残し、進捗サマリーを実状態へ更新する必要があったため採用。 | Helmholtz P2/P3 findings; D-003; updated progress / acceptance status | none |
+| EAL-006 | adopted | QA/code/spec final S99 findings | `report.md` | Final reviewers found stale S90/S99 closure state and missing EAL dogfooding; this report section and S99 evidence were added before re-review. | Maxwell, Kuhn, Poincare P1 findings; final re-review pass verdicts | none |
 
 ## Spec Interpretation / Decision Ledger
 - D-001:
@@ -178,7 +191,7 @@ ID: "iss-00122"
       - Chandrasekhar (`019e5619-187e-7ac0-a6a9-536bad87e553`) `review_status: pass`.
       - reason: no remaining findings; prior P1s are addressed by recorded pytest-unavailable fallback evidence and by moving generated dogfooding parity output into an explicit S90 contract.
 - S90 dogfooding-visible parity evidence:
-  - status: generated parity output has been produced; spec-reviewer gate pending.
+  - status: generated parity output has been produced; spec-reviewer gate passed.
   - generated parity command:
     - `uv run python -m spec_dock.cli update .`
     - result: pass with warning only; `repo-root shortcut already exists (skipped): .../spec`, followed by `spec-dock: ok (update) -> ...`.
@@ -201,8 +214,33 @@ ID: "iss-00122"
     - `git diff --check`
     - result: pass.
   - reviewer gate:
-    - pending spec-reviewer.
+    - Helmholtz (`019e561f-9888-7562-bba2-4a2717b7f0fc`) initial `review_status: pass` with P2/P3 cleanup findings.
+    - findings: record S90 scope amendment in decision ledger; refresh report summary; refresh acceptance status line.
+    - disposition: added D-003, updated progress summary, and updated acceptance status.
+    - re-review: pass; no P0/P1 blockers.
+- S99 final quality gate:
+  - validation commands:
+    - `./spec-dock/scripts/spec-dock validate`
+    - result: pass; `spec-dock: ok (validate) nodes=63`.
+    - `./spec-dock/scripts/spec-dock sync`
+    - result: pass; active unchanged matched `iss-00122`, generated indexes/trees/dashboard.
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_bundled_skill_routing_contract`
+    - result: pass; `Ran 1 test ... OK`.
+    - `git diff --check`
+    - result: pass.
+    - `git status --short`
+    - result: clean after S90 commit and S99 sync.
+  - final review attempt:
+    - qa-reviewer Maxwell (`019e5623-b01c-7173-8329-34e54ea67501`) `review_status: fail`.
+    - code-reviewer Kuhn (`019e5623-cf67-7063-b4e1-4d9f9456f6b2`) `review_status: fail`.
+    - spec-reviewer Poincare (`019e5623-ec6a-7683-8edb-bdb91e96614a`) `review_status: fail`.
+    - findings: report still recorded stale S90/S99 open state and did not dogfood Evidence Adoption Ledger rows for delegated evidence.
+    - disposition: added Evidence Adoption Ledger rows EAL-001〜EAL-006 and updated S90/S99 closure evidence in this report.
+  - final re-review:
+    - qa-reviewer Maxwell (`019e5623-b01c-7173-8329-34e54ea67501`) `review_status: pass`.
+    - code-reviewer Kuhn (`019e5623-cf67-7063-b4e1-4d9f9456f6b2`) `review_status: pass`.
+    - spec-reviewer Poincare (`019e5623-ec6a-7683-8edb-bdb91e96614a`) `review_status: pass`.
+    - result: tc-099 pass; no unresolved P0/P1 blocker remains.
 
 ## ブロッカー / 未完了
-- S90 spec-reviewer gate pending.
-- S99 not started.
+- none before issue finish.
