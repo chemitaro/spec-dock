@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00125",
+  "title": "Authority Aware Delegated Authoring Dogfooding Pilot",
+  "slug": "authority-aware-delegated-authoring-dogfooding-pilot",
+  "created_at": "2026-05-23T23:31:40+09:00",
+  "updated_at": "2026-05-23T23:33:48+09:00",
+  "parent_id": "epic-00112",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00112",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 125,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00120",
+    "iss-00121",
+    "iss-00122",
+    "iss-00123",
+    "iss-00124"
+  ]
+}
