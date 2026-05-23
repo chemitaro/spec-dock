@@ -12,9 +12,9 @@
 - source_snapshot field: source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
 - authority metadata field: status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash
 - grant keys: review_input, planning_input, design_baseline, implementation_start, issue_ready, issue_finish, phase_completion
-- wildcard grant semantics are not supported; `*`, `grants.*`, `all`, and broad role authority are invalid
-- Promotion Record / promotion_record field: status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, reviewer_target_hash, promoted_at, promoted_by, promotion_decision
-- reviewer_target_hash / approved_hash mismatch or stale source_revision / approved_revision blocks promotion and downstream authority
+- ワイルドカード grant semantics は非対応。`*`、`grants.*`、`all`、広すぎる role authority は invalid とする。
+- Promotion Record / `promotion_record` fields: `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision`
+- `reviewer_target_hash` / `approved_hash` の不一致、または stale な `source_revision` / `approved_revision` は promotion と下流 authority をブロックする。
 - failure-mode field: expected verdict, allowed next action, report evidence path, promotion eligibility
 
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |

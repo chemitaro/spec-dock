@@ -13,10 +13,10 @@ ID: "iss-00124"
 # iss-00124 Canonical Draft Authoring Role Rewrite — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S99 final verification commands passed; final QA/code/spec reviewer gates are pending.
-- 完了済み: S01/S02/S03 implementation and reviewer gates; S90 dogfooding update and spec-reviewer gate; implementation and dogfooding commits.
-- 未完了: S99 final QA/code/spec gates, final report commit, issue finish.
-- 次のマイルストーン: run S99 final reviewers, fix findings, then commit report closure and finish the issue.
+- 現在地: S99 final verification, QA/code/spec reviewer gates, final report commit, and issue finish are complete.
+- 完了済み: S01/S02/S03 implementation and reviewer gates; S90 dogfooding update and spec-reviewer gate; S99 final QA/code/spec gates; final report commit; issue finish.
+- 未完了: none for this Issue.
+- 次のマイルストーン: use this Issue as completed v1 amendment evidence in the Epic-wide G10 pre-PR quality gate.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -331,4 +331,9 @@ ID: "iss-00124"
 - `tc-004`: planned pytest command is unavailable in this environment. Initial alternative unittest coverage was insufficient because it missed `test_init_creates_expected_structure`; the corrected 4-test unittest alternative passed and was accepted by the S03 code-reviewer re-review.
 
 ## ブロッカー / 未完了
-- Final report commit and `spec-dock issue finish` are pending.
+- None for this Issue.
+
+## Final Closure Addendum
+- final report commit: `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b` (`fix(authoring): 委任ロールのhub導線を更新`) includes the final S99 corrective traceability and closure ledger.
+- issue finish: completed; GitHub #124 closed at `2026-05-23T19:53:38Z`.
+- stale wording disposition: earlier pending statements in this report were superseded by the S99 closure ledger, final report commit, issue finish, and this addendum. Epic G10 may treat `iss-00124` as closed evidence, not pending work.

@@ -20,13 +20,13 @@ ID: "epic-00112"
   - Child Issues #113..#118 are implemented, committed, and closed.
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
   - v1 amendment requirement/design/plan authoring is review-passed, and additive Issues `iss-00120`〜`iss-00125` / #120〜#125 are created with approved specs.
-  - v1 Issue execution is paused until the refreshed Epic plan review gate passes; `iss-00120` has preliminary uncommitted work that must be treated as pending issue execution, not Epic plan closure evidence.
+  - Additive v1 Issues `iss-00120`〜`iss-00125` / #120〜#125 are implemented, issue-finished, and closed.
+  - G10 Epic-wide pre-PR quality gate is now running against the full `main` baseline to final local `HEAD` delta before PR #119 is updated.
 - 次のマイルストーン:
-  - Complete the refreshed Epic plan review gate, then execute additive v1 Issues `iss-00120`〜`iss-00125` in dependency order before claiming authority-aware delegated authoring closure.
-  - Treat Epic PR #119 monitoring as v0 historical rollout work unless it is explicitly superseded by the v1 amendment rollout.
+  - Complete fresh `deep-consultant` and `spec-reviewer` review for G10, resolve all findings, re-review as needed, then update Epic PR #119.
 - ブロッカー:
   - None for v0 historical implementation closure.
-  - v1 authority-aware delegated authoring closure remains pending until additive Issues 007〜012 complete or record explicit fallback evidence.
+  - PR #119 update is blocked until G10 has no unresolved `deep-consultant` / `spec-reviewer` findings.
 
 ## 決定事項（ADRリンク） (必須)
 - No ADR was created in this Epic.
@@ -57,9 +57,9 @@ ID: "epic-00112"
   - disposition: resolved.
   - evidence: `plan.md` v1 Issue 007〜012 include provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
 - v1 execution state:
-  - decision: v1 amendment Issues are created and approved, but execution must wait for the refreshed Epic plan gate to pass.
-  - disposition: pending implementation.
-  - evidence: `iss-00120`〜`iss-00125` / #120〜#125 exist as additive v1 Issues; v1 implementation evidence remains pending.
+  - decision: v1 amendment Issues are created, approved, implemented, issue-finished, and closed.
+  - disposition: accepted.
+  - evidence: `iss-00120`〜`iss-00125` / #120〜#125 closure plus issue-local reports and commits through `2a7dbec2fc7000d4e596d2080312a5c83322c13d`.
 - v1 Epic-wide pre-PR quality gate:
   - decision: After all v1 Issues complete raw implementation and before Epic PR #119 is updated, run fresh `deep-consultant` and `spec-reviewer` gates over the full development-baseline-to-final-implementation delta.
   - disposition: accepted.
@@ -99,30 +99,30 @@ ID: "epic-00112"
 
 ## v1 Amendment 受け入れ条件（E-AC）の現在状況
 
-- E-AC-001: pending
-  - Required evidence: v1 Issue 007 authority metadata / promotion record schema implementation.
-- E-AC-002: pending
-  - Required evidence: v1 Issue 008 proposed-artifact blocking in context-pack and lifecycle gates.
-- E-AC-003: pending
-  - Required evidence: v1 Issue 011 `system-architect` draft `design.md` authoring with `authority: proposed` and no promotion authority.
-- E-AC-004: pending
-  - Required evidence: v1 Issue 011 `implementation-planner` draft `plan.md` authoring with approved design revision reference, `authority: proposed`, and no promotion authority.
-- E-AC-005: pending
-  - Required evidence: v1 Issue 007 / 008 / 012 promotion record and lifecycle handoff evidence.
-- E-AC-006: pending
-  - Required evidence: v1 Issue 009 evidence adoption ledger with disposition, reflected target, rejected reason, or pending state.
-- E-AC-007: pending
-  - Required evidence: v1 Issue 009 bounded depth=2 graph proving child specialists remain leaf-only evidence producers.
-- E-AC-008: pending
-  - Required evidence: v1 Issue 010 role-scoped Permission Profile / task manifest probe evidence.
-- E-AC-009: pending
-  - Required evidence: v1 Issue 009 / 011 / 012 final fresh reviewer evidence proving preflight review is not treated as final pass.
-- E-AC-010: pending
-  - Required evidence: v1 Issue 012 rollout evidence showing completed Issue 001〜006 / #113..#118 plans and reports were not rewritten, and v1 requirements are closed by additive Issues.
-- E-AC-011: pending
-  - Required evidence: v1 Issue 010 / 012 provider-first rollout and parity evidence for docs, role skills, host adapter assets, runtime gates, templates, and report scaffolds.
-- E-AC-012: pending
-  - Required evidence: v1 Issue 007 / 008 / 012 requirement authority prerequisite and lifecycle gate evidence.
+- E-AC-001: pass
+  - Evidence: `iss-00120` / #120 authority metadata and promotion record schema implementation.
+- E-AC-002: pass
+  - Evidence: `iss-00121` / #121 proposed-artifact blocking in context-pack and lifecycle gates.
+- E-AC-003: pass
+  - Evidence: `iss-00124` / #124 `system-architect` draft `design.md` authoring contract with `authority: proposed` and no promotion authority.
+- E-AC-004: pass
+  - Evidence: `iss-00124` / #124 `implementation-planner` draft `plan.md` authoring contract with approved design revision reference, `authority: proposed`, and no promotion authority.
+- E-AC-005: pass
+  - Evidence: `iss-00120`, `iss-00121`, and `iss-00125` promotion record / lifecycle handoff evidence.
+- E-AC-006: pass
+  - Evidence: `iss-00122` / #122 evidence adoption ledger with disposition, reflected target, rejected reason, or pending state.
+- E-AC-007: pass
+  - Evidence: `iss-00122` / #122 bounded depth=2 graph proving child specialists remain leaf-only evidence producers.
+- E-AC-008: pass
+  - Evidence: `iss-00123` / #123 role-scoped Permission Profile / task manifest probe contract and fallback evidence.
+- E-AC-009: pass
+  - Evidence: `iss-00122`, `iss-00124`, and `iss-00125` final fresh reviewer evidence proving preflight review is not treated as final pass.
+- E-AC-010: pass
+  - Evidence: `iss-00125` / #125 rollout evidence showing completed Issue 001〜006 / #113〜#118 plans and reports were not rewritten, and v1 requirements are closed by additive Issues.
+- E-AC-011: pass
+  - Evidence: `iss-00123` and `iss-00125` provider-first rollout and parity evidence for docs, role skills, host adapter assets, runtime gates, templates, and report scaffolds.
+- E-AC-012: pass
+  - Evidence: `iss-00120`, `iss-00121`, and `iss-00125` requirement authority prerequisite and lifecycle gate evidence.
 
 ## Spec Authoring Gate
 
@@ -216,21 +216,21 @@ ID: "epic-00112"
   - Fixed or superseded findings are revalidated and re-reviewed until the shared G10 evidence has no unresolved findings.
   - PR update / push is blocked while any finding has disposition `open`, `pending`, or `unresolved`.
 - evidence fields to fill at G10:
-  - base_ref_name: pending.
-  - base_ref_oid: pending.
-  - head_ref_name: pending.
-  - head_oid_before_pr_update: pending.
-  - shared_diff_artifact: pending.
+  - base_ref_name: `main`.
+  - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`.
+  - head_ref_name: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`.
+  - head_oid_before_pr_update: `2a7dbec2fc7000d4e596d2080312a5c83322c13d`.
+  - shared_diff_artifact: `discussions/20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate.md`.
   - diff_stat_command: `git diff --stat <baseRefOid>...HEAD`
   - diff_name_status_command: `git diff --name-status <baseRefOid>...HEAD`
-  - validation_commands: pending.
+  - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`.
   - deep_consultant_reviewer: pending.
   - spec_reviewer: pending.
   - findings_disposition_table: pending.
   - re_review_verdicts: pending.
   - pr_update_push_evidence: pending.
 - current status:
-  - Planned; not yet runnable because v1 Issues are still in execution.
+  - Running; all v1 Issues are closed and G10 shared diff evidence is captured. PR #119 update remains blocked until reviewer findings are resolved.
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
