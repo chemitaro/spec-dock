@@ -13,9 +13,9 @@ ID: "iss-00123"
 # iss-00123 Role Scoped Permission Profiles and Task Manifest Probes — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01/S02 committed; S90 dogfooding fallback/probe placement evidence recorded.
-- 未完了: S90 spec-reviewer gate and S99.
-- 次のマイルストーン: run S90 spec-reviewer, fix findings, then commit or approved-no-op S90.
+- 現在地: S01/S02/S90/S99 are implemented, reviewed, and ready for issue finish.
+- 未完了: issue finish.
+- 次のマイルストーン: run `./spec-dock/scripts/spec-dock issue finish`.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -72,7 +72,7 @@ ID: "iss-00123"
 - D-003:
   - Status: resolved
   - Type: fallback
-  - Decision: S02 installs role-scoped Permission Profile guardrails for delegated author adapters, but CLI/Desktop OS enforcement remains unverified in this execution environment; write-scoped delegation is therefore not enabled and the roles remain proposal-only until a future task manifest, canonical role skill contract, and host probe all explicitly pass.
+  - Decision: S02 installs role-scoped Permission Profile guardrails for delegated author adapters, but CLI/Desktop OS enforcement remains unverified in this execution environment; canonical spec write-scoped delegation is therefore not enabled. The static profiles allow only dedicated `.codex/permission-probe-evidence` probe evidence writes and keep `spec-dock/initiatives`, implementation, tests, config, and managed agent assets read-only until a future task manifest, canonical role skill contract, and host probe all explicitly pass.
   - Disposition: promoted_to_report_and_followup_context
   - Evidence: `codex --version` observed `codex-cli 0.133.0`; no confirmed non-interactive custom-agent enforcement path was available; Goodall P1/P2 findings; S02 report evidence below.
 
@@ -82,7 +82,8 @@ ID: "iss-00123"
 |---|---|---|---|---|---|---|
 | EAL-001 | adopted | delegated issue-authoring evidence | `requirement.md`, `design.md`, `plan.md` | Lovelace / Mencius / Archimedes の delegated evidence は issue requirement/design/plan の scope、provider path、step slicing に反映済みで、fresh spec-reviewer が pass したため採用。 | `discussions/20260523t144246z-disc-v1-issue-authoring-delegated-evidence.md`; Heisenberg `review_status: pass` | none |
 | EAL-002 | adopted | S01 spec-reviewer `Anscombe` finding | `report.md` | tc-001 hit lines and missing-field checklist were required by the approved plan, so the S01 report evidence was expanded before pass. | Anscombe P1 finding; S01 Step/Test Closure; Anscombe re-review pass | none |
-| EAL-003 | adopted | S02 code-reviewer `Goodall` findings | `report.md`, `src/spec_dock/assets/install_root/.codex/agents/*.toml`, `tests/test_init_update.py` | S02 needed exact closure evidence, a decision-ledger fallback entry, and no contradiction between write-scoped adapters and read-only canonical skills; the report and adapter language were updated accordingly. | Goodall P1/P2 findings; D-003; S02 Step/Test Closure evidence | re-run code-reviewer |
+| EAL-003 | adopted | S02 code-reviewer `Goodall` findings | `report.md`, `src/spec_dock/assets/install_root/.codex/agents/*.toml`, `tests/test_init_update.py` | S02 needed exact closure evidence, a decision-ledger fallback entry, and no contradiction between write-scoped adapters and read-only canonical skills; the report and adapter language were updated accordingly. | Goodall P1/P2 findings; D-003; S02 Step/Test Closure evidence; Goodall re-review pass | none |
+| EAL-004 | adopted | S99 QA/code/spec findings | `report.md`, `.codex/agents/*.toml`, `src/spec_dock/assets/install_root/.codex/agents/*.toml`, `tests/test_init_update.py` | Final reviewers found stale S99 evidence, a broad `spec-dock/initiatives` write root, and a non-profile-bound positive marker. The profile was narrowed to dedicated probe evidence only, the marker was removed, and AC-002 was reclassified as fallback-disabled rather than verified pass. | Laplace / Noether / Curie P1/P2 findings; revised profile resolver output; S99 final pass verdicts | none |
 
 ## Spec Authoring Gate
 - Requirement Gate:
@@ -112,7 +113,7 @@ ID: "iss-00123"
   - rationale: prior findings closed; no P0/P1 blockers in reviewed scope.
 
 ## 受け入れ条件の現在状況
-- status: S01 implementation evidence recorded; spec-reviewer gate pending.
+- status: S01/S02/S90 closure evidence recorded and reviewer gates passed; S99 final re-review is in progress with AC-002 explicitly fallback-disabled rather than enabled.
 - required evidence: see `plan.md` Spec-Locked Closure Index and final completion conditions.
 
 ## 実行証跡
@@ -178,7 +179,7 @@ ID: "iss-00123"
     - `spec-dock/.../iss-00123.../discussions/__permission_probe_allowed__.md`
   - implementation summary:
     - Replaced read-only sandbox mode in system architect / implementation planner Codex adapters with role-scoped `default_permissions` profiles.
-    - Granted write only to `spec-dock/initiatives` while keeping workspace root, `src`, `tests`, `.codex`, `.agents`, and `spec-dock/system/active-none` read-only and denying `.env*`.
+    - Granted write only to `.codex/permission-probe-evidence` while keeping workspace root, `spec-dock/initiatives`, `src`, `tests`, `.codex`, `.agents`, and `spec-dock/system/active-none` read-only and denying `.env*`.
     - Added fail-closed role instructions: Permission Profile is a guardrail for future write-scoped task manifests, not a grant by itself; missing/divergent/unavailable/fail-open probe evidence keeps the role in proposal-only mode with no writes.
     - Reconciled adapter language with canonical read-only skills by requiring proposal-only mode unless the canonical role skill, active issue contract, and host probe all explicitly allow write-scoped draft authoring.
     - Updated managed asset assertions to require Permission Profiles and forbid legacy `sandbox_mode` / `[sandbox_workspace_write]` mixing for delegated author adapters.
@@ -190,15 +191,15 @@ ID: "iss-00123"
     - result: unavailable; failed to spawn `pytest` with `No such file or directory (os error 2)`.
     - fallback command: `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers`
     - result: pass; `Ran 1 test ... OK`.
-    - positive probe command: `printf ... > spec-dock/.../iss-00123.../discussions/__permission_probe_allowed__.md`
-    - result: pass; issue-local evidence artifact was created and retained as allowed-path evidence.
+    - profile-bound positive probe: unavailable; this execution path did not confirm a non-interactive way to bind the custom agent file as an OS-enforced role-scoped profile.
+    - result: fallback-disabled; AC-002 is not claimed as verified profile-bound write enablement in this issue.
   - tc-003 commands:
     - `rg -n 'negative probe|forbidden path|implementation code|tests/|package.json|pyproject|deny|blocked' src/spec_dock/assets/install_root/.codex src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
     - result: pass; provider docs/agents expose forbidden implementation/config/test path and deny/block semantics.
     - hermetic profile resolver for `system-architect.toml`
-    - result: pass; `allowed_write ['spec-dock/initiatives']`; forbidden targets under `src/`, `tests/`, and `.codex/` resolved as `blocked_by_read_or_more_specific_rule`.
+    - result: pass; `allowed_write ['.codex/permission-probe-evidence']`; forbidden targets under `spec-dock/initiatives`, `src/`, `tests/`, and `.codex/agents` resolved as `blocked_by_read_or_more_specific_rule`.
     - hermetic profile resolver for `implementation-planner.toml`
-    - result: pass; `allowed_write ['spec-dock/initiatives']`; forbidden targets under `src/`, `tests/`, and `.codex/` resolved as `blocked_by_read_or_more_specific_rule`.
+    - result: pass; `allowed_write ['.codex/permission-probe-evidence']`; forbidden targets under `spec-dock/initiatives`, `src/`, `tests/`, and `.codex/agents` resolved as `blocked_by_read_or_more_specific_rule`.
     - host enforcement note: `codex --version` returned `codex-cli 0.133.0`, but this execution path did not provide a confirmed non-interactive way to bind the custom agent file as an OS-enforced role-scoped profile. Therefore CLI/Desktop enforcement remains unverified and write-scoped delegation is not claimed as enabled.
   - tc-004 command:
     - `rg -n 'fail closed|fail-open|unavailable|divergent|fallback|disable write-scoped delegation|Desktop|CLI' src/spec_dock/assets/install_root/.codex src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
@@ -213,7 +214,7 @@ ID: "iss-00123"
       - `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml:11`: `default_permissions = "spec_dock_system_architect_draft_authoring"`.
       - `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml:11`: `default_permissions = "spec_dock_implementation_planner_draft_authoring"`.
     - Write/read/deny allowlist:
-      - `system-architect.toml:55-63` and `implementation-planner.toml:55-63`: `"." = "read"`, `"spec-dock/initiatives" = "write"`, `"src" = "read"`, `"tests" = "read"`, `".codex" = "read"`, `".agents" = "read"`, `".env" = "deny"`, `".env.*" = "deny"`.
+      - `system-architect.toml:55-64` and `implementation-planner.toml:55-64`: `"." = "read"`, `"spec-dock/initiatives" = "read"`, `".codex/permission-probe-evidence" = "write"`, `"src" = "read"`, `"tests" = "read"`, `".codex" = "read"`, `".agents" = "read"`, `".env" = "deny"`, `".env.*" = "deny"`.
     - Network disable:
       - `system-architect.toml:65-66` and `implementation-planner.toml:65-66`: profile network `enabled = false`.
     - Proposal-only / fail-closed guardrail:
@@ -223,17 +224,17 @@ ID: "iss-00123"
       - `tests/test_init_update.py:2083-2103`: adapter text must include guardrail/proposal-only/no-write, Permission Profile, read/write/deny, network disable, and fail-open evidence fragments.
       - `tests/test_init_update.py:2120-2124`: adapter text must not mix `sandbox_mode =` or `[sandbox_workspace_write]`.
   - Test Contract Closure:
-    - tc-002: pass by provider profile rg evidence, unittest fallback managed asset assertion, and retained positive allowed evidence file.
+    - tc-002: fallback-disabled, not verified as profile-bound positive write enablement. Provider profile rg evidence and managed asset assertions prove the static allowed evidence target exists, but host enforcement was not proven; D-003 disables write-scoped delegation until a real profile-bound positive probe passes.
     - tc-003: pass for hermetic profile resolver negative behavior; host OS enforcement remains unverified and is explicitly fail-closed rather than claimed enabled.
     - tc-004: pass by provider fallback policy evidence and D-003 decision.
     - exact managed assertion command: `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers`.
     - exact managed assertion result: `Ran 1 test ... OK`.
-    - exact positive probe target: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/discussions/__permission_probe_allowed__.md`.
+    - exact static allowed probe target: `.codex/permission-probe-evidence`.
     - exact hermetic negative resolver output:
-      - system architect: `profile spec_dock_system_architect_draft_authoring`; `allowed_write ['spec-dock/initiatives']`; forbidden `src/`, `tests/`, `.codex/` targets -> `blocked_by_read_or_more_specific_rule`.
-      - implementation planner: `profile spec_dock_implementation_planner_draft_authoring`; `allowed_write ['spec-dock/initiatives']`; forbidden `src/`, `tests/`, `.codex/` targets -> `blocked_by_read_or_more_specific_rule`.
+      - system architect: `profile spec_dock_system_architect_draft_authoring`; `allowed_write ['.codex/permission-probe-evidence']`; forbidden `spec-dock/initiatives`, `src/`, `tests`, `.codex/agents` targets -> `blocked_by_read_or_more_specific_rule`.
+      - implementation planner: `profile spec_dock_implementation_planner_draft_authoring`; `allowed_write ['.codex/permission-probe-evidence']`; forbidden `spec-dock/initiatives`, `src/`, `tests`, `.codex/agents` targets -> `blocked_by_read_or_more_specific_rule`.
   - Closure Coverage:
-    - AC-002: covered by positive allowed-path profile contract, retained issue-local evidence artifact, and managed assertions.
+    - AC-002: explicitly fallback-disabled in this issue because no profile-bound positive write probe was available. Static profile and managed assertions define the intended allowed evidence target, but enablement remains disabled until a future host probe passes.
     - AC-003 / EC-002: covered by read-only/deny profile entries, hermetic negative resolver, and fail-closed decision when host enforcement is unverified.
     - AC-004 / EC-003: covered by proposal-only fallback instructions, D-003, and `workflow_spec_authoring.md` fallback policy.
     - unresolved host/runtime ambiguity: resolved for this issue as disabled / proposal-only, not as verified write-scoped delegation.
@@ -273,6 +274,40 @@ ID: "iss-00123"
     - Raman (`019e563b-4437-7623-a408-e7e0e45f2c68`) `review_status: pass`.
     - finding: P2, S90 should explicitly record ledger/no-new-decision disposition.
     - disposition: added S90 Ledger Note referencing D-003 and confirming no new material decision.
+- S99 final quality gate:
+  - validation commands:
+    - `./spec-dock/scripts/spec-dock validate`
+    - result: pass; `spec-dock: ok (validate) nodes=63`.
+    - `./spec-dock/scripts/spec-dock sync`
+    - result: pass; active unchanged matched `iss-00123`, generated indexes/trees/dashboard.
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers`
+    - result: pass; `Ran 1 test ... OK`.
+    - `git diff --check`
+    - result: pass.
+    - `git status --short`
+    - result: clean after S90 commit and S99 sync.
+  - post-correction validation commands:
+    - `./spec-dock/scripts/spec-dock validate`
+    - result: pass; `spec-dock: ok (validate) nodes=63`.
+    - `./spec-dock/scripts/spec-dock sync`
+    - result: pass; active unchanged matched `iss-00123`, generated indexes/trees/dashboard.
+    - `uv run python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers`
+    - result: pass; `Ran 1 test ... OK`.
+    - `git diff --check`
+    - result: pass.
+    - `git status --short`
+    - result: expected corrective diff only: provider/dogfooding system-architect and implementation-planner profiles, `tests/test_init_update.py`, `report.md`, and deleted stale `discussions/__permission_probe_allowed__.md`.
+  - final review attempt:
+    - qa-reviewer Laplace (`019e563d-f272-7600-9e91-b71887bb2012`) `review_status: fail`.
+    - code-reviewer Noether (`019e563e-111a-7d80-a34f-c7c451114b34`) `review_status: fail`.
+    - spec-reviewer Curie (`019e563e-384f-75f2-b4ff-602583eefe0f`) `review_status: fail`.
+    - findings: report lacked durable S99 closure evidence; EAL-003 had stale next action; broad `spec-dock/initiatives` write root was too permissive; AC-002 was incorrectly described as pass without profile-bound positive probe.
+    - disposition: narrowed static profile write target to `.codex/permission-probe-evidence`, removed issue-local plain write marker, reclassified AC-002 as fallback-disabled rather than verified pass, closed EAL-003 next action, added semantic profile assertions, refreshed acceptance status, and added post-correction S99 evidence.
+  - final re-review:
+    - qa-reviewer Laplace (`019e563d-f272-7600-9e91-b71887bb2012`) `review_status: pass`.
+    - code-reviewer Noether (`019e563e-111a-7d80-a34f-c7c451114b34`) `review_status: pass`.
+    - spec-reviewer Curie (`019e563e-384f-75f2-b4ff-602583eefe0f`) `review_status: pass`.
+    - result: tc-099 pass; no unresolved P0/P1 blocker remains.
 
 ## ブロッカー / 未完了
-- S99 remains.
+- none before issue finish.
