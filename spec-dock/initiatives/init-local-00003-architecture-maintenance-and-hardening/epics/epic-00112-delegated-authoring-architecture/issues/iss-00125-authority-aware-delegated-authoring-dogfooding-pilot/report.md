@@ -13,9 +13,9 @@ ID: "iss-00125"
 # iss-00125 Authority Aware Delegated Authoring Dogfooding Pilot — レポート（進捗 / 決定 / 結果）
 
 ## 進捗サマリー
-- 現在地: S01/S02 evidence committed, and S03 lifecycle/context-pack fallback verification has fresh spec-reviewer pass as approved no-op.
-- 未完了: S03 report commit, S90 docs impact, S99 final QA/code/spec gates, final report commit, and issue finish.
-- 次のマイルストーン: commit S03 report-only evidence, then proceed to S90 docs impact.
+- 現在地: S01/S02 evidence committed; S03 lifecycle/context-pack fallback verification and S90 docs impact no-op have fresh spec-reviewer pass.
+- 未完了: S03/S90 report commit, S99 final QA/code/spec gates, final report commit, and issue finish.
+- 次のマイルストーン: commit S03/S90 report-only evidence, then proceed to S99 final quality.
 
 ## Workflow Delegation Consent
 - source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
@@ -120,9 +120,13 @@ ID: "iss-00125"
   - scope: S03 lifecycle/context-pack fallback verification and provider defect disposition.
   - findings: none.
   - rationale: `tc-005` records active issue / validate evidence and absence of fallback draft artifact names from lifecycle/context-pack authority surfaces; `tc-006` records no provider defect and no provider/runtime/test/config diff. Current unstaged diff is report-only.
+- Mendel the 2nd (`019e567b-e0c9-7cc1-8482-32284e9fbb87`): `review_status: pass`
+  - scope: S90 docs impact no-op review.
+  - findings: none.
+  - rationale: validate passes, diff is report-only, the pilot discovered no provider/dogfooding docs defect, and existing docs/skills/adapters already cover task manifest, Permission Profile fail-closed behavior, proposal-only fallback, and `authority: proposed`.
 
 ## 受け入れ条件の現在状況
-- status: S01/S02 committed; S03 reviewer gate passed as approved no-op and report-only commit is pending.
+- status: S01/S02 committed; S03 and S90 reviewer gates passed as approved no-op / docs no-op and report-only commit is pending.
 - required evidence: S01 covers tc-001 / tc-002 with reviewer pass; S02 covers tc-003 / tc-004 with reviewer pass; remaining closure ids are open.
 
 ## 実行証跡
@@ -253,6 +257,27 @@ ID: "iss-00125"
   - findings: none.
   - closure state: `approved-no-op` for product/runtime/provider changes; report-only evidence commit pending.
   - rationale: S03 required inspection evidence only; no provider/runtime/test/config changes were required or made.
+- S90 docs impact:
+  - Implementation Delegation Gate:
+    - step: S90
+    - decision: `approved-local-orchestration-metadata`
+    - rationale: S90 is docs-impact classification by inspection. The current pilot produced issue-local fallback evidence only and no provider/runtime/docs/skills/adapters changes. No doc-writer edit is required unless reviewer finds a gap.
+    - allowed changes used: this `report.md` only.
+    - forbidden changes respected: no provider docs, dogfooding docs, role skill, adapter, v0 report, prerequisite report, runtime, or test edits.
+    - Ledger Note: No material implementation decisions beyond the approved no-op docs impact.
+  - tc-090 docs impact inspection:
+    - validate command: `./spec-dock/scripts/spec-dock validate`
+    - validate result: `spec-dock: ok (validate) nodes=63`.
+    - docs surface inspection command: `rg -n "Task Manifest Lock|pilot_target_issue_id|design_draft_path|plan_draft_path|stale-if|fallback|proposal-only|Permission Profile|authority: proposed" spec-dock/active/issue/report.md spec-dock/docs/workflow_spec_authoring.md spec-dock/docs/phase_design.md spec-dock/docs/phase_plan.md .agents/skills/spec-dock-system-architect/SKILL.md .agents/skills/spec-dock-implementation-planner/SKILL.md .codex/agents/system-architect.toml .codex/agents/implementation-planner.toml`
+    - docs surface inspection result: pass; active report records the pilot-specific lock/fallback evidence, while existing workflow docs, phase docs, role skills, and Codex adapters already describe `authority: proposed`, proposal-only fallback, task manifest, and Permission Profile fail-closed behavior.
+    - docs impact classification: `no-op`.
+    - rationale: S02/S03 added only issue-local fallback evidence and did not discover a provider/dogfooding docs defect. Existing docs and skills already instruct proposal-only fallback when Permission Profile / host probe / source revision is unverified, fail-open, divergent, or stale.
+    - follow-up: none for S90.
+  - reviewer gate:
+    - reviewer: Mendel the 2nd (`019e567b-e0c9-7cc1-8482-32284e9fbb87`)
+    - review_status: pass
+    - findings: none.
+    - closure state: `approved-no-op` for docs changes; report-only evidence commit pending.
 
 ## Step Contract Closure
 | step | closure id | status | evidence |
@@ -263,6 +288,7 @@ ID: "iss-00125"
 | S02 | tc-004 | pass | implementation-planner fallback plan discussion draft produced at locked path with `authority: proposed`; no canonical write verification, implementation-readiness, or final authority claim; Tesla the 2nd review passed. |
 | S03 | tc-005 | pass | active/context-pack/index/dashboard inspection has no fallback draft artifact matches; proposed drafts remain evidence only and are not downstream authority; Averroes the 2nd review passed. |
 | S03 | tc-006 | pass | `git diff --name-status` was empty before S03 report update; S02 commit touched only issue-local report/discussion artifacts; no provider defect discovered; Averroes the 2nd review passed. |
+| S90 | tc-090 | pass | docs impact classified as no-op; validate passes and docs/skills/adapters already expose fallback / Permission Profile / `authority: proposed` guidance; Mendel the 2nd review passed. |
 
 ## Test Contract Closure
 | test id | planned command / evidence | observed result | status |
@@ -273,6 +299,7 @@ ID: "iss-00125"
 | tc-004 | locked implementation-planner discussion draft path inspection | fallback plan draft file exists with `authority: proposed`, source hash, rejected canonical write / implementation-readiness scope, and no final authority claim; reviewer pass | pass |
 | tc-005 | `active show`, `validate`, active/context/index/dashboard fallback-name `rg` | active remains `iss-00125`; validate nodes=63; no fallback draft artifact names appear in active/context-pack/index/dashboard authority surfaces; reviewer pass | pass |
 | tc-006 | `git diff --name-status`; `git show --name-status --oneline --no-renames HEAD` | no current diff before S03 report update; S02 commit changed only issue-local report/discussion artifacts; no provider defect discovered; reviewer pass | pass |
+| tc-090 | `validate`; docs/skills/adapters/report fallback guidance `rg` | validate nodes=63; relevant surfaces expose task manifest / Permission Profile / proposal-only fallback / `authority: proposed`; no docs edit required; reviewer pass | pass |
 
 ## Closure Coverage
 | AC / EC | covered by | current evidence |
@@ -282,6 +309,7 @@ ID: "iss-00125"
 | AC-002 | S02 / tc-003, tc-004 | actual delegated design and plan draft evidence is produced as fallback `discussions/` artifacts with `authority: proposed`; no canonical write, final authority, promotion, reviewer-pass, or implementation-readiness claim. |
 | AC-003 / EC-001 | S03 / tc-005 | fallback discussion drafts are absent from active/context-pack/index/dashboard authority surfaces; validate passes. |
 | AC-004 / EC-002 | S03 / tc-006 | no provider/runtime/test/config diff or silent provider fix exists; no provider defect discovered in S03. |
+| AC-004 / EC-003 | S90 / tc-090 | host invocation remains unverified and is recorded without over-claiming; existing docs/skills/adapters already cover fallback behavior; no docs update required. |
 
 ## Closure Delta
 - `tc-001`: no closure id changed. Evidence includes an explicit caveat because `iss-00124/report.md:16-19` retains stale pending wording despite final pass/closure evidence at `iss-00124/report.md:277-308` and GitHub #124 closed state.
@@ -290,7 +318,8 @@ ID: "iss-00125"
 - `tc-004`: no closure id changed. Closed by fallback discussion draft evidence only, not by canonical plan write verification or implementation-readiness.
 - `tc-005`: no closure id changed. Evidence is an absence check; fallback draft artifact names are intentionally absent from active/context-pack/index/dashboard authority surfaces.
 - `tc-006`: no closure id changed. Evidence is no-op/provider-defect-disposition; no provider defect was found and no provider source was changed.
+- `tc-090`: no closure id changed. Docs impact is no-op because current docs/skills/adapters already cover the fallback behavior exercised by this pilot; S90 spec-reviewer passed.
 
 ## ブロッカー / 未完了
-- S03 report-only evidence commit is pending.
-- S90/S99 remain open.
+- S03/S90 report-only evidence commit is pending.
+- S99 remains open.
