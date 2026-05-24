@@ -4,7 +4,13 @@ from pathlib import Path
 from typing import cast
 
 from ..domain.active import infer_active_node_from_branch
-from ..domain.authority import GRANT_ISSUE_FINISH, evaluate_authority_gate
+from ..domain.authority import (
+    GRANT_ISSUE_FINISH,
+    evaluate_authority_gate,
+    evaluate_evidence_adoption_ledger_gate,
+    load_evidence_adoption_ledger_entries,
+    validate_delegated_authority_artifact,
+)
 from ..domain.ids import format_id, parse_id
 from ..domain.models import SpecGraph, SpecNode, SpecNodeKind, SpecNodeSeed
 from ..domain.tree import build_graph
@@ -229,6 +235,90 @@ def require_lifecycle_authority(
     )
 
 
+def require_evidence_adoption_ledger_clear(
+    *,
+    report_path: Path,
+    purpose: str,
+    command_label: str,
+) -> None:
+    entries = load_evidence_adoption_ledger_entries(report_path)
+    result = evaluate_evidence_adoption_ledger_gate(entries, target_artifact="*", purpose=purpose)
+    if result.ok:
+        return
+    raise RuntimeError(
+        "\n".join(
+            [
+                f"{command_label} blocked: Evidence Adoption Ledger has unresolved blocking entry",
+                f"- reason: {result.reason}",
+                f"- blocking_entry_id: {result.blocking_entry_id}",
+                f"- target_artifact: {result.target_artifact or '*'}",
+                f"- required_next_action: {result.required_next_action}",
+                f"- report_path: {report_path}",
+            ]
+        )
+    )
+
+
+def require_delegated_artifacts_authorized(
+    *,
+    issue_dir: Path,
+    purpose: str,
+    command_label: str,
+) -> None:
+    for artifact_name in ("design.md", "plan.md"):
+        artifact_path = issue_dir / artifact_name
+        result = validate_delegated_authority_artifact(artifact_path, purpose=purpose)
+        if result.ok:
+            continue
+        details = " ".join(result.details)
+        raise RuntimeError(
+            "\n".join(
+                [
+                    f"{command_label} blocked: delegated artifact authority gate failed",
+                    f"- reason: {result.reason}",
+                    f"- artifact: {artifact_path}",
+                    f"- details: {details}" if details else "- details: none",
+                    "Recovery: promote the delegated draft with fresh reviewer evidence or remove incomplete delegated metadata.",
+                ]
+            )
+        )
+
+
+def require_active_issue_lifecycle_gate(
+    ports: Ports,
+    *,
+    required_grant: str,
+    purpose: str,
+    command_label: str,
+) -> None:
+    if ports.active_state_store is None:
+        raise RuntimeError("active_state_store is required")
+    specdock_dir = _resolve_specdock_dir(ports)
+    active_load = ports.active_state_store.load_active_manifest(specdock_dir)
+    if active_load.manifest is None or active_load.manifest.issue is None:
+        raise RuntimeError(f"{command_label} requires an active issue manifest entry.")
+    require_lifecycle_authority(
+        active_load.manifest.issue,
+        required_grant=required_grant,
+        purpose=purpose,
+        command_label=command_label,
+    )
+    issue_path = getattr(active_load.manifest.issue, "path", None)
+    if isinstance(issue_path, str) and issue_path.strip():
+        issue_dir = _resolve_repo_root(ports) / issue_path
+        require_delegated_artifacts_authorized(
+            issue_dir=issue_dir,
+            purpose=purpose,
+            command_label=command_label,
+        )
+        report_path = issue_dir / "report.md"
+        require_evidence_adoption_ledger_clear(
+            report_path=report_path,
+            purpose=purpose,
+            command_label=command_label,
+        )
+
+
 def _require_issue_finish_authority(entry: object) -> None:
     require_lifecycle_authority(
         entry,
@@ -320,6 +410,20 @@ def issue_finish(req: IssueFinishRequest, ports: Ports) -> IssueFinishResult:
     if active_load.manifest is None or active_load.manifest.issue is None:
         raise RuntimeError("issue finish requires an active issue manifest entry.")
     _require_issue_finish_authority(active_load.manifest.issue)
+    issue_path = getattr(active_load.manifest.issue, "path", None)
+    if isinstance(issue_path, str) and issue_path.strip():
+        issue_dir = _resolve_repo_root(ports) / issue_path
+        require_delegated_artifacts_authorized(
+            issue_dir=issue_dir,
+            purpose="issue_finish",
+            command_label="issue finish",
+        )
+        report_path = issue_dir / "report.md"
+        require_evidence_adoption_ledger_clear(
+            report_path=report_path,
+            purpose="issue_finish",
+            command_label="issue finish",
+        )
 
     try:
         close_result = close_node(

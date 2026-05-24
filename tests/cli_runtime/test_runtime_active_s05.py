@@ -114,6 +114,87 @@ class TestRuntimeActiveS05(unittest.TestCase):
         self.assertIn("proposed or missing authority cannot authorize implementation", text)
         self.assertIn("issue ready", text)
         self.assertIn("- issue: authority=missing, grants=[]", text)
+        self.assertIn("- issue: authoritative_input=none, downstream_block=missing_authority", text)
+
+    def test_context_pack_marks_proposed_active_artifact_non_authoritative(self) -> None:
+        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
+        manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(
+                id="iss-local-00001",
+                path="spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001",
+                authority="proposed",
+                grants=("review_input", "planning_input", "implementation_start", "issue_finish"),
+                promotion_record={
+                    "status": "approved",
+                    "authority": "approved",
+                    "source_revision": "active:iss-local-00001",
+                    "approved_revision": "active:iss-local-00001",
+                    "approved_hash": "active:iss-local-00001",
+                    "reviewer_target_hash": "active:iss-local-00001",
+                    "promotion_decision": "main_orchestrator_promotion",
+                },
+            ),
+        )
+
+        for rendered in (infra_active_store._render_context_pack(manifest), app_set_active.build_context_pack_text(manifest)):
+            with self.subTest(rendered=rendered[:20]):
+                self.assertIn("- issue: authority=proposed", rendered)
+                self.assertIn("- issue: authoritative_input=none", rendered)
+                self.assertIn("downstream_block=authority_not_approved", rendered)
+
+    def test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal(self) -> None:
+        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_rel = Path("spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001")
+            issue_dir = repo_root / issue_rel
+            issue_dir.mkdir(parents=True)
+            (issue_dir / "report.md").write_text(
+                "\n".join(
+                    [
+                        "# Report",
+                        "",
+                        "## Evidence Adoption Ledger",
+                        "",
+                        "| ID | adoption_status | target_artifact | next_action |",
+                        "|---|---|---|---|",
+                        "| EAL-030 | blocked | plan.md | resolve plan evidence |",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            manifest = infra_contracts.ActiveManifest(
+                initiative=None,
+                epic=None,
+                issue=infra_contracts.ActiveManifestEntry(
+                    id="iss-local-00001",
+                    path=issue_rel.as_posix(),
+                    authority="approved",
+                    grants=("implementation_start", "issue_finish"),
+                    promotion_record={
+                        "status": "approved",
+                        "authority": "approved",
+                        "source_revision": "active:iss-local-00001",
+                        "approved_revision": "active:iss-local-00001",
+                        "approved_hash": "active:iss-local-00001",
+                        "reviewer_target_hash": "active:iss-local-00001",
+                        "promotion_decision": "main_orchestrator_promotion",
+                    },
+                ),
+            )
+
+            for rendered in (
+                infra_active_store._render_context_pack(manifest, repo_root=repo_root),
+                app_set_active.build_context_pack_text(manifest, repo_root=repo_root),
+            ):
+                with self.subTest(rendered=rendered[:20]):
+                    self.assertIn("- issue: authority=approved", rendered)
+                    self.assertIn("- issue: authoritative_input=none", rendered)
+                    self.assertIn("downstream_block=evidence_ledger_blocked", rendered)
+                    self.assertIn("blocking_entry_id=EAL-030", rendered)
 
     def test_sync_auto_update_from_branch_writes_authority_context_pack(self) -> None:
         app_contracts, app_ports = _runtime_modules()[1:3]

@@ -50,6 +50,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - issue handoff に必要な readiness がある
 - delegated plan draft を使う場合、draft provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
 - delegated draft を fresh `spec-reviewer` pass の代替にしていない
+- read-only specialist consent と write-scoped delegated authoring consent が分離され、write-scoped delegated authoring は task manifest / input authority / session invocation / probe / diff gate / fallback / report evidence destination を step-local に固定している
 - implementation planner が write-scoped draft authoring を使う場合でも、権限は検証済み task manifest の対象 `plan.md` に限られ、`authority: proposed` / `status: draft` を超えた final authority、phase promotion、reviewer-pass claim、requirement/design rewrite、implementation-readiness claim、完了済み issue plan/report の修正を含まない
-- Permission Profile / host probe / source revision が未検証、fail-open、または stale の場合、delegated plan authoring は proposal-only / discussions path に戻っている
+- Permission Profile / host probe / source revision が未検証、fail-open、manual/unprofiled/static broad profile、Desktop-only fallback、または stale の場合、delegated plan authoring は proposal-only / discussions path に戻っている
 - delegated authoring unavailable / skipped の場合も manual authoring path が有効である

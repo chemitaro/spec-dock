@@ -549,6 +549,129 @@ class TestCliValidate(CliRuntimeHarness):
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn("spec-dock: ok", p.stdout)
 
+    def test_validate_blocks_proposed_or_missing_metadata_delegated_draft_artifacts(self) -> None:
+        cases = (
+            (
+                "proposed delegated draft",
+                "---\n"
+                "status: draft\n"
+                "authority: proposed\n"
+                "grants: [review_input, planning_input]\n"
+                "owner_role: main-orchestrator\n"
+                "draft_author_role: system-architect\n"
+                "approval: pending-main-promotion\n"
+                "source_revision: rev-1\n"
+                "approved_revision: rev-1\n"
+                "approved_hash: hash-1\n"
+                "manifest_hash: manifest-hash\n"
+                "permission_profile_name: spec-dock-da\n"
+                "permission_profile_hash: profile-hash\n"
+                "write_session_invocation_hash: session-hash\n"
+                "probe_run_id: probe-1\n"
+                "positive_probe_result: pass\n"
+                "---\n# Design\n",
+                "authority_not_approved",
+            ),
+            (
+                "approved authority with draft status",
+                "---\n"
+                "status: draft\n"
+                "authority: approved\n"
+                "grants: [implementation_start]\n"
+                "owner_role: main-orchestrator\n"
+                "draft_author_role: system-architect\n"
+                "approval: fresh-reviewer-pass\n"
+                "source_revision: rev-1\n"
+                "approved_revision: rev-1\n"
+                "approved_hash: hash-1\n"
+                "manifest_hash: manifest-hash\n"
+                "permission_profile_name: spec-dock-da\n"
+                "permission_profile_hash: profile-hash\n"
+                "write_session_invocation_hash: session-hash\n"
+                "probe_run_id: probe-1\n"
+                "positive_probe_result: pass\n"
+                "---\n# Design\n",
+                "status_not_approved",
+            ),
+            (
+                "missing delegated metadata",
+                "---\n"
+                "authority: approved\n"
+                "manifest_hash: manifest-hash\n"
+                "---\n# Design\n",
+                "incomplete_draft_metadata",
+            ),
+        )
+        for _label, artifact_text, expected_reason in cases:
+            with self.subTest(expected_reason=expected_reason):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    self._create_same_repo_linked_hierarchy(target)
+                    issue_dir = (
+                        target
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001-auth-platform"
+                        / "epics"
+                        / "epic-00002-jwt-auth"
+                        / "issues"
+                        / "iss-00003-add-refresh-token"
+                    )
+                    (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
+
+                    p = self._run_runtime_capture(target, ["validate"])
+
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Delegated draft authority incomplete/blocked", p.stderr)
+                    self.assertIn(expected_reason, p.stderr)
+                    self.assertIn("design.md", p.stderr)
+
+    def test_validate_blocks_scope_local_evidence_adoption_ledger_entries(self) -> None:
+        cases = (
+            ("blocked", "EAL-021", "blocked", "EAL-021"),
+            ("stale", "EAL-022", "stale", "EAL-022"),
+            ("`blocked`", "`EAL-023`", "blocked", "EAL-023"),
+        )
+        for status, entry_id, expected_status, expected_entry_id in cases:
+            with self.subTest(status=status):
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = Path(tmp)
+                    self.assertEqual(main(["init", str(target)]), 0)
+                    self._create_same_repo_linked_hierarchy(target)
+                    issue_dir = (
+                        target
+                        / "spec-dock"
+                        / "initiatives"
+                        / "init-00001-auth-platform"
+                        / "epics"
+                        / "epic-00002-jwt-auth"
+                        / "issues"
+                        / "iss-00003-add-refresh-token"
+                    )
+                    (issue_dir / "report.md").write_text(
+                        "\n".join(
+                            [
+                                "# Report",
+                                "",
+                                "## Evidence Adoption Ledger",
+                                "",
+                                "| ID | adoption_status | target_artifact | next_action |",
+                                "|---|---|---|---|",
+                                f"| {entry_id} | {status} | design.md | resolve reviewer evidence |",
+                                "",
+                            ]
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    p = self._run_runtime_capture(target, ["validate"])
+
+                    self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                    self.assertIn("Evidence Adoption Ledger incomplete/blocked", p.stderr)
+                    self.assertIn(f"evidence_ledger_{expected_status}", p.stderr)
+                    self.assertIn(expected_entry_id, p.stderr)
+
     def test_validate_rejects_legacy_sequence_for_new_discussion_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

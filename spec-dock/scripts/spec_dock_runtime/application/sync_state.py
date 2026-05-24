@@ -640,7 +640,7 @@ def maybe_auto_update_from_branch(
         return (state, ActiveUpdateOutcome(applied=False, reason=reason or "already active"))
 
     manifest = build_active_manifest(selection, state.graph, repo_root=ports.repo_root)
-    context_pack_text = build_context_pack_text(manifest)
+    context_pack_text = build_context_pack_text(manifest, repo_root=ports.repo_root)
     commit_active_state(
         persisted_manifest=manifest,
         patch_manifest=manifest,

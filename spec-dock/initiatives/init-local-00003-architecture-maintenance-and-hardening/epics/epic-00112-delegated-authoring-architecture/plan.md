@@ -265,10 +265,10 @@ I5 --> I6
   - Issue 006 complete.
   - Provider/consumer parity, validation, sync, reviewer, and pilot metrics are recorded.
 - G10 Epic-wide pre-PR quality gate:
-  - All v1 Issues `iss-00120`〜`iss-00125` complete raw implementation and record issue-local closure evidence first.
+  - All v1 Issues `iss-00120`〜`iss-00125` and corrective Issue `iss-00126` complete raw implementation and record issue-local closure evidence first.
   - Before updating Epic PR #119, run an Epic-scope diff review from the development baseline to the fully implemented state.
   - Baseline endpoint is the resolved base of Epic PR #119 at G10 execution time, captured by `gh pr view 119 --json baseRefName,baseRefOid,headRefName,headRefOid`. Current expected base branch is `main`; the actual `baseRefOid` captured at G10 is authoritative.
-  - Final endpoint is local `HEAD` after all v1 Issue commits and final validation/sync are complete, before push/PR update.
+  - Final endpoint is local `HEAD` after all v1 Issue and corrective `iss-00126` changes and final validation/sync are complete, before push/PR update.
   - Shared diff evidence must record base ref/name/OID, final head ref/OID, `git diff --stat <baseRefOid>...HEAD`, `git diff --name-status <baseRefOid>...HEAD`, validation/sync commands, and any saved analysis artifact path under the Epic `discussions/`.
   - Required reviewers are a fresh `deep-consultant` and a fresh `spec-reviewer`; both must review the whole Epic delta, not only the last Issue.
   - Both reviewers must cite the same shared diff evidence and the captured base/head endpoints.
@@ -289,7 +289,7 @@ I5 --> I6
   - Provider docs and dogfooding docs are updated together or dogfooding refresh evidence explains intended differences.
   - Report templates and active-none report scaffolds include delegated evidence sections.
 - epic-wide pre-PR:
-  - After all v1 Issues are implemented and before PR update, compare the final implementation state against the development baseline.
+  - After all v1 Issues and corrective `iss-00126` are implemented and before PR update, compare the final implementation state against the development baseline.
   - Capture the development baseline from Epic PR #119 with `gh pr view 119 --json baseRefName,baseRefOid,headRefName,headRefOid`; use the captured `baseRefOid` as the diff base and local `HEAD` as the final endpoint.
   - Record `git diff --stat <baseRefOid>...HEAD` and `git diff --name-status <baseRefOid>...HEAD` in the Epic report or a referenced Epic discussion artifact.
   - A fresh `deep-consultant` analyzes architecture/workflow risk, hidden coupling, fallback adequacy, and product-quality gaps across the whole Epic delta.
@@ -352,7 +352,7 @@ I5 --> I6
 
 ## v1 Amendment Plan（追加修正 Issue）
 
-この節は、完了済みの Issue 001〜006 を上書きしない。v0 実装の上に積み上げる追加修正計画として扱う。v1 Issue 007〜012 は、spec-dock / GitHub 上では次の実IDで作成済みであり、実行はこの対応表と依存順に従う。
+この節は、完了済みの Issue 001〜006 を上書きしない。v0 実装の上に積み上げる追加修正計画として扱う。v1 Issue 007〜012 は、spec-dock / GitHub 上では次の実IDで作成済みであり、実行はこの対応表と依存順に従う。corrective Issue `iss-00126` / `#126` は、v1 Issue 012 後に見つかった受け入れ不足を修正する追加 Issue であり、PR 更新前の最終 G10 gate に含める。
 
 | v1計画ID | spec-dock ID | GitHub | title / slug | 実行順序 |
 | --- | --- | --- | --- | --- |
@@ -362,6 +362,7 @@ I5 --> I6
 | v1 Issue 010 | `iss-00123` | `#123` | `Role-Scoped Permission Profiles and Task Manifest Probes` / `role-scoped-permission-profiles-task-manifest` | 3 |
 | v1 Issue 011 | `iss-00124` | `#124` | `Canonical Draft Authoring Role Rewrite` / `canonical-draft-authoring-role-rewrite` | 4 |
 | v1 Issue 012 | `iss-00125` | `#125` | `Authority-Aware Delegated Authoring Dogfooding Pilot` / `authority-aware-delegated-authoring-dogfooding-pilot` | 5 |
+| corrective Issue | `iss-00126` | `#126` | `Write Capable Delegated Draft Authoring Correction` / `write-capable-delegated-draft-authoring-correction` | 6 |
 
 ### Amendment 方針
 
@@ -521,6 +522,7 @@ rectangle "v1 Issue 009\nLedger / depth=2 policy" as I9
 rectangle "v1 Issue 010\nPermission profiles / task manifest" as I10
 rectangle "v1 Issue 011\nCanonical draft role rewrite" as I11
 rectangle "v1 Issue 012\nDogfooding pilot / parity" as I12
+rectangle "corrective Issue\niss-00126 / #126" as I13
 
 V0 --> I7
 I7 --> I8
@@ -535,6 +537,7 @@ I8 --> I12
 I9 --> I12
 I10 --> I12
 I11 --> I12
+I12 --> I13
 @enduml
 ```
 

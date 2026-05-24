@@ -82,7 +82,8 @@ component "spec-reviewer\n(final blocking gate)" as Reviewer
 component "Context Pack Builder\n(purpose-aware)" as ContextPack
 component "Lifecycle Validator\n(authority-aware)" as Lifecycle
 database "design.md / plan.md\ncanonical path" as Canonical
-folder "discussions/ + evidence ledger" as Evidence
+folder "discussions/\ncandidate evidence" as Evidence
+database "report.md\ncanonical ledger" as ReportLedger
 component "Permission Profiles\n(role write scope)" as Perms
 component "Promotion Record\napproved revision" as Promotion
 
@@ -94,8 +95,9 @@ Planner --> Child : "asks bounded evidence"
 Child --> Evidence : "writes reports only"
 Architect --> Canonical : "writes proposed design draft"
 Planner --> Canonical : "writes proposed plan draft"
-Architect --> Evidence : "records adoption ledger"
-Planner --> Evidence : "records adoption ledger"
+Architect --> Evidence : "writes candidate ledger/handoff"
+Planner --> Evidence : "writes candidate ledger/handoff"
+Main --> ReportLedger : "records adoption disposition"
 Perms --> Architect : "allows design/evidence write"
 Perms --> Planner : "allows plan/evidence write"
 ContextPack --> Canonical : "reads status/authority/grants"
@@ -132,7 +134,8 @@ grants:
   issue_finish: false
   phase_completion: false
 source_discussions: []
-evidence_ledger: discussions/evidence-adoption-ledger.md
+evidence_ledger: report.md#evidence-adoption-ledger
+candidate_evidence: discussions/delegated-authoring/<task-id>/
 source_revisions:
   requirement_revision: "<approved-requirement-revision>"
   requirement_authority: approved
@@ -240,9 +243,9 @@ validator は whitelist 外の組み合わせを fail にする。
 
 | Role | Writable target | May read | Must not write | Authority |
 |---|---|---|---|---|
-| main orchestrator | all canonical specs, report, promotion record | repo/workflow/evidence | destructive changes without user approval | final owner |
-| system-architect | `design.md` when `authority: proposed`, evidence ledger / own discussions | requirement, approved design context, repo docs/code as needed | requirement, plan, implementation code, promotion record | draft author only |
-| implementation-planner | `plan.md` when `authority: proposed`, evidence ledger / own discussions | approved requirement/design, repo docs/code as needed | requirement, `design.md` body/metadata/approval fields, implementation code, promotion record | draft author only |
+| main orchestrator | all canonical specs, scope-local `report.md`, promotion record, canonical Evidence Adoption Ledger | repo/workflow/evidence | destructive changes without user approval | final owner |
+| system-architect | exact target `design.md` draft when `authority: proposed`, own candidate evidence, own discussions | requirement, approved design context, repo docs/code as needed | requirement, plan, implementation code, promotion record, scope-local `report.md` canonical Evidence Adoption Ledger | draft author only |
+| implementation-planner | exact target `plan.md` draft when `authority: proposed`, own candidate evidence, own discussions | approved requirement/design, repo docs/code as needed | requirement, `design.md` body/metadata/approval fields, implementation code, promotion record, scope-local `report.md` canonical Evidence Adoption Ledger | draft author only |
 | child specialist | own evidence report only | scoped inputs | canonical specs, promotion record, implementation code | evidence only |
 | spec-reviewer preflight | review report only | draft/evidence | canonical specs | advisory only |
 | spec-reviewer final | review verdict only | final candidate/evidence | canonical specs | blocking review gate |
@@ -253,20 +256,22 @@ CLI-first の検証を前提に、agent ごとに named permission profile を�
 
 - `system_architect_design_draft`:
   - workspace read
-  - `design.md` または design draft directory write
-  - evidence ledger / scoped discussions write
+  - exact target `design.md` write, or design draft directory write when fallback is explicitly selected
+  - own candidate evidence / scoped discussions write
+  - scope-local `report.md` canonical Evidence Adoption Ledger deny write
   - requirement / plan / implementation directories read-only or deny write
 - `implementation_planner_plan_draft`:
   - workspace read
-  - `plan.md` または plan draft directory write
-  - evidence ledger / scoped discussions write
+  - exact target `plan.md` write, or plan draft directory write when fallback is explicitly selected
+  - own candidate evidence / scoped discussions write
+  - scope-local `report.md` canonical Evidence Adoption Ledger deny write
   - requirement / design approval fields / implementation directories read-only or deny write
 - `child_specialist_evidence_only`:
   - workspace read
   - scoped evidence report write
   - canonical specs deny write
 
-単一ファイル write が host / OS sandbox の都合で不安定な場合は、専用 draft/evidence directory write + promotion-time copy/merge の fallback を使う。
+単一ファイル write が host / OS sandbox の都合で不安定な場合は、専用 draft/evidence directory write + promotion-time copy/merge の fallback を使う。fallback で書かれる `discussions/...` は candidate evidence only であり、canonical adoption ledger や approval / promotion record の代替にはしない。
 
 ### Write-scoped task manifest
 
@@ -289,12 +294,15 @@ stale_if:
   evidence_ledger_blocker_added: true
 allowed_write_paths:
   - "/abs/path/to/design.md"
-  - "/abs/path/to/discussions/evidence-adoption-ledger.md"
-  - "/abs/path/to/discussions/<task-evidence>.md"
+  - "/abs/path/to/discussions/delegated-authoring/<task-id>/candidate-ledger.md"
+  - "/abs/path/to/discussions/delegated-authoring/<task-id>/handoff.md"
+  - "/abs/path/to/discussions/delegated-authoring/<task-id>/<task-evidence>.md"
 forbidden_write_paths:
   - "/abs/path/to/requirement.md"
   - "/abs/path/to/plan.md"
+  - "/abs/path/to/report.md"
   - "/abs/path/to/report.md#spec-authoring-gate"
+  - "/abs/path/to/report.md#evidence-adoption-ledger"
   - "/abs/path/to/discussions/promotions"
   - "/abs/path/to/src"
 deny_by_default: true
@@ -308,7 +316,7 @@ fallback:
 invalidation_conditions:
   - "any input_revisions value no longer matches the current approved promotion record"
   - "the artifact authority metadata no longer matches the promotion record referenced by input_revisions"
-  - "a blocking evidence ledger entry is added after draft generation"
+  - "a blocking scope-local report.md Evidence Adoption Ledger entry is added after draft generation"
   - "the resolved canonical target changes or active symlink resolves to a different path"
   - "permission probe result changes from pass to fail or cannot be reproduced"
 output_contract:
@@ -319,19 +327,23 @@ output_contract:
 
 `implementation-planner` の manifest では `resolved_canonical_target` は `plan.md` になり、`design.md` は `forbidden_write_paths` に含める。
 
-All non-allowlisted paths are denied by construction. `report.md` promotion entries and `discussions/promotions/` attachments are explicitly forbidden to delegated authoring roles even when they can write evidence ledger entries.
+All non-allowlisted paths are denied by construction. `report.md` promotion entries, scope-local `report.md` Evidence Adoption Ledger, and `discussions/promotions/` attachments are explicitly forbidden to delegated authoring roles. Delegated authoring roles may write only candidate evidence / candidate ledger / handoff files under their own `discussions/delegated-authoring/<task-id>/` directory.
 
 Stale detection rule:
 
 - Draft generation records `input_revisions` and `stale_if`.
 - Validation recomputes current approved requirement/design promotion records before review, context-pack inclusion, and promotion.
 - If any recorded input revision differs from the current approved revision, the proposed draft becomes `stale` and cannot be used for promotion.
-- If only non-authoritative discussions changed, the draft is not automatically stale unless the evidence ledger adds a blocking entry.
+- If only non-authoritative discussions changed, the draft is not automatically stale unless the scope-local `report.md` Evidence Adoption Ledger adds a blocking entry.
 - A stale draft may be regenerated or explicitly reconciled by the same authoring role; reconciliation creates a new task manifest or records a new source revision snapshot.
 
 ## Evidence Adoption Ledger
 
-ledger は `discussions/evidence-adoption-ledger.md` または同等の structured artifact に置く。
+Canonical Evidence Adoption Ledger は scope-local `report.md` に置く。`discussions/...` 配下の `candidate-ledger.md` や handoff は delegated author / child specialist の candidate evidence only であり、adoption disposition の正本ではない。
+
+Supersession note: 旧案の `discussions/evidence-adoption-ledger.md` は v0 / proposal-era の例として superseded とする。v1 以降、canonical ledger は `report.md#evidence-adoption-ledger`、delegated author が書ける補助 artifact は `discussions/delegated-authoring/<task-id>/{candidate-ledger.md,handoff.md,...}` とする。
+
+`report.md` の canonical ledger entry 例:
 
 ```md
 ### EAD-0001
@@ -351,7 +363,7 @@ ledger は `discussions/evidence-adoption-ledger.md` または同等の structur
 
 不変条件:
 
-- child output は ledger entry なしに canonical draft へ反映しない。
+- child output / delegated author candidate evidence は scope-local `report.md` の canonical ledger entry なしに canonical draft へ反映しない。
 - `blocking: true` の unresolved item がある artifact は `authority: approved` に昇格できない。
 - rejected / deferred evidence は本文に混ぜず、必要なら rationale だけを残す。
 
@@ -397,10 +409,11 @@ ledger は `discussions/evidence-adoption-ledger.md` または同等の structur
 2. Main creates delegation invocation contract for `system-architect`.
 3. `system-architect` optionally requests bounded child evidence.
 4. Child specialists write evidence reports only.
-5. `system-architect` updates evidence adoption ledger.
+5. `system-architect` updates candidate ledger / handoff evidence only.
 6. `system-architect` writes `design.md` as `status: draft` / `authority: proposed`.
-7. Main reviews draft, fixes if needed, and requests final `spec-reviewer`.
-8. On pass, Main writes promotion record and promotes `authority: approved`.
+7. Main records the canonical Evidence Adoption Ledger disposition in scope-local `report.md`.
+8. Main reviews draft, fixes if needed, and requests final `spec-reviewer`.
+9. On pass, Main writes promotion record and promotes `status: approved` / `authority: approved`.
 
 ### Flow-B: Plan draft canonical authoring
 
@@ -408,10 +421,11 @@ ledger は `discussions/evidence-adoption-ledger.md` または同等の structur
 2. Main creates delegation invocation contract for `implementation-planner`.
 3. `implementation-planner` optionally requests bounded child evidence.
 4. Child specialists write evidence reports only.
-5. `implementation-planner` updates evidence adoption ledger.
+5. `implementation-planner` updates candidate ledger / handoff evidence only.
 6. `implementation-planner` writes `plan.md` as `status: draft` / `authority: proposed`, depending on approved design revision.
-7. Main reviews draft, fixes if needed, and requests final `spec-reviewer`.
-8. On pass, Main writes promotion record and promotes `authority: approved`.
+7. Main records the canonical Evidence Adoption Ledger disposition in scope-local `report.md`.
+8. Main reviews draft, fixes if needed, and requests final `spec-reviewer`.
+9. On pass, Main writes promotion record and promotes `status: approved` / `authority: approved`.
 
 ### Flow-C: Downstream context generation
 
@@ -547,8 +561,8 @@ Rollback:
   - finish purpose requires approved promotion record and `grants.issue_finish: true`.
   - phase-completion purpose requires approved artifacts, final reviewer evidence, and `grants.phase_completion: true`.
 - Permission tests:
-  - `system-architect` can write only design draft / evidence path.
-  - `implementation-planner` can write only plan draft / evidence path.
+  - `system-architect` can write only design draft / candidate evidence path.
+  - `implementation-planner` can write only plan draft / candidate evidence path.
   - child specialist cannot write canonical artifact.
   - failed probe disables write-scoped authoring.
 - Delegation tests:
@@ -557,7 +571,7 @@ Rollback:
   - child output without ledger disposition blocks promotion.
 - Review tests:
   - preflight pass is not accepted as final pass.
-  - final reviewer must see artifact + evidence ledger + promotion candidate.
+  - final reviewer must see artifact + scope-local `report.md` Evidence Adoption Ledger + promotion candidate.
 
 ## 要件 → 設計マッピング
 

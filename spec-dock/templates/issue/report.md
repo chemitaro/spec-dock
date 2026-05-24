@@ -59,6 +59,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 - `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
 - `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
 - Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
+- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
@@ -75,10 +76,11 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
   - `stale`, `rejected`, `superseded`, `blocked`
 - 必須証跡 field:
   - role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
+  - task manifest path/hash, input authority path/hash, session invocation path/hash, positive probe result, non-destructive negative probe result, diff gate result, fallback decision, report evidence destination
 - source_snapshot field:
   - source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
 - authority metadata field:
-  - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash
+  - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, manifest_hash, permission_profile_name, permission_profile_hash, write_session_invocation_hash, probe_run_id
 - grant keys:
   - review_input, planning_input, design_baseline, implementation_start, issue_ready, issue_finish, phase_completion
   - ワイルドカード grant semantics は非対応。`*`、`grants.*`、`all`、広すぎる role authority は invalid とする。

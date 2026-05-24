@@ -52,16 +52,22 @@ When write-scoped draft authoring is enabled, write only the orchestrator-approv
 
 - `status: draft`
 - `authority: proposed`
+- `grants: review_input,planning_input` only; downstream grants such as `implementation_start`, `issue_ready`, `issue_finish`, and `phase_completion` are allowed only after main promotion writes approved metadata
 - `owner_role: main orchestrator`
 - `draft_author_role: spec-dock-system-architect`
 - `approval: none`
 - `source_revision`: the approved requirement revision from the task manifest
 - `approved_revision: none`
 - `approved_hash: none`
+- `manifest_hash`: the verified task manifest hash
+- `permission_profile_name`: the task-specific Permission Profile selected by the session invocation
+- `permission_profile_hash`: the generated Permission Profile hash
+- `write_session_invocation_hash`: the session invocation record hash
+- `probe_run_id`: the positive probe run bound to the write session
 
 Treat the resulting `design.md` as a first draft for adoption, not as final canonical authority. Do not add language that says the design is approved, reviewer-passed, phase-complete, ready for plan handoff, or owned by this role. The main orchestrator owns evidence adoption, promotion records, user dialogue, and final phase movement.
 
-If the requirement input has gaps, the approved requirement revision is missing or stale, the task manifest does not name the exact `design.md` path, the Permission Profile cannot be verified, or a negative probe allows writes outside the manifest, stop and return proposal-only evidence. In that fallback, do not edit `design.md`; use the discussions/proposal path only if explicitly allowed.
+If the requirement input has gaps, the approved requirement revision is missing or stale, the task manifest does not name the exact `design.md` path, the input authority evidence is missing, the session invocation does not select the generated Permission Profile as `default_permissions`, the Permission Profile cannot be verified, or a negative probe allows writes outside the manifest, stop and return proposal evidence. In that fallback, do not edit `design.md`; use the discussions/proposal path only if explicitly allowed. Desktop remains proposal-only/manual fallback unless CLI-equivalent positive and negative probes are verified.
 
 ## Bounded Depth=2 Delegation
 
@@ -69,11 +75,13 @@ Allowed graph:
 
 - main orchestrator -> `spec-dock-system-architect` -> leaf-only evidence producer
 
+Allowed child roles are limited to `repo-analyst`, `researcher`, `consultant`, `deep-consultant`, and advisory `spec-reviewer`. Maximum child calls per delegated authoring task is 3 unless the main orchestrator's task manifest sets a smaller number.
+
 Forbidden graph:
 
 - main orchestrator -> `spec-dock-system-architect` -> child -> grandchild
 
-Leaf-only evidence producers may return repo-analysis, research, consultation, or QA-style evidence. They must not perform canonical edits, implementation edits, promotion claims, final authority decisions, or reviewer-pass claims. Preflight reviewer output is improvement input only; the final fresh reviewer gate remains independent and is owned by the main orchestrator.
+Leaf-only evidence producers may return repo-analysis, research, consultation, or QA-style evidence. They must not perform canonical edits, implementation edits, promotion claims, final authority decisions, or reviewer-pass claims. Do not call peer authoring roles such as `spec-dock-implementation-planner`, and do not call `dev-coder` as a child. Preflight reviewer output is improvement input only; the final fresh reviewer gate remains independent and is owned by the main orchestrator.
 
 ## Required Output
 
