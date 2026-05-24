@@ -1,0 +1,17 @@
+{
+  "promotion_record": {
+    "promotion_id": "iss-00126-requirement-promotion-20260524t025618z",
+    "authority": "approved",
+    "status": "approved",
+    "artifact_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/requirement.md",
+    "approved_revision": "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2",
+    "approved_hash": "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2",
+    "approved_grants": ["review_input", "planning_input"],
+    "grants": ["review_input", "planning_input"],
+    "approver": "main-orchestrator",
+    "final_reviewer": "Lorentz spec-reviewer",
+    "approved_at": "2026-05-24T02:56:18Z",
+    "ledger_blockers_remaining": 0,
+    "reviewer_evidence_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/input-authority/requirement-reviewer.json"
+  }
+}

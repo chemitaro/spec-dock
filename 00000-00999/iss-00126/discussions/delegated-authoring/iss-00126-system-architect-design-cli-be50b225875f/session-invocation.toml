@@ -1,0 +1,19 @@
+executor = "codex-cli"
+host_surface = "cli"
+role = "system-architect"
+scope_id = "iss-00126"
+target_artifact_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md"
+manifest_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-be50b225875f/manifest.toml"
+manifest_hash = "def423816fb282794608050bf39741765071a51a48d03e202df4d26c8e68a310"
+permission_profile_name = "spec-dock-iss-00126-system-architect-design-cli-be50b225875f"
+permission_profile_hash = "8f385660a6d18b14efaa6d71f7b950434ff95a9609c047e95a3da71922ec587a"
+default_permissions = "spec-dock-iss-00126-system-architect-design-cli-be50b225875f"
+positive_probe_id = "iss-00126-system-architect-design-cli-be50b225875f-positive"
+positive_probe_target = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md"
+negative_probe_plan_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-be50b225875f/probe-plan.md"
+diff_gate_plan_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-be50b225875f/probe-plan.md"
+acceptance_counted = true
+
+[config_overrides]
+default_permissions = "spec-dock-iss-00126-system-architect-design-cli-be50b225875f"
+old_sandbox_settings_absent = true

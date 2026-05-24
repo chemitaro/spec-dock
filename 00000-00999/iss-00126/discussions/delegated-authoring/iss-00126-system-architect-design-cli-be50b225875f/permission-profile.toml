@@ -1,0 +1,14 @@
+default_permissions = "spec-dock-iss-00126-system-architect-design-cli-be50b225875f"
+
+[permissions."spec-dock-iss-00126-system-architect-design-cli-be50b225875f".filesystem]
+":minimal" = "read"
+
+[permissions."spec-dock-iss-00126-system-architect-design-cli-be50b225875f".filesystem.":workspace_roots"]
+"." = "read"
+"spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md" = "write"
+"spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-be50b225875f" = "write"
+".env" = "deny"
+".env.*" = "deny"
+
+[permissions."spec-dock-iss-00126-system-architect-design-cli-be50b225875f".network]
+enabled = false

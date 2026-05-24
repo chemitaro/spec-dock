@@ -4,7 +4,7 @@ ID: "epic-00112"
 タイトル: "Delegated Authoring Architecture for Spec Workflow"
 状態: "approved"
 作成者: "Codex"
-最終更新: "2026-05-23"
+最終更新: "2026-05-24"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
 ---
@@ -20,13 +20,13 @@ ID: "epic-00112"
   - Child Issues #113..#118 are implemented, committed, and closed.
   - Delegated authoring is shipped as draft-only workflow evidence, role skills, phase gates, Codex thin adapters, and dogfooding pilot evidence.
   - v1 amendment requirement/design/plan authoring is review-passed, and additive Issues `iss-00120`〜`iss-00125` / #120〜#125 are created with approved specs.
-  - Additive v1 Issues `iss-00120`〜`iss-00125` / #120〜#125 are implemented, issue-finished, and closed.
-  - G10 Epic-wide pre-PR quality gate passed against the full `main` baseline to PR-bound clean `HEAD` delta before PR #119 update.
+  - Additive v1 Issues `iss-00120`〜`iss-00125` / #120〜#125 are historical completed work.
+  - Corrective Issue `iss-00126` / #126 is now the active v1 correction for write-capable delegated draft authoring because user review found the prior fallback/read-only implementation did not satisfy the Epic's intended write-capable design/plan draft authoring requirement.
+  - `iss-00126` has passed post-promotion `validate` and full-suite verification after its main-orchestrator promotion metadata was recorded. Fresh QA/spec/code findings were then fixed or dispositioned, targeted matrices passed, and post-P1 full-suite rerun passed. The latest code P1 added positive-probe fail-closed enforcement and its focused matrix passed. G10 Epic-wide pre-PR quality gate has deep-consultant, QA, fresh code-reviewer, and fresh spec-reviewer pass results after the latest G10 evidence repair. Final post-report verification also passed: `uv run python -m unittest discover -v` (`Ran 895 tests in 432.904s OK`), `./spec-dock/scripts/spec-dock validate` (`nodes=64`), and `git diff --check`.
 - 次のマイルストーン:
-  - Update Epic PR #119 after the completed G10 pass.
+  - Update Epic PR #119 and verify post-push PR checks/status.
 - ブロッカー:
-  - None for v0 historical implementation closure.
-  - None for G10; PR #119 update gate is unblocked.
+  - None for the corrective implementation gate. PR #119 update / push and post-push checks remain as delivery steps.
 
 ## 決定事項（ADRリンク） (必須)
 - No ADR was created in this Epic.
@@ -35,7 +35,7 @@ ID: "epic-00112"
   - Manual authoring remains valid.
   - Fresh `spec-reviewer` remains required for phase promotion and final closure.
   - `.codex/agents` support is a thin Codex adapter contract.
-  - `.github/agents` / Copilot support, write-capable delegation, runtime validation, and role registry expansion remain deferred.
+  - `.github/agents` / Copilot support and role registry expansion remain deferred; write-capable delegated draft authoring is now in-scope through corrective Issue `iss-00126`.
   - `iss-00117` closed as `adapter_contract_only`; live Codex host callability is not claimed.
 
 ## Spec Interpretation / Decision Ledger
@@ -57,13 +57,13 @@ ID: "epic-00112"
   - disposition: resolved.
   - evidence: `plan.md` v1 Issue 007〜012 include provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
 - v1 execution state:
-  - decision: v1 amendment Issues are created, approved, implemented, issue-finished, and closed.
-  - disposition: accepted.
-  - evidence: `iss-00120`〜`iss-00125` / #120〜#125 closure plus issue-local reports and implementation commits through `fc80c94bb97995e1c9e963bcb7886f53f43fa47d`.
+  - decision: v1 amendment Issues `iss-00120`〜`iss-00125` are historical completed work, but they did not close the user-accepted write-capable delegated draft authoring intent.
+  - disposition: superseded for final Epic closure by corrective Issue `iss-00126`.
+  - evidence: `iss-00126` requirement/design/plan/report and user follow-up on 2026-05-24.
 - v1 Epic-wide pre-PR quality gate:
-  - decision: After all v1 Issues complete raw implementation and before Epic PR #119 is updated, run fresh `deep-consultant` and `spec-reviewer` gates over the full development-baseline-to-final-implementation delta.
-  - disposition: accepted.
-  - evidence: user follow-up on 2026-05-24; `plan.md` now defines G10 Epic-wide pre-PR quality gate and final exit contract.
+  - decision: After corrective Issue `iss-00126` completes raw implementation and before Epic PR #119 is updated, run fresh `deep-consultant` and `spec-reviewer` gates over the full development-baseline-to-final-implementation delta.
+  - disposition: passed; fresh deep-consultant, QA, code-reviewer, and spec-reviewer gates passed after latest G10 evidence repair.
+  - evidence: `iss-00126` plan G10; G10 shared diff artifact; Aristotle deep-consultant approve; Poincare QA pass; Chandrasekhar code-review pass; James spec-review pass; Schrodinger/Gauss/Carson findings dispositioned in `iss-00126` report.
 
 ## 完了した Issue / PR / Release (必須)
 - #113 Delegated Authoring Policy Foundation: CLOSED.
@@ -72,6 +72,7 @@ ID: "epic-00112"
 - #116 Delegated Authoring Phase Gates: CLOSED.
 - #117 Codex Delegated Author Adapters: CLOSED.
 - #118 Delegated Authoring Dogfooding Pilot: CLOSED.
+- #126 Write Capable Delegated Draft Authoring Correction: OPEN / active correction.
 - Epic PR #119 Delegated Authoring Architectureを導入: OPEN, non-draft, mergeable at creation-time audit.
 
 ## v0 受け入れ条件（E-AC）の履歴達成状況 (必須)
@@ -93,7 +94,7 @@ ID: "epic-00112"
 - E-AC-007: pass
   - Evidence: #118 recorded provider/consumer parity evidence, `validate`, `sync`, and `git diff --check`.
 - E-AC-008: pass
-  - Evidence: #118 recorded pilot metrics and `write-capable delegation remains deferred`.
+  - Evidence: #118 recorded pilot metrics for the historical fallback contract. This v0 evidence is superseded for write-capable acceptance by `iss-00126`.
 - E-AC-009: pass
   - Evidence: #118 exercised the real `adapter_contract_only` fallback as negative/blocked-case evidence with `host_invocation_verified=false`.
 
@@ -104,9 +105,9 @@ ID: "epic-00112"
 - E-AC-002: pass
   - Evidence: `iss-00121` / #121 proposed-artifact blocking in context-pack and lifecycle gates.
 - E-AC-003: pass
-  - Evidence: `iss-00124` / #124 `system-architect` draft `design.md` authoring contract with `authority: proposed` and no promotion authority.
+  - Evidence: `iss-00126` implemented and dogfooded the actual write-capable `system-architect` draft `design.md` authoring path. The delegated session used the generated issue-cwd Permission Profile, produced substantive non-metadata `design.md` body delta, preserved delegated draft/proposed authority until main promotion, denied requirement/peer/report/source/tests/config/secrets boundaries, and post-promotion `validate` / targeted / full-suite checks passed.
 - E-AC-004: pass
-  - Evidence: `iss-00124` / #124 `implementation-planner` draft `plan.md` authoring contract with approved design revision reference, `authority: proposed`, and no promotion authority.
+  - Evidence: `iss-00126` implemented and dogfooded the actual write-capable `implementation-planner` draft `plan.md` authoring path with approved requirement/design inputs. The delegated session used the generated issue-cwd Permission Profile, produced substantive non-metadata `plan.md` body delta, preserved delegated draft/proposed authority until main promotion, denied requirement/peer/report/source/tests/config/secrets boundaries, and post-promotion `validate` / targeted / full-suite checks passed.
 - E-AC-005: pass
   - Evidence: `iss-00120`, `iss-00121`, and `iss-00125` promotion record / lifecycle handoff evidence.
 - E-AC-006: pass
@@ -194,57 +195,55 @@ ID: "epic-00112"
   - Each v1 Issue records provider source, dogfooding validation surface, test surface, rollback / fallback, and closes mapping.
 
 ### Epic-wide Pre-PR Quality Gate
-- phase: pre-PR update / final amendment rollout
+- phase: corrective pre-PR update / final amendment rollout
 - amendment reviewer:
-  - Fermat (`019e55c0-c71f-7302-bcd1-97a3097b1f20`) `review_status: fail`.
-    - findings: baseline/final endpoints were not pinned; non-blocking findings could remain unresolved; report evidence fields were incomplete.
-    - disposition: fixed by pinning PR #119 `baseRefOid...HEAD`, requiring disposition for every finding, and adding G10 evidence fields.
-  - Huygens (`019e55c4-4735-7540-a831-936cc9f47d50`) `review_status: pass`.
-    - finding: none.
-    - reason: G10 now defines shared diff endpoints/evidence and blocks PR update until all findings have accepted dispositions.
+  - Historical G10 reviewer passes remain recorded for the pre-`iss-00126` delta only.
+  - Current corrective G10 has fresh `deep-consultant`, QA, code-reviewer, and spec-reviewer pass results after the latest G10 evidence repair.
 - timing:
-  - Run only after `iss-00120`〜`iss-00125` complete raw implementation and issue-local closure evidence.
+  - Run only after `iss-00126` completes raw implementation and issue-local closure evidence.
   - Run before updating, pushing, or refreshing Epic PR #119.
 - reviewers:
-  - Fresh `deep-consultant`: first review failed; findings fixed; final re-review passed with Nash the 2nd.
-  - Fresh `spec-reviewer`: first review failed; first re-review failed on endpoint/scope alignment; final re-review passed with Boyle the 2nd.
+  - Fresh `deep-consultant`: pass / approve (Aristotle), findings none.
+  - Fresh QA: pass (Poincare), findings none.
+  - Fresh `code-reviewer`: pass (Chandrasekhar), findings none.
+  - Fresh `spec-reviewer`: pass (James), findings none after Carson P2 fixes.
 - review scope:
-  - Full delta from captured Epic PR #119 `baseRefOid` to the clean local `HEAD` that will update PR #119.
+  - Full delta from the captured development baseline to the clean local `HEAD` that includes `iss-00126` and will update PR #119.
   - Provider source, dogfooding workspace parity, runtime/test/docs/templates/skills/agent assets, active reports, validation/sync evidence, and PR rollout evidence.
 - pass condition:
   - Every finding from either reviewer receives disposition `fixed`, `superseded`, or `explicitly_deferred_with_user_acceptance`.
   - Fixed or superseded findings are revalidated and re-reviewed until the shared G10 evidence has no unresolved findings.
   - PR update / push is blocked while any finding has disposition `open`, `pending`, or `unresolved`.
-- evidence fields to fill at G10:
-  - base_ref_name: `main`.
+- evidence fields to fill at corrective G10:
+  - base_ref_name: `main` (`develop` is not a valid local ref; `origin/HEAD -> origin/main`).
   - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`.
   - head_ref_name: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`.
-  - final_pr_update_head: clean `HEAD` at reviewer handoff; this intentionally avoids self-referential evidence hashes.
-  - shared_diff_artifact: `discussions/20260523t202823z-disc-g10-epic-wide-pre-pr-quality-gate.md`.
+  - local_branch_at_handoff: `iss-00125-authority-aware-delegated-authoring-dogfooding-pilot`.
+  - pr_head_ref_at_handoff: `iss-00118-delegated-authoring-dogfooding-pilot`.
+  - final_pr_update_head: `4365d38f5d88ac4ace362837ce55fdf8e2d6e404` plus current working-tree changes included in the shared diff artifact before PR update.
+  - shared_diff_artifact: `discussions/20260524t043441z-disc-g10-shared-diff-evidence.md`.
+  - immutable_committed_diff_command: `git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`; result `270 files changed, 23075 insertions(+), 898 deletions(-)`.
+  - immutable_committed_name_status_command: `git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`; result recorded in `discussions/20260523t204806z-disc-g10-full-name-status.md` with `270` entries.
   - full_name_status_artifact: `discussions/20260523t204806z-disc-g10-full-name-status.md`.
-  - diff_stat_command: `git diff --stat 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
-  - diff_stat_result: `270 files changed`, `23075 insertions(+)`, `898 deletions(-)`.
-  - diff_name_status_command: `git diff --name-status 421fd4c02fd2649b8c29ec9549a961b7824b9149...HEAD`
-  - diff_name_status_result: full artifact records `270` entries.
-  - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`, `python -m unittest discover -v`.
-  - validation_results: `spec-dock: ok (validate) nodes=63`; `git diff --check` pass; active not set with active-none fallback; `python -m unittest discover -v` ran 847 tests in 400.478s and passed.
-  - deep_consultant_reviewer: `Euclid the 2nd` (`019e5689-c524-7633-a5ea-4180af5d4986`) first review `fail`; fixed findings re-reviewed by `Planck the 2nd` (`019e56b2-ddb6-7233-bc48-164a3a485696`) as `pass`; final `base...HEAD` re-review by `Nash the 2nd` (`019e56b9-f3cd-7ca2-b721-0a9022957699`) as `pass`.
-  - spec_reviewer: `Euler the 2nd` (`019e5689-fa44-71f3-8414-e8d1eab3a5a5`) first review `fail`; first re-review by `Galileo the 2nd` (`019e56b3-39e3-7ca2-9af5-8523229256bb`) still `fail`; final `base...HEAD` re-review by `Boyle the 2nd` (`019e56b9-f454-7e82-a3d7-737fb5ee9821`) as `pass`.
-  - findings_disposition_table:
-    - `DC-P1-close-bypass`: superseded by preserving `issue finish` as the authority-gated lifecycle closure path and restoring explicit `spec-dock close <target>` as a GitHub issue maintenance command that does not claim lifecycle completion or active clear.
-    - `DC-P1-missing-full-name-status`: fixed by `20260523t204806z-disc-g10-full-name-status.md`.
-    - `SR-P1-dirty-endpoint`: fixed by `fc80c94bb97995e1c9e963bcb7886f53f43fa47d` and then superseded by final `base...HEAD` G10 scope alignment.
-    - `SR-P1-stale-issue-report-wording`: fixed by additive final closure addenda in `iss-00124` and `iss-00125` reports.
-    - `SR-P1-final-head-scope`: fixed by regenerating G10 evidence and name-status artifacts against `base...HEAD`; final spec-reviewer re-review passed.
-    - `SR-P1-deep-consultant-pass-not-recorded`: fixed by recording Planck the 2nd's and Nash the 2nd's `consultant_status: pass`; final spec-reviewer re-review passed.
-  - re_review_verdicts: deep-consultant pass; spec-reviewer pass.
-  - post_pr_automated_review_disposition:
-    - `Codex-P2-tomli-python310`: fixed by declaring `tomli>=2.0.1` for Python `<3.11` and updating `uv.lock`.
-    - `Codex-P1-close-active-coupling`: fixed by restoring explicit close maintenance flow without active issue coupling and documenting the command/lifecycle separation in provider and dogfooding workflow docs.
-    - targeted verification: `python -m unittest tests.cli_runtime.test_close tests.cli_runtime.test_runtime_close_s12 tests.cli_runtime.test_issue_lifecycle tests.domain_runtime.test_authority -v` -> 55 tests OK; `git diff --check` pass.
-  - pr_update_push_evidence: pending.
+  - working_tree_supplement_artifact: `discussions/20260524t043441z-disc-g10-shared-diff-evidence.md`.
+  - validation_commands: `./spec-dock/scripts/spec-dock validate`, `git diff --check`, `git status --short`, `./spec-dock/scripts/spec-dock active show`, `uv run python -m unittest discover -v`.
+  - validation_results:
+    - `./spec-dock/scripts/spec-dock validate`: pass (`spec-dock: ok (validate) nodes=64`).
+    - `git diff --check`: pass.
+    - `./spec-dock/scripts/spec-dock active show`: active initiative `init-local-00003`, epic `epic-00112`, issue `iss-00126`.
+    - `uv run python -m unittest discover -v`: pass after latest Curie/Ampere P1 repairs (`Ran 892 tests in 436.168s OK`).
+    - post-P1 targeted matrix: `uv run python -m unittest tests.domain_runtime.test_authority tests.domain_runtime.test_delegated_authoring tests.cli_runtime.test_delegated_authoring tests.cli_runtime.test_validate tests.cli_runtime.test_runtime_active_s05 tests.cli_runtime.test_issue_lifecycle -v`: pass (`Ran 125 tests in 115.036s OK`).
+    - post-Zeno positive-probe authority repair focused matrix: `uv run python -m unittest tests.domain_runtime.test_authority tests.cli_runtime.test_validate tests.cli_runtime.test_issue_lifecycle -v`: pass (`Ran 95 tests in 109.130s OK`).
+    - `gh pr view 119 --json baseRefName,baseRefOid,headRefName,headRefOid,url,state,isDraft,mergeable`: pass; PR #119 open, non-draft, mergeable, base `main`, base OID `421fd4c02fd2649b8c29ec9549a961b7824b9149`, PR head OID `4365d38f5d88ac4ace362837ce55fdf8e2d6e404`.
+  - deep_consultant_reviewer: Aristotle approve; findings none; residual risk accepted for PR update gate because depth policy is contract/test enforced rather than whole-agent-graph runtime monitoring.
+  - spec_reviewer: James pass; findings none after Carson P2 fixes.
+  - code_reviewer: Chandrasekhar pass; findings none.
+  - findings_disposition_table: Schrodinger P1/P2 fixed; Gauss P1 fixed; Carson P2/P2 fixed and re-reviewed by James.
+  - re_review_verdicts: fresh spec/code pass.
+  - pr_update_push_evidence: unblocked by corrective G10; pending PR update / push.
 - current status:
-  - G10 passed; all v1 Issues are closed and PR #119 update gate is unblocked.
+  - Corrective G10 evidence has been refreshed after `iss-00126` main promotion and full verification, then repaired for immutable base-OID diff evidence after Schrodinger review and exact working-tree scope evidence after Carson review.
+  - PR #119 update gate is unblocked by fresh code/spec re-review; push/update and post-push checks remain.
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
@@ -258,8 +257,8 @@ ID: "epic-00112"
 ## フォローアップ（別Issue化） (必須)
 - Optional future work:
   - Dedicated Codex host schema/callability verification if the product wants to promote `adapter_contract_only` to verified host invocation.
-  - Separate Epic/Issue for write-capable delegation, runtime validation, role registry, or `.github/agents` / Copilot support.
-- Current Epic does not require these follow-ups for closure because they are explicitly out of scope or deferred.
+  - Separate Epic/Issue for `.github/agents` / Copilot support or broader role registry expansion.
+- Write-capable delegated draft authoring and runtime validation are no longer follow-up-only items; they are handled by `iss-00126` before this Epic can close.
 
 ## 省略/例外メモ (必須)
 - Live Codex host invocation is not verified by this Epic.

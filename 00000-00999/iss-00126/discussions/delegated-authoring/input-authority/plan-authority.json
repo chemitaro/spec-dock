@@ -1,0 +1,28 @@
+{
+  "source_revisions": {
+    "requirement": "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2",
+    "design": "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db"
+  },
+  "input_authority": {
+    "requirement": {
+      "promotion_record_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/input-authority/requirement-promotion.json",
+      "reviewer_evidence_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/input-authority/requirement-reviewer.json",
+      "approved_revision": "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2",
+      "approved_content_hash": "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2",
+      "reviewer_verdict": "pass",
+      "reviewer_target_hash": "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2",
+      "required_grants": ["review_input", "planning_input"],
+      "stale_check": "fresh"
+    },
+    "design": {
+      "promotion_record_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/input-authority/design-promotion.json",
+      "reviewer_evidence_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/input-authority/design-reviewer.json",
+      "approved_revision": "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db",
+      "approved_content_hash": "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db",
+      "reviewer_verdict": "pass",
+      "reviewer_target_hash": "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db",
+      "required_grants": ["design_baseline"],
+      "stale_check": "fresh"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+executor = "codex-cli"
+host_surface = "cli"
+role = "implementation-planner"
+scope_id = "iss-00126"
+target_artifact_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/plan.md"
+manifest_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/manifest.toml"
+manifest_hash = "76904f5528514d097ce0196891ff09ec4732b43469ba8f7fae70329bb8160b33"
+permission_profile_name = "spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a"
+permission_profile_hash = "21ff965384bf27993705e73147ef6abd17e5170a546b7d52af2459868dc1d083"
+default_permissions = "spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a"
+positive_probe_id = "iss-00126-implementation-planner-plan-cli-e03b5e56572a-positive"
+positive_probe_target = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/plan.md"
+negative_probe_plan_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/probe-plan.md"
+diff_gate_plan_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/probe-plan.md"
+acceptance_counted = true
+
+[config_overrides]
+default_permissions = "spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a"
+old_sandbox_settings_absent = true

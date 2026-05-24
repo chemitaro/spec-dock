@@ -1,0 +1,20 @@
+executor = "desktop-fallback"
+host_surface = "desktop"
+role = "system-architect"
+scope_id = "iss-00126"
+target_artifact_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md"
+manifest_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-desktop-85455ab6a889/manifest.toml"
+manifest_hash = "6571c947beb173809a3d86192c01807b672f6b8d8f8a1d759721d79d07c820c7"
+permission_profile_name = "spec-dock-iss-00126-system-architect-design-desktop-85455ab6a889"
+permission_profile_hash = "86adc92e411f5203e02077302aca5c94a27448eebd6c36f6d09420f57eeb6d6e"
+default_permissions = "spec-dock-iss-00126-system-architect-design-desktop-85455ab6a889"
+positive_probe_id = "iss-00126-system-architect-design-desktop-85455ab6a889-positive"
+positive_probe_target = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md"
+negative_probe_plan_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-desktop-85455ab6a889/probe-plan.md"
+diff_gate_plan_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-desktop-85455ab6a889/probe-plan.md"
+host_surface_acceptance_eligible = false
+acceptance_counted = false
+
+[config_overrides]
+default_permissions = "spec-dock-iss-00126-system-architect-design-desktop-85455ab6a889"
+old_sandbox_settings_absent = true

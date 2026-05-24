@@ -1,0 +1,28 @@
+schema = "spec-dock.delegated-authoring.manifest.v1"
+role = "implementation-planner"
+scope_id = "iss-00126"
+target = "plan"
+host_surface = "cli"
+target_artifact_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/plan.md"
+input_authority_file = "spec-dock/active/issue/discussions/delegated-authoring/input-authority/plan-authority.json"
+input_authority_hash = "e03b5e56572aa8c209117c6c0fdb9d9d2e47fd79e63d29f3aa67d851656ac1f6"
+permission_profile_name = "spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a"
+positive_probe_id = "iss-00126-implementation-planner-plan-cli-e03b5e56572a-positive"
+positive_probe_target = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/plan.md"
+negative_probe_sentinel = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/.iss-00126-implementation-planner-plan-cli-e03b5e56572a.spec-dock-permission-probe-denied"
+acceptance_counted = true
+
+[generated_artifacts]
+manifest = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/manifest.toml"
+permission_profile = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/permission-profile.toml"
+probe_plan = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/probe-plan.md"
+session_invocation = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a/session-invocation.toml"
+
+[source_revisions]
+design = "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db"
+requirement = "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2"
+
+[diff_gate]
+required = true
+forbidden_diff = "none"
+dirty_diff_abort = true
