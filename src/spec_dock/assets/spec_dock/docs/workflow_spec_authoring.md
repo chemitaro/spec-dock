@@ -21,27 +21,21 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、次 phase へ進む前にユーザーへヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 
-## 権限メタデータ（Authority metadata / grants / Promotion Record）
+## 権限境界（Authority boundary / Promotion Record）
 
-Delegated canonical draft authoring を使う場合、artifact や report evidence は次の authority metadata を明示します。
+Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority です。Sub-agent は canonical docs を直接編集しません。Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report です。
 
-- `status`: `draft` / `reviewed` / `approved` / `blocked` / `stale` / `superseded`
-- `authority`: `proposed` / `approved` / `historical`
-- `owner_role`: canonical artifact と phase promotion を所有する role。通常は main orchestrator。
-- `draft_author_role`: delegated draft を作成した role。未使用時は `N/A`。
-- `approval`: reviewer gate と main orchestrator promotion の evidence reference。未承認なら `none`。
-- `source_revision`: delegated draft が読んだ upstream artifact revision。
-- `approved_revision`: promotion された canonical artifact revision。未承認なら `none`。
-- `approved_hash`: promotion された canonical content hash。未承認なら `none`。
-- `manifest_hash`: delegated authoring task manifest の content hash。未使用時は `none`。
-- `permission_profile_name`: delegated write session に選択した Permission Profile 名。未使用時は `none`。
-- `permission_profile_hash`: selected Permission Profile の content hash。未使用時は `none`。
-- `write_session_invocation_hash`: delegated write session invocation の normalized hash。未使用時は `none`。
-- `probe_run_id`: positive / negative probe run の識別子。未使用時は `none`。
+Discussion output filenames follow existing discussion rules:
 
-Grant keys は明示的かつ完全一致で扱います。許可される key set は `review_input`, `planning_input`, `design_baseline`, `implementation_start`, `issue_ready`, `issue_finish`, `phase_completion` です。role 名、scope 名、workflow consent、または reviewer pass から暗黙の write 権限を推定してはなりません。
+- `<ts>-<kind>-<slug>.md`
+- `<ts>-<nn>-<kind>-<slug>.md` for same-second collisions
 
-Wildcard grant semantics はありません。`*`, `grants.*`, `all`, `admin`, `owner`, broad role authority のような包括 grant は無効として扱い、必要な exact key がない操作は blocked / incomplete にします。review input、planning input、design baseline、implementation start、issue ready、issue finish、phase completion はそれぞれ対応する grant key が必要です。
+Sub-agent-created draft は最低限、`created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、fallback decision、report evidence destination、adoption ledger note を持ちます。Evidence Adoption Ledger fields は ID、adoption_status、source、source_role、claim、target_artifact、target_section、rationale、evidence_strength、evidence_path、adopter、reviewer、blocking、next_action を標準にします。標準 delegated draft evidence として task manifest hash、Permission Profile hash、session invocation hash、probe run id、session hash を要求しません。これらは historical evidence または明示された例外証跡としてだけ扱います。
+権限や採用可否の wildcard 指定は使いません。`*`、`grants.*`、`all` は invalid wildcard token として扱い、scope-local discussion direct-write の根拠にしてはなりません。
+
+Sub-agent-created draft は `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to`、reviewer pass、phase completion、implementation readiness を自己主張してはなりません。`reflected_to` は実際に canonical artifact へ反映済みの対象だけを表し、予定先は `intended_targets` で表します。
+
+Accepted ADR は architecture decision authority を持ち得ますが、discussion draft / research / disc は evidence です。Implementation readiness、phase promotion、issue ready、issue finish、phase completion は、main orchestrator が evidence を canonical docs と `report.md` に再記述し、required reviewer gates が pass した後に成立します。
 
 Promotion Record は delegated draft や reviewer output を canonical authority に昇格した事実だけを記録します。canonical artifact promotion の `promotion_record` は少なくとも `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision` を持ちます。runtime active selection の promotion record は lifecycle gate 用の最小 record として `status`, `authority`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promotion_decision` を持ち、`source_revision` / `approved_revision` / `approved_hash` / `reviewer_target_hash` は active entry id に対応する `active:<id>` と一致している必要があります。`reviewer_target_hash` と `approved_hash` が一致しない場合、`source_revision` / `approved_revision` が一致しない場合、または active entry id と promotion record が一致しない場合、その promotion は invalid であり downstream authority には使えません。Mismatch / stale を発見した場合は report に reason と next action を残し、fresh reviewer gate と Promotion Record の再作成まで block します。
 
@@ -52,16 +46,16 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 - Issue scope の spec authoring では、reviewer / read-only specialist sub-agent を使う前に、current repo/worktree、active issue、session、named role に限定した issue-scoped workflow delegation consent を確認し、`report.md` に記録する。
 - 現在のユーザー指示が「この issue workflow 内では reviewer / specialist を自律利用してよい」と明示している場合、その指示を同一 issue / repo / session / named role に限定した consent として扱える。
 - consent がある場合、orchestrator は requirement / design / plan の各 phase ごとに再確認せず、必要な `spec-reviewer` や read-only specialist を起動してよい。
-- consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation を許可しない。scope が変わる場合は再確認する。
-- read-only specialist consent と write-scoped delegated authoring consent は別物として扱う。read-only consent は調査、レビュー、提案、proposal evidence だけを許可し、canonical `design.md` / `plan.md` の書き込み根拠にはならない。
-- write-scoped delegated authoring consent は、対象 node、phase、role、artifact、task manifest、input authority、Permission Profile、session invocation、probe、diff gate、fallback を明示した task-local consent として別途記録する。workflow-wide blanket consent、manual edit、unprofiled session、static broad profile、または Desktop-only fallback は write-scoped acceptance に数えない。
+- consent は destructive action、external publishing、credentialed access、scope expansion、named role 以外の delegation、または canonical docs への直接 write を許可しない。scope が変わる場合は再確認する。
+- read-only specialist consent と scope-local discussion direct-write consent は別物として扱う。Sub-agent authoring output は proposal-only に限定しないが、許可される write は対象 scope `discussions/` direct child の flat Markdown draft / analysis / discussion-local report に限る。
+- scope-local discussion direct-write consent は、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を明示した task-local consent として別途記録する。workflow-wide blanket consent、manual/unprofiled broad write、static broad profile、または Desktop-only fallback は adoption-ready delegated output に数えない。
 
 ## 委任 authoring policy foundation（delegated authoring policy foundation）
 
 - Main orchestrator は canonical `requirement.md` / `design.md` / `plan.md` / `report.md` の最終 ownership、user dialogue、canonical integration、Evidence Adoption Ledger、Promotion Record、phase promotion を所有する。
-- Delegated authoring は `authority: proposed` / `status: draft` の draft-only evidence であり、final canonical authority ではない。delegated output は main orchestrator が採否を判断し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
-- Delegated authoring を使う場合は、invocation ごとに `node + phase + role + artifact`、scope、source artifacts、allowed actions、forbidden actions、output expectation、stop / invalidation condition を明示し、`report.md` に残す。workflow-wide blanket consent は draft-only authoring delegation の根拠にしない。
-- Delegated role は task manifest が明示し、Permission Profile / host probe が検証した draft artifact だけを更新できる。System architect は approved requirement を入力にした `design.md` draft、implementation planner は approved requirement/design を入力にした `plan.md` draft に限定される。
+- Delegated authoring は scope-local flat `discussions/` evidence であり、final canonical authority ではない。delegated output は main orchestrator が採否を判断し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
+- Delegated authoring を使う場合は、invocation ごとに node、role、scope、source artifacts、allowed discussion path rule、forbidden actions、output expectation、stop / invalidation condition を明示し、`report.md` に残す。workflow-wide blanket consent は direct-write authoring delegation の根拠にしない。
+- Delegated role は対象 scope `discussions/` direct child の naming-rule compliant Markdown だけを作成できる。既存 discussion file の編集は main orchestrator が明示指定した proposed draft に限定する。
 - Delegated role は previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result を編集・確定・上書きしてはならない。destructive action、external publishing、credentialed access、`.github/agents` / Copilot support はこの workflow の delegated authoring policy では許可しない。
 - Delegated draft が unavailable / skipped / blocked / stale / rejected / superseded の場合でも、manual authoring path は有効である。ただし delegated authoring を使った evidence として扱ってはならない。
 - Delegated draft は fresh `spec-reviewer` pass の代替ではない。`spec-reviewer` は draft 自体ではなく、main orchestrator が統合した canonical artifact と evidence を review する。
@@ -70,8 +64,8 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 
 - Delegated draft lifecycle state は `requested` / `produced` / `integrated` / `partially_integrated` / `rejected` / `superseded` / `blocked` / `stale` のいずれかで記録する。
 - `stale`、`rejected`、`superseded`、`blocked` の delegated draft は promotion evidence に使えない。`partially_integrated` は採用部分、rejected portions、blockers、promotion decision を `report.md` に明示した場合だけ採用部分の補助 evidence にできる。
-- Delegated draft evidence record は少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を持つ。
-- `source_snapshot` を記録する場合は source_revision、requirement_reviewer_pass_reference、design_reviewer_pass_reference、generated_at、stale_if を含める。
+- Delegated draft evidence record は少なくとも `created_by_role`、scope、source artifacts、draft artifact path、intended targets、`adoption_status: unreviewed`、`reflected_to: []`、diff guard result、integration result、rejected portions、blockers、reviewer result、promotion decision を持つ。
+- `source_snapshot` を記録する場合は source revision、reviewer pass reference、generated_at、stale_if を含める。
 - Failure-mode record は expected verdict、allowed next action、report evidence path、promotion eligibility を持つ。
 - Required failure modes は missing consent、missing/stale previous reviewer pass、requirement gap during design、design gap during plan、role unavailable、forbidden action attempt、stale draft、superseded draft、missing draft evidence when delegated use is claimed、reviewer unavailable/denied/waived/provisional を含む。
 - Delegated draft evidence を使った場合、対象 scope の `report.md` は delegated draft evidence table と failure-mode table を持つ。使わなかった場合は manual authoring / not used として、promotion evidence に delegated draft を使っていないことを短く記録する。
@@ -95,36 +89,19 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 
 - allowed depth=2: main orchestrator -> authoring specialist -> leaf-only evidence producer
 - forbidden depth=3: main orchestrator -> authoring specialist -> leaf producer -> grandchild
-- authoring specialist と leaf-only evidence producer は、検証済み task manifest が許可した対象 `design.md` / `plan.md` draft 更新以外の canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない。leaf-only evidence producer は常に canonical edit を行わない
+- authoring specialist と leaf-only evidence producer は、scope-local `discussions/` direct child の flat Markdown evidence 作成以外の canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない。leaf-only evidence producer は常に canonical edit を行わない
 - preflight reviewer output は設計・計画の改善 input として扱い、final fresh reviewer pass とは分離する
 - reviewer independence: final `spec-reviewer` / `code-reviewer` / `qa-reviewer` は、同じ artifact を作成した authoring specialist や leaf-only evidence producer の代替ではない fresh gate として実行する
 
-## タスクマニフェストと権限ゲート（Task Manifest / Permission Profile Gate）
+## Scope-local discussion write gate
 
-Write-scoped delegated authoring は、role-scoped Permission Profile と task manifest の両方が検証済みの場合だけ有効にできます。manifest は raw intention ではなく、実行直前に解決済みの path と revision を固定する fail-closed contract として `report.md` または issue-local `discussions/` に残します。検証済みでない場合、delegated role は proposal-only / discussions path に戻り、canonical `design.md` / `plan.md` を編集してはなりません。
+Static adapter は read-mostly fallback surface です。broad write や canonical target write を許可してはなりません。host が target `discussions/` direct child への write を厳密に表現できない場合、run は post-run diff guard pass と canonical `report.md` の ledger entry 記録まで adoption-ineligible として扱います。
 
-Task manifest は少なくとも次を含めます。
+Allowed delegated output は target scope `discussions/` direct-child Markdown files に限定し、filename は `<ts>-<kind>-<slug>.md` または `<ts>-<nn>-<kind>-<slug>.md` に一致させます。既存 discussion update は explicit orchestrator allowlist を必須にし、accepted ADR、superseded、stale、rejected、adopted evidence ではなく proposed draft だけを対象にします。`--baseline-status` を使う場合も target scope `discussions/` は run 開始時点で clean にし、baseline に target discussion subtree の dirty/untracked entry がある delegated output は adoption-ineligible とします。pre-existing non-target dirtiness は repo 外に生成した `delegated-authoring baseline-status --output <path>` の file-state snapshot が current file content and mode と一致する場合に限り delegated output diff から除外できます。baseline entry が current status から消えた場合は、delegated run 中の non-target 変更として fail-closed に扱います。
 
-- `resolved target`: canonical artifact または evidence artifact の解決済み path。`spec-dock/active/*` symlink ではなく実体 path を記録する
-- `input authority`: upstream approval evidence、promotion record path、reviewer evidence path、approved revision/hash、reviewer target hash、required grants、stale check。reviewer verdict/hash の自己申告だけを信用してはならない
-- `session invocation`: executor、host surface、role、scope、target artifact path、manifest path/hash、permission profile name/hash、config overrides、selected `default_permissions`、positive probe id/result、negative probe plan、diff gate plan、`acceptance_counted`
-- `input revision`: 読み込んだ upstream requirement / design / plan / report の revision、hash、または commit
-- `allowed paths`: positive probe が write できる artifact / evidence path
-- `forbidden paths`: implementation code、tests、package/config、`.env*` など write してはならない path
-- `probe commands`: positive probe と negative probe の exact command、target path、cleanup command
-- `diff gate`: allowed target 以外の diff を拒否し、forbidden sentinel の cleanup と dirty diff abort を要求する確認手順
-- `fallback decision`: fail-open、probe unavailable、manual/unprofiled/static broad profile、Desktop/CLI divergent、または host enforcement 不明時に write-scoped delegation を disabled / proposal-only に戻す判断
-- `report evidence destination`: task manifest、input authority、session invocation、probe、diff gate、fallback decision、Evidence Adoption Ledger disposition を記録する scope-local `report.md` section または issue-local evidence path
-- `Evidence Adoption Ledger fields`: adoption_status、target_artifact、next_action など、採用状態と blocking follow-up を runtime gate が正規化して読める field set
-- `default_permissions` / `[permissions]`: role-scoped Permission Profile 名と read/write/deny の要約
+Forbidden output は canonical docs、implementation files、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、nested discussion directories、symlinks、non-Markdown files、deletes、renames、copied paths、out-of-scope discussions、mixed staged/unstaged discussion states、unmerged discussion states を含みます。
 
-Positive write probe は allowed artifact / evidence path だけに成功しなければなりません。Negative write probe は forbidden implementation / config / test path で失敗しなければなりません。forbidden path への write が成功した場合、または host が enforcement を証明できない場合は fail-open と扱い、write-scoped delegation を有効化してはなりません。
-
-Draft artifact probe は target phase に対応していなければなりません。System architect の positive probe は対象 `design.md` または manifest で許可された design draft evidence path だけ、implementation planner の positive probe は対象 `plan.md` または manifest で許可された plan draft evidence path だけに限定します。Previous phase artifact への write probe 成功、または implementation/test/config path への write 成功は invalid です。
-
-`sandbox_mode` / `sandbox_workspace_write` による workspace 全体 write と、Permission Profile による role-scoped write contract を混在させてはなりません。混在、Desktop/CLI divergent、probe unavailable、unreproducible result は `blocked` または `disabled` として記録し、v0 proposal-only authoring path に戻します。
-
-Desktop App は CLI-equivalent の positive probe、non-destructive negative probe、selected Permission Profile、session invocation hash、diff gate を同じ粒度で検証できるまで proposal-only / manual fallback として扱い、write-scoped delegated draft authoring acceptance に数えません。
+Historical `iss-00126` task manifest / Permission Profile / probe / session artifacts は grandfathered evidence です。current standard が manifest-heavy success path を使わなくなったことだけを理由に削除、rename、validation failure 化してはなりません。
 
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
 |---|---|---|---|---|

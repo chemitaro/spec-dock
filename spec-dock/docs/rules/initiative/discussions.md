@@ -5,6 +5,10 @@
 - Discussion workflow: `spec-dock/docs/workflow_adr.md`
 - Naming rules: `spec-dock/docs/reference_naming.md`
 - 作成される docs はこの directory に timestamp-prefixed original として保存されます（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。legacy sequential files は grandfathered で、自動 rename しません。
+- Delegated authoring の draft / analysis / discussion-local report も、この directory の直下に同じ命名規則で flat Markdown として保存します。per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` は新規出力先にしません。
+- Sub-agent-created draft は `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持ちます。`authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` は自己主張しません。
+- Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority です。discussion draft は evidence であり、採用は canonical `report.md` の Evidence Adoption Ledger と canonical docs への再記述で成立します。
+- Historical delegated-authoring manifest/Profile/probe/session artifacts は grandfathered evidence です。current delegated drafts が flat model を使うことだけを理由に削除、rename、validation failure 化しません。
 - 実行場所: コマンドはリポジトリ root から実行してください。`./spec-dock/scripts/spec-dock ...` はその位置で保証される実行経路で、nested directory では相対 path が変わります。
 - Current catalog:
   - `scratch`: raw capture。非 authoritative。未整理の発話、観察、思考、会話ログを置く。
