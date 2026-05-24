@@ -134,6 +134,35 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertIn("reason=forbidden_diff", p.stdout)
         self.assertIn("reason=canonical_doc", p.stdout)
 
+    def test_diff_guard_active_issue_fallback_requires_exact_meta_id(self) -> None:
+        target = self._make_target_repo_with_scope()
+        issue_dir = _issue_dir(target)
+        (issue_dir / ".meta.json").unlink()
+        active_issue = target / "spec-dock" / "active" / "issue"
+        if active_issue.exists() or active_issue.is_symlink():
+            active_issue.unlink()
+        active_issue.symlink_to(issue_dir, target_is_directory=True)
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=scope_not_found", p.stdout)
+
     def test_diff_guard_ignores_unchanged_preexisting_dirty_canonical_doc(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
