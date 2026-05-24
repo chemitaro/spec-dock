@@ -229,7 +229,8 @@ def require_lifecycle_authority(
                 f"- reason: {result.reason}",
                 f"- required_grant: {required_grant}",
                 f"- details: {details}" if details else "- details: none",
-                "Recovery: refresh active state with `spec-dock/scripts/spec-dock issue start <issue>` or obtain a fresh approved promotion record.",
+                "Recovery: obtain a fresh approved promotion record for the active selection.",
+                "Active selection from `active set` / `issue start` is synthetic approval and cannot satisfy lifecycle grants.",
             ]
         )
     )
