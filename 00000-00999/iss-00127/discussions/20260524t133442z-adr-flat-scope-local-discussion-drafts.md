@@ -4,14 +4,18 @@ ID: "20260524t133442z-adr"
 タイトル: "Flat Scope Local Discussion Drafts"
 状態: "accepted"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-24"
+最終更新: "2026-05-25"
 親: ["iss-00127"]
 authority: "accepted"
 derived_from:
   - "20260524t131259z-research-scoped-discussion-draft-authoring-model-analysis.md"
   - "user decision 2026-05-24"
-reflected_to:
-  - "iss-00127 requirement/design/plan (pending)"
+  - "user decision 2026-05-25"
+intended_targets:
+  - "iss-00127 requirement.md"
+  - "iss-00127 design.md"
+  - "iss-00127 plan.md"
+reflected_to: []
 ---
 
 # 20260524t133442z-adr Flat Scope Local Discussion Drafts
@@ -24,13 +28,17 @@ reflected_to:
 - Scope-local `discussions/` は、既存の timestamp-prefixed naming rule に従う flat Markdown document collection として運用する。
 - `discussions/system-architect/`、`discussions/implementation-planner/`、`discussions/<run>/` のような delegated authoring 専用サブディレクトリは採用しない。
 - system-architect / implementation-planner / consultant / reviewer などの sub-agent 成果物も、対象 initiative / epic / issue の `discussions/` 直下に 1 doc = 1 Markdown file として置く。
-- ファイル名は topic-first とし、role は必要な場合だけ slug または front matter に含める。
-- `discussions/` は非正本であり、canonical authority は常に `requirement.md` / `design.md` / `plan.md` / `report.md` にある。
-- sub-agent は canonical docs を直接編集しない。main orchestrator が `discussions/` の draft / research / disc を読んで採用・部分採用・却下を判断し、canonical docs に再記述する。
+- File name は `<ts>-<kind>-<slug>.md` を維持し、slug は role-first / run-first ではなく canonical target と論点を表す。
+- `discussions/` 配下の draft / research / disc は phase authority / implementation authority を持たない。一方で、accepted ADR は architecture decision authority を持ち得る。
+- 実行可能な仕様 authority は、main orchestrator が accepted ADR や discussion draft を読み、`requirement.md` / `design.md` / `plan.md` / `report.md` に再記述した時点で成立する。
+- sub-agent は canonical docs を直接編集しない。
+- sub-agent は、対象 initiative / epic / issue の scope-local `discussions/` 直下に flat Markdown draft / analysis / report を直接作成・編集できる。これは、agent context に残る揮発的な情報ではなく、設計上の情報伝達と意思決定材料をファイルベースで永続化するための許可である。
+- main orchestrator は `discussions/` の draft / research / disc / adr を読んで採用・部分採用・却下・延期・stale を判断し、採用部分だけ canonical docs に再記述する。
 
 ## 背景（Context） (必須)
 - `epic-00112` の v2 implementation は、write-capable delegated draft authoring を実現するために manifest / Permission Profile / session-invocation / input authority / EAL などを導入した。
 - しかしユーザーは、sub-agent が canonical `design.md` / `plan.md` を直接編集することは権限過多であり、draft は `discussions/` 配下に置くべきだと再判断した。
+- 2026-05-25 の追加判断では、sub-agent を proposal-only に落とす案は採用しない。安全性だけを最大化するよりも、harness engineering / context engineering として、sub-agent が自分の分析・draft を scope-local `discussions/` に直接保存できる方が、コンテキスト圧縮で失われる情報を減らし、協働効率を高められるためである。
 - さらに、agent 別 directory や run/task directory を作ると、既存の `discussions/` 命名規則とずれ、どの文書が時系列・論点上どこにあるかが読みづらくなる。
 - spec-dock の既存 discussion rule は、`<ts>-<kind>-<slug>.md` を `discussions/` 直下に置く flat model を標準としている。
 - delegated authoring でもこの既存 model を拡張し、別体系を作らないことを優先する。
@@ -72,24 +80,39 @@ reflected_to:
     - run が増えると最新論点を探しにくい。
   - 棄却理由（棄却する場合）:
     - 今回はシンプルな単一運用ルールを優先するため、例外としても採用しない。
+- 選択肢 D: sub-agent proposal-only / orchestrator-only file write
+  - 概要:
+    - sub-agent は Markdown proposal を返すだけにし、main orchestrator だけが `discussions/` にファイルを作る。
+  - 良い点（Pros）:
+    - write boundary は最も単純で、host permission が狭くなる。
+  - 悪い点 / 制約（Cons）:
+    - sub-agent の作業結果が一度 conversation context に滞留し、context compaction や伝言ゲームで情報が失われやすい。
+    - agentic collaboration の中間成果物が file-based source of context にならず、orchestrator の転記負荷が増える。
+    - harness engineering / context engineering の目的である「自律的な specialist が persistent evidence を残す」性質が弱くなる。
+  - 棄却理由（棄却する場合）:
+    - canonical docs への直接 write 禁止で主要な authority risk は抑えられるため、`discussions/` への直接 draft write は許容する。安全性を最大化する proposal-only より、ファイルベースの協働効率とコンテキスト永続化を優先する。
 
 ## 判断理由（Rationale） (必須)
 - spec-dock は docs を source of truth とするため、discussion docs も人間と agent が同じ規則で探索できることが重要である。
 - 既存の discussion rules は flat timestamp-prefixed docs を標準としており、delegated authoring だけ別体系にすると学習コストと運用分岐が増える。
 - agent-first directory は、agentic engineering の内部都合を文書構造に持ち込みすぎる。
 - run/task directory は、重い manifest / probe / session-invocation を退役する方向と相性が悪い。
-- flat topic-first docs と軽量 Markdown front matter で、必要な provenance / status / intended target は十分に表現できる。
+- flat timestamp-prefixed docs と lightweight Markdown front matter で、必要な provenance / status / intended target は十分に表現できる。
+- sub-agent に scope-local `discussions/` write を許すことで、agent が持つ一時的な分析・設計判断を会話 context から persistent project context へ移せる。
+- proposal-only は安全だが、sub-agent の専門的な分析を main orchestrator が再転記する伝言ゲームを増やす。今回の目的は、安全性を保ちながらも agentic engineering の協働効率を高めることである。
 
 ## 影響（Consequences） (必須)
 - 良い影響（Positive）:
   - `discussions/` を時系列で読めば、論点・draft・調査の流れを追える。
   - sub-agent 出力の置き場が単純になり、`.agents` / `.codex` / global draft store を使わずに済む。
   - canonical docs と discussion drafts の境界が明確になる。
+  - sub-agent の中間成果物が conversation context ではなく file-based context として残る。
   - issue / epic / initiative で同じ運用ルールを使える。
 - 悪い影響 / 将来負債（Negative / Debt）:
   - 1 scope に大量の discussion docs がある場合、一覧が長くなる。
   - 複数ファイルを束ねる機能は directory ではなく naming / front matter / future list command に頼る。
   - draft status の整理を怠ると、flat directory 内に stale docs が残り続ける。
+  - proposal-only より write boundary は広い。sub-agent output の diff guard と adoption ledger で補完する必要がある。
 - 影響範囲（コード/テスト/運用/データ）:
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
@@ -116,6 +139,6 @@ reflected_to:
 - 元になった discussion docs（derived_from）:
   - `20260524t131259z-research-scoped-discussion-draft-authoring-model-analysis.md`
 - 反映先（reflected_to）:
-  - `iss-00127 requirement/design/plan (pending)`
+  - none yet
 - PR/実装:
   - `epic-00112` PR #119 historical implementation context
