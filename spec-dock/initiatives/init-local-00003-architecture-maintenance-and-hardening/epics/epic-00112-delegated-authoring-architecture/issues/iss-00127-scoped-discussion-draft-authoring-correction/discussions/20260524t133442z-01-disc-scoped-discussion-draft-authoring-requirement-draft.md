@@ -2,17 +2,18 @@
 種別: disc
 ID: "20260524t133442z-01-disc"
 タイトル: "Scoped Discussion Draft Authoring Requirement Draft"
-状態: "proposed"
+状態: "superseded"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-24"
+最終更新: "2026-05-25"
 親: ["iss-00127"]
 関連: []
 authority: "proposed"
 derived_from:
   - "20260524t131259z-research-scoped-discussion-draft-authoring-model-analysis.md"
   - "20260524t133442z-adr-flat-scope-local-discussion-drafts.md"
-reflected_to:
-  - "iss-00127 requirement/design/plan (pending)"
+superseded_by:
+  - "20260524t150117z-disc-scoped-discussion-draft-authoring-requirement-draft-v2.md"
+reflected_to: []
 ---
 
 # 20260524t133442z-01-disc Scoped Discussion Draft Authoring Requirement Draft
@@ -20,6 +21,7 @@ reflected_to:
 ## 位置づけ
 - この document は、`iss-00127` の `requirement.md` / `design.md` / `plan.md` を書く前の要件・設計・実装作業ドラフトである。
 - この document は正本ではない。ユーザー決定済み ADR と research をもとに、main orchestrator が canonical docs に反映すべき内容を整理する。
+- この document は 2026-05-25 の追加方針により superseded になった。最新ドラフトは `20260524t150117z-disc-scoped-discussion-draft-authoring-requirement-draft-v2.md` を参照する。
 
 ## 議題 (必須)
 - `epic-00112` の delegated authoring 実装を、重い write-capable canonical draft authoring model から、flat scope-local discussion draft model へ修正するために何を実装すべきか。
