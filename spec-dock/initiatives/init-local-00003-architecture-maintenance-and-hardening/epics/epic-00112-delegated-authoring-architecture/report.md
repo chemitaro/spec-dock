@@ -22,11 +22,11 @@ ID: "epic-00112"
   - v1 amendment requirement/design/plan authoring is review-passed, and additive Issues `iss-00120`〜`iss-00125` / #120〜#125 are created with approved specs.
   - Additive v1 Issues `iss-00120`〜`iss-00125` / #120〜#125 are historical completed work.
   - Corrective Issue `iss-00126` / #126 is now the active v1 correction for write-capable delegated draft authoring because user review found the prior fallback/read-only implementation did not satisfy the Epic's intended write-capable design/plan draft authoring requirement.
-  - `iss-00126` has passed post-promotion `validate` and full-suite verification after its main-orchestrator promotion metadata was recorded. Fresh QA/spec/code findings were then fixed or dispositioned, targeted matrices passed, and post-P1 full-suite rerun passed. The latest code P1 added positive-probe fail-closed enforcement and its focused matrix passed. G10 Epic-wide pre-PR quality gate has deep-consultant, QA, fresh code-reviewer, and fresh spec-reviewer pass results after the latest G10 evidence repair. Final post-report verification also passed: `uv run python -m unittest discover -v` (`Ran 895 tests in 432.904s OK`), `./spec-dock/scripts/spec-dock validate` (`nodes=64`), and `git diff --check`.
+  - `iss-00126` has passed post-promotion `validate` and full-suite verification after its main-orchestrator promotion metadata was recorded. Fresh QA/spec/code findings were then fixed or dispositioned, targeted matrices passed, and post-P1 full-suite rerun passed. The latest code P1 added positive-probe fail-closed enforcement and its focused matrix passed. G10 Epic-wide pre-PR quality gate has deep-consultant, QA, fresh code-reviewer, and fresh spec-reviewer pass results after the latest G10 evidence repair. Final post-report verification also passed: `uv run python -m unittest discover -v` (`Ran 895 tests in 432.904s OK`), `./spec-dock/scripts/spec-dock validate` (`nodes=64`), and `git diff --check`. PR #119 was updated to commit `d365f554387240097b20593d5aa49aa6bd53387b`, and post-push checks passed (`provider-tests` push/pull_request and `validate` push/pull_request).
 - 次のマイルストーン:
-  - Update Epic PR #119 and verify post-push PR checks/status.
+  - Human merge decision for PR #119.
 - ブロッカー:
-  - None for the corrective implementation gate. PR #119 update / push and post-push checks remain as delivery steps.
+  - None for the corrective implementation gate, PR update, or post-push checks.
 
 ## 決定事項（ADRリンク） (必須)
 - No ADR was created in this Epic.
@@ -72,8 +72,8 @@ ID: "epic-00112"
 - #116 Delegated Authoring Phase Gates: CLOSED.
 - #117 Codex Delegated Author Adapters: CLOSED.
 - #118 Delegated Authoring Dogfooding Pilot: CLOSED.
-- #126 Write Capable Delegated Draft Authoring Correction: OPEN / active correction.
-- Epic PR #119 Delegated Authoring Architectureを導入: OPEN, non-draft, mergeable at creation-time audit.
+- #126 Write Capable Delegated Draft Authoring Correction: implementation / review / PR update complete; GitHub issue remains OPEN pending human PR merge decision.
+- Epic PR #119 Delegated Authoring Architectureを導入: OPEN, non-draft, MERGEABLE after update to `d365f554387240097b20593d5aa49aa6bd53387b`; post-push checks passed.
 
 ## v0 受け入れ条件（E-AC）の履歴達成状況 (必須)
 
