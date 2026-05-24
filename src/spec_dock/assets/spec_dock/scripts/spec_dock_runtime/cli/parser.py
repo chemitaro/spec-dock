@@ -56,6 +56,14 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "update",
     )
 
+    p_delegated = sub.add_parser("delegated-authoring", help="Generate delegated draft authoring artifacts")
+    delegated_sub = p_delegated.add_subparsers(dest="delegated_authoring_cmd", required=True)
+    _bind_leaf(
+        delegated_sub.add_parser("manifest", help="Generate a delegated authoring manifest and permission profile"),
+        registry,
+        "delegated_authoring_manifest",
+    )
+
     p_issue = sub.add_parser("issue", help="Run guided issue lifecycle commands")
     issue_sub = p_issue.add_subparsers(dest="issue_cmd", required=True)
     _bind_leaf(issue_sub.add_parser("start", help="Set active issue and checkout its branch"), registry, "issue_start")

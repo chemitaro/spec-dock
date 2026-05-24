@@ -1,0 +1,38 @@
+schema = "spec-dock.delegated-authoring.manifest.v1"
+role = "system-architect"
+scope_id = "iss-00126"
+target = "design"
+host_surface = "cli"
+target_artifact_path = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md"
+input_authority_file = "spec-dock/active/issue/discussions/delegated-authoring/input-authority/design-authority.json"
+input_authority_hash = "85455ab6a88923af266806777035a1c853499ad9894c2b8692034a5055c38330"
+permission_profile_name = "spec-dock-iss-00126-system-architect-design-cli-85455ab6a889"
+positive_probe_id = "iss-00126-system-architect-design-cli-85455ab6a889-positive"
+positive_probe_target = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md"
+negative_probe_sentinel = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/.iss-00126-system-architect-design-cli-85455ab6a889.requirement-md.spec-dock-permission-probe-denied"
+host_surface_acceptance_eligible = true
+acceptance_counted = false
+
+[generated_artifacts]
+manifest = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-85455ab6a889/manifest.toml"
+permission_profile = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-85455ab6a889/permission-profile.toml"
+probe_plan = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-85455ab6a889/probe-plan.md"
+session_invocation = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-system-architect-design-cli-85455ab6a889/session-invocation.toml"
+
+[source_revisions]
+requirement = "99443200ee057f3ab194dc7fbd1717ace06ceb31d28552d8a8a2d3095c40fcd2"
+
+[diff_gate]
+required = true
+forbidden_diff = "none"
+dirty_diff_abort = true
+
+[negative_probe_sentinels]
+"requirement.md" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/.iss-00126-system-architect-design-cli-85455ab6a889.requirement-md.spec-dock-permission-probe-denied"
+"peer_artifact" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/.iss-00126-system-architect-design-cli-85455ab6a889.plan.md.spec-dock-permission-probe-denied"
+"report.md" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/.iss-00126-system-architect-design-cli-85455ab6a889.report-md.spec-dock-permission-probe-denied"
+"src/" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/src/.iss-00126-system-architect-design-cli-85455ab6a889.spec-dock-permission-probe-denied"
+"tests/" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/tests/.iss-00126-system-architect-design-cli-85455ab6a889.spec-dock-permission-probe-denied"
+".codex/" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/.codex/.iss-00126-system-architect-design-cli-85455ab6a889.spec-dock-permission-probe-denied"
+".agents/" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/.agents/.iss-00126-system-architect-design-cli-85455ab6a889.spec-dock-permission-probe-denied"
+".env*" = "/Users/iwasawayuuta/workspace/tools/spec-dock-worktrees/spec-dock-delegated-authoring-architecture/.env.iss-00126-system-architect-design-cli-85455ab6a889.spec-dock-permission-probe-denied"

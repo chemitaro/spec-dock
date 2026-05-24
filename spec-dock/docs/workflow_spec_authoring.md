@@ -33,6 +33,11 @@ Delegated canonical draft authoring を使う場合、artifact や report eviden
 - `source_revision`: delegated draft が読んだ upstream artifact revision。
 - `approved_revision`: promotion された canonical artifact revision。未承認なら `none`。
 - `approved_hash`: promotion された canonical content hash。未承認なら `none`。
+- `manifest_hash`: delegated authoring task manifest の content hash。未使用時は `none`。
+- `permission_profile_name`: delegated write session に選択した Permission Profile 名。未使用時は `none`。
+- `permission_profile_hash`: selected Permission Profile の content hash。未使用時は `none`。
+- `write_session_invocation_hash`: delegated write session invocation の normalized hash。未使用時は `none`。
+- `probe_run_id`: positive / negative probe run の識別子。未使用時は `none`。
 
 Grant keys は明示的かつ完全一致で扱います。許可される key set は `review_input`, `planning_input`, `design_baseline`, `implementation_start`, `issue_ready`, `issue_finish`, `phase_completion` です。role 名、scope 名、workflow consent、または reviewer pass から暗黙の write 権限を推定してはなりません。
 
@@ -48,6 +53,8 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 - 現在のユーザー指示が「この issue workflow 内では reviewer / specialist を自律利用してよい」と明示している場合、その指示を同一 issue / repo / session / named role に限定した consent として扱える。
 - consent がある場合、orchestrator は requirement / design / plan の各 phase ごとに再確認せず、必要な `spec-reviewer` や read-only specialist を起動してよい。
 - consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation を許可しない。scope が変わる場合は再確認する。
+- read-only specialist consent と write-scoped delegated authoring consent は別物として扱う。read-only consent は調査、レビュー、提案、proposal evidence だけを許可し、canonical `design.md` / `plan.md` の書き込み根拠にはならない。
+- write-scoped delegated authoring consent は、対象 node、phase、role、artifact、task manifest、input authority、Permission Profile、session invocation、probe、diff gate、fallback を明示した task-local consent として別途記録する。workflow-wide blanket consent、manual edit、unprofiled session、static broad profile、または Desktop-only fallback は write-scoped acceptance に数えない。
 
 ## 委任 authoring policy foundation（delegated authoring policy foundation）
 
@@ -99,11 +106,16 @@ Write-scoped delegated authoring は、role-scoped Permission Profile と task m
 Task manifest は少なくとも次を含めます。
 
 - `resolved target`: canonical artifact または evidence artifact の解決済み path。`spec-dock/active/*` symlink ではなく実体 path を記録する
+- `input authority`: upstream approval evidence、promotion record path、reviewer evidence path、approved revision/hash、reviewer target hash、required grants、stale check。reviewer verdict/hash の自己申告だけを信用してはならない
+- `session invocation`: executor、host surface、role、scope、target artifact path、manifest path/hash、permission profile name/hash、config overrides、selected `default_permissions`、positive probe id/result、negative probe plan、diff gate plan、`acceptance_counted`
 - `input revision`: 読み込んだ upstream requirement / design / plan / report の revision、hash、または commit
 - `allowed paths`: positive probe が write できる artifact / evidence path
 - `forbidden paths`: implementation code、tests、package/config、`.env*` など write してはならない path
 - `probe commands`: positive probe と negative probe の exact command、target path、cleanup command
-- `fallback`: fail-open、probe unavailable、Desktop/CLI divergent、または host enforcement 不明時に write-scoped delegation を disabled / proposal-only に戻す判断
+- `diff gate`: allowed target 以外の diff を拒否し、forbidden sentinel の cleanup と dirty diff abort を要求する確認手順
+- `fallback decision`: fail-open、probe unavailable、manual/unprofiled/static broad profile、Desktop/CLI divergent、または host enforcement 不明時に write-scoped delegation を disabled / proposal-only に戻す判断
+- `report evidence destination`: task manifest、input authority、session invocation、probe、diff gate、fallback decision、Evidence Adoption Ledger disposition を記録する scope-local `report.md` section または issue-local evidence path
+- `Evidence Adoption Ledger fields`: adoption_status、target_artifact、next_action など、採用状態と blocking follow-up を runtime gate が正規化して読める field set
 - `default_permissions` / `[permissions]`: role-scoped Permission Profile 名と read/write/deny の要約
 
 Positive write probe は allowed artifact / evidence path だけに成功しなければなりません。Negative write probe は forbidden implementation / config / test path で失敗しなければなりません。forbidden path への write が成功した場合、または host が enforcement を証明できない場合は fail-open と扱い、write-scoped delegation を有効化してはなりません。
@@ -111,6 +123,8 @@ Positive write probe は allowed artifact / evidence path だけに成功しな�
 Draft artifact probe は target phase に対応していなければなりません。System architect の positive probe は対象 `design.md` または manifest で許可された design draft evidence path だけ、implementation planner の positive probe は対象 `plan.md` または manifest で許可された plan draft evidence path だけに限定します。Previous phase artifact への write probe 成功、または implementation/test/config path への write 成功は invalid です。
 
 `sandbox_mode` / `sandbox_workspace_write` による workspace 全体 write と、Permission Profile による role-scoped write contract を混在させてはなりません。混在、Desktop/CLI divergent、probe unavailable、unreproducible result は `blocked` または `disabled` として記録し、v0 proposal-only authoring path に戻します。
+
+Desktop App は CLI-equivalent の positive probe、non-destructive negative probe、selected Permission Profile、session invocation hash、diff gate を同じ粒度で検証できるまで proposal-only / manual fallback として扱い、write-scoped delegated draft authoring acceptance に数えません。
 
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
 |---|---|---|---|---|

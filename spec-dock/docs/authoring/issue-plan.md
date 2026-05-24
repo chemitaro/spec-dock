@@ -89,6 +89,8 @@ Sxx behavior slice
 - `red or alternative evidence requirement` は `red-required`、`covered-existing`、`inspect-only`、`manual-required` のいずれかを使い、failing-first を完全要求できない場合も test sensitivity または代替 evidence path を固定する。
 - docs-only / template-only / skill-text-only step は code test を無理に作らず、inspection、structural assertion、manual evidence、docs diff、spec-review evidence を planned verification として書く。
 - `report evidence destination` は、実行結果を `report.md` のどの ledger に残すかを明示する。`plan.md` へ observed evidence を戻して正本を二重化しない。
+- write-scoped delegated authoring step は、manifest/probe/diff/authority/session invocation field requirements を step-local contract に置く。最低 fields は task manifest path/hash、input authority path/hash、promotion record path、reviewer evidence path、approved revision/hash、required grants、stale check、allowed paths、forbidden paths、positive probe、non-destructive negative probe、diff gate、fallback decision、session invocation path/hash、Permission Profile name/hash、selected `default_permissions`、`acceptance_counted`、report evidence destination。
+- report evidence destination は、candidate evidence path だけでなく scope-local `report.md` の Evidence Adoption Ledger、Delegated Draft Evidence、Workflow Delegation Consent、Step Contract Closure、Test Contract Closure のどこへ採否・probe・diff・fallback を記録するかを示す。Evidence Adoption Ledger に採否がない delegated evidence は downstream authority に使えない。
 - `amendment trigger` は、どの発見が report 記録だけで足りず plan amendment / re-review を必要にするかを示す。
 
 ## 委任 contract（delegation contract）
@@ -116,6 +118,7 @@ Sxx behavior slice
   - 入力 docs の矛盾、許可パス外変更が必要、検証不能、delegated role 不適合、host policy / tool 制約、acceptance 未達など。
 - `output required`:
   - changed files、worker summary、verification result、unresolved risks、report へ転記する delegation evidence。
+  - write-scoped delegated authoring の場合は task manifest、input authority、session invocation、probe result、diff gate result、fallback decision、draft artifact metadata、Evidence Adoption Ledger に転記できる採否 note。
   - `Ledger Note` または `No material implementation decisions beyond the approved plan.`。
   - `Ledger Note` は worker の一次情報であり accepted decision ではない。material な仕様解釈、判断、逸脱、tradeoff、open question、follow-up がある場合は、source-agent、topic、trigger、ambiguity / constraint、observed facts、options considered、proposed decision、rationale、affected files、affected tests、risk if wrong、rollback or revisit、confidence、needs orchestrator decision を含める。
 

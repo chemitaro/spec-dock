@@ -92,6 +92,9 @@ Issue は実装の最小単位です。
 - consent がある場合、orchestrator は同一 issue / repo / session / named role の範囲で、`spec-reviewer`、`code-reviewer`、`qa-reviewer`、および必要な read-only specialist を phase ごとに再確認せず起動してよい。
 - consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation、browser/private external systems の利用を許可しない。これらが必要な場合は別途明示確認する。
 - consent がない、または host policy と衝突する場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
+- read-only specialist consent と write-scoped delegated authoring consent は分離する。read-only consent は調査、review、proposal evidence、worker note だけを許可し、canonical `design.md` / `plan.md` draft write の根拠にはならない。
+- write-scoped delegated authoring consent は task-local に記録する。最低限、target node、phase、role、artifact、task manifest path/hash、input authority evidence path/hash、session invocation path/hash、Permission Profile name/hash、positive probe、non-destructive negative probe、diff gate、fallback decision、report evidence destination を含める。
+- manual edit、unprofiled sub-agent edit、static broad profile edit、Desktop-only fallback は write-scoped delegated authoring acceptance に数えない。Desktop は CLI-equivalent probes と selected Permission Profile evidence が verified になるまで proposal-only / manual fallback として扱う。
 
 ## 報告判断台帳ライフサイクル（report decision ledger lifecycle）
 - `report.md` は observed evidence ledger に加えて仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）を持つ。ここには実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up だけを記録し、shell transcript、worker raw note、private reasoning、secret、逐次作業ログは置かない。
@@ -162,6 +165,7 @@ Issue は実装の最小単位です。
 ## 報告証跡（report）
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
+- write-scoped delegated authoring を使う場合は、task manifest、input authority、session invocation、positive probe、non-destructive negative probe、diff gate、fallback decision、candidate evidence、canonical Evidence Adoption Ledger disposition を `report.md` に記録する。candidate artifact を `discussions/delegated-authoring/<task-id>/...` に置く場合も、採否の正本は scope-local `report.md` の Evidence Adoption Ledger とする
 - 仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）に material な仕様解釈、判断、逸脱、tradeoff、open question、promotion / follow-up を残す。material decision がない場合は `No material interpretation changes.` と `No decision entries.` を残す
 - ledger entry は `Status`、`Type`、`Options Considered`、`Disposition`、evidence、必要な follow-up / promotion を持つ。`Status=open` は completion blocker とし、`Disposition` に必要な evidence がない entry、report-only durable decision、根拠のない `no_action` / `deferred` / `superseded` は reviewer finding として扱う
 - step 契約クロージャ（`Step Contract Closure`）に step、closure id、close condition、evidence、result を残す

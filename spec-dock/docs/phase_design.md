@@ -79,11 +79,12 @@ Delegated design draft を使う場合、orchestrator は draft 生成前に次�
 - fresh requirement reviewer pass があり、pass 対象の `requirement.md` revision を特定できる
 - active node、scope、parent boundary、non-scope が確認済み
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
-- allowed actions は、通常は read-only analysis と draft proposal に限定される。write-scoped delegated design authoring を使う場合だけ、検証済み task manifest と role-scoped Permission Profile が許可した対象 `design.md` を `authority: proposed` / `status: draft` として作成・更新できる
+- read-only specialist consent と write-scoped delegated authoring consent は分離されている。read-only analysis と draft proposal の consent は `design.md` write consent ではない
+- allowed actions は、通常は read-only analysis と draft proposal に限定される。write-scoped delegated design authoring を使う場合だけ、検証済み task manifest、input authority、session invocation、role-scoped Permission Profile、positive probe、non-destructive negative probe、diff gate が許可した対象 `design.md` を `authority: proposed` / `status: draft` として作成・更新できる
 - forbidden actions は、検証済み task manifest が許可した対象 `design.md` draft 更新以外の requirement/design/plan/report 正本編集、implementation edit、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
 - forbidden actions は `requirement.md` / `plan.md` / `report.md` / previous phase artifact の書き換え、実装・テスト・設定変更、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
 - required design draft output contract が、requirement coverage、existing context findings、design decisions、alternatives、boundary / contract model、dependency analysis、SoR、file/module plan、migration/compatibility/rollback、observability、test strategy、ADR candidates、risks、Requirement Clarification Requests、Integration Notes を含む
-- Permission Profile / host probe / source revision が未検証、fail-open、Desktop/CLI divergent、または stale の場合は `design.md` を編集せず、proposal-only / discussions path に戻る
+- Permission Profile / host probe / source revision が未検証、fail-open、manual/unprofiled/static broad profile、Desktop/CLI divergent、または stale の場合は `design.md` を編集せず、proposal-only / discussions path に戻る。Desktop は CLI-equivalent probes が verified になるまで proposal-only / manual fallback とする
 
 Delegated design draft を統合する場合、`report.md` に delegated draft evidence を残します。少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を記録します。
 

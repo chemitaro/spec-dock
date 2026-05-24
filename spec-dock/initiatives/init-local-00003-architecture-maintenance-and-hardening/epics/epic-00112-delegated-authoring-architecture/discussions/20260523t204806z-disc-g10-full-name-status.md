@@ -14,7 +14,7 @@ ID: "20260523t204806z-disc-g10-full-name-status"
 
 - base_ref_name: `main`
 - base_ref_oid: `421fd4c02fd2649b8c29ec9549a961b7824b9149`
-- final_pr_update_head: clean `HEAD` at reviewer handoff; this intentionally avoids self-referential evidence hashes.
+- committed_head_snapshot: `HEAD` at `4365d38f5d88ac4ace362837ce55fdf8e2d6e404`; working-tree tracked and untracked supplements are recorded in `20260524t043441z-disc-g10-shared-diff-evidence.md`.
 - entry_count: `270`
 
 ## Command
