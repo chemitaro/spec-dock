@@ -41,23 +41,24 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
   - `stale`, `rejected`, `superseded`, `blocked`
-- 必須証跡 field:
-  - role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-  - task manifest path/hash, input authority path/hash, session invocation path/hash, positive probe result, non-destructive negative probe result, diff gate result, fallback decision, report evidence destination
-- source_snapshot field:
-  - source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
-- authority metadata field:
-  - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, manifest_hash, permission_profile_name, permission_profile_hash, write_session_invocation_hash, probe_run_id
-- grant keys:
-  - review_input, planning_input, design_baseline, implementation_start, issue_ready, issue_finish, phase_completion
-  - ワイルドカード grant semantics は非対応。`*`、`grants.*`、`all`、広すぎる role authority は invalid とする。
-- Promotion Record / promotion_record field:
-  - status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, reviewer_target_hash, promoted_at, promoted_by, promotion_decision
-  - reviewer_target_hash / approved_hash mismatch or stale source_revision / approved_revision blocks promotion and downstream authority
+- 標準出力先:
+  - 対象 scope の `discussions/` direct child にある flat Markdown
+  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
+- 軽量 provenance:
+  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
+  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
+- 禁止 self-claim:
+  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
+- 禁止 wildcard token:
+  - `*`, `grants.*`, `all`
+- 標準必須にしない field:
+  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
+- historical note:
+  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
 
-| ロール（role） | フェーズ（phase） | 範囲（scope） | 同意（consent） | 参照元 artifact（source artifacts） | ドラフト artifact path（draft artifact path） | 状態（status） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| N/A | N/A | N/A | N/A | N/A | N/A | not used | manual authoring | N/A | none | N/A | no delegated draft promotion |
+| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |

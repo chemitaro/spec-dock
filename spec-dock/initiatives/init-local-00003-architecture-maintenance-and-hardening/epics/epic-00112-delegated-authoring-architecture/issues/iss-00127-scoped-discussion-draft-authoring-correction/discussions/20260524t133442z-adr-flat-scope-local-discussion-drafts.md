@@ -15,7 +15,10 @@ intended_targets:
   - "iss-00127 requirement.md"
   - "iss-00127 design.md"
   - "iss-00127 plan.md"
-reflected_to: []
+reflected_to:
+  - "iss-00127 requirement.md"
+  - "iss-00127 design.md"
+  - "iss-00127 plan.md"
 ---
 
 # 20260524t133442z-adr Flat Scope Local Discussion Drafts
@@ -139,6 +142,8 @@ reflected_to: []
 - 元になった discussion docs（derived_from）:
   - `20260524t131259z-research-scoped-discussion-draft-authoring-model-analysis.md`
 - 反映先（reflected_to）:
-  - none yet
+  - `iss-00127/requirement.md`
+  - `iss-00127/design.md`
+  - `iss-00127/plan.md`
 - PR/実装:
   - `epic-00112` PR #119 historical implementation context

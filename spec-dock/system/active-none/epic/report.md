@@ -8,13 +8,14 @@
 ## 委任ドラフト証跡 schema（Delegated Draft Evidence Schema / reference）
 - lifecycle state（契約値）: `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state: `stale`, `rejected`, `superseded`, `blocked`
-- 必須証跡 field: role, phase, scope, consent, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- write-scoped evidence field: task manifest path/hash, input authority path/hash, session invocation path/hash, positive probe result, non-destructive negative probe result, diff gate result, fallback decision, report evidence destination
-- source_snapshot field: source_revision, requirement_reviewer_pass_reference, design_reviewer_pass_reference, generated_at, stale_if
-- authority metadata field: status, authority, owner_role, draft_author_role, approval, source_revision, approved_revision, approved_hash, manifest_hash, permission_profile_name, permission_profile_hash, write_session_invocation_hash, probe_run_id
+- 標準出力先: target scope `discussions/` direct child の flat Markdown。filename は `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
+- 軽量 provenance field: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
+- 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
+- 禁止 self-claim: `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
+- 標準必須にしない field: task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
+- 禁止 wildcard token: `*`, `grants.*`, `all`
+- historical note: 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-- grant keys: review_input, planning_input, design_baseline, implementation_start, issue_ready, issue_finish, phase_completion
-- ワイルドカード grant semantics は非対応。`*`、`grants.*`、`all`、広すぎる role authority は invalid とする。
 - Promotion Record / `promotion_record` fields: `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision`
 - `reviewer_target_hash` / `approved_hash` の不一致、または stale な `source_revision` / `approved_revision` は promotion と下流 authority をブロックする。
 - failure-mode field: expected verdict, allowed next action, report evidence path, promotion eligibility
