@@ -1,7 +1,11 @@
 import json
-import tomllib
 import unittest
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 

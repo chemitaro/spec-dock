@@ -1,9 +1,13 @@
 import json
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
 
 
 def _runtime_modules():
@@ -375,6 +379,71 @@ class TestDelegatedAuthoringManifest(unittest.TestCase):
             assert result.paths is not None
             self.assertTrue(result.paths.manifest_path.is_file())
 
+    def test_authority_evidence_paths_resolve_relative_to_authority_file(self) -> None:
+        request_cls, generate, _domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            authority_file = _write_authority_file(repo_root, relative_paths=True)
+
+            result = generate(
+                request_cls(
+                    role="system-architect",
+                    scope_id="iss-00126",
+                    target="design",
+                    host_surface="cli",
+                    input_authority_file=authority_file,
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                )
+            )
+
+            self.assertTrue(result.ok, result.details)
+            self.assertEqual(result.target_artifact_path, issue_dir / "design.md")
+
+    def test_active_issue_fallback_requires_exact_meta_id(self) -> None:
+        request_cls, generate, _domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            for meta_path in (repo_root / "spec-dock" / "initiatives").glob("**/.meta.json"):
+                meta_path.unlink()
+            active_dir = repo_root / "spec-dock" / "active"
+            active_dir.mkdir()
+            (active_dir / "issue").symlink_to(issue_dir, target_is_directory=True)
+            authority_file = _write_authority_file(repo_root)
+
+            result = generate(
+                request_cls(
+                    role="system-architect",
+                    scope_id="iss-00126",
+                    target="design",
+                    host_surface="cli",
+                    input_authority_file=authority_file,
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                )
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.reason, "scope_not_found")
+            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+
+            (issue_dir / ".meta.json").write_text(json.dumps({"id": "iss-00126"}) + "\n", encoding="utf-8")
+            accepted = generate(
+                request_cls(
+                    role="system-architect",
+                    scope_id="iss-00126",
+                    target="design",
+                    host_surface="cli",
+                    input_authority_file=authority_file,
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                )
+            )
+
+            self.assertTrue(accepted.ok, accepted.details)
+
     def test_desktop_host_surface_generates_fallback_not_acceptance_counted(self) -> None:
         request_cls, generate, _domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -480,6 +549,7 @@ def _write_authority_file(
     minimal_promotion: bool = False,
     evidence_suffix: str = ".json",
     mismatched_promotion_reviewer_path: bool = False,
+    relative_paths: bool = False,
 ) -> Path:
     evidence_dir = repo_root / "evidence"
     evidence_dir.mkdir()
@@ -503,6 +573,8 @@ def _write_authority_file(
                     reviewer_evidence_path=(
                         evidence_dir / "requirement-reviewer-other.json"
                         if mismatched_promotion_reviewer_path
+                        else Path("requirement-reviewer.json")
+                        if relative_paths
                         else reviewer_path
                     ),
                     minimal=minimal_promotion,
@@ -516,8 +588,8 @@ def _write_authority_file(
             encoding="utf-8",
         )
     entry = {
-        "promotion_record_path": str(promotion_path),
-        "reviewer_evidence_path": str(reviewer_path),
+        "promotion_record_path": promotion_path.name if relative_paths else str(promotion_path),
+        "reviewer_evidence_path": reviewer_path.name if relative_paths else str(reviewer_path),
         "approved_revision": "rev-1",
         "approved_content_hash": "hash-1",
         "reviewer_verdict": "pass",

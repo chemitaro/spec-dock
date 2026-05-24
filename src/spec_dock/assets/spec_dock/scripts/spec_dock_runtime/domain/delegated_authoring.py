@@ -5,7 +5,10 @@ import json
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    tomllib = None  # type: ignore[assignment]
+    try:
+        import tomli as tomllib  # type: ignore[no-redef]
+    except ModuleNotFoundError:
+        tomllib = None  # type: ignore[assignment]
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -103,7 +106,12 @@ def load_authority_file(path: Path) -> Mapping[str, object]:
     return data
 
 
-def validate_input_authority(data: Mapping[str, object], *, role: str) -> tuple[str, ...]:
+def validate_input_authority(
+    data: Mapping[str, object],
+    *,
+    role: str,
+    authority_base_dir: Path | None = None,
+) -> tuple[str, ...]:
     errors: list[str] = []
     source_revisions = _mapping(data.get("source_revisions"))
     input_authority = _mapping(data.get("input_authority"))
@@ -131,6 +139,7 @@ def validate_input_authority(data: Mapping[str, object], *, role: str) -> tuple[
                 source_auth,
                 expected_revision=revision,
                 required_grants=REQUIRED_SOURCE_GRANTS.get(role, {}).get(source, ()),
+                authority_base_dir=authority_base_dir,
             )
         )
     return tuple(errors)
@@ -317,6 +326,7 @@ def _validate_authority_entry(
     *,
     expected_revision: str | None,
     required_grants: tuple[str, ...],
+    authority_base_dir: Path | None,
 ) -> list[str]:
     errors: list[str] = []
     required = (
@@ -354,11 +364,19 @@ def _validate_authority_entry(
             if grant not in normalized_grants:
                 errors.append(f"missing_required_grant={source}:{grant}")
     for key in ("promotion_record_path", "reviewer_evidence_path"):
-        evidence_path = Path(str(entry[key]))
+        evidence_path = _resolve_authority_path(str(entry[key]), authority_base_dir)
         if not evidence_path.is_file():
             errors.append(f"missing_{source}_{key}_file")
             continue
-        errors.extend(_verify_evidence_file(source, evidence_path, entry, kind=key.removesuffix("_path")))
+        errors.extend(
+            _verify_evidence_file(
+                source,
+                evidence_path,
+                entry,
+                kind=key.removesuffix("_path"),
+                authority_base_dir=authority_base_dir,
+            )
+        )
     return errors
 
 
@@ -368,6 +386,7 @@ def _verify_evidence_file(
     entry: Mapping[str, object],
     *,
     kind: str,
+    authority_base_dir: Path | None,
 ) -> list[str]:
     text = path.read_text(encoding="utf-8")
     parsed = _try_parse_structured(path, text)
@@ -385,6 +404,7 @@ def _verify_evidence_file(
                 expected_hash,
                 required_grants,
                 expected_reviewer_evidence_path=_text(entry.get("reviewer_evidence_path")),
+                authority_base_dir=authority_base_dir,
             )
         reviewer = _mapping(parsed.get("reviewer_evidence")) or parsed
         return _verify_structured_reviewer(source, reviewer, expected_reviewer_hash)
@@ -399,6 +419,7 @@ def _verify_structured_promotion(
     required_grants: tuple[str, ...] | None,
     *,
     expected_reviewer_evidence_path: str | None = None,
+    authority_base_dir: Path | None = None,
 ) -> list[str]:
     errors: list[str] = []
     required_text_fields = (
@@ -426,8 +447,8 @@ def _verify_structured_promotion(
     if (
         expected_reviewer_evidence_path is not None
         and promotion_reviewer_path is not None
-        and _normalized_path_for_compare(promotion_reviewer_path)
-        != _normalized_path_for_compare(expected_reviewer_evidence_path)
+        and _normalized_path_for_compare(promotion_reviewer_path, authority_base_dir)
+        != _normalized_path_for_compare(expected_reviewer_evidence_path, authority_base_dir)
     ):
         errors.append(f"promotion_reviewer_evidence_path_mismatch={source}")
     approved_grants = _grants(promotion.get("approved_grants"))
@@ -444,8 +465,15 @@ def _verify_structured_promotion(
     return errors
 
 
-def _normalized_path_for_compare(raw_path: str) -> str:
-    return Path(raw_path).expanduser().resolve(strict=False).as_posix()
+def _resolve_authority_path(raw_path: str, authority_base_dir: Path | None) -> Path:
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute() and authority_base_dir is not None:
+        path = authority_base_dir / path
+    return path
+
+
+def _normalized_path_for_compare(raw_path: str, authority_base_dir: Path | None = None) -> str:
+    return _resolve_authority_path(raw_path, authority_base_dir).resolve(strict=False).as_posix()
 
 
 def _verify_structured_reviewer(

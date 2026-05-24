@@ -37,7 +37,11 @@ def generate_delegated_authoring_manifest(
     except Exception as error:
         return _blocked(req, "invalid_input_authority_file", (str(error),))
 
-    authority_errors = domain.validate_input_authority(authority_data, role=req.role)
+    authority_errors = domain.validate_input_authority(
+        authority_data,
+        role=req.role,
+        authority_base_dir=req.input_authority_file.parent,
+    )
     if authority_errors:
         return _blocked(req, "input_authority_not_verified", authority_errors)
 
@@ -169,11 +173,7 @@ def _blocked(
 def _resolve_scope_dir(specdock_dir: Path, scope_id: str) -> Path | None:
     meta_paths = sorted(specdock_dir.glob(f"initiatives/**/{scope_id}*/.meta.json"))
     for meta_path in meta_paths:
-        try:
-            data = json.loads(meta_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue
-        if data.get("id") == scope_id:
+        if _scope_meta_matches(meta_path, scope_id):
             return meta_path.parent
     active_issue = specdock_dir / "active" / "issue"
     if active_issue.exists():
@@ -181,9 +181,17 @@ def _resolve_scope_dir(specdock_dir: Path, scope_id: str) -> Path | None:
             resolved = active_issue.resolve()
         except OSError:
             resolved = active_issue
-        if resolved.name.startswith(f"{scope_id}-") or resolved.name == scope_id:
+        if _scope_meta_matches(resolved / ".meta.json", scope_id):
             return resolved
     return None
+
+
+def _scope_meta_matches(meta_path: Path, scope_id: str) -> bool:
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return data.get("id") == scope_id
 
 
 def _task_id(role: str, scope_id: str, target: str, host_surface: str, input_hash: str) -> str:
