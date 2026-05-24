@@ -14,9 +14,9 @@ ID: "iss-00126"
 
 ## 進捗サマリー
 
-- 現在地: S05/S06 fail-closed implementation repair complete; S07 dogfooding actual write pilot substantive draft delta evidence collected; main orchestrator promotion metadata recorded; post-Zeno-P1 positive-probe authority gate repair, focused matrix, `validate`, and `git diff --check` pass; QA, deep-consultant, fresh code-reviewer, and fresh spec-reviewer G10 gates passed.
-- 未完了: PR #119 update / push and post-push PR checks。
-- 次のマイルストーン: update PR #119 with the completed corrective implementation and verify PR checks/status。
+- 現在地: S05/S06 fail-closed implementation repair complete; S07 dogfooding actual write pilot substantive draft delta evidence collected; main orchestrator promotion metadata recorded; post-Zeno-P1 positive-probe authority gate repair, focused matrix, `validate`, and `git diff --check` pass; QA, deep-consultant, fresh code-reviewer, and fresh spec-reviewer G10 gates passed; PR #119 updated and post-push checks passed.
+- 未完了: none for the corrective implementation, G10 review gate, PR update, and post-push check scope. PR #119 remains open for human merge decision。
+- 次のマイルストーン: human merge decision for PR #119。
 
 ## 仕様解釈・判断台帳
 
@@ -406,7 +406,11 @@ ID: "iss-00126"
     - `uv run python -m unittest discover -v`: pass (`Ran 895 tests in 432.904s OK`)。
     - `./spec-dock/scripts/spec-dock validate`: pass (`spec-dock: ok (validate) nodes=64`)。
     - `git diff --check`: pass。
-  - Gate result: PR #119 update is unblocked from the issue-local S90/S99/G10 perspective.
+  - PR update evidence:
+    - pushed commit: `d365f554387240097b20593d5aa49aa6bd53387b`
+    - PR: #119 `https://github.com/chemitaro/spec-dock/pull/119`
+    - post-push checks: pass (`provider-tests` push 11m1s; `provider-tests` pull_request 8m40s; `validate` push 7s; `validate` pull_request 7s)
+  - Gate result: PR #119 update and post-push checks passed from the issue-local S90/S99/G10 perspective; final merge remains a human decision.
 - Local verification environment:
   - `.venv/bin/python3 -m pip --version`: pass after `uv pip install pip` (`pip 26.1.1`)。
   - representative issue-69 / isolated wheel packaging tests: pass (`Ran 4 tests`)。
