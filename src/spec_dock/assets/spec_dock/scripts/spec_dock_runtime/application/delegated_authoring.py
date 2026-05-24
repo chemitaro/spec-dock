@@ -645,11 +645,7 @@ def _file_state_map(file_states: tuple[_BaselineFileState, ...]) -> dict[Path, t
 def _resolve_scope_dir(specdock_dir: Path, scope_id: str) -> Path | None:
     meta_paths = sorted(specdock_dir.glob(f"initiatives/**/{scope_id}*/.meta.json"))
     for meta_path in meta_paths:
-        try:
-            data = json.loads(meta_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue
-        if data.get("id") == scope_id:
+        if _scope_meta_matches(meta_path, scope_id):
             return meta_path.parent
     active_issue = specdock_dir / "active" / "issue"
     if active_issue.exists():
@@ -657,9 +653,17 @@ def _resolve_scope_dir(specdock_dir: Path, scope_id: str) -> Path | None:
             resolved = active_issue.resolve()
         except OSError:
             resolved = active_issue
-        if resolved.name.startswith(f"{scope_id}-") or resolved.name == scope_id:
+        if _scope_meta_matches(resolved / ".meta.json", scope_id):
             return resolved
     return None
+
+
+def _scope_meta_matches(meta_path: Path, scope_id: str) -> bool:
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return data.get("id") == scope_id
 
 
 def _repo_path(path: Path, repo_root: Path) -> Path:
