@@ -552,3 +552,5 @@ class UseCases:
     worktree_create: Callable[[WorktreeCreateRequest], WorktreeCreateResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("worktree_create is not configured")
     )
+    repo_root: Path | None = None
+    specdock_dir: Path | None = None

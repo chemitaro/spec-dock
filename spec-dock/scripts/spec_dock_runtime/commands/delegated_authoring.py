@@ -51,9 +51,8 @@ def _manifest_args(ns: argparse.Namespace) -> CommandArgs:
 
 
 def _run_manifest(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
-    del use_cases
     typed = _expect_manifest_args(args)
-    repo_root = Path.cwd()
+    repo_root, specdock_dir = _runtime_paths(use_cases)
     result = generate_delegated_authoring_manifest(
         DelegatedAuthoringManifestRequest(
             role=typed.role,
@@ -62,7 +61,7 @@ def _run_manifest(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
             host_surface=typed.host_surface,
             input_authority_file=typed.input_authority_file,
             repo_root=repo_root,
-            specdock_dir=repo_root / "spec-dock",
+            specdock_dir=specdock_dir,
         )
     )
     return CommandOutcome(exit_code=0 if result.ok else 1, text=_render_result(result))
@@ -72,6 +71,18 @@ def _expect_manifest_args(args: CommandArgs) -> DelegatedAuthoringManifestArgs:
     if not isinstance(args, DelegatedAuthoringManifestArgs):
         raise RuntimeError("Invalid command args for delegated-authoring manifest")
     return args
+
+
+def _runtime_paths(use_cases: UseCases) -> tuple[Path, Path]:
+    specdock_dir = use_cases.specdock_dir
+    repo_root = use_cases.repo_root
+    if specdock_dir is None and repo_root is not None:
+        specdock_dir = repo_root / "spec-dock"
+    if repo_root is None and specdock_dir is not None:
+        repo_root = specdock_dir.parent
+    if repo_root is None or specdock_dir is None:
+        raise RuntimeError("runtime paths are not configured")
+    return repo_root, specdock_dir
 
 
 def _render_result(result) -> CliText:

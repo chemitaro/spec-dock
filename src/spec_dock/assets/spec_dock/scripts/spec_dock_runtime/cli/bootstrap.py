@@ -264,5 +264,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         validate_tree=lambda req: application_validate_tree(req, ports),
         doctor=lambda req: application_doctor(req, ports),
         worktree_create=lambda req: application_worktree_create(req, ports),
+        repo_root=ports.repo_root,
+        specdock_dir=ports.specdock_dir,
     )
     return BootstrapContext(use_cases=use_cases)

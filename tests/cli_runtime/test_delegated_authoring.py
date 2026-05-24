@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -262,6 +265,35 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertIn('executor = "desktop-fallback"', session)
         self.assertIn("host_surface_acceptance_eligible = false", session)
 
+    def test_manifest_command_uses_bootstrapped_repo_root_from_subdirectory(self) -> None:
+        target = self._make_target_repo_with_scope()
+        authority_file = self._write_authority_file(target)
+        subdir = target / "nested" / "cwd"
+        subdir.mkdir(parents=True)
+
+        p = self._run_runtime_capture_from_cwd(
+            target,
+            [
+                "delegated-authoring",
+                "manifest",
+                "--role",
+                "system-architect",
+                "--scope",
+                "iss-00003",
+                "--target",
+                "design",
+                "--host-surface",
+                "cli",
+                "--input-authority-file",
+                str(authority_file),
+            ],
+            cwd=subdir,
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring manifest)", p.stdout)
+        self.assertIn("manifest_path=", p.stdout)
+
     def test_manifest_command_blocks_minimal_promotion_json(self) -> None:
         target = self._make_target_repo_with_scope()
         authority_file = self._write_authority_file(target, minimal_promotion=True)
@@ -320,14 +352,29 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
     def _make_target_repo_with_scope(self) -> Path:
         self._tmpdir = getattr(self, "_tmpdir", [])
-        import tempfile
-
         tmp = tempfile.TemporaryDirectory()
         self._tmpdir.append(tmp)
         target = Path(tmp.name)
         self.assertEqual(main(["init", str(target)]), 0)
         self._create_same_repo_linked_hierarchy(target, issue_issue_number=3, issue_title="Delegated authoring")
         return target
+
+    def _run_runtime_capture_from_cwd(
+        self,
+        target: Path,
+        args: list[str],
+        *,
+        cwd: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+        return subprocess.run(
+            [sys.executable, str(script), *args],
+            cwd=str(cwd),
+            env=self._runtime_env(target, None),
+            capture_output=True,
+            text=True,
+        )
 
     def _write_authority_file(
         self,
