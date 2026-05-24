@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -109,6 +110,32 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
         self.assertIn("status=pass", p.stdout)
+        self.assertIn("reason=ok", p.stdout)
+
+    def test_diff_guard_uses_bootstrapped_repo_root_from_subdirectory(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+        subdir = target / "nested" / "cwd"
+        subdir.mkdir(parents=True)
+
+        p = self._run_runtime_capture_from_cwd(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+            cwd=subdir,
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
         self.assertIn("reason=ok", p.stdout)
 
     def test_diff_guard_rejects_forbidden_path(self) -> None:
@@ -659,6 +686,23 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertEqual(main(["init", str(target)]), 0)
         self._create_same_repo_linked_hierarchy(target, issue_issue_number=3, issue_title="Delegated authoring")
         return target
+
+    def _run_runtime_capture_from_cwd(
+        self,
+        target: Path,
+        args: list[str],
+        *,
+        cwd: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        script = target / "spec-dock" / "scripts" / "spec-dock"
+        self.assertTrue(script.is_file(), f"runtime script missing: {script}")
+        return subprocess.run(
+            [sys.executable, str(script), *args],
+            cwd=str(cwd),
+            env=self._runtime_env(target, None),
+            capture_output=True,
+            text=True,
+        )
 
 
 def _issue_dir(target: Path) -> Path:
