@@ -18,7 +18,7 @@ ID: "iss-00127"
 | ID | Status | Type | Raised By | Gap | Options Considered | Decision / Interpretation | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | implementation | deep-consultant / orchestrator | post-run diff guard を docs-only 契約に留めるか runtime helper にするか未確定だった | A: docs/plan/report contract only; B: minimal runtime helper; C: full enforcement / adoption automation | B を採用。`delegated-authoring diff-guard` を minimal eligibility classifier として設計・実装対象にする | V2 は sub-agent direct write を許容するため、canonical single-writer と adoption ledger だけでは採用資格検査が人力に寄りすぎる | promoted_to_design | `requirement.md` Q-001 resolved decision; deep-consultant decision support; `design.md` | none |
-| D-002 | resolved | implementation | deep-consultant / orchestrator | static adapter で scope-local `discussions/` write をどこまで表現するか未確定だった | A: broad write with guard; B: no broad static write; C: keep canonical draft target write | B を採用。static adapter は read-mostly fallback とし、canonical docs write を禁止する | post-run diff guard は broad permission の正当化ではなく delegated output eligibility の検査である | promoted_to_design | `requirement.md` Q-002 resolved decision; deep-consultant decision support; `design.md` | none |
+| D-002 | superseded-by-s05 | implementation | deep-consultant / orchestrator | static adapter で scope-local `discussions/` write をどこまで表現するか未確定だった | A: broad write with guard; B: no broad static write; C: keep canonical draft target write | S05 で superseded。static adapter は read-mostly fallback ではなく、system-architect / implementation-planner に限り scope-local `discussions/*.md` write を静的に持つ。canonical docs write と broad `spec-dock/initiatives` write は引き続き禁止する | User follow-up clarified that proposal-only/read-mostly is too restrictive for these authoring roles, while canonical docs remain main-orchestrator-only | superseded_by_D-S05-001 | `requirement.md` Q-002 historical decision; S05 `D-S05-001`; updated adapters/tests/report | none |
 | D-003 | resolved | implementation | spec-reviewer / orchestrator | diff-guard allowed filename が collision-safe naming rule を含んでいなかった | A: stricter `<ts>-<kind>-<slug>.md` only; B: include `<ts>-<nn>-<kind>-<slug>.md` collision form | B を採用。既存 discussion rules と同じ collision-safe naming rule を diff-guard 契約へ含めた | `spec-dock/active/issue/discussions/rules.md` が same-second collision form を許可しており、正当な `new doc` output を拒否しないため | applied | `requirement.md`, `design.md`, `plan.md` | none |
 | D-004 | resolved | refactor | fresh deep-consultant / orchestrator | deprecated `delegated-authoring manifest` の旧 manifest/Profile/probe/session 生成 helper を runtime に残すか未確定だった | A: legacy helper を履歴参照として残す; B: external deprecated stub だけ残し、内部生成 helper を削除する | B を採用。CLI/API の deprecated/blocked 挙動は残し、旧生成 helper は削除する | 今回の標準経路は flat discussion draft + diff-guard であり、死んだ生成 helper は将来の誤再利用と設計誤読を招く | applied | deep-consultant result 2026-05-25; runtime diff | none |
 | D-005 | resolved | implementation | code-reviewer / qa-reviewer / orchestrator | `--baseline-status` が dirty baseline の forbidden path mutation を見逃す可能性と、allowlisted existing discussion update の lifecycle eligibility が不足していた | A: baseline entries を従来どおり無視する; B: content snapshot を追加する; C: baseline 内の forbidden dirty entry は fail-closed、allowlist は proposed/unreviewed state を要求する | C を採用。baseline で無視できるのは diff-guard 自体が許可できる entry だけにし、existing discussion update は `status: proposed` または `adoption_status: unreviewed` を要求する | baseline-status だけでは content mutation を厳密に比較できないため、canonical/config/test などの forbidden dirty path は安全側に倒す。追加 JSON/manifest なしで user 方針の軽量運用を保つ | applied | code-reviewer / qa-reviewer findings 2026-05-25; runtime diff; targeted tests | none |
@@ -29,6 +29,7 @@ ID: "iss-00127"
 | D-010 | resolved | implementation | Codex PR review / orchestrator | baseline entry が delegated run 後に current status から消えると、pre-existing non-target dirtiness の削除/復元を見逃しうる。加えて porcelain text parsing が quoted path と ` -> ` を含む通常ファイル名を誤読しうる | A: baseline-only entry を無視する; B: disappeared baseline entry は fail-closed で評価対象へ戻す; C: separate manifest で lifecycle を追跡する | B を採用。baseline-only entry は delegated run 中の non-target 変更として diff-guard に戻し、`git status --porcelain=v1 -z` で current status を取得して quoted path / rename separator 誤読を避ける | user 方針の軽量 file-based 運用を維持しながら、baseline subtraction を delta guard として閉じるには、消えた baseline entry を安全側に扱うのが最小で堅い | applied | Codex PR review #128 commit `1f95b09`; targeted 25/27-test runs | none |
 | D-011 | resolved | implementation | Codex PR review / orchestrator | editable-state 判定が本文中の説明文でも満たされ、新規 discussion draft が provenance metadata なしで通過し、baseline-status の tab / C-quoted path が誤分割されうる | A: proposal-only に戻す; B: frontmatter metadata を唯一の editable-state source にし、新規作成にも editable state を要求し、baseline path field を escaped text として扱う; C: JSON manifest を再導入する | B を採用。sub-agent direct write は維持しつつ、metadata は frontmatter の `status: proposed` または `adoption_status: unreviewed` のみを信頼する。baseline-status の path field は JSON escaping で出力し、JSON/C-quoted text を decode する | user 方針は proposal-only ではなく file-based direct discussion draft authoring である。一方で本文 prose や制御文字 path による誤承認は権限境界を曖昧にするため、軽量 metadata と escaped text format で閉じる | applied | Codex PR review #128 commit `bec31c4`; targeted 28/30-test runs; full 903-test run | none |
 | D-012 | resolved | implementation | Codex PR review / orchestrator | baseline text の rename 行で quoted original path 内に ` -> ` が含まれると、rename separator と誤分割され baseline key が壊れる | A: rename baseline text を禁止する; B: quoted field の終端を解釈し、その外側の ` -> ` だけを rename separator とする; C: baseline format を別ファイルに分離する | B を採用。baseline-status は JSON-escaped path field を使う前提を維持し、parser は quote/escape を見て rename left field の終端を決める | 追加 manifest や format 変更なしに、既存の escaped text format を正しく読めば足りる。pre-existing rename dirtiness を安全に baseline subtraction するための最小修正 | applied | Codex PR review #128 commit `3f78a74`; targeted 29/31-test runs; full 904-test run | none |
+| D-013 | superseded-by-s05 | implementation | qa-reviewer / spec-reviewer / code-reviewer / orchestrator | S04 の scoped-write execution path が `discussions/` directory write root と advisory `write_policy` だけでは nested / non-md / per-agent dir を実行境界で止められない | A: directory write root + post-run diff-guard に委ねる; B: static adapter に broad write を足す; C: runtime scoped-context で選択済み direct child Markdown 1ファイルだけを `write` root にする | S05 で superseded。`delegated-authoring scoped-context --discussion-file` と動的設定書き換えは削除し、静的 scope-local `discussions/*.md` write + post-run diff-guard/report adoption を採用する | User clarified that per-run config rewrite is too complex and unsuitable for multi-scope delegated authoring; the durable rule should stay static, simple, and file-based | superseded_by_D-S05-001 | S04 historical reviewer findings; S05 deletion regression tests; S05 `D-S05-001`; runtime removal diff | none |
 
 ## 証跡採用台帳
 | ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
@@ -47,6 +48,8 @@ ID: "iss-00127"
 | EAL-012 | adopted | reviewer | Codex PR review | baseline-only entries and porcelain quoted paths must not bypass or falsely block diff-guard | runtime delegated_authoring application, workflow docs, tests, report | PR review hardening | Disappeared baseline entries represent delegated-run mutation of pre-existing dirtiness, and status parsing must preserve filenames before file-state matching can be trusted | strong | Codex PR review #128, 2026-05-25; targeted 25/27-test runs | orchestrator | implemented / locally verified | no | reflected to runtime, docs, tests, and report |
 | EAL-013 | adopted | reviewer | Codex PR review | editable-state must come from frontmatter metadata, new draft files must carry editable provenance state, and baseline-status path fields must be escaped / decoded losslessly | runtime delegated_authoring application/domain, tests, report | PR review hardening | These findings prevent prose-only lifecycle claims and control-character filenames from bypassing the delegated output guard while preserving scope-local discussion direct-write | strong | Codex PR review #128, 2026-05-25; targeted 28/30-test runs; full 903-test run | orchestrator | implemented / locally verified | no | reflected to runtime, tests, and report |
 | EAL-014 | adopted | reviewer | Codex PR review | quoted rename baseline lines must not split inside escaped path fields | runtime delegated_authoring application, tests, report | PR review hardening | Pre-existing rename dirtiness can be a legitimate baseline entry, and filenames may contain the textual arrow separator; parser correctness is required before file-state matching can be trusted | strong | Codex PR review #128, 2026-05-25; targeted 29/31-test runs; full 904-test run | orchestrator | implemented / locally verified | no | reflected to runtime, tests, and report |
+| EAL-015 | adopted | reviewer | code-reviewer / qa-reviewer / spec-reviewer | S04 scoped-context must select the generated permission profile and enforce exact direct child Markdown file write roots, not just declare a policy label | runtime delegated_authoring application/command, tests, adapter/skill guidance, report | S04 implementation correction | Findings identified the exact mismatch between user intent, S04 plan, and the first implementation attempt; fixing this prevents `discussions/delegated-authoring/` or nested files from being writable through the execution path | strong | sub-agent review results 2026-05-25; targeted scoped-context tests | orchestrator | code-reviewer pass / qa-reviewer pass / spec-reviewer pass | no | reflected to runtime, assets, tests, design, and report |
+| EAL-016 | adopted | reviewer | qa-reviewer / orchestrator | S04 must also pin read-only specialist and workspace-write worker taxonomy so the scoped-write correction does not broaden adjacent agent permissions | `tests/test_init_update.py`, provider agent assets | S04 regression coverage | This directly covers `tc-s04-003` and prevents repeating the static/scoped role classification mistake that triggered the issue | strong | qa-reviewer result 2026-05-25; `test_s04_codex_agent_permission_taxonomy_contract` | orchestrator | qa-reviewer pass | no | reflected to tests |
 
 ## 委任ドラフト証跡
 - 委任 authoring の使用: not used
@@ -76,6 +79,9 @@ ID: "iss-00127"
 | implementation | code reviewer | code-reviewer | fresh | failed | no | blocked until fixes and re-review | 2026-05-25: P1 dirty-baseline forbidden path gap and P2 dangling symlink gap were fixed |
 | implementation | QA reviewer | qa-reviewer | fresh | failed | no | blocked until fixes and re-review | 2026-05-25: P1 dirty-baseline coverage gap and P1 non-proposed allowlisted update gap were fixed |
 | implementation/docs | final spec reviewer | spec-reviewer | fresh | passed | N/A | proceed after report ledger cleanup | 2026-05-25: no P0/P1 spec blockers; P2 stale final gate row cleanup addressed in this report |
+| S04 correction | QA reviewer | qa-reviewer | fresh | passed | N/A | proceed | 2026-05-25: initial P1/P2 findings fixed by exact `--discussion-file` write root, exact write-root assertion, and taxonomy tests; re-review found no P0/P1 blockers |
+| S04 correction | spec reviewer | spec-reviewer | fresh | passed | N/A | proceed | 2026-05-25: initial P1/P2 findings fixed by exact-file scoped context, S04 report evidence, and design CLI contract update |
+| S04 correction | code reviewer | code-reviewer | fresh | passed | N/A | proceed | 2026-05-25: initial P1 findings fixed with `default_permissions` and exact file write root; re-review found no P0/P1/P2 findings |
 
 ## Spec Authoring Gate
 | Phase | investigated facts | open questions | delegation consent | reviewer | verdict | fixes | promotion |
@@ -134,6 +140,20 @@ ID: "iss-00127"
 - required closure id: `tc-008`
 - required verification: provider/mirror parity, `sync`, `validate`, `doctor`
 
+### S04 Agent permission taxonomy and scoped-write execution correction
+- 状態: implemented / targeted local tests passed / reviewer gates passed
+- delegated role: orchestrator direct implementation with code-reviewer / qa-reviewer / spec-reviewer review findings
+- observed changes:
+  - `delegated-authoring scoped-context` now requires `--discussion-file` and resolves it against the target scope `discussions/`.
+  - scoped context blocks discussion file targets outside the resolved scope, nested paths, non-Markdown files, non-compliant discussion filenames, symlinks, and non-file existing targets.
+  - scoped context emits `default_permissions = <generated profile>` so the generated profile is selected when used as runtime context.
+  - generated permission profile grants write only to the exact selected direct child Markdown file, not to the whole `discussions/` directory or `spec-dock/initiatives`.
+  - static `system-architect` / `implementation-planner` adapters remain read-mostly fallback surfaces with no static write roots and no broad workspace write.
+  - provider and dogfooding mirror `.codex/AGENTS.md`, adapter TOMLs, and role skills describe runtime scoped context with `--discussion-file`.
+  - taxonomy regression coverage asserts researcher / consultant / deep-consultant / repo-analyst / reviewers / pr-monitor / spark-worker remain read-only specialists, dev-coder / doc-writer / utility-worker / worker remain workspace-write workers, and system-architect / implementation-planner remain static no-write scoped delegated authors.
+- required closure ids: `tc-s04-001`, `tc-s04-002`, `tc-s04-003`, `tc-s04-004`
+- required verification: scoped-context CLI tests, taxonomy asset tests, provider/mirror parity, `validate`, `sync`, `doctor`, `git diff --check`, reviewer re-review
+
 ## クロージャ状況
 | Closure ID | Step | Planned Evidence | Observed Evidence | Result | Notes |
 |---|---|---|---|---|---|
@@ -147,6 +167,10 @@ ID: "iss-00127"
 | tc-008 | S03 | provider/mirror parity tests / sync / validate / doctor | provider/dogfooding mirror parity tests passed; `sync`, `validate`, `doctor`, and `git diff --check` passed | passed | `validate` nodes=65; `doctor` findings=0 |
 | tc-009 | S90 | docs inspection / spec-reviewer | local asset tests, full unittest, and final spec-reviewer pass observed | passed | P2 stale report row cleanup addressed |
 | tc-010 | S99 | final tests / validation / reviewers | full unittest and spec-dock validation passed; targeted tests passed after dirty-baseline fail-closed hardening; final reviewers passed | passed | code-reviewer / qa-reviewer / spec-reviewer final re-review passed |
+| tc-s04-001 | S04 | scoped-write authoring agents are not read-only specialists | `test_scoped_context_writes_external_permission_context_for_exact_discussion_file` passed for system-architect and implementation-planner; static adapter tests passed | passed | runtime context provides write-capable exact-file profile while static adapters remain no-write fallback |
+| tc-s04-002 | S04 | scoped-write does not become broad write | scoped-context tests passed: write root is exact discussion file; target directory itself is not a write root; nested, non-md, and bad-name targets are blocked | passed | fixes reviewer P1 about advisory-only direct-child policy |
+| tc-s04-003 | S04 | read-only specialists and workspace-write workers keep their taxonomy | `test_s04_codex_agent_permission_taxonomy_contract` passed | passed | read-only specialists remain `sandbox_mode = "read-only"`; worker roles remain `workspace-write`; scoped delegated authors have no static write roots |
+| tc-s04-004 | S04 | diff guard remains adoption eligibility check, not write-boundary substitute | `tests.cli_runtime.test_delegated_authoring` and `tests.domain_runtime.test_delegated_authoring` passed; scoped-context write boundary is exact-file before diff-guard | passed | post-run diff-guard still required by context metadata and docs |
 
 ## 実行コマンド / 結果
 ```bash
@@ -332,6 +356,40 @@ spec-dock: ok (doctor) findings=0
 
 git diff --check
 OK
+
+python -m unittest tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_writes_external_permission_context_for_exact_discussion_file tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_rejects_non_exact_discussion_file_targets tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_rejects_repo_local_output -v
+Ran 3 tests in 2.781s
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_s04_codex_agent_permission_taxonomy_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers tests.test_init_update.TestInitUpdate.test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_runtime_mirror_match_provider_assets -v
+Ran 4 tests in 0.019s
+OK
+
+python -m unittest tests.cli_runtime.test_delegated_authoring tests.domain_runtime.test_delegated_authoring -v
+Ran 41 tests in 32.094s
+OK
+
+./spec-dock/scripts/spec-dock delegated-authoring scoped-context --role system-architect --scope iss-00127 --discussion-file 20260525t120000z-disc-system-architect-draft.md
+spec-dock: ok (delegated-authoring scoped-context)
+reason=scoped_context_ready
+write_policy=exact_direct_child_markdown_file
+
+./spec-dock/scripts/spec-dock delegated-authoring scoped-context --role implementation-planner --scope iss-00127 --discussion-file 20260525t120001z-disc-implementation-planner-draft.md
+spec-dock: ok (delegated-authoring scoped-context)
+reason=scoped_context_ready
+write_policy=exact_direct_child_markdown_file
+
+./spec-dock/scripts/spec-dock delegated-authoring scoped-context --role system-architect --scope iss-00127 --discussion-file delegated-authoring/20260525t120002z-disc-bad.md
+spec-dock: blocked (delegated-authoring scoped-context)
+reason=discussion_file_outside_target_discussions
+
+python -m unittest tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_writes_external_permission_context_for_exact_discussion_file tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_rejects_non_exact_discussion_file_targets tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_rejects_repo_local_output tests.test_init_update.TestInitUpdate.test_s04_codex_agent_permission_taxonomy_contract tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers -v
+Ran 5 tests in 2.728s
+OK
+
+python -m unittest discover -v
+Ran 917 tests in 464.233s
+OK
 ```
 
 ## 最終品質ゲート
@@ -342,6 +400,9 @@ OK
 | Final Code Review Gate | code-reviewer | issue-wide integrated diff | passed | final code re-review found no P0/P1/P2 findings |
 | Final Spec Review Gate | spec-reviewer | requirement/design/plan/report/implementation/tests/docs alignment | passed | final spec-reviewer found no P0/P1 blockers; P2 evidence freshness addressed in this report |
 | Final Commit Gate | git status / commit evidence | final report ledger and commit scope | external-evidence-required | implementation commit and report updates have been delivered to PR; final post-commit head SHA and clean check are recorded as external PR/final-response evidence because they necessarily occur after this committed report text |
+| S04 QA Gate | qa-reviewer | scoped-context write boundary and taxonomy coverage | passed | initial P1/P2 findings fixed; final remaining P2 exact write-root assertion addressed |
+| S04 Code Review Gate | code-reviewer | runtime permission context and selected profile | passed | re-review found no P0/P1/P2 findings |
+| S04 Spec Review Gate | spec-reviewer | S04 docs/report/implementation alignment | passed | re-review found no P0/P1 blockers; P2 design CLI contract update addressed |
 
 ## PR 送達ゲート
 | Field | Evidence |
@@ -402,6 +463,112 @@ OK
   - 解決: ignored forbidden output の収集 pathspec に `:(glob)**/.env*` を追加し、nested ignored `.env.secret` が delegated run 後に作成された場合も `reason=env_file` で fail-closed する CLI regression test を追加した。targeted CLI/domain/mirror test と full unittest exit code 0 で確認した。
 - 問題: Codex PR review が、`.env.d/secret.txt` のような `.env*` directory descendant は `.env*` / `:(glob)**/.env*` だけでは ignored forbidden output として収集できないと指摘した。
   - 解決: ignored forbidden output の収集 pathspec に `.env*/**` と `:(glob)**/.env*/**` を追加し、path part のいずれかが `.env` で始まる場合も `reason=env_file` に分類するようにした。`tmp/.env.d/secret.txt` の CLI regression test、provider/dogfooding mirror parity、full unittest で確認した。
+- 問題: S04 初期実装は generated scoped context に `default_permissions` がなく、かつ write root が target `discussions/` directory 全体だったため、実行境界として direct child Markdown only を保証できなかった。
+  - 解決: `--discussion-file` を必須にし、resolved scope の `discussions/` direct child にある naming-rule compliant Markdown 1ファイルだけを write root とする context を生成するようにした。`default_permissions` で generated profile を選択し、nested / non-md / bad-name target を blocked にする tests を追加した。
+- 問題: S04 初期実装は read-only specialist / full workspace-write worker / scoped delegated author の taxonomy regression coverage が不足していた。
+  - 解決: `test_s04_codex_agent_permission_taxonomy_contract` を追加し、対象 agent 群の static permission classification を asset-level で固定した。
+
+## S05 追補実装証跡
+
+### S05 Red / 代替証跡
+- `rg -n "scoped-context|--discussion-file|DelegatedAuthoringScopedContext|generate_delegated_authoring_scoped_context|read-mostly fallback|runtime scoped context required|one exact direct child Markdown file|no scoped context" src/spec_dock/assets spec-dock/scripts spec-dock/docs .codex .agents tests`:
+  - 実装前は provider runtime、dogfooding runtime mirror、`.codex` adapters、`.agents` role skills、workflow docs、`tests/cli_runtime/test_delegated_authoring.py`、`tests/test_init_update.py` に S04 exact-file scoped-context 経路が残っていた。
+  - static adapters は write root を持たず、run ごとの exact-file permission context を標準経路として要求していた。
+- 旧 targeted tests:
+  - `python -m unittest tests.cli_runtime.test_delegated_authoring tests.domain_runtime.test_delegated_authoring -v` は実装前に S04 scoped-context exact-file tests を含む旧期待で走っていた。
+
+### S05 実装内容
+- Runtime:
+  - `delegated-authoring scoped-context` parser binding、command spec、args class、argument builder、args factory、runner、expectation helper、renderer を削除した。
+  - application layer から `DelegatedAuthoringScopedContextRequest` / `DelegatedAuthoringScopedContextResult` / `_SCOPED_CONTEXT_PERMISSION_PROFILES` / `generate_delegated_authoring_scoped_context` / `_blocked_scoped_context_result` / `_render_scoped_context_toml` / `_resolve_scoped_discussion_file` / `_scoped_discussion_file_error` / `_toml_string` を削除した。
+  - `manifest` deprecated / blocked stub、`diff-guard`、`baseline-status` は維持した。
+- Assets / guidance:
+  - provider と dogfooding mirror の `system-architect` / `implementation-planner` adapters を static all scope-local `discussions/*.md` write capability に更新した。
+  - canonical docs direct-write、implementation/test/config/secrets write、per-agent directory、run/task directory、`discussions/delegated-authoring/` は禁止のまま維持した。
+  - role skills と workflow docs から read-mostly fallback / exact-file context requirement を削除し、static discussions write + post-run diff guard + orchestrator adoption ledger に更新した。
+- Tests:
+  - scoped-context exact-file generation tests を削除した。
+  - adapter asset tests と taxonomy tests を static discussion write roots の期待へ更新した。
+  - review follow-up として、`delegated-authoring scoped-context` が CLI subcommand として登録されていないことを自動テストで固定した。
+  - review follow-up として、provider runtime/assets/docs、dogfooding mirror、agent guidance、runtime/domain tests に `--discussion-file` / scoped-context helper identifiers が再導入されない focused asset assertion を追加した。
+  - stale `exact target` wording を phase plan issue docs と同 wording の epic docs から削除し、static scope-local discussion Markdown write + invocation scope + diff-guard/report adoption に整合させた。
+
+### S05 Green 検証
+```text
+python -m unittest tests.cli_runtime.test_delegated_authoring tests.domain_runtime.test_delegated_authoring -v
+Ran 38 tests in 28.350s
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers tests.test_init_update.TestInitUpdate.test_s04_codex_agent_permission_taxonomy_contract -v
+Ran 2 tests in 0.007s
+OK
+
+rg -n "scoped-context|--discussion-file|DelegatedAuthoringScopedContext|generate_delegated_authoring_scoped_context" src/spec_dock/assets spec-dock/scripts spec-dock/docs .codex .agents tests
+only intentional deletion-regression test reference remains in tests/cli_runtime/test_delegated_authoring.py
+
+rg -n "read-mostly fallback|runtime scoped context required|one exact direct child Markdown file|no scoped context|read-only fallback" src/spec_dock/assets spec-dock/docs .codex .agents tests
+no matches
+
+./spec-dock/scripts/spec-dock delegated-authoring scoped-context --help
+exit code 2; valid choices are manifest, baseline-status, diff-guard
+
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=65
+
+./spec-dock/scripts/spec-dock sync
+spec-dock: ok (sync)
+
+./spec-dock/scripts/spec-dock doctor
+spec-dock: ok (doctor) findings=0
+
+git diff --check
+OK
+
+# S05 review follow-up, 2026-05-25
+python -m unittest tests.cli_runtime.test_delegated_authoring.TestDelegatedAuthoringCli.test_scoped_context_subcommand_is_not_registered tests.test_init_update.TestInitUpdate.test_issue_127_removed_scoped_context_contract_stays_removed -v
+Ran 2 tests in 0.864s
+OK
+
+python -m unittest tests.cli_runtime.test_delegated_authoring tests.domain_runtime.test_delegated_authoring -v
+Ran 39 tests in 29.927s
+OK
+
+python -m unittest tests.test_init_update.TestInitUpdate.test_issue_127_removed_scoped_context_contract_stays_removed tests.test_init_update.TestInitUpdate.test_issue_116_delegated_authoring_phase_gate_contract_assets tests.test_init_update.TestInitUpdate.test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers tests.test_init_update.TestInitUpdate.test_s04_codex_agent_permission_taxonomy_contract tests.test_init_update.TestInitUpdate.test_checked_in_dogfooding_mirror_docs_match_provider_assets -v
+Ran 5 tests in 0.030s
+OK
+
+rg -n -e "--discussion-file|scoped-context|DelegatedAuthoringScopedContext|generate_delegated_authoring_scoped_context|delegated_authoring_scoped_context" src/spec_dock/assets spec-dock/scripts spec-dock/docs .codex .agents tests --glob "!spec-dock/initiatives/**"
+tests/cli_runtime/test_delegated_authoring.py:54: intentional negative CLI deletion-regression test reference only
+
+rg -n "exact target" src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md spec-dock/docs/phase_plan_issue.md src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md spec-dock/docs/phase_plan_epic.md
+no matches
+
+rg -n 'scope-local `discussions/\*\.md` write|invocation scope|report ledger adoption evidence' src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md spec-dock/docs/phase_plan_issue.md src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md spec-dock/docs/phase_plan_epic.md
+matches in provider/mirror phase_plan_issue.md and phase_plan_epic.md
+
+git diff --check
+OK
+```
+
+### S05 Step Contract Closure
+| Closure ID | Result | Evidence |
+|---|---|---|
+| tc-s05-001 | passed | `system-architect` / `implementation-planner` adapters now declare static write roots for initiative / epic / issue scope-local `discussions/*.md`; adapter tests passed |
+| tc-s05-002 | passed | static write roots are limited to discussion Markdown patterns; canonical docs, `src`, `tests`, `.agents`, `.codex`, `.github`, `.env*` remain non-write targets; diff-guard tests still pass forbidden path cases |
+| tc-s05-003 | passed | runtime command surface now exposes only `manifest`, `baseline-status`, `diff-guard`; scoped-context command returns argparse invalid choice; deletion is covered by `test_scoped_context_subcommand_is_not_registered` |
+| tc-s05-003a | passed | focused asset/test assertion blocks scoped-context / discussion-file / scoped context request/helper residue in runtime/assets/guidance target paths; residual `rg` found only the intentional negative CLI test reference |
+| tc-s05-004 | passed | delegated_authoring CLI/domain tests passed; diff guard remains adoption eligibility check and was not replaced by permission generation |
+| tc-s05-005 | passed | taxonomy asset test confirms read-only specialists remain read-only and workspace-write workers remain workspace-write |
+
+### S05 Evidence Adoption Ledger
+| ID | status | source_type | source | target | adoption rationale | evidence |
+|---|---|---|---|---|---|---|
+| EAL-S05-001 | adopted | discussion | `discussions/20260525t010211z-disc-static-all-discussions-write-permission-analysis.md` | provider/mirror adapters, skills, workflow docs, runtime, tests | S05 supersedes S04 exact-file context because delegated authoring should use static all scope-local discussions write with post-run diff guard adoption | S05 implementation diff and Green verification above |
+
+### S05 Decision Ledger
+| ID | status | type | source | ambiguity / constraint | proposed decision | evidence | follow-up |
+|---|---|---|---|---|---|---|---|
+| D-S05-001 | adopted-with-host-smoke-limitation | implementation | dev-coder + main orchestrator | Codex adapter TOML is inspectable in tests, but this local multi-agent runtime did not expose `system-architect` / `implementation-planner` as spawnable agent types for a live host write smoke. | Adopt explicit static glob-style discussion Markdown write-root keys in the adapter and keep broad `spec-dock/initiatives` write out of the profile. Do not restore scoped-context or dynamic settings rewriting. | TOML parses; asset tests verify only those three write roots; no broad write roots are present; provider/dogfooding mirrors match; attempted live authoring-role smoke was blocked by unavailable agent types in this runtime. | If host glob semantics differ in a runtime where these roles are spawnable, revise only the static permission expression; do not reintroduce scoped-context or broad write. |
 
 ## 今後の推奨事項
 - #119 を main へ merge した後、#128 を `main` へ retarget / rebase し、GitHub checks と Codex review を再確認する。

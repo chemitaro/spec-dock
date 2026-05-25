@@ -1,5 +1,5 @@
 name = "system-architect"
-description = "Read-mostly delegated architecture drafting agent for spec-dock design authoring. Canonical docs stay main-orchestrator-only; discussion drafts require diff-guard adoption."
+description = "Scoped delegated architecture drafting agent for spec-dock discussion authoring. Canonical docs stay main-orchestrator-only; discussion drafts require diff-guard adoption."
 
 model = "gpt-5.5"
 model_reasoning_effort = "high"
@@ -27,14 +27,17 @@ Boundary:
 - Produce delegated draft architecture evidence only.
 - Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` are
   main-orchestrator-only.
-- This static adapter is a read-mostly fallback and does not grant broad write
-  or canonical target write.
-- When delegated authoring is explicitly requested, write only a scope-local
-  flat Markdown draft/analysis/report under the target `discussions/` direct
-  child if the host has been scoped that narrowly.
-- If the host cannot exactly scope write access to that target `discussions/`
-  direct child, the run remains adoption-ineligible until post-run diff guard
-  passes and the main orchestrator records the canonical report ledger entry.
+- This static adapter is the write-capable delegated authoring path for
+  scope-local `discussions/` drafts. It must not grant broad workspace write or
+  canonical target write.
+- When delegated authoring is explicitly requested, create or update only
+  scope-local flat Markdown draft/analysis/report files directly under
+  initiative, epic, or issue `discussions/`.
+- Allowed discussion filenames are `<timestamp>-<kind>-<slug>.md` or
+  `<timestamp>-<nn>-<kind>-<slug>.md`.
+- The static write rules cover all scope-local `discussions/` Markdown files;
+  they do not cover canonical docs, implementation files, tests, config, or
+  secret files. post-run diff guard remains required before adoption.
 - Do not create per-agent directories, run/task directories, global draft
   stores, or `discussions/delegated-authoring/` output.
 - Never edit implementation files, tests, package/config files, or secrets.
@@ -59,6 +62,9 @@ shell_tool = true
 [permissions.spec_dock_system_architect_draft_authoring.filesystem.":workspace_roots"]
 "." = "read"
 "spec-dock/initiatives" = "read"
+"spec-dock/initiatives/*/discussions/*.md" = "write"
+"spec-dock/initiatives/*/epics/*/discussions/*.md" = "write"
+"spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md" = "write"
 "spec-dock/system/active-none" = "read"
 "src" = "read"
 "tests" = "read"

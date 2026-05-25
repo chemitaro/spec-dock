@@ -95,7 +95,7 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 
 ## Scope-local discussion write gate
 
-Static adapter は read-mostly fallback surface です。broad write や canonical target write を許可してはなりません。host が target `discussions/` direct child への write を厳密に表現できない場合、run は post-run diff guard pass と canonical `report.md` の ledger entry 記録まで adoption-ineligible として扱います。
+System architect / implementation planner の static adapter は、scope-local `discussions/` Markdown draft だけに write-capable な delegated authoring surface です。broad write や canonical target write を許可してはなりません。Run ごとの permission context 生成は標準経路にせず、post-run diff guard pass と canonical `report.md` の ledger entry 記録まで adoption-ineligible として扱います。
 
 Allowed delegated output は target scope `discussions/` direct-child Markdown files に限定し、filename は `<ts>-<kind>-<slug>.md` または `<ts>-<nn>-<kind>-<slug>.md` に一致させます。既存 discussion update は explicit orchestrator allowlist を必須にし、accepted ADR、superseded、stale、rejected、adopted evidence ではなく proposed draft だけを対象にします。`--baseline-status` を使う場合も target scope `discussions/` は run 開始時点で clean にし、baseline に target discussion subtree の dirty/untracked entry がある delegated output は adoption-ineligible とします。pre-existing non-target dirtiness は repo 外に生成した `delegated-authoring baseline-status --output <path>` の file-state snapshot が current file content and mode と一致する場合に限り delegated output diff から除外できます。baseline entry が current status から消えた場合は、delegated run 中の non-target 変更として fail-closed に扱います。
 

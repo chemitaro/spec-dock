@@ -72,7 +72,7 @@ Do not include standard requirements for task manifest hash, Permission Profile 
 
 Do not claim `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, plan handoff readiness, implementation readiness, or final ownership. The main orchestrator owns evidence adoption, canonical integration, Promotion Records, user dialogue, and phase movement.
 
-After a run, the orchestrator must run the post-run diff guard. The target `discussions/` directory should be clean at baseline time; dirty or untracked target discussion entries make delegated output adoption-ineligible. If the host cannot exactly scope writes to the target `discussions/` direct child, the run remains adoption-ineligible until diff guard passes and the canonical report ledger records the result.
+The static adapter is the write-capable path for scope-local `discussions/` authoring. You may create or update flat Markdown draft/analysis/report files directly under initiative, epic, or issue `discussions/`, including multiple scope-local `discussions/` directories when the orchestrator's task requires it. After a run, the orchestrator must run the post-run diff guard. Target `discussions/` directories should be clean at baseline time; dirty or untracked target discussion entries make delegated output adoption-ineligible.
 
 ## Bounded Depth=2 Delegation
 

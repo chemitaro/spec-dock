@@ -94,7 +94,7 @@ Issue は実装の最小単位です。
 - consent がない、または host policy と衝突する場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
 - read-only specialist consent と scope-local discussion direct-write consent は分離する。Sub-agent authoring output は proposal-only に限定しないが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority である。
 - scope-local discussion direct-write consent は task-local に記録する。最低限、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を含める。
-- manual/unprofiled broad write、static broad profile edit、Desktop-only fallback は adoption-ready delegated output に数えない。Static adapters は read-mostly fallback であり、broad write や canonical target write を許可しない。host が target `discussions/` direct child への write を厳密に表現できない場合、diff guard pass と report ledger entry まで adoption-ineligible とする。
+- manual/unprofiled broad write、static broad profile edit、Desktop-only fallback は adoption-ready delegated output に数えない。System architect / implementation planner の static adapters は scope-local `discussions/` Markdown draft だけに write-capable であり、broad write や canonical target write を許可しない。diff guard pass と report ledger entry まで adoption-ineligible とする。
 
 ## 報告判断台帳ライフサイクル（report decision ledger lifecycle）
 - `report.md` は observed evidence ledger に加えて仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）を持つ。ここには実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up だけを記録し、shell transcript、worker raw note、private reasoning、secret、逐次作業ログは置かない。
