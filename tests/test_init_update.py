@@ -15,6 +15,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
+
 from tests.cli_runtime.harness import (
     CliRuntimeHarness,
     _EXPECTED_MANAGED_SKILL_NAMES,
@@ -58,6 +63,187 @@ _INTERVIEW_REQUIRED_LABELS = (
     "回答欄",
     "回答後フォローアップ",
 )
+
+_DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
+    "missing consent",
+    "missing/stale previous reviewer pass",
+    "requirement gap during design",
+    "design gap during plan",
+    "role unavailable",
+    "forbidden action attempt",
+    "stale draft",
+    "superseded draft",
+    "missing draft evidence when delegated use is claimed",
+    "reviewer unavailable/denied/waived/provisional",
+)
+
+_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER = (
+    "| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | "
+    "対象課題（active issue） | セッション（session） | 指名ロール（named roles） | "
+    "境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | "
+    "拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |"
+)
+
+_JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES = (
+    "`",
+    ".",
+    "/",
+    "API",
+    "ADR",
+    "DDD",
+    "Event",
+    "S",
+    "UML",
+    "YYYY",
+    "active-none",
+    "spec-dock/",
+)
+
+_JAPANESE_PRIMARY_HEADING_ALLOWED_TOOL_TOKENS = (
+    "GitHub",
+    "PlantUML",
+)
+
+_JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS = (
+    "PlantUML",
+)
+
+_JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS = (
+    "5. GitHub default と `--no-github`",
+)
+
+_JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES = (
+    "diagram / trace guidance",
+    "trace guidance",
+)
+
+_JAPANESE_PRIMARY_FORBIDDEN_HEADING_PRIMARY_PHRASES = (
+    "initiative を",
+    "epic を",
+    "issue を",
+    "doc family",
+    "basename contract",
+    "legacy files",
+)
+
+_JAPANESE_PRIMARY_TABLE_CONTRACT_EXCEPTIONS = _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES + (
+    "active issue",
+    "boundary",
+    "denied / unavailable reason",
+    "expires / invalidation condition",
+    "named roles",
+    "next action",
+    "reviewer 利用不可 / 拒否 / waiver / provisional",
+    "session",
+)
+
+_JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS = {
+    "delegated draft evidence",
+    "delegated draft evidence / decision ledger",
+    "delegated / approved-local-execution / degraded mode",
+    "design phase へ戻す",
+    "decision ledger / gate evidence",
+    "added / already sufficient / not applicable",
+    "accepted / rejected / needs follow-up",
+    "add evidence or remove delegated-use claim",
+    "approval source / risk accepted: yes / no",
+    "blocked / incomplete / waived with explicit risk acceptance / next action",
+    "capture",
+    "code-reviewer / spec-reviewer / qa-reviewer",
+    "committed / approved-no-op",
+    "current session / ...",
+    "decision",
+    "discard draft and record incident",
+    "dev-coder / doc-writer / repo-analyst",
+    "docs / templates / readme / workflow / skill / migration notes",
+    "doc-writer / n/a",
+    "elicitation",
+    "final response / pr / issue comment / other external delivery evidence",
+    "framing",
+    "fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する",
+    "guardrail satisfied / no refactor needed",
+    "implementation / review / qa / user report",
+    "issue complete / session end / scope change / host policy conflict / user revocation",
+    "issue-wide integrated diff",
+    "manual authoring",
+    "multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none",
+    "n/a",
+    "none / ...",
+    "none / added / removed / changed / alias-mapped",
+    "none / denied / unavailable / host conflict",
+    "no delegated draft promotion",
+    "none",
+    "not used",
+    "obtain scoped consent or use manual authoring",
+    "obtain fresh passed reviewer or record risk acceptance without promotion",
+    "pass / approved-no-op / fail / blocked",
+    "pass / fail / blocked",
+    "pass / fail / unavailable / denied / waived / provisional",
+    "passed / failed / unavailable / denied / waived / provisional",
+    "proceed / ask user / block gate / record waiver request",
+    "proceed / blocked / incomplete / follow-up required",
+    "ready / blocked",
+    "reference replacement draft",
+    "record unavailable and continue manually if valid",
+    "recorded / added test / deferred / amended plan",
+    "regenerate or reconcile",
+    "report 証跡の記録先",
+    "repo-analyst / dev-coder / doc-writer / n/a",
+    "research",
+    "requirement phase へ戻す",
+    "requirement / design / plan / report / implementation / tests / docs alignment",
+    "rerun reviewer gate",
+    "return to design phase",
+    "return to requirement phase",
+    "reviewer gate evidence",
+    "reviewer gate を再実行する",
+    "reviewer role + passed / failed / unavailable / denied / waived / provisional",
+    "same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use",
+    "spec authoring gate / reviewer evidence",
+    "spec-reviewer / code-reviewer / qa-reviewer / read-only specialist",
+    "step reviewer / final reviewer",
+    "tc-001 / new",
+    "tc-001 / test-name",
+    "unavailable / denied / host conflict / impossible because ...",
+    "user instruction / explicit approval / none",
+    "whole issue obligation coverage",
+    "worker summary / changed files / verification / risks / integration decision",
+    "yes / no / n/a",
+}
+
+_JAPANESE_PRIMARY_TABLE_STATUS_TOKENS = {
+    "approved-no-op",
+    "blocked",
+    "failed",
+    "fresh",
+    "covered-existing",
+    "incomplete",
+    "ineligible",
+    "inspect-only",
+    "manual path",
+    "manual-required",
+    "n/a",
+    "no",
+    "pass",
+    "passed",
+    "provisional",
+    "red-required",
+    "rejected",
+    "stale",
+    "superseded",
+    "waived",
+    "yes",
+}
+
+_JAPANESE_PRIMARY_TABLE_ROLE_TOKENS = {
+    "code-reviewer",
+    "dev-coder",
+    "doc-writer",
+    "final reviewer",
+    "qa-reviewer",
+    "spec-reviewer",
+    "step reviewer",
+}
 
 
 class TestInitUpdate(CliRuntimeHarness):
@@ -143,6 +329,12 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
+        ".agents/skills/spec-dock-system-architect/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-implementation-planner/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md"
+        ),
         ".agents/skills/github-pr-merge-preparer/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md"
         ),
@@ -167,7 +359,13 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/prompts/execute-initiative.md": (
             "src/spec_dock/assets/install_root/.codex/prompts/execute-initiative.md"
         ),
+        ".codex/agents/implementation-planner.toml": (
+            "src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml"
+        ),
         ".codex/agents/spec-manager.toml": "src/spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
+        ".codex/agents/system-architect.toml": (
+            "src/spec_dock/assets/install_root/.codex/agents/system-architect.toml"
+        ),
         ".github/agents/orchestrator.agent.md": (
             "src/spec_dock/assets/install_root/.github/agents/orchestrator.agent.md"
         ),
@@ -175,7 +373,21 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/install_root/.github/agents/spec-manager.agent.md"
         ),
     }
+    _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP = {
+        "spec-dock/system/active-none/initiative/report.md": (
+            "src/spec_dock/assets/spec_dock/system/active-none/initiative/report.md"
+        ),
+        "spec-dock/system/active-none/epic/report.md": (
+            "src/spec_dock/assets/spec_dock/system/active-none/epic/report.md"
+        ),
+        "spec-dock/system/active-none/issue/report.md": (
+            "src/spec_dock/assets/spec_dock/system/active-none/issue/report.md"
+        ),
+    }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/scripts/spec_dock_runtime/app.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/application/contracts.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
         ),
@@ -215,6 +427,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/scripts/spec_dock_runtime/commands/new.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py"
         ),
+        "spec-dock/scripts/spec_dock_runtime/domain/delegated_authoring.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
         ),
@@ -238,7 +453,7 @@ class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_EXPECTATIONS = {
         "docs/rules/initiative/discussions.md": {
             "contains": (
-                "# discussions/rules.md",
+                "# 議論ルール（discussions/rules.md）",
                 "このディレクトリには initiative に紐づく議論資料を置きます。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
@@ -256,7 +471,7 @@ class TestInitUpdate(CliRuntimeHarness):
         },
         "docs/rules/initiative/epics.md": {
             "contains": (
-                "# epics/rules.md",
+                "# エピック一覧ルール（epics/rules.md）",
                 "このディレクトリには initiative 配下の epic を作成します。",
                 "Epic workflow: `spec-dock/docs/workflow_epic.md`",
                 "リポジトリ root から実行してください",
@@ -270,7 +485,7 @@ class TestInitUpdate(CliRuntimeHarness):
         },
         "docs/rules/epic/discussions.md": {
             "contains": (
-                "# discussions/rules.md",
+                "# 議論ルール（discussions/rules.md）",
                 "このディレクトリには epic に紐づく議論資料を置きます。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
@@ -288,7 +503,7 @@ class TestInitUpdate(CliRuntimeHarness):
         },
         "docs/rules/epic/issues.md": {
             "contains": (
-                "# issues/rules.md",
+                "# 課題一覧ルール（issues/rules.md）",
                 "このディレクトリには epic 配下の issue を作成します。",
                 "Issue workflow: `spec-dock/docs/workflow_issue.md`",
                 "GitHub linkage: `spec-dock/docs/reference_github.md`",
@@ -302,7 +517,7 @@ class TestInitUpdate(CliRuntimeHarness):
         },
         "docs/rules/issue/discussions.md": {
             "contains": (
-                "# discussions/rules.md",
+                "# 議論ルール（discussions/rules.md）",
                 "このディレクトリには issue に紐づく議論資料を置きます。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
@@ -427,6 +642,8 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-system-architect/SKILL.md",
+        ".agents/skills/spec-dock-implementation-planner/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ".codex/AGENTS.md",
@@ -442,11 +659,13 @@ class TestInitUpdate(CliRuntimeHarness):
         ".codex/agents/dev-coder.toml",
         ".codex/agents/doc-writer.toml",
         ".codex/agents/explorer.toml",
+        ".codex/agents/implementation-planner.toml",
         ".codex/agents/pr-monitor.toml",
         ".codex/agents/qa-reviewer.toml",
         ".codex/agents/repo-analyst.toml",
         ".codex/agents/researcher.toml",
         ".codex/agents/spark-worker.toml",
+        ".codex/agents/system-architect.toml",
         ".codex/agents/spec-manager.toml",
         ".codex/agents/spec-reviewer.toml",
         ".codex/agents/utility-worker.toml",
@@ -482,6 +701,8 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-system-architect/SKILL.md",
+            ".agents/skills/spec-dock-implementation-planner/SKILL.md",
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
             ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
         ),
@@ -496,11 +717,13 @@ class TestInitUpdate(CliRuntimeHarness):
             ".codex/agents/dev-coder.toml",
             ".codex/agents/doc-writer.toml",
             ".codex/agents/explorer.toml",
+            ".codex/agents/implementation-planner.toml",
             ".codex/agents/pr-monitor.toml",
             ".codex/agents/qa-reviewer.toml",
             ".codex/agents/repo-analyst.toml",
             ".codex/agents/researcher.toml",
             ".codex/agents/spark-worker.toml",
+            ".codex/agents/system-architect.toml",
             ".codex/agents/spec-manager.toml",
             ".codex/agents/spec-reviewer.toml",
             ".codex/agents/utility-worker.toml",
@@ -580,6 +803,22 @@ class TestInitUpdate(CliRuntimeHarness):
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
             ),
         },
+        "spec-dock-system-architect skill": {
+            "search_globs": (
+                "**/spec-dock-system-architect/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md",
+            ),
+        },
+        "spec-dock-implementation-planner skill": {
+            "search_globs": (
+                "**/spec-dock-implementation-planner/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md",
+            ),
+        },
         "spec-dock-codex-adapter skill": {
             "search_globs": (
                 "**/spec-dock-codex-adapter/SKILL.md",
@@ -650,11 +889,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/install_root/.codex/agents/dev-coder.toml",
         "spec_dock/assets/install_root/.codex/agents/doc-writer.toml",
         "spec_dock/assets/install_root/.codex/agents/explorer.toml",
+        "spec_dock/assets/install_root/.codex/agents/implementation-planner.toml",
         "spec_dock/assets/install_root/.codex/agents/pr-monitor.toml",
         "spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml",
         "spec_dock/assets/install_root/.codex/agents/repo-analyst.toml",
         "spec_dock/assets/install_root/.codex/agents/researcher.toml",
         "spec_dock/assets/install_root/.codex/agents/spark-worker.toml",
+        "spec_dock/assets/install_root/.codex/agents/system-architect.toml",
         "spec_dock/assets/install_root/.codex/agents/spec-manager.toml",
         "spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml",
         "spec_dock/assets/install_root/.codex/agents/utility-worker.toml",
@@ -779,6 +1020,21 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00091-default-github-state-commands/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00093-automatic-sync-after-state-mutations/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-delegated-authoring-policy-foundation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00114-delegated-draft-evidence-schema/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00115-delegated-author-role-skills/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00116-delegated-authoring-phase-gates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00117-codex-delegated-author-adapters/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00118-delegated-authoring-dogfooding-pilot/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00124-canonical-draft-authoring-role-rewrite/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -857,6 +1113,56 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00091-default-github-state-commands/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/issues/iss-00093-automatic-sync-after-state-mutations/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00113-delegated-authoring-policy-foundation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00114-delegated-draft-evidence-schema/.meta.json": [
+            "iss-00113"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00115-delegated-author-role-skills/.meta.json": [
+            "iss-00113",
+            "iss-00114",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00116-delegated-authoring-phase-gates/.meta.json": [
+            "iss-00113",
+            "iss-00114",
+            "iss-00115",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00117-codex-delegated-author-adapters/.meta.json": [
+            "iss-00115",
+            "iss-00116",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00118-delegated-authoring-dogfooding-pilot/.meta.json": [
+            "iss-00113",
+            "iss-00114",
+            "iss-00115",
+            "iss-00116",
+            "iss-00117",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00120-authority-metadata-and-promotion-record-schema/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00121-authority-aware-context-pack-lifecycle-gates/.meta.json": [
+            "iss-00120"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00122-evidence-adoption-ledger-depth2-delegation/.meta.json": [
+            "iss-00120"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00123-role-scoped-permission-profiles-task-manifest/.meta.json": [
+            "iss-00120",
+            "iss-00122",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00124-canonical-draft-authoring-role-rewrite/.meta.json": [
+            "iss-00121",
+            "iss-00122",
+            "iss-00123",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/.meta.json": [
+            "iss-00120",
+            "iss-00121",
+            "iss-00122",
+            "iss-00123",
+            "iss-00124",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -868,6 +1174,16 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00070": ["iss-00068", "iss-00069"],
         "iss-00071": ["iss-00069", "iss-00070"],
         "iss-00072": ["iss-00071"],
+        "iss-00114": ["iss-00113"],
+        "iss-00115": ["iss-00113", "iss-00114"],
+        "iss-00116": ["iss-00113", "iss-00114", "iss-00115"],
+        "iss-00117": ["iss-00115", "iss-00116"],
+        "iss-00118": ["iss-00113", "iss-00114", "iss-00115", "iss-00116", "iss-00117"],
+        "iss-00121": ["iss-00120"],
+        "iss-00122": ["iss-00120"],
+        "iss-00123": ["iss-00120", "iss-00122"],
+        "iss-00124": ["iss-00121", "iss-00122", "iss-00123"],
+        "iss-00125": ["iss-00120", "iss-00121", "iss-00122", "iss-00123", "iss-00124"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -967,6 +1283,182 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"guide contains legacy link token: {legacy_token}",
             )
 
+    def _assert_user_facing_markdown_labels_use_japanese_primary(
+        self,
+        text: str,
+        *,
+        source: str,
+    ) -> None:
+        def is_allowed_ascii_table_primary(primary: str) -> bool:
+            normalized = primary.strip()
+            lower_primary = normalized.lower()
+            if lower_primary in _JAPANESE_PRIMARY_TABLE_CONTRACT_EXCEPTIONS:
+                return True
+            if lower_primary in _JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS:
+                return True
+            if re.fullmatch(
+                r"(?:`[^`]+`|<[^<>]+>|[A-Z][A-Z0-9_-]*|[A-Z]{1,4}-\d+|S\d+|tc-[a-z0-9-]+)",
+                normalized,
+            ):
+                return True
+            if re.fullmatch(r"[a-z0-9._/-]+", normalized) and any(
+                separator in normalized for separator in ("/", ".")
+            ):
+                return True
+
+            status_parts = [
+                part.strip()
+                for part in re.split(r"\s*/\s*", lower_primary)
+                if part.strip()
+            ]
+            if status_parts and all(part in _JAPANESE_PRIMARY_TABLE_STATUS_TOKENS for part in status_parts):
+                return True
+
+            role_parts = [
+                part.strip()
+                for part in re.split(r"\s*/\s*", lower_primary)
+                if part.strip()
+            ]
+            return bool(role_parts) and all(part in _JAPANESE_PRIMARY_TABLE_ROLE_TOKENS for part in role_parts)
+
+        def assert_not_full_english_prose(line: str, *, line_number: int) -> None:
+            content = line.strip()
+            if not content:
+                return
+            if content.startswith(("#", "|", "```")):
+                return
+            if content.startswith(("- ", "* ", "> ")):
+                content = content[2:].strip()
+            elif re.match(r"^\d+[.)]\s+", content):
+                content = re.sub(r"^\d+[.)]\s+", "", content)
+            if content.startswith(("`", "./", "/", "[", "<")):
+                return
+            if re.search(r"[ぁ-んァ-ヶ一-龠]", content):
+                return
+
+            words = re.findall(r"[A-Za-z][A-Za-z'-]*", content)
+            if len(words) < 8:
+                return
+            lowercase_words = [word.lower() for word in words if word.isalpha()]
+            common_prose_words = {
+                "a",
+                "an",
+                "and",
+                "are",
+                "as",
+                "be",
+                "but",
+                "by",
+                "does",
+                "for",
+                "from",
+                "if",
+                "in",
+                "is",
+                "it",
+                "not",
+                "of",
+                "on",
+                "or",
+                "that",
+                "the",
+                "then",
+                "this",
+                "to",
+                "with",
+            }
+            if sum(1 for word in lowercase_words if word in common_prose_words) < 4:
+                return
+            self.fail(
+                f"{source}:{line_number}: explanatory prose must use Japanese primary "
+                f"with English anchor only: {line}"
+            )
+
+        in_code_fence = False
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if line.strip().startswith("```"):
+                in_code_fence = not in_code_fence
+                continue
+            if in_code_fence:
+                continue
+
+            heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+            if heading_match:
+                label = heading_match.group(2)
+                self.assertNotIn(
+                    label,
+                    _JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS,
+                    f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}",
+                )
+                primary = re.split(r"\s*[（(]", label, maxsplit=1)[0].strip()
+                primary_without_number = re.sub(r"^\d+[.)]\s+", "", primary)
+                lower_primary = primary_without_number.lower()
+                self.assertNotIn(
+                    primary_without_number,
+                    _JAPANESE_PRIMARY_FORBIDDEN_BARE_TOOL_TOKEN_HEADINGS,
+                    f"{source}:{line_number}: heading must use Japanese primary with tool anchor: {line}",
+                )
+                for phrase in _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES:
+                    self.assertNotIn(
+                        phrase,
+                        lower_primary,
+                        f"{source}:{line_number}: heading must keep English phrase in anchor only: {line}",
+                    )
+                for phrase in _JAPANESE_PRIMARY_FORBIDDEN_HEADING_PRIMARY_PHRASES:
+                    self.assertNotIn(
+                        phrase,
+                        lower_primary,
+                        f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}",
+                    )
+                if any(
+                    primary_without_number.startswith(prefix)
+                    for prefix in _JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES
+                ):
+                    continue
+                leading_tool_token = next(
+                    (
+                        token
+                        for token in _JAPANESE_PRIMARY_HEADING_ALLOWED_TOOL_TOKENS
+                        if primary_without_number == token or primary_without_number.startswith(f"{token} ")
+                    ),
+                    None,
+                )
+                if leading_tool_token is not None:
+                    token_remainder = primary_without_number[len(leading_tool_token) :].strip()
+                    if not token_remainder or not re.match(r"^[A-Za-z`-]", token_remainder):
+                        continue
+                self.assertNotRegex(
+                    primary_without_number,
+                    r"^[A-Za-z]",
+                    f"{source}:{line_number}: heading must use Japanese primary with English anchor: {line}",
+                )
+                continue
+
+            if line.startswith("|") and not re.fullmatch(r"\|[\s:-]+\|?", line):
+                cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+                for cell_index, cell in enumerate(cells, start=1):
+                    if not cell or cell.startswith("`"):
+                        continue
+                    primary = re.split(r"\s*[（(]", cell, maxsplit=1)[0].strip()
+                    lower_primary = primary.lower()
+                    for phrase in _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES:
+                        self.assertNotIn(
+                            phrase,
+                            lower_primary,
+                            f"{source}:{line_number}: table label must keep English phrase in anchor only: {line}",
+                        )
+                    if not re.match(r"^[a-z]", lower_primary):
+                        continue
+                    self.assertTrue(
+                        is_allowed_ascii_table_primary(primary),
+                        f"{source}:{line_number}: table label must use Japanese primary "
+                        "unless it is an explicit contract/code/path/status/role value "
+                        f"(cell {cell_index}: {cell!r}): {line}",
+                    )
+                continue
+
+            assert_not_full_english_prose(line, line_number=line_number)
+
     def _assert_concrete_test_cases_nested_list_contract(self, text: str, *, source: str) -> None:
         marker = "#### 具体テストケース一覧"
         self.assertIn(marker, text, f"{source} must include concrete test case section")
@@ -1028,6 +1520,222 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"{source} concrete case must not use a table row: {case_block}",
             )
 
+    def _assert_delegated_draft_evidence_schema_contract(self, text: str, *, source: str) -> None:
+        for state in (
+            "requested",
+            "produced",
+            "integrated",
+            "partially_integrated",
+            "rejected",
+            "superseded",
+            "blocked",
+            "stale",
+        ):
+            self.assertIn(state, text, f"{source}: missing lifecycle state {state}")
+        ineligible_rule_pattern = re.compile(
+            r"(?:Promotion-ineligible states:[\s\S]{0,160}"
+            r"stale[\s\S]{0,160}rejected[\s\S]{0,160}superseded[\s\S]{0,160}blocked"
+            r"|昇格不可 state:[\s\S]{0,160}"
+            r"stale[\s\S]{0,160}rejected[\s\S]{0,160}superseded[\s\S]{0,160}blocked"
+            r"|stale[\s\S]{0,80}rejected[\s\S]{0,80}superseded[\s\S]{0,80}blocked"
+            r"[\s\S]{0,80}promotion evidence に使えない)"
+        )
+        self.assertRegex(
+            text,
+            ineligible_rule_pattern,
+            f"{source}: missing explicit promotion-ineligible rule for stale/rejected/superseded/blocked",
+        )
+        for field in (
+            "role",
+            "phase",
+            "scope",
+            "consent",
+            "source artifacts",
+            "draft artifact path",
+            "status",
+            "integration result",
+            "rejected portions",
+            "blockers",
+            "reviewer result",
+            "promotion decision",
+        ):
+            self.assertIn(field, text, f"{source}: missing delegated evidence field {field}")
+        for field in (
+            "created_by_role",
+            "scope_id",
+            "source_paths",
+            "intended_targets",
+            "adoption_status: unreviewed",
+            "reflected_to: []",
+            "diff_guard_result",
+            "fallback decision",
+            "report evidence destination",
+            "Evidence Adoption Ledger fields",
+        ):
+            self.assertIn(field, text, f"{source}: missing scope-local discussion evidence field {field}")
+        for retired_heavy_field in (
+            "manifest_hash",
+            "permission_profile_name",
+            "permission_profile_hash",
+            "write_session_invocation_hash",
+            "probe_run_id",
+            "task manifest path/hash",
+            "input authority path/hash",
+            "session invocation path/hash",
+        ):
+            self.assertNotIn(
+                retired_heavy_field,
+                text,
+                f"{source}: retired manifest-heavy field must not be standard delegated draft evidence {retired_heavy_field}",
+            )
+        for retired_grant_key in (
+            "can_write_requirement",
+            "can_write_design",
+            "can_write_plan",
+            "can_write_report",
+            "can_write_discussions",
+            "can_write_implementation",
+            "can_mark_issue_ready",
+            "can_finish_issue",
+            "can_complete_phase",
+        ):
+            self.assertNotIn(
+                retired_grant_key,
+                text,
+                f"{source}: retired grant key must not appear in authority schema {retired_grant_key}",
+            )
+        for invalid_wildcard in ("`*`", "`grants.*`", "`all`"):
+            self.assertIn(invalid_wildcard, text, f"{source}: missing invalid wildcard token {invalid_wildcard}")
+        for field, alternatives in (
+            ("expected verdict", ("expected verdict", "期待される判定")),
+            ("allowed next action", ("allowed next action", "許可される次アクション")),
+            ("report evidence path", ("report evidence path", "report 証跡の記録先", "レポート証跡の記録先")),
+            ("promotion eligibility", ("promotion eligibility", "昇格可否")),
+        ):
+            self.assertTrue(
+                any(alternative in text for alternative in alternatives),
+                f"{source}: missing failure-mode field {field}",
+            )
+        expected_failure_mode_rows = {
+            "missing consent": (
+                "blocked / incomplete",
+                (
+                    "obtain scoped consent or use manual authoring",
+                    "範囲付き同意を取得する、または手動 authoring に戻す",
+                    "obtain scoped consent or use manual authoring（scope 付き同意を取得する、または手動 authoring を使う）",
+                ),
+            ),
+            "missing/stale previous reviewer pass": (
+                "blocked / incomplete",
+                (
+                    "rerun reviewer gate",
+                    "reviewer gate を再実行する",
+                    "レビューゲートを再実行する（rerun reviewer gate）",
+                    "rerun reviewer gate（reviewer gate を再実行する）",
+                ),
+            ),
+            "requirement gap during design": (
+                "blocked / incomplete",
+                (
+                    "return to requirement phase",
+                    "requirement phase へ戻す",
+                    "return to requirement phase（requirement phase に戻す）",
+                ),
+            ),
+            "design gap during plan": (
+                "blocked / incomplete",
+                (
+                    "return to design phase",
+                    "design phase へ戻す",
+                    "return to design phase（design phase に戻す）",
+                ),
+            ),
+            "role unavailable": (
+                "blocked / manual path",
+                (
+                    "record unavailable and continue manually if valid",
+                    "利用不可を記録し、妥当なら手動で続行する",
+                    "record unavailable and continue manually if valid（利用不可を記録し、妥当なら手動で継続する）",
+                ),
+            ),
+            "forbidden action attempt": (
+                "rejected",
+                (
+                    "discard draft and record incident",
+                    "ドラフトを破棄し incident を記録する",
+                    "discard draft and record incident（draft を破棄し、incident を記録する）",
+                ),
+            ),
+            "stale draft": (
+                "stale",
+                (
+                    "regenerate or reconcile",
+                    "再生成または差分調整する",
+                    "regenerate or reconcile（再生成または整合する）",
+                ),
+            ),
+            "superseded draft": (
+                "superseded",
+                (
+                    "reference replacement draft",
+                    "置換先ドラフトを参照する",
+                    "reference replacement draft（置換後 draft を参照する）",
+                ),
+            ),
+            "missing draft evidence when delegated use is claimed": (
+                "incomplete",
+                (
+                    "add evidence or remove delegated-use claim",
+                    "証跡を追加する、または委任使用 claim を外す",
+                    "add evidence or remove delegated-use claim（証跡を追加する、または委任利用 claim を削除する）",
+                ),
+            ),
+            "reviewer unavailable/denied/waived/provisional": (
+                "blocked / incomplete",
+                (
+                    "obtain fresh passed reviewer or record risk acceptance without promotion",
+                    "fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する",
+                    "obtain fresh passed reviewer or record risk acceptance without promotion（fresh passed reviewer を取得する、または昇格なしの risk acceptance を記録する）",
+                ),
+            ),
+        }
+        table_rows = {}
+        for line in text.splitlines():
+            if not line.startswith("|") or line.startswith("|---"):
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) == 5:
+                table_rows[cells[0]] = cells
+        for failure_mode, (expected_verdict, expected_next_actions) in expected_failure_mode_rows.items():
+            matching_keys = [
+                key
+                for key in table_rows
+                if key == failure_mode
+                or key.startswith(f"{failure_mode}（")
+                or key.endswith(f"（{failure_mode}）")
+            ]
+            self.assertTrue(matching_keys, f"{source}: missing failure-mode table row {failure_mode}")
+            cells = table_rows[matching_keys[0]]
+            self.assertEqual(
+                cells[1],
+                expected_verdict,
+                f"{source}: unexpected verdict for failure mode {failure_mode}",
+            )
+            self.assertIn(
+                cells[2],
+                expected_next_actions,
+                f"{source}: unexpected next action for failure mode {failure_mode}",
+            )
+            self.assertTrue(
+                cells[3],
+                f"{source}: missing report evidence path for failure mode {failure_mode}",
+            )
+            self.assertEqual(
+                cells[4],
+                "ineligible",
+                f"{source}: unexpected promotion eligibility for failure mode {failure_mode}",
+            )
+
     def _assert_checked_in_dogfooding_mirror_docs_match_provider_assets(self, repo_root: Path) -> None:
         for mirror_rel_path, asset_rel_path in self._DOGFOODING_MIRROR_PROVIDER_ASSET_MAP.items():
             mirror_path = repo_root / mirror_rel_path
@@ -1038,6 +1746,21 @@ class TestInitUpdate(CliRuntimeHarness):
                 mirror_path.read_text(encoding="utf-8"),
                 asset_path.read_text(encoding="utf-8"),
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}",
+            )
+
+    def _assert_checked_in_dogfooding_active_none_reports_match_provider_assets(
+        self,
+        repo_root: Path,
+    ) -> None:
+        for mirror_rel_path, asset_rel_path in self._DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP.items():
+            mirror_path = repo_root / mirror_rel_path
+            asset_path = repo_root / asset_rel_path
+            self.assertTrue(mirror_path.is_file(), f"missing checked-in active-none report mirror: {mirror_path}")
+            self.assertTrue(asset_path.is_file(), f"missing provider active-none report asset: {asset_path}")
+            self.assertEqual(
+                mirror_path.read_text(encoding="utf-8"),
+                asset_path.read_text(encoding="utf-8"),
+                f"checked-in active-none report mirror diverged from provider asset: {mirror_rel_path}",
             )
 
     def _assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(self, repo_root: Path) -> None:
@@ -1351,6 +2074,115 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("[features]", text, f"codex doc-writer missing features table ({shim_label})")
         self.assertIn("shell_tool = true", text, f"codex doc-writer missing shell tool enable ({shim_label})")
 
+    def _assert_codex_delegated_author_adapter_contract(
+        self,
+        *,
+        text: str,
+        shim_label: str,
+        agent_name: str,
+        skill_name: str,
+        draft_kind: str,
+    ) -> None:
+        parsed = tomllib.loads(text)
+        self.assertEqual(parsed.get("name"), agent_name)
+        self.assertEqual(parsed.get("model"), "gpt-5.5")
+        self.assertEqual(parsed.get("model_reasoning_effort"), "high")
+        self.assertEqual(parsed.get("web_search"), "disabled")
+        self.assertEqual(parsed.get("approval_policy"), "never")
+        self.assertNotIn("sandbox_mode", parsed)
+        self.assertIsInstance(parsed.get("default_permissions"), str)
+        self.assertIn(parsed["default_permissions"], parsed.get("permissions", {}))
+        filesystem_rules = parsed["permissions"][parsed["default_permissions"]]["filesystem"]
+        workspace_rules = filesystem_rules[":workspace_roots"]
+        write_roots = {path for path, permission in workspace_rules.items() if permission == "write"}
+        self.assertEqual(
+            write_roots,
+            {
+                "spec-dock/initiatives/*/discussions/*.md",
+                "spec-dock/initiatives/*/epics/*/discussions/*.md",
+                "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
+            },
+            f"delegated author adapter must grant only scope-local discussion write roots ({shim_label})",
+        )
+        for read_only_path in ("spec-dock/initiatives", "src", "tests", ".codex", ".agents"):
+            self.assertEqual(
+                workspace_rules.get(read_only_path),
+                "read",
+                f"delegated author adapter must keep {read_only_path} read-only ({shim_label})",
+            )
+        self.assertEqual(workspace_rules.get(".env"), "deny")
+        self.assertEqual(workspace_rules.get(".env.*"), "deny")
+        self.assertEqual(parsed.get("features", {}).get("shell_tool"), True)
+        self.assertIsInstance(parsed.get("developer_instructions"), str)
+        self.assertIn(f'name = "{agent_name}"', text, f"delegated author adapter missing name ({shim_label})")
+        self.assertIn(
+            f".agents/skills/{skill_name}/SKILL.md",
+            text,
+            f"delegated author adapter missing canonical role skill reference ({shim_label})",
+        )
+        for fragment in (
+            "intentionally thin",
+            "source of",
+            f"delegated draft {draft_kind} evidence only",
+            "write-capable delegated authoring path",
+            "must not grant broad workspace write",
+            "canonical target write",
+            "scope-local",
+            "flat Markdown draft/analysis/report",
+            "initiative, epic, or issue `discussions/`",
+            "static write rules cover all scope-local `discussions/`",
+            "post-run diff guard",
+            "Never edit implementation files",
+            "Do not promote phases",
+            "claim reviewer",
+            "runtime validation",
+            "role registry",
+            ".github/agents",
+            "default_permissions = ",
+            "[permissions.",
+            '":minimal" = "read"',
+            '"." = "read"',
+            '"spec-dock/initiatives" = "read"',
+            '"spec-dock/initiatives/*/discussions/*.md" = "write"',
+            '"spec-dock/initiatives/*/epics/*/discussions/*.md" = "write"',
+            '"spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md" = "write"',
+            '"src" = "read"',
+            '"tests" = "read"',
+            '".env" = "deny"',
+            "network]",
+            "enabled = false",
+            "lightweight",
+            "discussion draft provenance",
+            "Manual spec authoring remains valid",
+            "fresh `spec-reviewer` pass remains required",
+        ):
+            self.assertIn(
+                fragment,
+                text,
+                f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}",
+            )
+        self.assertIn('model = "gpt-5.5"', text, f"delegated author adapter missing model ({shim_label})")
+        self.assertIn(
+            'model_reasoning_effort = "high"',
+            text,
+            f"delegated author adapter missing reasoning effort ({shim_label})",
+        )
+        self.assertIn('web_search = "disabled"', text, f"delegated author adapter missing web setting ({shim_label})")
+        self.assertIn('approval_policy = "never"', text, f"delegated author adapter missing approval policy ({shim_label})")
+        self.assertNotIn("sandbox_mode =", text, f"delegated author adapter must use Permission Profiles ({shim_label})")
+        self.assertNotIn(
+            "[sandbox_workspace_write]",
+            text,
+            f"delegated author adapter must not mix legacy sandbox settings with Permission Profiles ({shim_label})",
+        )
+        self.assertIn("[features]", text, f"delegated author adapter missing features table ({shim_label})")
+        self.assertIn("shell_tool = true", text, f"delegated author adapter missing shell tool enable ({shim_label})")
+        self.assertNotIn(
+            "sandbox_mode = \"workspace-write\"",
+            text,
+            f"delegated author adapter must not use legacy broad workspace write ({shim_label})",
+        )
+
     def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
         self.assertIn("model: gpt-5.4-mini", text, f"copilot spec-manager model missing ({shim_label})")
@@ -1424,6 +2256,8 @@ class TestInitUpdate(CliRuntimeHarness):
             text,
             f"codex main config missing spec-manager routing guidance ({shim_label})",
         )
+        parsed = tomllib.loads(text)
+        self.assertEqual(parsed.get("agents", {}).get("max_depth"), 2, f"codex main config must set agents.max_depth = 2 ({shim_label})")
 
     def _assert_codex_command_rules_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("prefix_rule(", text, f"codex command rules missing prefix_rule ({shim_label})")
@@ -2090,6 +2924,16 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("docs/authoring/<scope>-<phase>.md", workflow_spec_authoring)
             self.assertIn("docs/authoring/issue-plan.md", workflow_spec_authoring)
             self.assertIn("具体テストケース一覧", workflow_spec_authoring)
+            for fragment in (
+                "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report",
+                "Sub-agent-created draft は最低限",
+                "workflow-wide blanket consent は direct-write authoring delegation の根拠にしない",
+                "previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result",
+                "manual authoring path は有効",
+                "Delegated draft は fresh `spec-reviewer` pass の代替ではない",
+            ):
+                self.assertIn(fragment, workflow_spec_authoring)
             self.assertIn("カード型のネストリスト", issue_plan_authoring)
             self.assertIn("横長テーブルに押し込まない", issue_plan_authoring)
             self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan_authoring)
@@ -2243,6 +3087,8 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((discussions_templates_dir / "research.md").is_file())
             self.assertTrue((discussions_templates_dir / "interview.md").is_file())
             self.assertTrue((discussions_templates_dir / "scratch.md").is_file())
+            for draft_template in ("draft-requirement.md", "draft-design.md", "draft-plan.md"):
+                self.assertFalse((discussions_templates_dir / draft_template).exists())
             self.assertFalse((discussions_templates_dir / "note.md").exists())
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
             for label in _INTERVIEW_REQUIRED_LABELS:
@@ -2254,7 +3100,7 @@ class TestInitUpdate(CliRuntimeHarness):
             design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
             # UML is embedded as small subsections (not a single block at the end).
             self.assertIn("```plantuml", design_text)
-            self.assertIn("### UML（", design_text)
+            self.assertIn("### 図表（UML /", design_text)
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             self.assertNotIn("update_plan", plan_text)
@@ -2262,14 +3108,17 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("## 実行ルール（全ステップ共通）", plan_text)
             self.assertIn("workflow_issue.md", plan_text)
             self.assertIn("phase_plan_issue.md", plan_text)
-            self.assertIn("S90 — docs impact resolution / docs refresh", plan_text)
-            self.assertIn("S99 — final quality gate", plan_text)
+            self.assertIn(
+                "### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）",
+                plan_text,
+            )
+            self.assertIn("### 最終品質ゲートステップ S99（final quality gate）", plan_text)
             self.assertIn("step reviewer gate", plan_text)
             self.assertIn("commit gate", plan_text)
             self.assertIn("planned contract", plan_text)
             self.assertIn("command queue", plan_text)
             self.assertIn("observed evidence ledger", plan_text)
-            self.assertIn("report evidence destination", plan_text)
+            self.assertIn("report 証跡の記録先", plan_text)
             self.assertIn("amendment trigger", plan_text)
             self.assertIn("read-only evidence", plan_text)
             self.assertIn("qa-reviewer", plan_text)
@@ -2277,34 +3126,48 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("final code review ゲート", plan_text)
             self.assertIn("final spec review ゲート", plan_text)
             self.assertIn("対象ファイル:", plan_text)
-            self.assertIn("#### delegation contract", plan_text)
+            self.assertIn("#### 委任契約（delegation contract）", plan_text)
             for fragment in (
-                "delegated role:",
-                "input docs:",
-                "allowed paths:",
-                "forbidden changes:",
-                "acceptance criteria:",
-                "required tests or docs-only verification:",
+                "委任ロール（delegated role）:",
+                "入力 docs:",
+                "許可 paths:",
+                "禁止 changes:",
+                "受け入れ条件:",
+                "必須 tests または docs-only verification:",
                 "reviewer focus:",
-                "output required:",
+                "必須出力（output required）:",
                 "verification result:",
-                "stop conditions:",
+                "停止条件（stop conditions）:",
                 "#### 具体テストケース一覧",
-                "#### step closure contract",
-                "#### step gate",
+                "#### ステップ完了契約（step closure contract）",
+                "#### ステップゲート（step gate）",
             ):
                 self.assertIn(fragment, plan_text)
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             self.assertIn("## 遭遇した問題と解決", report_text)
             self.assertIn("Observed Evidence Ledger", report_text)
-            self.assertIn("#### Red/Green/Refactor Evidence", report_text)
-            self.assertIn("#### Discovered Tests", report_text)
-            self.assertIn("#### Step Contract Closure", report_text)
-            self.assertIn("#### Test Contract Closure", report_text)
-            self.assertIn("#### Closure Coverage", report_text)
-            self.assertIn("#### Closure Delta", report_text)
-            self.assertIn("#### Workflow Delegation Consent", report_text)
+            self.assertIn("## 委任ドラフト証跡（Delegated Draft Evidence / 必須）", report_text)
+            self._assert_delegated_draft_evidence_schema_contract(
+                workflow_spec_authoring,
+                source="docs/workflow_spec_authoring.md",
+            )
+            for scope in ("initiative", "epic", "issue"):
+                scope_report_text = (target / "spec-dock" / "templates" / scope / "report.md").read_text(
+                    encoding="utf-8"
+                )
+                self._assert_delegated_draft_evidence_schema_contract(
+                    scope_report_text,
+                    source=f"templates/{scope}/report.md",
+                )
+            self.assertIn("#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）", report_text)
+            self.assertIn("#### 発見されたテスト / リスク（Discovered Tests）", report_text)
+            self.assertIn("#### ステップ契約の完了証跡（Step Contract Closure）", report_text)
+            self.assertIn("#### テスト契約の完了証跡（Test Contract Closure）", report_text)
+            self.assertIn("#### クロージャ網羅（Closure Coverage）", report_text)
+            self.assertIn("#### クロージャ差分（Closure Delta）", report_text)
+            self.assertIn("#### ワークフロー委任同意の証跡（Workflow Delegation Consent）", report_text)
+            self.assertIn(_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER, report_text)
             for fragment in (
                 "consent source",
                 "boundary",
@@ -2312,28 +3175,46 @@ class TestInitUpdate(CliRuntimeHarness):
                 "denied / unavailable handling",
             ):
                 self.assertIn(fragment, report_text)
-            self.assertIn("#### Implementation Delegation Gate", report_text)
-            self.assertIn("#### Delegated Worker Evidence", report_text)
-            self.assertIn("#### Parent Implementation Exception", report_text)
-            self.assertIn("#### Reviewer Gate Status", report_text)
-            self.assertIn("#### Step Commit Gate", report_text)
-            self.assertIn("## Final Quality Gate", report_text)
-            self.assertIn("### Final QA Gate", report_text)
-            self.assertIn("### Final Code Review Gate", report_text)
-            self.assertIn("### Final Spec Review Gate", report_text)
-            self.assertIn("### Final Commit", report_text)
+            self.assertIn("#### 実装委任ゲート（Implementation Delegation Gate）", report_text)
+            self.assertIn("#### 委任 worker 証跡（Delegated Worker Evidence）", report_text)
+            self.assertIn("#### 親実装例外（Parent Implementation Exception）", report_text)
+            self.assertIn("#### レビューゲート状態（Reviewer Gate Status）", report_text)
+            self.assertIn("#### ステップ commit ゲート（Step Commit Gate）", report_text)
+            self.assertIn("## 最終品質ゲート（Final Quality Gate / 必須）", report_text)
+            self.assertIn("### 最終 QA ゲート（Final QA Gate）", report_text)
+            self.assertIn("### 最終コードレビューゲート（Final Code Review Gate）", report_text)
+            self.assertIn("### 最終 spec review ゲート（Final Spec Review Gate）", report_text)
+            self.assertIn("### 最終 commit（Final Commit）", report_text)
             self.assertIn("no-op checked contracts / files", report_text)
+
+            for scope in ("initiative", "epic", "issue"):
+                active_none_report = (
+                    target / "spec-dock" / "system" / "active-none" / scope / "report.md"
+                ).read_text(encoding="utf-8")
+                self.assertIn("## 委任ドラフト証跡 schema（Delegated Draft Evidence Schema / reference）", active_none_report)
+                self._assert_delegated_draft_evidence_schema_contract(
+                    active_none_report,
+                    source=f"system/active-none/{scope}/report.md",
+                )
             self.assertIn("no-op diff-clean command", report_text)
             self.assertIn("no-op read-only confirmation", report_text)
             self.assertIn("post-commit external evidence destination", report_text)
-            self.assertIn("| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | output required | observed result |", report_text)
-            self.assertIn("| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |", report_text)
-            self.assertIn("| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |", report_text)
+            self.assertIn("| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |", report_text)
+            self.assertTrue(
+                any(
+                    header in report_text
+                    for header in (
+                        "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | reviewer 判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
+                        "| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |",
+                    )
+                )
+            )
+            self.assertIn("| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |", report_text)
             self.assertIn("delegated / approved-local-execution / degraded mode", report_text)
             self.assertNotIn("clean / expected only", report_text)
-            self.assertIn("| step | closure ids | close condition from plan | observed evidence | result | notes |", report_text)
-            self.assertIn("| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |", report_text)
-            self.assertIn("| change | closure id | test id alias | resolves to closure id | reason | plan amendment required | re-review required |", report_text)
+            self.assertIn("| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |", report_text)
+            self.assertIn("| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |", report_text)
+            self.assertIn("| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |", report_text)
             self.assertIn("`closure id / test id` は Spec-Locked Closure Index の `id` を指す", report_text)
             self.assertIn("pass / approved-no-op / fail / blocked", report_text)
             self.assertIn("|---|---|---|---|---|", report_text)
@@ -3174,13 +4055,67 @@ class TestInitUpdate(CliRuntimeHarness):
         repo_root = Path(__file__).resolve().parents[1]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
 
+    def test_checked_in_dogfooding_active_none_reports_match_provider_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self._assert_checked_in_dogfooding_active_none_reports_match_provider_assets(repo_root)
+
     def test_spec_document_templates_keep_policy_out_of_scaffold(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         template_root = repo_root / "src/spec_dock/assets/spec_dock/templates"
 
+        self._assert_user_facing_markdown_labels_use_japanese_primary(
+            "| N/A | not used | manual authoring | none | no delegated draft promotion |\n",
+            source="table-value-guard-allowed-fixture",
+        )
+        with self.assertRaisesRegex(AssertionError, "table label must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "| acceptance | spec drift | report step closure |\n",
+                source="table-value-guard-rejected-fixture",
+            )
+        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "## 3. reader contract\n",
+                source="numbered-heading-guard-rejected-fixture",
+            )
+        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "## 5. GitHub default と `--no-github`\n",
+                source="github-default-heading-guard-rejected-fixture",
+            )
+        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "## 8. PlantUML（処理フロー）\n",
+                source="plantuml-flow-heading-guard-rejected-fixture",
+            )
+        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "## 4) PlantUML（内部処理のイメージ）\n",
+                source="plantuml-internal-heading-guard-rejected-fixture",
+            )
+        for allowed_heading in (
+            "## 4) 内部処理のイメージ（PlantUML）\n",
+            "## 8. 処理フロー（PlantUML）\n",
+        ):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                allowed_heading,
+                source="plantuml-heading-guard-allowed-fixture",
+            )
+        with self.assertRaisesRegex(AssertionError, "heading must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "## 2. Initiative を固める（Outcome とガードレールを固定）\n"
+                "### 4.1 doc family と保存先\n",
+                source="titlecase-heading-primary-guard-rejected-fixture",
+            )
+        with self.assertRaisesRegex(AssertionError, "explanatory prose must use Japanese primary"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                "- This is lifecycle closure only and it does not guarantee final delivery completion.\n",
+                source="english-prose-guard-rejected-fixture",
+            )
+
         for scope in ("initiative", "epic", "issue"):
-            for filename in ("requirement.md", "design.md", "plan.md"):
-                text = (template_root / scope / filename).read_text(encoding="utf-8")
+            for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+                path = template_root / scope / filename
+                text = path.read_text(encoding="utf-8")
                 self.assertNotIn("## 文書契約", text)
                 self.assertNotIn("この文書が答える問い", text)
                 self.assertNotIn("この文書に書かないこと", text)
@@ -3188,32 +4123,61 @@ class TestInitUpdate(CliRuntimeHarness):
                 self.assertNotIn("## 図表方針", text)
                 self.assertNotIn("## 図表ポートフォリオ", text)
                 self.assertNotIn("## Traceability matrix", text)
+                self._assert_user_facing_markdown_labels_use_japanese_primary(
+                    text,
+                    source=str(path.relative_to(repo_root)),
+                )
 
+        active_none_root = repo_root / "src/spec_dock/assets/spec_dock/system/active-none"
+        for path in active_none_root.rglob("*.md"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                path.read_text(encoding="utf-8"),
+                source=str(path.relative_to(repo_root)),
+            )
+
+        docs_root = repo_root / "src/spec_dock/assets/spec_dock/docs"
         phase_docs = [
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_requirement.md",
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_design.md",
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md",
+            docs_root / "phase_requirement.md",
+            docs_root / "phase_design.md",
+            docs_root / "phase_plan.md",
         ]
         for path in phase_docs:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("## scope ownership", text)
-            self.assertIn("## diagram guidance", text)
+            self.assertIn("## 範囲所有（scope ownership）", text)
+            self.assertIn("## 図表指針（diagram guidance）", text)
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                text,
+                source=str(path.relative_to(repo_root)),
+            )
 
-        plan_scope_docs = [
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_initiative.md",
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md",
-            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md",
-        ]
-        for path in plan_scope_docs:
+        plan_scope_docs = {
+            docs_root / "phase_plan_initiative.md": "## 図表 / trace 指針（diagram / trace guidance）",
+            docs_root / "phase_plan_epic.md": "## 図表 / trace 指針（diagram / trace guidance）",
+            docs_root / "phase_plan_issue.md": "## 図表 / trace 指針（diagram / trace guidance）",
+        }
+        for path, expected_heading in plan_scope_docs.items():
             text = path.read_text(encoding="utf-8")
-            self.assertIn("## diagram / trace guidance", text)
+            self.assertIn(expected_heading, text)
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                text,
+                source=str(path.relative_to(repo_root)),
+            )
+
+        for path in docs_root.rglob("*.md"):
+            self._assert_user_facing_markdown_labels_use_japanese_primary(
+                path.read_text(encoding="utf-8"),
+                source=str(path.relative_to(repo_root)),
+            )
 
         initiative_design = (template_root / "initiative" / "design.md").read_text(encoding="utf-8")
         epic_design = (template_root / "epic" / "design.md").read_text(encoding="utf-8")
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
         issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
-        self.assertIn("UML（推奨: system context / target-state overview）", initiative_design)
+        self.assertIn(
+            "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）",
+            initiative_design,
+        )
         self.assertIn("```plantuml", initiative_design)
         self.assertIn("!include C4_Context.puml", initiative_design)
         self.assertIn("LAYOUT_WITH_LEGEND()", initiative_design)
@@ -3230,14 +4194,14 @@ class TestInitUpdate(CliRuntimeHarness):
         )[0]
         self.assertIn("N/A: 理由", container_overview_section)
         self.assertNotIn("```plantuml", container_overview_section)
-        self.assertIn("## Component / Module View", epic_design)
-        self.assertIn("## Package Dependency", epic_design)
-        self.assertIn("UML（推奨: package dependency / package dependency delta）", epic_design)
+        self.assertIn("## コンポーネント / モジュール構成（Component / Module View）", epic_design)
+        self.assertIn("## パッケージ依存（Package Dependency）", epic_design)
+        self.assertIn("### 図表（UML / 推奨: パッケージ依存 / 依存差分）", epic_design)
         self.assertIn("diagram メタデータ:", epic_design)
-        self.assertIn("## Domain Model（DDD 必要時）", epic_design)
-        self.assertIn("UML（推奨: component / module）", epic_design)
-        self.assertIn("UML（推奨: main sequence）", epic_design)
-        domain_model_section = epic_design.split("## Domain Model（DDD 必要時）", 1)[1].split(
+        self.assertIn("## ドメインモデル（Domain Model / DDD 必要時）", epic_design)
+        self.assertIn("### 図表（UML / 推奨: コンポーネント / モジュール）", epic_design)
+        self.assertIn("### 図表（UML / 推奨: main sequence）", epic_design)
+        domain_model_section = epic_design.split("## ドメインモデル（Domain Model / DDD 必要時）", 1)[1].split(
             "## 契約", 1
         )[0]
         data_model_section = epic_design.split("## データモデル", 1)[1].split(
@@ -3247,18 +4211,24 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("```plantuml", data_model_section)
         self.assertIn("N/A: 理由", domain_model_section)
         self.assertIn("N/A: 理由", data_model_section)
-        self.assertIn("## State / Activity（必要時）", epic_design)
-        state_activity_section = epic_design.split("## State / Activity（必要時）", 1)[1].split(
+        self.assertIn("## 状態 / アクティビティ（State / Activity / 必要時）", epic_design)
+        state_activity_section = epic_design.split("## 状態 / アクティビティ（State / Activity / 必要時）", 1)[1].split(
             "## 失敗設計", 1
         )[0]
         self.assertIn("N/A: 理由", state_activity_section)
         self.assertNotIn("```plantuml", state_activity_section)
         for section in (
-            epic_design.split("## Component / Module View", 1)[1].split("## Package Dependency", 1)[0],
-            epic_design.split("## Package Dependency", 1)[1].split("## Domain Model", 1)[0],
+            epic_design.split("## コンポーネント / モジュール構成（Component / Module View）", 1)[1].split(
+                "## パッケージ依存（Package Dependency）", 1
+            )[0],
+            epic_design.split("## パッケージ依存（Package Dependency）", 1)[1].split(
+                "## ドメインモデル（Domain Model / DDD 必要時）", 1
+            )[0],
             domain_model_section,
             data_model_section,
-            epic_design.split("## 主要フロー", 1)[1].split("## State / Activity", 1)[0],
+            epic_design.split("## 主要フロー", 1)[1].split(
+                "## 状態 / アクティビティ（State / Activity / 必要時）", 1
+            )[0],
             state_activity_section,
         ):
             for metadata_field in (
@@ -3271,27 +4241,27 @@ class TestInitUpdate(CliRuntimeHarness):
                 self.assertIn(metadata_field, section)
         self.assertIn("このテンプレートは最小 scaffold", issue_design)
         self.assertIn("項目は追加・削除・統合・並べ替えてよい", issue_design)
-        self.assertIn("## 親 Diagram 参照", issue_design)
+        self.assertIn("## 親図（Diagram）参照", issue_design)
         self.assertIn("module 依存:", issue_design)
         self.assertIn("class 依存（必要時）:", issue_design)
         self.assertIn("function 依存（必要時）:", issue_design)
         self.assertIn("file 依存:", issue_design)
-        self.assertIn("## Module Dependency Diagram", issue_design)
+        self.assertIn("## モジュール依存図（Module Dependency Diagram）", issue_design)
         self.assertIn("- タイトル:", issue_design)
-        self.assertIn("UML（原則: module dependency / package dependency delta）", issue_design)
-        module_dependency_section = issue_design.split("## Module Dependency Diagram", 1)[1].split(
-            "## Local Diagram Delta（必要時）", 1
+        self.assertIn("### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）", issue_design)
+        module_dependency_section = issue_design.split("## モジュール依存図（Module Dependency Diagram）", 1)[1].split(
+            "## ローカル図の差分（Local Diagram Delta / 必要時）", 1
         )[0]
         self.assertIn("```plantuml", module_dependency_section)
         self.assertNotIn("N/A: 理由", module_dependency_section)
-        self.assertIn("## Local Diagram Delta（必要時）", issue_design)
-        self.assertIn("## Sequence Delta（必要時）", issue_design)
-        self.assertIn("## Domain Model Delta（必要時）", issue_design)
+        self.assertIn("## ローカル図の差分（Local Diagram Delta / 必要時）", issue_design)
+        self.assertIn("## シーケンス差分（Sequence Delta / 必要時）", issue_design)
+        self.assertIn("## ドメインモデル差分（Domain Model Delta / 必要時）", issue_design)
         for optional_issue_section in (
-            issue_design.split("## Sequence Delta（必要時）", 1)[1].split(
-                "## Domain Model Delta（必要時）", 1
+            issue_design.split("## シーケンス差分（Sequence Delta / 必要時）", 1)[1].split(
+                "## ドメインモデル差分（Domain Model Delta / 必要時）", 1
             )[0],
-            issue_design.split("## Domain Model Delta（必要時）", 1)[1].split(
+            issue_design.split("## ドメインモデル差分（Domain Model Delta / 必要時）", 1)[1].split(
                 "## クラス / インターフェース詳細設計（必要時）", 1
             )[0],
             issue_design.split("## クラス / インターフェース詳細設計（必要時）", 1)[1].split(
@@ -3319,7 +4289,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertNotIn("unknown path handling", issue_design)
         self.assertNotIn("user confirmation points", issue_design)
         self.assertIn("## 要件 → 設計マッピング", issue_design)
-        self.assertIn("## 要件 / 例外 -> verification mapping", issue_design)
+        self.assertIn("## 要件 / 例外 -> 検証マッピング", issue_design)
         self.assertIn("このテンプレートは最小 scaffold", issue_plan)
         self.assertIn("workflow_issue.md", issue_plan)
         self.assertIn("phase_plan_issue.md", issue_plan)
@@ -3330,26 +4300,26 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("依存:", issue_plan)
         self.assertIn("unblock:", issue_plan)
         self.assertIn("対象ファイル:", issue_plan)
-        self.assertIn("## Spec-Locked Closure Index（仕様固定クロージャ索引）", issue_plan)
+        self.assertIn("## 仕様固定クロージャ索引（Spec-Locked Closure Index）", issue_plan)
         self.assertIn("coverage ledger", issue_plan)
         self.assertIn("実際の step-local obligation", issue_plan)
-        self.assertIn("| id | step | slice | type | spec link | locked expectation | observable input/state | bug class guarded | required | evidence level | closure evidence |", issue_plan)
-        self.assertIn("evidence level:", issue_plan)
+        self.assertIn("| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |", issue_plan)
+        self.assertIn("証跡レベル（evidence level）:", issue_plan)
         self.assertIn("red-required:", issue_plan)
         self.assertIn("covered-existing:", issue_plan)
         self.assertIn("inspect-only:", issue_plan)
         self.assertIn("manual-required:", issue_plan)
         self.assertIn("件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk", issue_plan)
         self.assertIn("private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない", issue_plan)
-        self.assertIn("test obligation:", issue_plan)
+        self.assertIn("テスト義務（test obligation）:", issue_plan)
         self.assertIn("closure id:", issue_plan)
         self.assertIn("coverage rationale:", issue_plan)
-        self.assertIn("Red / alternative evidence requirement:", issue_plan)
+        self.assertIn("Red / 代替証跡の要件:", issue_plan)
         self.assertIn("代替 evidence path:", issue_plan)
-        self.assertIn("Green verification:", issue_plan)
-        self.assertIn("Refactor / cleanup guardrail:", issue_plan)
-        self.assertIn("report evidence destination:", issue_plan)
-        self.assertIn("amendment trigger:", issue_plan)
+        self.assertIn("Green 検証:", issue_plan)
+        self.assertIn("Refactor / cleanup ガードレール:", issue_plan)
+        self.assertIn("report 証跡の記録先:", issue_plan)
+        self.assertIn("amendment trigger（plan amendment が必要になる契機）:", issue_plan)
         self.assertIn("#### 具体テストケース一覧", issue_plan)
         self.assertIn("- `tc-s01-001` acceptance: <短い説明>", issue_plan)
         self.assertIn("- `tc-s01-002` inspect-only / manual-required: <短い説明>", issue_plan)
@@ -3365,21 +4335,21 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("記録先:", issue_plan)
         self.assertIn("S01 の subsections を複製して記入する", issue_plan)
         self.assertIn("implementation-ready ではない", issue_plan)
-        self.assertIn("#### delegation contract", issue_plan)
+        self.assertIn("#### 委任契約（delegation contract）", issue_plan)
         for fragment in (
-            "delegated role:",
-            "input docs:",
-            "allowed paths:",
-            "forbidden changes:",
-            "acceptance criteria:",
-            "required tests or docs-only verification:",
+            "委任ロール（delegated role）:",
+            "入力 docs:",
+            "許可 paths:",
+            "禁止 changes:",
+            "受け入れ条件:",
+            "必須 tests または docs-only verification:",
             "reviewer focus:",
-            "output required:",
+            "必須出力（output required）:",
             "verification result:",
-            "stop conditions:",
+            "停止条件（stop conditions）:",
         ):
             self.assertIn(fragment, issue_plan)
-        self.assertIn("#### step closure contract", issue_plan)
+        self.assertIn("#### ステップ完了契約（step closure contract）", issue_plan)
         self.assertIn("closure id:", issue_plan)
         self.assertIn("close 条件:", issue_plan)
         self.assertIn("検証 evidence:", issue_plan)
@@ -3391,10 +4361,11 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("commit gate", issue_plan)
         self.assertIn("step reviewer gate", issue_plan)
         self.assertIn("no-op gate", issue_plan)
-        self.assertIn("#### step gate", issue_plan)
+        self.assertIn("#### ステップゲート（step gate）", issue_plan)
         self.assertIn("## 要件 ↔ ステップ対応", issue_plan)
 
-        self.assertIn("#### Workflow Delegation Consent", issue_report)
+        self.assertIn("#### ワークフロー委任同意の証跡（Workflow Delegation Consent）", issue_report)
+        self.assertIn(_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER, issue_report)
         for fragment in (
             "consent source",
             "boundary",
@@ -3402,10 +4373,10 @@ class TestInitUpdate(CliRuntimeHarness):
             "denied / unavailable handling",
         ):
             self.assertIn(fragment, issue_report)
-        self.assertIn("#### Delegated Worker Evidence", issue_report)
-        self.assertIn("#### Parent Implementation Exception", issue_report)
-        self.assertIn("| step | delegated role | delegated worker summary | changed files | tests run or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |", issue_report)
-        self.assertIn("| step | delegation unavailable/impossible reason | user approval / risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable / denied / host conflict / waiver handling |", issue_report)
+        self.assertIn("#### 委任 worker 証跡（Delegated Worker Evidence）", issue_report)
+        self.assertIn("#### 親実装例外（Parent Implementation Exception）", issue_report)
+        self.assertIn("| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |", issue_report)
+        self.assertIn("| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |", issue_report)
         for fragment in (
             "workflow_issue.md",
             "source of truth",
@@ -3422,14 +4393,14 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("Markdown preview compatibility", phase_design)
         self.assertIn("`c4plantuml` fence は VS Code Markdown preview 互換性のため使わない", phase_design)
         self.assertIn("`!include C4_Context.puml`", phase_design)
-        self.assertIn("## PlantUML / UML usage policy", phase_design)
+        self.assertIn("## 図表での PlantUML / UML 利用方針（PlantUML / UML usage policy）", phase_design)
         self.assertIn("人間が構造・境界・責務・流れ・状態・依存を短時間で理解できる設計書", phase_design)
         self.assertIn("視覚的・構造的に把握しやすくするために使う", phase_design)
         self.assertIn("目的は「図を増やすこと」ではなく", phase_design)
         self.assertIn("templates は完成形や準拠規格ではなく", phase_design)
         self.assertIn("項目を追加・削除・統合・並べ替えてよい", phase_design)
-        self.assertIn("## diagram selection rules", phase_design)
-        self.assertIn("## optional diagram catalog", phase_design)
+        self.assertIn("## 図表選択ルール（diagram selection rules）", phase_design)
+        self.assertIn("## 任意 diagram catalog（optional diagram catalog）", phase_design)
         self.assertIn("テンプレートから削った図表は「不要になった情報」ではなく", phase_design)
         self.assertIn("必要ならここにない図表も追加してよい", phase_design)
         for diagram_name in (
@@ -3451,8 +4422,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "Step Dependency Graph / Test Matrix / Rollback Map",
         ):
             self.assertIn(diagram_name, phase_design)
-        self.assertIn("## DDD diagram guidance", phase_design)
-        self.assertIn("## UML review gate", phase_design)
+        self.assertIn("## ドメイン駆動設計図表指針（DDD diagram guidance）", phase_design)
+        self.assertIn("## 図表レビューゲート（UML review gate）", phase_design)
         self.assertIn("Title", phase_design)
         self.assertIn("Question answered", phase_design)
         self.assertIn("Excluded details", phase_design)
@@ -3462,7 +4433,17 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("図を書く場合は `N/A: reason` を残さない", phase_design)
         self.assertIn("Domain Model Delta", phase_design)
         self.assertIn("PlantUML / C4 / DDD 図は Markdown 内では `plantuml` fence を使う", phase_design)
-        self.assertIn("## Issue dependency and file-change planning", phase_design)
+        self.assertIn("## 委任 design authoring ゲート（delegated design authoring gate）", phase_design)
+        self.assertIn("fresh requirement reviewer pass", phase_design)
+        self.assertIn("delegated draft provenance", phase_design)
+        self.assertIn("stale / superseded / rejected / blocked", phase_design)
+        self.assertIn("proposal-only ではありません", phase_design)
+        self.assertIn("adoption_status: unreviewed", phase_design)
+        self.assertIn("diff_guard_result", phase_design)
+        self.assertIn("task manifest hash", phase_design)
+        self.assertIn("authority: accepted", phase_design)
+        self.assertIn("fresh `spec-reviewer` pass の代替ではありません", phase_design)
+        self.assertIn("## 課題依存と file-change planning（Issue dependency and file-change planning）", phase_design)
         self.assertIn("Module Dependency Diagram", phase_design)
         self.assertIn("ディレクトリ / ファイル変更計画", phase_design)
         self.assertIn("Linux `tree` style", phase_design)
@@ -3487,7 +4468,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("observed evidence ledger", phase_plan_issue)
         self.assertIn("report evidence destination", phase_plan_issue)
         self.assertIn("amendment trigger", phase_plan_issue)
-        self.assertIn("`Spec-Locked Closure Index`（仕様固定クロージャ索引）", phase_plan_issue)
+        self.assertIn("仕様固定クロージャ索引（`Spec-Locked Closure Index`）", phase_plan_issue)
         self.assertIn("coverage ledger", phase_plan_issue)
         self.assertIn("`spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step", phase_plan_issue)
         self.assertIn("docs-only / inspect-only / manual-required", phase_plan_issue)
@@ -3515,9 +4496,43 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("report-before-commit、step reviewer gate pass、step commit、approved-no-op", phase_plan_issue)
         self.assertIn("`1 implementation step = 1 review scope = 1 commit`", phase_plan_issue)
         self.assertIn("`step reviewer gate`、`commit gate`、`no-op gate`", phase_plan_issue)
-        self.assertIn("`S99 final quality gate`", phase_plan_issue)
+        self.assertIn("`S99 最終品質ゲート（S99 final quality gate）`", phase_plan_issue)
         self.assertIn("`qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`", phase_plan_issue)
-        self.assertIn("三者 final quality gate", phase_plan_issue)
+        self.assertIn("三者最終品質ゲート（final quality gate）", phase_plan_issue)
+        self.assertIn("delegated plan draft", phase_plan_issue)
+        self.assertIn("phase gate preservation", phase_plan_issue)
+        self.assertIn("scope-local discussion direct-write consent", phase_plan_issue)
+        self.assertIn("forbidden canonical/implementation paths", phase_plan_issue)
+        self.assertIn("post-run diff guard", phase_plan_issue)
+        self.assertIn("adoption-ineligible", phase_plan_issue)
+        self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_issue)
+        self.assertIn("manual authoring path が有効", phase_plan_issue)
+
+        phase_plan = (repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("## 委任 plan authoring ゲート（delegated plan authoring gate）", phase_plan)
+        self.assertIn("fresh requirement reviewer pass と fresh design reviewer pass", phase_plan)
+        self.assertIn("Plan Summary", phase_plan)
+        self.assertIn("plan blocker", phase_plan)
+        self.assertIn("phase gate bypass", phase_plan)
+        self.assertIn("proposal-only ではありません", phase_plan)
+        self.assertIn("adoption_status: unreviewed", phase_plan)
+        self.assertIn("diff_guard_result", phase_plan)
+        self.assertIn("task manifest hash", phase_plan)
+        self.assertIn("post-run diff guard が failed / not run", phase_plan)
+
+        phase_plan_epic = (
+            repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("delegated plan draft", phase_plan_epic)
+        self.assertIn("fresh requirement/design reviewer pass", phase_plan_epic)
+        self.assertIn("scope-local discussion direct-write consent", phase_plan_epic)
+        self.assertIn("forbidden canonical/implementation paths", phase_plan_epic)
+        self.assertIn("post-run diff guard", phase_plan_epic)
+        self.assertIn("adoption-ineligible", phase_plan_epic)
+        self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_epic)
+        self.assertIn("manual authoring path が有効", phase_plan_epic)
 
         workflow_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
@@ -3541,7 +4556,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("Step Contract Closure", workflow_issue)
         self.assertIn("Test Contract Closure", workflow_issue)
         self.assertIn("Closure Coverage", workflow_issue)
-        self.assertIn("required closure id が `Step Contract Closure` / `Test Contract Closure` / `Closure Coverage` で pass または approved-no-op", workflow_issue)
+        self.assertIn("required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op", workflow_issue)
         self.assertIn("Closure Delta", workflow_issue)
         self.assertIn("planned executable workflow contract / command queue", workflow_issue)
         self.assertIn("`report.md` は observed evidence ledger", workflow_issue)
@@ -8559,6 +9574,102 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             shim_label="bundled copilot orchestrator",
         )
 
+    def test_issue_117_codex_delegated_author_adapters_are_thin_skill_wrappers(self) -> None:
+        import spec_dock.cli as cli
+
+        adapters = {
+            "system architect": {
+                "path": Path(".codex/agents/system-architect.toml"),
+                "agent_name": "system-architect",
+                "skill_name": "spec-dock-system-architect",
+                "draft_kind": "architecture",
+            },
+            "implementation planner": {
+                "path": Path(".codex/agents/implementation-planner.toml"),
+                "agent_name": "implementation-planner",
+                "skill_name": "spec-dock-implementation-planner",
+                "draft_kind": "planning",
+            },
+        }
+
+        with cli._assets_dir() as assets_dir:
+            install_root = assets_dir / "install_root"
+            for label, expected in adapters.items():
+                with self.subTest(adapter=label, surface="provider"):
+                    provider_path = install_root / expected["path"]
+                    self.assertTrue(provider_path.is_file(), f"missing provider Codex adapter: {provider_path}")
+                    self._assert_codex_delegated_author_adapter_contract(
+                        text=provider_path.read_text(encoding="utf-8"),
+                        shim_label=f"provider {label}",
+                        agent_name=expected["agent_name"],
+                        skill_name=expected["skill_name"],
+                        draft_kind=expected["draft_kind"],
+                    )
+
+                with self.subTest(adapter=label, surface="dogfooding"):
+                    checked_in_path = Path(__file__).resolve().parents[1] / expected["path"]
+                    self.assertTrue(checked_in_path.is_file(), f"missing dogfooding Codex adapter: {checked_in_path}")
+                    self.assertEqual(
+                        checked_in_path.read_bytes(),
+                        provider_path.read_bytes(),
+                        f"dogfooding Codex adapter drifted from provider asset: {expected['path']}",
+                    )
+
+    def test_s04_codex_agent_permission_taxonomy_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        read_only_specialists = (
+            "researcher",
+            "consultant",
+            "deep-consultant",
+            "repo-analyst",
+            "code-reviewer",
+            "qa-reviewer",
+            "spec-reviewer",
+            "pr-monitor",
+            "spark-worker",
+        )
+        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker", "worker")
+        scoped_delegated_authors = ("system-architect", "implementation-planner")
+
+        with cli._assets_dir() as assets_dir:
+            agents_dir = assets_dir / "install_root" / ".codex" / "agents"
+            for agent_name in read_only_specialists:
+                with self.subTest(agent=agent_name, taxonomy="read-only-specialist"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertEqual(parsed.get("sandbox_mode"), "read-only")
+                    self.assertNotEqual(parsed.get("sandbox_mode"), "workspace-write")
+                    self.assertNotIn("default_permissions", parsed)
+
+            for agent_name in workspace_write_workers:
+                with self.subTest(agent=agent_name, taxonomy="workspace-write-worker"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
+
+            for agent_name in scoped_delegated_authors:
+                with self.subTest(agent=agent_name, taxonomy="scoped-delegated-author"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertNotIn("sandbox_mode", parsed)
+                    default_permissions = parsed.get("default_permissions")
+                    self.assertIsInstance(default_permissions, str)
+                    workspace_rules = parsed["permissions"][default_permissions]["filesystem"][":workspace_roots"]
+                    self.assertEqual(
+                        {path for path, permission in workspace_rules.items() if permission == "write"},
+                        {
+                            "spec-dock/initiatives/*/discussions/*.md",
+                            "spec-dock/initiatives/*/epics/*/discussions/*.md",
+                            "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
+                        },
+                    )
+                    self.assertIn("write-capable delegated authoring path", text)
+                    self.assertIn("static write rules cover all scope-local `discussions/`", text)
+                    self.assertNotIn("spec-dock/initiatives = \"write\"", text)
+                    self.assertNotIn('".codex" = "write"', text)
+                    self.assertNotIn('".agents" = "write"', text)
+
     def test_issue_102_agentic_tdd_contract_assets(self) -> None:
         import spec_dock.cli as cli
 
@@ -8631,16 +9742,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "planned contract",
             "command queue",
             "observed evidence ledger",
-            "report evidence destination",
+            "report 証跡の記録先",
             "amendment trigger",
             "#### 具体テストケース一覧",
             "step-local obligation",
             "concrete red / characterization / inspect / manual seeds",
-            "#### step closure contract",
-            "#### step gate",
-            "Red / alternative evidence requirement",
-            "Green verification",
-            "Refactor / cleanup guardrail",
+            "#### ステップ完了契約（step closure contract）",
+            "#### ステップゲート（step gate）",
+            "Red / 代替証跡の要件",
+            "Green 検証",
+            "Refactor / cleanup ガードレール",
         ):
             with self.subTest(asset="issue plan template", fragment=fragment):
                 self.assertIn(fragment, plan_text)
@@ -8649,11 +9760,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for fragment in (
             "Observed Evidence Ledger",
             "observed evidence ledger",
-            "#### Red/Green/Refactor Evidence",
-            "#### Discovered Tests",
-            "#### Closure Delta",
-            "#### Reviewer Gate Status",
-            "#### Step Commit Gate",
+            "#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）",
+            "#### 発見されたテスト / リスク（Discovered Tests）",
+            "#### クロージャ差分（Closure Delta）",
+            "#### レビューゲート状態（Reviewer Gate Status）",
+            "#### ステップ commit ゲート（Step Commit Gate）",
+            _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER,
             "実際の Red / Green / Refactor evidence",
             "closure delta",
             "reviewer status",
@@ -8710,6 +9822,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "closure ids",
                 "report evidence",
                 "reviewer gate status",
+                "For delegated authoring, treat the updated phase docs as authoritative review",
+                "phase_plan_issue.md",
+                "delegated draft provenance",
+                "stale / superseded",
+                "phase gate bypass",
             ),
         }
         for label, fragments in agent_contracts.items():
@@ -8786,11 +9903,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "`Disposition`",
                 "`Type`",
                 "Raised By",
-                "Trigger / Gap",
+                "契機 / 差分（Gap）",
                 "interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up",
-                "Options Considered",
+                "検討した選択肢",
                 "promoted_to_design",
-                "Disposition required evidence",
+                "Disposition ごとの必須証跡",
                 "converted_to_followup",
                 "no_action",
             ),
@@ -8812,6 +9929,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "needs orchestrator decision",
                 "No material implementation decisions beyond the approved plan.",
                 "durable decision",
+                "scope-local discussion direct-write step",
+                "diff guard result",
+                "lightweight provenance",
+                "最低 fields は `created_by_role`",
+                "Evidence Adoption Ledger",
             ),
             "execute issue prompt": (
                 "Spec Interpretation / Decision Ledger",
@@ -8884,6 +10006,179 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with self.subTest(asset=label, fragment=fragment):
                     self.assertIn(fragment, text)
 
+    def test_issue_116_delegated_authoring_phase_gate_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            asset_paths = {
+                "phase design docs": assets_dir / "spec_dock" / "docs" / "phase_design.md",
+                "phase plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan.md",
+                "phase epic plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_epic.md",
+                "phase issue plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_issue.md",
+                "codex spec-reviewer agent": assets_dir
+                / "install_root"
+                / ".codex"
+                / "agents"
+                / "spec-reviewer.toml",
+            }
+            texts = {
+                label: path.read_text(encoding="utf-8")
+                for label, path in asset_paths.items()
+            }
+
+        expected_fragments = {
+            "phase design docs": (
+                "## 委任 design authoring ゲート（delegated design authoring gate）",
+                "fresh requirement reviewer pass",
+                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "proposal-only ではありません",
+                "scope-local",
+                "discussions/` 直下",
+                "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "main orchestrator",
+                "single-writer authority",
+                "diff guard",
+                "lightweight provenance",
+                "created_by_role",
+                "diff_guard_result",
+                "task manifest hash",
+                "標準 delegated draft evidence として",
+                "要求しません",
+                "Accepted ADR",
+                "historical evidence",
+                "implementation",
+                "GitHub mutation",
+                "phase promotion",
+                "reviewer-pass claim",
+                "user への直接質問",
+                "Requirement Clarification Requests",
+                "delegated draft provenance",
+                "stale / superseded / rejected / blocked",
+                "approved requirement への traceability",
+                "scope creep",
+                "manual authoring path",
+            ),
+            "phase plan docs": (
+                "## 委任 plan authoring ゲート（delegated plan authoring gate）",
+                "fresh requirement reviewer pass",
+                "fresh design reviewer pass",
+                "design dependency analysis",
+                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "proposal-only ではありません",
+                "scope-local",
+                "discussions/` 直下",
+                "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "main orchestrator",
+                "single-writer authority",
+                "diff guard",
+                "lightweight provenance",
+                "created_by_role",
+                "diff_guard_result",
+                "task manifest hash",
+                "標準 delegated draft evidence として",
+                "要求しません",
+                "Accepted ADR",
+                "historical evidence",
+                "implementation",
+                "GitHub mutation",
+                "phase promotion",
+                "reviewer-pass claim",
+                "user への直接質問",
+                "plan blocker",
+                "delegated draft provenance",
+                "approved requirement / design への traceability",
+                "scope creep",
+                "phase gate bypass",
+                "manual authoring path",
+            ),
+            "phase epic plan docs": (
+                "delegated plan draft",
+                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "target scope `discussions/` direct child",
+                "stale / superseded handling",
+                "phase gate preservation",
+                "final authority",
+                "完了済み issue plan/report の修正を含まない",
+                "delegated draft を fresh `spec-reviewer` pass の代替にしていない",
+                "manual authoring path",
+            ),
+            "phase issue plan docs": (
+                "delegated plan draft",
+                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "target scope `discussions/` direct child",
+                "stale / superseded handling",
+                "phase gate preservation",
+                "step reviewer gate",
+                "final QA/code/spec gate",
+                "final authority",
+                "完了済み issue plan/report の修正を含まない",
+                "manual authoring path",
+            ),
+            "codex spec-reviewer agent": (
+                "For delegated authoring",
+                "phase_design.md",
+                "phase_plan.md",
+                "phase_plan_epic.md",
+                "phase_plan_issue.md",
+                "delegated draft provenance",
+                "stale / superseded",
+                "traceability to the",
+                "freshly approved previous phase",
+                "creep or phase gate bypass",
+                "delegated draft is treated as `spec-reviewer` pass",
+                "manual authoring",
+            ),
+        }
+        for label, fragments in expected_fragments.items():
+            text = texts[label]
+            for fragment in fragments:
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+
+    def test_issue_127_removed_scoped_context_contract_stays_removed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        forbidden_terms = (
+            "scoped" + "-context",
+            "--discussion" + "-file",
+            "DelegatedAuthoring" + "ScopedContext",
+            "generate_delegated_authoring_" + "scoped_context",
+            "delegated_authoring_" + "scoped_context",
+            "runtime scoped " + "context required",
+            "one exact direct child Markdown file",
+            "exact" + "-file context",
+        )
+        searched_paths = (
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "spec_dock_runtime",
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "docs",
+            repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".agents",
+            repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex",
+            repo_root / "tests" / "cli_runtime",
+            repo_root / "tests" / "domain_runtime",
+            repo_root / "spec-dock" / "scripts" / "spec_dock_runtime",
+            repo_root / "spec-dock" / "docs",
+            repo_root / ".agents",
+            repo_root / ".codex",
+        )
+
+        offenders: list[str] = []
+        for root in searched_paths:
+            for path in sorted(root.rglob("*")):
+                if not path.is_file():
+                    continue
+                if path.suffix not in {".md", ".py", ".toml", ".json", ".yaml", ".yml"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for term in forbidden_terms:
+                    if (
+                        path.name == "test_delegated_authoring.py"
+                        and term == "scoped" + "-context"
+                    ):
+                        continue
+                    if term in text:
+                        offenders.append(f"{path.relative_to(repo_root)}: {term}")
+
+        self.assertEqual([], offenders)
+
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
 
@@ -8893,6 +10188,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+            system_architect_text = (skills_dir / "spec-dock-system-architect" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            implementation_planner_text = (
+                skills_dir / "spec-dock-implementation-planner" / "SKILL.md"
+            ).read_text(encoding="utf-8")
             adr_text = (skills_dir / "spec-dock-adr-facilitation" / "SKILL.md").read_text(encoding="utf-8")
             codex_adapter_text = (skills_dir / "spec-dock-codex-adapter" / "SKILL.md").read_text(
                 encoding="utf-8"
@@ -8911,6 +10212,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         self.assertIn(
             "`spec-dock-issue-execution`: issue-level TDD execution and report updates.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
             hub_text,
         )
         self.assertIn(
@@ -8946,6 +10255,103 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Parent direct fixes require a documented Parent Implementation Exception",
         ):
             self.assertIn(fragment, issue_text)
+
+        for fragment in (
+            "Requirement Coverage",
+            "Existing Context Findings",
+            "Design Decisions",
+            "Alternatives Considered",
+            "Boundary / Contract Model",
+            "Dependency Analysis",
+            "Source of Record",
+            "Data Flow / Domain Model / Interface Contract",
+            "File / Module Change Plan",
+            "Migration / Compatibility / Rollback",
+            "Observability",
+            "Test Strategy",
+            "ADR Candidates",
+            "Risks",
+            "Requirement Clarification Requests",
+            "Integration Notes for Main Orchestrator",
+            "return a blocker to the main orchestrator",
+            "Do not ask the user directly",
+            "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
+            "same-second collision",
+            "lightweight provenance",
+            "created_by_role: spec-dock-system-architect",
+            "adoption_status: unreviewed",
+            "reflected_to: []",
+            "diff_guard_result",
+            "Do not include standard requirements for task manifest hash",
+            "No canonical edit, final authority, promotion, reviewer-pass, or user-dialogue ownership is claimed.",
+            "canonical artifacts edited: `none`",
+            "close, update, or mutate GitHub issues",
+            "run destructive commands",
+            "promote phases or mark work complete",
+            "bounded depth=2 leaf-only evidence",
+            "Allowed child roles are limited to",
+            "Maximum child calls",
+            "depth=3 / grandchild delegation",
+            "leaf-only evidence producer",
+            "Do not call peer authoring roles",
+            "do not call `dev-coder` as a child",
+            "final fresh reviewer gate remains independent",
+            "claim final authority, issue ready, issue finish, or phase completion",
+            "claim `spec-reviewer` pass",
+        ):
+            self.assertIn(fragment, system_architect_text)
+
+        for fragment in (
+            "Plan Summary",
+            "Requirement / Design Traceability",
+            "Milestones",
+            "Dependency-Derived Execution Order",
+            "Issue / Step Slicing",
+            "Test Strategy Mapping",
+            "Review Gates",
+            "Rollback / Compatibility",
+            "Docs Impact",
+            "Final Quality Gate",
+            "Plan Blockers",
+            "Integration Notes for Main Orchestrator",
+            "`spec-dock/docs/workflow_issue.md`",
+            "`spec-dock/docs/authoring/issue-plan.md`",
+            "issue plan field semantics",
+            "issue lifecycle, execution, validation, reviewer, and completion policy",
+            "return `Plan Blocked`",
+            "Do not ask the user directly",
+            "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
+            "same-second collision",
+            "lightweight provenance",
+            "created_by_role: spec-dock-implementation-planner",
+            "adoption_status: unreviewed",
+            "reflected_to: []",
+            "diff_guard_result",
+            "Do not include standard requirements for task manifest hash",
+            "No canonical edit, final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.",
+            "canonical artifacts edited: `none`",
+            "close, update, or mutate GitHub issues",
+            "run destructive commands",
+            "promote phases or mark work complete",
+            "bounded depth=2 leaf-only evidence",
+            "Allowed child roles are limited to",
+            "Maximum child calls",
+            "depth=3 / grandchild delegation",
+            "leaf-only evidence producer",
+            "Do not call peer authoring roles",
+            "do not call `dev-coder` as a child",
+            "final fresh reviewer gate remains independent",
+            "claim final authority, issue ready, issue finish, or phase completion",
+            "claim `spec-reviewer` pass",
+        ):
+            self.assertIn(fragment, implementation_planner_text)
+        for fragment in (
+            "Bounded depth=2 delegation",
+            "Depth=3 / grandchild delegation is forbidden",
+            "Leaf-only evidence producers must not edit canonical artifacts",
+            "final fresh reviewer pass remains independent",
+        ):
+            self.assertIn(fragment, epic_text)
         self._assert_issue_execution_runtime_command_reminders(
             issue_text,
             source="bundled issue-execution skill",
@@ -10026,9 +11432,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Merge Preparation Gate",
             "non-required check status and waiver evidence",
             "unresolved review-thread limitation status",
-            "`issue finish` is lifecycle closure only",
+            "`issue finish` は delivery completion に対する lifecycle closure 専用",
             "`issue finish` は lifecycle-only command",
-            "does not guarantee commit, push, PR, merge, validate, test, review, or final delivery",
+            "commit、push、PR、merge、validate、test、review、final delivery completion は保証しません",
         )
         for phrase in workflow_phrases:
             self.assertIn(phrase, workflow_issue)

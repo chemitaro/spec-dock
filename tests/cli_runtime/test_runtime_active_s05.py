@@ -109,6 +109,229 @@ class TestRuntimeActiveS05(unittest.TestCase):
         self.assertIn("human guidance", text)
         self.assertIn("not the sole source of truth", text)
         self.assertIn("- `spec-dock/active/issue/report.md`", text)
+        self.assertIn("## Authority", text)
+        self.assertIn("- source: `spec-dock/.agent/active.json`", text)
+        self.assertIn("proposed or missing authority cannot authorize implementation", text)
+        self.assertIn("issue ready", text)
+        self.assertIn("- issue: authority=missing, grants=[]", text)
+        self.assertIn("- issue: authoritative_input=none, downstream_block=missing_authority", text)
+
+    def test_context_pack_marks_proposed_active_artifact_non_authoritative(self) -> None:
+        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
+        manifest = infra_contracts.ActiveManifest(
+            initiative=None,
+            epic=None,
+            issue=infra_contracts.ActiveManifestEntry(
+                id="iss-local-00001",
+                path="spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001",
+                authority="proposed",
+                grants=("review_input", "planning_input", "implementation_start", "issue_finish"),
+                promotion_record={
+                    "status": "approved",
+                    "authority": "approved",
+                    "source_revision": "active:iss-local-00001",
+                    "approved_revision": "active:iss-local-00001",
+                    "approved_hash": "active:iss-local-00001",
+                    "reviewer_target_hash": "active:iss-local-00001",
+                    "promotion_decision": "main_orchestrator_promotion",
+                },
+            ),
+        )
+
+        for rendered in (infra_active_store._render_context_pack(manifest), app_set_active.build_context_pack_text(manifest)):
+            with self.subTest(rendered=rendered[:20]):
+                self.assertIn("- issue: authority=proposed", rendered)
+                self.assertIn("- issue: authoritative_input=none", rendered)
+                self.assertIn("downstream_block=authority_not_approved", rendered)
+
+    def test_context_pack_blocks_authoritative_input_when_scope_report_has_unresolved_eal(self) -> None:
+        _runtime_app, _app_contracts, _app_ports, app_set_active, infra_active_store, infra_contracts, _cli = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_rel = Path("spec-dock/initiatives/init-local-00001/epics/epic-local-00001/issues/iss-local-00001")
+            issue_dir = repo_root / issue_rel
+            issue_dir.mkdir(parents=True)
+            (issue_dir / "report.md").write_text(
+                "\n".join(
+                    [
+                        "# Report",
+                        "",
+                        "## Evidence Adoption Ledger",
+                        "",
+                        "| ID | adoption_status | target_artifact | next_action |",
+                        "|---|---|---|---|",
+                        "| EAL-030 | blocked | plan.md | resolve plan evidence |",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            manifest = infra_contracts.ActiveManifest(
+                initiative=None,
+                epic=None,
+                issue=infra_contracts.ActiveManifestEntry(
+                    id="iss-local-00001",
+                    path=issue_rel.as_posix(),
+                    authority="approved",
+                    grants=("implementation_start", "issue_finish"),
+                    promotion_record={
+                        "status": "approved",
+                        "authority": "approved",
+                        "source_revision": "active:iss-local-00001",
+                        "approved_revision": "active:iss-local-00001",
+                        "approved_hash": "active:iss-local-00001",
+                        "reviewer_target_hash": "active:iss-local-00001",
+                        "promotion_decision": "main_orchestrator_promotion",
+                    },
+                ),
+            )
+
+            for rendered in (
+                infra_active_store._render_context_pack(manifest, repo_root=repo_root),
+                app_set_active.build_context_pack_text(manifest, repo_root=repo_root),
+            ):
+                with self.subTest(rendered=rendered[:20]):
+                    self.assertIn("- issue: authority=approved", rendered)
+                    self.assertIn("- issue: authoritative_input=none", rendered)
+                    self.assertIn("downstream_block=evidence_ledger_blocked", rendered)
+                    self.assertIn("blocking_entry_id=EAL-030", rendered)
+
+    def test_sync_auto_update_from_branch_writes_authority_context_pack(self) -> None:
+        app_contracts, app_ports = _runtime_modules()[1:3]
+        infra_contracts = _runtime_modules()[5]
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import sync_state as app_sync_state
+            from spec_dock_runtime.domain import models as domain_models
+        finally:
+            sys.path.pop(0)
+
+        class _GitGateway:
+            def current_branch_or_none(self, repo_root):
+                del repo_root
+                return "iss-local-00001-authority"
+
+            def origin_github_repo_slug(self, repo_root):
+                del repo_root
+                return None
+
+        class _ActiveStateStore:
+            def __init__(self):
+                self.written_manifest = None
+                self.rendered_context_pack = None
+
+            def snapshot_current_state(self, specdock_dir):
+                del specdock_dir
+                return infra_contracts.ActiveStateSnapshot(
+                    manifest=None,
+                    context_pack_text=None,
+                    active_json_text=None,
+                    managed_agent_state={},
+                )
+
+            def write_active_manifest(self, specdock_dir, manifest):
+                del specdock_dir
+                self.written_manifest = manifest
+                return manifest
+
+            def apply_active_pointers(self, specdock_dir, manifest, rendered_context_pack):
+                del specdock_dir, manifest
+                self.rendered_context_pack = rendered_context_pack
+
+            def patch_agent_state_active_fields(self, specdock_dir, manifest):
+                del specdock_dir, manifest
+
+            def restore_previous_state(self, specdock_dir, snapshot):
+                del specdock_dir, snapshot
+
+        nodes_by_id = {
+            "init-local-00001": domain_models.SpecNode(
+                kind="initiative",
+                id="init-local-00001",
+                title="initiative",
+                slug="initiative",
+                path=Path("/repo/spec-dock/initiatives/init-local-00001-initiative"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-initiative/.meta.json"),
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            "epic-local-00001": domain_models.SpecNode(
+                kind="epic",
+                id="epic-local-00001",
+                title="epic",
+                slug="epic",
+                path=Path("/repo/spec-dock/initiatives/init-local-00001-initiative/epics/epic-local-00001-epic"),
+                meta_path=Path("/repo/spec-dock/initiatives/init-local-00001-initiative/epics/epic-local-00001-epic/.meta.json"),
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            "iss-local-00001": domain_models.SpecNode(
+                kind="issue",
+                id="iss-local-00001",
+                title="issue",
+                slug="issue",
+                path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-initiative/epics/"
+                    "epic-local-00001-epic/issues/iss-local-00001-issue"
+                ),
+                meta_path=Path(
+                    "/repo/spec-dock/initiatives/init-local-00001-initiative/epics/"
+                    "epic-local-00001-epic/issues/iss-local-00001-issue/.meta.json"
+                ),
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+        }
+        state = app_contracts.SyncStateResult(
+            graph=domain_models.SpecGraph(nodes_by_id=nodes_by_id),
+            active=None,
+            issue_statuses={},
+            progress=domain_models.ProgressMap(by_node_id={}, counts={"total": 0, "done": 0, "open": 0, "unknown": 0}),
+            deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+            deps_eval_by_id={},
+            generated_at="2026-05-24T00:00:00+00:00",
+            warnings=[],
+            deps_preflight_error=None,
+            repo_root=Path("/repo"),
+        )
+        active_state_store = _ActiveStateStore()
+        ports = app_ports.Ports(
+            node_reader=_StubNodeReader(),
+            repo_root=Path("/repo"),
+            specdock_dir=Path("/repo/spec-dock"),
+            git_gateway=_GitGateway(),
+            active_state_store=active_state_store,
+        )
+
+        next_state, outcome = app_sync_state.maybe_auto_update_from_branch(state, ports)
+
+        self.assertIsNotNone(outcome)
+        assert outcome is not None
+        self.assertTrue(outcome.applied)
+        self.assertEqual(next_state.active.issue_id, "iss-local-00001")
+        self.assertIsNotNone(active_state_store.written_manifest)
+        assert active_state_store.written_manifest is not None
+        assert active_state_store.written_manifest.issue is not None
+        self.assertEqual(active_state_store.written_manifest.issue.authority, "approved")
+        self.assertIn("issue_ready", active_state_store.written_manifest.issue.grants)
+        self.assertIsNotNone(active_state_store.rendered_context_pack)
+        assert active_state_store.rendered_context_pack is not None
+        self.assertIn("issue ready", active_state_store.rendered_context_pack)
+        self.assertIn("- issue: authority=approved", active_state_store.rendered_context_pack)
 
     def test_show_active_reads_agent_manifest_into_active_view_result(self) -> None:
         (

@@ -41,8 +41,8 @@ class TestCliActive(CliRuntimeHarness):
             )
             self.assertFalse(active["initiative"]["path"].startswith(str(target)))
             self.assertIn("init-00001", self._read_active_pointer_text(target, "initiative", "requirement.md"))
-            self.assertIn("Active Epic: （なし）", self._read_active_pointer_text(target, "epic", "README.md"))
-            self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
+            self.assertIn("Active Epic: なし", self._read_active_pointer_text(target, "epic", "README.md"))
+            self.assertIn("Active Issue: なし", self._read_active_pointer_text(target, "issue", "README.md"))
 
             # Epic-only active: issue is a placeholder.
             self._run_runtime(target, ["active", "set", "epic-00002", "--force"])
@@ -59,7 +59,7 @@ class TestCliActive(CliRuntimeHarness):
             )
             self.assertFalse(active["epic"]["path"].startswith(str(target)))
             self.assertIn("epic-00002", self._read_active_pointer_text(target, "epic", "requirement.md"))
-            self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
+            self.assertIn("Active Issue: なし", self._read_active_pointer_text(target, "issue", "README.md"))
 
             # Clear: all placeholders.
             self._run_runtime(target, ["active", "clear"])
@@ -67,9 +67,9 @@ class TestCliActive(CliRuntimeHarness):
             self.assertIsNone(active.get("initiative"))
             self.assertIsNone(active.get("epic"))
             self.assertIsNone(active.get("issue"))
-            self.assertIn("Active Initiative: （なし）", self._read_active_pointer_text(target, "initiative", "README.md"))
-            self.assertIn("Active Epic: （なし）", self._read_active_pointer_text(target, "epic", "README.md"))
-            self.assertIn("Active Issue: （なし）", self._read_active_pointer_text(target, "issue", "README.md"))
+            self.assertIn("Active Initiative: なし", self._read_active_pointer_text(target, "initiative", "README.md"))
+            self.assertIn("Active Epic: なし", self._read_active_pointer_text(target, "epic", "README.md"))
+            self.assertIn("Active Issue: なし", self._read_active_pointer_text(target, "issue", "README.md"))
 
     def test_active_set_rejects_legacy_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

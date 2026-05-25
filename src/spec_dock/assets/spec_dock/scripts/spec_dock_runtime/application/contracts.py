@@ -156,7 +156,17 @@ class ImportNodeResult:
 
 @dataclass(frozen=True)
 class CreateDiscussionDocRequest:
-    doc_type: Literal["adr", "disc", "research", "interview", "scratch", "note"]
+    doc_type: Literal[
+        "adr",
+        "disc",
+        "research",
+        "interview",
+        "scratch",
+        "draft-requirement",
+        "draft-design",
+        "draft-plan",
+        "note",
+    ]
     scope_node_id: str
     title: str
     slug: str | None
@@ -552,3 +562,5 @@ class UseCases:
     worktree_create: Callable[[WorktreeCreateRequest], WorktreeCreateResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("worktree_create is not configured")
     )
+    repo_root: Path | None = None
+    specdock_dir: Path | None = None

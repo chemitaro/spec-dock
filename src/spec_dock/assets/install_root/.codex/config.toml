@@ -96,7 +96,7 @@ project_doc_fallback_filenames = [".codex/AGENTS.md"]
 
 [agents]
 max_threads = 12
-max_depth = 1
+max_depth = 2
 
 [mcp_servers.context7]
 command = "npx"

@@ -34,6 +34,8 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock-initiative-planning",
     "spec-dock-epic-planning",
     "spec-dock-issue-execution",
+    "spec-dock-system-architect",
+    "spec-dock-implementation-planner",
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",
     "spec-dock-copilot-adapter",
@@ -533,6 +535,10 @@ class CliRuntimeHarness(unittest.TestCase):
         self.assertIn("new doc research", combined)
         self.assertIn("new doc interview", combined)
         self.assertIn("new doc scratch", combined)
+        self.assertIn("new doc draft-requirement", combined)
+        self.assertIn("new doc draft-design", combined)
+        self.assertIn("new doc draft-plan", combined)
+        self.assertIn("canonical docs remain main-orchestrator-only", combined)
         self.assertIn("<ts>-<kind>-<slug>.md", combined)
         self.assertIn("<ts>-<nn>-<kind>-<slug>.md", combined)
         self.assertIn("yyyymmddthhmmssz", combined)
