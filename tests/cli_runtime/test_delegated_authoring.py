@@ -187,6 +187,33 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
         self.assertIn("reason=ok", p.stdout)
 
+    def test_diff_guard_resolves_relative_baseline_status_from_repo_root_when_run_from_subdirectory(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        baseline_arg = os.path.relpath(baseline, start=target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+        subdir = target / "nested" / "cwd"
+        subdir.mkdir(parents=True)
+
+        p = self._run_runtime_capture_from_cwd(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                baseline_arg,
+            ],
+            cwd=subdir,
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=ok", p.stdout)
+
     def test_diff_guard_rejects_forbidden_path(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
