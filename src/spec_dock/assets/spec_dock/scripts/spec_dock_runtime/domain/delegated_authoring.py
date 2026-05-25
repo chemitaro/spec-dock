@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DISCUSSION_DOC_FILENAME_RE = re.compile(
-    r"^[0-9]{8}t[0-9]{6}z(?:-(?:0[1-9]|[1-9][0-9]))?-(?:adr|disc|research|interview|scratch)-"
+    r"^[0-9]{8}t[0-9]{6}z(?:-(?:0[1-9]|[1-9][0-9]))?"
+    r"-(?:adr|disc|research|interview|scratch|draft-requirement|draft-design|draft-plan)-"
     r"[a-z0-9]+(?:-[a-z0-9]+)*\.md$"
 )
 CANONICAL_DOC_NAMES: tuple[str, ...] = ("requirement.md", "design.md", "plan.md", "report.md")
@@ -227,7 +228,7 @@ def _validate_existing_discussion_update(
     if pre_change_error is not None:
         return pre_change_error
     if pre_change_text is not None:
-        pre_change_error = _validate_existing_discussion_text(pre_change_text)
+        pre_change_error = _validate_existing_discussion_text(pre_change_text, path=path)
         if pre_change_error is not None:
             return pre_change_error
     if not path.is_file():
@@ -236,7 +237,7 @@ def _validate_existing_discussion_update(
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         return "existing_discussion_non_utf8"
-    return _validate_existing_discussion_text(text)
+    return _validate_existing_discussion_text(text, path=path)
 
 
 def _validate_new_discussion_create(path: Path) -> str | None:
@@ -249,15 +250,19 @@ def _validate_new_discussion_create(path: Path) -> str | None:
     metadata = _discussion_frontmatter_metadata(text)
     if NON_EDITABLE_DISCUSSION_STATE_RE.search(metadata):
         return "new_discussion_claims_non_editable_state"
+    if _is_draft_artifact_name(path):
+        return None
     if not EDITABLE_DISCUSSION_STATE_RE.search(metadata):
         return "new_discussion_missing_proposed_state"
     return None
 
 
-def _validate_existing_discussion_text(text: str) -> str | None:
+def _validate_existing_discussion_text(text: str, *, path: Path | None = None) -> str | None:
     metadata = _discussion_frontmatter_metadata(text)
     if NON_EDITABLE_DISCUSSION_STATE_RE.search(metadata):
         return "existing_discussion_not_proposed"
+    if path is not None and _is_draft_artifact_name(path):
+        return None
     if not EDITABLE_DISCUSSION_STATE_RE.search(metadata):
         return "existing_discussion_missing_proposed_state"
     return None
@@ -296,6 +301,10 @@ def _is_direct_child_of(path: Path, parent: Path) -> bool:
 
 def _is_valid_discussion_markdown_name(path: Path) -> bool:
     return DISCUSSION_DOC_FILENAME_RE.fullmatch(path.name) is not None
+
+
+def _is_draft_artifact_name(path: Path) -> bool:
+    return re.search(r"-(?:draft-requirement|draft-design|draft-plan)-", path.name) is not None
 
 
 def _normalize_repo_path(path: Path, repo_root: Path) -> Path:

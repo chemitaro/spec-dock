@@ -47,7 +47,7 @@ Initiative
 
 ## 議論文書カタログ（discussion docs catalog）
 
-current catalog は `scratch` / `interview` / `research` / `disc` / `adr` です。
+current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan` です。
 
 | 種別（type） | ライフサイクル（lifecycle） | 既定 authority（authority default） | 使う場面 |
 |---|---|---:|---|

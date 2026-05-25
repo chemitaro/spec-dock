@@ -129,6 +129,38 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertIn("status=pass", p.stdout)
         self.assertIn("reason=ok", p.stdout)
 
+    def test_diff_guard_allows_new_draft_artifact_discussion_markdown(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussions_dir = _issue_dir(target) / "discussions"
+        for doc_type in ("draft-requirement", "draft-design", "draft-plan"):
+            (discussions_dir / f"20260525t010203z-{doc_type}-agent-draft.md").write_text(
+                "---\n"
+                "種別: canonical-template-derived-draft\n"
+                "状態: \"draft | approved\"\n"
+                "---\n"
+                f"# {doc_type}\n",
+                encoding="utf-8",
+            )
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("status=pass", p.stdout)
+        self.assertIn("reason=ok", p.stdout)
+
     def test_diff_guard_uses_bootstrapped_repo_root_from_subdirectory(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -383,6 +415,31 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
 
+    def test_diff_guard_allows_explicit_existing_draft_artifact_update(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-draft-requirement-agent-draft.md"
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# updated\n", encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
     def test_diff_guard_rejects_preexisting_dirty_forbidden_path_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
@@ -488,6 +545,50 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
         self.assertIn("reason=existing_discussion_not_proposed", p.stdout)
+
+    def test_diff_guard_rejects_allowlisted_update_when_current_draft_claims_non_editable_authority(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "20260525t010203z-draft-requirement-agent-draft.md",
+                "---\nstatus: accepted\n---\n# accepted\n",
+            ),
+            (
+                "20260525t010203z-draft-design-agent-draft.md",
+                "---\nadoption_status: adopted\n---\n# adopted\n",
+            ),
+            (
+                "20260525t010203z-draft-plan-agent-draft.md",
+                "---\nstatus: stale\n---\n# stale\n",
+            ),
+        )
+        for filename, current_text in cases:
+            with self.subTest(filename=filename):
+                target = self._make_target_repo_with_scope()
+                discussion = _issue_dir(target) / "discussions" / filename
+                discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
+                _commit_all(target)
+                baseline = _write_git_status_baseline(target)
+                discussion.write_text(current_text, encoding="utf-8")
+
+                p = self._run_runtime_capture(
+                    target,
+                    [
+                        "delegated-authoring",
+                        "diff-guard",
+                        "--scope",
+                        "iss-00003",
+                        "--baseline-status",
+                        str(baseline),
+                        "--allow-existing-discussion",
+                        str(discussion.relative_to(target)),
+                    ],
+                )
+
+                self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+                self.assertIn("reason=existing_discussion_not_proposed", p.stdout)
 
     def test_diff_guard_rejects_dirty_baseline_discussion_state_rewrite(self) -> None:
         target = self._make_target_repo_with_scope()

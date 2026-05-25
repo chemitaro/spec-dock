@@ -385,6 +385,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/scripts/spec_dock_runtime/app.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/application/contracts.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
         ),
@@ -423,6 +426,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/scripts/spec_dock_runtime/commands/new.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/domain/delegated_authoring.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
@@ -3081,6 +3087,8 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((discussions_templates_dir / "research.md").is_file())
             self.assertTrue((discussions_templates_dir / "interview.md").is_file())
             self.assertTrue((discussions_templates_dir / "scratch.md").is_file())
+            for draft_template in ("draft-requirement.md", "draft-design.md", "draft-plan.md"):
+                self.assertFalse((discussions_templates_dir / draft_template).exists())
             self.assertFalse((discussions_templates_dir / "note.md").exists())
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
             for label in _INTERVIEW_REQUIRED_LABELS:
