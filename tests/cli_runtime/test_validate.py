@@ -435,6 +435,9 @@ class TestCliValidate(CliRuntimeHarness):
             "foo-scratch-capture.md",
             "bogus-01-adr-kickoff.md",
             "adr-kickoff.md",
+            "draft-requirement-kickoff.md",
+            "draft-design-kickoff.md",
+            "draft-plan-kickoff.md",
             "interview_kickoff.md",
             "adr_kickoff.md",
         )
@@ -491,6 +494,9 @@ class TestCliValidate(CliRuntimeHarness):
             (discussions_dir / "20260329t123456z-99-research-spike.md").write_text("spike\n", encoding="utf-8")
             (discussions_dir / "20260329t123457z-interview-hearing.md").write_text("hearing\n", encoding="utf-8")
             (discussions_dir / "20260329t123458z-scratch-capture.md").write_text("capture\n", encoding="utf-8")
+            (discussions_dir / "20260329t123459z-draft-requirement-req.md").write_text("req\n", encoding="utf-8")
+            (discussions_dir / "20260329t123500z-01-draft-design-design.md").write_text("design\n", encoding="utf-8")
+            (discussions_dir / "20260329t123501z-99-draft-plan-plan.md").write_text("plan\n", encoding="utf-8")
 
             p = self._run_runtime_capture(target, ["validate"])
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)

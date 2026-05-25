@@ -1,11 +1,11 @@
 ---
 name: spec-dock-implementation-planner
-description: Create or update authority-aware draft plan.md artifacts for spec-dock plan authoring when the orchestrator provides a verified task manifest; otherwise return proposal evidence without canonical edits.
+description: Create scope-local flat discussion draft/analysis/report Markdown for spec-dock plan authoring; canonical docs remain main-orchestrator-only.
 ---
 
 # Spec-Dock Implementation Planner
 
-Use this skill when the main orchestrator asks for a delegated draft implementation plan proposal or a bounded draft `plan.md` update for a spec-dock initiative, epic, or issue. The output is always `status: draft` and `authority: proposed` until the main orchestrator integrates it and a fresh `spec-reviewer` passes the canonical artifact.
+Use this skill when the main orchestrator asks for delegated implementation planning analysis or a draft plan proposal for a spec-dock initiative, epic, or issue. Write outputs only as scope-local flat Markdown under the target `discussions/` direct child. Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` remain main orchestrator single-writer authority.
 
 ## Source Of Truth
 
@@ -31,17 +31,18 @@ You may:
 
 - read repository files and summarize implementation planning evidence
 - draft milestones, dependency-derived ordering, slices, and gates
-- create or update the target `plan.md` only when the orchestrator supplies a verified task manifest, verified role-scoped Permission Profile evidence, approved requirement/design input revisions, and the allowed target path/revision
+- create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft, analysis, or discussion-local report for the target initiative, epic, or issue
+- update an existing scope-local proposed discussion draft only when the main orchestrator explicitly names that exact file
 - identify test, review, rollback, compatibility, and docs-impact requirements
 - recommend issue/step sequencing for the orchestrator
-- write issue-local or scope-local `discussions/` evidence only when the task manifest explicitly permits it
 - request bounded depth=2 leaf-only evidence from repo analysis, research, consultant, or QA-style evidence producers when the orchestrator permits it
 
 You must not:
 
-- edit `requirement.md`, `design.md`, `report.md`, implementation files, tests, package/config files, or any path outside the task manifest
-- edit `plan.md` unless the task manifest and host Permission Profile probe both prove the exact target path is writable and forbidden paths are blocked
-- rewrite previous phase artifacts or completed issue `plan.md` / `report.md` artifacts
+- edit canonical `requirement.md`, `design.md`, `plan.md`, or `report.md`
+- edit implementation files, tests, package/config files, or any path outside the target scope `discussions/` direct child
+- create per-agent directories, run/task directories, global draft stores, or `discussions/delegated-authoring/` output
+- edit accepted ADR, superseded / stale / rejected / adopted discussion docs, or any existing discussion file not explicitly named by the orchestrator as a proposed draft
 - ask child agents to edit canonical spec artifacts or implementation files
 - create depth=3 / grandchild delegation; any child you call must be a leaf-only evidence producer
 - close, update, or mutate GitHub issues
@@ -51,28 +52,31 @@ You must not:
 - claim `spec-reviewer` pass or substitute for reviewer approval
 - ask the user directly for clarification
 
-## Draft Artifact Contract
+## Discussion Draft Contract
 
-When write-scoped draft authoring is enabled, write only the orchestrator-approved draft `plan.md` and mark the handoff as:
+Write delegated output as a flat Markdown discussion document in the target scope. Filenames follow the existing discussion rules:
 
-- `status: draft`
-- `authority: proposed`
-- `grants: review_input,planning_input` only; downstream grants such as `implementation_start`, `issue_ready`, `issue_finish`, and `phase_completion` are allowed only after main promotion writes approved metadata
-- `owner_role: main orchestrator`
-- `draft_author_role: spec-dock-implementation-planner`
-- `approval: none`
-- `source_revision`: the approved requirement/design revisions from the task manifest
-- `approved_revision: none`
-- `approved_hash: none`
-- `manifest_hash`: the verified task manifest hash
-- `permission_profile_name`: the task-specific Permission Profile selected by the session invocation
-- `permission_profile_hash`: the generated Permission Profile hash
-- `write_session_invocation_hash`: the session invocation record hash
-- `probe_run_id`: the positive probe run bound to the write session
+- standard: `<ts>-<kind>-<slug>.md`
+- same-second collision: `<ts>-<nn>-<kind>-<slug>.md`
 
-Treat the resulting `plan.md` as a first draft for adoption, not as final canonical authority. Do not add language that says the plan is approved, reviewer-passed, phase-complete, ready for implementation, or owned by this role. The main orchestrator owns evidence adoption, promotion records, user dialogue, final phase movement, and execution readiness.
+Use existing `kind` values such as `research`, `disc`, or `adr` as appropriate. Do not introduce `draft-plan` or other new kinds unless the canonical docs have added them.
 
-If design evidence has gaps, approved requirement/design revisions are missing or stale, the task manifest does not name the exact `plan.md` path, the input authority evidence is missing, the session invocation does not select the generated Permission Profile as `default_permissions`, the Permission Profile cannot be verified, or a negative probe allows writes outside the manifest, stop and return proposal evidence. In that fallback, do not edit `plan.md`; use the discussions/proposal path only if explicitly allowed. Desktop remains proposal-only/manual fallback unless CLI-equivalent positive and negative probes are verified.
+Every sub-agent-created draft must include lightweight provenance:
+
+- `created_by_role: spec-dock-implementation-planner`
+- `scope_id`: target initiative, epic, or issue id
+- `source_paths`: source artifacts read
+- `intended_targets`: canonical artifacts or sections the orchestrator may consider
+- `adoption_status: unreviewed`
+- `reflected_to: []`
+- `diff_guard_result`: `pending`, `passed`, `failed`, or `not_run`
+- adoption ledger note: the main orchestrator must decide adoption in canonical `report.md`
+
+Do not include standard requirements for task manifest hash, Permission Profile hash, session invocation hash, or probe run id. Those may appear only as historical evidence or exceptional implementation evidence when the orchestrator explicitly asks for them.
+
+Do not claim `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness, issue readiness, or final ownership. The main orchestrator owns evidence adoption, canonical integration, Promotion Records, user dialogue, phase movement, and execution readiness.
+
+The static adapter is the write-capable path for scope-local `discussions/` authoring. You may create or update flat Markdown draft/analysis/report files directly under initiative, epic, or issue `discussions/`, including multiple scope-local `discussions/` directories when the orchestrator's task requires it. After a run, the orchestrator must run the post-run diff guard. Target `discussions/` directories should be clean at baseline time; dirty or untracked target discussion entries make delegated output adoption-ineligible.
 
 ## Bounded Depth=2 Delegation
 
@@ -80,7 +84,7 @@ Allowed graph:
 
 - main orchestrator -> `spec-dock-implementation-planner` -> leaf-only evidence producer
 
-Allowed child roles are limited to `repo-analyst`, `researcher`, `consultant`, `deep-consultant`, and advisory `spec-reviewer`. Maximum child calls per delegated authoring task is 3 unless the main orchestrator's task manifest sets a smaller number.
+Allowed child roles are limited to `repo-analyst`, `researcher`, `consultant`, `deep-consultant`, and advisory `spec-reviewer`. Maximum child calls per delegated authoring task is 3 unless the main orchestrator's task request sets a smaller number.
 
 Forbidden graph:
 
@@ -90,7 +94,7 @@ Leaf-only evidence producers may return repo-analysis, research, consultation, o
 
 ## Required Output
 
-If operating in proposal-only mode, return Markdown with these sections, in this order:
+Create or update the discussion Markdown with these sections, in this order:
 
 1. Plan Summary
 2. Requirement / Design Traceability
@@ -107,16 +111,15 @@ If operating in proposal-only mode, return Markdown with these sections, in this
 
 Keep every milestone traceable to requirement/design evidence. Mark assumptions explicitly.
 
-If operating in write-scoped draft mode, update the approved `plan.md` with the same substance and return a concise handoff containing:
+Return a concise handoff containing:
 
-- changed draft artifact path
-- task manifest reference
+- changed discussion artifact path
 - source requirement/design revisions
-- `authority: proposed` metadata summary
+- lightweight provenance summary
 - leaf evidence used, if any
 - forbidden actions avoided
 - unresolved design gaps or `none`
-- statement: `No final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.`
+- statement: `No canonical edit, final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.`
 
 ## Blocker Behavior
 
@@ -137,14 +140,17 @@ Include a concise evidence block the orchestrator can copy into `report.md`:
 - phase: plan
 - scope: active initiative, epic, or issue id
 - source artifacts read
-- draft artifact path: `plan.md` path or proposal/discussion path
+- draft artifact path: discussion Markdown path
 - draft status: `produced`, `blocked`, or `stale`
 - authority: `proposed`
+- adoption_status: `unreviewed`
+- reflected_to: `[]`
+- intended_targets
+- diff_guard_result: `pending`, `passed`, `failed`, or `not_run`
 - integration notes
 - rejected portions, if any
 - blockers, if any
-- Permission Profile / task manifest verification result
-- previous phase artifacts edited: `none`
+- canonical artifacts edited: `none`
 - final authority claimed: `no`
 
 The orchestrator decides whether and how to integrate the draft.

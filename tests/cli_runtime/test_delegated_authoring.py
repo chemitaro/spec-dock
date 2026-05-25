@@ -1,14 +1,9 @@
-import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
@@ -19,102 +14,10 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
             tmp.cleanup()
         super().tearDown()
 
-    def test_manifest_command_generates_issue_local_artifacts(self) -> None:
-        with self.subTest("cli host acceptance counted"):
-            target = self._make_target_repo_with_scope()
-            authority_file = self._write_authority_file(target)
-
-            p = self._run_runtime_capture(
-                target,
-                [
-                    "delegated-authoring",
-                    "manifest",
-                    "--role",
-                    "system-architect",
-                    "--scope",
-                    "iss-00003",
-                    "--target",
-                    "design",
-                    "--host-surface",
-                    "cli",
-                    "--input-authority-file",
-                    str(authority_file),
-                ],
-            )
-
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-            self.assertIn("spec-dock: ok (delegated-authoring manifest)", p.stdout)
-            self.assertIn("host_surface_acceptance_eligible=true", p.stdout)
-            self.assertIn("acceptance_counted=false", p.stdout)
-            self.assertIn("manifest_path=", p.stdout)
-            manifest_path = _stdout_path(p.stdout, "manifest_path")
-            profile_path = _stdout_path(p.stdout, "permission_profile_path")
-            probe_path = _stdout_path(p.stdout, "probe_plan_path")
-            session_path = _stdout_path(p.stdout, "session_invocation_path")
-            self.assertTrue(manifest_path.is_file())
-            self.assertTrue(profile_path.is_file())
-            self.assertTrue(probe_path.is_file())
-            self.assertTrue(session_path.is_file())
-            profile = profile_path.read_text(encoding="utf-8")
-            profile_data = tomllib.loads(profile)
-            manifest_data = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-            profile_name = _stdout_value(p.stdout, "permission_profile_name")
-            target_rel = (_issue_dir(target) / "design.md").relative_to(target).as_posix()
-            task_rel = profile_path.parent.resolve().relative_to(target.resolve()).as_posix()
-            sentinel_path = Path(manifest_data["negative_probe_sentinel"]).resolve()
-            sentinel_rel = sentinel_path.relative_to(target.resolve()).as_posix()
-            sentinel_map = {category: Path(path).resolve() for category, path in manifest_data["negative_probe_sentinels"].items()}
-            self.assertEqual(
-                set(sentinel_map),
-                {"requirement.md", "peer_artifact", "report.md", "src/", "tests/", ".codex/", ".agents/", ".env*"},
-            )
-            issue_dir = _issue_dir(target).resolve()
-            self.assertEqual(sentinel_map["requirement.md"].parent, issue_dir / "discussions")
-            self.assertEqual(sentinel_map["peer_artifact"].parent, issue_dir / "discussions")
-            self.assertIn(".plan.md.", sentinel_map["peer_artifact"].name)
-            self.assertEqual(sentinel_map["report.md"].parent, issue_dir / "discussions")
-            target_root = target.resolve()
-            self.assertEqual(sentinel_map["src/"].parent, target_root / "src")
-            self.assertEqual(sentinel_map["tests/"].parent, target_root / "tests")
-            self.assertEqual(sentinel_map[".codex/"].parent, target_root / ".codex")
-            self.assertEqual(sentinel_map[".agents/"].parent, target_root / ".agents")
-            self.assertEqual(sentinel_map[".env*"].parent, target_root)
-            self.assertTrue(sentinel_map[".env*"].name.startswith(".env."))
-            self.assertFalse(sentinel_path.is_relative_to(profile_path.parent))
-            self.assertEqual(profile_data["default_permissions"], profile_name)
-            profile_config = profile_data["permissions"][profile_name]
-            self.assertEqual(profile_config["filesystem"][":minimal"], "read")
-            workspace_rules = profile_config["filesystem"][":workspace_roots"]
-            self.assertEqual(workspace_rules["."], "read")
-            self.assertEqual(workspace_rules[target_rel], "write")
-            self.assertEqual(workspace_rules[task_rel], "write")
-            self.assertNotIn(sentinel_rel, workspace_rules)
-            for sentinel in sentinel_map.values():
-                self.assertNotIn(sentinel.relative_to(target.resolve()).as_posix(), workspace_rules)
-            self.assertEqual(workspace_rules[".env"], "deny")
-            self.assertEqual(workspace_rules[".env.*"], "deny")
-            self.assertFalse(profile_config["network"]["enabled"])
-            self.assertIn(f'[permissions."{profile_name}".filesystem]', profile)
-            self.assertIn(f'[permissions."{profile_name}".filesystem.":workspace_roots"]', profile)
-            self.assertIn(f'[permissions."{profile_name}".network]', profile)
-            self.assertNotIn("[permissions]\n", profile)
-            self.assertNotIn('mode = "workspace-write"', profile)
-            self.assertNotIn("read = true", profile)
-            self.assertNotIn("write = [", profile)
-            self.assertNotIn("sandbox_mode", profile)
-            self.assertNotIn("[sandbox_workspace_write]", profile)
-            probe = probe_path.read_text(encoding="utf-8")
-            for category, sentinel in sentinel_map.items():
-                self.assertIn(f"category: `{category}`", probe)
-                self.assertIn(sentinel.as_posix(), probe)
-            session = session_path.read_text(encoding="utf-8")
-            self.assertIn(f'default_permissions = "{profile_name}"', session)
-            self.assertIn("host_surface_acceptance_eligible = true", session)
-            self.assertIn("acceptance_counted = false", session)
-
-    def test_manifest_command_blocks_bad_authority_without_generating_profile(self) -> None:
+    def test_manifest_command_is_deprecated_blocked_and_writes_no_artifacts(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(target, remove_key="reviewer_evidence_path")
+        authority_file = target / "input-authority.json"
+        authority_file.write_text("{}\n", encoding="utf-8")
 
         p = self._run_runtime_capture(
             target,
@@ -136,138 +39,134 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("spec-dock: blocked (delegated-authoring manifest)", p.stdout)
-        self.assertIn("missing_requirement_reviewer_evidence_path", p.stdout)
-        issue_dir = _issue_dir(target)
-        self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
-
-    def test_manifest_command_blocks_missing_required_grant(self) -> None:
-        target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(target, required_grants=["review_input"])
-
-        p = self._run_runtime_capture(
-            target,
-            [
-                "delegated-authoring",
-                "manifest",
-                "--role",
-                "system-architect",
-                "--scope",
-                "iss-00003",
-                "--target",
-                "design",
-                "--host-surface",
-                "cli",
-                "--input-authority-file",
-                str(authority_file),
-            ],
-        )
-
-        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("spec-dock: blocked (delegated-authoring manifest)", p.stdout)
-        self.assertIn("missing_required_grant=requirement:planning_input", p.stdout)
+        self.assertIn("status=deprecated", p.stdout)
+        self.assertIn("reason=deprecated_scope_local_discussion_drafts", p.stdout)
+        self.assertNotIn("manifest_path=", p.stdout)
         self.assertFalse((_issue_dir(target) / "discussions" / "delegated-authoring").exists())
 
-    def test_manifest_command_blocks_invalid_required_grant(self) -> None:
+    def test_scoped_context_subcommand_is_not_registered(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(
-            target,
-            required_grants=["review_input", "planning_input", "admin"],
-        )
 
         p = self._run_runtime_capture(
             target,
             [
                 "delegated-authoring",
-                "manifest",
-                "--role",
-                "system-architect",
-                "--scope",
-                "iss-00003",
-                "--target",
-                "design",
-                "--host-surface",
-                "cli",
-                "--input-authority-file",
-                str(authority_file),
+                "scoped-context",
+                "--help",
             ],
         )
 
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("spec-dock: blocked (delegated-authoring manifest)", p.stdout)
-        self.assertIn("invalid_required_grant=requirement:admin", p.stdout)
-        self.assertFalse((_issue_dir(target) / "discussions" / "delegated-authoring").exists())
+        self.assertIn("invalid choice", p.stderr)
+        self.assertIn("{manifest,baseline-status,diff-guard}", p.stderr)
+        self.assertNotIn("--discussion" + "-file", p.stdout + p.stderr)
 
-    def test_manifest_command_generates_implementation_planner_plan_with_design_input(self) -> None:
+    def test_baseline_status_writes_content_hash_snapshot(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(
-            target,
-            include_design=True,
-            design_required_grants=["design_baseline"],
-        )
+        _commit_all(target)
+        design = _issue_dir(target) / "design.md"
+        design.write_text("# pre-existing orchestrator draft\n", encoding="utf-8")
+        baseline = _external_baseline_path()
 
         p = self._run_runtime_capture(
             target,
             [
                 "delegated-authoring",
-                "manifest",
-                "--role",
-                "implementation-planner",
-                "--scope",
-                "iss-00003",
-                "--target",
-                "plan",
-                "--host-surface",
-                "cli",
-                "--input-authority-file",
-                str(authority_file),
+                "baseline-status",
+                "--output",
+                str(baseline),
             ],
         )
 
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("spec-dock: ok (delegated-authoring manifest)", p.stdout)
-        manifest_path = _stdout_path(p.stdout, "manifest_path")
-        manifest = manifest_path.read_text(encoding="utf-8")
-        self.assertIn('role = "implementation-planner"', manifest)
-        self.assertIn('target = "plan"', manifest)
-        self.assertIn("design =", manifest)
-        self.assertEqual(
-            _stdout_path(p.stdout, "target_artifact_path").resolve(),
-            (_issue_dir(target) / "plan.md").resolve(),
-        )
+        self.assertIn("spec-dock: ok (delegated-authoring baseline-status)", p.stdout)
+        self.assertIn("reason=baseline_status_written", p.stdout)
+        baseline_text = baseline.read_text(encoding="utf-8")
+        self.assertIn("# spec-dock delegated-authoring baseline-status v1", baseline_text)
+        self.assertIn("# file-state-sha256\t", baseline_text)
+        self.assertIn("design.md", baseline_text)
 
-    def test_desktop_manifest_is_fallback_not_acceptance_counted(self) -> None:
+    def test_baseline_status_rejects_repo_local_output(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(target)
+        _commit_all(target)
+        baseline = target / "baseline-status.txt"
 
         p = self._run_runtime_capture(
             target,
             [
                 "delegated-authoring",
-                "manifest",
-                "--role",
-                "system-architect",
+                "baseline-status",
+                "--output",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring baseline-status)", p.stdout)
+        self.assertIn("reason=baseline_status_inside_repo", p.stdout)
+
+    def test_diff_guard_allows_new_flat_discussion_markdown(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
                 "--scope",
                 "iss-00003",
-                "--target",
-                "design",
-                "--host-surface",
-                "desktop",
-                "--input-authority-file",
-                str(authority_file),
+                "--baseline-status",
+                str(baseline),
             ],
         )
 
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("host_surface_acceptance_eligible=false", p.stdout)
-        self.assertIn("acceptance_counted=false", p.stdout)
-        session_path = _stdout_path(p.stdout, "session_invocation_path")
-        session = session_path.read_text(encoding="utf-8")
-        self.assertIn('executor = "desktop-fallback"', session)
-        self.assertIn("host_surface_acceptance_eligible = false", session)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("status=pass", p.stdout)
+        self.assertIn("reason=ok", p.stdout)
 
-    def test_manifest_command_uses_bootstrapped_repo_root_from_subdirectory(self) -> None:
+    def test_diff_guard_allows_new_draft_artifact_discussion_markdown(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(target)
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussions_dir = _issue_dir(target) / "discussions"
+        for doc_type in ("draft-requirement", "draft-design", "draft-plan"):
+            (discussions_dir / f"20260525t010203z-{doc_type}-agent-draft.md").write_text(
+                "---\n"
+                "種別: canonical-template-derived-draft\n"
+                "状態: \"draft | approved\"\n"
+                "---\n"
+                f"# {doc_type}\n",
+                encoding="utf-8",
+            )
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("status=pass", p.stdout)
+        self.assertIn("reason=ok", p.stdout)
+
+    def test_diff_guard_uses_bootstrapped_repo_root_from_subdirectory(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
         subdir = target / "nested" / "cwd"
         subdir.mkdir(parents=True)
 
@@ -275,80 +174,627 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
             target,
             [
                 "delegated-authoring",
-                "manifest",
-                "--role",
-                "system-architect",
+                "diff-guard",
                 "--scope",
                 "iss-00003",
-                "--target",
-                "design",
-                "--host-surface",
-                "cli",
-                "--input-authority-file",
-                str(authority_file),
+                "--baseline-status",
+                str(baseline),
             ],
             cwd=subdir,
         )
 
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("spec-dock: ok (delegated-authoring manifest)", p.stdout)
-        self.assertIn("manifest_path=", p.stdout)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=ok", p.stdout)
 
-    def test_manifest_command_blocks_minimal_promotion_json(self) -> None:
+    def test_diff_guard_rejects_forbidden_path(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(target, minimal_promotion=True)
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        (_issue_dir(target) / "design.md").write_text("# forbidden\n", encoding="utf-8")
 
         p = self._run_runtime_capture(
             target,
             [
                 "delegated-authoring",
-                "manifest",
-                "--role",
-                "system-architect",
+                "diff-guard",
                 "--scope",
                 "iss-00003",
-                "--target",
-                "design",
-                "--host-surface",
-                "cli",
-                "--input-authority-file",
-                str(authority_file),
+                "--baseline-status",
+                str(baseline),
             ],
         )
 
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("spec-dock: blocked (delegated-authoring manifest)", p.stdout)
-        self.assertIn("promotion_status_not_approved=requirement", p.stdout)
-        self.assertIn("promotion_missing_artifact_path=requirement", p.stdout)
-        self.assertFalse((_issue_dir(target) / "discussions" / "delegated-authoring").exists())
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=forbidden_diff", p.stdout)
+        self.assertIn("reason=canonical_doc", p.stdout)
 
-    def test_manifest_command_blocks_unstructured_markdown_evidence(self) -> None:
+    def test_diff_guard_active_issue_fallback_requires_exact_meta_id(self) -> None:
         target = self._make_target_repo_with_scope()
-        authority_file = self._write_authority_file(target, evidence_suffix=".md")
+        issue_dir = _issue_dir(target)
+        (issue_dir / ".meta.json").unlink()
+        active_issue = target / "spec-dock" / "active" / "issue"
+        if active_issue.exists() or active_issue.is_symlink():
+            active_issue.unlink()
+        active_issue.symlink_to(issue_dir, target_is_directory=True)
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
             target,
             [
                 "delegated-authoring",
-                "manifest",
-                "--role",
-                "system-architect",
+                "diff-guard",
                 "--scope",
                 "iss-00003",
-                "--target",
-                "design",
-                "--host-surface",
-                "cli",
-                "--input-authority-file",
-                str(authority_file),
+                "--baseline-status",
+                str(baseline),
             ],
         )
 
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("spec-dock: blocked (delegated-authoring manifest)", p.stdout)
-        self.assertIn("unstructured_promotion_record_evidence=requirement", p.stdout)
-        self.assertIn("unstructured_reviewer_evidence_evidence=requirement", p.stdout)
-        self.assertFalse((_issue_dir(target) / "discussions" / "delegated-authoring").exists())
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=scope_not_found", p.stdout)
+
+    def test_diff_guard_ignores_unchanged_preexisting_dirty_canonical_doc(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        design = _issue_dir(target) / "design.md"
+        design.write_text("# pre-existing orchestrator draft\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_ignores_unchanged_preexisting_dirty_path_with_space(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        notes = target / "manual notes.md"
+        notes.write_text("# pre-existing notes\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_uses_escaped_baseline_path_fields(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        notes = target / "manual\tnotes.md"
+        notes.write_text("# pre-existing notes\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        self.assertIn('"manual\\tnotes.md"', baseline.read_text(encoding="utf-8"))
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_rejects_disappeared_baseline_forbidden_path(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        env_file = target / ".env.local"
+        env_file.write_text("SECRET=before\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        env_file.unlink()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=env_file", p.stdout)
+
+    def test_diff_guard_does_not_parse_arrow_filename_as_rename(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        notes = target / "manual -> notes.md"
+        notes.write_text("# pre-existing notes\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_parses_quoted_rename_baseline_arrow_path(self) -> None:
+        target = self._make_target_repo_with_scope()
+        original = target / "manual -> notes.md"
+        original.write_text("# pre-existing notes\n", encoding="utf-8")
+        _commit_all(target)
+        renamed = target / "renamed notes.md"
+        _run_git(target, ["mv", original.name, renamed.name])
+        baseline = _write_delegated_authoring_baseline(self, target)
+        baseline_text = baseline.read_text(encoding="utf-8")
+        self.assertIn('"manual -> notes.md" -> "renamed notes.md"', baseline_text)
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_allows_explicit_existing_discussion_update(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# updated\n", encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_allows_explicit_existing_draft_artifact_update(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-draft-requirement-agent-draft.md"
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# updated\n", encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: ok (delegated-authoring diff-guard)", p.stdout)
+
+    def test_diff_guard_rejects_preexisting_dirty_forbidden_path_after_baseline(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        design = _issue_dir(target) / "design.md"
+        design.write_text("# pre-existing dirty forbidden edit\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        design.write_text("# delegated run edited dirty forbidden path\n", encoding="utf-8")
+        before_baseline_ns = max(0, baseline.stat().st_mtime_ns - 1_000_000)
+        os.utime(design, ns=(before_baseline_ns, before_baseline_ns))
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=canonical_doc", p.stdout)
+
+    def test_diff_guard_rejects_preexisting_dirty_forbidden_path_mode_change_after_baseline(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        design = _issue_dir(target) / "design.md"
+        design.write_text("# pre-existing dirty forbidden edit\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        design.chmod(0o755)
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=canonical_doc", p.stdout)
+
+    def test_diff_guard_rejects_mixed_baseline_forbidden_path_staged_change(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        design = _issue_dir(target) / "design.md"
+        design.write_text("# staged before baseline\n", encoding="utf-8")
+        _run_git(target, ["add", str(design.relative_to(target))])
+        design.write_text("# worktree snapshot\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+        design.write_text("# staged after baseline\n", encoding="utf-8")
+        _run_git(target, ["add", str(design.relative_to(target))])
+        design.write_text("# worktree snapshot\n", encoding="utf-8")
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=canonical_doc", p.stdout)
+
+    def test_diff_guard_rejects_allowlisted_update_when_previous_state_was_accepted(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion.write_text("---\nstatus: accepted\n---\n# accepted\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion.write_text("---\nstatus: proposed\n---\n# rewritten\n", encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=existing_discussion_not_proposed", p.stdout)
+
+    def test_diff_guard_rejects_allowlisted_update_when_current_draft_claims_non_editable_authority(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "20260525t010203z-draft-requirement-agent-draft.md",
+                "---\nstatus: accepted\n---\n# accepted\n",
+            ),
+            (
+                "20260525t010203z-draft-design-agent-draft.md",
+                "---\nadoption_status: adopted\n---\n# adopted\n",
+            ),
+            (
+                "20260525t010203z-draft-plan-agent-draft.md",
+                "---\nstatus: stale\n---\n# stale\n",
+            ),
+        )
+        for filename, current_text in cases:
+            with self.subTest(filename=filename):
+                target = self._make_target_repo_with_scope()
+                discussion = _issue_dir(target) / "discussions" / filename
+                discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
+                _commit_all(target)
+                baseline = _write_git_status_baseline(target)
+                discussion.write_text(current_text, encoding="utf-8")
+
+                p = self._run_runtime_capture(
+                    target,
+                    [
+                        "delegated-authoring",
+                        "diff-guard",
+                        "--scope",
+                        "iss-00003",
+                        "--baseline-status",
+                        str(baseline),
+                        "--allow-existing-discussion",
+                        str(discussion.relative_to(target)),
+                    ],
+                )
+
+                self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+                self.assertIn("reason=existing_discussion_not_proposed", p.stdout)
+
+    def test_diff_guard_rejects_dirty_baseline_discussion_state_rewrite(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
+        _commit_all(target)
+        discussion.write_text("---\nstatus: accepted\n---\n# dirty before run\n", encoding="utf-8")
+        baseline = _write_git_status_baseline(target)
+        discussion.write_text("---\nstatus: proposed\n---\n# rewritten by delegated run\n", encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=dirty_baseline_discussion", p.stdout)
+
+    def test_diff_guard_rejects_nested_dirty_baseline_discussion(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        nested = _issue_dir(target) / "discussions" / "nested" / "20260525t010203z-disc-agent-draft.md"
+        nested.parent.mkdir()
+        nested.write_text("# dirty before run\n", encoding="utf-8")
+        baseline = _write_delegated_authoring_baseline(self, target)
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=dirty_baseline_discussion", p.stdout)
+
+    def test_diff_guard_rejects_committed_symlinked_discussions_dir_without_diff(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussions_dir = _issue_dir(target) / "discussions"
+        external_discussions = target / "external-discussions"
+        external_discussions.mkdir()
+        (discussions_dir / "rules.md").unlink()
+        discussions_dir.rmdir()
+        discussions_dir.symlink_to(external_discussions, target_is_directory=True)
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=discussions_dir_symlink", p.stdout)
+
+    def test_diff_guard_rejects_committed_discussion_symlink_without_diff(self) -> None:
+        target = self._make_target_repo_with_scope()
+        symlink = _issue_dir(target) / "discussions" / "20260525t010203z-disc-link.md"
+        symlink.symlink_to(_issue_dir(target) / "design.md")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=discussion_symlink", p.stdout)
+
+    def test_diff_guard_rejects_ignored_env_file_written_after_baseline(self) -> None:
+        target = self._make_target_repo_with_scope()
+        (target / ".gitignore").write_text(".env*\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        (target / ".env.local").write_text("SECRET=delegated\n", encoding="utf-8")
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=env_file", p.stdout)
+
+    def test_diff_guard_rejects_nested_ignored_env_file_written_after_baseline(self) -> None:
+        target = self._make_target_repo_with_scope()
+        (target / ".gitignore").write_text("**/.env*\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        nested_dir = target / "tmp"
+        nested_dir.mkdir()
+        (nested_dir / ".env.secret").write_text("SECRET=delegated\n", encoding="utf-8")
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=env_file", p.stdout)
+
+    def test_diff_guard_rejects_ignored_env_directory_descendant_written_after_baseline(self) -> None:
+        target = self._make_target_repo_with_scope()
+        (target / ".gitignore").write_text("**/.env*\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        secret_dir = target / "tmp" / ".env.d"
+        secret_dir.mkdir(parents=True)
+        (secret_dir / "secret.txt").write_text("SECRET=delegated\n", encoding="utf-8")
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=env_file", p.stdout)
+
+    def test_diff_guard_rejects_non_utf8_head_discussion_without_crashing(self) -> None:
+        target = self._make_target_repo_with_scope()
+        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion.write_bytes(b"---\nadoption_status: unreviewed\n---\n# invalid \xff\n")
+        _commit_all(target)
+        baseline = _write_git_status_baseline(target)
+        discussion.write_text("---\nadoption_status: unreviewed\n---\n# valid working tree\n", encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("spec-dock: blocked (delegated-authoring diff-guard)", p.stdout)
+        self.assertIn("reason=existing_discussion_head_non_utf8", p.stdout)
 
     def _make_target_repo_with_scope(self) -> Path:
         self._tmpdir = getattr(self, "_tmpdir", [])
@@ -376,106 +822,6 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
             text=True,
         )
 
-    def _write_authority_file(
-        self,
-        target: Path,
-        *,
-        remove_key: str | None = None,
-        required_grants: list[str] | None = None,
-        include_design: bool = False,
-        design_required_grants: list[str] | None = None,
-        minimal_promotion: bool = False,
-        evidence_suffix: str = ".json",
-    ) -> Path:
-        evidence_dir = target / "authority-evidence"
-        evidence_dir.mkdir()
-        promotion_path = evidence_dir / f"requirement-promotion{evidence_suffix}"
-        reviewer_path = evidence_dir / f"requirement-reviewer{evidence_suffix}"
-        requirement_grants = required_grants or ["review_input", "planning_input"]
-        if evidence_suffix == ".md":
-            promotion_path.write_text(
-                "approved_revision rev-1 approved_hash hash-1 status approved authority approved grants review_input planning_input\n",
-                encoding="utf-8",
-            )
-            reviewer_path.write_text("review_status pass reviewer_target_hash hash-1\n", encoding="utf-8")
-        else:
-            promotion_path.write_text(
-                json.dumps(
-                    _promotion_record(
-                        artifact_path="requirement.md",
-                        approved_revision="rev-1",
-                        approved_hash="hash-1",
-                        approved_grants=requirement_grants,
-                        reviewer_evidence_path=reviewer_path,
-                        minimal=minimal_promotion,
-                    )
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            reviewer_path.write_text(
-                json.dumps({"review_status": "pass", "reviewer_target_hash": "hash-1"}) + "\n",
-                encoding="utf-8",
-            )
-        entry = {
-            "promotion_record_path": str(promotion_path),
-            "reviewer_evidence_path": str(reviewer_path),
-            "approved_revision": "rev-1",
-            "approved_content_hash": "hash-1",
-            "reviewer_verdict": "pass",
-            "reviewer_target_hash": "hash-1",
-            "required_grants": requirement_grants,
-            "stale_check": "fresh",
-        }
-        if remove_key is not None:
-            entry.pop(remove_key)
-        source_revisions = {"requirement": "rev-1"}
-        input_authority = {"requirement": entry}
-        if include_design:
-            design_promotion_path = evidence_dir / "design-promotion.json"
-            design_reviewer_path = evidence_dir / "design-reviewer.json"
-            design_grants = design_required_grants or ["design_baseline"]
-            design_promotion_path.write_text(
-                json.dumps(
-                    _promotion_record(
-                        artifact_path="design.md",
-                        approved_revision="design-rev-1",
-                        approved_hash="design-hash-1",
-                        approved_grants=design_grants,
-                        reviewer_evidence_path=design_reviewer_path,
-                    )
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            design_reviewer_path.write_text(
-                json.dumps({"review_status": "pass", "reviewer_target_hash": "design-hash-1"}) + "\n",
-                encoding="utf-8",
-            )
-            source_revisions["design"] = "design-rev-1"
-            input_authority["design"] = {
-                "promotion_record_path": str(design_promotion_path),
-                "reviewer_evidence_path": str(design_reviewer_path),
-                "approved_revision": "design-rev-1",
-                "approved_content_hash": "design-hash-1",
-                "reviewer_verdict": "pass",
-                "reviewer_target_hash": "design-hash-1",
-                "required_grants": design_grants,
-                "stale_check": "fresh",
-            }
-        authority_file = evidence_dir / "input-authority.json"
-        authority_file.write_text(
-            json.dumps(
-                {
-                    "source_revisions": source_revisions,
-                    "input_authority": input_authority,
-                }
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        return authority_file
-
 
 def _issue_dir(target: Path) -> Path:
     return (
@@ -490,50 +836,55 @@ def _issue_dir(target: Path) -> Path:
     )
 
 
-def _stdout_path(stdout: str, key: str) -> Path:
-    return Path(_stdout_value(stdout, key))
+def _write_git_status_baseline(target: Path) -> Path:
+    baseline = _external_baseline_path()
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    baseline.write_text(result.stdout, encoding="utf-8")
+    return baseline
 
 
-def _stdout_value(stdout: str, key: str) -> str:
-    for line in stdout.splitlines():
-        prefix = f"{key}="
-        if line.startswith(prefix):
-            return line[len(prefix) :]
-    raise AssertionError(f"missing stdout path: {key}\n{stdout}")
+def _write_delegated_authoring_baseline(testcase: TestDelegatedAuthoringCli, target: Path) -> Path:
+    baseline = _external_baseline_path()
+    p = testcase._run_runtime_capture(
+        target,
+        [
+            "delegated-authoring",
+            "baseline-status",
+            "--output",
+            str(baseline),
+        ],
+    )
+    testcase.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+    return baseline
 
 
-def _promotion_record(
-    *,
-    artifact_path: str,
-    approved_revision: str,
-    approved_hash: str,
-    approved_grants: list[str],
-    reviewer_evidence_path: Path,
-    minimal: bool = False,
-) -> dict[str, object]:
-    if minimal:
-        return {
-            "promotion_record": {
-                "authority": "approved",
-                "approved_revision": approved_revision,
-                "approved_hash": approved_hash,
-            }
-        }
-    return {
-        "promotion_record": {
-            "status": "approved",
-            "authority": "approved",
-            "artifact_path": artifact_path,
-            "approved_revision": approved_revision,
-            "approved_hash": approved_hash,
-            "approved_grants": approved_grants,
-            "approver": "main-orchestrator",
-            "approved_at": "2026-05-24T00:00:00Z",
-            "reviewer_evidence_path": str(reviewer_evidence_path),
-            "final_reviewer": "spec-reviewer",
-            "ledger_blockers_remaining": 0,
-        }
-    }
+def _external_baseline_path() -> Path:
+    return Path(tempfile.mkdtemp(prefix="spec-dock-baseline-")) / "baseline-status.txt"
+
+
+def _draft_text(body: str) -> str:
+    return f"---\nadoption_status: unreviewed\n---\n{body}\n"
+
+
+def _commit_all(target: Path) -> None:
+    _run_git(target, ["add", "."])
+    _run_git(target, ["commit", "-m", "baseline"])
+
+
+def _run_git(target: Path, args: list[str]) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=Spec Dock Test", "-c", "user.email=spec-dock@example.test", *args],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
 
 
 if __name__ == "__main__":

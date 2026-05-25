@@ -54,13 +54,24 @@ For SpecDock usage and workflow details, start here:
 - Run `./spec-dock/scripts/spec-dock validate` after structural changes and before handoff.
 - Use `./spec-dock/scripts/spec-dock sync` only to regenerate CLI-managed views, pointers, or exported state. Do not use it as a general repair step.
 
-## Task Manifest / Permission Profile Gate
+## Scoped Discussion Draft Authoring
 
-Use write-scoped delegated authoring only when the active issue contract explicitly permits it and a task manifest has been recorded. The manifest must name the resolved target, input revision or hash, allowed paths, forbidden paths, positive probe command, negative probe command, cleanup, fallback, and the role-scoped `default_permissions` / `[permissions]` profile being tested.
+Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` are main orchestrator single-writer authority. System-architect and implementation-planner style sub-agents must not directly edit those canonical docs.
 
-Positive probe evidence must write only the allowed artifact or evidence path named in the manifest. Negative probe evidence must show that forbidden implementation, test, config, or secret paths are blocked. If the probe is unavailable, divergent between Desktop and CLI, unreproducible, or fail-open, disable write-scoped delegation and use the proposal-only fallback path.
+Sub-agent authoring outputs are not proposal-only. When the active issue contract permits delegated authoring, sub-agents may directly create or edit a scope-local flat Markdown draft, analysis, or discussion-local report under the target `discussions/` direct child.
 
-Do not mix role-scoped Permission Profiles with broad `sandbox_mode` / `sandbox_workspace_write` assumptions. Treat unresolved profile behavior as blocked until `report.md` records the probe result and fallback decision.
+Filenames follow the existing discussion rules:
+
+- `<ts>-<kind>-<slug>.md`
+- `<ts>-<nn>-<kind>-<slug>.md` for same-second collisions
+
+Do not create per-agent directories, run/task directories, global draft stores, or `discussions/delegated-authoring/` output for new delegated authoring runs.
+
+Sub-agent-created drafts use lightweight provenance: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, and an adoption ledger note. Do not require task manifest hash, Permission Profile hash, session invocation hash, or probe run id as standard delegated draft evidence.
+
+Static adapters for `system-architect` and `implementation-planner` are write-capable only for scope-local `discussions/` Markdown drafts. They must not grant broad workspace write access or canonical target write. Delegated authoring may create or update flat Markdown draft/analysis/report files directly under initiative, epic, or issue `discussions/`; the target `discussions/` directories should be clean at baseline time. Dirty or untracked target discussion entries make delegated output adoption-ineligible until post-run diff guard passes and `report.md` records the ledger entry.
+
+Historical `iss-00126` delegated-authoring manifest/Profile/probe/session artifacts are grandfathered evidence. Do not delete, rename, or treat them as validation failures solely because the current contract has changed.
 
 ## Source Boundaries
 - `spec-dock/active/*`: current task contract

@@ -63,27 +63,33 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 
 ## 委任 plan authoring ゲート（delegated plan authoring gate）
 
-Delegated plan authoring は任意の draft-only 支援であり、manual authoring path は常に有効です。Delegated draft は `authority: proposed` / `status: draft` であり、fresh `spec-reviewer` pass の代替ではありません。
+Delegated plan authoring は、対象 scope の `discussions/` 直下へ flat Markdown draft / analysis / discussion-local report を直接保存できる支援です。proposal-only ではありませんが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority であり、sub-agent は直接編集しません。Delegated draft は evidence であり、fresh `spec-reviewer` pass の代替ではありません。
 
 Delegated plan draft を使う場合、orchestrator は draft 生成前に次を確認します。
 
 - fresh requirement reviewer pass と fresh design reviewer pass があり、pass 対象 revision を特定できる
 - design dependency analysis、file/module change plan、verification strategy、rollback / compatibility が plan 入力として確認できる
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
-- read-only specialist consent と write-scoped delegated authoring consent は分離されている。read-only analysis と draft proposal の consent は `plan.md` write consent ではない
-- allowed actions は、通常は read-only analysis と draft proposal に限定される。write-scoped delegated plan authoring を使う場合だけ、検証済み task manifest、input authority、session invocation、role-scoped Permission Profile、positive probe、non-destructive negative probe、diff gate が許可した対象 `plan.md` を `authority: proposed` / `status: draft` として作成・更新できる
-- forbidden actions は `requirement.md` / `design.md` / `report.md` / previous phase artifact の書き換え、完了済み issue `plan.md` / `report.md` の修正、実装・テスト・設定変更、GitHub mutation、phase promotion、reviewer-pass claim、implementation-readiness claim、user への直接質問を含む
+- read-only specialist consent と scope-local discussion direct-write consent は分離されている
+- allowed actions は、対象 scope の `discussions/` direct child にある naming-rule compliant Markdown の新規作成、または orchestrator が明示指定した既存 proposed discussion draft の更新に限定される
+- filename は既存 discussion rules に従い、標準は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md` とする
+- forbidden actions は canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、implementation、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、GitHub mutation、phase promotion、reviewer-pass claim、implementation-readiness claim、user への直接質問を含む
+- forbidden locations は per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を含む
 - required plan draft output contract が、計画要約（Plan Summary）、要件 / 設計 traceability（Requirement / Design Traceability）、milestone（Milestones）、依存関係から導く実行順序（Dependency-Derived Execution Order）、Issue / step 分割（Issue / Step Slicing）、テスト戦略 mapping（Test Strategy Mapping）、review gate（Review Gates）、rollback / compatibility（Rollback / Compatibility）、docs impact（Docs Impact）、最終品質ゲート（Final Quality Gate）、plan blocker（Plan Blockers）、integration notes（Integration Notes）を含む
-- Permission Profile / host probe / source revision が未検証、fail-open、manual/unprofiled/static broad profile、Desktop/CLI divergent、または stale の場合は `plan.md` を編集せず、proposal-only / discussions path に戻る。Desktop は CLI-equivalent probes が verified になるまで proposal-only / manual fallback とする
+- static adapter は scope-local `discussions/` Markdown draft だけに write-capable とし、broad write や canonical target write を許可しない。run ごとの permission context 生成に依存せず、run は post-run diff guard pass と `report.md` ledger 記録まで adoption-ineligible とする
 
-Delegated plan draft を統合する場合、`report.md` に delegated draft evidence を残します。少なくとも role、phase、scope、consent、source artifacts、draft artifact path、status、integration result、rejected portions、blockers、reviewer result、promotion decision を記録します。
+Sub-agent-created draft は lightweight provenance として `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持ちます。標準 delegated draft evidence として task manifest hash、Permission Profile hash、session invocation hash、probe run id を要求しません。これらは historical evidence または明示された例外証跡としてだけ扱います。
+
+Delegated plan draft を統合する場合、main orchestrator が canonical `report.md` の Evidence Adoption Ledger に採否を残し、採用部分だけ canonical `plan.md` へ再記述します。Accepted ADR は architecture decision authority を持ち得ますが、discussion draft は evidence であり、implementation / phase authority は canonical docs への反映後に成立します。既存 `iss-00126` delegated-authoring manifest/Profile/probe/session artifacts は grandfathered historical evidence として残し、削除・rename・validation failure 化しません。
 
 Reviewer は delegated draft を含む plan を review するとき、次を fail / incomplete 条件として扱います。
 
 - delegated draft provenance が不明
+- draft が `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` を自己主張している
 - draft が stale / superseded / rejected / blocked のまま promotion evidence に使われている
 - approved requirement / design への traceability がない
 - delegated content が scope creep または parent non-scope の破り込みを含む
+- post-run diff guard が failed / not run のまま採用されている
 - phase gate bypass、reviewer gate bypass、または delegated draft を reviewer pass とみなす記述がある
 - delegated authoring unavailable / skipped のときに manual authoring path が閉じられている
 

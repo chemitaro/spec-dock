@@ -1,13 +1,7 @@
-import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib
 
 
 def _runtime_modules():
@@ -31,496 +25,327 @@ def _runtime_modules():
     return DelegatedAuthoringManifestRequest, generate_delegated_authoring_manifest, delegated_authoring
 
 
-class TestDelegatedAuthoringManifest(unittest.TestCase):
-    def test_valid_authority_generates_manifest_profile_probe_and_session_invocation(self) -> None:
+class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
+    def test_manifest_request_returns_deprecated_blocked_result_without_artifacts(self) -> None:
         request_cls, generate, _domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root)
+            authority_file = repo_root / "input-authority.json"
+            authority_file.write_text("{}\n", encoding="utf-8")
 
             result = generate(
                 request_cls(
                     role="system-architect",
-                    scope_id="iss-00126",
+                    scope_id="iss-00003",
                     target="design",
                     host_surface="cli",
                     input_authority_file=authority_file,
                     repo_root=repo_root,
                     specdock_dir=repo_root / "spec-dock",
                 )
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.status, "deprecated")
+            self.assertEqual(result.reason, "deprecated_scope_local_discussion_drafts")
+            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+
+    def test_diff_guard_allows_new_flat_discussion_markdown(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text(_draft_text("# draft"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
             self.assertTrue(result.ok, result.details)
-            self.assertEqual(result.status, "generated")
-            self.assertTrue(result.host_surface_acceptance_eligible)
-            self.assertFalse(result.acceptance_counted)
-            self.assertEqual(result.target_artifact_path, issue_dir / "design.md")
-            self.assertIsNotNone(result.paths)
-            paths = result.paths
-            assert paths is not None
-            self.assertTrue(paths.manifest_path.is_file())
-            self.assertTrue(paths.permission_profile_path.is_file())
-            self.assertTrue(paths.probe_plan_path.is_file())
-            self.assertTrue(paths.session_invocation_path.is_file())
-            manifest = paths.manifest_path.read_text(encoding="utf-8")
-            self.assertIn('role = "system-architect"', manifest)
-            self.assertIn('target = "design"', manifest)
-            self.assertIn("[diff_gate]", manifest)
-            manifest_data = tomllib.loads(manifest)
-            profile = paths.permission_profile_path.read_text(encoding="utf-8")
-            profile_data = tomllib.loads(profile)
-            profile_name = result.permission_profile_name
-            self.assertIsNotNone(profile_name)
-            assert profile_name is not None
-            target_rel = (issue_dir / "design.md").relative_to(repo_root).as_posix()
-            task_rel = paths.task_dir.relative_to(repo_root).as_posix()
-            sentinel_path = Path(manifest_data["negative_probe_sentinel"])
-            sentinel_rel = sentinel_path.relative_to(repo_root).as_posix()
-            sentinel_map = manifest_data["negative_probe_sentinels"]
-            expected_categories = {
-                "requirement.md",
-                "peer_artifact",
-                "report.md",
-                "src/",
-                "tests/",
-                ".codex/",
-                ".agents/",
-                ".env*",
-            }
-            self.assertEqual(set(sentinel_map), expected_categories)
-            self.assertFalse(
-                sentinel_path.is_relative_to(paths.task_dir),
-                "negative sentinel must be outside the allowed task_dir",
-            )
-            self.assertTrue(sentinel_rel.startswith("spec-dock/"))
-            self.assertEqual(Path(sentinel_map["requirement.md"]).parent, issue_dir / "discussions")
-            self.assertEqual(Path(sentinel_map["peer_artifact"]).parent, issue_dir / "discussions")
-            self.assertIn(".plan.md.", Path(sentinel_map["peer_artifact"]).name)
-            self.assertEqual(Path(sentinel_map["report.md"]).parent, issue_dir / "discussions")
-            self.assertEqual(Path(sentinel_map["src/"]).parent, repo_root / "src")
-            self.assertEqual(Path(sentinel_map["tests/"]).parent, repo_root / "tests")
-            self.assertEqual(Path(sentinel_map[".codex/"]).parent, repo_root / ".codex")
-            self.assertEqual(Path(sentinel_map[".agents/"]).parent, repo_root / ".agents")
-            self.assertEqual(Path(sentinel_map[".env*"]).parent, repo_root)
-            self.assertTrue(Path(sentinel_map[".env*"]).name.startswith(".env."))
-            self.assertEqual(profile_data["default_permissions"], profile_name)
-            profile_config = profile_data["permissions"][profile_name]
-            self.assertEqual(profile_config["filesystem"][":minimal"], "read")
-            workspace_rules = profile_config["filesystem"][":workspace_roots"]
-            self.assertEqual(workspace_rules["."], "read")
-            self.assertEqual(workspace_rules[target_rel], "write")
-            self.assertEqual(workspace_rules[task_rel], "write")
-            self.assertNotIn(sentinel_rel, workspace_rules)
-            for sentinel in sentinel_map.values():
-                self.assertNotIn(Path(sentinel).relative_to(repo_root).as_posix(), workspace_rules)
-            self.assertEqual(workspace_rules[".env"], "deny")
-            self.assertEqual(workspace_rules[".env.*"], "deny")
-            self.assertFalse(profile_config["network"]["enabled"])
-            self.assertIn(f'[permissions."{profile_name}".filesystem]', profile)
-            self.assertIn(f'[permissions."{profile_name}".filesystem.":workspace_roots"]', profile)
-            self.assertIn(f'[permissions."{profile_name}".network]', profile)
-            self.assertNotIn("[permissions]\n", profile)
-            self.assertNotIn('mode = "workspace-write"', profile)
-            self.assertNotIn("read = true", profile)
-            self.assertNotIn("write = [", profile)
-            self.assertNotIn("sandbox_mode", profile)
-            self.assertNotIn("[sandbox_workspace_write]", profile)
-            probe = paths.probe_plan_path.read_text(encoding="utf-8")
-            for category, sentinel in sentinel_map.items():
-                self.assertIn(f"category: `{category}`", probe)
-                self.assertIn(Path(sentinel).as_posix(), probe)
-                self.assertTrue(Path(sentinel).name.endswith(".spec-dock-permission-probe-denied"))
-            self.assertIn("real artifact/source/test/config/secret files must not be touched", probe)
-            real_protected_paths = {
-                issue_dir / "requirement.md",
-                issue_dir / "design.md",
-                issue_dir / "plan.md",
-                issue_dir / "report.md",
-                repo_root / ".env",
-            }
-            self.assertTrue(real_protected_paths.isdisjoint({Path(path) for path in sentinel_map.values()}))
-            session = paths.session_invocation_path.read_text(encoding="utf-8")
-            self.assertIn('executor = "codex-cli"', session)
-            self.assertIn(f'manifest_hash = "{result.manifest_hash}"', session)
-            self.assertIn(f'permission_profile_name = "{result.permission_profile_name}"', session)
-            self.assertIn(f'permission_profile_hash = "{result.permission_profile_hash}"', session)
-            self.assertIn(f'default_permissions = "{result.permission_profile_name}"', session)
-            self.assertIn("old_sandbox_settings_absent = true", session)
-            self.assertIn("host_surface_acceptance_eligible = true", session)
-            self.assertIn("acceptance_counted = false", session)
+            self.assertEqual(result.status, "pass")
 
-    def test_minimal_promotion_json_blocks_without_artifacts(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_rejects_new_discussion_without_frontmatter_editable_state(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, minimal_promotion=True)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text("# draft\n\nadoption_status: unreviewed\n", encoding="utf-8")
 
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
             self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("promotion_status_not_approved=requirement", result.details)
-            self.assertIn("promotion_missing_artifact_path=requirement", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+            self.assertIn("reason=new_discussion_missing_proposed_state", "\n".join(result.details))
 
-    def test_unstructured_markdown_evidence_blocks_without_artifacts(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_rejects_new_discussion_with_non_editable_state_claim(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, evidence_suffix=".md")
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text("---\nadoption_status: adopted\n---\n# draft\n", encoding="utf-8")
 
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
             )
 
             self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("unstructured_promotion_record_evidence=requirement", result.details)
-            self.assertIn("unstructured_reviewer_evidence_evidence=requirement", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+            self.assertIn("reason=new_discussion_claims_non_editable_state", "\n".join(result.details))
 
-    def test_missing_reviewer_evidence_path_blocks_without_artifacts(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_rejects_mixed_staged_and_unmerged_discussion_statuses(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, remove_key="reviewer_evidence_path")
+            discussions_dir = issue_dir / "discussions"
+            mixed_create = discussions_dir / "20260525t010203z-disc-mixed-create.md"
+            mixed_create.write_text("---\nadoption_status: unreviewed\n---\n# mixed create\n", encoding="utf-8")
+            mixed_update = discussions_dir / "20260525t010204z-disc-mixed-update.md"
+            mixed_update.write_text("---\nadoption_status: unreviewed\n---\n# mixed update\n", encoding="utf-8")
+            unmerged_add = discussions_dir / "20260525t010205z-disc-unmerged-add.md"
+            unmerged_add.write_text("---\nadoption_status: unreviewed\n---\n# unmerged add\n", encoding="utf-8")
 
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(
+                    domain.DiffGuardEntry(status="AM", path=mixed_create.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="MM", path=mixed_update.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="AA", path=unmerged_add.relative_to(repo_root)),
+                ),
+                allow_existing_discussions=(mixed_update.relative_to(repo_root),),
             )
 
             self.assertFalse(result.ok)
-            self.assertEqual(result.status, "blocked")
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("missing_requirement_reviewer_evidence_path", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+            joined = "\n".join(result.details)
+            self.assertEqual(joined.count("reason=mixed_staged_unstaged_discussion"), 2)
+            self.assertIn("reason=unmerged_status", joined)
 
-    def test_stale_or_mismatched_authority_blocks_without_profile(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_allows_allowlisted_existing_discussion_update(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, reviewer_target_hash="stale-hash")
+            discussion = issue_dir / "discussions" / "20260525t010203z-01-research-agent-draft.md"
+            discussion.write_text("---\nadoption_status: unreviewed\n---\n# draft\n", encoding="utf-8")
 
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertFalse(result.ok)
-            self.assertIn("reviewer_hash_mismatch=requirement", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
-
-    def test_promotion_reviewer_evidence_path_mismatch_blocks_without_artifacts(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, mismatched_promotion_reviewer_path=True)
-
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("promotion_reviewer_evidence_path_mismatch=requirement", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
-
-    def test_missing_required_grant_blocks_without_profile(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, required_grants=["review_input"])
-
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("missing_required_grant=requirement:planning_input", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
-
-    def test_invalid_required_grant_blocks_without_profile(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(
-                repo_root,
-                required_grants=["review_input", "planning_input", "admin"],
-            )
-
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("invalid_required_grant=requirement:admin", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
-
-    def test_implementation_planner_requires_design_baseline_input(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(
-                repo_root,
-                include_design=True,
-                design_required_grants=["review_input"],
-            )
-
-            result = generate(
-                request_cls(
-                    role="implementation-planner",
-                    scope_id="iss-00126",
-                    target="plan",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "input_authority_not_verified")
-            self.assertIn("missing_required_grant=design:design_baseline", result.details)
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
-
-    def test_implementation_planner_accepts_requirement_and_design_authority(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(
-                repo_root,
-                include_design=True,
-                design_required_grants=["design_baseline"],
-            )
-
-            result = generate(
-                request_cls(
-                    role="implementation-planner",
-                    scope_id="iss-00126",
-                    target="plan",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status=" M", path=discussion.relative_to(repo_root)),),
+                allow_existing_discussions=(discussion.relative_to(repo_root),),
             )
 
             self.assertTrue(result.ok, result.details)
-            self.assertEqual(result.target_artifact_path, issue_dir / "plan.md")
-            assert result.paths is not None
-            self.assertTrue(result.paths.manifest_path.is_file())
 
-    def test_authority_evidence_paths_resolve_relative_to_authority_file(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_rejects_allowlisted_existing_discussion_without_proposed_state(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root, relative_paths=True)
+            unstated = issue_dir / "discussions" / "20260525t010204z-disc-unstated-draft.md"
+            unstated.write_text("# missing state\n", encoding="utf-8")
+            non_editable_paths = []
+            for index, state in enumerate(
+                (
+                    "accepted",
+                    "adopted",
+                    "partially_adopted",
+                    "integrated",
+                    "partially_integrated",
+                    "rejected",
+                    "superseded",
+                    "blocked",
+                    "stale",
+                ),
+                start=1,
+            ):
+                discussion = issue_dir / "discussions" / f"20260525t0102{index:02d}z-disc-{state.replace('_', '-')}.md"
+                field = "adoption_status" if "adopted" in state else "status"
+                discussion.write_text(f"---\n{field}: {state}\n---\n# {state}\n", encoding="utf-8")
+                non_editable_paths.append(discussion)
 
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertTrue(result.ok, result.details)
-            self.assertEqual(result.target_artifact_path, issue_dir / "design.md")
-
-    def test_active_issue_fallback_requires_exact_meta_id(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            for meta_path in (repo_root / "spec-dock" / "initiatives").glob("**/.meta.json"):
-                meta_path.unlink()
-            active_dir = repo_root / "spec-dock" / "active"
-            active_dir.mkdir()
-            (active_dir / "issue").symlink_to(issue_dir, target_is_directory=True)
-            authority_file = _write_authority_file(repo_root)
-
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=tuple(
+                    domain.DiffGuardEntry(status=" M", path=path.relative_to(repo_root))
+                    for path in (*non_editable_paths, unstated)
+                ),
+                allow_existing_discussions=tuple(path.relative_to(repo_root) for path in (*non_editable_paths, unstated)),
             )
 
             self.assertFalse(result.ok)
-            self.assertEqual(result.reason, "scope_not_found")
-            self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
+            joined = "\n".join(result.details)
+            self.assertIn("reason=existing_discussion_not_proposed", joined)
+            self.assertEqual(joined.count("reason=existing_discussion_not_proposed"), len(non_editable_paths))
+            self.assertIn("reason=existing_discussion_missing_proposed_state", joined)
 
-            (issue_dir / ".meta.json").write_text(json.dumps({"id": "iss-00126"}) + "\n", encoding="utf-8")
-            accepted = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="cli",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
-            )
-
-            self.assertTrue(accepted.ok, accepted.details)
-
-    def test_desktop_host_surface_generates_fallback_not_acceptance_counted(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_rejects_allowlisted_update_when_editable_state_is_only_body_text(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
-            _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-01-research-agent-draft.md"
+            discussion.write_text("# body-only\n\nstatus: proposed\n", encoding="utf-8")
 
-            result = generate(
-                request_cls(
-                    role="system-architect",
-                    scope_id="iss-00126",
-                    target="design",
-                    host_surface="desktop",
-                    input_authority_file=authority_file,
-                    repo_root=repo_root,
-                    specdock_dir=repo_root / "spec-dock",
-                )
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status=" M", path=discussion.relative_to(repo_root)),),
+                allow_existing_discussions=(discussion.relative_to(repo_root),),
             )
 
-            self.assertTrue(result.ok, result.details)
-            self.assertFalse(result.host_surface_acceptance_eligible)
-            self.assertFalse(result.acceptance_counted)
-            assert result.paths is not None
-            session = result.paths.session_invocation_path.read_text(encoding="utf-8")
-            self.assertIn('executor = "desktop-fallback"', session)
-            self.assertIn("host_surface_acceptance_eligible = false", session)
-            self.assertIn("acceptance_counted = false", session)
+            self.assertFalse(result.ok)
+            self.assertIn("reason=existing_discussion_missing_proposed_state", "\n".join(result.details))
 
-    def test_cli_and_desktop_same_authority_use_distinct_task_dirs_without_overwrite(self) -> None:
-        request_cls, generate, _domain = _runtime_modules()
+    def test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
-            _make_issue_scope(repo_root)
-            authority_file = _write_authority_file(repo_root)
-            base_kwargs = {
-                "role": "system-architect",
-                "scope_id": "iss-00126",
-                "target": "design",
-                "input_authority_file": authority_file,
-                "repo_root": repo_root,
-                "specdock_dir": repo_root / "spec-dock",
-            }
+            issue_dir = _make_issue_scope(repo_root)
+            external_discussions = repo_root / "external-discussions"
+            external_discussions.mkdir()
+            discussions_dir = issue_dir / "discussions"
+            discussions_dir.rmdir()
+            discussions_dir.symlink_to(external_discussions, target_is_directory=True)
 
-            cli_result = generate(request_cls(host_surface="cli", **base_kwargs))
-            desktop_result = generate(request_cls(host_surface="desktop", **base_kwargs))
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(),
+            )
 
-            self.assertTrue(cli_result.ok, cli_result.details)
-            self.assertTrue(desktop_result.ok, desktop_result.details)
-            assert cli_result.paths is not None
-            assert desktop_result.paths is not None
-            self.assertNotEqual(cli_result.paths.task_dir, desktop_result.paths.task_dir)
-            self.assertIn("-cli-", cli_result.paths.task_dir.name)
-            self.assertIn("-desktop-", desktop_result.paths.task_dir.name)
-            self.assertNotEqual(cli_result.manifest_hash, desktop_result.manifest_hash)
-            self.assertNotEqual(cli_result.session_invocation_hash, desktop_result.session_invocation_hash)
+            self.assertFalse(result.ok)
+            self.assertIn("reason=discussions_dir_symlink", "\n".join(result.details))
 
-            cli_session = cli_result.paths.session_invocation_path.read_text(encoding="utf-8")
-            desktop_session = desktop_result.paths.session_invocation_path.read_text(encoding="utf-8")
-            self.assertIn('host_surface = "cli"', cli_session)
-            self.assertIn("host_surface_acceptance_eligible = true", cli_session)
-            self.assertIn("acceptance_counted = false", cli_session)
-            self.assertNotIn('host_surface = "desktop"', cli_session)
-            self.assertIn('host_surface = "desktop"', desktop_session)
-            self.assertIn("host_surface_acceptance_eligible = false", desktop_session)
-            self.assertIn("acceptance_counted = false", desktop_session)
+    def test_diff_guard_rejects_discussion_symlink_without_status_entries(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            symlink = issue_dir / "discussions" / "20260525t010203z-disc-link.md"
+            symlink.symlink_to(issue_dir / "design.md")
 
-            cli_manifest = cli_result.paths.manifest_path.read_text(encoding="utf-8")
-            desktop_manifest = desktop_result.paths.manifest_path.read_text(encoding="utf-8")
-            self.assertIn('host_surface = "cli"', cli_manifest)
-            self.assertIn("host_surface_acceptance_eligible = true", cli_manifest)
-            self.assertIn("acceptance_counted = false", cli_manifest)
-            self.assertIn('host_surface = "desktop"', desktop_manifest)
-            self.assertIn("host_surface_acceptance_eligible = false", desktop_manifest)
-            self.assertIn("acceptance_counted = false", desktop_manifest)
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(),
+            )
+
+            self.assertFalse(result.ok)
+            self.assertIn("reason=discussion_symlink", "\n".join(result.details))
 
 
-def _make_issue_scope(repo_root: Path) -> Path:
+    def test_diff_guard_rejects_forbidden_paths(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            forbidden_entries = (
+                domain.DiffGuardEntry(status=" M", path=(issue_dir / "design.md").relative_to(repo_root)),
+                domain.DiffGuardEntry(status=" M", path=Path("src/spec_dock/cli.py")),
+                domain.DiffGuardEntry(status=" M", path=Path("tests/test_runtime.py")),
+                domain.DiffGuardEntry(status="??", path=Path(".agents/agent.md")),
+                domain.DiffGuardEntry(status="??", path=Path(".codex/config.toml")),
+                domain.DiffGuardEntry(status="??", path=Path(".github/workflows/ci.yml")),
+                domain.DiffGuardEntry(status="??", path=Path(".env.local")),
+            )
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=forbidden_entries,
+            )
+
+            self.assertFalse(result.ok)
+            joined = "\n".join(result.details)
+            self.assertIn("reason=canonical_doc", joined)
+            self.assertIn("reason=forbidden_root", joined)
+            self.assertIn("reason=env_file", joined)
+
+    def test_diff_guard_rejects_malformed_discussion_diffs(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            other_issue_dir = _make_issue_scope(repo_root, scope_id="iss-00004", slug="other")
+            discussions_dir = issue_dir / "discussions"
+            nested = discussions_dir / "nested" / "20260525t010203z-disc-nested.md"
+            nested.parent.mkdir()
+            nested.write_text("# nested\n", encoding="utf-8")
+            symlink = discussions_dir / "20260525t010203z-disc-link.md"
+            symlink.symlink_to(issue_dir / "design.md")
+            dangling_symlink = discussions_dir / "20260525t010203z-disc-dangling-link.md"
+            dangling_symlink.symlink_to(issue_dir / "missing.md")
+            non_md = discussions_dir / "20260525t010203z-disc-agent-draft.txt"
+            non_md.write_text("text\n", encoding="utf-8")
+            bad_name = discussions_dir / "20260525t010203z-disc.md"
+            bad_name.write_text("# bad\n", encoding="utf-8")
+            retired_note_kind = discussions_dir / "20260525t010203z-note-retired-kind.md"
+            retired_note_kind.write_text("# retired note kind\n", encoding="utf-8")
+            unallowlisted = discussions_dir / "20260525t010204z-disc-existing-draft.md"
+            unallowlisted.write_text("# existing\n", encoding="utf-8")
+            other_discussion = other_issue_dir / "discussions" / "20260525t010205z-disc-other.md"
+            other_discussion.write_text("# other\n", encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(
+                    domain.DiffGuardEntry(status="??", path=nested.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=symlink.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=dangling_symlink.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=non_md.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=bad_name.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=retired_note_kind.relative_to(repo_root)),
+                    domain.DiffGuardEntry(
+                        status=" D",
+                        path=(discussions_dir / "20260525t010206z-disc-old.md").relative_to(repo_root),
+                    ),
+                    domain.DiffGuardEntry(
+                        status="R ",
+                        path=(discussions_dir / "20260525t010207z-disc-new.md").relative_to(repo_root),
+                        original_path=(discussions_dir / "20260525t010207z-disc-old.md").relative_to(repo_root),
+                    ),
+                    domain.DiffGuardEntry(status=" M", path=unallowlisted.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=other_discussion.relative_to(repo_root)),
+                ),
+            )
+
+            self.assertFalse(result.ok)
+            joined = "\n".join(result.details)
+            self.assertIn("reason=outside_target_discussions", joined)
+            self.assertIn("reason=symlink", joined)
+            self.assertIn("reason=non_markdown", joined)
+            self.assertIn("reason=discussion_name_noncompliant", joined)
+            self.assertIn("reason=delete", joined)
+            self.assertIn("reason=rename_or_copy", joined)
+            self.assertIn("reason=existing_discussion_not_allowlisted", joined)
+
+
+def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str = "delegated-authoring") -> Path:
     issue_dir = (
         repo_root
         / "spec-dock"
@@ -529,156 +354,18 @@ def _make_issue_scope(repo_root: Path) -> Path:
         / "epics"
         / "epic-00112-delegated-authoring"
         / "issues"
-        / "iss-00126-write-capable"
+        / f"{scope_id}-{slug}"
     )
     issue_dir.mkdir(parents=True)
-    (issue_dir / ".meta.json").write_text(json.dumps({"id": "iss-00126"}) + "\n", encoding="utf-8")
-    (issue_dir / "design.md").write_text("---\nstatus: draft\n---\n", encoding="utf-8")
-    (issue_dir / "plan.md").write_text("---\nstatus: draft\n---\n", encoding="utf-8")
+    (issue_dir / "discussions").mkdir()
+    (issue_dir / ".meta.json").write_text(f'{{"id": "{scope_id}"}}\n', encoding="utf-8")
+    for name in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (issue_dir / name).write_text("---\nstatus: draft\n---\n", encoding="utf-8")
     return issue_dir
 
 
-def _write_authority_file(
-    repo_root: Path,
-    *,
-    remove_key: str | None = None,
-    reviewer_target_hash: str = "hash-1",
-    required_grants: list[str] | None = None,
-    include_design: bool = False,
-    design_required_grants: list[str] | None = None,
-    minimal_promotion: bool = False,
-    evidence_suffix: str = ".json",
-    mismatched_promotion_reviewer_path: bool = False,
-    relative_paths: bool = False,
-) -> Path:
-    evidence_dir = repo_root / "evidence"
-    evidence_dir.mkdir()
-    promotion_path = evidence_dir / f"requirement-promotion{evidence_suffix}"
-    reviewer_path = evidence_dir / f"requirement-reviewer{evidence_suffix}"
-    requirement_grants = required_grants or ["review_input", "planning_input"]
-    if evidence_suffix == ".md":
-        promotion_path.write_text(
-            "approved_revision rev-1 approved_hash hash-1 status approved authority approved grants review_input planning_input\n",
-            encoding="utf-8",
-        )
-        reviewer_path.write_text("review_status pass reviewer_target_hash hash-1\n", encoding="utf-8")
-    else:
-        promotion_path.write_text(
-            json.dumps(
-                _promotion_record(
-                    artifact_path="requirement.md",
-                    approved_revision="rev-1",
-                    approved_hash="hash-1",
-                    approved_grants=requirement_grants,
-                    reviewer_evidence_path=(
-                        evidence_dir / "requirement-reviewer-other.json"
-                        if mismatched_promotion_reviewer_path
-                        else Path("requirement-reviewer.json")
-                        if relative_paths
-                        else reviewer_path
-                    ),
-                    minimal=minimal_promotion,
-                )
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        reviewer_path.write_text(
-            json.dumps({"review_status": "pass", "reviewer_target_hash": "hash-1"}) + "\n",
-            encoding="utf-8",
-        )
-    entry = {
-        "promotion_record_path": promotion_path.name if relative_paths else str(promotion_path),
-        "reviewer_evidence_path": reviewer_path.name if relative_paths else str(reviewer_path),
-        "approved_revision": "rev-1",
-        "approved_content_hash": "hash-1",
-        "reviewer_verdict": "pass",
-        "reviewer_target_hash": reviewer_target_hash,
-        "required_grants": requirement_grants,
-        "stale_check": "fresh",
-    }
-    if remove_key is not None:
-        entry.pop(remove_key)
-    source_revisions = {"requirement": "rev-1"}
-    input_authority = {"requirement": entry}
-    if include_design:
-        design_promotion_path = evidence_dir / "design-promotion.json"
-        design_reviewer_path = evidence_dir / "design-reviewer.json"
-        design_grants = design_required_grants or ["design_baseline"]
-        design_promotion_path.write_text(
-            json.dumps(
-                _promotion_record(
-                    artifact_path="design.md",
-                    approved_revision="design-rev-1",
-                    approved_hash="design-hash-1",
-                    approved_grants=design_grants,
-                    reviewer_evidence_path=design_reviewer_path,
-                )
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        design_reviewer_path.write_text(
-            json.dumps({"review_status": "pass", "reviewer_target_hash": "design-hash-1"}) + "\n",
-            encoding="utf-8",
-        )
-        source_revisions["design"] = "design-rev-1"
-        input_authority["design"] = {
-            "promotion_record_path": str(design_promotion_path),
-            "reviewer_evidence_path": str(design_reviewer_path),
-            "approved_revision": "design-rev-1",
-            "approved_content_hash": "design-hash-1",
-            "reviewer_verdict": "pass",
-            "reviewer_target_hash": "design-hash-1",
-            "required_grants": design_grants,
-            "stale_check": "fresh",
-        }
-    authority_path = evidence_dir / "authority.json"
-    authority_path.write_text(
-        json.dumps(
-            {
-                "source_revisions": source_revisions,
-                "input_authority": input_authority,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return authority_path
-
-
-def _promotion_record(
-    *,
-    artifact_path: str,
-    approved_revision: str,
-    approved_hash: str,
-    approved_grants: list[str],
-    reviewer_evidence_path: Path,
-    minimal: bool = False,
-) -> dict[str, object]:
-    if minimal:
-        return {
-            "promotion_record": {
-                "authority": "approved",
-                "approved_revision": approved_revision,
-                "approved_hash": approved_hash,
-            }
-        }
-    return {
-        "promotion_record": {
-            "status": "approved",
-            "authority": "approved",
-            "artifact_path": artifact_path,
-            "approved_revision": approved_revision,
-            "approved_hash": approved_hash,
-            "approved_grants": approved_grants,
-            "approver": "main-orchestrator",
-            "approved_at": "2026-05-24T00:00:00Z",
-            "reviewer_evidence_path": str(reviewer_evidence_path),
-            "final_reviewer": "spec-reviewer",
-            "ledger_blockers_remaining": 0,
-        }
-    }
+def _draft_text(body: str) -> str:
+    return f"---\nadoption_status: unreviewed\n---\n{body}\n"
 
 
 if __name__ == "__main__":

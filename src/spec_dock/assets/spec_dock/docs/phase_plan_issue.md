@@ -120,10 +120,10 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
 - AC / EC と step の対応が取れている
 - docs impact と最終品質ゲート（final quality gate）が計画に埋め込まれ、`doc-writer` による必要 docs 更新、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review が追跡できる
-- delegated plan draft を使う場合、draft provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
+- delegated plan draft を使う場合、lightweight provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
 - delegated draft を fresh `spec-reviewer` pass、step reviewer gate、final QA/code/spec gate の代替にしていない
-- read-only specialist consent と write-scoped delegated authoring consent が分離され、write-scoped delegated authoring は task manifest / input authority / session invocation / probe / diff gate / fallback / report evidence destination を step-local に固定している
-- implementation planner が write-scoped draft authoring を使う場合でも、権限は検証済み task manifest の対象 `plan.md` に限られ、`authority: proposed` / `status: draft` を超えた final authority、phase promotion、reviewer-pass claim、requirement/design rewrite、implementation-readiness claim、完了済み issue plan/report の修正を含まない
-- Permission Profile / host probe / source revision が未検証、fail-open、manual/unprofiled/static broad profile、Desktop-only fallback、または stale の場合、delegated plan authoring は proposal-only / discussions path に戻っている
+- read-only specialist consent と scope-local discussion direct-write consent が分離され、direct-write delegated authoring は target scope `discussions/` direct child、allowed filename rule、forbidden canonical/implementation paths、post-run diff guard、report evidence destination を step-local に固定している
+- implementation planner が direct-write draft authoring を使う場合でも、出力は scope-local flat discussion Markdown に限られ、canonical `plan.md` edit、final authority、phase promotion、reviewer-pass claim、requirement/design rewrite、implementation-readiness claim、完了済み issue plan/report の修正を含まない
+- static adapter は scope-local `discussions/*.md` write に限って delegated authoring を許可し、delegated plan authoring output は invocation scope、diff guard pass、report ledger adoption evidence が揃うまで adoption-ineligible として扱われている
 - delegated authoring unavailable / skipped の場合も manual authoring path が有効である
 - reviewer が「この plan で実装してよい」と判断できる

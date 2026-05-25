@@ -14,7 +14,7 @@
 
 - `new {initiative,epic,issue}`
 - `import {initiative,epic,issue}`
-- `new doc <type>`（current catalog: `scratch` / `interview` / `research` / `disc` / `adr`）
+- `new doc <type>`（current catalog: `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan`）
 
 補足:
 - `new doc <type>` は explicit basename / `doc_id` override（`--id` / `--seq` など）を提供しません。

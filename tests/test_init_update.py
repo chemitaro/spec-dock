@@ -385,6 +385,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP = {
+        "spec-dock/scripts/spec_dock_runtime/app.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/application/contracts.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
         ),
@@ -423,6 +426,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/scripts/spec_dock_runtime/commands/new.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/domain/delegated_authoring.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
@@ -1028,6 +1034,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00124-canonical-draft-authoring-role-rewrite/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1155,6 +1162,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00124",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -1553,50 +1561,33 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             self.assertIn(field, text, f"{source}: missing delegated evidence field {field}")
         for field in (
-            "source_revision",
-            "requirement_reviewer_pass_reference",
-            "design_reviewer_pass_reference",
-            "generated_at",
-            "stale_if",
+            "created_by_role",
+            "scope_id",
+            "source_paths",
+            "intended_targets",
+            "adoption_status: unreviewed",
+            "reflected_to: []",
+            "diff_guard_result",
+            "fallback decision",
+            "report evidence destination",
+            "Evidence Adoption Ledger fields",
         ):
-            self.assertIn(field, text, f"{source}: missing source_snapshot field {field}")
-        for field in (
-            "authority metadata",
-            "authority",
-            "owner_role",
-            "draft_author_role",
-            "approval",
-            "approved_revision",
-            "approved_hash",
+            self.assertIn(field, text, f"{source}: missing scope-local discussion evidence field {field}")
+        for retired_heavy_field in (
             "manifest_hash",
             "permission_profile_name",
             "permission_profile_hash",
             "write_session_invocation_hash",
             "probe_run_id",
+            "task manifest path/hash",
+            "input authority path/hash",
+            "session invocation path/hash",
         ):
-            self.assertIn(field, text, f"{source}: missing authority metadata field {field}")
-        for field in (
-            "task manifest",
-            "input authority",
-            "session invocation",
-            "positive probe",
-            "non-destructive negative probe",
-            "diff gate",
-            "fallback decision",
-            "report evidence destination",
-            "Evidence Adoption Ledger fields",
-        ):
-            self.assertIn(field, text, f"{source}: missing write-scoped delegated authoring field {field}")
-        for grant_key in (
-            "review_input",
-            "planning_input",
-            "design_baseline",
-            "implementation_start",
-            "issue_ready",
-            "issue_finish",
-            "phase_completion",
-        ):
-            self.assertIn(grant_key, text, f"{source}: missing explicit grant key {grant_key}")
+            self.assertNotIn(
+                retired_heavy_field,
+                text,
+                f"{source}: retired manifest-heavy field must not be standard delegated draft evidence {retired_heavy_field}",
+            )
         for retired_grant_key in (
             "can_write_requirement",
             "can_write_design",
@@ -1613,26 +1604,6 @@ class TestInitUpdate(CliRuntimeHarness):
                 text,
                 f"{source}: retired grant key must not appear in authority schema {retired_grant_key}",
             )
-        for fragment, alternatives in (
-            ("Promotion Record", ("Promotion Record",)),
-            ("promotion_record", ("promotion_record",)),
-            ("reviewer_target_hash", ("reviewer_target_hash",)),
-            ("mismatch", ("mismatch", "不一致")),
-            ("stale", ("stale",)),
-        ):
-            self.assertTrue(
-                any(alternative.casefold() in text.casefold() for alternative in alternatives),
-                f"{source}: missing promotion/grant contract fragment {fragment}",
-            )
-        lower_text = text.casefold()
-        self.assertTrue(
-            (
-                "wildcard grant semantics are not supported" in lower_text
-                or "wildcard grant semantics はありません" in lower_text
-                or "ワイルドカード grant semantics は非対応" in lower_text
-            ),
-            f"{source}: missing explicit wildcard grant denial",
-        )
         for invalid_wildcard in ("`*`", "`grants.*`", "`all`"):
             self.assertIn(invalid_wildcard, text, f"{source}: missing invalid wildcard token {invalid_wildcard}")
         for field, alternatives in (
@@ -2126,8 +2097,12 @@ class TestInitUpdate(CliRuntimeHarness):
         write_roots = {path for path, permission in workspace_rules.items() if permission == "write"}
         self.assertEqual(
             write_roots,
-            {".codex/permission-probe-evidence"},
-            f"delegated author adapter write roots must be probe-evidence only ({shim_label})",
+            {
+                "spec-dock/initiatives/*/discussions/*.md",
+                "spec-dock/initiatives/*/epics/*/discussions/*.md",
+                "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
+            },
+            f"delegated author adapter must grant only scope-local discussion write roots ({shim_label})",
         )
         for read_only_path in ("spec-dock/initiatives", "src", "tests", ".codex", ".agents"):
             self.assertEqual(
@@ -2149,16 +2124,14 @@ class TestInitUpdate(CliRuntimeHarness):
             "intentionally thin",
             "source of",
             f"delegated draft {draft_kind} evidence only",
-            "probe/fallback guardrail",
-            "Write-scoped draft authoring is allowed only when",
-            "verified task manifest",
-            "input authority evidence",
-            "task-specific",
-            "positive probe",
-            "non-destructive negative probe",
-            "session invocation",
-            "diff gate",
-            "exact target",
+            "write-capable delegated authoring path",
+            "must not grant broad workspace write",
+            "canonical target write",
+            "scope-local",
+            "flat Markdown draft/analysis/report",
+            "initiative, epic, or issue `discussions/`",
+            "static write rules cover all scope-local `discussions/`",
+            "post-run diff guard",
             "Never edit implementation files",
             "Do not promote phases",
             "claim reviewer",
@@ -2170,14 +2143,16 @@ class TestInitUpdate(CliRuntimeHarness):
             '":minimal" = "read"',
             '"." = "read"',
             '"spec-dock/initiatives" = "read"',
-            '".codex/permission-probe-evidence" = "write"',
+            '"spec-dock/initiatives/*/discussions/*.md" = "write"',
+            '"spec-dock/initiatives/*/epics/*/discussions/*.md" = "write"',
+            '"spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md" = "write"',
             '"src" = "read"',
             '"tests" = "read"',
             '".env" = "deny"',
             "network]",
             "enabled = false",
-            "fallback proposal evidence",
-            "fail-open probe evidence",
+            "lightweight",
+            "discussion draft provenance",
             "Manual spec authoring remains valid",
             "fresh `spec-reviewer` pass remains required",
         ):
@@ -2951,9 +2926,9 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("具体テストケース一覧", workflow_spec_authoring)
             for fragment in (
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
-                "Delegated authoring は `authority: proposed` / `status: draft` の draft-only evidence",
-                "invocation ごとに `node + phase + role + artifact`",
-                "workflow-wide blanket consent は draft-only authoring delegation の根拠にしない",
+                "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report",
+                "Sub-agent-created draft は最低限",
+                "workflow-wide blanket consent は direct-write authoring delegation の根拠にしない",
                 "previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result",
                 "manual authoring path は有効",
                 "Delegated draft は fresh `spec-reviewer` pass の代替ではない",
@@ -3112,6 +3087,8 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertTrue((discussions_templates_dir / "research.md").is_file())
             self.assertTrue((discussions_templates_dir / "interview.md").is_file())
             self.assertTrue((discussions_templates_dir / "scratch.md").is_file())
+            for draft_template in ("draft-requirement.md", "draft-design.md", "draft-plan.md"):
+                self.assertFalse((discussions_templates_dir / draft_template).exists())
             self.assertFalse((discussions_templates_dir / "note.md").exists())
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
             for label in _INTERVIEW_REQUIRED_LABELS:
@@ -4460,7 +4437,11 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("fresh requirement reviewer pass", phase_design)
         self.assertIn("delegated draft provenance", phase_design)
         self.assertIn("stale / superseded / rejected / blocked", phase_design)
-        self.assertIn("`authority: proposed` / `status: draft`", phase_design)
+        self.assertIn("proposal-only ではありません", phase_design)
+        self.assertIn("adoption_status: unreviewed", phase_design)
+        self.assertIn("diff_guard_result", phase_design)
+        self.assertIn("task manifest hash", phase_design)
+        self.assertIn("authority: accepted", phase_design)
         self.assertIn("fresh `spec-reviewer` pass の代替ではありません", phase_design)
         self.assertIn("## 課題依存と file-change planning（Issue dependency and file-change planning）", phase_design)
         self.assertIn("Module Dependency Diagram", phase_design)
@@ -4520,7 +4501,10 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("三者最終品質ゲート（final quality gate）", phase_plan_issue)
         self.assertIn("delegated plan draft", phase_plan_issue)
         self.assertIn("phase gate preservation", phase_plan_issue)
-        self.assertIn("authority: proposed", phase_plan_issue)
+        self.assertIn("scope-local discussion direct-write consent", phase_plan_issue)
+        self.assertIn("forbidden canonical/implementation paths", phase_plan_issue)
+        self.assertIn("post-run diff guard", phase_plan_issue)
+        self.assertIn("adoption-ineligible", phase_plan_issue)
         self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_issue)
         self.assertIn("manual authoring path が有効", phase_plan_issue)
 
@@ -4532,15 +4516,21 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("Plan Summary", phase_plan)
         self.assertIn("plan blocker", phase_plan)
         self.assertIn("phase gate bypass", phase_plan)
-        self.assertIn("authority: proposed", phase_plan)
-        self.assertIn("Permission Profile / host probe / source revision が未検証", phase_plan)
+        self.assertIn("proposal-only ではありません", phase_plan)
+        self.assertIn("adoption_status: unreviewed", phase_plan)
+        self.assertIn("diff_guard_result", phase_plan)
+        self.assertIn("task manifest hash", phase_plan)
+        self.assertIn("post-run diff guard が failed / not run", phase_plan)
 
         phase_plan_epic = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md"
         ).read_text(encoding="utf-8")
         self.assertIn("delegated plan draft", phase_plan_epic)
         self.assertIn("fresh requirement/design reviewer pass", phase_plan_epic)
-        self.assertIn("authority: proposed", phase_plan_epic)
+        self.assertIn("scope-local discussion direct-write consent", phase_plan_epic)
+        self.assertIn("forbidden canonical/implementation paths", phase_plan_epic)
+        self.assertIn("post-run diff guard", phase_plan_epic)
+        self.assertIn("adoption-ineligible", phase_plan_epic)
         self.assertIn("完了済み issue plan/report の修正を含まない", phase_plan_epic)
         self.assertIn("manual authoring path が有効", phase_plan_epic)
 
@@ -9625,6 +9615,61 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         f"dogfooding Codex adapter drifted from provider asset: {expected['path']}",
                     )
 
+    def test_s04_codex_agent_permission_taxonomy_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        read_only_specialists = (
+            "researcher",
+            "consultant",
+            "deep-consultant",
+            "repo-analyst",
+            "code-reviewer",
+            "qa-reviewer",
+            "spec-reviewer",
+            "pr-monitor",
+            "spark-worker",
+        )
+        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker", "worker")
+        scoped_delegated_authors = ("system-architect", "implementation-planner")
+
+        with cli._assets_dir() as assets_dir:
+            agents_dir = assets_dir / "install_root" / ".codex" / "agents"
+            for agent_name in read_only_specialists:
+                with self.subTest(agent=agent_name, taxonomy="read-only-specialist"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertEqual(parsed.get("sandbox_mode"), "read-only")
+                    self.assertNotEqual(parsed.get("sandbox_mode"), "workspace-write")
+                    self.assertNotIn("default_permissions", parsed)
+
+            for agent_name in workspace_write_workers:
+                with self.subTest(agent=agent_name, taxonomy="workspace-write-worker"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
+
+            for agent_name in scoped_delegated_authors:
+                with self.subTest(agent=agent_name, taxonomy="scoped-delegated-author"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertNotIn("sandbox_mode", parsed)
+                    default_permissions = parsed.get("default_permissions")
+                    self.assertIsInstance(default_permissions, str)
+                    workspace_rules = parsed["permissions"][default_permissions]["filesystem"][":workspace_roots"]
+                    self.assertEqual(
+                        {path for path, permission in workspace_rules.items() if permission == "write"},
+                        {
+                            "spec-dock/initiatives/*/discussions/*.md",
+                            "spec-dock/initiatives/*/epics/*/discussions/*.md",
+                            "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
+                        },
+                    )
+                    self.assertIn("write-capable delegated authoring path", text)
+                    self.assertIn("static write rules cover all scope-local `discussions/`", text)
+                    self.assertNotIn("spec-dock/initiatives = \"write\"", text)
+                    self.assertNotIn('".codex" = "write"', text)
+                    self.assertNotIn('".agents" = "write"', text)
+
     def test_issue_102_agentic_tdd_contract_assets(self) -> None:
         import spec_dock.cli as cli
 
@@ -9884,10 +9929,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "needs orchestrator decision",
                 "No material implementation decisions beyond the approved plan.",
                 "durable decision",
-                "manifest/probe/diff/authority/session invocation field requirements",
-                "input authority path/hash",
-                "non-destructive negative probe",
-                "selected `default_permissions`",
+                "scope-local discussion direct-write step",
+                "diff guard result",
+                "lightweight provenance",
+                "最低 fields は `created_by_role`",
                 "Evidence Adoption Ledger",
             ),
             "execute issue prompt": (
@@ -9985,23 +10030,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "phase design docs": (
                 "## 委任 design authoring ゲート（delegated design authoring gate）",
                 "fresh requirement reviewer pass",
-                "invocation contract",
-                "read-only specialist consent と write-scoped delegated authoring consent は分離",
-                "read-only analysis と draft proposal",
-                "input authority",
-                "session invocation",
-                "non-destructive negative probe",
-                "diff gate",
-                "authority: proposed",
-                "status: draft",
-                "対象 `design.md` draft 更新以外の requirement/design/plan/report 正本編集",
-                "実装・テスト・設定変更",
+                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "proposal-only ではありません",
+                "scope-local",
+                "discussions/` 直下",
+                "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "main orchestrator",
+                "single-writer authority",
+                "diff guard",
+                "lightweight provenance",
+                "created_by_role",
+                "diff_guard_result",
+                "task manifest hash",
+                "標準 delegated draft evidence として",
+                "要求しません",
+                "Accepted ADR",
+                "historical evidence",
+                "implementation",
                 "GitHub mutation",
                 "phase promotion",
                 "reviewer-pass claim",
                 "user への直接質問",
-                "required design draft output contract",
-                "Desktop は CLI-equivalent probes が verified になるまで proposal-only / manual fallback",
                 "Requirement Clarification Requests",
                 "delegated draft provenance",
                 "stale / superseded / rejected / blocked",
@@ -10014,23 +10063,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "fresh requirement reviewer pass",
                 "fresh design reviewer pass",
                 "design dependency analysis",
-                "read-only specialist consent と write-scoped delegated authoring consent は分離",
-                "read-only analysis と draft proposal",
-                "input authority",
-                "session invocation",
-                "non-destructive negative probe",
-                "diff gate",
-                "authority: proposed",
-                "status: draft",
-                "Permission Profile / host probe / source revision が未検証",
-                "完了済み issue `plan.md` / `report.md` の修正",
-                "実装・テスト・設定変更",
+                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "proposal-only ではありません",
+                "scope-local",
+                "discussions/` 直下",
+                "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "main orchestrator",
+                "single-writer authority",
+                "diff guard",
+                "lightweight provenance",
+                "created_by_role",
+                "diff_guard_result",
+                "task manifest hash",
+                "標準 delegated draft evidence として",
+                "要求しません",
+                "Accepted ADR",
+                "historical evidence",
+                "implementation",
                 "GitHub mutation",
                 "phase promotion",
                 "reviewer-pass claim",
                 "user への直接質問",
-                "required plan draft output contract",
-                "Desktop は CLI-equivalent probes が verified になるまで proposal-only / manual fallback",
                 "plan blocker",
                 "delegated draft provenance",
                 "approved requirement / design への traceability",
@@ -10040,24 +10093,24 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "phase epic plan docs": (
                 "delegated plan draft",
-                "read-only specialist consent と write-scoped delegated authoring consent が分離",
-                "task manifest / input authority / session invocation / probe / diff gate / fallback / report evidence destination",
+                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "target scope `discussions/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
-                "authority: proposed",
+                "final authority",
                 "完了済み issue plan/report の修正を含まない",
                 "delegated draft を fresh `spec-reviewer` pass の代替にしていない",
                 "manual authoring path",
             ),
             "phase issue plan docs": (
                 "delegated plan draft",
-                "read-only specialist consent と write-scoped delegated authoring consent が分離",
-                "task manifest / input authority / session invocation / probe / diff gate / fallback / report evidence destination",
+                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "target scope `discussions/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
                 "step reviewer gate",
                 "final QA/code/spec gate",
-                "authority: proposed",
+                "final authority",
                 "完了済み issue plan/report の修正を含まない",
                 "manual authoring path",
             ),
@@ -10081,6 +10134,50 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for fragment in fragments:
                 with self.subTest(asset=label, fragment=fragment):
                     self.assertIn(fragment, text)
+
+    def test_issue_127_removed_scoped_context_contract_stays_removed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        forbidden_terms = (
+            "scoped" + "-context",
+            "--discussion" + "-file",
+            "DelegatedAuthoring" + "ScopedContext",
+            "generate_delegated_authoring_" + "scoped_context",
+            "delegated_authoring_" + "scoped_context",
+            "runtime scoped " + "context required",
+            "one exact direct child Markdown file",
+            "exact" + "-file context",
+        )
+        searched_paths = (
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "spec_dock_runtime",
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "docs",
+            repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".agents",
+            repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex",
+            repo_root / "tests" / "cli_runtime",
+            repo_root / "tests" / "domain_runtime",
+            repo_root / "spec-dock" / "scripts" / "spec_dock_runtime",
+            repo_root / "spec-dock" / "docs",
+            repo_root / ".agents",
+            repo_root / ".codex",
+        )
+
+        offenders: list[str] = []
+        for root in searched_paths:
+            for path in sorted(root.rglob("*")):
+                if not path.is_file():
+                    continue
+                if path.suffix not in {".md", ".py", ".toml", ".json", ".yaml", ".yml"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for term in forbidden_terms:
+                    if (
+                        path.name == "test_delegated_authoring.py"
+                        and term == "scoped" + "-context"
+                    ):
+                        continue
+                    if term in text:
+                        offenders.append(f"{path.relative_to(repo_root)}: {term}")
+
+        self.assertEqual([], offenders)
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli
@@ -10118,11 +10215,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-system-architect`: bounded draft `design.md` authoring with `authority: proposed` when a verified task manifest and role-scoped Permission Profile allow it; otherwise proposal-only architecture evidence.",
+            "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-implementation-planner`: bounded draft `plan.md` authoring with `authority: proposed` when a verified task manifest and role-scoped Permission Profile allow it; otherwise proposal-only planning evidence.",
+            "`spec-dock-implementation-planner`: delegated planning analysis and draft plan evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
             hub_text,
         )
         self.assertIn(
@@ -10178,13 +10275,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Integration Notes for Main Orchestrator",
             "return a blocker to the main orchestrator",
             "Do not ask the user directly",
-            "create or update the target `design.md` only when",
-            "verified role-scoped Permission Profile evidence",
-            "authority: proposed",
-            "status: draft",
-            "grants: review_input,planning_input",
-            "downstream grants such as `implementation_start`, `issue_ready`, `issue_finish`, and `phase_completion` are allowed only after main promotion writes approved metadata",
-            "previous phase artifacts edited: `none`",
+            "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
+            "same-second collision",
+            "lightweight provenance",
+            "created_by_role: spec-dock-system-architect",
+            "adoption_status: unreviewed",
+            "reflected_to: []",
+            "diff_guard_result",
+            "Do not include standard requirements for task manifest hash",
+            "No canonical edit, final authority, promotion, reviewer-pass, or user-dialogue ownership is claimed.",
+            "canonical artifacts edited: `none`",
             "close, update, or mutate GitHub issues",
             "run destructive commands",
             "promote phases or mark work complete",
@@ -10220,13 +10320,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "issue lifecycle, execution, validation, reviewer, and completion policy",
             "return `Plan Blocked`",
             "Do not ask the user directly",
-            "create or update the target `plan.md` only when",
-            "verified role-scoped Permission Profile evidence",
-            "authority: proposed",
-            "status: draft",
-            "grants: review_input,planning_input",
-            "downstream grants such as `implementation_start`, `issue_ready`, `issue_finish`, and `phase_completion` are allowed only after main promotion writes approved metadata",
-            "rewrite previous phase artifacts or completed issue `plan.md` / `report.md` artifacts",
+            "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
+            "same-second collision",
+            "lightweight provenance",
+            "created_by_role: spec-dock-implementation-planner",
+            "adoption_status: unreviewed",
+            "reflected_to: []",
+            "diff_guard_result",
+            "Do not include standard requirements for task manifest hash",
+            "No canonical edit, final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.",
+            "canonical artifacts edited: `none`",
             "close, update, or mutate GitHub issues",
             "run destructive commands",
             "promote phases or mark work complete",

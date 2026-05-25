@@ -74,7 +74,7 @@ Issue は実装の最小単位です。
 
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
-- `discussions/`: `new doc <type> --issue <issue-id> --title "..."` で、この issue の `discussions/` 配下に timestamp-prefixed original を作成する。current catalog は `scratch` / `interview` / `research` / `disc` / `adr`。標準形は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
+- `discussions/`: `new doc <type> --issue <issue-id> --title "..."` で、この issue の `discussions/` 配下に timestamp-prefixed original を作成する。current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `draft-requirement` / `draft-design` / `draft-plan`。標準形は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - discussion docs は思考、知識、未確定情報を外部化する作業面であり、それ自体を正本へ昇格させない。`scratch` / `interview` / `research` / `disc` の文脈をもとに、必要な `adr` を新規作成し、`requirement.md` / `design.md` / `plan.md` へ織り込む。
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
 - templates は完成形ではなく、書き始めるための最小 scaffold に留める。仕様書作成の説明や判断基準は docs / skills を参照する
@@ -92,9 +92,9 @@ Issue は実装の最小単位です。
 - consent がある場合、orchestrator は同一 issue / repo / session / named role の範囲で、`spec-reviewer`、`code-reviewer`、`qa-reviewer`、および必要な read-only specialist を phase ごとに再確認せず起動してよい。
 - consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation、browser/private external systems の利用を許可しない。これらが必要な場合は別途明示確認する。
 - consent がない、または host policy と衝突する場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
-- read-only specialist consent と write-scoped delegated authoring consent は分離する。read-only consent は調査、review、proposal evidence、worker note だけを許可し、canonical `design.md` / `plan.md` draft write の根拠にはならない。
-- write-scoped delegated authoring consent は task-local に記録する。最低限、target node、phase、role、artifact、task manifest path/hash、input authority evidence path/hash、session invocation path/hash、Permission Profile name/hash、positive probe、non-destructive negative probe、diff gate、fallback decision、report evidence destination を含める。
-- manual edit、unprofiled sub-agent edit、static broad profile edit、Desktop-only fallback は write-scoped delegated authoring acceptance に数えない。Desktop は CLI-equivalent probes と selected Permission Profile evidence が verified になるまで proposal-only / manual fallback として扱う。
+- read-only specialist consent と scope-local discussion direct-write consent は分離する。Sub-agent authoring output は proposal-only に限定しないが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority である。
+- scope-local discussion direct-write consent は task-local に記録する。最低限、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を含める。
+- manual/unprofiled broad write、static broad profile edit、Desktop-only fallback は adoption-ready delegated output に数えない。System architect / implementation planner の static adapters は scope-local `discussions/` Markdown draft だけに write-capable であり、broad write や canonical target write を許可しない。diff guard pass と report ledger entry まで adoption-ineligible とする。
 
 ## 報告判断台帳ライフサイクル（report decision ledger lifecycle）
 - `report.md` は observed evidence ledger に加えて仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）を持つ。ここには実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up だけを記録し、shell transcript、worker raw note、private reasoning、secret、逐次作業ログは置かない。
@@ -111,6 +111,9 @@ Issue は実装の最小単位です。
 - 実装前に `workflow_spec_authoring.md` の requirement / design / plan gate がすべて pass し、`Spec Authoring Gate` evidence が `report.md` に残っていることを確認する
 - `plan.md` は planned executable workflow contract / command queue である。実行者は step を上から順に読み、各 step の behavior goal、planned obligation、Red または代替 evidence、Green verification、refactor guardrail、closure requirements、report evidence destination、amendment trigger に従って作業する
 - `report.md` は observed evidence ledger である。実際の Red / Green / Refactor 結果、verification result、discovered tests、closure delta、reviewer verdict、commit/no-op evidence は `report.md` に記録し、`plan.md` を実行結果の正本にしない
+- Sub-agent-created discussion draft は lightweight provenance として `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持つ。task manifest / profile / probe / session hash fields は標準 delegated draft evidence として要求しない。
+- Delegated authoring output filenames は既存 discussion rules に従う。標準は `<ts>-<kind>-<slug>.md`、same-second collisions は `<ts>-<nn>-<kind>-<slug>.md` とする。新規 delegated run は per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を作らない。
+- Historical `iss-00126` delegated-authoring manifest/Profile/probe/session artifacts は grandfathered evidence である。current standard が scope-local flat discussion drafts を使うことだけを理由に削除、rename、validation failure 化しない。
 - `report.md` の仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）は実行中判断の audit trail であり、planned contract の正本ではない。report に durable decision が残った場合は、completion 前に canonical artifact への promotion、follow-up 化、または issue-local disposition の evidence を残す
 - `Parent Agent Invariant`: normal execution における親 Codex は inspect / plan / delegate / verify / integrate / report を担当する orchestration owner であり、code / runtime / tests / scaffold behavior / templates / shipped docs / skills / workflow text の直接実装者ではない
 - 親 Codex が直接作成・更新してよいのは、`report.md`、handoff note、phase evidence など run-local orchestration metadata に限定する。shipped docs / templates / skills / workflow text、runtime-facing scaffold、コード、テスト、runtime behavior は delegated worker work として扱う
@@ -165,7 +168,7 @@ Issue は実装の最小単位です。
 ## 報告証跡（report）
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
-- write-scoped delegated authoring を使う場合は、task manifest、input authority、session invocation、positive probe、non-destructive negative probe、diff gate、fallback decision、candidate evidence、canonical Evidence Adoption Ledger disposition を `report.md` に記録する。candidate artifact を `discussions/delegated-authoring/<task-id>/...` に置く場合も、採否の正本は scope-local `report.md` の Evidence Adoption Ledger とする
+- scope-local discussion direct-write authoring を使う場合は、created discussion path、created_by_role、scope_id、source_paths、intended_targets、`adoption_status: unreviewed`、`reflected_to: []`、diff_guard_result、canonical Evidence Adoption Ledger disposition を `report.md` に記録する。採否の正本は scope-local `report.md` の Evidence Adoption Ledger とする
 - 仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）に material な仕様解釈、判断、逸脱、tradeoff、open question、promotion / follow-up を残す。material decision がない場合は `No material interpretation changes.` と `No decision entries.` を残す
 - ledger entry は `Status`、`Type`、`Options Considered`、`Disposition`、evidence、必要な follow-up / promotion を持つ。`Status=open` は completion blocker とし、`Disposition` に必要な evidence がない entry、report-only durable decision、根拠のない `no_action` / `deferred` / `superseded` は reviewer finding として扱う
 - step 契約クロージャ（`Step Contract Closure`）に step、closure id、close condition、evidence、result を残す
