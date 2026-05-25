@@ -61,6 +61,7 @@ PURPOSE_REQUIRED_GRANTS: dict[str, str] = {
     "context_pack_finish": GRANT_ISSUE_FINISH,
     "phase_completion": GRANT_PHASE_COMPLETION,
 }
+DELEGATED_AUTHORITY_METADATA_READ_ERROR = "_delegated_authority_metadata_read_error"
 
 
 @dataclass(frozen=True)
@@ -252,7 +253,10 @@ def validate_draft_artifact_metadata(
 def delegated_authority_metadata_from_markdown(path: Path) -> Mapping[str, object] | None:
     if not path.is_file():
         return None
-    lines = path.read_text(encoding="utf-8").splitlines()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError as error:
+        return {DELEGATED_AUTHORITY_METADATA_READ_ERROR: f"unicode_decode_error={error}"}
     metadata: Mapping[str, object] | None = None
     if lines and lines[0].strip() == "---":
         try:
@@ -272,6 +276,13 @@ def validate_delegated_authority_artifact(path: Path, *, purpose: str) -> Author
     metadata = delegated_authority_metadata_from_markdown(path)
     if metadata is None:
         return AuthorityGateResult(True, "ok", (f"purpose={purpose}", f"path={path.as_posix()}"))
+    read_error = metadata.get(DELEGATED_AUTHORITY_METADATA_READ_ERROR)
+    if isinstance(read_error, str):
+        return AuthorityGateResult(
+            False,
+            "delegated_authority_artifact_non_utf8",
+            (f"purpose={purpose}", f"path={path.as_posix()}", read_error),
+        )
     result = validate_draft_artifact_metadata(metadata, purpose=purpose)
     if result.ok:
         return result

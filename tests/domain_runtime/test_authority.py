@@ -539,6 +539,19 @@ class TestAuthorityGate(unittest.TestCase):
         self.assertEqual(result.reason, "incomplete_draft_metadata")
         self.assertIn("missing=status", result.details)
 
+    def test_non_utf8_delegated_markdown_artifact_is_structured_gate_failure(self) -> None:
+        authority = _authority_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "plan.md"
+            path.write_bytes(b"---\nauthority: approved\n---\n# invalid \xff\n")
+
+            result = authority.validate_delegated_authority_artifact(path, purpose="issue_finish")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "delegated_authority_artifact_non_utf8")
+        self.assertIn("purpose=issue_finish", result.details)
+        self.assertIn(f"path={path.as_posix()}", result.details)
+
     def _approved_artifact_metadata(self, authority):
         return {
             "status": "approved",

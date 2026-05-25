@@ -70,7 +70,8 @@ def run_delegated_authoring_diff_guard(
         )
     entries = current.entries
     if req.baseline_status is not None:
-        if _is_inside_repo(req.baseline_status, req.repo_root):
+        baseline_status_path = _abs_repo_path(req.baseline_status, req.repo_root)
+        if _is_inside_repo(baseline_status_path, req.repo_root):
             return domain.DiffGuardResult(
                 ok=False,
                 status="blocked",
@@ -78,7 +79,7 @@ def run_delegated_authoring_diff_guard(
                 scope_id=req.scope_id,
                 details=("baseline_status_must_be_outside_repo",),
             )
-        baseline = _read_status_file(req.baseline_status, repo_root=req.repo_root)
+        baseline = _read_status_file(baseline_status_path, repo_root=req.repo_root)
         if not baseline.ok:
             return domain.DiffGuardResult(
                 ok=False,
@@ -87,7 +88,7 @@ def run_delegated_authoring_diff_guard(
                 scope_id=req.scope_id,
                 details=baseline.errors,
             )
-        baseline_path = _repo_path(req.baseline_status, req.repo_root)
+        baseline_path = _repo_path(baseline_status_path, req.repo_root)
         baseline_errors = _dirty_discussion_baseline_errors(
             baseline.entries,
             repo_root=req.repo_root,
