@@ -739,11 +739,11 @@ ID: "iss-00127"
   - `python -m unittest` の impacted tests、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync`、`./spec-dock/scripts/spec-dock doctor`、`git diff --check` が pass または limitation が report に記録されている。
   - PR #119 / #128 または後続 PR の状態が、S05 の requirement/design/plan 修正と実装結果を反映している。
 
-## 追加実装ステップ S06: `draft-design` / `draft-plan` discussion doc creation
+## 追加実装ステップ S06: `draft-requirement` / `draft-design` / `draft-plan` discussion doc creation
 
 ### S06 目的
-- `spec-dock new doc` で `draft-design` / `draft-plan` を作成できるようにする。
-- 既存 canonical design / plan template を source としつつ、生成物は discussion-local evidence として `discussions/` に配置する。
+- `spec-dock new doc` で `draft-requirement` / `draft-design` / `draft-plan` を作成できるようにする。
+- 既存 canonical requirement / design / plan template を source としつつ、生成物は discussion-local evidence として `discussions/` に配置する。
 - `system-architect` / `implementation-planner` が structured draft artifact を作れる標準経路を提供する。
 
 ### S06 対象ファイル
@@ -756,6 +756,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
 `-- application/sync_state.py
 
 src/spec_dock/assets/spec_dock/templates/
+|-- discussions/draft-requirement.md
 |-- discussions/draft-design.md
 `-- discussions/draft-plan.md
 
@@ -776,26 +777,26 @@ tests/
 
 ### S06 作業順序
 1. Characterization / Red
-   - `new doc draft-design` / `new doc draft-plan` が現状 unknown type で失敗することを確認する。
-   - 現行 discussion filename validators が `draft-design` / `draft-plan` を許可していないことを確認する。
+   - `new doc draft-requirement` / `new doc draft-design` / `new doc draft-plan` が現状 unknown type で失敗することを確認する。
+   - 現行 discussion filename validators が `draft-requirement` / `draft-design` / `draft-plan` を許可していないことを確認する。
 2. Runtime type expansion
-   - `commands/new.py` の help / doc type list に `draft-design` / `draft-plan` を追加する。
+   - `commands/new.py` の help / doc type list に `draft-requirement` / `draft-design` / `draft-plan` を追加する。
    - `application/contracts.py` の `CreateDiscussionDocRequest.doc_type` を更新する。
    - `application/create_node.py` の creatable doc type list と filename regex を更新する。
 3. Draft rendering implementation
-   - `templates/discussions/draft-design.md` と `templates/discussions/draft-plan.md` を追加する。
+   - `templates/discussions/draft-requirement.md`、`templates/discussions/draft-design.md`、`templates/discussions/draft-plan.md` を追加する。
    - draft type の場合、scope kind に応じた canonical template source を選ぶ。
    - canonical template body は discussion-local envelope の下に差し込む。
    - canonical template frontmatter を draft の authoritative metadata として扱わない。
    - `<DRAFT_ID>`、`<DRAFT_TITLE>`、`<TEMPLATE_SOURCE>`、`<INTENDED_TARGET>`、scope / parent placeholders を render する。
 4. Validation / sync / diff-guard compatibility
-   - validation / sync / delegated-authoring diff-guard の discussion filename recognition を `draft-design` / `draft-plan` 対応にする。
-   - `draft-design` / `draft-plan` は discussion doc として扱い、canonical artifact として扱わない。
+   - validation / sync / delegated-authoring diff-guard の discussion filename recognition を `draft-requirement` / `draft-design` / `draft-plan` 対応にする。
+   - `draft-requirement` / `draft-design` / `draft-plan` は discussion doc として扱い、canonical artifact として扱わない。
 5. Docs and mirror
-   - `docs/rules/{initiative,epic,issue}/discussions.md` の catalog と create command examples に `draft-design` / `draft-plan` を追加する。
+   - `docs/rules/{initiative,epic,issue}/discussions.md` の catalog と create command examples に `draft-requirement` / `draft-design` / `draft-plan` を追加する。
    - provider asset と dogfooding mirror を同期する。
 6. Tests
-   - `new doc draft-design` / `draft-plan` の issue / epic / initiative 作成テストを追加する。
+   - `new doc draft-requirement` / `draft-design` / `draft-plan` の issue / epic / initiative 作成テストを追加する。
    - scope kind ごとの template source selection を固定する。
    - same-second suffix allocation が hyphenated kind で機能することを固定する。
    - `validate` / `sync` / `diff-guard` compatibility を固定する。
@@ -820,36 +821,39 @@ tests/
   - `disc` / `research` の variant として draft artifact を隠さない。
   - canonical docs direct-write success path を復活させない。
   - canonical template frontmatter を discussion-local draft の authoritative metadata として扱わない。
-  - `draft-requirement` を今回の必須実装として広げない。
 - acceptance criteria:
-  - `new doc draft-design` / `draft-plan` が initiative / epic / issue の `discussions/` に flat Markdown を作成できる。
+  - `new doc draft-requirement` / `draft-design` / `draft-plan` が initiative / epic / issue の `discussions/` に flat Markdown を作成できる。
   - generated draft は discussion-local envelope と delegated draft provenance を持つ。
-  - generated draft body は scope-specific canonical design / plan template source から作られる。
+  - generated draft body は scope-specific canonical requirement / design / plan template source から作られる。
   - `validate` / `sync` / `diff-guard` が新 doc type と整合する。
   - provider assets と dogfooding mirror が同期している。
 
 ### S06 具体テストケース一覧
-- `tc-s06-001` acceptance: issue draft design creation
+- `tc-s06-001` acceptance: initiative draft requirement creation
+  - 前提: initiative scope が存在する。
+  - 操作: `new doc draft-requirement --initiative <id> --title "<title>"`
+  - 期待結果: initiative `discussions/` に `<ts>-draft-requirement-<slug>.md` が作成され、`templates/initiative/requirement.md` derived body と discussion-local envelope を持つ。
+- `tc-s06-002` acceptance: issue draft design creation
   - 前提: issue scope が存在する。
   - 操作: `new doc draft-design --issue <id> --title "<title>"`
   - 期待結果: issue `discussions/` に `<ts>-draft-design-<slug>.md` が作成され、`templates/issue/design.md` derived body と discussion-local envelope を持つ。
-- `tc-s06-002` acceptance: epic draft plan creation
+- `tc-s06-003` acceptance: epic draft plan creation
   - 前提: epic scope が存在する。
   - 操作: `new doc draft-plan --epic <id> --title "<title>"`
   - 期待結果: epic `discussions/` に `<ts>-draft-plan-<slug>.md` が作成され、`templates/epic/plan.md` derived body と discussion-local envelope を持つ。
-- `tc-s06-003` matrix: scope-specific template selection
+- `tc-s06-004` matrix: scope-specific template selection
   - 前提: initiative / epic / issue scopes が存在する。
-  - 操作: 各 scope で `draft-design` / `draft-plan` を作成する。
+  - 操作: 各 scope で `draft-requirement` / `draft-design` / `draft-plan` を作成する。
   - 期待結果: scope kind ごとに対応する canonical template source が使われる。
-- `tc-s06-004` regression: hyphenated discussion kind naming
+- `tc-s06-005` regression: hyphenated discussion kind naming
   - 前提: same-second collision が起きる。
-  - 操作: 同一 timestamp family で `draft-design` / `draft-plan` を作成する。
-  - 期待結果: `<ts>-<nn>-draft-design-<slug>.md` / `<ts>-<nn>-draft-plan-<slug>.md` が割り当てられ、validate / sync が通る。
-- `tc-s06-005` integration: diff guard accepts draft artifact docs
-  - 前提: sub-agent output として `draft-design` / `draft-plan` が作成される。
+  - 操作: 同一 timestamp family で `draft-requirement` / `draft-design` / `draft-plan` を作成する。
+  - 期待結果: `<ts>-<nn>-draft-requirement-<slug>.md` / `<ts>-<nn>-draft-design-<slug>.md` / `<ts>-<nn>-draft-plan-<slug>.md` が割り当てられ、validate / sync が通る。
+- `tc-s06-006` integration: diff guard accepts draft artifact docs
+  - 前提: sub-agent output として `draft-requirement` / `draft-design` / `draft-plan` が作成される。
   - 操作: `delegated-authoring diff-guard` を実行する。
   - 期待結果: valid draft create/update は allowed discussion output になり、canonical docs / forbidden paths は従来通り rejected / ineligible。
-- `tc-s06-006` negative: canonical template metadata is not draft authority
+- `tc-s06-007` negative: canonical template metadata is not draft authority
   - 前提: generated draft を確認する。
   - 操作: frontmatter と body を inspect する。
   - 期待結果: top-level frontmatter は discussion-local draft envelope であり、canonical `状態: approved` / `authority: accepted` / adopted self-claim を持たない。
@@ -871,5 +875,5 @@ tests/
 - report evidence:
   - Decision Ledger: command surface / envelope / template source decisions.
   - Evidence Adoption Ledger: analysis report adoption.
-  - Step Contract Closure: `tc-s06-001` through `tc-s06-006`.
+  - Step Contract Closure: `tc-s06-001` through `tc-s06-007`.
   - Test Contract Closure: test commands and results.

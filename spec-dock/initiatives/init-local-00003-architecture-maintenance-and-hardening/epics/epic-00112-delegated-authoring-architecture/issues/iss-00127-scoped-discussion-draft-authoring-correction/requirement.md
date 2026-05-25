@@ -45,7 +45,7 @@ derived_from:
   - sub-agent が canonical `requirement.md` / `design.md` / `plan.md` / `report.md` を直接編集できる成功パスを残すこと。
   - `sub-agent proposal-only` を標準方針にすること。
   - 独立 JSON/TOML manifest、input authority、session invocation、`acceptance_counted`、authority graph を user-facing acceptance contract として必須にすること。
-  - 初回対応で `draft-requirement` / `draft-design` / `draft-plan` kind を追加すること。
+  - S06 の契約外で ad hoc に `draft-requirement` / `draft-design` / `draft-plan` kind を追加すること。
   - 既存 `iss-00126` の historical evidence を削除・rename・validate failure 化すること。
 - 対象外:
   - GitHub Copilot / `.github/agents` support の追加。
@@ -225,13 +225,18 @@ derived_from:
 
 ### 背景
 - S05 により、`system-architect` / `implementation-planner` は canonical docs ではなく scope-local `discussions/` に draft / analysis / discussion-local report を作成できる権限境界になった。
-- しかし現行 `spec-dock new doc` で作成できる discussion doc type は `adr` / `disc` / `research` / `interview` / `scratch` のみであり、canonical `design.md` / `plan.md` の scope-specific template を discussion-local draft として作成する正規コマンドがない。
-- `disc` や `research` へ自由記述するだけでは、initiative / epic / issue ごとに異なる design / plan template の構造を再利用できず、delegated authoring の draft artifact としての品質と機械的識別性が不足する。
+- しかし現行 `spec-dock new doc` で作成できる discussion doc type は `adr` / `disc` / `research` / `interview` / `scratch` のみであり、canonical `requirement.md` / `design.md` / `plan.md` の scope-specific template を discussion-local draft として作成する正規コマンドがない。
+- `disc` や `research` へ自由記述するだけでは、initiative / epic / issue ごとに異なる requirement / design / plan template の構造を再利用できず、delegated authoring の draft artifact としての品質と機械的識別性が不足する。
 
 ### 追加スコープ
 - `spec-dock new doc` に、discussion-local artifact draft を作成する doc type を追加する。
+  - 必須: `draft-requirement`
   - 必須: `draft-design`
   - 必須: `draft-plan`
+- `draft-requirement` は対象 scope kind に応じて既存 canonical requirement template を source として使う。
+  - initiative -> `templates/initiative/requirement.md`
+  - epic -> `templates/epic/requirement.md`
+  - issue -> `templates/issue/requirement.md`
 - `draft-design` は対象 scope kind に応じて既存 canonical design template を source として使う。
   - initiative -> `templates/initiative/design.md`
   - epic -> `templates/epic/design.md`
@@ -241,10 +246,10 @@ derived_from:
   - epic -> `templates/epic/plan.md`
   - issue -> `templates/issue/plan.md`
 - 生成先は既存 discussion rule と同じ flat layout とする。
+  - `discussions/<ts>-draft-requirement-<slug>.md`
   - `discussions/<ts>-draft-design-<slug>.md`
   - `discussions/<ts>-draft-plan-<slug>.md`
-  - same-second collision は既存通り `discussions/<ts>-<nn>-draft-design-<slug>.md` / `discussions/<ts>-<nn>-draft-plan-<slug>.md`
-- `draft-requirement` は同型で追加可能な設計余地を残すが、今回の必須実装対象には含めない。
+  - same-second collision は既存通り `discussions/<ts>-<nn>-draft-requirement-<slug>.md` / `discussions/<ts>-<nn>-draft-design-<slug>.md` / `discussions/<ts>-<nn>-draft-plan-<slug>.md`
 
 ### 追加非スコープ
 - canonical `requirement.md` / `design.md` / `plan.md` の直接作成・直接編集権限を sub-agent に与えない。
@@ -254,37 +259,47 @@ derived_from:
 - canonical template frontmatter をそのまま discussion-local draft の authoritative metadata として扱わない。
 
 ### 追加受け入れ条件
-- AC-012: draft-design creation
+- AC-012: draft-requirement creation
+  - アクター: CLI user / delegated authoring role
+  - 前提: initiative / epic / issue のいずれかの scope が存在する。
+  - 操作: `./spec-dock/scripts/spec-dock new doc draft-requirement --<scope-kind> <id> --title "<title>"` を実行する。
+  - 期待結果: 対象 scope の `discussions/` 直下に naming-rule compliant な `draft-requirement` Markdown が作成され、対象 scope kind に対応する canonical requirement template source が draft body として使われる。
+  - 観測点: created path、rendered content、tests。
+- AC-013: draft-design creation
   - アクター: CLI user / delegated authoring role
   - 前提: initiative / epic / issue のいずれかの scope が存在する。
   - 操作: `./spec-dock/scripts/spec-dock new doc draft-design --<scope-kind> <id> --title "<title>"` を実行する。
   - 期待結果: 対象 scope の `discussions/` 直下に naming-rule compliant な `draft-design` Markdown が作成され、対象 scope kind に対応する canonical design template source が draft body として使われる。
   - 観測点: created path、rendered content、tests。
-- AC-013: draft-plan creation
+- AC-014: draft-plan creation
   - アクター: CLI user / delegated authoring role
   - 前提: initiative / epic / issue のいずれかの scope が存在する。
   - 操作: `./spec-dock/scripts/spec-dock new doc draft-plan --<scope-kind> <id> --title "<title>"` を実行する。
   - 期待結果: 対象 scope の `discussions/` 直下に naming-rule compliant な `draft-plan` Markdown が作成され、対象 scope kind に対応する canonical plan template source が draft body として使われる。
   - 観測点: created path、rendered content、tests。
-- AC-014: discussion-local draft envelope
+- AC-015: discussion-local draft envelope
   - アクター: maintainer / reviewer
-  - 前提: `draft-design` または `draft-plan` が作成された。
+  - 前提: `draft-requirement`、`draft-design`、または `draft-plan` が作成された。
   - 操作: frontmatter と導入文を確認する。
   - 期待結果: generated draft は discussion-local evidence であることを明示し、`created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持つ。canonical artifact として accepted / approved / adopted を自己主張しない。
   - 観測点: generated file、diff guard、spec-reviewer。
-- AC-015: validation and diff-guard compatibility
+- AC-016: validation and diff-guard compatibility
   - アクター: maintainer
-  - 前提: `draft-design` / `draft-plan` discussion docs が存在する。
+  - 前提: `draft-requirement` / `draft-design` / `draft-plan` discussion docs が存在する。
   - 操作: `validate`、`sync`、`delegated-authoring diff-guard`、relevant tests を実行する。
-  - 期待結果: `draft-design` / `draft-plan` filename は valid discussion Markdown として扱われ、canonical artifact としては扱われない。diff-guard は valid draft create/update を allowed discussion output として扱い、forbidden paths は従来通り拒否する。
+  - 期待結果: `draft-requirement` / `draft-design` / `draft-plan` filename は valid discussion Markdown として扱われ、canonical artifact としては扱われない。diff-guard は valid draft create/update を allowed discussion output として扱い、forbidden paths は従来通り拒否する。
   - 観測点: `tests/cli_runtime/test_new.py`、`tests/cli_runtime/test_runtime_new_doc_s09.py`、`tests/cli_runtime/test_validate.py`、`tests/cli_runtime/test_delegated_authoring.py`。
 
 ### 追加入力→出力例
-- EX-003: issue design draft
+- EX-003: initiative requirement draft
+  - 入力: `./spec-dock/scripts/spec-dock new doc draft-requirement --initiative init-local-00003 --title "Delegated Authoring Requirement Draft"`
+  - 出力: `initiatives/init-local-00003-.../discussions/<ts>-draft-requirement-delegated-authoring-requirement-draft.md`
+  - 内容: discussion-local envelope + `templates/initiative/requirement.md` derived body。
+- EX-004: issue design draft
   - 入力: `./spec-dock/scripts/spec-dock new doc draft-design --issue iss-00127 --title "Static Discussion Write Design Draft"`
   - 出力: `issues/iss-00127-.../discussions/<ts>-draft-design-static-discussion-write-design-draft.md`
   - 内容: discussion-local envelope + `templates/issue/design.md` derived body。
-- EX-004: epic plan draft
+- EX-005: epic plan draft
   - 入力: `./spec-dock/scripts/spec-dock new doc draft-plan --epic epic-00112 --title "Delegated Authoring Plan Draft"`
   - 出力: `epics/epic-00112-.../discussions/<ts>-draft-plan-delegated-authoring-plan-draft.md`
   - 内容: discussion-local envelope + `templates/epic/plan.md` derived body。
