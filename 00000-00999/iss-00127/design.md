@@ -18,6 +18,7 @@ ID: "iss-00127"
   - `discussions/20260524t133442z-adr-flat-scope-local-discussion-drafts.md`
   - `discussions/20260524t150117z-disc-scoped-discussion-draft-authoring-requirement-draft-v2.md`
   - `discussions/20260524t150916z-disc-fresh-consultant-review-v2-discussion-direct-write-model.md`
+  - `discussions/20260524t235542z-disc-agent-permission-classification-gap-analysis.md`
 
 ## 目的・制約
 - 目的:
@@ -57,9 +58,14 @@ ID: "iss-00127"
   - 理由: sub-agent direct write を許容する以上、forbidden diff を機械的に reject / ineligible にできる安全弁が必要である。
 - D-002: static adapter permissions
   - 決定: static adapter は broad write を許可しない read-mostly fallback として表現する。
-  - スコープ: canonical docs write、manifest/Profile/probe 前提、`.codex/permission-probe-evidence` 自然出力先を削除する。
-  - 例外: host が exact scope-local `discussions/` write を表現できない場合、run 自体を成功扱いにせず、diff guard pass と report ledger 記録まで adoption-ineligible とする。
-- D-003: manifest command retirement
+  - スコープ: canonical docs write、manifest/Profile/probe 前提、`.codex/permission-probe-evidence` 自然出力先、repo-wide / `spec-dock/initiatives` broad write を削除する。
+  - 境界: static fallback が read-mostly であることは、system-architect / implementation-planner を read-only specialist として扱うことを意味しない。
+- D-003: scoped-write delegated authoring execution
+  - 決定: system-architect / implementation-planner は scoped-write delegated authoring agent として扱い、target scope `discussions/` direct child だけを書ける execution path を持つ。
+  - スコープ: read は repo / active scope / source docs / relevant implementation を許可する。write は resolved target scope の `discussions/<ts>-<kind>-<slug>.md` または `discussions/<ts>-<nn>-<kind>-<slug>.md` の新規作成と、main orchestrator が明示指定した既存 proposed discussion draft の更新に限定する。
+  - 禁止: canonical docs、implementation files、tests、config、`.agents`、`.codex`、`.github`、`.env*`、nested directory、per-agent directory、run/task directory、`discussions/delegated-authoring/`。
+  - 実現方針: static `.codex/agents/*.toml` に broad write を与えず、main orchestrator が target scope を解決した後に scoped invocation / permission context を与える。host が exact write root を表現できない場合は、static fallback run として扱い、write-capable delegated authoring の完了証跡には数えない。
+- D-004: manifest command retirement
   - 決定: `delegated-authoring manifest` は command を残して fail-closed stub にする。
   - 理由: unknown command よりも migration message が明確で、historical artifacts の grandfathered 方針とも整合する。
 
@@ -90,6 +96,19 @@ ID: "iss-00127"
 - Discussion draft front matter:
   - required: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`
   - forbidden self-claims: `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`
+- Agent execution surfaces:
+  - read-only static specialist:
+    - `researcher`, `consultant`, `deep-consultant`, `repo-analyst`, `spec-reviewer`, `code-reviewer`, `qa-reviewer`, `pr-monitor`, `spark-worker`
+    - no file write
+  - full workspace-write worker:
+    - `dev-coder`, `doc-writer`, `worker`, `utility-worker`, `default`, `explorer`
+    - task-scoped broad edits under main orchestrator control
+  - scoped-write delegated authoring agent:
+    - `system-architect`, `implementation-planner`
+    - target scope `discussions/` direct child write only
+  - canonical authority:
+    - main orchestrator / spec-manager-like orchestration support
+    - canonical docs integration and Evidence Adoption Ledger
 
 ## 依存関係分析
 - Runtime dependency:
@@ -97,6 +116,10 @@ ID: "iss-00127"
   - `commands/delegated_authoring.py` converts argparse args and renders CLI text
   - `application/delegated_authoring.py` resolves scope and orchestrates domain helpers
   - `domain/delegated_authoring.py` owns request validation and path-level classification rules
+- Agent permission dependency:
+  - static `.codex/agents/system-architect.toml` and `implementation-planner.toml` remain read-mostly fallback surfaces and must not grant broad write.
+  - scoped-write execution is a separate orchestrator-mediated path that injects the resolved target `discussions/` write boundary.
+  - diff guard validates post-run eligibility; it does not replace the need for an actual target-discussions write-capable execution path.
 - Asset dependency:
   - provider `src/spec_dock/assets/install_root/` -> installed `.agents` / `.codex`
   - provider `src/spec_dock/assets/spec_dock/` -> installed `spec-dock/` docs / templates / scripts
@@ -199,7 +222,7 @@ Tests --> SpecDockAssets : shipped docs / templates / runtime
 - AC-009 -> manifest command の blocked / deprecated / no artifact generation behavior を CLI / domain tests で固定する。
 - AC-010 -> provider assets と dogfooding mirror を同期し、parity tests / sync / doctor で確認する。
 - AC-011 -> targeted tests、`validate`、`sync`、`doctor`、`git diff --check`、reviewer gates で閉じる。
-- EC-001 -> static adapter は broad write を許可せず、guard pass まで adoption-ineligible とする文言へ変更する。
+- EC-001 -> static adapter は broad write を許可しない read-mostly fallback とし、system-architect / implementation-planner には別途 scoped-write execution path を用意する。
 - EC-002 -> diff guard の forbidden categories と report ledger rejection contract で扱う。
 - EC-003 -> docs / tests で historical artifacts を grandfathered とし、削除や validation failure にしない。
 - EC-004 -> `--allow-existing-discussion` と skill contract で既存 proposed draft の明示 allowlist だけを許可する。

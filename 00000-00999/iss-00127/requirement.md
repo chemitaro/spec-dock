@@ -12,6 +12,7 @@ derived_from:
   - "discussions/20260524t133442z-adr-flat-scope-local-discussion-drafts.md"
   - "discussions/20260524t150117z-disc-scoped-discussion-draft-authoring-requirement-draft-v2.md"
   - "discussions/20260524t150916z-disc-fresh-consultant-review-v2-discussion-direct-write-model.md"
+  - "discussions/20260524t235542z-disc-agent-permission-classification-gap-analysis.md"
 ---
 
 # iss-00127 Scoped Discussion Draft Authoring Correction — 要件定義
@@ -32,6 +33,7 @@ derived_from:
 - 必須:
   - system-architect / implementation-planner の canonical docs direct edit success path を削除する。
   - sub-agent が対象 scope の `discussions/` 直下に flat Markdown draft / analysis / discussion-local report を直接作成・編集できる契約を shipped skills / adapters / workflow docs に反映する。
+  - system-architect / implementation-planner を read-only static specialist ではなく scoped-write delegated authoring agent として分類し、対象 scope の `discussions/` 直下に限る write-capable execution path を成立させる。
   - `discussions/` の出力は既存命名規則 `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md` に従い、per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を新規生成しない。
   - `delegated-authoring manifest` を新規 user-facing success path として使えない状態にし、新規 manifest / profile / probe / session artifact を生成しない。
   - accepted ADR と discussion draft と canonical docs の authority 境界を明記する。
@@ -45,7 +47,8 @@ derived_from:
   - 既存 `iss-00126` の historical evidence を削除・rename・validate failure 化すること。
 - 対象外:
   - GitHub Copilot / `.github/agents` support の追加。
-  - scoped writable adapter の完全な runtime enforcement を新規設計すること。初回は canonical direct write を禁止し、post-run diff guard を必須安全弁にする。
+  - 汎用的な権限サンドボックス基盤や、任意 scope / 任意 host に対応する完全な permission engine を新規設計すること。
+  - static adapter だけで exact target scope write を表現できない場合に、static adapter へ広い write root を与えて解決すること。
   - `validate` / `issue finish` に discussion draft schema の深い意味解析を追加すること。
 
 ## 境界
@@ -56,7 +59,7 @@ derived_from:
   - `reflected_to` は実際に canonical artifact へ反映済みの対象だけを表し、予定先は `intended_targets` で表す。
 - 解決済み判断:
   - post-run diff guard は今回 runtime helper として最小実装する。helper は delegated output の採用資格を判定するだけで、adoption ledger や canonical artifact を更新しない。
-  - static adapter は broad write を許可せず、read-mostly fallback として扱う。scope-local write を host 側で厳密に表現できない run は post-run diff guard pass と report ledger 記録まで adoption-ineligible とする。
+  - static adapter は broad write を許可せず、read-mostly fallback として扱う。ただし static fallback は `system-architect` / `implementation-planner` の本命実行経路ではない。これら 2 role は、別途 target scope `discussions/` direct child だけを書ける scoped-write delegated authoring execution path を持たなければならない。
 - 行わない:
   - Sub-agent に canonical artifact の authoring authority / promotion authority / reviewer pass claim を与えない。
   - Per-agent directory や run directory を `discussions/` 配下に作らない。
@@ -76,6 +79,21 @@ derived_from:
 - `discussions/20260524t150117z-disc-scoped-discussion-draft-authoring-requirement-draft-v2.md` が最新の discussion draft であり、V1 draft は superseded である。
 - Existing historical artifacts from `iss-00126` are grandfathered evidence and are not migrated or deleted by this issue.
 
+## Agent 権限分類
+- Read-only static specialist:
+  - 対象: `researcher`, `consultant`, `deep-consultant`, `repo-analyst`, `spec-reviewer`, `code-reviewer`, `qa-reviewer`, `pr-monitor`, `spark-worker`。
+  - 契約: 調査、分析、レビュー、監視に限定し、ファイル作成・編集・削除を行わない。
+- Full workspace-write worker:
+  - 対象: `dev-coder`, `doc-writer`, `worker`, `utility-worker`, `default`, `explorer`。
+  - 契約: main orchestrator の委任範囲内で実装、テスト、ドキュメント編集を行える。
+- Scoped-write delegated authoring agent:
+  - 対象: `system-architect`, `implementation-planner`。
+  - 契約: canonical docs や implementation files は編集しない。一方で、target initiative / epic / issue の `discussions/` direct child に限り、命名規則準拠の flat Markdown draft / analysis / discussion-local report を直接作成できる。
+  - 補足: static `.codex/agents/*.toml` が read-mostly fallback であることは、この 2 role を read-only specialist に分類する根拠ではない。実運用では target scope を解決した scoped-write execution path が必要である。
+- Canonical authority / orchestrator:
+  - 対象: main orchestrator と spec-manager-like orchestration support。
+  - 契約: discussion draft の採否判断、canonical docs への統合、Evidence Adoption Ledger、phase / lifecycle authority を担う。
+
 ## 受け入れ条件
 - AC-001: Canonical direct-write path removal
   - アクター: system-architect / implementation-planner
@@ -86,9 +104,9 @@ derived_from:
 - AC-002: Scope-local flat discussion direct-write contract
   - アクター: sub-agent / main orchestrator
   - 前提: target initiative / epic / issue scope が解決済みである。
-  - 操作: sub-agent output contract を確認する。
-  - 期待結果: sub-agent は対象 scope の `discussions/` 直下に `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md` の flat Markdown draft / analysis / discussion-local report を直接作成・編集できる。
-  - 観測点: shipped skills、adapters、discussion rules、tests。
+  - 操作: system-architect / implementation-planner の output contract と execution permission contract を確認する。
+  - 期待結果: system-architect / implementation-planner は対象 scope の `discussions/` 直下に `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md` の flat Markdown draft / analysis / discussion-local report を直接作成できる。static fallback が read-only の場合でも、別途 scoped-write execution path が存在し、read-only specialist と同列に扱われていない。
+  - 観測点: shipped skills、adapters、discussion rules、permission / execution path tests。
 - AC-003: Forbidden delegated output locations
   - アクター: delegated authoring runtime / docs / tests
   - 前提: delegated authoring output を生成または案内する経路を確認する。
@@ -147,7 +165,7 @@ derived_from:
 ## 例外・エッジケース
 - EC-001: Static adapter cannot enforce exact target scope
   - 条件: `.codex/agents/*.toml` だけでは active target scope の `discussions/` 直下 write を厳密に表現できない。
-  - 期待: canonical docs direct write success path は置かず、post-run diff guard を必須安全弁として扱う。過剰な broad write を正当化しない。
+  - 期待: static adapter は read-mostly fallback のままにし、過剰な broad write を正当化しない。ただし system-architect / implementation-planner の本命経路として、target scope `discussions/` direct child だけを書ける scoped-write execution path を別に提供する。
   - 観測点: adapter contract、report ledger、tests / inspection。
 - EC-002: Sub-agent modifies forbidden file
   - 条件: sub-agent execution 後の diff に canonical docs、implementation、tests、config、`.agents`、`.codex`、`.env*`、nested dirs、symlinks、non-Markdown、delete、rename が含まれる。
@@ -190,6 +208,6 @@ derived_from:
   - 理由: V2 は sub-agent direct write を採用するため、canonical single-writer authority と adoption ledger だけでなく、post-run diff の機械的 eligibility classifier が必要である。docs-only に閉じると、直接書き込みは許す一方で検証だけ人力に寄る。
   - 影響範囲: runtime command / application / domain、tests、workflow docs、report ledger。
 - Q-002: static adapter の scope-local write enforcement 粒度
-  - 判断: static adapter では broad write を許可しない。canonical docs write は常に禁止し、scope-local write を host 側で厳密に表現できない場合でも broad write を「許可」とは呼ばない。
-  - 理由: post-run diff guard は broad permission の正当化ではなく、delegated output の採用資格を判定する安全弁である。
-  - 影響範囲: `.codex/agents/*.toml`、skills、workflow docs。
+  - 判断: static adapter では broad write を許可しない。canonical docs write は常に禁止し、scope-local write を host 側で厳密に表現できない場合でも broad write を「許可」とは呼ばない。一方で、system-architect / implementation-planner は read-only static specialist ではなく scoped-write delegated authoring agent であるため、target scope `discussions/` direct child だけを書ける本命 execution path を完了条件に含める。
+  - 理由: post-run diff guard は broad permission の正当化ではなく、delegated output の採用資格を判定する安全弁である。direct-write authoring を採用する以上、権限分類上も実行経路上も write-capable でなければ要件を満たさない。
+  - 影響範囲: `.codex/agents/*.toml`、scoped execution path、skills、workflow docs、tests。
