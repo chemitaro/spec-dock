@@ -78,6 +78,7 @@ class _StubNodeRepo:
 class _StubTemplateScaffolder:
     def __init__(self, events=None):
         self.events = events if events is not None else []
+        self.loaded_paths: list[Path] = []
 
     def render_text(self, text, replacements):
         self.events.append("render_text")
@@ -88,6 +89,7 @@ class _StubTemplateScaffolder:
 
     def load_template_text(self, src_path):
         self.events.append("load_template_text")
+        self.loaded_paths.append(src_path)
         return src_path.read_text(encoding="utf-8")
 
     def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
@@ -164,6 +166,23 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+        for scope_kind, id_placeholder, title_placeholder in (
+            ("initiative", "<INIT_ID>", "<INIT_TITLE>"),
+            ("epic", "<EPIC_ID>", "<EPIC_TITLE>"),
+            ("issue", "<ISS_ID>", "<ISS_TITLE>"),
+        ):
+            scope_template_dir = specdock_dir / "templates" / scope_kind
+            scope_template_dir.mkdir(parents=True, exist_ok=True)
+            for target in ("requirement", "design", "plan"):
+                (scope_template_dir / f"{target}.md").write_text(
+                    (
+                        "---\n"
+                        f"kind={scope_kind}-{target}\n"
+                        "---\n"
+                        f"body={scope_kind}-{target} {id_placeholder} {title_placeholder}\n"
+                    ),
+                    encoding="utf-8",
+                )
 
     def _prepare_node_templates(self, specdock_dir: Path) -> None:
         issue_template = specdock_dir / "templates" / "issue"
@@ -228,6 +247,46 @@ class TestRuntimeNewDocS09(unittest.TestCase):
             epic_id="epic-local-00001",
             github_issue_number=None,
         )
+
+    def _scope_records(self, infra_contracts, *, specdock_dir: Path):
+        init_dir = specdock_dir / "initiatives" / "init-local-00001-auth"
+        epic_dir = init_dir / "epics" / "epic-local-00001-login"
+        issue_dir = epic_dir / "issues" / "iss-local-00001-refresh-token"
+        return [
+            _record(
+                infra_contracts,
+                kind="initiative",
+                node_id="init-local-00001",
+                title="Auth platform",
+                path=init_dir,
+                parent_id=None,
+                initiative_id="init-local-00001",
+                epic_id=None,
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="epic",
+                node_id="epic-local-00001",
+                title="Login",
+                path=epic_dir,
+                parent_id="init-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+            _record(
+                infra_contracts,
+                kind="issue",
+                node_id="iss-local-00001",
+                title="Refresh token",
+                path=issue_dir,
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=None,
+            ),
+        ]
 
     def test_timestamp_regression_and_planning(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
@@ -328,6 +387,81 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 content = result.path.read_text(encoding="utf-8")
                 self.assertIn(f"type={doc_type}", content)
                 self.assertIn(f"id={expected_ids[doc_type]}", content)
+
+    def test_draft_doc_types_render_scope_specific_template_bodies(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            discussions_template_dir = specdock_dir / "templates" / "discussions"
+            for doc_type in ("draft-requirement", "draft-design", "draft-plan"):
+                (discussions_template_dir / f"{doc_type}.md").write_text(
+                    f"type={doc_type}\nenvelope=discussion-draft-template\n",
+                    encoding="utf-8",
+                )
+            records = self._scope_records(infra_contracts, specdock_dir=specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=records)
+
+            scope_ids = {
+                "initiative": "init-local-00001",
+                "epic": "epic-local-00001",
+                "issue": "iss-local-00001",
+            }
+            target_by_doc_type = {
+                "draft-requirement": "requirement",
+                "draft-design": "design",
+                "draft-plan": "plan",
+            }
+            for scope_kind, scope_id in scope_ids.items():
+                for doc_type, target in target_by_doc_type.items():
+                    title = f"{scope_kind} {target}"
+                    result = app_create_node.create_discussion_doc(
+                        app_contracts.CreateDiscussionDocRequest(
+                            doc_type=doc_type,
+                            scope_node_id=scope_id,
+                            title=title,
+                            slug=None,
+                        ),
+                        ports,
+                    )
+                    self.assertRegex(
+                        result.doc_id,
+                        rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}$",
+                    )
+                    self.assertRegex(result.path.name, rf"^20260312t010203z(?:-[0-9]{{2}})?-{doc_type}-")
+                    self.assertEqual(
+                        ports.template_scaffolder.loaded_paths[-1],
+                        specdock_dir / "templates" / scope_kind / f"{target}.md",
+                    )
+                    content = result.path.read_text(encoding="utf-8")
+                    self.assertIn(f"kind={scope_kind}-{target}", content)
+                    self.assertIn(f"body={scope_kind}-{target}", content)
+                    self.assertNotIn(f"type={doc_type}", content)
+                    self.assertNotIn("envelope=discussion-draft-template", content)
+                    self.assertNotIn("template=templates/", content)
+                    self.assertNotIn("target=", content)
+
+            suffix_results = [
+                app_create_node.create_discussion_doc(
+                    app_contracts.CreateDiscussionDocRequest(
+                        doc_type=doc_type,
+                        scope_node_id="iss-local-00001",
+                        title=f"{doc_type} collision",
+                        slug=None,
+                    ),
+                    ports,
+                )
+                for doc_type in ("draft-requirement", "draft-design", "draft-plan")
+            ]
+            self.assertEqual(
+                [result.doc_id for result in suffix_results],
+                [
+                    "20260312t010203z-03-draft-requirement",
+                    "20260312t010203z-04-draft-design",
+                    "20260312t010203z-05-draft-plan",
+                ],
+            )
 
     def test_suffix_exhaustion_fail_fast_no_write(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()

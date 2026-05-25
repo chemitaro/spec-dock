@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..commands import active as active_commands
 from ..commands import close as close_commands
 from ..commands import delete as delete_commands
+from ..commands import delegated_authoring as delegated_authoring_commands
 from ..commands import deps as deps_commands
 from ..commands import doctor as doctor_commands
 from ..commands import import_cmd as import_commands
@@ -22,6 +23,7 @@ def build_registry() -> CommandRegistry:
     items.update(active_commands.command_specs())
     items.update(delete_commands.command_specs())
     items.update(close_commands.command_specs())
+    items.update(delegated_authoring_commands.command_specs())
     items.update(update_commands.command_specs())
     items.update(issue_commands.command_specs())
     items.update(worktree_commands.command_specs())

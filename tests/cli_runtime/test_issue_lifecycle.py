@@ -36,8 +36,31 @@ class _StubNodeReader:
 
 
 class _StubActiveStateStore:
-    def __init__(self, infra_contracts) -> None:
+    def __init__(self, infra_contracts, *, issue_authority="approved", issue_grants=None, promotion_record=None) -> None:
         self._infra_contracts = infra_contracts
+        self.issue_authority = issue_authority
+        self.issue_grants = (
+            tuple(issue_grants)
+            if issue_grants is not None
+            else (
+                "review_input",
+                "planning_input",
+                "design_baseline",
+                "implementation_start",
+                "issue_ready",
+                "issue_finish",
+                "phase_completion",
+            )
+        )
+        self.promotion_record = promotion_record or {
+            "status": "approved",
+            "authority": "approved",
+            "source_revision": "active:iss-00101",
+            "approved_revision": "active:iss-00101",
+            "approved_hash": "active:iss-00101",
+            "reviewer_target_hash": "active:iss-00101",
+            "promotion_decision": "main_orchestrator_promotion",
+        }
 
     def load_active_manifest(self, specdock_dir: Path):
         del specdock_dir
@@ -48,6 +71,9 @@ class _StubActiveStateStore:
                 issue=self._infra_contracts.ActiveManifestEntry(
                     id="iss-00101",
                     path="spec-dock/initiatives/init-00001/epics/epic-00002/issues/iss-00101",
+                    authority=self.issue_authority,
+                    grants=self.issue_grants,
+                    promotion_record=self.promotion_record,
                 ),
             ),
             source="agent.active",
@@ -56,6 +82,386 @@ class _StubActiveStateStore:
 
 
 class TestIssueLifecycleApplication(unittest.TestCase):
+    def test_issue_finish_blocks_proposed_or_missing_grant_active_issue_before_close(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        close_calls = []
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                raise AssertionError("close_node must not run when authority gate fails")
+
+            app_issue_lifecycle.close_node = fake_close_node
+
+            cases = (
+                (
+                    "proposed",
+                    "proposed",
+                    (
+                        "review_input",
+                        "planning_input",
+                        "design_baseline",
+                        "implementation_start",
+                        "issue_ready",
+                        "issue_finish",
+                        "phase_completion",
+                    ),
+                    "authority_not_approved",
+                ),
+                (
+                    "missing grant",
+                    "approved",
+                    ("review_input", "planning_input"),
+                    "missing_required_grant",
+                ),
+                ("missing metadata", None, (), "missing_authority"),
+            )
+            for _label, authority, grants, reason in cases:
+                with self.subTest(reason=reason):
+                    close_calls.clear()
+                    with tempfile.TemporaryDirectory() as tmp:
+                        repo_root = Path(tmp)
+                        ports = app_ports.Ports(
+                            node_reader=_StubNodeReader(),
+                            repo_root=repo_root,
+                            specdock_dir=repo_root / "spec-dock",
+                            active_state_store=_StubActiveStateStore(
+                                infra_contracts,
+                                issue_authority=authority,
+                                issue_grants=grants,
+                            ),
+                        )
+                        with self.assertRaises(RuntimeError) as raised:
+                            app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+                    message = str(raised.exception)
+                    self.assertIn("issue finish blocked: authority gate failed", message)
+                    self.assertIn(reason, message)
+                    self.assertIn("required_grant: issue_finish", message)
+                    self.assertEqual(close_calls, [])
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
+
+    def test_issue_finish_blocks_promotion_record_for_different_issue_before_close(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        close_calls = []
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                raise AssertionError("close_node must not run when promotion record is stale")
+
+            app_issue_lifecycle.close_node = fake_close_node
+            stale_record = {
+                "status": "approved",
+                "authority": "approved",
+                "source_revision": "active:iss-00999",
+                "approved_revision": "active:iss-00999",
+                "approved_hash": "active:iss-00999",
+                "reviewer_target_hash": "active:iss-00999",
+                "promotion_decision": "main_orchestrator_promotion",
+            }
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                ports = app_ports.Ports(
+                    node_reader=_StubNodeReader(),
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                    active_state_store=_StubActiveStateStore(
+                        infra_contracts,
+                        promotion_record=stale_record,
+                    ),
+                )
+                with self.assertRaises(RuntimeError) as raised:
+                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+            message = str(raised.exception)
+            self.assertIn("issue finish blocked: authority gate failed", message)
+            self.assertIn("promotion_record_not_bound_to_active_entry", message)
+            self.assertIn("expected_revision=active:iss-00101", message)
+            self.assertEqual(close_calls, [])
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
+
+    def test_issue_finish_blocks_unresolved_evidence_adoption_ledger_before_close(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        close_calls = []
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                raise AssertionError("close_node must not run when EAL gate fails")
+
+            app_issue_lifecycle.close_node = fake_close_node
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+                issue_dir.mkdir(parents=True)
+                (issue_dir / "report.md").write_text(
+                    "\n".join(
+                        [
+                            "## 証跡採用台帳（Evidence Adoption Ledger）",
+                            "",
+                            "| ID | adoption_status | target_artifact | next_action |",
+                            "|---|---|---|---|",
+                            "| EAL-009 | blocked | design.md | resolve reviewer evidence |",
+                            "",
+                            "## Other",
+                        ]
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                ports = app_ports.Ports(
+                    node_reader=_StubNodeReader(),
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                    active_state_store=_StubActiveStateStore(infra_contracts),
+                )
+                with self.assertRaises(RuntimeError) as raised:
+                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+            message = str(raised.exception)
+            self.assertIn("issue finish blocked: Evidence Adoption Ledger", message)
+            self.assertIn("blocking_entry_id: EAL-009", message)
+            self.assertIn("resolve reviewer evidence", message)
+            self.assertEqual(close_calls, [])
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
+
+    def test_issue_finish_blocks_localized_eal_header_before_close(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        close_calls = []
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                raise AssertionError("close_node must not run when localized EAL gate fails")
+
+            app_issue_lifecycle.close_node = fake_close_node
+            with tempfile.TemporaryDirectory() as tmp:
+                repo_root = Path(tmp)
+                issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+                issue_dir.mkdir(parents=True)
+                (issue_dir / "report.md").write_text(
+                    "\n".join(
+                        [
+                            "## 証跡採用台帳（Evidence Adoption Ledger）",
+                            "",
+                            "| ID | 採用状態（adoption_status） | 対象（target） | 次アクション（next_action） |",
+                            "|---|---|---|---|",
+                            "| EAL-011 | stale | plan.md | refresh localized evidence |",
+                            "",
+                            "## Other",
+                        ]
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                ports = app_ports.Ports(
+                    node_reader=_StubNodeReader(),
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                    active_state_store=_StubActiveStateStore(infra_contracts),
+                )
+                with self.assertRaises(RuntimeError) as raised:
+                    app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+            message = str(raised.exception)
+            self.assertIn("issue finish blocked: Evidence Adoption Ledger", message)
+            self.assertIn("blocking_entry_id: EAL-011", message)
+            self.assertIn("evidence_ledger_stale", message)
+            self.assertIn("refresh localized evidence", message)
+            self.assertEqual(close_calls, [])
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
+
+    def test_issue_finish_blocks_proposed_or_missing_metadata_delegated_artifacts_before_close(self) -> None:
+        app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        original_close_node = app_issue_lifecycle.close_node
+        close_calls = []
+        try:
+            def fake_close_node(req, ports):
+                close_calls.append((req, ports))
+                raise AssertionError("close_node must not run when delegated artifact gate fails")
+
+            app_issue_lifecycle.close_node = fake_close_node
+            cases = (
+                (
+                    "proposed",
+                    "---\n"
+                    "status: draft\n"
+                    "authority: proposed\n"
+                    "grants: [review_input, planning_input]\n"
+                    "owner_role: main-orchestrator\n"
+                    "draft_author_role: system-architect\n"
+                    "approval: pending-main-promotion\n"
+                    "source_revision: rev-1\n"
+                    "approved_revision: rev-1\n"
+                    "approved_hash: hash-1\n"
+                    "manifest_hash: manifest-hash\n"
+                    "permission_profile_name: spec-dock-da\n"
+                    "permission_profile_hash: profile-hash\n"
+                    "write_session_invocation_hash: session-hash\n"
+                    "probe_run_id: probe-1\n"
+                    "positive_probe_result: pass\n"
+                    "---\n# Design\n",
+                    "authority_not_approved",
+                ),
+                (
+                    "missing metadata",
+                    "---\nauthority: approved\nmanifest_hash: manifest-hash\n---\n# Design\n",
+                    "incomplete_draft_metadata",
+                ),
+            )
+            for _label, artifact_text, expected_reason in cases:
+                with self.subTest(expected_reason=expected_reason):
+                    close_calls.clear()
+                    with tempfile.TemporaryDirectory() as tmp:
+                        repo_root = Path(tmp)
+                        issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+                        issue_dir.mkdir(parents=True)
+                        (issue_dir / "design.md").write_text(artifact_text, encoding="utf-8")
+                        ports = app_ports.Ports(
+                            node_reader=_StubNodeReader(),
+                            repo_root=repo_root,
+                            specdock_dir=repo_root / "spec-dock",
+                            active_state_store=_StubActiveStateStore(infra_contracts),
+                        )
+                        with self.assertRaises(RuntimeError) as raised:
+                            app_issue_lifecycle.issue_finish(app_contracts.IssueFinishRequest(), ports)
+
+                    message = str(raised.exception)
+                    self.assertIn("issue finish blocked: delegated artifact authority gate failed", message)
+                    self.assertIn(expected_reason, message)
+                    self.assertIn("design.md", message)
+                    self.assertEqual(close_calls, [])
+        finally:
+            app_issue_lifecycle.close_node = original_close_node
+
+    def test_active_issue_lifecycle_gate_blocks_unresolved_eal_for_non_finish_purposes(self) -> None:
+        _app_contracts, app_issue_lifecycle, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = repo_root / "spec-dock" / "initiatives" / "init-00001" / "epics" / "epic-00002" / "issues" / "iss-00101"
+            issue_dir.mkdir(parents=True)
+            (issue_dir / "report.md").write_text(
+                "\n".join(
+                    [
+                        "## Evidence Adoption Ledger",
+                        "",
+                        "| id | adoption_status | target_artifact | next_action |",
+                        "|---|---|---|---|",
+                        "| EAL-010 | stale | plan.md | refresh adopted evidence |",
+                        "",
+                        "## Other",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(),
+                repo_root=repo_root,
+                specdock_dir=repo_root / "spec-dock",
+                active_state_store=_StubActiveStateStore(infra_contracts),
+            )
+
+            cases = (
+                ("implementation_start", "implementation start"),
+                ("issue_ready", "issue ready"),
+                ("phase_completion", "phase completion"),
+            )
+            for required_grant, command_label in cases:
+                with self.subTest(required_grant=required_grant):
+                    with self.assertRaises(RuntimeError) as raised:
+                        app_issue_lifecycle.require_active_issue_lifecycle_gate(
+                            ports,
+                            required_grant=required_grant,
+                            purpose=required_grant,
+                            command_label=command_label,
+                        )
+                    message = str(raised.exception)
+                    self.assertIn(f"{command_label} blocked: Evidence Adoption Ledger", message)
+                    self.assertIn("blocking_entry_id: EAL-010", message)
+                    self.assertIn("refresh adopted evidence", message)
+
+    def test_lifecycle_authority_gate_blocks_non_finish_purposes(self) -> None:
+        _app_contracts, app_issue_lifecycle, _app_ports, _domain_models, infra_contracts = _runtime_modules()
+        issue_entry = infra_contracts.ActiveManifestEntry(
+            id="iss-00101",
+            path="spec-dock/initiatives/init-00001/epics/epic-00002/issues/iss-00101",
+            authority="proposed",
+            grants=(
+                "review_input",
+                "planning_input",
+                "design_baseline",
+                "implementation_start",
+                "issue_ready",
+                "issue_finish",
+                "phase_completion",
+            ),
+            promotion_record={
+                "status": "approved",
+                "authority": "approved",
+                "source_revision": "active:iss-00101",
+                "approved_revision": "active:iss-00101",
+                "approved_hash": "active:iss-00101",
+                "reviewer_target_hash": "active:iss-00101",
+                "promotion_decision": "main_orchestrator_promotion",
+            },
+        )
+
+        cases = (
+            ("implementation_start", "implementation start"),
+            ("issue_ready", "issue ready"),
+            ("phase_completion", "phase completion"),
+        )
+        for required_grant, command_label in cases:
+            with self.subTest(required_grant=required_grant):
+                with self.assertRaises(RuntimeError) as raised:
+                    app_issue_lifecycle.require_lifecycle_authority(
+                        issue_entry,
+                        required_grant=required_grant,
+                        purpose=required_grant,
+                        command_label=command_label,
+                    )
+                message = str(raised.exception)
+                self.assertIn(f"{command_label} blocked: authority gate failed", message)
+                self.assertIn("authority_not_approved", message)
+                self.assertIn(f"required_grant: {required_grant}", message)
+
+    def test_lifecycle_authority_gate_uses_requested_non_finish_grant(self) -> None:
+        _app_contracts, app_issue_lifecycle, _app_ports, _domain_models, infra_contracts = _runtime_modules()
+        issue_entry = infra_contracts.ActiveManifestEntry(
+            id="iss-00101",
+            path="spec-dock/initiatives/init-00001/epics/epic-00002/issues/iss-00101",
+            authority="approved",
+            grants=("review_input", "planning_input", "issue_finish"),
+            promotion_record={
+                "status": "approved",
+                "authority": "approved",
+                "source_revision": "active:iss-00101",
+                "approved_revision": "active:iss-00101",
+                "approved_hash": "active:iss-00101",
+                "reviewer_target_hash": "active:iss-00101",
+                "promotion_decision": "runtime_active_selection",
+            },
+        )
+
+        with self.assertRaises(RuntimeError) as raised:
+            app_issue_lifecycle.require_lifecycle_authority(
+                issue_entry,
+                required_grant="phase_completion",
+                purpose="phase_completion",
+                command_label="phase completion",
+            )
+
+        message = str(raised.exception)
+        self.assertIn("phase completion blocked: authority gate failed", message)
+        self.assertIn("missing_required_grant", message)
+        self.assertIn("required_grant: phase_completion", message)
+
     def test_issue_finish_clear_active_failure_includes_recovery_guidance(self) -> None:
         app_contracts, app_issue_lifecycle, app_ports, domain_models, infra_contracts = _runtime_modules()
         original_close_node = app_issue_lifecycle.close_node
@@ -293,6 +699,13 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             return path_file.read_text(encoding="utf-8").strip()
         return ""
 
+    def _promote_active_issue_lifecycle(self, target: Path) -> None:
+        active_path = target / "spec-dock" / ".agent" / "active.json"
+        active = json.loads(active_path.read_text(encoding="utf-8"))
+        issue = active["issue"]
+        issue["promotion_record"]["promotion_decision"] = "main_orchestrator_promotion"
+        self._write_json_force(active_path, active)
+
     def test_issue_start_sets_active_and_checks_out_issue_branch(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
@@ -312,6 +725,15 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("issue=iss-00101", p.stdout)
             self.assertIn("spec-dock: ok (issue checkout) branch=iss-00101-first-issue", p.stdout)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
+            issue = active["issue"]
+            self.assertEqual(issue["authority"], "approved")
+            self.assertIn("issue_finish", issue["grants"])
+            self.assertEqual(issue["promotion_record"]["approved_hash"], issue["promotion_record"]["reviewer_target_hash"])
+            context_pack = (target / "spec-dock" / "active" / "context-pack.md").read_text(encoding="utf-8")
+            self.assertIn("- issue: authority=approved", context_pack)
+            self.assertIn("issue ready", context_pack)
+            self.assertIn("issue_finish", context_pack)
             current = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(current, "iss-00101-first-issue")
 
@@ -617,6 +1039,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertIn("issue=iss-00101", started.stdout)
             self.assertIn("spec-dock: ok (issue checkout) branch=iss-00101-first-issue", started.stdout)
             self.assertEqual(self._active_issue_id(target), "iss-00101")
+            self._promote_active_issue_lifecycle(target)
             started_branch = self._run_git(target, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
             self.assertEqual(started_branch, "iss-00101-first-issue")
             list_count_before_finish = (bin_dir / "gh-calls.log").read_text(encoding="utf-8").count("issue list")
@@ -649,6 +1072,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
+            self._promote_active_issue_lifecycle(target)
             bin_dir = Path(bin_tmp)
             state_path = self._make_gh_stub(bin_dir, states={101: "OPEN"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -664,6 +1088,35 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(state["101"]["state"], "CLOSED")
 
+    def test_issue_finish_blocks_normal_active_set_synthetic_approval_before_close(self) -> None:
+        if os.name == "nt":
+            self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as bin_tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
+            self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
+            bin_dir = Path(bin_tmp)
+            state_path = self._make_gh_stub(bin_dir, states={101: "OPEN"})
+            test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+            p = self._run_runtime_capture(target, ["issue", "finish"], env=test_env)
+
+            self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn("issue finish blocked: authority gate failed", p.stderr)
+            self.assertIn("active_synthetic_approval_not_lifecycle_approval", p.stderr)
+            self.assertIn("required_grant: issue_finish", p.stderr)
+            self.assertIn("obtain a fresh approved promotion record", p.stderr)
+            self.assertIn("synthetic approval", p.stderr)
+            self.assertNotIn("issue start <issue>", p.stderr)
+            self.assertEqual(self._active_issue_id(target), "iss-00101")
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["101"]["state"], "OPEN")
+            log_path = bin_dir / "gh-calls.log"
+            if log_path.exists():
+                self.assertNotIn("issue close", log_path.read_text(encoding="utf-8"))
+
     def test_issue_finish_already_closed_clears_active(self) -> None:
         if os.name == "nt":
             self.skipTest("This test uses a python gh stub with shebang; skip on Windows.")
@@ -673,6 +1126,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self.assertEqual(main(["init", str(target)]), 0)
             self._create_same_repo_linked_hierarchy(target, issue_issue_number=101, issue_title="First issue")
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
+            self._promote_active_issue_lifecycle(target)
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "CLOSED"})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -719,6 +1173,7 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             unlinked_meta.pop("github", None)
             self._write_json_force(linked_meta_path, unlinked_meta)
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
+            self._promote_active_issue_lifecycle(target)
             no_link = self._run_runtime_capture(target, ["issue", "finish"])
             self.assertNotEqual(no_link.returncode, 0, no_link.stdout + no_link.stderr)
             self.assertIn("issue finish failed while closing GitHub issue", no_link.stderr)
@@ -735,16 +1190,19 @@ class TestCliIssueLifecycle(CliRuntimeHarness):
             self._write_json_force(active_path, stale_active)
             node_not_found = self._run_runtime_capture(target, ["issue", "finish"])
             self.assertNotEqual(node_not_found.returncode, 0, node_not_found.stdout + node_not_found.stderr)
-            self.assertIn("issue finish failed while closing GitHub issue", node_not_found.stderr)
-            self.assertIn("Active selection was not cleared.", node_not_found.stderr)
+            self.assertIn("issue finish blocked: authority gate failed", node_not_found.stderr)
+            self.assertIn("promotion_record_not_bound_to_active_entry", node_not_found.stderr)
+            self.assertIn("required_grant: issue_finish", node_not_found.stderr)
             self.assertIn("Recovery:", node_not_found.stderr)
-            self.assertIn("spec-dock/scripts/spec-dock issue finish", node_not_found.stderr)
-            self.assertIn("spec-dock/scripts/spec-dock active show", node_not_found.stderr)
-            self.assertIn("Node not found: iss-00999", node_not_found.stderr)
+            self.assertIn("obtain a fresh approved promotion record", node_not_found.stderr)
+            self.assertIn("synthetic approval", node_not_found.stderr)
+            self.assertNotIn("issue start <issue>", node_not_found.stderr)
+            self.assertIn("expected_revision=active:iss-00999", node_not_found.stderr)
             self.assertEqual(self._active_issue_id(target), "iss-00999")
 
             self._write_json_force(linked_meta_path, linked_meta)
             self._run_runtime(target, ["active", "set", "--id", "iss-00101", "--force"])
+            self._promote_active_issue_lifecycle(target)
             bin_dir = Path(bin_tmp)
             self._make_gh_stub(bin_dir, states={101: "OPEN"}, fail_view_numbers={101})
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}

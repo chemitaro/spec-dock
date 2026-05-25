@@ -56,6 +56,24 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "update",
     )
 
+    p_delegated = sub.add_parser("delegated-authoring", help="Check delegated discussion draft output")
+    delegated_sub = p_delegated.add_subparsers(dest="delegated_authoring_cmd", required=True)
+    _bind_leaf(
+        delegated_sub.add_parser("manifest", help="Deprecated delegated authoring manifest path"),
+        registry,
+        "delegated_authoring_manifest",
+    )
+    _bind_leaf(
+        delegated_sub.add_parser("baseline-status", help="Capture delegated authoring baseline status"),
+        registry,
+        "delegated_authoring_baseline_status",
+    )
+    _bind_leaf(
+        delegated_sub.add_parser("diff-guard", help="Classify delegated authoring diffs"),
+        registry,
+        "delegated_authoring_diff_guard",
+    )
+
     p_issue = sub.add_parser("issue", help="Run guided issue lifecycle commands")
     issue_sub = p_issue.add_subparsers(dest="issue_cmd", required=True)
     _bind_leaf(issue_sub.add_parser("start", help="Set active issue and checkout its branch"), registry, "issue_start")

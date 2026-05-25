@@ -1,0 +1,17 @@
+{
+  "promotion_record": {
+    "promotion_id": "iss-00126-design-promotion-20260524t025618z",
+    "authority": "approved",
+    "status": "approved",
+    "artifact_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/design.md",
+    "approved_revision": "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db",
+    "approved_hash": "59db046e937ae8c36a48e2f81979c79a35fdcdbfd61e603dad02329047c328db",
+    "approved_grants": ["design_baseline"],
+    "grants": ["design_baseline"],
+    "approver": "main-orchestrator",
+    "final_reviewer": "Lorentz spec-reviewer",
+    "approved_at": "2026-05-24T02:56:18Z",
+    "ledger_blockers_remaining": 0,
+    "reviewer_evidence_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/input-authority/design-reviewer.json"
+  }
+}

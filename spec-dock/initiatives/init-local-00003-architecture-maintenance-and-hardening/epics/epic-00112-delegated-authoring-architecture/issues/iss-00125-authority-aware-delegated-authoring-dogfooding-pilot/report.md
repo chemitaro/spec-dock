@@ -1,0 +1,393 @@
+---
+種別: レポート（Issue）
+ID: "iss-00125"
+タイトル: "Authority Aware Delegated Authoring Dogfooding Pilot"
+関連GitHub: ["#125"]
+状態: "approved"
+作成者: "Codex"
+最終更新: "2026-05-23"
+依存: ["requirement.md", "design.md", "plan.md"]
+親: ["epic-00112", "init-local-00003"]
+---
+
+# iss-00125 Authority Aware Delegated Authoring Dogfooding Pilot — レポート（進捗 / 決定 / 結果）
+
+## 進捗サマリー
+- 現在地: S01/S02/S03/S90 evidence, S99 final QA/code/spec re-review, final report commit, and issue finish are complete.
+- 未完了: none for this Issue.
+- 次のマイルストーン: use this Issue as completed v1 amendment evidence in the Epic-wide G10 pre-PR quality gate.
+
+## Workflow Delegation Consent
+- source: user explicitly requested appropriate sub-agent use for issue requirement/design/plan authoring.
+- scope: current repo/worktree, iss-00125, current session, named read-only specialist/reviewer roles.
+- allowed roles: system-architect, implementation-planner, repo-analyst, consultant/deep-consultant if needed, spec-reviewer.
+- boundary: no destructive action, no credentialed private browsing, no write-capable delegation without separate approval.
+
+## Delegated Draft Evidence
+- evidence artifact path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/discussions/20260523t144246z-disc-v1-issue-authoring-delegated-evidence.md`
+- system-architect `Lovelace`:
+  - role: `system-architect`
+  - phase: requirement/design input
+  - source artifacts: parent Epic requirement/design/plan/report, v0 historical Issue #113〜#118 docs, current Issue scaffold, workflow/phase docs.
+  - status: `integrated`
+  - integration result: AC/EC/non-scope/provider/test/rollback guidance reflected into this Issue requirement/design.
+  - rejected portions: none.
+  - blockers: none.
+  - reviewer result: Heisenberg `review_status: pass` on canonical docs.
+  - promotion decision: not promoted by itself; used as draft evidence only.
+- repo-analyst `Mencius`:
+  - role: `repo-analyst`
+  - phase: design path/test surface input
+  - source artifacts: provider source tree, dogfooding paths, test directories.
+  - status: `integrated`
+  - integration result: provider source, dogfooding validation surface, likely tests, and risk reflected into design/plan.
+  - rejected portions: none.
+  - blockers: Permission/Profile behavior remains probe-driven and fail-closed where relevant.
+  - reviewer result: Heisenberg `review_status: pass`.
+  - promotion decision: not promoted by itself; used as draft evidence only.
+- implementation-planner `Archimedes`:
+  - role: `implementation-planner`
+  - phase: plan slicing input
+  - source artifacts: workflow_issue.md, phase_plan_issue.md, authoring/issue-plan.md, parent Epic v1 amendment, current Issue docs.
+  - status: `integrated_after_canonicalization`
+  - integration result: step slicing, delegated roles, closure ids, reviewer mapping reflected into plan.
+  - rejected portions: treating original scaffold plans as implementation-ready.
+  - blockers: none after canonical docs were rewritten.
+  - reviewer result: Heisenberg `review_status: pass`.
+  - promotion decision: not promoted by itself; used as draft planning input only.
+
+## Spec Interpretation / Decision Ledger
+- D-001:
+  - Status: resolved
+  - Type: scope
+  - Decision: This Issue is an additive v1 amendment and must not rewrite v0 Issue 001〜006 / #113〜#118 plans or reports.
+  - Disposition: promoted_to_requirement_design_plan
+  - Evidence: parent Epic v1 amendment and this Issue docs.
+- D-002:
+  - Status: resolved
+  - Type: authority
+  - Decision: final authority and phase promotion remain with main orchestrator plus fresh reviewer gates.
+  - Disposition: promoted_to_requirement_design_plan
+  - Evidence: requirement constraints and design interface contract.
+
+## Spec Authoring Gate
+- Requirement Gate:
+  - state: passed
+  - reviewer: Heisenberg (`019e5570-9ebf-72f0-bdfc-762f906a2c7a`)
+  - review_status: pass
+  - reviewed scope: requirement.md, design.md, plan.md, report.md, parent epic v1 amendment.
+  - investigated facts: parent Epic docs, v0 issue historical evidence, delegated evidence artifact, Avicenna failed-review findings, and Heisenberg re-review evidence.
+  - promotion: approved for issue execution; implementation remains not started.
+- Design Gate:
+  - state: passed
+  - reviewer: Heisenberg (`019e5570-9ebf-72f0-bdfc-762f906a2c7a`)
+  - review_status: pass
+  - finding closure: role/gate/probe-scope issues from Avicenna were fixed before pass.
+- Plan Gate:
+  - state: passed
+  - reviewer: Heisenberg (`019e5570-9ebf-72f0-bdfc-762f906a2c7a`)
+  - review_status: pass
+  - execution boundary: issue specs are approved, but no issue implementation has started.
+
+## Reviewer History
+- Avicenna (`019e556c-cf16-7d23-a773-3a7b23cf89df`): `review_status: fail`
+  - findings: iss-00123 required real positive/negative write probe steps; iss-00123 S01 had `.codex/agents` and manual probe evidence under spec-reviewer scope; iss-00122 S01 had `.agents/skills` under spec-reviewer scope.
+  - disposition: fixed in plan.md before re-review.
+- Heisenberg (`019e5570-9ebf-72f0-bdfc-762f906a2c7a`): `review_status: pass`
+  - findings: none.
+  - rationale: prior findings closed; no P0/P1 blockers in reviewed scope.
+- Kuhn the 2nd (`019e566a-7217-7571-8dbd-7e75af40d63d`): `review_status: fail`
+  - scope: S01 preflight evidence review.
+  - findings:
+    - P1: S02 Task Manifest Lock did not pin an immutable source hash.
+    - P2: `iss-00124` stale-report caveat lacked line-cited evidence.
+  - disposition:
+    - P1 fixed by pinning source hash `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b`.
+    - P2 fixed by citing `iss-00124/report.md:16-19`, `145-170`, `277-298`, `303-308`, and exact `gh issue view 124` closed-state JSON.
+- Kuhn the 2nd (`019e566a-7217-7571-8dbd-7e75af40d63d`): `review_status: pass`
+  - scope: S01 re-review.
+  - findings: none.
+  - rationale: prior P1/P2 are resolved; no remaining finding blocks moving to S02 fallback draft evidence.
+- Tesla the 2nd (`019e5673-72a1-7c82-8aff-9df6eb6a322f`): `review_status: pass`
+  - scope: S02 fallback delegated draft evidence review.
+  - findings: none.
+  - rationale: S02 satisfies `tc-003` / `tc-004` as proposal-only fallback draft evidence; both drafts carry `authority: proposed`, source hash, no-promotion / no-reviewer-pass / no-implementation-readiness boundaries, and no forbidden canonical/provider/runtime/test/prerequisite report changes are present.
+- Tesla the 2nd (`019e5673-72a1-7c82-8aff-9df6eb6a322f`): `review_status: pass`
+  - scope: S02 post-review discussion naming/path correction re-review.
+  - findings: none.
+  - rationale: duplicate timestamp-slot validation failure was fixed by renaming the two discussion artifacts to `20260524t000000z-01-*` and `20260524t000000z-02-*`; report paths are consistent, `validate` and `git diff --check` pass, and changed scope remains issue-local report/discussions only.
+- Averroes the 2nd (`019e5679-252e-7081-a21c-068e6b733597`): `review_status: pass`
+  - scope: S03 lifecycle/context-pack fallback verification and provider defect disposition.
+  - findings: none.
+  - rationale: `tc-005` records active issue / validate evidence and absence of fallback draft artifact names from lifecycle/context-pack authority surfaces; `tc-006` records no provider defect and no provider/runtime/test/config diff. Current unstaged diff is report-only.
+- Mendel the 2nd (`019e567b-e0c9-7cc1-8482-32284e9fbb87`): `review_status: pass`
+  - scope: S90 docs impact no-op review.
+  - findings: none.
+  - rationale: validate passes, diff is report-only, the pilot discovered no provider/dogfooding docs defect, and existing docs/skills/adapters already cover task manifest, Permission Profile fail-closed behavior, proposal-only fallback, and `authority: proposed`.
+- Bohr the 2nd (`019e567e-7d1c-7f62-b7d9-e218bd21f7d3`): `review_status: fail`
+  - scope: S99 final QA gate.
+  - findings:
+    - P1: S99 final validate/sync/diff/clean and QA/code/spec gate evidence was described to reviewer but not recorded in the authoritative report ledger.
+  - disposition: fixed by adding the S99 final quality section, `tc-099` Step/Test Closure rows, Closure Coverage row, and explicit final command / reviewer finding disposition evidence below.
+- Socrates the 2nd (`019e567e-7ddf-7373-9e51-581b6999df03`): `review_status: pass`
+  - scope: S99 issue-wide code/diff review.
+  - findings:
+    - P2: stale blocker wording said S03/S90 report-only evidence commit was pending after commit `f2d865a`.
+  - disposition: fixed in this report update by marking S03/S90 committed and replacing stale blockers with S99 re-review/final commit/issue finish.
+- Laplace the 2nd (`019e567e-7e78-77c0-bc4e-c5d0d9d98250`): `review_status: fail`
+  - scope: S99 final spec review.
+  - findings:
+    - P1: S99 / `tc-099` closure ledger was missing, stale incomplete status remained, and final command/gate evidence was not in the report.
+  - disposition: fixed by adding S99 final command evidence, QA/code/spec reviewer evidence and dispositions, `tc-099` closure rows, and updated acceptance / blocker summaries.
+- Bohr the 2nd (`019e567e-7d1c-7f62-b7d9-e218bd21f7d3`): `review_status: pass`
+  - scope: S99 final QA re-review.
+  - findings: none.
+  - rationale: prior S99 report-ledger evidence gap is fixed; no remaining P0/P1 test or evidence adequacy findings.
+- Socrates the 2nd (`019e567e-7ddf-7373-9e51-581b6999df03`): `review_status: pass`
+  - scope: S99 issue-wide code/diff re-review.
+  - findings: none.
+  - rationale: stale S03/S90 blocker wording is fixed, diff remains report-only, no forbidden product/runtime/provider/test/config files changed, and no canonical write verification is over-claimed.
+- Laplace the 2nd (`019e567e-7e78-77c0-bc4e-c5d0d9d98250`): `review_status: pass`
+  - scope: S99 final spec re-review.
+  - findings: none.
+  - rationale: S99 final command evidence, reviewer finding dispositions, and `tc-099` rows are recorded across Step Contract Closure, Test Contract Closure, Closure Coverage, and Closure Delta.
+
+## 受け入れ条件の現在状況
+- status: S01/S02/S03/S90 are committed and reviewer-passed; S99 final QA/code/spec re-review passed.
+- required evidence: tc-001〜tc-006, tc-090, and tc-099 are pass.
+
+## 実行証跡
+- S01 pilot preflight:
+  - Implementation Delegation Gate:
+    - step: S01
+    - decision: `approved-local-orchestration-metadata`
+    - rationale: S01 is report evidence, active-state inspection, validate/sync baseline, prerequisite-state inspection, and Task Manifest Lock recording only. No provider source, runtime, tests, shipped docs, templates, skills, or scaffold behavior is edited.
+    - allowed changes used: this `report.md` only.
+    - forbidden changes respected: no v0 Issue #113〜#118 plan/report rewrites; no prerequisite v1 Issue #120〜#124 report rewrites; no provider/runtime/test edits; no final promotion or reviewer-pass claim by delegated roles.
+    - Ledger Note: No material implementation decisions beyond the approved plan; stale prerequisite report wording is recorded here instead of rewriting completed prerequisite issue reports.
+  - tc-001 prerequisite closure inspection:
+    - command: `rg -n "S99|final|review_status: pass|issue finish|status: passed|complete|fallback|未完了: none|現在地:" spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-0012{0,1,2,3,4}-*/report.md`
+    - result: pass with caveat. Reports for `iss-00120`〜`iss-00123` record implementation/reviewer pass evidence or explicit fallback-disabled evidence. `iss-00124/report.md` contains final QA/code/spec pass evidence and final closure rows, but also retains stale progress/blocker wording.
+    - GitHub confirmation command: `for n in 120 121 122 123 124 125; do gh issue view "$n" --repo chemitaro/spec-dock --json number,state,title,url; done`
+    - GitHub result: #120, #121, #122, #123, and #124 are `CLOSED`; #125 is `OPEN`.
+    - `iss-00124` stale wording evidence:
+      - `iss-00124/report.md:16-19` still says S99 final reviewer gates, final report commit, and issue finish are pending.
+      - `iss-00124/report.md:145-170` records reviewer-loop findings and dispositions through S90, including Socrates/Godel pass and Descartes scope findings.
+      - `iss-00124/report.md:277-298` records S90 pass, S99 verification, QA/code re-review disposition, targeted unittest, validate, sync, and diff-check evidence.
+      - `iss-00124/report.md:303-308` records S01/S02/S03/S90/S99 closure rows as pass.
+      - GitHub #124 state evidence: `gh issue view 124 --repo chemitaro/spec-dock --json number,state,title,url` returned `{"number":124,"state":"CLOSED","title":"Canonical Draft Authoring Role Rewrite","url":"https://github.com/chemitaro/spec-dock/issues/124"}`.
+    - prerequisite disposition: complete-or-explicit-fallback evidence is sufficient for S02 preflight. The stale `iss-00124/report.md` summary/blocker wording is not rewritten here because this issue forbids prerequisite report rewrites; it is carried as pilot caveat and will be in scope for S03/S99/G10 reviewer scrutiny.
+  - tc-002 active scope / baseline:
+    - active command: `./spec-dock/scripts/spec-dock active show`
+    - active result: active initiative `init-local-00003`, epic `epic-00112`, issue `iss-00125`.
+    - validate command: `./spec-dock/scripts/spec-dock validate`
+    - validate result: `spec-dock: ok (validate) nodes=63`.
+    - sync command: `./spec-dock/scripts/spec-dock sync`
+    - sync result: `active unchanged (matched id in branch: iss-00125)` and generated index/tree/deps/dashboard artifacts.
+    - clean check: `git status --short` returned empty after sync.
+  - permission/profile state:
+    - inspection: `.codex/agents/system-architect.toml` and `.codex/agents/implementation-planner.toml`.
+    - result: both adapters define role-specific `default_permissions`, read workspace paths, and write only `.codex/permission-probe-evidence`; both adapter descriptions remain read-only/proposal evidence oriented and require proposal-only fallback when canonical skill, issue contract, or host probe is missing, divergent, unavailable, stale, or fail-open.
+    - implication: write-scoped canonical `design.md` / `plan.md` pilot is not enabled in this issue.
+  - Task Manifest Lock for S02:
+    - pilot_target_issue_id: `none`.
+    - reason: no safe dedicated pilot target issue is available. Plan forbids `iss-00125` itself, v0 `iss-00113`〜`iss-00118`, and prerequisite v1 `iss-00120`〜`iss-00124` unless a separate plan amendment and fresh spec-reviewer pass explicitly authorize it.
+    - design_draft_path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/discussions/20260524t000000z-01-disc-fallback-system-architect-design-draft.md` (fallback discussion draft; not canonical write verification).
+    - plan_draft_path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/discussions/20260524t000000z-02-disc-fallback-implementation-planner-plan-draft.md` (fallback discussion draft; not canonical write verification).
+    - source revision/hash: `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b` (`git rev-parse HEAD` after S01 baseline, before S02 draft production).
+    - allowed evidence paths: this `report.md` and the two locked fallback discussion draft paths above.
+    - forbidden paths: `spec-dock/active/**`; v0 issue `iss-00113`〜`iss-00118` plans/reports; prerequisite v1 issue `iss-00120`〜`iss-00124` plans/reports; provider source; runtime code; tests; package/config files; GitHub mutation; phase promotion.
+    - fallback: S02 must produce proposal/fallback draft evidence only and must not claim verified canonical draft write.
+    - stale-if: active issue changes away from `iss-00125`; locked paths change; prerequisite complete/fallback evidence is contradicted; Permission Profile/host probe becomes fail-open, unavailable, divergent, or unverified; local `HEAD` changes before S02 without refreshing this lock.
+- S01 reviewer gate:
+  - first review: Kuhn the 2nd `review_status: fail`.
+  - fix: pinned S02 source hash and added line-cited `iss-00124` stale/pass/closed-state evidence.
+  - re-review: Kuhn the 2nd `review_status: pass`.
+- S02 delegated fallback draft production:
+  - Implementation Delegation Gate:
+    - step: S02
+    - decision: `delegated`
+    - delegated roles: `system-architect` for design fallback draft; `implementation-planner` for plan fallback draft.
+    - scope: proposal-only fallback discussion drafts under this issue; no canonical `design.md` / `plan.md` write verification.
+    - source of truth: S02 Task Manifest Lock, active issue requirement/design/plan/report, active epic requirement/design/plan/report, and canonical role skills.
+    - allowed changes integrated by orchestrator: two locked discussion draft files and this `report.md`.
+    - forbidden changes respected: no canonical spec edits, no provider/runtime/test/config edits, no v0/prerequisite report rewrites, no GitHub mutation, no phase promotion, no reviewer-pass or implementation-readiness claims.
+    - worker summary: both delegated roles returned proposal-only content and explicitly rejected canonical write verification.
+    - Ledger Note: No material implementation decisions beyond the approved fallback plan.
+  - tc-003 system-architect design fallback draft:
+    - draft artifact path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/discussions/20260524t000000z-01-disc-fallback-system-architect-design-draft.md`
+    - draft status: `produced`.
+    - authority: `proposed`.
+    - permission/profile result: fallback discussion draft only; no canonical write verification; no safe pilot target; source hash `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b`.
+    - rejected portions: canonical `design.md` write, v0/prerequisite report rewrite, Permission/Profile verification claim, lifecycle block pass claim.
+    - previous phase artifacts edited: none.
+    - final authority claimed: no.
+  - tc-004 implementation-planner plan fallback draft:
+    - draft artifact path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/discussions/20260524t000000z-02-disc-fallback-implementation-planner-plan-draft.md`
+    - draft status: `produced`.
+    - authority: `proposed`.
+    - permission/profile result: fallback discussion draft only; no canonical write verification; no safe pilot target; source hash `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b`.
+    - rejected portions: canonical `plan.md` write, report edit by delegated role, provider/runtime/test/config edit, GitHub mutation, phase promotion, reviewer-pass claim, implementation-readiness claim.
+    - previous phase artifacts edited: none.
+    - final authority claimed: no.
+- S02 reviewer gate:
+  - reviewer: Tesla the 2nd (`019e5673-72a1-7c82-8aff-9df6eb6a322f`)
+  - review_status: pass
+  - findings: none.
+  - rationale: only `report.md` and the two locked issue-local discussion drafts are changed; both drafts are proposal-only fallback evidence with `authority: proposed`; no canonical write verification, promotion, reviewer-pass, or implementation-readiness is claimed.
+  - post-review naming correction:
+    - initial validation after S02 draft creation failed with duplicate discussion timestamp slot `20260524t000000z`.
+    - fix: renamed discussion artifacts to `20260524t000000z-01-disc-fallback-system-architect-design-draft.md` and `20260524t000000z-02-disc-fallback-implementation-planner-plan-draft.md`, and updated all report/path references.
+    - validation: `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`.
+    - whitespace: `git diff --check` -> pass.
+    - re-review: Tesla the 2nd `review_status: pass`.
+- S01/S02 Step Commit Gate:
+  - step scope: S01 preflight evidence plus S02 fallback draft evidence.
+  - reason for combined evidence commit: S02 depends directly on the S01 Task Manifest Lock and reviewer pass, and both steps are issue-local evidence-only changes with no provider/runtime/test/scaffold behavior changes.
+  - changed files:
+    - `report.md`
+    - `discussions/20260524t000000z-01-disc-fallback-system-architect-design-draft.md`
+    - `discussions/20260524t000000z-02-disc-fallback-implementation-planner-plan-draft.md`
+  - reviewer verdicts:
+    - S01 spec-reviewer Kuhn the 2nd: pass.
+    - S02 spec-reviewer Tesla the 2nd: pass, including post-review naming/path correction re-review.
+  - closure state: commit pending.
+- S01/S02 commit:
+  - commit: `59e2a89 docs(issue): iss-00125 S01-S02証跡を記録`
+  - scope: issue-local `report.md` and two fallback discussion draft artifacts.
+  - post-commit clean check: `git status --short` returned empty before S3 execution.
+- S03 lifecycle/context-pack fallback verification:
+  - Implementation Delegation Gate:
+    - step: S03
+    - decision: `approved-local-orchestration-metadata`
+    - rationale: S03 is inspect-only validation of lifecycle/context-pack surfaces and git diff scope after S02; no provider source, runtime, tests, shipped docs, templates, skills, or scaffold behavior is edited.
+    - allowed changes used: this `report.md` only.
+    - forbidden changes respected: no provider source edits, no v0/prerequisite report rewrites, no canonical draft promotion, no GitHub mutation.
+    - Ledger Note: No material implementation decisions beyond the approved plan.
+  - tc-005 proposed artifact lifecycle/context-pack block:
+    - active command: `./spec-dock/scripts/spec-dock active show`
+    - active result: active initiative `init-local-00003`, epic `epic-00112`, issue `iss-00125`.
+    - validate command: `./spec-dock/scripts/spec-dock validate`
+    - validate result: `spec-dock: ok (validate) nodes=63`.
+    - lifecycle/context-pack inspection command: `rg -n "20260524t000000z|fallback-system-architect|fallback-implementation-planner" spec-dock/active/context-pack.md spec-dock/.agent/active.json spec-dock/.agent/index.json spec-dock/dashboard.md`
+    - lifecycle/context-pack inspection result: no matches; the two fallback discussion draft artifacts are not included as active authoritative context-pack / active manifest / index / dashboard authority.
+    - conclusion: proposed fallback discussion drafts remain evidence artifacts only and do not become downstream implementation / issue finish authority.
+  - tc-006 provider defect disposition:
+    - working tree scope command after S02 commit and S03 inspection: `git diff --name-status`
+    - result: empty before this S03 report update; no provider/runtime/test/config diff exists.
+    - S02 commit scope command: `git show --name-status --oneline --no-renames HEAD`
+    - S02 commit scope result: only issue-local `report.md` and the two fallback discussion draft artifacts changed.
+    - provider defect disposition: no provider defect discovered in S03; no follow-up/amendment required for this step.
+- S03 reviewer/no-op gate:
+  - reviewer: Averroes the 2nd (`019e5679-252e-7081-a21c-068e6b733597`)
+  - review_status: pass
+  - findings: none.
+  - closure state: `approved-no-op` for product/runtime/provider changes; report-only evidence commit pending.
+  - rationale: S03 required inspection evidence only; no provider/runtime/test/config changes were required or made.
+- S90 docs impact:
+  - Implementation Delegation Gate:
+    - step: S90
+    - decision: `approved-local-orchestration-metadata`
+    - rationale: S90 is docs-impact classification by inspection. The current pilot produced issue-local fallback evidence only and no provider/runtime/docs/skills/adapters changes. No doc-writer edit is required unless reviewer finds a gap.
+    - allowed changes used: this `report.md` only.
+    - forbidden changes respected: no provider docs, dogfooding docs, role skill, adapter, v0 report, prerequisite report, runtime, or test edits.
+    - Ledger Note: No material implementation decisions beyond the approved no-op docs impact.
+  - tc-090 docs impact inspection:
+    - validate command: `./spec-dock/scripts/spec-dock validate`
+    - validate result: `spec-dock: ok (validate) nodes=63`.
+    - docs surface inspection command: `rg -n "Task Manifest Lock|pilot_target_issue_id|design_draft_path|plan_draft_path|stale-if|fallback|proposal-only|Permission Profile|authority: proposed" spec-dock/active/issue/report.md spec-dock/docs/workflow_spec_authoring.md spec-dock/docs/phase_design.md spec-dock/docs/phase_plan.md .agents/skills/spec-dock-system-architect/SKILL.md .agents/skills/spec-dock-implementation-planner/SKILL.md .codex/agents/system-architect.toml .codex/agents/implementation-planner.toml`
+    - docs surface inspection result: pass; active report records the pilot-specific lock/fallback evidence, while existing workflow docs, phase docs, role skills, and Codex adapters already describe `authority: proposed`, proposal-only fallback, task manifest, and Permission Profile fail-closed behavior.
+    - docs impact classification: `no-op`.
+    - rationale: S02/S03 added only issue-local fallback evidence and did not discover a provider/dogfooding docs defect. Existing docs and skills already instruct proposal-only fallback when Permission Profile / host probe / source revision is unverified, fail-open, divergent, or stale.
+    - follow-up: none for S90.
+  - reviewer gate:
+    - reviewer: Mendel the 2nd (`019e567b-e0c9-7cc1-8482-32284e9fbb87`)
+    - review_status: pass
+    - findings: none.
+    - closure state: `approved-no-op` for docs changes; report-only evidence commit pending.
+- S03/S90 commit:
+  - commit: `f2d865a docs(issue): iss-00125 S03-S90証跡を記録`
+  - scope: issue-local `report.md` only.
+  - post-commit clean check: `git status --short` returned empty before S99 final command execution.
+  - S99 final quality gate:
+  - final command evidence before this S99 report update:
+    - `git status --short` -> empty.
+    - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=63`.
+    - `./spec-dock/scripts/spec-dock sync` -> `active unchanged (matched id in branch: iss-00125)` and wrote index/tree/deps/dashboard artifacts.
+    - `git diff --check` -> pass.
+    - `git status --short` after sync -> empty.
+  - QA review attempt:
+    - reviewer: Bohr the 2nd (`019e567e-7d1c-7f62-b7d9-e218bd21f7d3`)
+    - review_status: fail
+    - finding: P1 missing S99 report-ledger closure evidence.
+    - disposition: fixed by recording this S99 final quality gate section and `tc-099` closure rows.
+  - issue-wide code review:
+    - reviewer: Socrates the 2nd (`019e567e-7ddf-7373-9e51-581b6999df03`)
+    - review_status: pass
+    - finding: P2 stale S03/S90 pending status.
+    - disposition: fixed by replacing stale progress/blocker wording and recording S03/S90 commit `f2d865a`.
+  - final spec review attempt:
+    - reviewer: Laplace the 2nd (`019e567e-7e78-77c0-bc4e-c5d0d9d98250`)
+    - review_status: fail
+    - finding: P1 missing S99 / `tc-099` closure ledger and stale incomplete status.
+    - disposition: fixed by recording S99 final command evidence, reviewer findings/dispositions, `tc-099` closure rows, and updated acceptance / blocker summaries.
+  - changed files since S90 commit:
+    - `report.md` only.
+  - re-review status:
+    - qa-reviewer Bohr the 2nd: `review_status: pass`.
+    - code-reviewer Socrates the 2nd: `review_status: pass`.
+    - spec-reviewer Laplace the 2nd: `review_status: pass`.
+  - closure state: pass; final report commit pending.
+
+## Step Contract Closure
+| step | closure id | status | evidence |
+|---|---|---|---|
+| S01 | tc-001 | pass | prerequisite reports inspected; GitHub #120〜#124 are closed; `iss-00124` stale report wording and pass evidence are cited by line/command as caveat rather than rewritten; Kuhn the 2nd re-review passed. |
+| S01 | tc-002 | pass | active scope, validate, sync, clean status, permission/profile state, and S02 Task Manifest Lock with pinned source hash recorded; Kuhn the 2nd re-review passed. |
+| S02 | tc-003 | pass | system-architect fallback design discussion draft produced at locked path with `authority: proposed`; no canonical write verification or final authority claim; Tesla the 2nd review passed. |
+| S02 | tc-004 | pass | implementation-planner fallback plan discussion draft produced at locked path with `authority: proposed`; no canonical write verification, implementation-readiness, or final authority claim; Tesla the 2nd review passed. |
+| S03 | tc-005 | pass | active/context-pack/index/dashboard inspection has no fallback draft artifact matches; proposed drafts remain evidence only and are not downstream authority; Averroes the 2nd review passed. |
+| S03 | tc-006 | pass | `git diff --name-status` was empty before S03 report update; S02 commit touched only issue-local report/discussion artifacts; no provider defect discovered; Averroes the 2nd review passed. |
+| S90 | tc-090 | pass | docs impact classified as no-op; validate passes and docs/skills/adapters already expose fallback / Permission Profile / `authority: proposed` guidance; Mendel the 2nd review passed. |
+| S99 | tc-099 | pass | final validate/sync/diff-check/clean evidence is recorded; initial QA/spec P1 findings and code P2 finding are dispositioned; QA/code/spec re-reviews passed. |
+
+## Test Contract Closure
+| test id | planned command / evidence | observed result | status |
+|---|---|---|---|
+| tc-001 | prerequisite report `rg`, `nl -ba iss-00124/report.md`, plus `gh issue view 120..125` | prerequisite evidence sufficient with line-cited stale-report caveat for `iss-00124`; #120〜#125 are now closed; reviewer pass | pass |
+| tc-002 | `active show`, `validate`, `sync`, permission/profile inspection, clean check | active `iss-00125`; validate nodes=63; sync active unchanged; clean status; write-scoped canonical pilot disabled/fallback locked with source hash; reviewer pass | pass |
+| tc-003 | locked system-architect discussion draft path inspection | fallback design draft file exists with `authority: proposed`, source hash, rejected canonical write scope, and no final authority claim; reviewer pass | pass |
+| tc-004 | locked implementation-planner discussion draft path inspection | fallback plan draft file exists with `authority: proposed`, source hash, rejected canonical write / implementation-readiness scope, and no final authority claim; reviewer pass | pass |
+| tc-005 | `active show`, `validate`, active/context/index/dashboard fallback-name `rg` | active remains `iss-00125`; validate nodes=63; no fallback draft artifact names appear in active/context-pack/index/dashboard authority surfaces; reviewer pass | pass |
+| tc-006 | `git diff --name-status`; `git show --name-status --oneline --no-renames HEAD` | no current diff before S03 report update; S02 commit changed only issue-local report/discussion artifacts; no provider defect discovered; reviewer pass | pass |
+| tc-090 | `validate`; docs/skills/adapters/report fallback guidance `rg` | validate nodes=63; relevant surfaces expose task manifest / Permission Profile / proposal-only fallback / `authority: proposed`; no docs edit required; reviewer pass | pass |
+| tc-099 | `git status --short`; `validate`; `sync`; `git diff --check`; S99 QA/code/spec reviews | clean before S99 report update; validate nodes=63; sync active unchanged; diff-check pass; QA/spec initial P1 and code P2 are dispositioned; QA/code/spec re-reviews passed | pass |
+
+## Closure Coverage
+| AC / EC | covered by | current evidence |
+|---|---|---|
+| AC-001 / EC-002 | S01 / tc-001 | prerequisite closure/fallback state recorded before pilot authoring; stale prerequisite wording is carried as caveat instead of rewriting completed issue reports. |
+| AC-001 / EC-001 / EC-003 | S01 / tc-002 | active scope, baseline validate/sync, permission fallback state, and S02 fallback manifest lock recorded. |
+| AC-002 | S02 / tc-003, tc-004 | actual delegated design and plan draft evidence is produced as fallback `discussions/` artifacts with `authority: proposed`; no canonical write, final authority, promotion, reviewer-pass, or implementation-readiness claim. |
+| AC-003 / EC-001 | S03 / tc-005 | fallback discussion drafts are absent from active/context-pack/index/dashboard authority surfaces; validate passes. |
+| AC-004 / EC-002 | S03 / tc-006 | no provider/runtime/test/config diff or silent provider fix exists; no provider defect discovered in S03. |
+| AC-004 / EC-003 | S90 / tc-090 | host invocation remains unverified and is recorded without over-claiming; existing docs/skills/adapters already cover fallback behavior; no docs update required. |
+| Final quality | S99 / tc-099 | final command evidence is recorded; initial reviewer findings are dispositioned; QA/code/spec re-reviews passed before final commit / issue finish. |
+
+## Closure Delta
+- `tc-001`: no closure id changed. Evidence includes an explicit caveat because `iss-00124/report.md:16-19` retains stale pending wording despite final pass/closure evidence at `iss-00124/report.md:277-308` and GitHub #124 closed state.
+- `tc-002`: no closure id changed. S02 is locked to fallback discussion drafts because no safe canonical pilot target exists and host/profile positive write enablement is not verified. The stale-if source hash is pinned to `608a7e994e37e2ee2d095eb96f6700ebe1f62e1b`.
+- `tc-003`: no closure id changed. Closed by fallback discussion draft evidence only, not by canonical design write verification.
+- `tc-004`: no closure id changed. Closed by fallback discussion draft evidence only, not by canonical plan write verification or implementation-readiness.
+- `tc-005`: no closure id changed. Evidence is an absence check; fallback draft artifact names are intentionally absent from active/context-pack/index/dashboard authority surfaces.
+- `tc-006`: no closure id changed. Evidence is no-op/provider-defect-disposition; no provider defect was found and no provider source was changed.
+- `tc-090`: no closure id changed. Docs impact is no-op because current docs/skills/adapters already cover the fallback behavior exercised by this pilot; S90 spec-reviewer passed.
+- `tc-099`: no closure id changed. S99 final command evidence and reviewer finding dispositions were added after initial QA/spec fail and code P2 feedback; QA/code/spec re-reviews passed.
+
+## ブロッカー / 未完了
+- None for this Issue.
+
+## Final Closure Addendum
+- final report commit: `2a7dbec2fc7000d4e596d2080312a5c83322c13d` (`docs(issue): iss-00125 S99品質ゲートを記録`) records the final S99 command evidence, finding dispositions, and reviewer pass results.
+- issue finish: completed; GitHub #125 closed at `2026-05-23T20:25:37Z`.
+- stale wording disposition: earlier pending statements in this report were superseded by the S99 closure ledger, final report commit, issue finish, and this addendum. Epic G10 may treat `iss-00125` as closed evidence, not pending work.

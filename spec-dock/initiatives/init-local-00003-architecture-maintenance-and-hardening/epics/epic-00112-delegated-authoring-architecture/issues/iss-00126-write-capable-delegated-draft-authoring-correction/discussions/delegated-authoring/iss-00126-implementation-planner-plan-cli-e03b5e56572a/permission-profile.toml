@@ -1,0 +1,14 @@
+default_permissions = "spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a"
+
+[permissions."spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a".filesystem]
+":minimal" = "read"
+
+[permissions."spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a".filesystem.":workspace_roots"]
+"." = "read"
+"spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/plan.md" = "write"
+"spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/discussions/delegated-authoring/iss-00126-implementation-planner-plan-cli-e03b5e56572a" = "write"
+".env" = "deny"
+".env.*" = "deny"
+
+[permissions."spec-dock-iss-00126-implementation-planner-plan-cli-e03b5e56572a".network]
+enabled = false

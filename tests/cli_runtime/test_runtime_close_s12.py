@@ -133,14 +133,76 @@ class _StubGitGateway:
         return self.origin_repo_slug_value
 
 
+class _StubActiveStateStore:
+    def __init__(
+        self,
+        infra_contracts,
+        *,
+        issue_id: str | None = "iss-local-00001",
+        issue_authority: str | None = "approved",
+        issue_grants=None,
+        promotion_record=None,
+    ) -> None:
+        self._infra_contracts = infra_contracts
+        self.issue_id = issue_id
+        self.issue_authority = issue_authority
+        self.issue_grants = tuple(issue_grants) if issue_grants is not None else ("issue_finish",)
+        self.promotion_record = promotion_record
+
+    def load_active_manifest(self, specdock_dir: Path):
+        del specdock_dir
+        issue_entry = None
+        if self.issue_id is not None:
+            promotion_record = self.promotion_record
+            if promotion_record is None:
+                promotion_record = {
+                    "status": "approved",
+                    "authority": "approved",
+                    "source_revision": f"active:{self.issue_id}",
+                    "approved_revision": f"active:{self.issue_id}",
+                    "approved_hash": f"active:{self.issue_id}",
+                    "reviewer_target_hash": f"active:{self.issue_id}",
+                    "promotion_decision": "runtime_active_selection",
+                }
+            issue_entry = self._infra_contracts.ActiveManifestEntry(
+                id=self.issue_id,
+                path=f"spec-dock/issues/{self.issue_id}",
+                authority=self.issue_authority,
+                grants=self.issue_grants,
+                promotion_record=promotion_record,
+            )
+        return self._infra_contracts.ActiveManifestLoadResult(
+            manifest=self._infra_contracts.ActiveManifest(initiative=None, epic=None, issue=issue_entry),
+            source="agent.active",
+            warnings=[],
+        )
+
+
 class TestRuntimeCloseS12(unittest.TestCase):
-    def _ports(self, *, repo_root: Path, records, issue_gateway):
-        _app_close_node, _app_contracts, app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, _infra_contracts = _runtime_modules()
+    def _ports(
+        self,
+        *,
+        repo_root: Path,
+        records,
+        issue_gateway,
+        active_issue_id: str | None = "iss-local-00001",
+        active_issue_authority: str | None = "approved",
+        active_issue_grants=None,
+        active_promotion_record=None,
+    ):
+        _app_close_node, _app_contracts, app_ports, _cli_bootstrap, _domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
         return app_ports.Ports(
             node_reader=_StubNodeReader(records),
             repo_root=repo_root,
             specdock_dir=repo_root / "spec-dock",
             issue_gateway=issue_gateway,
+            active_state_store=_StubActiveStateStore(
+                infra_contracts,
+                issue_id=active_issue_id,
+                issue_authority=active_issue_authority,
+                issue_grants=active_issue_grants,
+                promotion_record=active_promotion_record,
+            ),
         )
 
     def test_close_node_fails_when_target_has_no_linked_github_issue(self) -> None:
@@ -194,6 +256,138 @@ class TestRuntimeCloseS12(unittest.TestCase):
 
         self.assertEqual(issue_gateway.view_calls, [])
         self.assertEqual(issue_gateway.close_calls, [])
+
+    def test_close_node_allows_explicit_issue_target_when_authority_is_proposed(self) -> None:
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        repo_root = Path("/repo")
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00001",
+                slug="target",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            )
+        ]
+        issue_gateway = _StubIssueGateway(
+            view_snapshots=[_snapshot(domain_models, issue_number=301, state="OPEN")],
+            close_snapshot=_snapshot(domain_models, issue_number=301, state="CLOSED"),
+        )
+        ports = self._ports(
+            repo_root=repo_root,
+            records=records,
+            issue_gateway=issue_gateway,
+            active_issue_authority="proposed",
+        )
+
+        result = app_close_node.close_node(
+            app_contracts.CloseNodeRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+            ),
+            ports,
+        )
+
+        self.assertEqual(result.node_id, "iss-local-00001")
+        self.assertFalse(result.already_closed)
+        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
+
+    def test_close_node_allows_explicit_issue_target_when_promotion_record_is_stale(self) -> None:
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        repo_root = Path("/repo")
+        stale_record = {
+            "status": "approved",
+            "authority": "approved",
+            "source_revision": "active:iss-local-00999",
+            "approved_revision": "active:iss-local-00999",
+            "approved_hash": "active:iss-local-00999",
+            "reviewer_target_hash": "active:iss-local-00999",
+            "promotion_decision": "runtime_active_selection",
+        }
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00001",
+                slug="target",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            )
+        ]
+        issue_gateway = _StubIssueGateway(
+            view_snapshots=[_snapshot(domain_models, issue_number=301, state="OPEN")],
+            close_snapshot=_snapshot(domain_models, issue_number=301, state="CLOSED"),
+        )
+        ports = self._ports(
+            repo_root=repo_root,
+            records=records,
+            issue_gateway=issue_gateway,
+            active_promotion_record=stale_record,
+        )
+
+        result = app_close_node.close_node(
+            app_contracts.CloseNodeRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+            ),
+            ports,
+        )
+
+        self.assertEqual(result.node_id, "iss-local-00001")
+        self.assertFalse(result.already_closed)
+        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
+
+    def test_close_node_allows_explicit_issue_target_when_target_is_not_active(self) -> None:
+        app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
+        repo_root = Path("/repo")
+        records = [
+            _record(
+                infra_contracts,
+                repo_root=repo_root,
+                kind="issue",
+                node_id="iss-local-00001",
+                slug="target",
+                parent_id="epic-local-00001",
+                initiative_id="init-local-00001",
+                epic_id="epic-local-00001",
+                github_issue_number=301,
+                github_repo_owner="example",
+                github_repo_name="repo",
+            )
+        ]
+        issue_gateway = _StubIssueGateway(
+            view_snapshots=[_snapshot(domain_models, issue_number=301, state="OPEN")],
+            close_snapshot=_snapshot(domain_models, issue_number=301, state="CLOSED"),
+        )
+        ports = self._ports(
+            repo_root=repo_root,
+            records=records,
+            issue_gateway=issue_gateway,
+            active_issue_id="iss-local-00002",
+        )
+
+        result = app_close_node.close_node(
+            app_contracts.CloseNodeRequest(
+                target=app_contracts.TargetRef(kind="node_id", node_id="iss-local-00001", github_issue_number=None)
+            ),
+            ports,
+        )
+
+        self.assertEqual(result.node_id, "iss-local-00001")
+        self.assertFalse(result.already_closed)
+        self.assertEqual(issue_gateway.view_calls, [(str(repo_root), 301, "example/repo")])
+        self.assertEqual(issue_gateway.close_calls, [(str(repo_root), 301, "example/repo")])
 
     def test_close_node_gh_failure_leaves_local_tree_unchanged(self) -> None:
         app_close_node, app_contracts, _app_ports, _cli_bootstrap, domain_models, _infra_github_cli, infra_contracts = _runtime_modules()
@@ -630,6 +824,7 @@ class TestRuntimeCloseS12(unittest.TestCase):
             specdock_dir=repo_root / "spec-dock",
             issue_gateway=issue_gateway,
             git_gateway=_StubGitGateway("example/repo"),
+            active_state_store=_StubActiveStateStore(infra_contracts, issue_id="iss-local-00001"),
         )
 
         result = app_close_node.close_node(
