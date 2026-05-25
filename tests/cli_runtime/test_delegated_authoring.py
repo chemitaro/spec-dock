@@ -44,6 +44,23 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         self.assertNotIn("manifest_path=", p.stdout)
         self.assertFalse((_issue_dir(target) / "discussions" / "delegated-authoring").exists())
 
+    def test_scoped_context_subcommand_is_not_registered(self) -> None:
+        target = self._make_target_repo_with_scope()
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "scoped-context",
+                "--help",
+            ],
+        )
+
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("invalid choice", p.stderr)
+        self.assertIn("{manifest,baseline-status,diff-guard}", p.stderr)
+        self.assertNotIn("--discussion" + "-file", p.stdout + p.stderr)
+
     def test_baseline_status_writes_content_hash_snapshot(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)

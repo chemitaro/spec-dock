@@ -443,3 +443,433 @@ ID: "iss-00127"
 - `git status --short` が意図した未コミット差分なし、または PR 作成直前に最終 commit 済みである。
 - main 向け PR が作成され、CI / checks / reviewer feedback の状態を確認済みである。
 - unresolved `Status=open` decision ledger entry、blocking Evidence Adoption Ledger entry、failed reviewer gate が残っていない。
+
+## 追加実装計画追補 S04 — Agent permission taxonomy and scoped-write execution correction
+
+この追補は、S01-S03 / S90 / S99 実施後に判明した requirement / design の矛盾を解消する追加修正作業である。既存の実施済みステップは編集せず、追加ステップとして扱う。
+
+- 追加背景:
+  - `discussions/20260524t235542z-disc-agent-permission-classification-gap-analysis.md` により、`system-architect` / `implementation-planner` が read-only static fallback として扱われ、target `discussions/` へ実際に write できない gap が確認された。
+  - read-only specialist、full workspace-write worker、scoped-write delegated authoring agent、canonical authority の分類が正本に固定されていなかった。
+- 振る舞いの目標:
+  - `system-architect` / `implementation-planner` を scoped-write delegated authoring agent として実装し、target scope `discussions/` direct child の flat Markdown だけを書ける本命 execution path を成立させる。
+  - static `.codex/agents/*.toml` は broad write を許可しない read-mostly fallback として維持し、fallback と本命 scoped-write execution を混同しない。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml`
+  - `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
+  - scoped invocation / permission context を生成または記録する runtime / workflow / adapter files
+  - dogfooding mirror: `.codex/agents/system-architect.toml`, `.codex/agents/implementation-planner.toml`, `.agents/skills/spec-dock-system-architect/SKILL.md`, `.agents/skills/spec-dock-implementation-planner/SKILL.md`
+  - `tests/test_init_update.py`
+  - 必要に応じて `tests/cli_runtime/test_delegated_authoring.py` / `tests/domain_runtime/test_delegated_authoring.py`
+- Red / 代替証跡の要件:
+  - red-required: 現状の static adapter inspection では `system-architect` / `implementation-planner` に `write` permission がなく、scope-local direct-write contract を満たさないことを確認する。
+  - red-required: scoped-write execution path が存在しない、または target `discussions/` への write-capable contract を検証できないことを確認する。
+  - inspect-only fallback: host が実際の sub-agent permission sandbox を test から起動できない場合、生成される scoped permission context / invocation artifact / adapter contract を fixture として検査する。
+- Green 検証:
+  - `system-architect` / `implementation-planner` の本命 execution path では、resolved target scope `discussions/` direct child への naming-rule compliant Markdown create が許可される。
+  - canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、implementation files、tests、config、`.agents`、`.codex`、`.github`、`.env*`、nested directory、per-agent directory、run/task directory、`discussions/delegated-authoring/` はこの 2 role から write 不可である。
+  - `researcher` / `consultant` / `deep-consultant` / `repo-analyst` / reviewers / `pr-monitor` / `spark-worker` は read-only static specialist のままである。
+  - `dev-coder` / `doc-writer` / worker 系は full workspace-write worker として別分類に残る。
+  - post-run `delegated-authoring diff-guard` は scoped-write output の採用資格を検査するが、actual write-capable execution path の代替とは扱わない。
+- amendment trigger:
+  - host が exact target `discussions/` write root を表現できないことが確認された場合、static adapter に broad write を足して解決せず、requirement/design/report に blocker または follow-up decision として記録する。
+  - scoped execution path が runtime command ではなく orchestrator workflow の責務になる場合、workflow docs と tests の対象を更新する。
+
+### S04 委任契約
+- 委任ロール:
+  - dev-coder for runtime / tests / permission context generation.
+  - doc-writer for shipped skill / adapter / workflow wording.
+- 入力 docs / source of truth:
+  - `requirement.md` の Agent 権限分類、AC-002、EC-001、Q-002。
+  - `design.md` の D-002、D-003、Agent execution surfaces、Agent permission dependency。
+  - `discussions/20260524t235542z-disc-agent-permission-classification-gap-analysis.md`。
+- 許可 paths:
+  - S04 対象ファイルに列挙した provider assets、dogfooding mirror、runtime / tests / docs。
+- 禁止 changes:
+  - S01-S03 / S90 / S99 の既存計画本文を書き換えない。
+  - static adapter に repo-wide / `spec-dock/initiatives` broad write を与えない。
+  - canonical docs direct-write success path を復活させない。
+  - read-only specialist を write-capable にしない。
+- acceptance criteria:
+  - `system-architect` / `implementation-planner` は read-only specialist ではなく scoped-write delegated authoring agent として分類・実装されている。
+  - static fallback と scoped-write execution path が docs / adapter / tests 上で明確に分離されている。
+  - target `discussions/` direct child への write-capable contract と forbidden write boundaries が test / fixture / inspection で固定されている。
+- required tests or docs-only verification:
+  - impacted `tests/test_init_update.py`
+  - impacted delegated-authoring CLI / domain tests if runtime helper changes are introduced.
+  - `rg` inspection for broad write, canonical direct-write, and read-only specialist regression.
+  - `./spec-dock/scripts/spec-dock validate`
+  - `git diff --check`
+- reviewer focus:
+  - system-architect / implementation-planner が read-only static に戻っていないこと。
+  - broad write を safety guard で正当化していないこと。
+  - actual write-capable execution path と post-run diff guard の責務が混同されていないこと。
+- stop conditions:
+  - host permission model の制約により scoped-write execution path を実装できず、代替として broad write を足す必要が出た場合。
+  - target `discussions/` direct child だけの write 境界を test / fixture / inspection で観測できない場合。
+  - canonical docs direct-write success path の復活が必要になる場合。
+- output required:
+  - changed files list grouped by provider, mirror, runtime, tests, docs。
+  - scoped-write execution path の説明。
+  - permission boundary evidence。
+  - test / validation results。
+  - report evidence to update for Decision Ledger, Evidence Adoption Ledger, Step Contract Closure, Test Contract Closure, Reviewer Gate Status。
+
+### S04 具体テストケース一覧
+- `tc-s04-001` acceptance: scoped-write authoring agents are not read-only specialists
+  - 前提: system-architect / implementation-planner の provider adapter / skill / execution path が更新済み。
+  - 操作: permission taxonomy と execution contract を inspection する。
+  - 期待結果: 2 role は scoped-write delegated authoring agent として分類され、target `discussions/` direct child への write-capable path が存在する。
+  - 失敗検出: 2 role が read-only static fallback のみで完了扱いになる回帰を検出する。
+  - 検証方法: asset tests、fixture inspection、`rg` inspection。
+- `tc-s04-002` negative: scoped-write does not become broad write
+  - 前提: scoped-write execution path が生成または設定される。
+  - 操作: allowed / denied paths を inspection または fixture test で確認する。
+  - 期待結果: target `discussions/` direct child の flat Markdown create だけが write allowed であり、canonical docs、implementation files、tests、config、`.agents`、`.codex`、`.github`、`.env*`、nested dirs、`discussions/delegated-authoring/` は denied / ineligible。
+  - 失敗検出: static adapter や scoped context が repo-wide / `spec-dock/initiatives` broad write を持つ回帰を検出する。
+  - 検証方法: permission fixture tests、asset tests、diff-guard forbidden cases。
+- `tc-s04-003` regression: read-only specialists remain read-only
+  - 前提: agent taxonomy が docs / assets に反映済み。
+  - 操作: researcher / consultant / deep-consultant / repo-analyst / reviewers / pr-monitor / spark-worker の adapter を確認する。
+  - 期待結果: これらの agent は read-only static specialist として write permission を持たない。
+  - 失敗検出: scoped-write authoring correction の副作用で specialist に write が広がる回帰を検出する。
+  - 検証方法: asset tests、`rg` inspection。
+- `tc-s04-004` integration: diff guard remains an adoption eligibility check
+  - 前提: scoped-write output が target discussion に作成される。
+  - 操作: `delegated-authoring diff-guard` を実行する。
+  - 期待結果: diff guard は output eligibility を判定するが、write permission の代替として説明されない。
+  - 失敗検出: write-capable execution path なしで diff guard pass だけを direct-write 実装完了とみなす回帰を検出する。
+  - 検証方法: delegated-authoring tests、docs inspection、report ledger。
+
+### S04 step closure contract
+- closure ids: `tc-s04-001`, `tc-s04-002`, `tc-s04-003`, `tc-s04-004`
+- close 条件:
+  - provider assets / mirror / tests が requirement/design の updated taxonomy と整合する。
+  - system-architect / implementation-planner の scoped-write execution path が確認できる。
+  - static fallback に broad write が追加されていない。
+- report evidence:
+  - Decision Ledger、Step Contract Closure、Test Contract Closure、Closure Coverage、Reviewer Gate Status。
+- refactor guardrail:
+  - 旧 manifest-heavy model や canonical direct-write target を復活させない。
+  - permission model の変更は scoped-write delegated authoring に限定し、read-only specialist と full workspace-write worker の既存分類を不用意に変えない。
+
+### S04 step gate
+- step reviewer gate:
+  - reviewers: spec-reviewer, code-reviewer, qa-reviewer
+  - review 範囲: updated requirement/design alignment、provider / mirror adapters and skills、permission execution path、tests。
+  - pass 条件: all `review_status: pass`
+- commit / no-op gate:
+  - closure 状態: committed
+  - commit 範囲: S04 requirement/design follow-up, provider / mirror / runtime / tests / report evidence。
+
+## 追加最終ゲート追補
+- S04 完了後、既存 S99 / Final Exit Contract に加えて以下を確認する。
+  - `report.md` に S04 の observed evidence、Decision Ledger、closure coverage、reviewer gates、commit/no-op evidence が記録されている。
+  - `python -m unittest` の impacted tests、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync`、`./spec-dock/scripts/spec-dock doctor`、`git diff --check` が pass または limitation が report に記録されている。
+  - PR #119 / #128 または後続 PR の状態が、S04 の requirement/design 修正と実装結果を反映している。
+
+## 追加実装計画追補 S05 — Static all discussions write permission correction
+
+この追補は、S04 実装後に判明した運用設計上の過剰複雑性を修正する追加作業である。既存の S01-S04 / S90 / S99 の本文は編集せず、S05 が S04 の `exact file runtime scoped-context` 方針を supersede する。
+
+- 追加背景:
+  - `discussions/20260525t010211z-disc-static-all-discussions-write-permission-analysis.md` により、run ごとの `scoped-context --discussion-file` 生成は、単一 file の write boundary としては安全だが、複数 initiative / epic / issue の `discussions/` に連続して draft を残す delegated authoring 運用には過剰に複雑であることが確認された。
+  - user decision と更新済み requirement / design により、system-architect / implementation-planner は static adapter で全 scope-local `discussions/` への write capability を持つ delegated authoring agent として扱う。
+  - canonical docs、implementation files、tests、config、secrets への write 禁止は維持する。
+- 振る舞いの目標:
+  - `system-architect` / `implementation-planner` の通常実行は、run ごとの agent setting rewrite や exact-file permission context generation に依存しない。
+  - static `.codex/agents/*.toml` は、all scope-local `discussions/` direct-child Markdown authoring を許可する。
+  - `spec-dock/initiatives` 全体や repo-wide write のように canonical docs まで含む broad write は採用しない。
+  - `delegated-authoring scoped-context --discussion-file` は標準成功経路から外すだけでなく、runtime command / application helper / parser binding / tests / guidance から削除する。deprecated / diagnostic fallback として残さない。
+  - post-run diff guard は、actual write permission の代替ではなく、delegated output の採用資格検査として維持する。
+- 対象ファイル:
+  - `src/spec_dock/assets/install_root/.codex/agents/system-architect.toml`
+  - `src/spec_dock/assets/install_root/.codex/agents/implementation-planner.toml`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
+  - `src/spec_dock/assets/install_root/.codex/AGENTS.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_epic.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delegated_authoring.py`
+    - remove: `DelegatedAuthoringScopedContextRequest`, `DelegatedAuthoringScopedContextResult`, `_SCOPED_CONTEXT_PERMISSION_PROFILES`, `generate_delegated_authoring_scoped_context`, `_blocked_scoped_context_result`, `_render_scoped_context_toml`, `_resolve_scoped_discussion_file`, `_scoped_discussion_file_error`, and `_toml_string` if no longer used.
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/delegated_authoring.py`
+    - remove: scoped-context imports, `DelegatedAuthoringScopedContextArgs`, command registry entry, argument builder, args factory, runner, expectation helper, and renderer.
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
+    - remove: `delegated-authoring scoped-context` subparser binding.
+  - dogfooding mirror: `.codex/`, `.agents/`, `spec-dock/docs/`, `spec-dock/scripts/spec_dock_runtime/...`
+  - `tests/test_init_update.py`
+  - `tests/cli_runtime/test_delegated_authoring.py`
+  - `tests/domain_runtime/test_delegated_authoring.py`
+- Red / 代替証跡の要件:
+  - red-required: 現状の static adapter inspection では `system-architect` / `implementation-planner` に all scope-local `discussions/` write capability がなく、run ごとの exact-file context generation を標準経路として要求していることを確認する。
+  - red-required: `scoped-context --discussion-file` exact write root 前提の tests / docs / skills が、新方針と矛盾することを確認する。
+  - red-required: S04 exact-file context generation code path の存在を `rg` inspection で確認し、削除対象 inventory として report に記録する。
+  - feasibility-required: Codex permission profile が `spec-dock/initiatives/**/discussions/` 相当の static write rule を表現できるかを fixture / inspection / documented limitation で確認する。
+  - fallback-required: glob 表現が使えない場合でも、`spec-dock/initiatives` 全体 write や repo-wide write へ逃げず、最小代替案を report に記録する。
+- Green 検証:
+  - `system-architect` / `implementation-planner` は static delegated authoring profile 上、all scope-local `discussions/` direct-child Markdown authoring を許可される。
+  - canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、implementation files、tests、config、`.agents`、`.codex`、`.github`、`.env*` は write target にならない。
+  - `researcher` / `consultant` / `deep-consultant` / `repo-analyst` / reviewers / `pr-monitor` / `spark-worker` は read-only specialist のままである。
+  - `dev-coder` / `doc-writer` / worker 系は full workspace-write worker として別分類に残る。
+  - `scoped-context --discussion-file` を標準成功経路として要求する文言、runtime command path、application helpers、exact-file context tests は削除されている。deprecated / diagnostic fallback として残っていない。
+  - diff guard は all inspected scope-local `discussions/` の valid draft create/update を許可し、canonical / implementation / config / secret / nested / symlink / non-Markdown / invalid-state output を拒否する。
+- amendment trigger:
+  - permission profile が all scope-local `discussions/` write を静的に表現できない場合。
+  - all discussions write を表現するために canonical docs を含む broad write が必要になる場合。
+  - diff guard を single target scope 前提から広げる過程で、既存の baseline safety contract と衝突する場合。
+  - S04 exact-file context generation code を削除すると、diff guard / baseline-status / manifest deprecated stub まで壊れることが判明した場合。
+
+### S05 委任契約
+- 委任ロール:
+  - dev-coder for runtime deletion / tests replacement / permission contract adjustment.
+  - doc-writer for shipped skill / adapter / workflow wording.
+  - spec-reviewer for requirement/design/plan alignment after implementation.
+  - qa-reviewer and code-reviewer for final implementation gate.
+- 入力 docs / source of truth:
+  - `requirement.md` の Q-002、AC-002、AC-007、EC-001。
+  - `design.md` の D-002、D-003、Interface contract、Agent permission dependency。
+  - `discussions/20260525t010211z-disc-static-all-discussions-write-permission-analysis.md`。
+- 許可 paths:
+  - S05 対象ファイルに列挙した provider assets、dogfooding mirror、runtime、tests、workflow docs。
+- 禁止 changes:
+  - S01-S04 / S90 / S99 の既存計画本文を書き換えない。
+  - canonical docs direct-write success path を復活させない。
+  - `spec-dock/initiatives` 全体または repo-wide write を system-architect / implementation-planner に与えない。
+  - `delegated-authoring scoped-context` を deprecated / diagnostic fallback として残さない。
+  - read-only specialist を write-capable にしない。
+  - per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を新規 delegated output として復活させない。
+- acceptance criteria:
+  - system-architect / implementation-planner の通常 delegated authoring は static all discussions write に基づき、run ごとの exact-file context generation に依存しない。
+  - S04 exact-file context generation の runtime code、parser binding、command tests、asset wording は削除されている。
+  - canonical single-writer authority と discussions direct-write authority が docs / skills / adapters / tests 上で分離されている。
+  - provider assets と dogfooding mirror が同期している。
+- required tests or docs-only verification:
+  - impacted `tests/test_init_update.py`
+  - impacted `tests/cli_runtime/test_delegated_authoring.py`
+  - impacted `tests/domain_runtime/test_delegated_authoring.py`
+  - `rg` inspection for `scoped-context`, `discussion-file`, `read-mostly fallback`, canonical direct-write, broad write, and read-only specialist regression.
+  - `./spec-dock/scripts/spec-dock validate`
+  - `./spec-dock/scripts/spec-dock sync`
+  - `./spec-dock/scripts/spec-dock doctor`
+  - `git diff --check`
+- reviewer focus:
+  - S05 が S04 の exact-file context 方針を正しく supersede していること。
+  - all discussions write が canonical docs write や repo-wide write へ拡大していないこと。
+  - diff guard が permission generation の代替ではなく adoption eligibility check として残っていること。
+- stop conditions:
+  - host permission model の制約により all discussions write を static adapter で表現できず、かつ broad write 以外の代替が見つからない場合。
+  - canonical docs direct-write success path の復活が必要になる場合。
+- output required:
+  - changed files list grouped by provider, mirror, runtime, tests, docs。
+  - static all discussions write permission expression or documented limitation。
+  - scoped-context runtime command deletion evidence。
+  - permission boundary evidence。
+  - test / validation results。
+  - report evidence to update for Decision Ledger, Evidence Adoption Ledger, Step Contract Closure, Test Contract Closure, Reviewer Gate Status。
+
+### S05 具体テストケース一覧
+- `tc-s05-001` acceptance: static all discussions write capability
+  - 前提: system-architect / implementation-planner provider adapter が更新済み。
+  - 操作: permission profile / developer instructions / skill contract を inspection する。
+  - 期待結果: 2 role は all scope-local `discussions/` direct-child Markdown authoring capability を持ち、run ごとの exact-file context generation を標準経路として要求しない。
+  - 失敗検出: read-only fallback または `--discussion-file` 必須経路へ戻る回帰を検出する。
+  - 検証方法: asset tests、fixture inspection、`rg` inspection。
+- `tc-s05-002` negative: all discussions write does not become broad write
+  - 前提: static delegated authoring profile が更新済み。
+  - 操作: allowed / denied paths を inspection または fixture test で確認する。
+  - 期待結果: scope-local `discussions/` direct child Markdown authoring だけが allowed であり、canonical docs、implementation files、tests、config、`.agents`、`.codex`、`.github`、`.env*` は denied / ineligible。
+  - 失敗検出: `spec-dock/initiatives` 全体または repo-wide write の混入を検出する。
+  - 検証方法: permission fixture tests、asset tests、diff-guard forbidden cases。
+- `tc-s05-003` regression: scoped-context is not the standard path
+  - 前提: runtime / docs / skills が更新済み。
+  - 操作: `scoped-context --discussion-file` の扱いを tests と docs で確認する。
+  - 期待結果: command は runtime surface から削除され、deprecated / diagnostic fallback としても残っていない。通常 delegated authoring の完了条件になっていない。
+  - 失敗検出: exact direct child 1 file context generation が再び標準成功経路になる回帰を検出する。
+  - 検証方法: CLI tests、docs inspection、`rg` inspection。
+- `tc-s05-003a` cleanup: obsolete scoped-context code and tests are removed
+  - 前提: S04 exact-file scoped-context implementation が存在する。
+  - 操作: provider runtime、dogfooding mirror、tests、adapter/skill/workflow docs を `rg` で検索する。
+  - 期待結果: `DelegatedAuthoringScopedContextRequest`、`generate_delegated_authoring_scoped_context`、`delegated_authoring_scoped_context` command spec、`scoped-context` parser binding、`--discussion-file` exact-context tests、runtime scoped context guidance が削除されている。残るのは historical report / discussion evidence と、削除済みであることを説明する S05 docs のみである。
+  - 失敗検出: 使われない command code、helper function、test fixture、guidance wording が残る回帰を検出する。
+  - 検証方法: `rg` inspection、CLI test update、asset wording tests。
+- `tc-s05-004` integration: diff guard supports inspected discussions without replacing permission
+  - 前提: sub-agent output が scope-local `discussions/` に作成される。
+  - 操作: diff guard を実行する。
+  - 期待結果: diff guard は valid discussion draft create/update を eligible とし、forbidden paths を rejected / ineligible とする。diff guard は write permission generation の代替として説明されない。
+  - 失敗検出: write-capable execution path なしで diff guard pass だけを実装完了とみなす回帰を検出する。
+  - 検証方法: delegated-authoring CLI / domain tests、docs inspection、report ledger。
+- `tc-s05-005` regression: other agent taxonomy remains stable
+  - 前提: agent taxonomy が docs / assets に反映済み。
+  - 操作: read-only specialist と full workspace-write worker の adapters / docs を確認する。
+  - 期待結果: read-only specialist は write permission を持たず、full workspace-write worker は既存分類のまま残る。
+  - 失敗検出: S05 の副作用で unrelated agent の write boundary が変わる回帰を検出する。
+  - 検証方法: asset tests、`rg` inspection。
+
+### S05 step closure contract
+- closure ids: `tc-s05-001`, `tc-s05-002`, `tc-s05-003`, `tc-s05-003a`, `tc-s05-004`, `tc-s05-005`
+- close 条件:
+  - provider assets / mirror / tests が requirement/design の static all discussions write 方針と整合する。
+  - `scoped-context --discussion-file` の runtime command path と exact-file context generation tests が削除されている。
+  - canonical docs direct-write success path と broad write が復活していない。
+- report evidence:
+  - Decision Ledger、Evidence Adoption Ledger、Step Contract Closure、Test Contract Closure、Closure Coverage、Reviewer Gate Status。
+- refactor guardrail:
+  - 旧 manifest-heavy model、canonical direct-write target、exact-file runtime context code path を復活させない。
+  - permission model の変更は system-architect / implementation-planner の scoped delegated authoring に限定し、read-only specialist と full workspace-write worker の既存分類を不用意に変えない。
+
+### S05 step gate
+- step reviewer gate:
+  - reviewers: spec-reviewer, code-reviewer, qa-reviewer
+  - review 範囲: updated requirement/design/plan alignment、provider / mirror adapters and skills、runtime scoped-context handling、diff guard behavior、tests。
+  - pass 条件: all `review_status: pass`
+- commit / no-op gate:
+  - closure 状態: committed
+  - commit 範囲: S05 plan follow-up, provider / mirror / runtime / tests / report evidence。
+
+## 追加最終ゲート追補 S05
+- S05 完了後、既存 S99 / S04 final gate に加えて以下を確認する。
+  - `report.md` に S05 の observed evidence、Decision Ledger、closure coverage、reviewer gates、commit/no-op evidence が記録されている。
+  - `python -m unittest` の impacted tests、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync`、`./spec-dock/scripts/spec-dock doctor`、`git diff --check` が pass または limitation が report に記録されている。
+  - PR #119 / #128 または後続 PR の状態が、S05 の requirement/design/plan 修正と実装結果を反映している。
+
+## 追加実装ステップ S06: `draft-design` / `draft-plan` discussion doc creation
+
+### S06 目的
+- `spec-dock new doc` で `draft-design` / `draft-plan` を作成できるようにする。
+- 既存 canonical design / plan template を source としつつ、生成物は discussion-local evidence として `discussions/` に配置する。
+- `system-architect` / `implementation-planner` が structured draft artifact を作れる標準経路を提供する。
+
+### S06 対象ファイル
+```text
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
+|-- commands/new.py
+|-- application/contracts.py
+|-- application/create_node.py
+|-- domain/validation.py
+`-- application/sync_state.py
+
+src/spec_dock/assets/spec_dock/templates/
+|-- discussions/draft-design.md
+`-- discussions/draft-plan.md
+
+src/spec_dock/assets/spec_dock/docs/rules/
+|-- initiative/discussions.md
+|-- epic/discussions.md
+`-- issue/discussions.md
+
+spec-dock/                         # dogfooding mirror equivalents
+
+tests/
+|-- cli_runtime/test_new.py
+|-- cli_runtime/test_runtime_new_doc_s09.py
+|-- cli_runtime/test_validate.py
+|-- cli_runtime/test_delegated_authoring.py
+`-- test_init_update.py
+```
+
+### S06 作業順序
+1. Characterization / Red
+   - `new doc draft-design` / `new doc draft-plan` が現状 unknown type で失敗することを確認する。
+   - 現行 discussion filename validators が `draft-design` / `draft-plan` を許可していないことを確認する。
+2. Runtime type expansion
+   - `commands/new.py` の help / doc type list に `draft-design` / `draft-plan` を追加する。
+   - `application/contracts.py` の `CreateDiscussionDocRequest.doc_type` を更新する。
+   - `application/create_node.py` の creatable doc type list と filename regex を更新する。
+3. Draft rendering implementation
+   - `templates/discussions/draft-design.md` と `templates/discussions/draft-plan.md` を追加する。
+   - draft type の場合、scope kind に応じた canonical template source を選ぶ。
+   - canonical template body は discussion-local envelope の下に差し込む。
+   - canonical template frontmatter を draft の authoritative metadata として扱わない。
+   - `<DRAFT_ID>`、`<DRAFT_TITLE>`、`<TEMPLATE_SOURCE>`、`<INTENDED_TARGET>`、scope / parent placeholders を render する。
+4. Validation / sync / diff-guard compatibility
+   - validation / sync / delegated-authoring diff-guard の discussion filename recognition を `draft-design` / `draft-plan` 対応にする。
+   - `draft-design` / `draft-plan` は discussion doc として扱い、canonical artifact として扱わない。
+5. Docs and mirror
+   - `docs/rules/{initiative,epic,issue}/discussions.md` の catalog と create command examples に `draft-design` / `draft-plan` を追加する。
+   - provider asset と dogfooding mirror を同期する。
+6. Tests
+   - `new doc draft-design` / `draft-plan` の issue / epic / initiative 作成テストを追加する。
+   - scope kind ごとの template source selection を固定する。
+   - same-second suffix allocation が hyphenated kind で機能することを固定する。
+   - `validate` / `sync` / `diff-guard` compatibility を固定する。
+   - provider / mirror parity tests を更新する。
+7. Report and review
+   - `report.md` Decision Ledger / Evidence Adoption Ledger / Step Contract Closure / Test Contract Closure に S06 を記録する。
+   - `spec-reviewer`、`code-reviewer`、`qa-reviewer` の順または並列で review gate を通す。
+
+### S06 委任契約
+- 委任ロール:
+  - dev-coder for runtime / templates / tests implementation.
+  - spec-reviewer for requirement/design/plan alignment.
+  - code-reviewer for runtime / tests / template rendering review.
+  - qa-reviewer for validation coverage and regression risk review.
+- 入力 docs / source of truth:
+  - 追加要件 S06 in `requirement.md`
+  - 追加設計 S06 in `design.md`
+  - `discussions/20260525t055851z-research-draft-artifact-template-command-analysis.md`
+- 禁止 changes:
+  - S01-S05 / S90 / S99 の既存計画本文を書き換えない。
+  - `new draft` など別 command surface を追加しない。
+  - `disc` / `research` の variant として draft artifact を隠さない。
+  - canonical docs direct-write success path を復活させない。
+  - canonical template frontmatter を discussion-local draft の authoritative metadata として扱わない。
+  - `draft-requirement` を今回の必須実装として広げない。
+- acceptance criteria:
+  - `new doc draft-design` / `draft-plan` が initiative / epic / issue の `discussions/` に flat Markdown を作成できる。
+  - generated draft は discussion-local envelope と delegated draft provenance を持つ。
+  - generated draft body は scope-specific canonical design / plan template source から作られる。
+  - `validate` / `sync` / `diff-guard` が新 doc type と整合する。
+  - provider assets と dogfooding mirror が同期している。
+
+### S06 具体テストケース一覧
+- `tc-s06-001` acceptance: issue draft design creation
+  - 前提: issue scope が存在する。
+  - 操作: `new doc draft-design --issue <id> --title "<title>"`
+  - 期待結果: issue `discussions/` に `<ts>-draft-design-<slug>.md` が作成され、`templates/issue/design.md` derived body と discussion-local envelope を持つ。
+- `tc-s06-002` acceptance: epic draft plan creation
+  - 前提: epic scope が存在する。
+  - 操作: `new doc draft-plan --epic <id> --title "<title>"`
+  - 期待結果: epic `discussions/` に `<ts>-draft-plan-<slug>.md` が作成され、`templates/epic/plan.md` derived body と discussion-local envelope を持つ。
+- `tc-s06-003` matrix: scope-specific template selection
+  - 前提: initiative / epic / issue scopes が存在する。
+  - 操作: 各 scope で `draft-design` / `draft-plan` を作成する。
+  - 期待結果: scope kind ごとに対応する canonical template source が使われる。
+- `tc-s06-004` regression: hyphenated discussion kind naming
+  - 前提: same-second collision が起きる。
+  - 操作: 同一 timestamp family で `draft-design` / `draft-plan` を作成する。
+  - 期待結果: `<ts>-<nn>-draft-design-<slug>.md` / `<ts>-<nn>-draft-plan-<slug>.md` が割り当てられ、validate / sync が通る。
+- `tc-s06-005` integration: diff guard accepts draft artifact docs
+  - 前提: sub-agent output として `draft-design` / `draft-plan` が作成される。
+  - 操作: `delegated-authoring diff-guard` を実行する。
+  - 期待結果: valid draft create/update は allowed discussion output になり、canonical docs / forbidden paths は従来通り rejected / ineligible。
+- `tc-s06-006` negative: canonical template metadata is not draft authority
+  - 前提: generated draft を確認する。
+  - 操作: frontmatter と body を inspect する。
+  - 期待結果: top-level frontmatter は discussion-local draft envelope であり、canonical `状態: approved` / `authority: accepted` / adopted self-claim を持たない。
+
+### S06 required verification
+- `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 -v`
+- impacted `tests.cli_runtime.test_validate`
+- impacted `tests.cli_runtime.test_delegated_authoring`
+- impacted `tests.test_init_update`
+- `./spec-dock/scripts/spec-dock validate`
+- `./spec-dock/scripts/spec-dock sync`
+- `./spec-dock/scripts/spec-dock doctor`
+- `git diff --check`
+
+### S06 step gate
+- step reviewer gate:
+  - reviewers: spec-reviewer, code-reviewer, qa-reviewer
+  - pass 条件: all `review_status: pass`
+- report evidence:
+  - Decision Ledger: command surface / envelope / template source decisions.
+  - Evidence Adoption Ledger: analysis report adoption.
+  - Step Contract Closure: `tc-s06-001` through `tc-s06-006`.
+  - Test Contract Closure: test commands and results.

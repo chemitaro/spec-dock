@@ -76,7 +76,7 @@ Delegated plan draft を使う場合、orchestrator は draft 生成前に次を
 - forbidden actions は canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、implementation、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、GitHub mutation、phase promotion、reviewer-pass claim、implementation-readiness claim、user への直接質問を含む
 - forbidden locations は per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を含む
 - required plan draft output contract が、計画要約（Plan Summary）、要件 / 設計 traceability（Requirement / Design Traceability）、milestone（Milestones）、依存関係から導く実行順序（Dependency-Derived Execution Order）、Issue / step 分割（Issue / Step Slicing）、テスト戦略 mapping（Test Strategy Mapping）、review gate（Review Gates）、rollback / compatibility（Rollback / Compatibility）、docs impact（Docs Impact）、最終品質ゲート（Final Quality Gate）、plan blocker（Plan Blockers）、integration notes（Integration Notes）を含む
-- static adapter は broad write や canonical target write を許可しない read-mostly fallback とする。host が target `discussions/` direct child への write を厳密に表現できない場合、run は post-run diff guard pass と `report.md` ledger 記録まで adoption-ineligible とする
+- static adapter は scope-local `discussions/` Markdown draft だけに write-capable とし、broad write や canonical target write を許可しない。run ごとの permission context 生成に依存せず、run は post-run diff guard pass と `report.md` ledger 記録まで adoption-ineligible とする
 
 Sub-agent-created draft は lightweight provenance として `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持ちます。標準 delegated draft evidence として task manifest hash、Permission Profile hash、session invocation hash、probe run id を要求しません。これらは historical evidence または明示された例外証跡としてだけ扱います。
 

@@ -2091,8 +2091,12 @@ class TestInitUpdate(CliRuntimeHarness):
         write_roots = {path for path, permission in workspace_rules.items() if permission == "write"}
         self.assertEqual(
             write_roots,
-            set(),
-            f"delegated author adapter must not grant static write roots ({shim_label})",
+            {
+                "spec-dock/initiatives/*/discussions/*.md",
+                "spec-dock/initiatives/*/epics/*/discussions/*.md",
+                "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
+            },
+            f"delegated author adapter must grant only scope-local discussion write roots ({shim_label})",
         )
         for read_only_path in ("spec-dock/initiatives", "src", "tests", ".codex", ".agents"):
             self.assertEqual(
@@ -2114,16 +2118,14 @@ class TestInitUpdate(CliRuntimeHarness):
             "intentionally thin",
             "source of",
             f"delegated draft {draft_kind} evidence only",
-            "read-mostly fallback",
-            "does not grant broad write",
+            "write-capable delegated authoring path",
+            "must not grant broad workspace write",
             "canonical target write",
             "scope-local",
             "flat Markdown draft/analysis/report",
-            "target `discussions/`",
-            "direct child",
-            "adoption-ineligible",
+            "initiative, epic, or issue `discussions/`",
+            "static write rules cover all scope-local `discussions/`",
             "post-run diff guard",
-            "canonical report ledger",
             "Never edit implementation files",
             "Do not promote phases",
             "claim reviewer",
@@ -2135,6 +2137,9 @@ class TestInitUpdate(CliRuntimeHarness):
             '":minimal" = "read"',
             '"." = "read"',
             '"spec-dock/initiatives" = "read"',
+            '"spec-dock/initiatives/*/discussions/*.md" = "write"',
+            '"spec-dock/initiatives/*/epics/*/discussions/*.md" = "write"',
+            '"spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md" = "write"',
             '"src" = "read"',
             '"tests" = "read"',
             '".env" = "deny"',
@@ -9602,6 +9607,61 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                         f"dogfooding Codex adapter drifted from provider asset: {expected['path']}",
                     )
 
+    def test_s04_codex_agent_permission_taxonomy_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        read_only_specialists = (
+            "researcher",
+            "consultant",
+            "deep-consultant",
+            "repo-analyst",
+            "code-reviewer",
+            "qa-reviewer",
+            "spec-reviewer",
+            "pr-monitor",
+            "spark-worker",
+        )
+        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker", "worker")
+        scoped_delegated_authors = ("system-architect", "implementation-planner")
+
+        with cli._assets_dir() as assets_dir:
+            agents_dir = assets_dir / "install_root" / ".codex" / "agents"
+            for agent_name in read_only_specialists:
+                with self.subTest(agent=agent_name, taxonomy="read-only-specialist"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertEqual(parsed.get("sandbox_mode"), "read-only")
+                    self.assertNotEqual(parsed.get("sandbox_mode"), "workspace-write")
+                    self.assertNotIn("default_permissions", parsed)
+
+            for agent_name in workspace_write_workers:
+                with self.subTest(agent=agent_name, taxonomy="workspace-write-worker"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
+
+            for agent_name in scoped_delegated_authors:
+                with self.subTest(agent=agent_name, taxonomy="scoped-delegated-author"):
+                    text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
+                    parsed = tomllib.loads(text)
+                    self.assertNotIn("sandbox_mode", parsed)
+                    default_permissions = parsed.get("default_permissions")
+                    self.assertIsInstance(default_permissions, str)
+                    workspace_rules = parsed["permissions"][default_permissions]["filesystem"][":workspace_roots"]
+                    self.assertEqual(
+                        {path for path, permission in workspace_rules.items() if permission == "write"},
+                        {
+                            "spec-dock/initiatives/*/discussions/*.md",
+                            "spec-dock/initiatives/*/epics/*/discussions/*.md",
+                            "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
+                        },
+                    )
+                    self.assertIn("write-capable delegated authoring path", text)
+                    self.assertIn("static write rules cover all scope-local `discussions/`", text)
+                    self.assertNotIn("spec-dock/initiatives = \"write\"", text)
+                    self.assertNotIn('".codex" = "write"', text)
+                    self.assertNotIn('".agents" = "write"', text)
+
     def test_issue_102_agentic_tdd_contract_assets(self) -> None:
         import spec_dock.cli as cli
 
@@ -10066,6 +10126,50 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for fragment in fragments:
                 with self.subTest(asset=label, fragment=fragment):
                     self.assertIn(fragment, text)
+
+    def test_issue_127_removed_scoped_context_contract_stays_removed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        forbidden_terms = (
+            "scoped" + "-context",
+            "--discussion" + "-file",
+            "DelegatedAuthoring" + "ScopedContext",
+            "generate_delegated_authoring_" + "scoped_context",
+            "delegated_authoring_" + "scoped_context",
+            "runtime scoped " + "context required",
+            "one exact direct child Markdown file",
+            "exact" + "-file context",
+        )
+        searched_paths = (
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "spec_dock_runtime",
+            repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "docs",
+            repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".agents",
+            repo_root / "src" / "spec_dock" / "assets" / "install_root" / ".codex",
+            repo_root / "tests" / "cli_runtime",
+            repo_root / "tests" / "domain_runtime",
+            repo_root / "spec-dock" / "scripts" / "spec_dock_runtime",
+            repo_root / "spec-dock" / "docs",
+            repo_root / ".agents",
+            repo_root / ".codex",
+        )
+
+        offenders: list[str] = []
+        for root in searched_paths:
+            for path in sorted(root.rglob("*")):
+                if not path.is_file():
+                    continue
+                if path.suffix not in {".md", ".py", ".toml", ".json", ".yaml", ".yml"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for term in forbidden_terms:
+                    if (
+                        path.name == "test_delegated_authoring.py"
+                        and term == "scoped" + "-context"
+                    ):
+                        continue
+                    if term in text:
+                        offenders.append(f"{path.relative_to(repo_root)}: {term}")
+
+        self.assertEqual([], offenders)
 
     def test_bundled_skill_routing_contract(self) -> None:
         import spec_dock.cli as cli

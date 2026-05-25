@@ -13,6 +13,7 @@ derived_from:
   - "discussions/20260524t150117z-disc-scoped-discussion-draft-authoring-requirement-draft-v2.md"
   - "discussions/20260524t150916z-disc-fresh-consultant-review-v2-discussion-direct-write-model.md"
   - "discussions/20260524t235542z-disc-agent-permission-classification-gap-analysis.md"
+  - "discussions/20260525t010211z-disc-static-all-discussions-write-permission-analysis.md"
 ---
 
 # iss-00127 Scoped Discussion Draft Authoring Correction — 要件定義
@@ -32,8 +33,9 @@ derived_from:
 ## スコープ
 - 必須:
   - system-architect / implementation-planner の canonical docs direct edit success path を削除する。
-  - sub-agent が対象 scope の `discussions/` 直下に flat Markdown draft / analysis / discussion-local report を直接作成・編集できる契約を shipped skills / adapters / workflow docs に反映する。
-  - system-architect / implementation-planner を read-only static specialist ではなく scoped-write delegated authoring agent として分類し、対象 scope の `discussions/` 直下に限る write-capable execution path を成立させる。
+  - sub-agent が initiative / epic / issue の scope-local `discussions/` 直下に flat Markdown draft / analysis / discussion-local report を直接作成・編集できる契約を shipped skills / adapters / workflow docs に反映する。
+  - system-architect / implementation-planner を read-only static specialist ではなく scoped-write delegated authoring agent として分類し、静的 permission で全 scope-local `discussions/` への write-capable execution path を成立させる。
+  - S04 で追加された run-by-run exact-file permission context generation の runtime code、parser/command binding、tests、adapter/skill guidance を削除し、deprecated / diagnostic fallback として残さない。
   - `discussions/` の出力は既存命名規則 `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md` に従い、per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を新規生成しない。
   - `delegated-authoring manifest` を新規 user-facing success path として使えない状態にし、新規 manifest / profile / probe / session artifact を生成しない。
   - accepted ADR と discussion draft と canonical docs の authority 境界を明記する。
@@ -48,7 +50,7 @@ derived_from:
 - 対象外:
   - GitHub Copilot / `.github/agents` support の追加。
   - 汎用的な権限サンドボックス基盤や、任意 scope / 任意 host に対応する完全な permission engine を新規設計すること。
-  - static adapter だけで exact target scope write を表現できない場合に、static adapter へ広い write root を与えて解決すること。
+  - `spec-dock/initiatives` 全体や repo-wide write のように、canonical docs まで含む広い write root で解決すること。
   - `validate` / `issue finish` に discussion draft schema の深い意味解析を追加すること。
 
 ## 境界
@@ -59,14 +61,15 @@ derived_from:
   - `reflected_to` は実際に canonical artifact へ反映済みの対象だけを表し、予定先は `intended_targets` で表す。
 - 解決済み判断:
   - post-run diff guard は今回 runtime helper として最小実装する。helper は delegated output の採用資格を判定するだけで、adoption ledger や canonical artifact を更新しない。
-  - static adapter は broad write を許可せず、read-mostly fallback として扱う。ただし static fallback は `system-architect` / `implementation-planner` の本命実行経路ではない。これら 2 role は、別途 target scope `discussions/` direct child だけを書ける scoped-write delegated authoring execution path を持たなければならない。
+  - system-architect / implementation-planner の static adapter は read-only fallback ではなく、全 scope-local `discussions/` への scoped write capability を持つ delegated authoring surface として扱う。canonical docs、implementation files、tests、config、secrets への write は引き続き禁止する。
+  - `delegated-authoring scoped-context --discussion-file` は標準経路から外すだけでなく削除する。役割を終えた exact-file context generation code / tests / docs は、コード清潔性のために残さない。
 - 行わない:
   - Sub-agent に canonical artifact の authoring authority / promotion authority / reviewer pass claim を与えない。
   - Per-agent directory や run directory を `discussions/` 配下に作らない。
 
 ## 非交渉制約
 - Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は sub-agent が直接編集しない。
-- Sub-agent は対象 scope の `discussions/` 直下に限り、flat Markdown draft / analysis / discussion-local report を直接作成・編集できる。
+- Sub-agent は initiative / epic / issue の scope-local `discussions/` 直下に限り、flat Markdown draft / analysis / discussion-local report を直接作成・編集できる。
 - Sub-agent-created draft は `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` を自己主張しない。
 - Sub-agent-created draft は最低限 `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []` を持つ。
 - Sub-agent は原則として discussion file を新規作成する。既存 discussion file の編集は main orchestrator が明示指定した proposed draft に限定する。
@@ -88,8 +91,8 @@ derived_from:
   - 契約: main orchestrator の委任範囲内で実装、テスト、ドキュメント編集を行える。
 - Scoped-write delegated authoring agent:
   - 対象: `system-architect`, `implementation-planner`。
-  - 契約: canonical docs や implementation files は編集しない。一方で、target initiative / epic / issue の `discussions/` direct child に限り、命名規則準拠の flat Markdown draft / analysis / discussion-local report を直接作成できる。
-  - 補足: static `.codex/agents/*.toml` が read-mostly fallback であることは、この 2 role を read-only specialist に分類する根拠ではない。実運用では target scope を解決した scoped-write execution path が必要である。
+  - 契約: canonical docs や implementation files は編集しない。一方で、initiative / epic / issue の scope-local `discussions/` direct child に限り、命名規則準拠の flat Markdown draft / analysis / discussion-local report を直接作成できる。
+  - 補足: static `.codex/agents/*.toml` は、この 2 role に all discussions write capability を事前付与する。run ごとに agent 設定や permission context を生成・注入する方式は標準経路にしない。
 - Canonical authority / orchestrator:
   - 対象: main orchestrator と spec-manager-like orchestration support。
   - 契約: discussion draft の採否判断、canonical docs への統合、Evidence Adoption Ledger、phase / lifecycle authority を担う。
@@ -103,10 +106,16 @@ derived_from:
   - 観測点: `rg` による旧語彙・旧契約検索、targeted tests、spec-reviewer pass。
 - AC-002: Scope-local flat discussion direct-write contract
   - アクター: sub-agent / main orchestrator
-  - 前提: target initiative / epic / issue scope が解決済みである。
+  - 前提: initiative / epic / issue の scope-local `discussions/` が存在する。
   - 操作: system-architect / implementation-planner の output contract と execution permission contract を確認する。
-  - 期待結果: system-architect / implementation-planner は対象 scope の `discussions/` 直下に `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md` の flat Markdown draft / analysis / discussion-local report を直接作成できる。static fallback が read-only の場合でも、別途 scoped-write execution path が存在し、read-only specialist と同列に扱われていない。
+  - 期待結果: system-architect / implementation-planner は全 scope-local `discussions/` 直下に `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md` の flat Markdown draft / analysis / discussion-local report を直接作成できる。read-only specialist と同列に扱われず、run ごとの exact file context generation を標準経路として要求されない。
   - 観測点: shipped skills、adapters、discussion rules、permission / execution path tests。
+- AC-002a: Obsolete exact-file context implementation removal
+  - アクター: maintainer / dev-coder
+  - 前提: S04 exact-file scoped-context implementation が存在する。
+  - 操作: runtime command、application helper、parser binding、tests、adapter / skill / workflow docs を検索・点検する。
+  - 期待結果: `delegated-authoring scoped-context --discussion-file` の command path、context TOML generation、exact-file write-root tests、runtime scoped context guidance は削除されている。deprecated / diagnostic fallback として残っていない。
+  - 観測点: runtime diff、asset tests、CLI tests、`rg` inspection。
 - AC-003: Forbidden delegated output locations
   - アクター: delegated authoring runtime / docs / tests
   - 前提: delegated authoring output を生成または案内する経路を確認する。
@@ -135,7 +144,7 @@ derived_from:
   - アクター: main orchestrator
   - 前提: sub-agent が discussion draft を作成・編集した。
   - 操作: 実行前 baseline と実行後 diff を比較する。
-  - 期待結果: 許可 diff は target scope `discussions/` 直下の naming-rule compliant Markdown create/update のみである。canonical docs、implementation files、tests、config、`.agents`、`.codex`、`.env*`、nested dirs、symlinks、non-Markdown、delete、rename、baseline 時点で dirty/untracked な target discussion entry、新規 discussion の non-editable state claim があれば delegated output は rejected / ineligible になる。
+  - 期待結果: 許可 diff は scope-local `discussions/` 直下の naming-rule compliant Markdown create/update のみである。canonical docs、implementation files、tests、config、`.agents`、`.codex`、`.env*`、nested dirs、symlinks、non-Markdown、delete、rename、baseline 時点で dirty/untracked な inspected discussion entry、新規 discussion の non-editable state claim があれば delegated output は rejected / ineligible になる。
   - 観測点: report ledger、diff guard evidence。
 - AC-008: Orchestrator-owned adoption ledger
   - アクター: main orchestrator
@@ -163,10 +172,10 @@ derived_from:
   - 観測点: command output、report.md、PR checks。
 
 ## 例外・エッジケース
-- EC-001: Static adapter cannot enforce exact target scope
-  - 条件: `.codex/agents/*.toml` だけでは active target scope の `discussions/` 直下 write を厳密に表現できない。
-  - 期待: static adapter は read-mostly fallback のままにし、過剰な broad write を正当化しない。ただし system-architect / implementation-planner の本命経路として、target scope `discussions/` direct child だけを書ける scoped-write execution path を別に提供する。
-  - 観測点: adapter contract、report ledger、tests / inspection。
+- EC-001: Static adapter cannot express all discussions glob
+  - 条件: `.codex/agents/*.toml` だけでは `spec-dock/initiatives/**/discussions/` 相当の write を静的に表現できない。
+  - 期待: run ごとの exact file context generation へ戻さず、host permission model の表現力を確認した上で最小の代替案を選ぶ。`delegated-authoring scoped-context` を fallback として復活させず、`spec-dock/initiatives` 全体や repo-wide write のように canonical docs まで含む広い write root も採用しない。
+  - 観測点: adapter contract、permission feasibility evidence、report ledger、tests / inspection。
 - EC-002: Sub-agent modifies forbidden file
   - 条件: sub-agent execution 後の diff に canonical docs、implementation、tests、config、`.agents`、`.codex`、`.env*`、nested dirs、symlinks、non-Markdown、delete、rename が含まれる。
   - 期待: その delegated output は rejected / ineligible であり、canonical adoption しない。
@@ -186,7 +195,7 @@ derived_from:
 
 ## 入力→出力例
 - EX-001: system-architect draft
-  - 入力: Active issue scope、approved requirement、source docs、target `discussions/` directory。
+  - 入力: Active issue scope、approved requirement、source docs、scope-local `discussions/` directory。
   - 出力: `discussions/<ts>-disc-design-boundary-analysis.md` with `authority: proposed`, `created_by_role: system-architect`, `scope_id: iss-00127`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`。
 - EX-002: rejected forbidden diff
   - 入力: sub-agent output plus diff modifying `.codex/agents/system-architect.toml` directly.
@@ -208,6 +217,74 @@ derived_from:
   - 理由: V2 は sub-agent direct write を採用するため、canonical single-writer authority と adoption ledger だけでなく、post-run diff の機械的 eligibility classifier が必要である。docs-only に閉じると、直接書き込みは許す一方で検証だけ人力に寄る。
   - 影響範囲: runtime command / application / domain、tests、workflow docs、report ledger。
 - Q-002: static adapter の scope-local write enforcement 粒度
-  - 判断: static adapter では broad write を許可しない。canonical docs write は常に禁止し、scope-local write を host 側で厳密に表現できない場合でも broad write を「許可」とは呼ばない。一方で、system-architect / implementation-planner は read-only static specialist ではなく scoped-write delegated authoring agent であるため、target scope `discussions/` direct child だけを書ける本命 execution path を完了条件に含める。
-  - 理由: post-run diff guard は broad permission の正当化ではなく、delegated output の採用資格を判定する安全弁である。direct-write authoring を採用する以上、権限分類上も実行経路上も write-capable でなければ要件を満たさない。
-  - 影響範囲: `.codex/agents/*.toml`、scoped execution path、skills、workflow docs、tests。
+  - 判断: system-architect / implementation-planner は static adapter で全 scope-local `discussions/` への write capability を持つ。canonical docs write は常に禁止し、`spec-dock/initiatives` 全体や repo-wide write のような broad write は採用しない。run ごとに agent 設定や permission context を書き換える方式は標準経路にしない。
+  - 理由: file-based context persistence を重視する delegated authoring では、sub-agent が複数 initiative / epic / issue の `discussions/` に連続して draft を残せる必要がある。post-run diff guard は broad permission の正当化ではなく、delegated output の採用資格を判定する安全弁である。役割を終えた exact-file context generation code は将来の誤用と設計誤読を招くため削除する。
+  - 影響範囲: `.codex/agents/*.toml`、skills、workflow docs、runtime delegated_authoring parser / command / application、tests、diff-guard の inspected discussions handling。
+
+## 追加要件 S06: Discussion-local artifact draft creation
+
+### 背景
+- S05 により、`system-architect` / `implementation-planner` は canonical docs ではなく scope-local `discussions/` に draft / analysis / discussion-local report を作成できる権限境界になった。
+- しかし現行 `spec-dock new doc` で作成できる discussion doc type は `adr` / `disc` / `research` / `interview` / `scratch` のみであり、canonical `design.md` / `plan.md` の scope-specific template を discussion-local draft として作成する正規コマンドがない。
+- `disc` や `research` へ自由記述するだけでは、initiative / epic / issue ごとに異なる design / plan template の構造を再利用できず、delegated authoring の draft artifact としての品質と機械的識別性が不足する。
+
+### 追加スコープ
+- `spec-dock new doc` に、discussion-local artifact draft を作成する doc type を追加する。
+  - 必須: `draft-design`
+  - 必須: `draft-plan`
+- `draft-design` は対象 scope kind に応じて既存 canonical design template を source として使う。
+  - initiative -> `templates/initiative/design.md`
+  - epic -> `templates/epic/design.md`
+  - issue -> `templates/issue/design.md`
+- `draft-plan` は対象 scope kind に応じて既存 canonical plan template を source として使う。
+  - initiative -> `templates/initiative/plan.md`
+  - epic -> `templates/epic/plan.md`
+  - issue -> `templates/issue/plan.md`
+- 生成先は既存 discussion rule と同じ flat layout とする。
+  - `discussions/<ts>-draft-design-<slug>.md`
+  - `discussions/<ts>-draft-plan-<slug>.md`
+  - same-second collision は既存通り `discussions/<ts>-<nn>-draft-design-<slug>.md` / `discussions/<ts>-<nn>-draft-plan-<slug>.md`
+- `draft-requirement` は同型で追加可能な設計余地を残すが、今回の必須実装対象には含めない。
+
+### 追加非スコープ
+- canonical `requirement.md` / `design.md` / `plan.md` の直接作成・直接編集権限を sub-agent に与えない。
+- `new draft` など別系統の command surface は追加しない。
+- `disc --template design` のように既存 `disc` / `research` の variant として draft artifact を埋め込まない。
+- `discussions/` 配下に per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を作らない。
+- canonical template frontmatter をそのまま discussion-local draft の authoritative metadata として扱わない。
+
+### 追加受け入れ条件
+- AC-012: draft-design creation
+  - アクター: CLI user / delegated authoring role
+  - 前提: initiative / epic / issue のいずれかの scope が存在する。
+  - 操作: `./spec-dock/scripts/spec-dock new doc draft-design --<scope-kind> <id> --title "<title>"` を実行する。
+  - 期待結果: 対象 scope の `discussions/` 直下に naming-rule compliant な `draft-design` Markdown が作成され、対象 scope kind に対応する canonical design template source が draft body として使われる。
+  - 観測点: created path、rendered content、tests。
+- AC-013: draft-plan creation
+  - アクター: CLI user / delegated authoring role
+  - 前提: initiative / epic / issue のいずれかの scope が存在する。
+  - 操作: `./spec-dock/scripts/spec-dock new doc draft-plan --<scope-kind> <id> --title "<title>"` を実行する。
+  - 期待結果: 対象 scope の `discussions/` 直下に naming-rule compliant な `draft-plan` Markdown が作成され、対象 scope kind に対応する canonical plan template source が draft body として使われる。
+  - 観測点: created path、rendered content、tests。
+- AC-014: discussion-local draft envelope
+  - アクター: maintainer / reviewer
+  - 前提: `draft-design` または `draft-plan` が作成された。
+  - 操作: frontmatter と導入文を確認する。
+  - 期待結果: generated draft は discussion-local evidence であることを明示し、`created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持つ。canonical artifact として accepted / approved / adopted を自己主張しない。
+  - 観測点: generated file、diff guard、spec-reviewer。
+- AC-015: validation and diff-guard compatibility
+  - アクター: maintainer
+  - 前提: `draft-design` / `draft-plan` discussion docs が存在する。
+  - 操作: `validate`、`sync`、`delegated-authoring diff-guard`、relevant tests を実行する。
+  - 期待結果: `draft-design` / `draft-plan` filename は valid discussion Markdown として扱われ、canonical artifact としては扱われない。diff-guard は valid draft create/update を allowed discussion output として扱い、forbidden paths は従来通り拒否する。
+  - 観測点: `tests/cli_runtime/test_new.py`、`tests/cli_runtime/test_runtime_new_doc_s09.py`、`tests/cli_runtime/test_validate.py`、`tests/cli_runtime/test_delegated_authoring.py`。
+
+### 追加入力→出力例
+- EX-003: issue design draft
+  - 入力: `./spec-dock/scripts/spec-dock new doc draft-design --issue iss-00127 --title "Static Discussion Write Design Draft"`
+  - 出力: `issues/iss-00127-.../discussions/<ts>-draft-design-static-discussion-write-design-draft.md`
+  - 内容: discussion-local envelope + `templates/issue/design.md` derived body。
+- EX-004: epic plan draft
+  - 入力: `./spec-dock/scripts/spec-dock new doc draft-plan --epic epic-00112 --title "Delegated Authoring Plan Draft"`
+  - 出力: `epics/epic-00112-.../discussions/<ts>-draft-plan-delegated-authoring-plan-draft.md`
+  - 内容: discussion-local envelope + `templates/epic/plan.md` derived body。
