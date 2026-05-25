@@ -33,7 +33,7 @@ ID: "iss-00127"
 - 禁止:
   - proposal-only を標準運用に戻すこと。
   - per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を新規 delegated output として生成・推奨すること。
-  - `draft-requirement` / `draft-design` / `draft-plan` kind をこの issue で追加すること。
+  - S06 の契約外で ad hoc に `draft-requirement` / `draft-design` / `draft-plan` kind を追加すること。
 - 前提:
   - `iss-00126` 以前の historical delegated-authoring artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
 
@@ -277,7 +277,7 @@ Tests --> SpecDockAssets : shipped docs / templates / runtime
 
 ### 設計目的
 
-`system-architect` / `implementation-planner` が、canonical docs を直接編集せずに、scope-specific な canonical template 構造を持つ draft design / draft plan を `discussions/` に作成できるようにする。
+`system-architect` / `implementation-planner` が、canonical docs を直接編集せずに、scope-specific な canonical template 構造を持つ draft requirement / draft design / draft plan を `discussions/` に作成できるようにする。
 
 この追加設計は既存 S01-S05 の権限境界を変更しない。S06 は `new doc` の doc type と template rendering を拡張するだけであり、canonical `requirement.md` / `design.md` / `plan.md` の single-writer authority は main orchestrator に残る。
 
@@ -286,6 +286,10 @@ Tests --> SpecDockAssets : shipped docs / templates / runtime
 既存 `new doc` に doc type を追加する。
 
 ```bash
+./spec-dock/scripts/spec-dock new doc draft-requirement --initiative <id> --title "<title>"
+./spec-dock/scripts/spec-dock new doc draft-requirement --epic <id> --title "<title>"
+./spec-dock/scripts/spec-dock new doc draft-requirement --issue <id> --title "<title>"
+
 ./spec-dock/scripts/spec-dock new doc draft-design --initiative <id> --title "<title>"
 ./spec-dock/scripts/spec-dock new doc draft-design --epic <id> --title "<title>"
 ./spec-dock/scripts/spec-dock new doc draft-design --issue <id> --title "<title>"
@@ -299,16 +303,18 @@ Tests --> SpecDockAssets : shipped docs / templates / runtime
 
 ### File naming
 
-`draft-design` / `draft-plan` は discussion doc kind として扱う。
+`draft-requirement` / `draft-design` / `draft-plan` は discussion doc kind として扱う。
 
 ```text
+<ts>-draft-requirement-<slug>.md
+<ts>-<nn>-draft-requirement-<slug>.md
 <ts>-draft-design-<slug>.md
 <ts>-<nn>-draft-design-<slug>.md
 <ts>-draft-plan-<slug>.md
 <ts>-<nn>-draft-plan-<slug>.md
 ```
 
-filename parser は fixed alternatives で `draft-design` / `draft-plan` を認識する。hyphen split に依存しない。
+filename parser は fixed alternatives で `draft-requirement` / `draft-design` / `draft-plan` を認識する。hyphen split に依存しない。
 
 ### Template rendering structure
 
@@ -319,11 +325,11 @@ filename parser は fixed alternatives で `draft-design` / `draft-plan` を認�
 
 #### Envelope
 
-draft envelope は `templates/discussions/draft-design.md` / `templates/discussions/draft-plan.md` に置く。
+draft envelope は `templates/discussions/draft-requirement.md` / `templates/discussions/draft-design.md` / `templates/discussions/draft-plan.md` に置く。
 
 Envelope は以下を持つ。
 
-- `種別: draft-design` または `種別: draft-plan`
+- `種別: draft-requirement`、`種別: draft-design`、または `種別: draft-plan`
 - `ID: "<DRAFT_ID>"`
 - `タイトル: "<DRAFT_TITLE>"`
 - `状態: "proposed"`
@@ -341,6 +347,14 @@ Envelope は以下を持つ。
 Envelope には、canonical docs remain main-orchestrator-only であること、採用には canonical `report.md` Evidence Adoption Ledger と canonical docs への再記述が必要であることを明記する。
 
 #### Canonical template body
+
+`draft-requirement` の body source:
+
+```text
+initiative -> templates/initiative/requirement.md
+epic       -> templates/epic/requirement.md
+issue      -> templates/issue/requirement.md
+```
 
 `draft-design` の body source:
 
@@ -392,6 +406,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.p
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py
+src/spec_dock/assets/spec_dock/templates/discussions/draft-requirement.md
 src/spec_dock/assets/spec_dock/templates/discussions/draft-design.md
 src/spec_dock/assets/spec_dock/templates/discussions/draft-plan.md
 src/spec_dock/assets/spec_dock/docs/rules/{initiative,epic,issue}/discussions.md
@@ -403,18 +418,19 @@ tests/
 
 ### Interaction with delegated authoring
 
+- `system-architect` / `implementation-planner` は必要に応じて `draft-requirement` を作成する標準経路として使える。
 - `system-architect` は `draft-design` を作成する標準経路として使える。
 - `implementation-planner` は `draft-plan` を作成する標準経路として使える。
 - これらは canonical docs ではなく discussion evidence である。
-- post-run diff guard は `draft-design` / `draft-plan` の valid create/update を allowed discussion Markdown として扱う。
-- 採用は main orchestrator が `report.md` Evidence Adoption Ledger に記録し、必要な内容だけ canonical `design.md` / `plan.md` へ再記述する。
+- post-run diff guard は `draft-requirement` / `draft-design` / `draft-plan` の valid create/update を allowed discussion Markdown として扱う。
+- 採用は main orchestrator が `report.md` Evidence Adoption Ledger に記録し、必要な内容だけ canonical `requirement.md` / `design.md` / `plan.md` へ再記述する。
 
 ### Test impact
 
-- `new doc --help` が `draft-design` / `draft-plan` を表示する。
-- `new doc draft-design` / `draft-plan` が initiative / epic / issue で正しい path と content を生成する。
+- `new doc --help` が `draft-requirement` / `draft-design` / `draft-plan` を表示する。
+- `new doc draft-requirement` / `draft-design` / `draft-plan` が initiative / epic / issue で正しい path と content を生成する。
 - same-second suffix allocation が hyphenated kind でも機能する。
-- `validate` が `draft-design` / `draft-plan` filename を valid として扱う。
+- `validate` が `draft-requirement` / `draft-design` / `draft-plan` filename を valid として扱う。
 - `sync` が discussion doc として扱い、canonical artifact として扱わない。
 - `delegated-authoring diff-guard` が valid draft create/update を許可する。
 - provider assets と dogfooding mirror が一致する。
@@ -423,7 +439,6 @@ tests/
 
 S06 は Option A を採用する。
 
-- `new doc` に `draft-design` / `draft-plan` を追加する。
-- 既存 canonical design / plan template を source として使う。
+- `new doc` に `draft-requirement` / `draft-design` / `draft-plan` を追加する。
+- 既存 canonical requirement / design / plan template を source として使う。
 - 生成物は discussion-local draft envelope + canonical template body とする。
-- `draft-requirement` は同型拡張可能にするが、今回の必須実装には含めない。
