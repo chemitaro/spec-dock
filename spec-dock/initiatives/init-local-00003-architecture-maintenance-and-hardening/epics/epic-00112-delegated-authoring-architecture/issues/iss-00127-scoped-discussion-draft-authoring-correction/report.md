@@ -57,8 +57,9 @@ ID: "iss-00127"
   - Read-only sub-agent analysis and spec review were used.
   - No write-capable sub-agent discussion draft has been produced or promoted for this issue yet.
 - 軽量 delegated draft evidence contract for future runs:
-  - required discussion draft provenance: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`
-  - required output eligibility evidence: `diff_guard_result`, `allowed_paths_summary`, `forbidden_diff_summary`, `baseline_reference`
+  - manually authored sub-agent draft / analysis / discussion-local report は、必要に応じて `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []` を持つ。
+  - S06 command-created `draft-requirement` / `draft-design` / `draft-plan` は canonical-template-derived draft artifact であり、draft 専用 envelope/provenance metadata を要求しない。draft 性は scope-local `discussions/` placement、`draft-*` filename、canonical template source selection、diff-guard result、Evidence Adoption Ledger で扱う。
+  - required output eligibility evidence for delegated write runs: `diff_guard_result`, `allowed_paths_summary`, `forbidden_diff_summary`, `baseline_reference`
   - forbidden self-claims: `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`
   - adoption authority: only this report's Evidence Adoption Ledger can record adoption into canonical docs or implementation decisions.
 - Current promotion decision:
@@ -569,6 +570,142 @@ OK
 | ID | status | type | source | ambiguity / constraint | proposed decision | evidence | follow-up |
 |---|---|---|---|---|---|---|---|
 | D-S05-001 | adopted-with-host-smoke-limitation | implementation | dev-coder + main orchestrator | Codex adapter TOML is inspectable in tests, but this local multi-agent runtime did not expose `system-architect` / `implementation-planner` as spawnable agent types for a live host write smoke. | Adopt explicit static glob-style discussion Markdown write-root keys in the adapter and keep broad `spec-dock/initiatives` write out of the profile. Do not restore scoped-context or dynamic settings rewriting. | TOML parses; asset tests verify only those three write roots; no broad write roots are present; provider/dogfooding mirrors match; attempted live authoring-role smoke was blocked by unavailable agent types in this runtime. | If host glob semantics differ in a runtime where these roles are spawnable, revise only the static permission expression; do not reintroduce scoped-context or broad write. |
+
+## S06 追補実装証跡
+
+### S06 Red / 代替証跡
+- `./spec-dock/scripts/spec-dock new doc draft-design --issue iss-00127 --title "S06 Red Design Draft"`:
+  - exit code 1
+  - stderr: `error: Unknown discussion doc type: draft-design (allowed: adr, disc, research, interview, scratch)`
+- `python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 -v` before implementation:
+  - Ran 56 tests
+  - OK
+  - 既存 targeted tests は旧 `new doc` catalog の characterization として通過し、draft artifact type が未実装であることは上記 CLI Red で確認した。
+- Corrective Red / alternative evidence after user clarification:
+  - `find src/spec_dock/assets/spec_dock/templates/discussions spec-dock/templates/discussions -maxdepth 1 -type f` showed prohibited untracked `draft-requirement.md`, `draft-design.md`, and `draft-plan.md` under both provider and dogfooding mirror.
+  - Existing S06 tests/report expected discussion-local envelope metadata, `template_source`, `diff_guard_result`, and canonical frontmatter stripping, which contradicted the corrected requirement/design/plan.
+  - `find src/spec_dock/assets/spec_dock/templates/discussions spec-dock/templates/discussions -maxdepth 1 -type f | rg 'draft-'` returned matches before correction and no matches after correction.
+
+### S06 実装内容
+- Superseded / corrected:
+  - The previous S06 implementation note that added `templates/discussions/draft-requirement.md` / `draft-design.md` / `draft-plan.md` is superseded by the user clarification. Draft-specific discussion templates are prohibited because they duplicate canonical templates.
+  - The previous envelope/provenance/frontmatter-stripping expectation is superseded. Draft artifacts are identified by `discussions/` placement and `draft-*` filename, not by a dedicated wrapper template.
+- Runtime:
+  - `new doc` の creatable discussion doc type に `draft-requirement` / `draft-design` / `draft-plan` を追加した。
+  - discussion filename parser / validation / diff-guard recognition を hyphenated draft kind に対応させた。
+  - malformed discussion filename detection を補強し、`draft-requirement-kickoff.md` / `draft-design-kickoff.md` / `draft-plan-kickoff.md` のような non-timestamp hyphenated draft names を malformed として reject するようにした。
+  - draft type の場合、scope kind と target artifact から既存 canonical `templates/{initiative,epic,issue}/{requirement,design,plan}.md` を直接 source として render し、`discussions/<ts>-draft-*-<slug>.md` に配置するようにした。
+  - canonical template frontmatter は stripping せず、rendered canonical template content として保持する。
+  - diff-guard は `draft-requirement` / `draft-design` / `draft-plan` filename の新規作成と明示 allowlist された既存 draft artifact 更新について、dedicated envelope metadata がなくても valid discussion draft artifact として許可する。ただし non-editable self-claim は従来通り拒否する。
+  - `new draft` command は追加していない。
+- Templates / docs:
+  - provider と dogfooding mirror の `templates/discussions/draft-requirement.md` / `draft-design.md` / `draft-plan.md` を削除した。
+  - `templates/README.md` と discussion rules / guidance docs は、`new doc draft-*` が draft 専用 template ではなく既存 canonical templates を source として使うことを案内するよう更新した。
+  - provider docs rules と dogfooding mirror の discussion catalog / create examples を更新した。
+- Tests:
+  - CLI creation testsで initiative draft requirement、issue draft design、epic draft plan の作成、draft 専用 envelope 不在、scope-specific canonical template source 由来 content を固定した。
+  - application runtime tests で initiative / epic / issue x draft-requirement / draft-design / draft-plan の 3x3 template source matrix、canonical frontmatter retention、same-second suffix allocation for hyphenated kinds を固定した。
+  - `templates/discussions/draft-*.md` の偽 template が存在しても S06 draft artifact 生成で使われないことを固定した。
+  - diff-guard tests で新規 draft artifact 作成、明示 allowlist された既存 draft artifact 更新、既存 draft artifact の accepted/adopted/stale self-claim rejection を固定した。
+  - installer/update tests は `templates/discussions/draft-*.md` が存在しないこと、`app.py` と `domain/delegated_authoring.py` を含む provider/dogfooding runtime mirror parity を固定した。
+  - validate tests は valid timestamped draft filenames と malformed non-timestamp hyphenated draft filenames の両方を固定した。
+
+### S06 Green 検証
+```text
+python -m unittest tests.cli_runtime.test_new tests.cli_runtime.test_runtime_new_doc_s09 -v
+Ran 58 tests in 28.233s
+OK
+
+python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_delegated_authoring -v
+Ran 69 tests in 114.617s
+OK
+
+python -m unittest tests.test_init_update -v
+Ran 176 tests in 54.551s
+OK
+
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=65
+
+./spec-dock/scripts/spec-dock sync
+spec-dock: sync: active unchanged (matched id in branch: iss-00127)
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+./spec-dock/scripts/spec-dock doctor
+spec-dock: ok (doctor) findings=0
+
+git diff --check
+OK
+
+find src/spec_dock/assets/spec_dock/templates/discussions spec-dock/templates/discussions -maxdepth 1 -type f | rg 'draft-'
+no matches (exit code 1 from rg)
+
+Additional verification after QA/code-review hardening:
+
+python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 -v
+Ran 16 tests in 0.819s
+OK
+
+python -m unittest tests.cli_runtime.test_delegated_authoring tests.domain_runtime.test_delegated_authoring -v
+Ran 42 tests in 34.603s
+OK
+
+python -m unittest tests.cli_runtime.test_validate tests.cli_runtime.test_new tests.test_init_update -v
+Ran 259 tests in 172.639s
+OK
+
+./spec-dock/scripts/spec-dock validate
+spec-dock: ok (validate) nodes=65
+
+./spec-dock/scripts/spec-dock sync
+spec-dock: ok (sync) wrote=spec-dock/.agent/index-all.json,spec-dock/.agent/tree-all.json,spec-dock/.agent/index.json,spec-dock/.agent/tree.json,spec-dock/tree-all.puml,spec-dock/tree.puml,spec-dock/.agent/deps-issues.json,spec-dock/deps-issues.puml,spec-dock/dashboard.md
+
+./spec-dock/scripts/spec-dock doctor
+spec-dock: ok (doctor) findings=0
+
+git diff --check
+OK
+
+find src/spec_dock/assets/spec_dock/templates/discussions spec-dock/templates/discussions -maxdepth 1 -type f
+only adr.md / disc.md / interview.md / research.md / scratch.md under provider and dogfooding mirror
+```
+
+### S06 Step Contract Closure
+| Closure ID | Result | Evidence |
+|---|---|---|
+| tc-s06-001 | passed | `test_new_doc_creates_draft_artifacts_from_scope_specific_templates` creates initiative `draft-requirement` and verifies naming, no draft envelope/provenance metadata, `templates/initiative/requirement.md`, and rendered canonical template content |
+| tc-s06-002 | passed | same CLI test creates issue `draft-design` and verifies naming, no draft envelope/provenance metadata, `templates/issue/design.md`, and rendered canonical template content |
+| tc-s06-003 | passed | same CLI test creates epic `draft-plan` and verifies naming, no draft envelope/provenance metadata, `templates/epic/plan.md`, and rendered canonical template content |
+| tc-s06-004 | passed | `test_draft_doc_types_render_scope_specific_template_bodies` verifies full 3x3 scope-kind/template-source matrix across initiative / epic / issue and draft-requirement / draft-design / draft-plan |
+| tc-s06-005 | passed | `test_draft_doc_types_render_scope_specific_template_bodies` verifies same-second suffix allocation for `draft-requirement` / `draft-design` / `draft-plan` in the same issue discussions directory |
+| tc-s06-006 | passed | `test_validate_accepts_mixed_same_timestamp_unsuffixed_and_suffixed_slots` accepts draft filenames; `test_validate_rejects_malformed_discussion_doc_candidates` rejects malformed non-timestamp draft filenames; diff-guard accepts new and explicit existing draft updates while rejecting non-editable self-claims |
+| tc-s06-007 | passed | CLI/runtime/tests verify dedicated draft template absence, fake discussion draft templates are not used, direct canonical template rendering, and canonical template frontmatter retention |
+
+### S06 Test Contract Closure
+| Command / Area | Result | Evidence |
+|---|---|---|
+| `tests.cli_runtime.test_new` + `tests.cli_runtime.test_runtime_new_doc_s09` | passed | 58 tests OK |
+| `tests.cli_runtime.test_validate` + `tests.cli_runtime.test_delegated_authoring` | passed | 69 tests OK |
+| `tests.test_init_update` | passed | 176 tests OK; provider/dogfooding mirror docs/templates/runtime parity included; draft discussion templates are asserted absent |
+| QA/code-review hardening rerun | passed | 16 runtime new-doc tests OK; 42 delegated-authoring tests OK; 259 validate/new/init-update tests OK |
+| repo-local workflow commands | passed | validate / sync / doctor / git diff --check OK; draft-template find/rg no matches |
+
+### S06 Evidence Adoption Ledger
+| ID | status | source_type | source | target | adoption rationale | evidence |
+|---|---|---|---|---|---|---|
+| EAL-S06-001 | superseded-corrected | discussion | `discussions/20260525t055851z-research-draft-artifact-template-command-analysis.md` | runtime `new doc`, discussion templates, rules docs, validation, diff-guard, tests | Earlier research selected a discussion-local envelope plus canonical template body; user clarification superseded that portion because draft-specific templates duplicate canonical templates | Corrected S06 implementation diff and Green verification above |
+| EAL-S06-002 | adopted | user clarification / active docs | updated S06 requirement/design/plan | runtime `new doc`, docs/rules/templates README, validation, diff-guard, tests | `new doc draft-*` remains the extension point, but generated content comes directly from existing scope-specific canonical templates and no `templates/discussions/draft-*.md` files exist | Corrected S06 implementation diff, find/rg no matches, and Green verification above |
+| EAL-S06-003 | adopted | qa-reviewer | full 3x3 template matrix / existing draft update / runtime parity coverage findings | tests for runtime new-doc, delegated-authoring diff-guard, init/update parity | The QA findings closed a real coverage gap in the S06 acceptance matrix and protected provider/dogfooding mirror parity for changed runtime files | dev-coder hardening diff and additional Green verification |
+| EAL-S06-004 | adopted | code-reviewer | malformed hyphenated draft filename finding | validation runtime and tests | The finding exposed a real validation bug where non-timestamp hyphenated draft filenames were ignored instead of rejected | regression test failed before fix, then 259-test rerun passed |
+
+### S06 Decision Ledger
+| ID | decision | status | rationale | evidence |
+|---|---|---|---|---|
+| D-S06-001 | Keep `new doc draft-requirement` / `draft-design` / `draft-plan` as the command surface; do not add `new draft`. | adopted | The draft artifacts are discussion documents and should stay in the existing `new doc <type>` catalog. | requirement/design S06, command tests |
+| D-S06-002 | Do not create `templates/discussions/draft-requirement.md`, `draft-design.md`, or `draft-plan.md`. | adopted | Separate draft templates would duplicate canonical requirement/design/plan templates and create two sources to maintain. | user clarification, EAL-S06-001, absence checks |
+| D-S06-003 | Render S06 draft artifacts directly from existing `templates/{initiative,epic,issue}/{requirement,design,plan}.md` based on the target scope kind. | adopted | Initiative drafts must use initiative templates, epic drafts must use epic templates, and issue drafts must use issue templates. | runtime implementation, S06 Green verification |
+| D-S06-004 | Do not add a discussion-local envelope or strip canonical template frontmatter for S06 command-created draft artifacts. | adopted | The file's draft status is represented by `discussions/` placement and `draft-*` filename; adding envelope metadata would reintroduce a duplicate schema. | user clarification, tests asserting no envelope metadata |
+| D-S06-005 | Treat non-timestamp filenames beginning with known hyphenated draft doc types as malformed discussion doc filename candidates. | adopted | Without this, `draft-requirement-kickoff.md`-style files bypass validation even though they are visibly failed attempts at the new S06 doc types. | code-reviewer P2 finding, validation regression |
 
 ## 今後の推奨事項
 - #119 を main へ merge した後、#128 を `main` へ retarget / rebase し、GitHub checks と Codex review を再確認する。

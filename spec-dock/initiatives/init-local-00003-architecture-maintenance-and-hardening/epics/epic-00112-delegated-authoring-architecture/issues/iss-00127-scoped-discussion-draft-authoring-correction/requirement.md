@@ -256,7 +256,7 @@ derived_from:
 - `new draft` など別系統の command surface は追加しない。
 - `disc --template design` のように既存 `disc` / `research` の variant として draft artifact を埋め込まない。
 - `discussions/` 配下に per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を作らない。
-- canonical template frontmatter をそのまま discussion-local draft の authoritative metadata として扱わない。
+- `templates/discussions/draft-requirement.md` / `draft-design.md` / `draft-plan.md` のような draft 専用テンプレートを追加しない。canonical template との二重管理を避けるため、既存 `templates/{initiative,epic,issue}/{requirement,design,plan}.md` を唯一の template source とする。
 
 ### 追加受け入れ条件
 - AC-012: draft-requirement creation
@@ -277,12 +277,12 @@ derived_from:
   - 操作: `./spec-dock/scripts/spec-dock new doc draft-plan --<scope-kind> <id> --title "<title>"` を実行する。
   - 期待結果: 対象 scope の `discussions/` 直下に naming-rule compliant な `draft-plan` Markdown が作成され、対象 scope kind に対応する canonical plan template source が draft body として使われる。
   - 観測点: created path、rendered content、tests。
-- AC-015: discussion-local draft envelope
+- AC-015: canonical template source without duplicate draft templates
   - アクター: maintainer / reviewer
   - 前提: `draft-requirement`、`draft-design`、または `draft-plan` が作成された。
-  - 操作: frontmatter と導入文を確認する。
-  - 期待結果: generated draft は discussion-local evidence であることを明示し、`created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持つ。canonical artifact として accepted / approved / adopted を自己主張しない。
-  - 観測点: generated file、diff guard、spec-reviewer。
+  - 操作: template source と generated file を確認する。
+  - 期待結果: generated draft は対象 scope kind の既存 canonical template を render した内容であり、draft 専用 template file を source にしない。draft であることは `discussions/` 配置、`draft-*` filename、report adoption ledger、post-run diff guard によって扱う。
+  - 観測点: generated file、template source path、tests、spec-reviewer。
 - AC-016: validation and diff-guard compatibility
   - アクター: maintainer
   - 前提: `draft-requirement` / `draft-design` / `draft-plan` discussion docs が存在する。
@@ -294,12 +294,12 @@ derived_from:
 - EX-003: initiative requirement draft
   - 入力: `./spec-dock/scripts/spec-dock new doc draft-requirement --initiative init-local-00003 --title "Delegated Authoring Requirement Draft"`
   - 出力: `initiatives/init-local-00003-.../discussions/<ts>-draft-requirement-delegated-authoring-requirement-draft.md`
-  - 内容: discussion-local envelope + `templates/initiative/requirement.md` derived body。
+  - 内容: `templates/initiative/requirement.md` を直接 source として render した内容。draft 専用 envelope は付与しない。
 - EX-004: issue design draft
   - 入力: `./spec-dock/scripts/spec-dock new doc draft-design --issue iss-00127 --title "Static Discussion Write Design Draft"`
   - 出力: `issues/iss-00127-.../discussions/<ts>-draft-design-static-discussion-write-design-draft.md`
-  - 内容: discussion-local envelope + `templates/issue/design.md` derived body。
+  - 内容: `templates/issue/design.md` を直接 source として render した内容。draft 専用 envelope は付与しない。
 - EX-005: epic plan draft
   - 入力: `./spec-dock/scripts/spec-dock new doc draft-plan --epic epic-00112 --title "Delegated Authoring Plan Draft"`
   - 出力: `epics/epic-00112-.../discussions/<ts>-draft-plan-delegated-authoring-plan-draft.md`
-  - 内容: discussion-local envelope + `templates/epic/plan.md` derived body。
+  - 内容: `templates/epic/plan.md` を直接 source として render した内容。draft 専用 envelope は付与しない。

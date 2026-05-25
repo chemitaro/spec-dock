@@ -705,6 +705,77 @@ class TestCliNew(CliRuntimeHarness):
             self.assertEqual(len(sorted(discussions_dir.glob("*-interview-interview-one.md"))), 1)
             self.assertEqual(len(sorted(discussions_dir.glob("*-scratch-scratch-one.md"))), 1)
 
+    def test_new_doc_creates_draft_artifacts_from_scope_specific_templates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self.assertEqual(main(["init", str(target)]), 0)
+            self._create_same_repo_linked_hierarchy(target)
+
+            cases = (
+                (
+                    ["new", "doc", "draft-requirement", "--initiative", "init-00001", "--title", "Requirement Draft"],
+                    target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "discussions",
+                    "draft-requirement",
+                    "templates/initiative/requirement.md",
+                    "requirement.md",
+                    "要件定義（何を、なぜ行うか）",
+                ),
+                (
+                    ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", "Design Draft"],
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                    / "discussions",
+                    "draft-design",
+                    "templates/issue/design.md",
+                    "design.md",
+                    "設計（どう実現するか）",
+                ),
+                (
+                    ["new", "doc", "draft-plan", "--epic", "epic-00002", "--title", "Plan Draft"],
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "discussions",
+                    "draft-plan",
+                    "templates/epic/plan.md",
+                    "plan.md",
+                    "計画（Issue と実施順序）",
+                ),
+            )
+
+            for command, discussions_dir, doc_type, template_source, _intended_target, body_heading in cases:
+                p = self._run_runtime_capture(target, command)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn(f"type={doc_type}", p.stdout)
+                created = sorted(discussions_dir.glob(f"*-{doc_type}-*.md"))
+                self.assertEqual(len(created), 1)
+                self.assertRegex(
+                    created[0].name,
+                    rf"^[0-9]{{8}}t[0-9]{{6}}z(?:-[0-9]{{2}})?-{doc_type}-[a-z0-9-]+\.md$",
+                )
+                content = created[0].read_text(encoding="utf-8")
+                frontmatter = content.split("---", 2)[1]
+                self.assertIn("状態: \"draft | approved\"", frontmatter)
+                self.assertNotIn("adoption_status", frontmatter)
+                self.assertNotIn("template_source", frontmatter)
+                self.assertNotIn("created_by_role", frontmatter)
+                self.assertNotIn("Canonical `", content)
+                self.assertNotIn("remains main-orchestrator-only", content)
+                canonical_source = target / "spec-dock" / template_source
+                self.assertTrue(canonical_source.is_file(), f"missing source template: {canonical_source}")
+                canonical_text = canonical_source.read_text(encoding="utf-8")
+                self.assertIn(canonical_text.splitlines()[1], content)
+                self.assertIn(body_heading, content)
+
     def test_new_doc_note_is_retired_with_scratch_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
