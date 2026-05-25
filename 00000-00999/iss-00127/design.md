@@ -318,35 +318,9 @@ filename parser は fixed alternatives で `draft-requirement` / `draft-design` 
 
 ### Template rendering structure
 
-生成物は2層構造にする。
+生成物は既存 canonical template を直接 source として render する。
 
-1. discussion-local draft envelope
-2. scope-specific canonical template body
-
-#### Envelope
-
-draft envelope は `templates/discussions/draft-requirement.md` / `templates/discussions/draft-design.md` / `templates/discussions/draft-plan.md` に置く。
-
-Envelope は以下を持つ。
-
-- `種別: draft-requirement`、`種別: draft-design`、または `種別: draft-plan`
-- `ID: "<DRAFT_ID>"`
-- `タイトル: "<DRAFT_TITLE>"`
-- `状態: "proposed"`
-- `親: ["<SCOPE_ID>"]`
-- `authority: "proposed"`
-- `created_by_role`
-- `scope_id`
-- `source_paths`
-- `intended_targets`
-- `adoption_status: "unreviewed"`
-- `reflected_to: []`
-- `diff_guard_result: "pending"`
-- `template_source`
-
-Envelope には、canonical docs remain main-orchestrator-only であること、採用には canonical `report.md` Evidence Adoption Ledger と canonical docs への再記述が必要であることを明記する。
-
-#### Canonical template body
+draft 専用 template file は追加しない。`templates/discussions/draft-requirement.md` / `draft-design.md` / `draft-plan.md` を作ると、canonical `templates/{initiative,epic,issue}/{requirement,design,plan}.md` と二重管理になるため禁止する。
 
 `draft-requirement` の body source:
 
@@ -372,12 +346,7 @@ epic       -> templates/epic/plan.md
 issue      -> templates/issue/plan.md
 ```
 
-Canonical template body は draft envelope の下に差し込む。canonical template frontmatter はそのまま draft の authoritative metadata として扱わない。実装では次のどちらかを採用する。
-
-- 推奨: canonical template の frontmatter を除いた body を差し込む。
-- 代替: canonical template 全文を fenced / quoted section として差し込み、canonical metadata ではないことを明示する。
-
-推奨は frontmatter を除いた body 差し込みである。これにより discussion-local frontmatter が唯一の metadata になり、canonical artifact との誤認を避けられる。
+生成される discussion draft は、選択された既存 canonical template を render した内容を持つ。draft であることは content wrapper ではなく、`discussions/` 配置、`draft-*` filename、post-run diff guard、canonical `report.md` Evidence Adoption Ledger で扱う。
 
 ### Placeholder strategy
 
@@ -394,7 +363,7 @@ Canonical template body は draft envelope の下に差し込む。canonical tem
 - `<EPIC_ID>` / `<EPIC_TITLE>`
 - `<ISS_ID>` / `<ISS_TITLE>`
 
-scope node と親 node から、可能な限り actual id/title を埋める。GitHub linkage が不明な placeholder は既存 template と同じ placeholder または empty value に留める。
+scope node と親 node から、可能な限り actual id/title を埋める。GitHub linkage が不明な placeholder は既存 template と同じ placeholder または empty value に留める。`<DRAFT_*>` 系 placeholder は実装内部または将来拡張用であり、draft 専用 template file を導入する理由にはしない。
 
 ### Runtime impact
 
@@ -406,9 +375,6 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.p
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py
-src/spec_dock/assets/spec_dock/templates/discussions/draft-requirement.md
-src/spec_dock/assets/spec_dock/templates/discussions/draft-design.md
-src/spec_dock/assets/spec_dock/templates/discussions/draft-plan.md
 src/spec_dock/assets/spec_dock/docs/rules/{initiative,epic,issue}/discussions.md
 spec-dock/ dogfooding mirror equivalents
 tests/
@@ -433,6 +399,7 @@ tests/
 - `validate` が `draft-requirement` / `draft-design` / `draft-plan` filename を valid として扱う。
 - `sync` が discussion doc として扱い、canonical artifact として扱わない。
 - `delegated-authoring diff-guard` が valid draft create/update を許可する。
+- `templates/discussions/draft-requirement.md` / `draft-design.md` / `draft-plan.md` が存在しないことを確認する。
 - provider assets と dogfooding mirror が一致する。
 
 ### Decision
@@ -441,4 +408,5 @@ S06 は Option A を採用する。
 
 - `new doc` に `draft-requirement` / `draft-design` / `draft-plan` を追加する。
 - 既存 canonical requirement / design / plan template を source として使う。
-- 生成物は discussion-local draft envelope + canonical template body とする。
+- 生成物は scope kind に対応する既存 canonical template を `discussions/` 直下に render したものとする。
+- draft 専用 template file は追加しない。
