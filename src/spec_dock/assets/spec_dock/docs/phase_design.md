@@ -80,12 +80,12 @@ Delegated design draft を使う場合、orchestrator は draft 生成前に次�
 - active node、scope、parent boundary、non-scope が確認済み
 - invocation contract が scope、source artifacts、allowed actions、forbidden actions、boundary、invalidation conditions を含む
 - read-only specialist consent と scope-local discussion direct-write consent は分離されている
-- allowed actions は、対象 scope の `discussions/` direct child にある naming-rule compliant Markdown の新規作成、または orchestrator が明示指定した既存 proposed discussion draft の更新に限定される
+- allowed actions は、対象 scope の `discussions/` direct child にある naming-rule compliant Markdown 1 ファイルの新規作成に限定される。既存 proposed discussion draft の更新は static adapter contract の対象外であり、将来必要な場合は別 workflow / follow-up で narrower allowlist と追加 gate を定義する
 - filename は既存 discussion rules に従い、標準は `<ts>-<kind>-<slug>.md`、same-second collision は `<ts>-<nn>-<kind>-<slug>.md` とする
 - forbidden actions は canonical `requirement.md` / `design.md` / `plan.md` / `report.md`、implementation、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、GitHub mutation、phase promotion、reviewer-pass claim、user への直接質問を含む
 - forbidden locations は per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` を含む
 - required design draft output contract が、requirement coverage、existing context findings、design decisions、alternatives、boundary / contract model、dependency analysis、SoR、file/module plan、migration/compatibility/rollback、observability、test strategy、ADR candidates、risks、Requirement Clarification Requests、Integration Notes を含む
-- static adapter は scope-local `discussions/` Markdown draft だけに write-capable とし、broad write や canonical target write を許可しない。run ごとの permission context 生成に依存せず、run は post-run diff guard pass と `report.md` ledger 記録まで adoption-ineligible とする
+- static adapter は guarded workspace-write で scope-local `discussions/` Markdown draft を作成する。workspace-write は hard path allow-list ではなく canonical target write の許可でもない。run ごとの permission context 生成に依存せず、run は post-run diff guard pass と `report.md` ledger 記録まで adoption-ineligible とする
 
 Sub-agent-created draft は lightweight provenance として `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、adoption ledger note を持ちます。標準 delegated draft evidence として task manifest hash、Permission Profile hash、session invocation hash、probe run id を要求しません。これらは historical evidence または明示された例外証跡としてだけ扱います。
 
