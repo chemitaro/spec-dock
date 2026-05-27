@@ -18,7 +18,7 @@ ID: "epic-00107"
   - `Metric-001` の「feature value 中心の portfolio」に対して、runtime command で実用できる operator value を追加する。
 - この epic が提供する能力:
   - repo-local SpecDock runtime command から、現在 checkout に紐づく linked worktree と新規 branch を作成できる。
-  - 作成先は main checkout の中ではなく、main checkout と同じ親 directory に作る `<repo-basename>-worktrees/` container 配下へ集約できる。
+  - 作成先は main checkout の中ではなく、`SPEC_DOCK_WORKTREE_ROOT` で指定した central root 配下の `<repo-basename>/` namespace へ集約できる。
   - worktree directory name / initial branch name は、既に実用している `taikyohiyou_project` の naming UX を踏襲して自動合成できる。
   - worktree 作成後に、project-local bootstrap interface として worktree root の `make init` を optional / non-fatal に呼び出せる。
   - Codex app が管理する短命 worktree とは別に、開発者が自分で管理する長命 worktree を作る導線を提供する。
@@ -40,14 +40,16 @@ ID: "epic-00107"
 - E-RQ-001:
   - SpecDock は repo-local runtime command として worktree 作成 capability を提供し、maintainer が `git worktree add` の naming / collision handling / bootstrap を毎回手作業で組み立てなくてよいこと。
 - E-RQ-002:
-  - 作成先 container は main checkout の内側ではなく、main checkout の親 directory 直下の `<repo-basename>-worktrees/` とすること。
-  - container 名は lowercase path policy に従い、dot suffix ではなく hyphen suffix を標準とすること。
-  - 例: `/Users/.../spec-dock` から作る場合、container は `/Users/.../spec-dock-worktrees/` であること。
-  - command が既存 linked worktree から実行された場合も、container placement と repo basename は Git が認識する main worktree を基準に正規化すること。
+  - 作成先 namespace は main checkout の内側ではなく、必須環境変数 `SPEC_DOCK_WORKTREE_ROOT` で指定した central root 直下の `<repo-basename>/` とすること。
+  - `SPEC_DOCK_WORKTREE_ROOT` が未設定、空文字、空白のみ、relative path、file、壊れた symlink、directory として使えない path の場合は fail-fast すること。
+  - 通常 directory と directory を指す symlink は root として許可し、root / namespace directory は必要に応じて作成できること。
+  - 例: `/Users/.../spec-dock` から `SPEC_DOCK_WORKTREE_ROOT=/Users/.../worktrees` を使う場合、namespace は `/Users/.../worktrees/spec-dock/` であること。
+  - command が既存 linked worktree から実行された場合も、namespace と repo basename は Git が認識する main worktree を基準に正規化すること。
+  - 過去の sibling `<repo-basename>-worktrees/` placement は legacy context とし、future `worktree create` の fallback として使わないこと。
 - E-RQ-003:
   - 個別 worktree directory name と initial branch name は、参照プロダクトの実用 naming を踏襲すること。
   - label 省略時の id は `wt1`, `wt2`, ... とし、label 指定時の id は `<label>`, `<label>2`, ... とすること。
-  - 個別 worktree directory は `<repo-basename>-<id>` を基本とし、container 配下に作ること。
+  - 個別 worktree directory は `<repo-basename>-<id>` を基本とし、central root namespace 配下に作ること。
   - initial branch は `<current-branch>-<id>` を基本とすること。
 - E-RQ-004:
   - label は lowercase alphanumeric と hyphen のみを許可し、uppercase、underscore、dot、space、slash、shell metacharacter を拒否すること。
@@ -75,11 +77,12 @@ ID: "epic-00107"
 - E-AC-001:
   - 前提:
     - Git repo の main checkout が `/tmp/example/spec-dock` にあり、current branch が `main` である
-    - `../spec-dock-worktrees/` は存在しない、または空である
+    - `SPEC_DOCK_WORKTREE_ROOT` が `/tmp/worktrees` に設定されている
+    - `/tmp/worktrees/spec-dock/` は存在しない、または空である
   - 操作:
     - maintainer が worktree 作成 command を label なしで実行する
   - 期待結果:
-    - `/tmp/example/spec-dock-worktrees/spec-dock-wt1` が linked worktree として作成される
+    - `/tmp/worktrees/spec-dock/spec-dock-wt1` が linked worktree として作成される
     - `main-wt1` branch が作成され、その worktree で checkout される
     - command output が id / path / branch / bootstrap result を表示する
   - 観測点:
@@ -92,7 +95,7 @@ ID: "epic-00107"
     - maintainer が label なしで再度 worktree 作成 command を実行する
   - 期待結果:
     - command は衝突を避けて `wt2` を採用する
-    - `/tmp/example/spec-dock-worktrees/spec-dock-wt2` と `main-wt2` が作成される
+    - `/tmp/worktrees/spec-dock/spec-dock-wt2` と `main-wt2` が作成される
   - 観測点:
     - CLI / runtime test
     - branch / directory / worktree record collision test
@@ -103,7 +106,7 @@ ID: "epic-00107"
     - maintainer が worktree 作成 command に label `issue-107-worktree` を指定する
   - 期待結果:
     - id は `issue-107-worktree` になる
-    - worktree path は `<repo-parent>/<repo-basename>-worktrees/<repo-basename>-issue-107-worktree` になる
+    - worktree path は `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-issue-107-worktree` になる
     - branch は `feature/base-issue-107-worktree` になる
   - 観測点:
     - naming unit test
@@ -154,14 +157,14 @@ ID: "epic-00107"
     - output assertion
 - E-AC-008:
   - 前提:
-    - command が `/tmp/example/spec-dock-worktrees/spec-dock-existing` のような既存 linked worktree から実行される
+    - command が `/tmp/worktrees/spec-dock/spec-dock-existing` のような既存 linked worktree から実行される
     - Git が認識する main worktree は `/tmp/example/spec-dock` である
     - current branch は `main-existing` である
   - 操作:
     - maintainer が label なしで worktree 作成 command を実行する
   - 期待結果:
-    - command は main worktree basename `spec-dock` を使って container `/tmp/example/spec-dock-worktrees/` を選ぶ
-    - 新しい個別 worktree は `/tmp/example/spec-dock-worktrees/spec-dock-wtN` に作成される
+    - command は main worktree basename `spec-dock` を使って namespace `/tmp/worktrees/spec-dock/` を選ぶ
+    - 新しい個別 worktree は `/tmp/worktrees/spec-dock/spec-dock-wtN` に作成される
     - initial branch は実行元 current branch を基点に `main-existing-wtN` として合成される
     - `spec-dock-existing-worktrees/` や `spec-dock-existing-wtN` のような chained path は作られない
   - 観測点:
@@ -205,7 +208,7 @@ ID: "epic-00107"
 ## スコープ
 - 必須:
   - SpecDock runtime worktree creation command
-  - repo sibling `<repo-basename>-worktrees/` container placement
+  - required `SPEC_DOCK_WORKTREE_ROOT` central root placement
   - taikyohiyou_project 由来の id / directory / branch naming
   - label validation
   - collision detection and retry
@@ -215,6 +218,7 @@ ID: "epic-00107"
   - dogfooding workspace inspection / parity confirmation
 - 禁止:
   - main checkout 内に `.worktrees/` や `worktrees/` を標準作成先として持ち込むこと
+  - missing / invalid `SPEC_DOCK_WORKTREE_ROOT` 時に legacy sibling placement へ fallback すること
   - Codex app managed worktree を移動・削除・再実装すること
   - `make init` failure を worktree 作成失敗として扱うこと
   - invalid label を shell / Git command に渡してから失敗させること
@@ -231,8 +235,8 @@ ID: "epic-00107"
 
 ## 境界
 - 常に行う:
-  - worktree 作成は repo 外 sibling container に集約する
-  - linked worktree から実行された場合も、main worktree を基準に container と repo basename を決める
+  - worktree 作成は `SPEC_DOCK_WORKTREE_ROOT` 配下の repo namespace に集約する
+  - linked worktree から実行された場合も、main worktree を基準に namespace と repo basename を決める
   - current branch を基点に initial branch 名を合成する
   - Git が管理する linked worktree として作成する
   - `make init` は project-local bootstrap interface として扱い、存在しない / 失敗する場合でも作成済み worktree を残す

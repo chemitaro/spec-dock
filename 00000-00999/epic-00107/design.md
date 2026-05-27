@@ -16,7 +16,7 @@ ID: "epic-00107"
 - 対象境界:
   - `spec-dock worktree create [LABEL]` を runtime command として追加する。
   - command は Git linked worktree と initial branch を作るが、spec node / active pointer / GitHub issue は変更しない。
-  - 作成先は main worktree の sibling container `<repo-basename>-worktrees/` 配下へ正規化する。
+  - 作成先は `SPEC_DOCK_WORKTREE_ROOT` 配下の `<repo-basename>/` namespace へ正規化する。
   - 作成後 bootstrap は optional / non-fatal な `make init` として扱う。
 - 影響領域:
   - CLI parser / registry
@@ -65,7 +65,7 @@ package "commands" {
 package "application" {
   [contracts.py\nWorktreeCreateRequest/Result] as Contracts
   [worktree.py\ncreate_worktree] as UseCase
-  [ports.py\nGitGateway + BootstrapGateway] as Ports
+  [ports.py\nEnvironmentGateway + GitGateway + BootstrapGateway] as Ports
 }
 
 package "infra" {
@@ -136,6 +136,7 @@ presentation --> application : result dataclasses only
 設計判断:
 - `application.contracts.UseCases` に `worktree_create` callable を追加する。
 - `application.ports.GitGateway` は worktree-specific methods を追加してよい。ただし `make init` は Git の責務ではないため、別 protocol `BootstrapGateway` を追加する。
+- `application.ports.EnvironmentGateway` は `SPEC_DOCK_WORKTREE_ROOT` lookup を扱い、command layer と use case の direct `os.environ` 依存を避ける。
 - domain への抽出は optional とする。label validation / candidate naming が複数 issue で再利用される場合だけ `domain/worktree.py` のような pure helper に逃がす。
 
 ## Domain Model（DDD 必要時）
@@ -157,7 +158,7 @@ presentation --> application : result dataclasses only
     - stdout に id、worktree absolute path、branch、bootstrap result を出す
   - fatal error:
     - exit code `1`
-    - stderr に invalid label / detached HEAD / Git repo 外 / non-retryable Git failure / path failure を出す
+    - stderr に missing / invalid `SPEC_DOCK_WORKTREE_ROOT` / invalid label / detached HEAD / Git repo 外 / non-retryable Git failure / path failure を出す
   - bootstrap failure:
     - exit code `0`
     - worktree 作成 success として扱う
@@ -194,7 +195,7 @@ presentation --> application : result dataclasses only
 - file / state 変更:
   - Git creates linked worktree metadata under Git common dir.
   - Git creates a new branch.
-  - Files are checked out into `<main-parent>/<repo-basename>-worktrees/<repo-basename>-<id>`.
+  - Files are checked out into `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>`.
   - Optional `make init` may create project-specific untracked files, but SpecDock does not define those files.
 - 不変条件:
   - SpecDock must not create nested worktrees inside the main checkout.
@@ -210,7 +211,7 @@ presentation --> application : result dataclasses only
   1. CLI parses `worktree create`.
   2. Command validates CLI shape and builds `WorktreeCreateRequest(label=None)`.
   3. Application resolves current branch and main worktree path from Git.
-  4. Application derives container path `<main-parent>/<repo-basename>-worktrees`.
+  4. Application requires and validates `SPEC_DOCK_WORKTREE_ROOT`, then derives namespace path `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>`.
   5. Application evaluates candidates `wt1`, `wt2`, ... against directory / branch / worktree record collisions.
   6. Application calls Git gateway to add worktree with `-b <current-branch>-<id>`.
   7. Application calls BootstrapGateway for optional `make init`.
@@ -219,7 +220,7 @@ presentation --> application : result dataclasses only
   - Candidate collision found before add or during `git worktree add` with known retryable message.
   - Application increments candidate id and retries until a usable candidate is found or candidate ceiling `10000` is exceeded.
   - Candidate ceiling `10000` follows the reference product's proven upper bound and prevents infinite retry loops.
-  - If no candidate is found by `10000`, command exits `1` with a fatal message that includes label mode, last attempted id, container path, and the reason that candidates were exhausted.
+  - If no candidate is found by `10000`, command exits `1` with a fatal message that includes label mode, last attempted id, namespace path, and the reason that candidates were exhausted.
 - Flow-C: bootstrap failure
   - Worktree creation succeeds.
   - `make init` exists but returns non-zero, or bootstrap detection fails for a reason other than target-missing.
@@ -310,7 +311,7 @@ skinparam monochrome true
 start
 :Validate label;
 if (inside Git repo and branch?) then (yes)
-  :Resolve main worktree and container;
+  :Resolve env root, main worktree, and namespace;
   :n = 1;
   repeat
     :Build id/path/branch candidate;
@@ -354,12 +355,14 @@ endif
 - 失敗モード:
   - invalid label:
     - before Git mutation; exit `1`.
+  - missing / invalid `SPEC_DOCK_WORKTREE_ROOT`:
+    - before Git mutation; exit `1`; output names the variable, path/cause when available, and an absolute-path setup example.
   - Git repo 外 / detached HEAD:
     - before Git mutation; exit `1`.
   - no candidate after retry ceiling:
     - retry ceiling is fixed at `10000`.
     - before Git mutation or after retryable collisions; exit `1`.
-    - fatal output includes label mode, last attempted id, container path, and exhaustion reason.
+    - fatal output includes label mode, last attempted id, namespace path, and exhaustion reason.
   - non-retryable `git worktree add` failure:
     - exit `1`; output includes command context and whether path exists / branch exists / record exists when observable.
   - path creation / permission failure:
@@ -386,7 +389,8 @@ endif
 
 ## 移行戦略
 - 移行戦略:
-  - Additive runtime command; no existing command behavior changes.
+  - Runtime placement change for `worktree create`; command surface and naming behavior remain compatible.
+  - Existing sibling `<repo-basename>-worktrees/` worktrees are legacy Git worktrees and are not moved or removed.
   - Provider-side source under `src/spec_dock/assets/spec_dock/...` is updated first.
   - Dogfooding workspace `spec-dock/...` is refreshed/inspected as validation, not treated as implementation source.
 - 必要時の dual write/read:
@@ -418,12 +422,12 @@ endif
   - main worktree normalization from linked worktree records.
   - retryable vs non-retryable error classification.
 - CLI/runtime:
-  - `spec-dock worktree create` creates `<repo-basename>-worktrees/<repo-basename>-wt1`.
+  - `spec-dock worktree create` requires `SPEC_DOCK_WORKTREE_ROOT` and creates `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-wt1`.
   - repeated invocation creates `wt2`.
   - label invocation creates `<label>` and branch `<current-branch>-<label>`.
   - invalid labels fail before mutation.
   - detached HEAD / Git repo 外 fail.
-  - linked-worktree invocation uses main worktree basename/container.
+  - linked-worktree invocation uses main worktree basename/namespace.
   - `make init` success / skipped / detection failure / execution failure all render correct output and exit code.
   - non-retryable Git/path failures exit `1`.
 - E2E:
@@ -480,7 +484,7 @@ endif
   - 決定:
     - A を採用する。
     - partial Git failure は success result variant にせず、既存 dispatch contract に合わせて `RuntimeError` text として返す。
-    - retryable collision の candidate ceiling は `10000` とし、超過時は `RuntimeError` text に label mode、last attempted id、container path、exhaustion reason を含める。
+    - retryable collision の candidate ceiling は `10000` とし、超過時は `RuntimeError` text に label mode、last attempted id、namespace path、exhaustion reason を含める。
   - 影響範囲:
     - application error contract
     - CLI tests

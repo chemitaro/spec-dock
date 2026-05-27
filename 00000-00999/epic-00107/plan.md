@@ -15,7 +15,7 @@ ID: "epic-00107"
 ## この計画で閉じる E-RQ / E-AC
 - E-RQ:
   - E-RQ-001: runtime worktree creation command
-  - E-RQ-002: sibling `<repo-basename>-worktrees/` placement and linked-worktree normalization
+  - E-RQ-002: required `SPEC_DOCK_WORKTREE_ROOT` central placement and linked-worktree normalization
   - E-RQ-003: id / directory / branch naming
   - E-RQ-004: label validation
   - E-RQ-005: collision detection and retry
@@ -135,7 +135,7 @@ ID: "epic-00107"
   3. Docs / dogfooding parity / final verification.
 - 契約 / docs 更新:
   - Add a worktree command section to shipped workflow/reference docs.
-  - Mention sibling container placement and no nested `.worktrees/`.
+  - Mention required `SPEC_DOCK_WORKTREE_ROOT`, central root namespace placement, legacy sibling boundary, and no nested `.worktrees/`.
   - Mention optional / non-fatal `make init`.
   - Mention future extensions: list/status/remove/prune are out of scope.
 
@@ -156,7 +156,7 @@ ID: "epic-00107"
   - `./spec-dock/scripts/spec-dock validate` and `./spec-dock/scripts/spec-dock sync` pass.
 - docs 影響解決:
   - Provider docs and dogfooding docs show the same command contract.
-  - No stale wording suggests nested `.worktrees/` or Codex-managed worktree replacement.
+  - No stale wording suggests sibling placement as future behavior, nested `.worktrees/`, or Codex-managed worktree replacement.
 
 ## 依存 / ブロッカー
 - D-001:
