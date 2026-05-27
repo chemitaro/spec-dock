@@ -14,19 +14,38 @@ underscore、dot、space、slash、uppercase、shell metacharacters は拒否さ
 
 ## ディレクトリ構成（directory layout）
 
-main checkout と同じ親ディレクトリに `<repo-basename>-worktrees/` を作り、その中に worktree を作ります。
-main checkout の中に nested `.worktrees/` は作りません。
+`worktree create` は `SPEC_DOCK_WORKTREE_ROOT` で指定した central root 配下に、repo basename の namespace directory を作り、その中に worktree を作ります。
+`SPEC_DOCK_WORKTREE_ROOT` は必須です。未設定、空文字、空白のみの場合は fatal error になり、Git branch、worktree directory、bootstrap side effect は作られません。
+
+設定例:
+
+```bash
+export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"
+```
+
+layout:
 
 ```text
-~/workspace/tools/
+~/workspace/worktrees/
   spec-dock/
-  spec-dock-worktrees/
     spec-dock-wt1/
     spec-dock-feature/
 ```
 
-linked worktree から実行した場合も、Git が認識する main worktree を基準に container path と repo basename を決めます。
+worktree path は `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>` です。
+central root directory と namespace directory は、必要に応じて command が作成します。
+main checkout の中に nested `.worktrees/` は作りません。
+
+`SPEC_DOCK_WORKTREE_ROOT` は `~` 展開後に absolute path である必要があります。
+通常 directory と directory を指す symlink は許可されます。
+relative path、file、壊れた symlink、directory として使えない path は fatal error です。
+
+linked worktree から実行した場合も、Git が認識する main worktree を基準に namespace と repo basename を決めます。
 branch name は実行元 checkout の current branch を基準にします。
+
+過去バージョンで作られた sibling `<repo-basename>-worktrees/` は legacy placement です。
+この command は既存 sibling worktree を移動・削除・migration しません。
+future `worktree create` は central root を使い、missing env var 時に sibling placement へ fallback しません。
 
 ## 命名（naming）
 
@@ -34,7 +53,7 @@ LABEL なし:
 
 ```text
 id: wt1, wt2, wt3, ...
-path: <repo-basename>-worktrees/<repo-basename>-<id>
+path: $SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>
 branch: <current-branch>-<id>
 ```
 
@@ -42,7 +61,7 @@ LABEL あり:
 
 ```text
 id: <label>, <label>2, <label>3, ...
-path: <repo-basename>-worktrees/<repo-basename>-<id>
+path: $SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>
 branch: <current-branch>-<id>
 ```
 
@@ -66,7 +85,7 @@ bootstrap の detection / execution failure は worktree 作成成功を取り�
 bootstrap warning は既存 CLI warning path に流れます。
 
 ```text
-spec-dock: ok (worktree create) id=wt1 branch=main-wt1 path=/abs/path/spec-dock-worktrees/spec-dock-wt1
+spec-dock: ok (worktree create) id=wt1 branch=main-wt1 path=/abs/path/worktrees/spec-dock/spec-dock-wt1
 spec-dock: worktree bootstrap status=skipped command=-
 ```
 
@@ -77,7 +96,9 @@ spec-dock: worktree bootstrap status=skipped command=-
 - Git repo 外での実行。
 - detached HEAD での実行。
 - invalid label。
-- container path の作成失敗。
+- missing / blank `SPEC_DOCK_WORKTREE_ROOT`。
+- invalid `SPEC_DOCK_WORKTREE_ROOT`。
+- central root / namespace directory の作成失敗。
 - non-retryable `git worktree add` failure。
 - candidate retry ceiling exhaustion。
 
