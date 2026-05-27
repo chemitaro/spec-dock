@@ -14,6 +14,8 @@ _RETRYABLE_GIT_WORKTREE_ERRORS = (
     "is already checked out",
     "a branch named",
 )
+_WORKTREE_ROOT_ENV = "SPEC_DOCK_WORKTREE_ROOT"
+_WORKTREE_ROOT_EXAMPLE = "export SPEC_DOCK_WORKTREE_ROOT=\"$HOME/workspace/worktrees\""
 
 
 def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateResult:
@@ -23,8 +25,11 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
         raise RuntimeError("worktree create requires a Git gateway")
     if ports.bootstrap_gateway is None:
         raise RuntimeError("worktree create requires a bootstrap gateway")
+    if ports.environment_gateway is None:
+        raise RuntimeError("worktree create requires an environment gateway")
 
     label = _normalize_label(req.label)
+    central_root = _resolve_worktree_root(ports)
     repo_root = ports.repo_root
     branch_prefix = ports.git_gateway.current_branch_or_none(repo_root)
     if branch_prefix is None:
@@ -35,7 +40,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
         raise RuntimeError("git worktree list returned no worktrees")
     main_worktree = records[0].path
     repo_basename = main_worktree.name
-    container = main_worktree.parent / f"{repo_basename}-worktrees"
+    container = central_root / repo_basename
     known_paths = {_canonical_path(record.path) for record in records}
     last_attempt_id = ""
     last_reason = "no candidates attempted"
@@ -68,7 +73,11 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 ports=ports,
                 refresh_records=False,
             )
-            raise RuntimeError(f"failed to create worktree container: {container} {state}\n{exc}") from exc
+            raise RuntimeError(
+                "failed to create worktree container from "
+                f"{_WORKTREE_ROOT_ENV}: root={central_root} container={container} "
+                f"{state}\n{exc}\nSet an absolute path, for example: {_WORKTREE_ROOT_EXAMPLE}"
+            ) from exc
 
         try:
             ports.git_gateway.add_worktree_with_new_branch(repo_root, path=worktree_path, branch=branch_name)
@@ -128,6 +137,39 @@ def _candidate_id(label: str | None, index: int) -> str:
     if index == 1:
         return label
     return f"{label}{index}"
+
+
+def _resolve_worktree_root(ports: Ports) -> Path:
+    assert ports.environment_gateway is not None
+    raw_value = ports.environment_gateway.getenv(_WORKTREE_ROOT_ENV)
+    if raw_value is None or not raw_value.strip():
+        raise RuntimeError(
+            f"{_WORKTREE_ROOT_ENV} is required for worktree create. "
+            "Set it to an absolute directory for spec-dock managed worktrees, "
+            f"for example: {_WORKTREE_ROOT_EXAMPLE}"
+        )
+    return _validate_worktree_root(raw_value)
+
+
+def _validate_worktree_root(raw_value: str) -> Path:
+    expanded = Path(raw_value).expanduser()
+    resolved = expanded.resolve(strict=False)
+    if not expanded.is_absolute():
+        raise RuntimeError(_invalid_worktree_root_message(raw_value, resolved, "path is relative"))
+    if expanded.exists():
+        if not expanded.is_dir():
+            raise RuntimeError(_invalid_worktree_root_message(raw_value, resolved, "path is not a directory"))
+        return expanded
+    if expanded.is_symlink():
+        raise RuntimeError(_invalid_worktree_root_message(raw_value, resolved, "path is a broken symlink"))
+    return expanded
+
+
+def _invalid_worktree_root_message(raw_value: str, resolved: Path, cause: str) -> str:
+    return (
+        f"invalid {_WORKTREE_ROOT_ENV}: raw={raw_value!r} resolved={resolved} cause={cause}. "
+        f"Set an absolute directory, for example: {_WORKTREE_ROOT_EXAMPLE}"
+    )
 
 
 def _preflight_collision(
