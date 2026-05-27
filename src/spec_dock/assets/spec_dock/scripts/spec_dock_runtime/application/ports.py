@@ -169,6 +169,11 @@ class BootstrapGateway(Protocol):
         ...
 
 
+class EnvironmentGateway(Protocol):
+    def getenv(self, name: str) -> str | None:
+        ...
+
+
 class ArtifactWriter(Protocol):
     def write(self, specdock_dir: Path, bundle: ArtifactBundle) -> ArtifactWriteResult:
         ...
@@ -217,3 +222,4 @@ class Ports:
     artifact_writer: ArtifactWriter | None = None
     sync_legacy_runner: SyncLegacyRunner | None = None
     bootstrap_gateway: BootstrapGateway | None = None
+    environment_gateway: EnvironmentGateway | None = None

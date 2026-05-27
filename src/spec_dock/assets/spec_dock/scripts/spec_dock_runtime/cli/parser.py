@@ -82,7 +82,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     p_worktree = sub.add_parser("worktree", help="Manage long-lived Git worktrees")
     worktree_sub = p_worktree.add_subparsers(dest="worktree_cmd", required=True)
     _bind_leaf(
-        worktree_sub.add_parser("create", help="Create a sibling Git worktree and optional make init bootstrap"),
+        worktree_sub.add_parser("create", help="Create a central-root Git worktree and optional make init bootstrap"),
         registry,
         "worktree_create",
     )
