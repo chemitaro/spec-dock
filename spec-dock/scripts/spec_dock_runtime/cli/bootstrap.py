@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -203,6 +204,12 @@ class _BootstrapGateway:
 
 
 @dataclass(frozen=True)
+class _EnvironmentGateway:
+    def getenv(self, name: str) -> str | None:
+        return os.environ.get(name)
+
+
+@dataclass(frozen=True)
 class _JsonStore:
     def load_json(self, path: Path):
         return infra_json_store.load_json(path)
@@ -239,6 +246,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         deps_topology_reader=_DepsTopologyReader(),
         git_gateway=_GitGateway(),
         bootstrap_gateway=_BootstrapGateway(),
+        environment_gateway=_EnvironmentGateway(),
         json_store=_JsonStore(),
         clock=_Clock(),
         artifact_writer=_ArtifactWriter(),
