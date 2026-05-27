@@ -67,6 +67,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-004 | `adopted` | `sub-agent` qa-reviewer | test coverage / report cleanup | QA gate passed with P2 recommendations; invalid-label central-root side-effect coverage and decision-ledger cleanup were adopted and targeted tests passed. | qa-reviewer `Locke` -> `review_status: pass`; `uv run python -m unittest tests.cli_runtime.test_worktree -v` -> OK, 22 tests | なし |
 | EAL-005 | `adopted` | `sub-agent` code-reviewer | CLI help contract cleanup | Fresh code review passed with P2 stale help wording; provider and dogfooding parser help were updated to central-root wording and parity verified. | code-reviewer `Newton` -> `review_status: pass`; `rg` stale-help check; mirror parity test -> OK | なし |
 | EAL-006 | `adopted` | `sub-agent` qa-reviewer | post-cleanup QA review | Fresh QA review passed with only evidence-ledger cleanup; EAL-004 was closed and targeted tests had already passed. | qa-reviewer `Herschel` -> `review_status: pass` | なし |
+| EAL-007 | `adopted` | `command` / PR monitor | S100 PR delivery and merge-preparation evidence | PR #133 exists against `main`, closes #130, initial head checks passed, merge state is clean, and GraphQL reviewThreads returned zero threads. | `gh pr view 133 --json ...`; `gh pr checks 133 --watch=false`; `gh api graphql ... reviewThreads.totalCount=0` | Final post-report push monitor remains external evidence because recording that push inside this report would change the head again. |
+| EAL-008 | `adopted` | `sub-agent` spec-reviewer | final S100 report review | Fresh spec review passed with a P2 recommendation to name S100 gate fields explicitly; the S100 table was expanded with ready/draft, PR reuse, open state, monitor status, fix-loop count, blockers, and merge-prepared decision fields. | spec-reviewer `Carver` -> `review_status: pass` | なし |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -306,7 +308,7 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 | slci-010 | S90 | yes | inspect-only | N/A | docs and parent Epic inspection | pass | central root is future contract |
 | slci-011 | S90/S99 | yes | inspect-only | N/A | diff/docs inspection | pass | no list/remove/prune, no `$CODEX_HOME/worktrees` mixing |
 | slci-012 | S90/S99 | yes | command evidence | N/A | `validate`, `sync`, targeted and full unittest discovery | pass | provider/dogfooding parity covered by tests |
-| slci-013 | S100 | yes | PR evidence | N/A | PR Delivery Gate / Merge Preparation Gate | pending | PR creation and monitoring happen after initial commit/push |
+| slci-013 | S100 | yes | PR evidence | N/A | PR Delivery Gate / Merge Preparation Gate | pass for initial implementation head | PR #133 exists, closes #130, initial head checks passed, merge state is clean, reviewThreads totalCount is 0; final report-evidence push monitor remains external evidence |
 
 ### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
@@ -323,7 +325,7 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 | slci-010 | S90 | docs/spec inspection | pass | future contract updated |
 | slci-011 | S90/S99 | diff/docs inspection | pass | scope exclusions preserved |
 | slci-012 | S90/S99 | `validate`, `sync`, unittest | pass | full system-Python suite OK |
-| slci-013 | S100 | PR URL / monitor evidence | pending | to be recorded after PR creation |
+| slci-013 | S100 | PR URL / checks / merge-state / reviewThreads evidence | pass for initial implementation head | final report-evidence push monitor remains external evidence |
 
 ### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -346,12 +348,13 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 | S01-S05/S90 | repo-analyst | implementation surfaces and test-harness risks identified | none | read-only | accepted | none | adopted in EAL-001 |
 | S99 | code-reviewer | integrated diff satisfies central-root contract and mirror parity | none | read-only diff/test review | pass | none | adopted in EAL-003 |
 | S99 | qa-reviewer | no P0/P1 coverage gaps; P2 invalid-label/report cleanup noted | none | read-only QA review | pass | P2 addressed locally | adopted in EAL-004 |
-| S99/S100 | spec-reviewer | final report closure and PR evidence gaps found | none | read-only spec review | fail | S100 pending until PR exists | report closure updated; PR evidence deferred to post-PR commit |
+| S99/S100 | spec-reviewer | final report closure and PR evidence gaps found | none | read-only spec review | fail before S100 update | S100 evidence now recorded; fresh rerun required | report closure updated; PR evidence recorded in S100 gate |
+| S100 | spec-reviewer | S100 report evidence is sufficient; P2 explicit field naming recommended | none | read-only spec review | pass | P2 field naming adopted | adopted in EAL-008 |
 
 ### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01-S05/S90 | canonical docs/report and tightly coupled runtime/test/docs integration remained parent-owned per workflow | user instructed workflow execution with subagent use; no waiver | changed files in this issue diff | parent edited canonical specs/report, provider runtime/docs, dogfooding mirror, tests | revert central-root runtime/docs/tests to previous sibling placement | targeted tests, full suite, validate/sync | code-reviewer pass; qa-reviewer pass; spec-reviewer pending S100 | none |
+| S01-S05/S90 | canonical docs/report and tightly coupled runtime/test/docs integration remained parent-owned per workflow | user instructed workflow execution with subagent use; no waiver | changed files in this issue diff | parent edited canonical specs/report, provider runtime/docs, dogfooding mirror, tests | revert central-root runtime/docs/tests to previous sibling placement | targeted tests, full suite, validate/sync | code-reviewer pass; qa-reviewer pass; spec-reviewer pass after S100 evidence update | none |
 
 ### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -360,13 +363,14 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 | S99 | final QA review | qa-reviewer | fresh | passed | N/A | proceed after P2 cleanup | invalid-label central side-effect coverage added |
 | S99 | final code review follow-up | code-reviewer | fresh | passed | N/A | proceed after P2 cleanup | central-root help wording updated |
 | S99 | final QA review follow-up | qa-reviewer | fresh | passed | N/A | proceed | EAL follow-up closed |
-| S99/S100 | final spec review | spec-reviewer | fresh | failed | no | incomplete until PR evidence recorded | report placeholders and S100 evidence gap identified; non-PR report gaps fixed here |
+| S99/S100 | final spec review | spec-reviewer | fresh before S100 update | failed before S100 update | no | rerun required after S100 evidence update | report placeholders and S100 evidence gap identified; S100 evidence recorded here for rerun |
+| S100 | final spec review follow-up | spec-reviewer | fresh | passed | N/A | proceed after P2 field naming cleanup | no P0/P1 blocker; S100 external-evidence loop note accepted |
 
 ### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01-S99 | pending initial commit | runtime, tests, docs, specs, report, discussions | pending | pending | N/A | N/A | N/A | N/A |
-| S100 | pending post-PR evidence commit | PR delivery / merge-prep evidence in report | pending | pending | N/A | N/A | N/A | N/A |
+| S01-S99 | closed and committed | runtime, tests, docs, specs, report, discussions | `50154d98b9c7d55e3fea7081afc2c0a8f13b192b` | `git status --short --branch` clean before S100 report update | N/A | N/A | N/A | N/A |
+| S100 | report evidence update pending commit | PR delivery / merge-prep evidence in report | pending S100 evidence commit | pending post-commit clean check | N/A | N/A | N/A | final latest-head PR monitor will be recorded outside this report to avoid an endless evidence-commit loop |
 
 ### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` - env gateway port を追加。
@@ -377,14 +381,15 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 - `spec-dock/active/issue/*.md` / parent Epic docs / `discussions/` - requirement/design/plan/report evidence and supersession context を記録。
 
 ### コミット
-- pending
+- `50154d98b9c7d55e3fea7081afc2c0a8f13b192b` - initial implementation / docs / tests / report commit.
+- S100 evidence report update commit: pending.
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| provider/dogfooding reference docs and parent Epic docs | yes | parent orchestrator | docs updated; `validate` and `sync` pass | pending final S100 rerun |
+| provider/dogfooding reference docs and parent Epic docs | yes | parent orchestrator | docs updated; `validate` and `sync` pass | fresh S100 spec review passed |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -399,20 +404,27 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer `Kepler` | requirement / design / plan / report / implementation / tests / docs alignment | report closure placeholders and S100 PR evidence missing; non-PR report gaps fixed here | 1 | pending rerun after PR evidence |
+| spec-reviewer `Kepler`, spec-reviewer `Carver` | requirement / design / plan / report / implementation / tests / docs alignment | Kepler found report closure placeholders and missing S100 PR evidence; Carver passed the S100 update with one P2 explicit-field recommendation, which is adopted here | 2 | pass |
 
 ### PR Delivery Gate / Merge Preparation Gate（S100）
 | 項目 | 証跡 | 結果 |
 |---|---|---|
-| PR URL / base / head / issue linkage | pending until PR creation | pending |
-| latest pushed head SHA and monitored head match | pending until push / PR monitor | pending |
-| CI / PR checks / Codex review state | pending until PR monitor | pending |
-| S100 report evidence commit and re-push | pending after PR evidence is recorded | pending |
+| PR creation / reuse decision | Created new PR #133 because no existing PR for branch `iss-00130-central-worktree-root-placement` was reused in this workflow. | pass |
+| Draft / ready decision | PR #133 is `isDraft=false`; this issue is intended for human merge judgment after monitor gates pass. | pass |
+| PR open state | `gh pr view 133 --json state,isDraft` returned `state=OPEN`, `isDraft=false`. | pass |
+| PR URL / base / head / issue linkage | PR #133: `https://github.com/chemitaro/spec-dock/pull/133`; base `main`; head `iss-00130-central-worktree-root-placement`; `Closes #130`; `closingIssuesReferences` includes issue #130 | pass |
+| latest pushed head SHA and monitored head match | Initial PR head `50154d98b9c7d55e3fea7081afc2c0a8f13b192b`; `gh pr view 133 --json headRefOid,mergeStateStatus,mergeable` returned the same head, `MERGEABLE`, `CLEAN` | pass for initial implementation head; S100 evidence commit will require post-push external monitor |
+| CI / PR checks / review state | `gh pr checks 133 --watch=false` returned `provider-tests` pass x2 and `validate` pass x2; GraphQL `reviewThreads.totalCount=0`; `reviewDecision` empty | pass |
+| Monitor status | Initial PR monitor result is clean: all observed checks completed successfully, merge state `CLEAN`, no review threads. | pass for initial implementation head |
+| Fix-loop count / history | PR monitor fix loops: 0. No post-PR code fix was required before this report-evidence update. | pass |
+| Unresolved blockers | None observed on initial PR head. Post-report evidence commit must be monitored after push. | pass for initial implementation head |
+| Final merge-prepared decision | Initial PR head is merge-prepared for human judgment. The final merge-prepared decision for the report-evidence head is delegated to the post-push PR monitor / final response. | pass for initial implementation head |
+| S100 report evidence commit and re-push | This report update records PR evidence. The act of committing and pushing it will create a new head, so latest-head CI / merge-state evidence is delivered through the final PR monitor and final response rather than another report edit. | pending post-report push monitor |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S01-S99 evidence recorded; S100 pending PR creation | initial implementation commit pending | PR body / final response / report S100 update | pending |
+| S01-S99 and initial S100 PR evidence recorded | S100 report evidence update commit pending | final PR monitor / final response | pending post-report push monitor |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `uvx --from . spec-dock update .` が central-root scope 外の dogfooding scaffold churn を発生させた。
@@ -424,7 +436,7 @@ ls: /Users/iwasawayuuta/workspace/worktrees: No such file or directory
 - worktree placement の contract 変更は provider runtime、dogfooding mirror、reference docs、parent Epic docs、issue docs を同時に閉じる必要がある。
 
 ## 今後の推奨事項 (任意)
-- S100 は PR 作成後に PR URL、head SHA、checks / review 状態、delivery-evidence commit を report に追記してから final spec review を rerun する。
+- S100 report evidence commit 後は head が変わるため、latest-head の CI / merge-state / reviewThreads は final PR monitor と最終報告に記録する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
