@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00131",
+  "title": "Debug Codex subagent Permission Profile callability",
+  "slug": "debug-codex-subagent-permission-profile-callability",
+  "created_at": "2026-05-26T19:55:36+09:00",
+  "updated_at": "2026-05-26T19:55:36+09:00",
+  "parent_id": "epic-00112",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00112",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 131,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
