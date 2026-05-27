@@ -990,6 +990,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00108-worktree-create-cli-and-output/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00109-worktree-docs-dogfooding-and-final-verification/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00110-worktree-create-core-use-case/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00130-central-worktree-root-placement/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json",
@@ -1035,6 +1036,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00125-authority-aware-delegated-authoring-dogfooding-pilot/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1059,6 +1061,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00108-worktree-create-cli-and-output/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00109-worktree-docs-dogfooding-and-final-verification/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00110-worktree-create-core-use-case/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00130-central-worktree-root-placement/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00033-github-backed-identity-and-adr-mirror-workflow/issues/iss-00034-github-mandatory-node-creation-contract/.meta.json": [],
@@ -1163,6 +1166,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00126-write-capable-delegated-draft-authoring-correction/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00127-scoped-discussion-draft-authoring-correction/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00112-delegated-authoring-architecture/issues/iss-00131-debug-codex-subagent-permission-profile-callability/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP = {
         "iss-00035": ["iss-00036"],
@@ -2089,29 +2093,10 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertEqual(parsed.get("model_reasoning_effort"), "high")
         self.assertEqual(parsed.get("web_search"), "disabled")
         self.assertEqual(parsed.get("approval_policy"), "never")
-        self.assertNotIn("sandbox_mode", parsed)
-        self.assertIsInstance(parsed.get("default_permissions"), str)
-        self.assertIn(parsed["default_permissions"], parsed.get("permissions", {}))
-        filesystem_rules = parsed["permissions"][parsed["default_permissions"]]["filesystem"]
-        workspace_rules = filesystem_rules[":workspace_roots"]
-        write_roots = {path for path, permission in workspace_rules.items() if permission == "write"}
-        self.assertEqual(
-            write_roots,
-            {
-                "spec-dock/initiatives/*/discussions/*.md",
-                "spec-dock/initiatives/*/epics/*/discussions/*.md",
-                "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
-            },
-            f"delegated author adapter must grant only scope-local discussion write roots ({shim_label})",
-        )
-        for read_only_path in ("spec-dock/initiatives", "src", "tests", ".codex", ".agents"):
-            self.assertEqual(
-                workspace_rules.get(read_only_path),
-                "read",
-                f"delegated author adapter must keep {read_only_path} read-only ({shim_label})",
-            )
-        self.assertEqual(workspace_rules.get(".env"), "deny")
-        self.assertEqual(workspace_rules.get(".env.*"), "deny")
+        self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
+        self.assertNotIn("default_permissions", parsed)
+        self.assertNotIn("permissions", parsed)
+        self.assertEqual(parsed.get("sandbox_workspace_write", {}).get("network_access"), False)
         self.assertEqual(parsed.get("features", {}).get("shell_tool"), True)
         self.assertIsInstance(parsed.get("developer_instructions"), str)
         self.assertIn(f'name = "{agent_name}"', text, f"delegated author adapter missing name ({shim_label})")
@@ -2125,12 +2110,14 @@ class TestInitUpdate(CliRuntimeHarness):
             "source of",
             f"delegated draft {draft_kind} evidence only",
             "write-capable delegated authoring path",
-            "must not grant broad workspace write",
+            "uses guarded workspace-write",
             "canonical target write",
+            "Workspace-write is not a hard path allow-list",
             "scope-local",
             "flat Markdown draft/analysis/report",
             "initiative, epic, or issue `discussions/`",
-            "static write rules cover all scope-local `discussions/`",
+            "create exactly one new",
+            "Existing discussion draft updates are out of scope",
             "post-run diff guard",
             "Never edit implementation files",
             "Do not promote phases",
@@ -2138,19 +2125,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "runtime validation",
             "role registry",
             ".github/agents",
-            "default_permissions = ",
-            "[permissions.",
-            '":minimal" = "read"',
-            '"." = "read"',
-            '"spec-dock/initiatives" = "read"',
-            '"spec-dock/initiatives/*/discussions/*.md" = "write"',
-            '"spec-dock/initiatives/*/epics/*/discussions/*.md" = "write"',
-            '"spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md" = "write"',
-            '"src" = "read"',
-            '"tests" = "read"',
-            '".env" = "deny"',
-            "network]",
-            "enabled = false",
+            'sandbox_mode = "workspace-write"',
+            "[sandbox_workspace_write]",
+            "network_access = false",
             "lightweight",
             "discussion draft provenance",
             "Manual spec authoring remains valid",
@@ -2169,19 +2146,13 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         self.assertIn('web_search = "disabled"', text, f"delegated author adapter missing web setting ({shim_label})")
         self.assertIn('approval_policy = "never"', text, f"delegated author adapter missing approval policy ({shim_label})")
-        self.assertNotIn("sandbox_mode =", text, f"delegated author adapter must use Permission Profiles ({shim_label})")
-        self.assertNotIn(
-            "[sandbox_workspace_write]",
-            text,
-            f"delegated author adapter must not mix legacy sandbox settings with Permission Profiles ({shim_label})",
-        )
+        self.assertIn('sandbox_mode = "workspace-write"', text, f"delegated author adapter missing sandbox mode ({shim_label})")
+        self.assertIn("[sandbox_workspace_write]", text, f"delegated author adapter missing workspace-write table ({shim_label})")
+        self.assertIn("network_access = false", text, f"delegated author adapter must disable network ({shim_label})")
+        self.assertNotIn("default_permissions =", text, f"delegated author adapter must not use Permission Profiles ({shim_label})")
+        self.assertNotIn("[permissions.", text, f"delegated author adapter must not define Permission Profiles ({shim_label})")
         self.assertIn("[features]", text, f"delegated author adapter missing features table ({shim_label})")
         self.assertIn("shell_tool = true", text, f"delegated author adapter missing shell tool enable ({shim_label})")
-        self.assertNotIn(
-            "sandbox_mode = \"workspace-write\"",
-            text,
-            f"delegated author adapter must not use legacy broad workspace write ({shim_label})",
-        )
 
     def _assert_copilot_spec_manager_contract(self, *, text: str, shim_label: str) -> None:
         self.assertIn("name: spec-manager", text, f"copilot spec-manager name missing ({shim_label})")
@@ -2928,6 +2899,11 @@ class TestInitUpdate(CliRuntimeHarness):
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report",
                 "Sub-agent-created draft は最低限",
+                "`source_paths` と `intended_targets` は non-empty block list",
+                "inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格",
+                "`.env*` read denial は hard sandbox や diff guard で証明されるものではありません",
+                "`.env*` read は instruction-forbidden / soft control",
+                "post-run diff guard が検出できるのは `.env*` write",
                 "workflow-wide blanket consent は direct-write authoring delegation の根拠にしない",
                 "previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result",
                 "manual authoring path は有効",
@@ -9652,20 +9628,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with self.subTest(agent=agent_name, taxonomy="scoped-delegated-author"):
                     text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
                     parsed = tomllib.loads(text)
-                    self.assertNotIn("sandbox_mode", parsed)
-                    default_permissions = parsed.get("default_permissions")
-                    self.assertIsInstance(default_permissions, str)
-                    workspace_rules = parsed["permissions"][default_permissions]["filesystem"][":workspace_roots"]
-                    self.assertEqual(
-                        {path for path, permission in workspace_rules.items() if permission == "write"},
-                        {
-                            "spec-dock/initiatives/*/discussions/*.md",
-                            "spec-dock/initiatives/*/epics/*/discussions/*.md",
-                            "spec-dock/initiatives/*/epics/*/issues/*/discussions/*.md",
-                        },
-                    )
+                    self.assertEqual(parsed.get("sandbox_mode"), "workspace-write")
+                    self.assertNotIn("default_permissions", parsed)
+                    self.assertNotIn("permissions", parsed)
+                    self.assertEqual(parsed.get("sandbox_workspace_write", {}).get("network_access"), False)
                     self.assertIn("write-capable delegated authoring path", text)
-                    self.assertIn("static write rules cover all scope-local `discussions/`", text)
+                    self.assertIn("post-run diff guard", text)
                     self.assertNotIn("spec-dock/initiatives = \"write\"", text)
                     self.assertNotIn('".codex" = "write"', text)
                     self.assertNotIn('".agents" = "write"', text)
@@ -10031,6 +9999,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "## 委任 design authoring ゲート（delegated design authoring gate）",
                 "fresh requirement reviewer pass",
                 "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "guarded workspace-write",
+                "workspace-write は hard path allow-list ではなく canonical target write の許可でもない",
                 "proposal-only ではありません",
                 "scope-local",
                 "discussions/` 直下",
@@ -10064,6 +10034,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "fresh design reviewer pass",
                 "design dependency analysis",
                 "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "guarded workspace-write",
+                "workspace-write は hard path allow-list ではなく canonical target write の許可でもない",
                 "proposal-only ではありません",
                 "scope-local",
                 "discussions/` 直下",
@@ -10094,6 +10066,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "phase epic plan docs": (
                 "delegated plan draft",
                 "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "guarded workspace-write",
+                "hard path allow-list",
                 "target scope `discussions/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
@@ -10105,6 +10079,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "phase issue plan docs": (
                 "delegated plan draft",
                 "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "guarded workspace-write",
+                "hard path allow-list",
                 "target scope `discussions/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
@@ -10276,12 +10252,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "return a blocker to the main orchestrator",
             "Do not ask the user directly",
             "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
+            "Create exactly one new discussion Markdown file",
             "same-second collision",
+            "YAML-style frontmatter delimited by `---` on line 1",
             "lightweight provenance",
             "created_by_role: spec-dock-system-architect",
+            "`source_paths`: non-empty block list",
+            "`intended_targets`: non-empty block list",
+            "inline scalars and empty lists",
+            "fail the post-run diff guard",
             "adoption_status: unreviewed",
             "reflected_to: []",
             "diff_guard_result",
+            "post-run diff guard reads the frontmatter",
             "Do not include standard requirements for task manifest hash",
             "No canonical edit, final authority, promotion, reviewer-pass, or user-dialogue ownership is claimed.",
             "canonical artifacts edited: `none`",
@@ -10321,12 +10304,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "return `Plan Blocked`",
             "Do not ask the user directly",
             "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
+            "Create exactly one new discussion Markdown file",
             "same-second collision",
+            "YAML-style frontmatter delimited by `---` on line 1",
             "lightweight provenance",
             "created_by_role: spec-dock-implementation-planner",
+            "`source_paths`: non-empty block list",
+            "`intended_targets`: non-empty block list",
+            "inline scalars and empty lists",
+            "fail the post-run diff guard",
             "adoption_status: unreviewed",
             "reflected_to: []",
             "diff_guard_result",
+            "post-run diff guard reads the frontmatter",
             "Do not include standard requirements for task manifest hash",
             "No canonical edit, final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.",
             "canonical artifacts edited: `none`",

@@ -25,6 +25,26 @@ def _runtime_modules():
     return DelegatedAuthoringManifestRequest, generate_delegated_authoring_manifest, delegated_authoring
 
 
+def _application_diff_guard_modules():
+    runtime_scripts_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "scripts"
+    )
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.application.delegated_authoring import (
+            DelegatedAuthoringDiffGuardRequest,
+            run_delegated_authoring_diff_guard,
+        )
+    finally:
+        sys.path.pop(0)
+    return DelegatedAuthoringDiffGuardRequest, run_delegated_authoring_diff_guard
+
+
 class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
     def test_manifest_request_returns_deprecated_blocked_result_without_artifacts(self) -> None:
         request_cls, generate, _domain = _runtime_modules()
@@ -51,6 +71,26 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             self.assertEqual(result.reason, "deprecated_scope_local_discussion_drafts")
             self.assertFalse((issue_dir / "discussions" / "delegated-authoring").exists())
 
+    def test_application_diff_guard_rejects_missing_baseline_status(self) -> None:
+        request_cls, run_diff_guard = _application_diff_guard_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            _make_issue_scope(repo_root)
+
+            result = run_diff_guard(
+                request_cls(
+                    role="system-architect",
+                    scope_id="iss-00003",
+                    repo_root=repo_root,
+                    specdock_dir=repo_root / "spec-dock",
+                    baseline_status=None,
+                )
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.status, "blocked")
+            self.assertEqual(result.reason, "missing_baseline_status")
+
     def test_diff_guard_allows_new_flat_discussion_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -68,6 +108,90 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
 
             self.assertTrue(result.ok, result.details)
             self.assertEqual(result.status, "pass")
+
+    def test_diff_guard_allows_implementation_planner_discussion_markdown(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text(_draft_text("# draft", role="spec-dock-implementation-planner"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                authorized_role="implementation-planner",
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            self.assertTrue(result.ok, result.details)
+            self.assertEqual(result.status, "pass")
+
+    def test_diff_guard_allows_quoted_role_and_scope_frontmatter_scalars(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            text = _draft_text("# draft", role="spec-dock-implementation-planner")
+            text = text.replace(
+                "created_by_role: spec-dock-implementation-planner",
+                'created_by_role: "spec-dock-implementation-planner"',
+            ).replace("scope_id: iss-00003", "scope_id: 'iss-00003'")
+            discussion.write_text(text, encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                authorized_role="implementation-planner",
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            self.assertTrue(result.ok, result.details)
+            self.assertEqual(result.status, "pass")
+
+    def test_diff_guard_rejects_discussion_created_by_different_authorized_role(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text(_draft_text("# draft", role="spec-dock-implementation-planner"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                authorized_role="system-architect",
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            self.assertFalse(result.ok)
+            self.assertIn("reason=new_discussion_created_by_role_mismatch", "\n".join(result.details))
+
+    def test_diff_guard_rejects_arbitrary_diff_guard_result_frontmatter(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text(
+                _draft_text("# draft").replace("diff_guard_result: pending", "diff_guard_result: banana"),
+                encoding="utf-8",
+            )
+
+            result = domain.evaluate_diff_guard(
+                authorized_role="system-architect",
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            self.assertFalse(result.ok)
+            self.assertIn("reason=new_discussion_missing_provenance:diff_guard_result", "\n".join(result.details))
 
     def test_diff_guard_rejects_new_discussion_without_frontmatter_editable_state(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -105,6 +229,27 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertIn("reason=new_discussion_claims_non_editable_state", "\n".join(result.details))
 
+    def test_diff_guard_rejects_new_discussion_without_required_provenance(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text("---\nadoption_status: unreviewed\n---\n# draft\n", encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            self.assertFalse(result.ok)
+            joined = "\n".join(result.details)
+            self.assertIn("reason=new_discussion_missing_provenance:", joined)
+            self.assertIn("created_by_role", joined)
+            self.assertIn("diff_guard_result", joined)
+
     def test_diff_guard_rejects_mixed_staged_and_unmerged_discussion_statuses(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
@@ -112,11 +257,11 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             issue_dir = _make_issue_scope(repo_root)
             discussions_dir = issue_dir / "discussions"
             mixed_create = discussions_dir / "20260525t010203z-disc-mixed-create.md"
-            mixed_create.write_text("---\nadoption_status: unreviewed\n---\n# mixed create\n", encoding="utf-8")
+            mixed_create.write_text(_draft_text("# mixed create"), encoding="utf-8")
             mixed_update = discussions_dir / "20260525t010204z-disc-mixed-update.md"
-            mixed_update.write_text("---\nadoption_status: unreviewed\n---\n# mixed update\n", encoding="utf-8")
+            mixed_update.write_text(_draft_text("# mixed update"), encoding="utf-8")
             unmerged_add = discussions_dir / "20260525t010205z-disc-unmerged-add.md"
-            unmerged_add.write_text("---\nadoption_status: unreviewed\n---\n# unmerged add\n", encoding="utf-8")
+            unmerged_add.write_text(_draft_text("# unmerged add"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
                 scope_id="iss-00003",
@@ -135,13 +280,13 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             self.assertEqual(joined.count("reason=mixed_staged_unstaged_discussion"), 2)
             self.assertIn("reason=unmerged_status", joined)
 
-    def test_diff_guard_allows_allowlisted_existing_discussion_update(self) -> None:
+    def test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             discussion = issue_dir / "discussions" / "20260525t010203z-01-research-agent-draft.md"
-            discussion.write_text("---\nadoption_status: unreviewed\n---\n# draft\n", encoding="utf-8")
+            discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
                 scope_id="iss-00003",
@@ -151,9 +296,145 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
                 allow_existing_discussions=(discussion.relative_to(repo_root),),
             )
 
-            self.assertTrue(result.ok, result.details)
+            self.assertFalse(result.ok)
+            self.assertIn("reason=existing_discussion_update_unsupported", "\n".join(result.details))
 
-    def test_diff_guard_rejects_allowlisted_existing_discussion_without_proposed_state(self) -> None:
+    def test_diff_guard_rejects_multiple_new_discussion_drafts(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            first = issue_dir / "discussions" / "20260525t010203z-disc-first-draft.md"
+            second = issue_dir / "discussions" / "20260525t010204z-disc-second-draft.md"
+            first.write_text(_draft_text("# first"), encoding="utf-8")
+            second.write_text(_draft_text("# second"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(
+                    domain.DiffGuardEntry(status="??", path=first.relative_to(repo_root)),
+                    domain.DiffGuardEntry(status="??", path=second.relative_to(repo_root)),
+                ),
+            )
+
+            self.assertFalse(result.ok)
+            self.assertIn("reason=expected_exactly_one_new_discussion_draft count=2", "\n".join(result.details))
+
+    def test_diff_guard_rejects_zero_new_discussion_drafts(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(),
+            )
+
+            self.assertFalse(result.ok)
+            self.assertIn("reason=expected_exactly_one_new_discussion_draft count=0", "\n".join(result.details))
+
+    def test_diff_guard_rejects_new_discussion_with_mismatched_scope_or_role(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        cases = (
+            ("scope", _draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"), "scope_id_mismatch"),
+            (
+                "role",
+                _draft_text("# draft").replace("created_by_role: spec-dock-system-architect", "created_by_role: dev-coder"),
+                "missing_provenance:created_by_role",
+            ),
+        )
+        for _name, text, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    issue_dir = _make_issue_scope(repo_root)
+                    discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                    discussion.write_text(text, encoding="utf-8")
+
+                    result = domain.evaluate_diff_guard(
+                        scope_id="iss-00003",
+                        repo_root=repo_root,
+                        scope_dir=issue_dir,
+                        entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+                    )
+
+                    self.assertFalse(result.ok)
+                    self.assertIn(f"reason=new_discussion_{expected}", "\n".join(result.details))
+
+    def test_diff_guard_rejects_new_discussion_with_empty_source_or_target_provenance(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        cases = (
+            ("source_paths", "source_paths:\n  - spec-dock/active/issue/requirement.md", "source_paths: []", "empty_source_paths"),
+            ("intended_targets", "intended_targets:\n  - spec-dock/active/issue/design.md", "intended_targets: []", "empty_intended_targets"),
+            (
+                "inline_source_paths",
+                "source_paths:\n  - spec-dock/active/issue/requirement.md",
+                "source_paths: spec-dock/active/issue/requirement.md",
+                "empty_source_paths",
+            ),
+            (
+                "inline_intended_targets",
+                "intended_targets:\n  - spec-dock/active/issue/design.md",
+                "intended_targets: spec-dock/active/issue/design.md",
+                "empty_intended_targets",
+            ),
+        )
+        for _name, old, new, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    issue_dir = _make_issue_scope(repo_root)
+                    discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                    discussion.write_text(_draft_text("# draft").replace(old, new), encoding="utf-8")
+
+                    result = domain.evaluate_diff_guard(
+                        scope_id="iss-00003",
+                        repo_root=repo_root,
+                        scope_dir=issue_dir,
+                        entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+                    )
+
+                    self.assertFalse(result.ok)
+                    self.assertIn(f"reason=new_discussion_{expected}", "\n".join(result.details))
+
+    def test_diff_guard_rejects_duplicate_frontmatter_provenance_keys(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        cases = (
+            ("created_by_role", "created_by_role: spec-dock-system-architect"),
+            ("scope_id", "scope_id: iss-00003"),
+            ("source_paths", "source_paths:\n  - spec-dock/active/issue/requirement.md"),
+            ("intended_targets", "intended_targets:\n  - spec-dock/active/issue/design.md"),
+            ("adoption_status", "adoption_status: unreviewed"),
+            ("reflected_to", "reflected_to: []"),
+            ("diff_guard_result", "diff_guard_result: pending"),
+        )
+        for key, duplicate_line in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo_root = Path(tmp)
+                    issue_dir = _make_issue_scope(repo_root)
+                    discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                    discussion.write_text(
+                        _draft_text("# draft").replace("---\n", f"---\n{duplicate_line}\n", 1),
+                        encoding="utf-8",
+                    )
+
+                    result = domain.evaluate_diff_guard(
+                        scope_id="iss-00003",
+                        repo_root=repo_root,
+                        scope_dir=issue_dir,
+                        entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+                    )
+
+                    self.assertFalse(result.ok)
+                    self.assertIn(f"reason=new_discussion_duplicate_provenance:{key}", "\n".join(result.details))
+
+    def test_diff_guard_rejects_allowlisted_existing_discussion_without_state_as_unsupported_update(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -193,11 +474,12 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
 
             self.assertFalse(result.ok)
             joined = "\n".join(result.details)
-            self.assertIn("reason=existing_discussion_not_proposed", joined)
-            self.assertEqual(joined.count("reason=existing_discussion_not_proposed"), len(non_editable_paths))
-            self.assertIn("reason=existing_discussion_missing_proposed_state", joined)
+            self.assertEqual(
+                joined.count("reason=existing_discussion_update_unsupported"),
+                (len(non_editable_paths) + 1) * 2,
+            )
 
-    def test_diff_guard_rejects_allowlisted_update_when_editable_state_is_only_body_text(self) -> None:
+    def test_diff_guard_rejects_allowlisted_update_with_body_only_state_as_unsupported_update(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -214,7 +496,7 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             )
 
             self.assertFalse(result.ok)
-            self.assertIn("reason=existing_discussion_missing_proposed_state", "\n".join(result.details))
+            self.assertIn("reason=existing_discussion_update_unsupported", "\n".join(result.details))
 
     def test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -342,7 +624,7 @@ class TestDelegatedAuthoringRuntimeDomain(unittest.TestCase):
             self.assertIn("reason=discussion_name_noncompliant", joined)
             self.assertIn("reason=delete", joined)
             self.assertIn("reason=rename_or_copy", joined)
-            self.assertIn("reason=existing_discussion_not_allowlisted", joined)
+            self.assertIn("reason=existing_discussion_update_unsupported", joined)
 
 
 def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str = "delegated-authoring") -> Path:
@@ -364,8 +646,21 @@ def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str
     return issue_dir
 
 
-def _draft_text(body: str) -> str:
-    return f"---\nadoption_status: unreviewed\n---\n{body}\n"
+def _draft_text(body: str, *, role: str = "spec-dock-system-architect") -> str:
+    return (
+        "---\n"
+        f"created_by_role: {role}\n"
+        "scope_id: iss-00003\n"
+        "source_paths:\n"
+        "  - spec-dock/active/issue/requirement.md\n"
+        "intended_targets:\n"
+        "  - spec-dock/active/issue/design.md\n"
+        "adoption_status: unreviewed\n"
+        "reflected_to: []\n"
+        "diff_guard_result: pending\n"
+        "---\n"
+        f"{body}\n"
+    )
 
 
 if __name__ == "__main__":
