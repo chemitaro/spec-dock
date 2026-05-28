@@ -1,11 +1,11 @@
 ---
 種別: 要件定義書（Issue）
 ID: "iss-00134"
-タイトル: "Matt Pocock grill-style clarification workflow を spec-dock に取り込む"
+タイトル: "docs-aware clarification workflow を spec-dock に取り込む"
 関連GitHub: ["#134"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-28"
+最終更新: "2026-05-29"
 親: ["epic-00067", "init-local-00003"]
 derived_from:
   - "discussions/20260528t004419z-research-mattpocock-skills-source-capture.md"
@@ -29,21 +29,43 @@ derived_from:
   - "discussions/20260528t040240z-disc-cleanup-and-simplification-requirement.md"
   - "discussions/20260528t041343z-disc-consultant-grill-essence-integration-review.md"
   - "discussions/20260528t041831z-disc-consultant-requirement-update-proposal.md"
+  - "discussions/20260528t172725z-disc-clarification-workflow-naming.md"
 ---
 
-# iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 要件定義
+# iss-00134 docs-aware clarification workflow を spec-dock に取り込む — 要件定義
 
 ## 目的
 
-Matt Pocock `grill-me` / `grill-with-docs` の本質である「既存ドキュメントとコードを踏まえ、一問ずつユーザーに確認し、曖昧さを解消して共有理解に到達する」考え方を、spec-dock の要件定義・設計・計画 workflow に適した形で取り込む。
+Matt Pocock の既存パターンから抽出した「既存ドキュメントとコードを踏まえ、一問ずつユーザーに確認し、曖昧さを解消して共有理解に到達する」考え方を、`docs-aware clarification workflow` として spec-dock の要件定義・設計・計画 workflow に適した形で取り込む。
 
 この issue の目的は、直接的な移植や実装を急ぐことではない。
 spec-dock において、質問、回答、分析、採用判断を `discussions/` に記録し、それらを積み上げて `requirement.md`、`design.md`、`plan.md`、必要に応じて ADR へ昇華できる clarification workflow の要件を定義することである。
 
+## 目的階層
+
+この issue の主目的は、spec-dock-native な docs-aware clarification workflow を first-class workflow として統合することである。
+
+主目的:
+
+- 一問一答と decision tree traversal を、spec-dock の authoring / discussion / canonical docs に適用できる形で定義する。
+- docs-aware challenge、domain language sharpening、concrete scenario による境界確認、code / docs との照合、ADR sparingly を、spec-dock の既存 context source と artifact model に翻訳する。
+- canonical docs 作成を必須にしない local analysis / draft / decision clarification と、requirement / design / plan authoring の両方で使える clarification workflow として扱う。
+
+副次要件:
+
+- template、workflow docs、skill guidance、agent guidance の更新は、主目的を実行可能にするための supporting surface である。
+- Issue planning / Issue execution の境界整理が必要になる場合でも、それは clarification workflow を安全に authoring から implementation handoff へ渡すための補助要件に限る。
+
+明示的な非目的:
+
+- Issue planning / Issue execution の分離を、この issue の headline deliverable にしない。
+- clarification workflow を Issue planning 内の補助作法だけに閉じ込めない。
+- execution policy、delegation framework、PR delivery、issue finish lifecycle の再設計を、docs-aware clarification workflow 統合の代替成果物にしない。
+
 ## 背景・現状
 
 - Matt Pocock skills の source snapshot は、issue-local `discussions/mattpocock-skills-source/` に取り込み済みである。
-- 既存分析では、`grill-me` / `grill-with-docs` をそのまま import するのではなく、spec-dock-native に変形して採用する方針が妥当と整理されている。
+- 既存分析では、Matt Pocock 由来の pattern をそのまま import するのではなく、spec-dock-native に変形して採用する方針が妥当と整理されている。
 - spec-dock では、root `CONTEXT.md` を新しい正本にするのではなく、active docs、parent docs、issue-local discussions、関連 source/tests/templates を context source とする必要がある。
 - ユーザーは、要件定義書・設計書・実装計画書を作成する前段として、憶測や曖昧な理解を残さないための壁打ち workflow を求めている。
 - ユーザーは、質問前に未回答の質問シートを作成し、回答後に同じシートを完成させる方式を採用した。
@@ -77,7 +99,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 重要判断に関わる質問では、事前に未回答の正式質問シートを作成する。軽微な確認は chat 上の一問一答で扱ってよい。
 - 正式質問シートには、判断に必要な構造を必須項目として持たせる。PlantUML 図、詳細 tradeoff、後続反映案は、質問の性質に応じた条件付き項目とする。
 - 正式質問シートの lifecycle は、質問状態を表す `status` と、採用状態を表す `adoption_status` と、反映先を表す `reflected_to` を分けて扱う。
-- 既存 `research` / `interview` / `disc` / `adr` / `report` は、grill 専用 variant を重複追加するのではなく、共通 template として再設計する。
+- 既存 `research` / `interview` / `disc` / `adr` / `report` は、clarification 専用 variant を重複追加するのではなく、共通 template として再設計する。
 - 複数の質問シートを参照し、中間レポート / 上位レポートを作成できるようにする。
 - 中間レポートを通じて、質問回答を ADR candidate、要件定義書、設計書、計画書へ昇華できるようにする。
 - 質問シート、中間レポート、上位レポート、ADR candidate triage など、今回の workflow で必要になる artifact 概念は、まず共通 template catalog 上で表現する。
@@ -89,7 +111,9 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - agent の context を圧迫し、生産性や挙動を悪化させる documentation bloat を避ける。
 - main workflow では、最終成果物として `requirement.md`、`design.md`、`plan.md` の作成までを含む。
 - skill として利用する場合は、canonical docs 作成を必須にせず、分析レポートや設計ドラフトなどの成果物にも利用できるようにする。
-- 一問一答の質問作法は標準とする。一方で、質問前シート、PlantUML、中間レポートまで含む徹底分析 / artifact-heavy grill workflow の起動条件は設計で具体化する。
+- すべての implementation diff、test、report evidence、PR description は、主目的である first-class docs-aware clarification workflow 統合を前進させていることを説明できるようにする。
+- 副次要件を実装する場合は、主目的への寄与、許可された境界、主従逆転していない根拠を `report.md` に記録する。
+- 一問一答の質問作法は標準とする。一方で、質問前シート、PlantUML、中間レポートまで含む徹底分析 / artifact-heavy clarification workflow の起動条件は設計で具体化する。
 - ユーザーへの質問は orchestrator が取りまとめ、一度に一つだけ行う。
 - 専門 agent は、ユーザーに直接質問せず、質問候補、質問理由、影響する artifact、推奨回答を orchestrator へ渡す。
 - 細かい設計判断は deep consultant が一次回答役を担える。deep consultant が判断材料不足、権限不足、人間の価値判断が必要と判断した場合のみ、orchestrator が人間ユーザーへ一問ずつ確認する。
@@ -104,6 +128,8 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 新しい workflow / template / skill guidance と矛盾する古い文言や不要 guidance を残したままにすること。
 - 似た template や似た workflow を重複して増やし、agent がどれを使うべきか迷う状態にすること。
 - 外部ツール固有の操作手順や責務を、spec-dock の要件として定義すること。
+- 副次要件を主要成果物として扱い、PR title、PR description、主要 workflow、主要 skill、closure evidence の主語を docs-aware clarification workflow 以外に置き換えること。
+- Issue planning / Issue execution の整理が必要な場合に、それを first-class clarification workflow より上位または同格の目的として扱うこと。
 
 ### 対象外
 
@@ -156,6 +182,13 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 専門 agent が見つけた追加質問は、orchestrator が取りまとめてユーザーに確認する。
 
 ## 受け入れ条件
+
+- AC-000: primary docs-aware clarification integration
+  - アクター: orchestrator / 実装者
+  - 前提: この issue の成果物を設計または実装する。
+  - 操作: workflow docs、templates、skills、report evidence、PR description の主語を確認する。
+  - 期待結果: spec-dock-native な docs-aware clarification workflow が first-class concept として定義され、Issue planning や execution handoff の補助作法に縮退していない。
+  - 観測点: design / plan / report / changed docs が、source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、docs synthesis、ADR sparingly を主成果物として扱っている。
 
 - AC-001: source-grounded clarification
   - アクター: orchestrator
@@ -226,6 +259,13 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
   - 操作: 既存 docs / templates / guidance を見直し、矛盾、重複、不要文言、使われなくなる workflow を整理する。
   - 期待結果: 新しい方針と古い guidance が併存して agent を迷わせる状態を避ける。
   - 観測点: design / plan に cleanup 対象と維持する legacy artifact の扱いが明記され、不要な重複 template や不要 guidance が残っていない。
+
+- AC-011: no objective inversion
+  - アクター: orchestrator / reviewer
+  - 前提: 実装中に副次要件、handoff boundary、execution guidance、delegation policy、report evidence の更新が必要になる。
+  - 操作: 差分、テスト、report evidence、PR title / description を確認する。
+  - 期待結果: 副次要件は主目的を支える境界整理に限定され、Issue planning / execution split、execution policy、delegation framework が headline deliverable になっていない。
+  - 観測点: `report.md` の Objective Alignment Ledger に primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict が記録されている。
 
 ## 例外・エッジケース
 
