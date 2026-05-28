@@ -6,6 +6,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 関連:
 - 全体像: [guide.md](guide.md)
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
+- Clarification workflow: [workflow_clarification.md](workflow_clarification.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - 議論資料の置き方と命名: 対象 scope 配下の `discussions/rules.md`, [reference_naming.md](reference_naming.md)
 
@@ -45,7 +46,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 1. requirement と対象 scope の workflow を確認する
 2. 既存実装 / 既存 docs / 既存 ADR を調べる
 3. 比較や下調べは `research` / `disc` に分離する
-4. 必要ならヒアリングし、反映前に docs に整理する
+4. 必要なら [workflow_clarification.md](workflow_clarification.md) に従って一問ずつヒアリングし、反映前に docs に整理する
 5. `design.md` を固めて fresh `spec-reviewer` loop を `review_status: pass` まで回す
 6. 関連 docs を束ねて plan へ handoff する
 
@@ -53,7 +54,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 
 - `requirement.md` が reviewer 承認レベルにある
 - `requirement.md` が `workflow_spec_authoring.md` の requirement gate を pass している
-- design で閉じる論点と、先にヒアリング / 追加調査が要る論点を分けた
+- design で閉じる論点と、先に source-grounding / domain language sharpening / concrete scenario 確認 / ヒアリングが要る論点を分けた
 - 既存実装、既存 docs、既存 ADR を見て、採用候補の既存パターンを把握した
 - ヒアリング前に docs へ残す前提を整理した
   - 決めたい設計論点
@@ -105,6 +106,7 @@ Reviewer は delegated draft を含む design を review するとき、次を f
 ## 設計 checklist（design checklist）
 
 - 既存パターンに乗れるかを最初に確認し、新しい概念は「既存で足りない理由」を残す
+- 用語、責務境界、domain relationship が曖昧な場合は、既存 docs / code と照合し、必要なら concrete scenario / edge case で境界を確認してから design 本文へ反映する
 - 先に押さえる:
   - 既存の責務分割
   - 現在の入出力契約
@@ -328,7 +330,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
 ## 論点の逃がし先
 
 - `scratch`: 図の叩き台、軽量メモ、生ログ。raw capture であり非 authoritative
-- `interview`: code だけでは決められない UX / 運用 / policy / 優先順位の質問票
+- `interview`: code だけでは決められない UX / 運用 / policy / 優先順位の一問一答質問票
 - `research`: 既存実装調査、類似機能比較、外部仕様調査。事実、推測、未検証事項、判断への含意を分ける
 - `disc`: 設計案比較、トレードオフ整理、採否判断の前段。回答収集や生ログを抱え込みすぎない
 - `adr`: 境界 / 契約 / 移行などの長期判断
@@ -340,7 +342,7 @@ agent はこの一覧から、設計上の誤読を減らすものだけを選�
   - UX / 運用フロー / 監査要件など、code だけでは決められない前提がある
   - ロールアウト条件や業務手順が境界に影響する
   - requirement で残した TBD が利用者都合でしか閉じられない
-  - trivial な yes/no でも、重要な判断、後続反映、回答証跡が必要なら `interview` を使う
+  - trivial な yes/no でも、重要な判断、後続反映、回答証跡が必要なら unanswered `interview` を先に作る
 - 次なら ADR を検討する:
   - 境界、契約、整合性、移行戦略の採択が後続へ長く効く
   - 代替案を比較したうえで 1 案を明示的に選ぶ
