@@ -242,7 +242,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - EC-003: 大きな判断が複数質問にまたがる
   - 条件: 複数の質問シートを読まないと意思決定できない。
   - 期待: 中間レポート / 上位レポートを作成し、選択肢、tradeoff、採用判断、反映先を整理する。
-  - 観測点: report artifact が複数質問シートを `derived_from` として参照する。
+  - 観測点: `disc.md` を使った synthesis / 中間レポート / 上位レポート artifact が複数質問シートを `derived_from` として参照する。ここでいう report は issue の `report.md` evidence ledger ではない。
 
 - EC-004: 専門 agent が追加確認を必要とする
   - 条件: 設計書または計画書の作成中に、専門 agent がユーザー判断を必要とする。

@@ -1,16 +1,16 @@
 ---
 種別: 実装報告書（Issue）
 ID: "iss-00134"
-タイトル: "Adopt Matt Pocock grill skill review patterns"
+タイトル: "Matt Pocock grill-style clarification workflow を spec-dock に取り込む"
 関連GitHub: ["#134"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-05-28"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
 
-# iss-00134 Adopt Matt Pocock grill skill review patterns — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
 
 > `report.md` は観測証跡台帳（observed evidence ledger）です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する。
 
@@ -106,6 +106,24 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
 | 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+
+## 仕様作成ゲート（Spec Authoring Gate）
+
+`workflow_spec_authoring.md` に従い、requirement -> design -> plan の順で fresh `spec-reviewer` pass を得た。実装はまだ開始していない。
+
+| phase | artifact | reviewer | freshness | state | investigated facts | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| requirement | `requirement.md` | `spec-reviewer` | fresh | passed | discussions / prior analysis / Matt Pocock `grill-me` essence / spec-dock workflow constraints | design phase へ進行可 | EC-003 の `disc.md` synthesis と issue `report.md` ledger の混同を修正後に pass |
+| design | `design.md` | `spec-reviewer` | fresh | passed | requirement, workflow docs, template catalog, installed skill boundaries, frontmatter compatibility | plan phase へ進行可 | formal question trigger、EC-002 re-question loop、root `.agents/skills` mirror、frontmatter compatibility を修正後に pass |
+| plan | `plan.md` | `spec-reviewer` | fresh | passed | requirement, design, `workflow_issue.md`, `workflow_spec_authoring.md`, `authoring/issue-plan.md`, `phase_plan_issue.md` | implementation handoff 可。ただし実装開始はユーザー提出後の明示指示待ち | S01/S02/S04/S05/S90 と report evidence destinations の指摘を修正後に pass |
+
+### Reviewer Gate History
+
+| phase | reviewer result | disposition |
+|---|---|---|
+| requirement | first review: fail / final review: pass | EC-003 の report artifact ambiguity を `disc.md` synthesis と `report.md` ledger に分離して解消 |
+| design | multiple review cycles: fail -> pass | re-question loop、dogfooding path、external support artifact route、AC/EC verification mapping、formal question trigger、frontmatter compatibility を反映 |
+| plan | multiple review cycles: fail -> pass | input docs、verification order、report/no-op gates、interview/disc full field contract、external evidence adoption、delegated-authoring verification、S90 inspect-only gate を反映 |
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
