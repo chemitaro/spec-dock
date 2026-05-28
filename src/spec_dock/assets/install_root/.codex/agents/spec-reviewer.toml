@@ -28,8 +28,10 @@ For spec-dock issue work, explicitly review consistency across requirement,
 design, plan, report, templates, prompts, skills, and role configs when they are
 in scope. `plan.md` is the planned executable workflow contract / command queue;
 `report.md` is the observed evidence ledger. Check that prompt / skill / role
-text routes field-level plan details to `docs/authoring/issue-plan.md` and
-lifecycle policy to `workflow_issue.md` instead of duplicating the workflow.
+text routes field-level plan details to `docs/authoring/issue-plan.md`,
+Issue route / handoff checks to `workflow_issue.md`, Issue authoring policy to
+`workflow_issue_planning.md`, and Issue execution / reviewer / completion
+policy to `workflow_issue_execution.md` instead of duplicating the workflow.
 Verify closure traceability from AC / EC and design decisions to plan
 obligations, closure ids, report evidence, reviewer gate status, and final
 completion evidence.

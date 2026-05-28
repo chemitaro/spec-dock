@@ -6,7 +6,14 @@ ID: "<ADR_ID>"
 作成者: "<YOUR_NAME>"
 最終更新: "YYYY-MM-DD"
 親: ["<SCOPE_ID>"]
-authority: "accepted"
+関連: []
+scope: "<issue | epic | initiative | local>"
+scope_id: "<SCOPE_ID>"
+created_at: "YYYY-MM-DDTHH:MM:SSZ"
+created_by: "<orchestrator | role>"
+status: "draft | accepted | superseded"
+authority: "proposed | accepted"
+adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"
 derived_from: []
 reflected_to: []
 ---
@@ -15,9 +22,22 @@ reflected_to: []
 
 ## 位置づけ
 - 用途: 長期的に参照される architecture / contract / migration decision を固定する。
-- authority default: `accepted`。通常は doc type から推定し、例外時だけ front matter の `authority` で override する。
+- authority default: `proposed`。`status: draft` の間は accepted authority を claim しない。結論が確定し、採用判断と必要な reviewer evidence が揃った場合だけ `authority: accepted` にする。
 - `disc` / `research` / `interview` / `scratch` の文脈をもとに作成してよいが、元文書を昇格させず、この ADR と必要な `requirement.md` / `design.md` / `plan.md` へ反映する。
 - 汎用議事録、質問票、調査ログ、raw capture の代替にしない。
+- ADR は sparingly に作る。原則として hard to reverse、surprising without context、real tradeoff の 3 条件を満たす判断だけを ADR 化する。
+
+## ADR 化基準（Sparing Criteria） (必須)
+- hard to reverse:
+  - yes | no | unclear
+- surprising without context:
+  - yes | no | unclear
+- real tradeoff:
+  - yes | no | unclear
+- 3 条件を満たさない場合の反映先:
+  - `interview` | `disc` | `requirement.md` | `design.md` | `plan.md` | none
+- ADR 化する理由 / しない理由:
+  - ...
 
 ## 結論（Decision） (必須)
 - **未決（TBD）**: この ADR は「議題が上がった時点」で作成し、結論はユーザー/レビュアーが最終決定した後に更新する。

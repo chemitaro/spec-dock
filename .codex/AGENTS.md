@@ -43,7 +43,9 @@ Always start from `spec-dock/active/*`. When no active context exists, those pat
 For SpecDock usage and workflow details, start here:
 - `spec-dock/docs/guide.md`: overall entry point
 - `spec-dock/docs/workflow-tree.md`: tree structure, active context, and sync outputs
-- `spec-dock/docs/workflow_issue.md`: issue execution workflow
+- `spec-dock/docs/workflow_issue.md`: Issue umbrella route
+- `spec-dock/docs/workflow_issue_planning.md`: Issue authoring / Spec Authoring Gate workflow
+- `spec-dock/docs/workflow_issue_execution.md`: approved Issue execution / completion workflow
 - `spec-dock/docs/reference_sync.md`: sync behavior and generated artifacts
 
 ## Operating Rules

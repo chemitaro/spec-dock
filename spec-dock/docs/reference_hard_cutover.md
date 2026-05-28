@@ -2,7 +2,7 @@
 
 Hard cutover は標準 Issue workflow ではなく、fallback 廃止、dual-read 廃止、checked-in data の手動境界修正、または canonical storage / mutation contract の切替を伴う issue だけが採用する optional pattern です。
 
-通常の Issue は [workflow_issue.md](workflow_issue.md) の lifecycle / execution / reviewer / completion policy と、[authoring/issue-plan.md](authoring/issue-plan.md) の planned contract / observed evidence ledger 境界に従います。Hard cutover を採用する場合は、この reference の entry 条件と evidence keys を `plan.md` の planned contract に取り込み、実結果を `report.md` の observed evidence ledger に残します。
+通常の Issue は [workflow_issue.md](workflow_issue.md) の route、[workflow_issue_planning.md](workflow_issue_planning.md) の planning policy、[workflow_issue_execution.md](workflow_issue_execution.md) の execution / reviewer / completion policy と、[authoring/issue-plan.md](authoring/issue-plan.md) の planned contract / observed evidence ledger 境界に従います。Hard cutover を採用する場合は、この reference の entry 条件と evidence keys を `plan.md` の planned contract に取り込み、実結果を `report.md` の observed evidence ledger に残します。
 
 ## 着手条件（entry conditions）
 

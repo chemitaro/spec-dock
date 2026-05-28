@@ -29,6 +29,7 @@ derived_from:
   - "discussions/20260528t040240z-disc-cleanup-and-simplification-requirement.md"
   - "discussions/20260528t041343z-disc-consultant-grill-essence-integration-review.md"
   - "discussions/20260528t041831z-disc-consultant-requirement-update-proposal.md"
+  - "discussions/20260528t070322z-disc-deep-consultant-issue-planning-execution-split.md"
 ---
 
 # iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 要件定義
@@ -89,6 +90,10 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - agent の context を圧迫し、生産性や挙動を悪化させる documentation bloat を避ける。
 - main workflow では、最終成果物として `requirement.md`、`design.md`、`plan.md` の作成までを含む。
 - skill として利用する場合は、canonical docs 作成を必須にせず、分析レポートや設計ドラフトなどの成果物にも利用できるようにする。
+- Issue の planning interface と execution interface を分離する。
+- `spec-dock-issue-planning` は、Issue の `requirement.md` / `design.md` / `plan.md` 作成・更新と、各 phase の fresh `spec-reviewer pass` までを扱う。
+- `spec-dock-issue-execution` は、fresh reviewer pass 済みの `requirement.md` / `design.md` / `plan.md` と `report.md` の Spec Authoring Gate evidence を前提に、approved plan の実装、検証、PR delivery、merge preparation、issue finish を扱う。
+- execution 中に requirement / design / plan の不足、stale reviewer pass、または未解決の仕様判断が見つかった場合は、実装を継続せず planning phase に戻す。
 - 一問一答の質問作法は標準とする。一方で、質問前シート、PlantUML、中間レポートまで含む徹底分析 / artifact-heavy grill workflow の起動条件は設計で具体化する。
 - ユーザーへの質問は orchestrator が取りまとめ、一度に一つだけ行う。
 - 専門 agent は、ユーザーに直接質問せず、質問候補、質問理由、影響する artifact、推奨回答を orchestrator へ渡す。
@@ -104,12 +109,17 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 新しい workflow / template / skill guidance と矛盾する古い文言や不要 guidance を残したままにすること。
 - 似た template や似た workflow を重複して増やし、agent がどれを使うべきか迷う状態にすること。
 - 外部ツール固有の操作手順や責務を、spec-dock の要件として定義すること。
+- `spec-dock-issue-execution` を requirement / design / plan authoring の入口として扱うこと。
+- grill discussion evidence や質問回答 record を fresh `spec-reviewer pass` の代替として扱うこと。
+- `spec-dock-issue-planning` が実装、PR 作成、merge-prepared、issue finish、または reviewer pass 前の implementation readiness を claim すること。
 
 ### 対象外
 
 - この要件定義時点では、具体的な実装ファイル、CLI command、template file の最終設計は確定しない。
 - 外部分析ツール、ブラウザ操作、外部セッション管理、外部出力の取得手順は、この issue の spec-dock 要件では扱わない。
 - `CONTEXT.md` を spec-dock の新しい正本として導入することは、この issue の目的ではない。
+- runtime CLI command を planning / execution 用に分割することは、この issue の対象外とする。
+- lifecycle state machine の大改造、既存 artifact の自動 migration、PR / finish lifecycle の再設計は、この issue の対象外とする。
 
 ## 境界
 
@@ -227,6 +237,13 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
   - 期待結果: 新しい方針と古い guidance が併存して agent を迷わせる状態を避ける。
   - 観測点: design / plan に cleanup 対象と維持する legacy artifact の扱いが明記され、不要な重複 template や不要 guidance が残っていない。
 
+- AC-011: issue planning / execution interface separation
+  - アクター: orchestrator / user
+  - 前提: ユーザーが Issue の仕様作成、または Issue の実装を依頼する。
+  - 操作: 仕様作成依頼は `spec-dock-issue-planning` に route し、実装依頼は fresh reviewer pass 済みの plan と Spec Authoring Gate evidence を確認したうえで `spec-dock-issue-execution` に route する。
+  - 期待結果: planning は requirement / design / plan 作成と review pass までに限定され、execution は approved plan の実装、検証、PR delivery、merge preparation、issue finish に限定される。
+  - 観測点: skill / workflow guidance が planning と execution の入口、前提条件、禁止行為、handoff 条件を分離している。
+
 ## 例外・エッジケース
 
 - EC-001: 質問が local context で解ける
@@ -253,6 +270,11 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
   - 条件: ユーザー指示により、外部支援を使って分析 artifact が作られている。
   - 期待: spec-dock は外部ツール固有の操作を定義せず、作成済み artifact を通常の evidence として扱う。
   - 観測点: canonical docs への反映時に、artifact と採用判断が追跡できる。
+
+- EC-006: execution 中に planning gap が見つかる
+  - 条件: approved plan の実行中に、requirement / design / plan の不足、stale reviewer pass、未解決の仕様判断、または plan amendment が必要な差分が見つかる。
+  - 期待: 実装を継続せず、`spec-dock-issue-planning` または該当 authoring phase に戻して、canonical docs と reviewer gate を更新する。
+  - 観測点: `report.md` に blocked / incomplete reason と planning への戻し先が記録され、実装側で report-only durable decision が残らない。
 
 ## 入力→出力例
 
@@ -284,6 +306,12 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - TERM-006: 専門 agent
   - 設計、計画、ADR などの専門分析を担当する agent。人間ユーザーには直接質問せず、質問候補を orchestrator に返す。
 
+- TERM-007: `spec-dock-issue-planning`
+  - Issue の requirement / design / plan 作成・更新と fresh reviewer pass までを扱う orchestrator-facing skill / workflow interface。grill 型 clarification と Spec Authoring Gate を利用するが、実装や PR delivery は扱わない。
+
+- TERM-008: `spec-dock-issue-execution`
+  - fresh reviewer pass 済みの requirement / design / plan と Spec Authoring Gate evidence を前提に、approved plan の実装、検証、PR delivery、merge preparation、issue finish を扱う skill / workflow interface。
+
 ## 設計で具体化する事項
 
 - shipped skill としての名称、配置、呼び出し方。
@@ -303,6 +331,9 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 正式質問シートの必須 frontmatter、本文 section、条件付き項目。
 - 正式質問シートの `status` / `authority` / `adoption_status` / `reflected_to` の状態遷移。
 - deep consultant が回答できる質問と、人間確認へ戻す質問の判定基準。
+- Issue planning skill と Issue execution skill の責務境界、routing、handoff 条件、禁止行為。
+- `workflow_issue.md` を umbrella として残すか、`workflow_issue_planning.md` / `workflow_issue_execution.md` へ分割するかの具体設計。
+- `spec-driven-tdd-workflow` から planning / execution へ route する導線。
 - 既存 workflow / template / skill / agent guidance の cleanup 対象と、残す legacy artifact / grandfathered artifact の扱い。
 - agent の context 圧迫や誤作動につながる重複文言、不要 document、不要 workflow の削減方針。
 

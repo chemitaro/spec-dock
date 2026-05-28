@@ -107,6 +107,26 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
+## 仕様作成ゲート（Spec Authoring Gate / 必須）
+
+Requirement / design / plan の phase promotion と、issue execution handoff の前提を記録する。fresh `spec-reviewer` pass 済みでない artifact、stale reviewer pass、unresolved planning gap、blocked / stale Evidence Adoption Ledger entry は implementation start を止める。
+
+| phase | artifact | reviewer | freshness | state | investigated facts | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| requirement | `requirement.md` | `spec-reviewer` | fresh / stale / missing | passed / failed / unavailable / denied / waived / provisional / blocked / incomplete | docs / code / ADR / discussions / interviews / research / external primary sources | design phase へ進行可 / requirement phase に戻す / blocked / incomplete | ... |
+| design | `design.md` | `spec-reviewer` | fresh / stale / missing | passed / failed / unavailable / denied / waived / provisional / blocked / incomplete | requirement / docs / code / ADR / discussions / research / design drafts | plan phase へ進行可 / design phase に戻す / blocked / incomplete | ... |
+| plan | `plan.md` | `spec-reviewer` | fresh / stale / missing | passed / failed / unavailable / denied / waived / provisional / blocked / incomplete | requirement / design / plan docs / authoring contract / workflow docs / issue-specific evidence | execution handoff 可 / planning phase に戻す / blocked / incomplete | ... |
+
+### Planning Gap / Execution Handoff Check
+- execution handoff:
+  - ready / blocked / incomplete
+- unresolved planning gaps:
+  - none / ...
+- stale or missing reviewer evidence:
+  - none / ...
+- Evidence Adoption Ledger blockers:
+  - none / ...
+
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
 
@@ -166,14 +186,14 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
+`workflow_issue.md` is the Issue umbrella / route source for workflow-scoped consent and handoff. `workflow_issue_execution.md` is the policy source for execution delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
 | user instruction / explicit approval / none | ... | <ISS_ID> | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+`workflow_issue_execution.md` is the policy source for implementation delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. `workflow_issue.md` remains only the Issue umbrella / route source. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|

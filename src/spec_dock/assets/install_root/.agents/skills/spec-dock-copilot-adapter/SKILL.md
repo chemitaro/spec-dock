@@ -6,7 +6,7 @@ description: Thin Copilot host adapter for spec-dock.
 # Spec-dock Copilot Adapter
 
 - Use this as the Copilot entrypoint for spec-dock work.
-- Follow `spec-dock/docs/workflow_issue.md` as the canonical issue workflow.
+- Follow `spec-dock/docs/workflow_issue.md` as the Issue umbrella; use `workflow_issue_planning.md` for Issue authoring and `workflow_issue_execution.md` for approved execution.
 - Route orchestration to the appropriate leaf skill; do not reimplement protocol or state logic here.
 - Keep this adapter thin: wording only, no generated state, no pruning logic, no protocol interpretation.
 - Adapter safety baseline follows issue-00049 host-adapter hardening scope.
@@ -23,4 +23,4 @@ description: Thin Copilot host adapter for spec-dock.
   - `spec-dock/docs/reference_deps.md`
   - `spec-dock/docs/reference_sync.md`
 - Completion workflow reference:
-  - `spec-dock/docs/workflow_issue.md`
+  - `spec-dock/docs/workflow_issue_execution.md`

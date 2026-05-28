@@ -37,15 +37,15 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 所有しない判断:
     - 親 design の再定義、Red / Green / Refactor の作業手順、commit / review の運用順序
 - ADR rule:
-  - 長寿命・横断的・不可逆寄りの判断は ADR / decision log に分離する
+  - 長寿命・横断的・不可逆寄りで、将来の読者にとって意外性があり、実質的な tradeoff がある判断は ADR / decision log に分離する
   - 局所的で可逆な判断は対象 scope の design に置く
 
 ## 標準順
 
 1. requirement と対象 scope の workflow を確認する
 2. 既存実装 / 既存 docs / 既存 ADR を調べる
-3. 比較や下調べは `research` / `disc` に分離する
-4. 必要ならヒアリングし、反映前に docs に整理する
+3. 比較や下調べは `research` / `disc` に分離する。`research` は facts / inference / unverified / terms / edge cases / implications を分け、`disc` は synthesis / reflection proposal / ADR candidate triage を扱う
+4. 必要ならヒアリングし、重要判断は回答前に一問一答の `interview` を作成してから orchestrator が人間ユーザーに確認する。専門 agent は質問候補、理由、影響 artifact、推奨回答を返し、人間へ直接質問しない
 5. `design.md` を固めて fresh `spec-reviewer` loop を `review_status: pass` まで回す
 6. 関連 docs を束ねて plan へ handoff する
 
@@ -61,6 +61,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - 未確定事項 / 仮説
   - 選択肢と推奨案
   - 反映先の本文節または ADR
+- formal `interview` が必要な質問と、chat 上の軽微な一問で足りる確認を分けた
 - template:
   - Initiative: `spec-dock/templates/initiative/design.md`
   - Epic: `spec-dock/templates/epic/design.md`
@@ -117,6 +118,9 @@ Reviewer は delegated draft を含む design を review するとき、次を f
   - 既存テストの守備範囲
   - 移行 / 運用 / 監視で壊しうる点
 - 本文には採用結論と guardrails を残し、長い比較や生の調査ログは `discussions/` へ逃がす
+- source-grounding で用語衝突、責務境界、edge case を確認し、local context で解ける疑問を人間へ聞かない
+- 人間判断が必要な高影響質問は、一問一答の `interview` に source-grounded context、回答案、Codex の分析、推奨案を置いてから確認する
+- 複数の質問 / research を束ねる場合は `disc` に synthesis と ADR candidate triage を置き、採否確定は canonical docs / ADR / `report.md` の Evidence Adoption Ledger で行う
 - UML / PlantUML は、人間が誤読しやすい構造・境界・責務・流れ・状態・依存を可視化する用途で使う
 - 図は本文の代替ではなく、本文で固定した設計判断を視覚的に検証する補助資料にする
 - 図を置かない場合も、期待される図が不要な理由を `N/A: reason` として残す

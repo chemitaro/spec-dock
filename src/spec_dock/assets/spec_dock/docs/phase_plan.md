@@ -2,7 +2,7 @@
 
 Initiative / Epic / Issue に共通する plan の shared axiom です。
 scope 固有の plan authoring rule は `phase_plan_<scope>.md` を参照してください。
-workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / governance、`workflow_issue.md` が lifecycle / governance / execution policy の正本です。
+workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / governance、`workflow_issue.md` が Issue umbrella、`workflow_issue_planning.md` / `workflow_issue_execution.md` が Issue planning / execution policy の正本です。
 
 関連:
 - 全体像: [guide.md](guide.md)

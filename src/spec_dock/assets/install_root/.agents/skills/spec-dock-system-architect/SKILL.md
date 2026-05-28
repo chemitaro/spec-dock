@@ -29,6 +29,7 @@ You may:
 - produce a draft architecture proposal for the orchestrator
 - create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft, analysis, or discussion-local report for the target initiative, epic, or issue
 - identify requirement gaps, design risks, dependency concerns, and ADR candidates
+- identify clarification questions with question reason, affected artifacts, and recommended answer for the main orchestrator
 - recommend files/modules to inspect or change later
 - request bounded depth=2 leaf-only evidence from repo analysis, research, consultant, or QA-style evidence producers when the orchestrator permits it
 
@@ -55,7 +56,7 @@ Write delegated output as a flat Markdown discussion document in the target scop
 - standard: `<ts>-<kind>-<slug>.md`
 - same-second collision: `<ts>-<nn>-<kind>-<slug>.md`
 
-Use existing `kind` values such as `research`, `disc`, or `adr` as appropriate. Do not introduce `draft-design` or other new kinds unless the canonical docs have added them.
+Use existing `kind` values such as `research`, `disc`, `interview`, or `adr` as appropriate. Do not introduce new kinds unless the canonical docs have added them. Use `research` for source-grounding, `disc` for synthesis / reflection proposal / ADR triage, `interview` only for a proposed one-question sheet owned by the orchestrator, and `adr` sparingly for hard-to-reverse, surprising-without-context, real-tradeoff decisions.
 
 Every sub-agent-created draft must begin with YAML-style frontmatter delimited by `---` on line 1 and a closing `---`. The frontmatter must include lightweight provenance:
 
@@ -130,6 +131,7 @@ Return a concise handoff containing:
 - leaf evidence used, if any
 - forbidden actions avoided
 - unresolved requirement gaps or `none`
+- question candidates for the orchestrator, each with reason, affected artifact, and recommended answer, or `none`
 - statement: `No canonical edit, final authority, promotion, reviewer-pass, or user-dialogue ownership is claimed.`
 
 ## Blocker Behavior

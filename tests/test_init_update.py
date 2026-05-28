@@ -45,23 +45,91 @@ _ISS_00031_EXCLUDE_PATTERNS = (
     "assets/spec_dock/templates/epic/issues/new-issue",
 )
 
-_INTERVIEW_REQUIRED_LABELS = (
-    "質問主題",
-    "回答してほしいこと",
-    "なぜ質問するのか",
-    "背景",
-    "詳細説明",
-    "事前分析",
-    "回答案",
-    "選択肢比較",
-    "メリット",
-    "デメリット",
-    "リスク",
-    "ベストプラクティス分析",
-    "推奨案",
-    "未回答時の影響",
-    "回答欄",
-    "回答後フォローアップ",
+_INTERVIEW_REQUIRED_FRAGMENTS = (
+    "scope: \"<issue | epic | initiative | local>\"",
+    "scope_id: \"<SCOPE_ID>\"",
+    "created_at: \"YYYY-MM-DDTHH:MM:SSZ\"",
+    "created_by: \"<orchestrator | role>\"",
+    "status: \"unanswered | answered | superseded | deferred\"",
+    "authority: \"proposed | user-approved | synthesized\"",
+    "adoption_status: \"unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked\"",
+    "derived_from: []",
+    "reflected_to: []",
+    "一問一答の正式質問シート",
+    "`status` は質問 lifecycle",
+    "`authority` は回答 / synthesis の権限",
+    "`adoption_status` は canonical docs への採用状態",
+    "status: unanswered",
+    "authority: proposed",
+    "adoption_status: unreviewed",
+    "同じ file にユーザー回答、採用判断、反映先への含意を追記",
+    "この file に複数質問を追加せず、次の unanswered `interview` を作成",
+    "## 質問の目的 (必須)",
+    "## 質問 (必須)",
+    "一度に聞く本質的な質問はこの 1 件だけ",
+    "## Source-grounded context (必須)",
+    "## 回答案 (必須)",
+    "## Codex の分析 (必須)",
+    "## Codex の推奨案 (必須)",
+    "## ユーザー回答 (回答後に必須)",
+    "## 追加確認の要否 (回答後に必須)",
+    "## 採用判断 (回答後に必須)",
+    "## requirement / design / plan / ADR への含意 (必須)",
+    "## 図解（必要な場合のみ）",
+    "```plantuml",
+    "## 詳細 tradeoff / 具体シナリオ / edge case（必要な場合のみ）",
+    "## 後続 reflection proposal（必要な場合のみ）",
+)
+
+_RESEARCH_REQUIRED_FRAGMENTS = (
+    "sources、facts、inference、unverified、terms、edge cases、implications を混ぜない",
+    "## Sources / 調査方法 (必須)",
+    "## Facts / 観測事実 (必須)",
+    "## Inference / 推論 (必須)",
+    "## Unverified / 未検証事項 (必須)",
+    "## Terms / 用語・境界の衝突 (必須)",
+    "## Edge cases / 例外・境界ケース (必須)",
+    "## Implications / 判断への含意 (必須)",
+)
+
+_DISC_REQUIRED_FRAGMENTS = (
+    "synthesis し、reflection proposal、ADR candidate triage",
+    "この文書は採否確定 ledger ではない",
+    "Evidence Adoption Ledger に昇格して記録",
+    "## Synthesis (必須)",
+    "## Reflection proposal (必須)",
+    "## ADR candidate triage (必須)",
+    "hard to reverse",
+    "surprising without context",
+    "real tradeoff",
+    "## 未採用 / deferred 理由 (必須)",
+)
+
+_ADR_REQUIRED_FRAGMENTS = (
+    "authority: \"proposed | accepted\"",
+    "authority default: `proposed`",
+    "`status: draft` の間は accepted authority を claim しない",
+    "採用判断と必要な reviewer evidence が揃った場合だけ `authority: accepted`",
+    "ADR は sparingly に作る",
+    "hard to reverse",
+    "surprising without context",
+    "real tradeoff",
+    "## ADR 化基準（Sparing Criteria） (必須)",
+    "3 条件を満たさない場合の反映先",
+)
+
+_ISSUE_REPORT_SPEC_AUTHORING_GATE_FRAGMENTS = (
+    "## 仕様作成ゲート（Spec Authoring Gate / 必須）",
+    "fresh `spec-reviewer` pass 済みでない artifact",
+    "stale reviewer pass",
+    "unresolved planning gap",
+    "blocked / stale Evidence Adoption Ledger entry",
+    "| phase | artifact | reviewer | freshness | state | investigated facts | promotion / completion decision | notes |",
+    "Planning Gap / Execution Handoff Check",
+    "execution handoff:",
+    "unresolved planning gaps:",
+    "stale or missing reviewer evidence:",
+    "Evidence Adoption Ledger blockers:",
 )
 
 _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
@@ -112,6 +180,28 @@ _JAPANESE_PRIMARY_FORBIDDEN_HEADING_LABELS = (
     "5. GitHub default と `--no-github`",
 )
 
+_JAPANESE_PRIMARY_ALLOWED_ASCII_HEADING_LABELS = (
+    "Planning Gap / Execution Handoff Check",
+    "route",
+    "commands",
+    "planning summary",
+    "execution summary",
+    "handoff",
+    "completion summary",
+    "hard cutover",
+    "planning gap handling",
+    "report evidence",
+    "PR / finish",
+    "clarification / grill 作法",
+    "Phase Gates",
+    "Handoff To Execution",
+)
+
+_JAPANESE_PRIMARY_ALLOWED_ENGLISH_PROSE_LINES = (
+    "Command semantics are maintained for compatibility. Detailed planning and execution policy lives in the route-specific documents above.",
+    "- Issue execution handoff requires fresh reviewer pass evidence for `requirement.md`, `design.md`, and `plan.md`; missing / stale previous reviewer pass returns to planning and is not implementation readiness.",
+)
+
 _JAPANESE_PRIMARY_FORBIDDEN_PRIMARY_PHRASES = (
     "diagram / trace guidance",
     "trace guidance",
@@ -130,11 +220,22 @@ _JAPANESE_PRIMARY_TABLE_CONTRACT_EXCEPTIONS = _DELEGATED_DRAFT_REQUIRED_FAILURE_
     "active issue",
     "boundary",
     "denied / unavailable reason",
+    "design",
     "expires / invalidation condition",
+    "artifact",
+    "freshness",
+    "investigated facts",
     "named roles",
     "next action",
+    "notes",
+    "phase",
+    "plan",
+    "promotion / completion decision",
+    "requirement",
+    "reviewer",
     "reviewer 利用不可 / 拒否 / waiver / provisional",
     "session",
+    "state",
 )
 
 _JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS = {
@@ -142,6 +243,7 @@ _JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS = {
     "delegated draft evidence / decision ledger",
     "delegated / approved-local-execution / degraded mode",
     "design phase へ戻す",
+    "design phase へ進行可 / requirement phase に戻す / blocked / incomplete",
     "decision ledger / gate evidence",
     "added / already sufficient / not applicable",
     "accepted / rejected / needs follow-up",
@@ -156,9 +258,11 @@ _JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS = {
     "discard draft and record incident",
     "dev-coder / doc-writer / repo-analyst",
     "docs / templates / readme / workflow / skill / migration notes",
+    "docs / code / adr / discussions / interviews / research / external primary sources",
     "doc-writer / n/a",
     "elicitation",
     "final response / pr / issue comment / other external delivery evidence",
+    "fresh / stale / missing",
     "framing",
     "fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する",
     "guardrail satisfied / no refactor needed",
@@ -179,6 +283,7 @@ _JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS = {
     "pass / approved-no-op / fail / blocked",
     "pass / fail / blocked",
     "pass / fail / unavailable / denied / waived / provisional",
+    "passed / failed / unavailable / denied / waived / provisional / blocked / incomplete",
     "passed / failed / unavailable / denied / waived / provisional",
     "proceed / ask user / block gate / record waiver request",
     "proceed / blocked / incomplete / follow-up required",
@@ -192,9 +297,13 @@ _JAPANESE_PRIMARY_TABLE_VALUE_EXCEPTIONS = {
     "research",
     "requirement phase へ戻す",
     "requirement / design / plan / report / implementation / tests / docs alignment",
+    "requirement / docs / code / adr / discussions / research / design drafts",
+    "requirement / design / plan docs / authoring contract / workflow docs / issue-specific evidence",
     "rerun reviewer gate",
     "return to design phase",
     "return to requirement phase",
+    "execution handoff 可 / planning phase に戻す / blocked / incomplete",
+    "plan phase へ進行可 / design phase に戻す / blocked / incomplete",
     "reviewer gate evidence",
     "reviewer gate を再実行する",
     "reviewer role + passed / failed / unavailable / denied / waived / provisional",
@@ -297,6 +406,12 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
         "spec-dock/docs/workflow_issue.md": "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
+        "spec-dock/docs/workflow_issue_planning.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_issue_planning.md"
+        ),
+        "spec-dock/docs/workflow_issue_execution.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_issue_execution.md"
+        ),
         "spec-dock/docs/workflow-tree.md": "src/spec_dock/assets/spec_dock/docs/workflow-tree.md",
         "spec-dock/docs/reference_github.md": (
             "src/spec_dock/assets/spec_dock/docs/reference_github.md"
@@ -328,6 +443,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-issue-planning/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
         ),
         ".agents/skills/spec-dock-system-architect/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md"
@@ -554,8 +672,10 @@ class TestInitUpdate(CliRuntimeHarness):
             repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates" / "discussions" / "interview.md"
         ).read_text(encoding="utf-8")
 
-        for label in _INTERVIEW_REQUIRED_LABELS:
-            self.assertIn(label, interview_text)
+        for fragment in _INTERVIEW_REQUIRED_FRAGMENTS:
+            self.assertIn(fragment, interview_text)
+
+        self.assertNotIn("質問ブロック（必要な数だけ繰り返す）", interview_text)
     _GUIDE_REFERENCE_NAME_REQUIRED_FRAGMENTS = (
         "[workflow_initiative.md](workflow_initiative.md)",
         "[workflow_epic.md](workflow_epic.md)",
@@ -1016,6 +1136,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00102-agentic-tdd-plan-step-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1111,6 +1232,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00102-agentic-tdd-plan-step-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -1385,6 +1507,8 @@ class TestInitUpdate(CliRuntimeHarness):
                 continue
             if in_code_fence:
                 continue
+            if line.strip() in _JAPANESE_PRIMARY_ALLOWED_ENGLISH_PROSE_LINES:
+                continue
 
             heading_match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
             if heading_match:
@@ -1396,6 +1520,8 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
                 primary = re.split(r"\s*[（(]", label, maxsplit=1)[0].strip()
                 primary_without_number = re.sub(r"^\d+[.)]\s+", "", primary)
+                if primary_without_number in _JAPANESE_PRIMARY_ALLOWED_ASCII_HEADING_LABELS:
+                    continue
                 lower_primary = primary_without_number.lower()
                 self.assertNotIn(
                     primary_without_number,
@@ -2015,6 +2141,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "requirement/design/plan/report",
             "manual",
             "Read order",
+            "spec-dock/docs/workflow_issue_planning.md",
+            "spec-dock/docs/workflow_issue_execution.md",
         ):
             self.assertIn(
                 fragment,
@@ -2859,6 +2987,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("spec-driven-tdd-workflow", docs_readme)
             self.assertIn("spec-dock-initiative-planning", docs_readme)
             self.assertIn("spec-dock-epic-planning", docs_readme)
+            self.assertIn("spec-dock-issue-planning", docs_readme)
             self.assertIn("spec-dock-issue-execution", docs_readme)
             self.assertIn("spec-dock-adr-facilitation", docs_readme)
             self.assertIn("reference レイヤ", docs_readme)
@@ -2880,6 +3009,12 @@ class TestInitUpdate(CliRuntimeHarness):
             workflow_initiative = (docs_dir / "workflow_initiative.md").read_text(encoding="utf-8")
             workflow_epic = (docs_dir / "workflow_epic.md").read_text(encoding="utf-8")
             workflow_issue = (docs_dir / "workflow_issue.md").read_text(encoding="utf-8")
+            workflow_issue_planning = (docs_dir / "workflow_issue_planning.md").read_text(
+                encoding="utf-8"
+            )
+            workflow_issue_execution = (docs_dir / "workflow_issue_execution.md").read_text(
+                encoding="utf-8"
+            )
             workflow_spec_authoring = (docs_dir / "workflow_spec_authoring.md").read_text(encoding="utf-8")
             workflow_adr = (docs_dir / "workflow_adr.md").read_text(encoding="utf-8")
             phase_requirement = (docs_dir / "phase_requirement.md").read_text(encoding="utf-8")
@@ -2952,21 +3087,36 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("scope / non-scope / user intent / acceptance criteria", phase_requirement)
             self.assertIn("spec-dock-initiative-planning", workflow_initiative)
             self.assertIn("spec-dock-epic-planning", workflow_epic)
+            self.assertIn("workflow_issue_planning.md", workflow_issue)
+            self.assertIn("workflow_issue_execution.md", workflow_issue)
+            self.assertIn("互換用 umbrella", workflow_issue)
+            self.assertIn("Issue の `requirement.md` / `design.md` / `plan.md` 作成・更新", workflow_issue)
+            self.assertIn("approved plan execution", workflow_issue)
+            self.assertIn("planning phase に戻す", workflow_issue)
+            self.assertIn("spec-dock-issue-planning", workflow_issue)
             self.assertIn("spec-dock-issue-execution", workflow_issue)
+            self.assertIn("Issue 固有の authoring entrypoint", workflow_issue_planning)
+            self.assertIn("Spec Authoring Gate evidence", workflow_issue_planning)
+            self.assertIn("implementation edits、tests edits、runtime changes", workflow_issue_planning)
+            self.assertIn("Execution に渡せるのは", workflow_issue_planning)
+            self.assertIn("execution-only の正本", workflow_issue_execution)
+            self.assertIn("Issue の requirement / design / plan authoring", workflow_issue_execution)
+            self.assertIn("workflow_issue_planning.md", workflow_issue_execution)
+            self.assertIn("planning gap handling", workflow_issue_execution)
             self.assertIn("spec-dock-adr-facilitation", workflow_adr)
-            self.assertIn("plan upfront approval", workflow_issue)
-            self.assertIn("step result approval", workflow_issue)
-            self.assertIn("docs impact", workflow_issue)
-            self.assertIn("final quality gate", workflow_issue)
-            self.assertIn("`qa-reviewer`", workflow_issue)
-            self.assertIn("issue-wide `code-reviewer`", workflow_issue)
-            self.assertIn("Parent Agent Invariant", workflow_issue)
-            self.assertIn("inspect / plan / delegate / verify / integrate / report", workflow_issue)
-            self.assertIn("delegated worker handoff", workflow_issue)
-            self.assertIn("Parent Implementation Exception", workflow_issue)
-            self.assertIn("run-local orchestration metadata", workflow_issue)
-            self.assertIn("reviewer gate mapping", workflow_issue)
-            self.assertIn("docs-only / template-only / skill-text-only", workflow_issue)
+            self.assertIn("Final QA Gate", workflow_issue_execution)
+            self.assertIn("Final Code Review Gate", workflow_issue_execution)
+            self.assertIn("Final Spec Review Gate", workflow_issue_execution)
+            self.assertIn("Step Contract Closure", workflow_issue_execution)
+            self.assertIn("Test Contract Closure", workflow_issue_execution)
+            self.assertIn("Closure Coverage", workflow_issue_execution)
+            self.assertIn("Implementation Delegation Gate", workflow_issue_execution)
+            self.assertIn("Parent Agent Invariant", workflow_issue_execution)
+            self.assertIn("delegated worker handoff", workflow_issue_execution)
+            self.assertIn("reviewer gate mapping", workflow_issue_execution)
+            self.assertIn("Parent Implementation Exception", workflow_issue_execution)
+            self.assertIn("degraded success", workflow_issue_execution)
+            self.assertIn("docs-only / template-only / skill-text-only", workflow_issue_execution)
             for command in (
                 "./spec-dock/scripts/spec-dock new issue --epic <epic-id> --title",
                 "./spec-dock/scripts/spec-dock import issue <num|#num|canonical-url> --title",
@@ -2975,7 +3125,6 @@ class TestInitUpdate(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock active set --github-issue <n>",
                 "./spec-dock/scripts/spec-dock active show",
                 "./spec-dock/scripts/spec-dock deps check <target>",
-                "./spec-dock/scripts/spec-dock active set <target> --force",
                 "./spec-dock/scripts/spec-dock validate",
                 "./spec-dock/scripts/spec-dock sync",
             ):
@@ -3066,9 +3215,25 @@ class TestInitUpdate(CliRuntimeHarness):
             for draft_template in ("draft-requirement.md", "draft-design.md", "draft-plan.md"):
                 self.assertFalse((discussions_templates_dir / draft_template).exists())
             self.assertFalse((discussions_templates_dir / "note.md").exists())
+            self.assertFalse((discussions_templates_dir / "report.md").exists())
+            self.assertFalse((discussions_templates_dir / "reflection.md").exists())
+            self.assertEqual(list(discussions_templates_dir.glob("grill-*.md")), [])
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
-            for label in _INTERVIEW_REQUIRED_LABELS:
-                self.assertIn(label, interview_text)
+            research_text = (discussions_templates_dir / "research.md").read_text(encoding="utf-8")
+            disc_text = (discussions_templates_dir / "disc.md").read_text(encoding="utf-8")
+            adr_text = (discussions_templates_dir / "adr.md").read_text(encoding="utf-8")
+            report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
+            for fragment in _INTERVIEW_REQUIRED_FRAGMENTS:
+                self.assertIn(fragment, interview_text)
+            self.assertNotIn("質問ブロック（必要な数だけ繰り返す）", interview_text)
+            for fragment in _RESEARCH_REQUIRED_FRAGMENTS:
+                self.assertIn(fragment, research_text)
+            for fragment in _DISC_REQUIRED_FRAGMENTS:
+                self.assertIn(fragment, disc_text)
+            for fragment in _ADR_REQUIRED_FRAGMENTS:
+                self.assertIn(fragment, adr_text)
+            for fragment in _ISSUE_REPORT_SPEC_AUTHORING_GATE_FRAGMENTS:
+                self.assertIn(fragment, report_text)
             self.assertEqual(list(initiative_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(epic_templates_dir.rglob("README.md")), [])
             self.assertEqual(list(issue_templates_dir.rglob("README.md")), [])
@@ -4467,7 +4632,7 @@ class TestInitUpdate(CliRuntimeHarness):
         self.assertIn("every required row に step-local close condition", phase_plan_issue)
         self.assertIn("public CLI behavior、shipped scaffold / runtime contract", phase_plan_issue)
         self.assertNotIn("failing test は iteration ごとに 1 本ずつ進める", phase_plan_issue)
-        self.assertIn("completion policy の正本は `workflow_issue.md`", phase_plan_issue)
+        self.assertIn("completion policy の正本は `workflow_issue_execution.md`", phase_plan_issue)
         self.assertIn("step 固有の worker handoff contract", phase_plan_issue)
         self.assertIn("report-before-commit、step reviewer gate pass、step commit、approved-no-op", phase_plan_issue)
         self.assertIn("`1 implementation step = 1 review scope = 1 commit`", phase_plan_issue)
@@ -4513,71 +4678,55 @@ class TestInitUpdate(CliRuntimeHarness):
         workflow_issue = (
             repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("templates は完成形ではなく、書き始めるための最小 scaffold", workflow_issue)
-        self.assertIn("項目を追加・削除・統合・並べ替えてよい", workflow_issue)
-        self.assertIn("正確性、検証可能性、人間の理解、エージェントの実行", workflow_issue)
-        self.assertIn("`optional diagram catalog` から必要なものを選んで追加してよい", workflow_issue)
-        self.assertIn("カタログ外でも、構造・境界・責務・流れ・状態・依存", workflow_issue)
-        self.assertIn("Linux `tree` style の `ディレクトリ / ファイル変更計画`", workflow_issue)
-        self.assertIn("仕様固定マイクロバッチTDD", workflow_issue)
-        self.assertIn("Spec-Locked Micro-Batch TDD", workflow_issue)
-        self.assertIn("Spec-Locked Closure Index", workflow_issue)
-        self.assertIn("Parent Agent Invariant", workflow_issue)
-        self.assertIn("inspect / plan / delegate / verify / integrate / report", workflow_issue)
-        self.assertIn("run-local orchestration metadata", workflow_issue)
-        self.assertIn("Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく", workflow_issue)
-        self.assertIn("closure index の `id` を参照", workflow_issue)
-        self.assertIn("required closure id が behavior slice", workflow_issue)
-        self.assertIn("plan amendment と re-review", workflow_issue)
-        self.assertIn("Step Contract Closure", workflow_issue)
-        self.assertIn("Test Contract Closure", workflow_issue)
-        self.assertIn("Closure Coverage", workflow_issue)
-        self.assertIn("required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op", workflow_issue)
-        self.assertIn("Closure Delta", workflow_issue)
-        self.assertIn("planned executable workflow contract / command queue", workflow_issue)
-        self.assertIn("`report.md` は observed evidence ledger", workflow_issue)
-        self.assertIn("field semantics、card schema、risk-calibrated obligation coverage", workflow_issue)
-        self.assertIn("lifecycle、実行順、reviewer gate、completion policy", workflow_issue)
-        self.assertNotIn("test bundle", workflow_issue)
-        self.assertIn("bounded implementation batch", workflow_issue)
-        self.assertIn("Implementation Delegation Gate", workflow_issue)
-        self.assertIn("delegated worker handoff", workflow_issue)
-        self.assertIn("`delegated role`、`scope`、`source of truth`、`allowed changes`、`forbidden changes`、`required verification`、`stop conditions`、`output required`", workflow_issue)
-        self.assertIn("複数 layer / module / package", workflow_issue)
-        self.assertIn("runtime / CLI / infra / templates / shipped scaffold / shared docs", workflow_issue)
-        self.assertIn("integration test / migration / backward compatibility / filesystem / GitHub / active state", workflow_issue)
-        self.assertIn("`delegated` / `approved-local-execution` / degraded mode", workflow_issue)
-        self.assertIn("implementation delegation は reviewer gate の代替ではない", workflow_issue)
-        self.assertIn("Parent Implementation Exception", workflow_issue)
-        self.assertIn("delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate", workflow_issue)
-        self.assertIn("reviewer gate mapping", workflow_issue)
-        self.assertIn("docs-only / template-only / skill-text-only", workflow_issue)
-        self.assertIn("bounded delegated follow-up", workflow_issue)
-        self.assertIn("test sensitivity evidence", workflow_issue)
-        self.assertNotIn("Red → Green → Refactor → review", workflow_issue)
-        self.assertIn("step reviewer gate → fix → re-review → commit → clean確認", workflow_issue)
-        self.assertIn("`1 implementation step = 1 review scope = 1 commit`", workflow_issue)
-        self.assertIn("`committed` または `approved-no-op`", workflow_issue)
-        self.assertIn("docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認", workflow_issue)
-        self.assertIn("`qa-reviewer` がテスト十分性", workflow_issue)
-        self.assertIn("issue-wide `code-reviewer` pass", workflow_issue)
-        self.assertIn("final `spec-reviewer` pass", workflow_issue)
-        self.assertIn("final commit 済み", workflow_issue)
-        self.assertIn("post-commit external delivery evidence", workflow_issue)
-        self.assertIn("意図しない staged / unstaged 変更なし", workflow_issue)
+        workflow_issue_execution = (
+            repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_issue_execution.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("互換用 umbrella", workflow_issue)
+        self.assertIn("Issue planning", workflow_issue)
+        self.assertIn("Issue execution", workflow_issue)
+        self.assertIn("workflow_issue_planning.md", workflow_issue)
+        self.assertIn("workflow_issue_execution.md", workflow_issue)
+        self.assertIn("`report` / `reflection` / `grill-*` を new doc catalog に追加しない", workflow_issue)
+        self.assertIn("approved plan execution", workflow_issue)
+        self.assertIn("planning phase へ戻す", workflow_issue)
+        self.assertNotIn("Spec-Locked Micro-Batch TDD", workflow_issue)
+        self.assertNotIn("Parent Agent Invariant", workflow_issue)
+        self.assertNotIn("run-local orchestration metadata", workflow_issue)
+
+        self.assertIn("approved executable workflow contract / command queue", workflow_issue_execution)
+        self.assertIn("実際の Red / Green / Refactor evidence", workflow_issue_execution)
+        self.assertIn("workflow_issue_planning.md", workflow_issue_execution)
+        self.assertIn("Spec Authoring Gate", workflow_issue_execution)
+        self.assertIn("planning gap handling", workflow_issue_execution)
+        self.assertIn("runtime / tests / scaffold behavior", workflow_issue_execution)
+        self.assertIn("docs-only / template-only / skill-text-only", workflow_issue_execution)
+        self.assertIn("Parent Agent Invariant", workflow_issue_execution)
+        self.assertIn("Implementation Delegation Gate", workflow_issue_execution)
+        self.assertIn("delegated worker handoff", workflow_issue_execution)
+        self.assertIn("reviewer gate mapping", workflow_issue_execution)
+        self.assertIn("Parent Implementation Exception", workflow_issue_execution)
+        self.assertIn("PR Delivery Gate", workflow_issue_execution)
+        self.assertIn("Merge Preparation Gate", workflow_issue_execution)
+        self.assertIn("issue finish", workflow_issue_execution)
 
         issue_execution_skill = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ).read_text(encoding="utf-8")
         for fragment in (
-            "spec-dock/docs/workflow_issue.md as the source of truth",
-            "concise reminder for issue execution",
+            "spec-dock/docs/workflow_issue_execution.md` as the source of truth",
+            "workflow_issue.md` is the umbrella route",
+            "workflow_issue_planning.md` owns Issue authoring",
             "parent agent responsible for orchestration",
+            "Spec Authoring Gate evidence",
+            "route to `spec-dock-issue-planning`",
+            "requirement / design / plan gap",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
             "bounded delegated follow-up",
             "Parent direct fixes require a documented Parent Implementation Exception",
+            "detailed execution / completion policy in `workflow_issue_execution.md`",
+            "Update `workflow_issue.md` only for route / handoff / scope-out changes",
         ):
             self.assertIn(fragment, issue_execution_skill)
         self._assert_issue_execution_runtime_command_reminders(
@@ -9643,7 +9792,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with cli._assets_dir() as assets_dir:
             asset_paths = {
-                "workflow issue docs": assets_dir / "spec_dock" / "docs" / "workflow_issue.md",
+                "workflow issue execution docs": assets_dir
+                / "spec_dock"
+                / "docs"
+                / "workflow_issue_execution.md",
                 "phase issue plan docs": assets_dir / "spec_dock" / "docs" / "phase_plan_issue.md",
                 "issue plan authoring docs": assets_dir
                 / "spec_dock"
@@ -9696,7 +9848,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 self.assertNotIn("minimal tests", text)
 
         for label in (
-            "workflow issue docs",
+            "workflow issue execution docs",
             "phase issue plan docs",
             "issue plan authoring docs",
             "issue plan template",
@@ -9720,6 +9872,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Red / 代替証跡の要件",
             "Green 検証",
             "Refactor / cleanup ガードレール",
+            "Issue workflow の入口と handoff は `workflow_issue.md`",
+            "Issue authoring / planning workflow は `workflow_issue_planning.md`",
+            "実行 / reviewer / completion policy は `workflow_issue_execution.md`",
         ):
             with self.subTest(asset="issue plan template", fragment=fragment):
                 self.assertIn(fragment, plan_text)
@@ -9787,6 +9942,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "observed evidence ledger",
                 "docs/authoring/issue-plan.md",
                 "workflow_issue.md",
+                "workflow_issue_planning.md",
+                "workflow_issue_execution.md",
+                "Issue route / handoff checks",
+                "Issue authoring policy",
+                "Issue execution / reviewer / completion",
                 "closure ids",
                 "report evidence",
                 "reviewer gate status",
@@ -9809,7 +9969,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         with cli._assets_dir() as assets_dir:
             asset_paths = {
                 "issue report template": assets_dir / "spec_dock" / "templates" / "issue" / "report.md",
-                "workflow issue docs": assets_dir / "spec_dock" / "docs" / "workflow_issue.md",
+                "workflow issue execution docs": assets_dir
+                / "spec_dock"
+                / "docs"
+                / "workflow_issue_execution.md",
                 "issue plan authoring docs": assets_dir
                 / "spec_dock"
                 / "docs"
@@ -9879,15 +10042,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "converted_to_followup",
                 "no_action",
             ),
-            "workflow issue docs": (
+            "workflow issue execution docs": (
                 "Spec Interpretation / Decision Ledger",
                 "Ledger Note",
-                "source-agent",
-                "options considered",
-                "needs orchestrator decision",
                 "No material implementation decisions beyond the approved plan.",
-                "Status=open",
-                "report-only durable decision",
             ),
             "issue plan authoring docs": (
                 "Spec Interpretation / Decision Ledger",
@@ -10163,6 +10321,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
+            issue_planning_text = (skills_dir / "spec-dock-issue-planning" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
             system_architect_text = (skills_dir / "spec-dock-system-architect" / "SKILL.md").read_text(
                 encoding="utf-8"
@@ -10187,9 +10348,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-issue-execution`: issue-level TDD execution and report updates.",
+            "`spec-dock-issue-planning`: issue-level requirement/design/plan authoring, grill clarification, and fresh Spec Authoring Gate reviewer passes.",
             hub_text,
         )
+        self.assertIn(
+            "`spec-dock-issue-execution`: issue-level approved plan execution and report updates after fresh Spec Authoring Gate evidence.",
+            hub_text,
+        )
+        self.assertIn("Planning requests or planning gaps route back to `spec-dock-issue-planning`.", hub_text)
         self.assertIn(
             "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
             hub_text,
@@ -10210,20 +10376,53 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
         self.assertIn("issue-00049", codex_adapter_text)
         self.assertIn("spec-dock/docs/workflow_issue.md", codex_adapter_text)
+        self.assertIn("workflow_issue_planning.md", codex_adapter_text)
+        self.assertIn("workflow_issue_execution.md", codex_adapter_text)
         self.assertIn("thin", codex_adapter_text.lower())
         self.assertIn("issue-00049", copilot_adapter_text)
         self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
+        self.assertIn("workflow_issue_planning.md", copilot_adapter_text)
+        self.assertIn("workflow_issue_execution.md", copilot_adapter_text)
         self.assertIn("thin", copilot_adapter_text.lower())
 
-        for skill_text in (hub_text, issue_text, codex_adapter_text, copilot_adapter_text):
+        for skill_text in (hub_text, issue_planning_text, issue_text, codex_adapter_text, copilot_adapter_text):
             if "./spec-dock/scripts/spec-dock" not in skill_text:
-                self.assertIn("spec-dock/docs/workflow_issue.md as the source of truth", skill_text)
+                self.assertTrue(
+                    "workflow_issue.md` only as the Issue umbrella" in skill_text
+                    or "workflow_issue.md` as the Issue umbrella" in skill_text
+                    or "workflow_issue_planning.md` as the source of truth" in skill_text
+                    or "workflow_issue_execution.md` as the source of truth" in skill_text,
+                    skill_text,
+                )
             else:
                 self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
             self.assertNotIn("./spec ", skill_text)
 
         for fragment in (
-            "spec-dock/docs/workflow_issue.md as the source of truth",
+            "spec-dock/docs/workflow_issue_planning.md` as the source of truth",
+            "Issue authoring and planning",
+            "source-grounding before asking the user",
+            "one-question-at-a-time clarification",
+            "unanswered `interview` sheet before asking",
+            "Use `research` for sources / facts / inference / unverified / terms / edge cases / implications",
+            "Use `disc` for synthesis, reflection proposal, and ADR candidate triage",
+            "hard to reverse, surprising without context, and involve a real tradeoff",
+            "fresh `spec-reviewer` pass for requirement, design, and plan",
+            "Spec Authoring Gate evidence",
+            "Do not edit implementation files, tests, runtime code",
+            "Do not create PRs, claim merge-prepared, run issue finish",
+            "Do not claim implementation readiness before fresh reviewer pass",
+        ):
+            self.assertIn(fragment, issue_planning_text)
+
+        for fragment in (
+            "spec-dock/docs/workflow_issue_execution.md` as the source of truth",
+            "workflow_issue.md` is the umbrella route",
+            "workflow_issue_planning.md` owns Issue authoring",
+            "fresh `spec-reviewer` pass evidence",
+            "Spec Authoring Gate evidence",
+            "If the request is to create/update `requirement.md`, `design.md`, or `plan.md`, route to `spec-dock-issue-planning`",
+            "requirement / design / plan gap",
             "parent agent responsible for orchestration",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
@@ -10298,9 +10497,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Plan Blockers",
             "Integration Notes for Main Orchestrator",
             "`spec-dock/docs/workflow_issue.md`",
+            "`workflow_issue_planning.md`",
+            "`workflow_issue_execution.md`",
             "`spec-dock/docs/authoring/issue-plan.md`",
             "issue plan field semantics",
-            "issue lifecycle, execution, validation, reviewer, and completion policy",
+            "Issue authoring policy",
+            "execution, validation, reviewer, and completion policy",
             "return `Plan Blocked`",
             "Do not ask the user directly",
             "create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft",
@@ -10385,12 +10587,18 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("fresh `spec-reviewer`", epic_text)
         self.assertIn("Spec Authoring Gate", epic_text)
         for fragment in (
-            "spec-dock/docs/workflow_issue.md as the source of truth",
-            "concise reminder for issue execution",
+            "spec-dock/docs/workflow_issue_execution.md` as the source of truth",
+            "workflow_issue.md` is the umbrella route",
+            "workflow_issue_planning.md` owns Issue authoring",
             "parent agent responsible for orchestration",
+            "Spec Authoring Gate evidence",
+            "route to `spec-dock-issue-planning`",
+            "requirement / design / plan gap",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
             "Parent direct fixes require a documented Parent Implementation Exception",
+            "detailed execution / completion policy in `workflow_issue_execution.md`",
+            "Update `workflow_issue.md` only for route / handoff / scope-out changes",
         ):
             self.assertIn(fragment, issue_text)
 
@@ -11380,14 +11588,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             / "spec-dock-issue-execution"
             / "SKILL.md"
         ).read_text(encoding="utf-8")
-        workflow_issue = (
+        workflow_issue_execution = (
             repo_root
             / "src"
             / "spec_dock"
             / "assets"
             / "spec_dock"
             / "docs"
-            / "workflow_issue.md"
+            / "workflow_issue_execution.md"
         ).read_text(encoding="utf-8")
 
         merge_preparer_phrases = (
@@ -11417,17 +11625,13 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             self.assertIn(phrase, merge_preparer)
 
         workflow_phrases = (
-            "github-pr-merge-preparer",
             "PR Delivery Gate",
             "Merge Preparation Gate",
-            "non-required check status and waiver evidence",
-            "unresolved review-thread limitation status",
-            "`issue finish` は delivery completion に対する lifecycle closure 専用",
             "`issue finish` は lifecycle-only command",
-            "commit、push、PR、merge、validate、test、review、final delivery completion は保証しません",
+            "PR 作成、merge readiness、checks、review、final delivery completion を保証しない",
         )
         for phrase in workflow_phrases:
-            self.assertIn(phrase, workflow_issue)
+            self.assertIn(phrase, workflow_issue_execution)
 
         issue_execution_phrases = (
             "github-pr-merge-preparer",
@@ -11472,6 +11676,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "spec-dock/active/issue/plan.md",
                 "spec-dock/active/issue/report.md",
                 "spec-dock/docs/workflow_issue.md",
+                "spec-dock/docs/workflow_issue_planning.md",
+                "spec-dock/docs/workflow_issue_execution.md",
                 "spec-dock/docs/authoring/issue-plan.md",
                 "具体テストケース一覧",
                 "前提",

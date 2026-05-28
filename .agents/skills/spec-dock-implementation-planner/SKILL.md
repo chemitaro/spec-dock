@@ -16,6 +16,8 @@ Read the current active context first:
 - parent initiative / epic docs needed to understand dependency order
 - `spec-dock/docs/workflow_spec_authoring.md`
 - `spec-dock/docs/workflow_issue.md`
+- `spec-dock/docs/workflow_issue_planning.md`
+- `spec-dock/docs/workflow_issue_execution.md`
 - `spec-dock/docs/authoring/issue-plan.md`
 - `spec-dock/docs/phase_plan.md`
 - `spec-dock/docs/reference_deps.md`
@@ -23,7 +25,7 @@ Read the current active context first:
 
 If design evidence is missing, stale, contradictory, or insufficient for planning, return a blocker to the main orchestrator. Do not ask the user directly.
 
-Use `spec-dock/docs/authoring/issue-plan.md` for issue plan field semantics, test case structure, closure index details, and amendment rules. Use `spec-dock/docs/workflow_issue.md` for issue lifecycle, execution, validation, reviewer, and completion policy.
+Use `spec-dock/docs/authoring/issue-plan.md` for issue plan field semantics, test case structure, closure index details, and amendment rules. Use `workflow_issue.md` as the Issue umbrella, `workflow_issue_planning.md` for Issue authoring policy, and `workflow_issue_execution.md` for execution, validation, reviewer, and completion policy.
 
 ## Operating Boundary
 
@@ -33,6 +35,7 @@ You may:
 - draft milestones, dependency-derived ordering, slices, and gates
 - create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft, analysis, or discussion-local report for the target initiative, epic, or issue
 - identify test, review, rollback, compatibility, and docs-impact requirements
+- identify planning clarification questions with question reason, affected artifacts, and recommended answer for the main orchestrator
 - recommend issue/step sequencing for the orchestrator
 - request bounded depth=2 leaf-only evidence from repo analysis, research, consultant, or QA-style evidence producers when the orchestrator permits it
 
@@ -59,7 +62,7 @@ Write delegated output as a flat Markdown discussion document in the target scop
 - standard: `<ts>-<kind>-<slug>.md`
 - same-second collision: `<ts>-<nn>-<kind>-<slug>.md`
 
-Use existing `kind` values such as `research`, `disc`, or `adr` as appropriate. Do not introduce `draft-plan` or other new kinds unless the canonical docs have added them.
+Use existing `kind` values such as `research`, `disc`, `interview`, or `adr` as appropriate. Do not introduce new kinds unless the canonical docs have added them. Use `research` for source-grounding, `disc` for synthesis / reflection proposal / ADR triage, `interview` only for a proposed one-question sheet owned by the orchestrator, and `adr` sparingly for hard-to-reverse, surprising-without-context, real-tradeoff decisions.
 
 Every sub-agent-created draft must begin with YAML-style frontmatter delimited by `---` on line 1 and a closing `---`. The frontmatter must include lightweight provenance:
 
@@ -130,6 +133,7 @@ Return a concise handoff containing:
 - leaf evidence used, if any
 - forbidden actions avoided
 - unresolved design gaps or `none`
+- question candidates for the orchestrator, each with reason, affected artifact, and recommended answer, or `none`
 - statement: `No canonical edit, final authority, promotion, reviewer-pass, implementation-readiness, or user-dialogue ownership is claimed.`
 
 ## Blocker Behavior

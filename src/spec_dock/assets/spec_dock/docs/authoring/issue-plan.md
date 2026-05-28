@@ -1,8 +1,8 @@
 # 課題 plan 作成（authoring: issue plan）
 
 Issue の `plan.md` を作成・更新するときの agent-facing entrypoint です。
-共通正本は `workflow_spec_authoring.md`、`phase_plan.md`、`phase_plan_issue.md`、`workflow_issue.md` です。
-この文書は Issue plan の field semantics と executable step schema の正本です。Lifecycle / execution / reviewer / completion policy は `workflow_issue.md`、plan philosophy と review checklist は `phase_plan_issue.md` を参照します。
+共通正本は `workflow_spec_authoring.md`、`phase_plan.md`、`phase_plan_issue.md`、`workflow_issue.md`、`workflow_issue_planning.md`、`workflow_issue_execution.md` です。
+この文書は Issue plan の field semantics と executable step schema の正本です。Lifecycle route は `workflow_issue.md`、planning policy は `workflow_issue_planning.md`、execution / reviewer / completion policy は `workflow_issue_execution.md`、plan philosophy と review checklist は `phase_plan_issue.md` を参照します。
 
 ## 読む順序
 
@@ -12,7 +12,9 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 2. `phase_plan.md`
 3. `phase_plan_issue.md`
 4. `workflow_issue.md`
-5. `templates/issue/plan.md`
+5. `workflow_issue_planning.md`
+6. `workflow_issue_execution.md`
+7. `templates/issue/plan.md`
 
 ## この artifact の責務
 
@@ -21,7 +23,7 @@ Issue の `plan.md` を作成・更新するときの agent-facing entrypoint �
 - `report.md` を observed evidence ledger として扱い、実際の Red / Green / Refactor 結果、discovered tests、closure delta、reviewer verdict、commit/no-op evidence の記録先にする。
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）で仕様 coverage を固定し、各 implementation step の `具体テストケース一覧` で step-local obligation と concrete red / characterization / inspect / manual seeds を固定する。
 - step 順、依存、対象ファイル、検証方法、report evidence destination、amendment trigger を実装者が判断せずに実行できる粒度へ落とす。
-- `workflow_issue.md` の delegated-by-default policy を再定義せず、各 implementation step の `delegation contract` として委任先、入力、許可範囲、検証、reviewer focus、停止条件、出力を具体化する。
+- `workflow_issue_execution.md` の delegated-by-default policy を再定義せず、各 implementation step の `delegation contract` として委任先、入力、許可範囲、検証、reviewer focus、停止条件、出力を具体化する。
 
 ## 計画契約 / 観測 evidence 台帳（planned contract / observed evidence ledger）
 
@@ -95,7 +97,7 @@ Sxx behavior slice
 
 ## 委任 contract（delegation contract）
 
-各 implementation step は、`workflow_issue.md` の `Parent Agent Invariant`、`Implementation Delegation Gate`、delegated worker handoff、reviewer gate mapping を参照し、その step 固有の handoff contract を持つ。
+各 implementation step は、`workflow_issue_execution.md` の `Parent Agent Invariant`、`Implementation Delegation Gate`、delegated worker handoff、reviewer gate mapping を参照し、その step 固有の handoff contract を持つ。
 この欄は execution policy の再定義ではない。plan author は、worker が追加判断なしに作業でき、reviewer が scope / verification / report evidence を確認できるように、次の項目を step-local に埋める。
 
 標準項目:
@@ -113,7 +115,7 @@ Sxx behavior slice
 - `required tests or docs-only verification`:
   - targeted command、manual evidence、inspection、docs diff など、その step の検証方法。
 - `reviewer focus`:
-  - `workflow_issue.md` の mapping に従い、code / runtime / tests / scaffold behavior は `code-reviewer`、docs-only / template-only / skill-text-only は `spec-reviewer` docs/spec alignment を基本にする。
+  - `workflow_issue_execution.md` の mapping に従い、code / runtime / tests / scaffold behavior は `code-reviewer`、docs-only / template-only / skill-text-only は `spec-reviewer` docs/spec alignment を基本にする。
 - `stop conditions`:
   - 入力 docs の矛盾、許可パス外変更が必要、検証不能、delegated role 不適合、host policy / tool 制約、acceptance 未達など。
 - `output required`:
@@ -156,7 +158,7 @@ Sxx behavior slice
 
 - implementation step に `具体テストケース一覧` がない。
 - implementation step に `delegation contract` がない、または `delegated role`、`input docs`、`allowed paths`、`forbidden changes`、`acceptance criteria`、`required tests or docs-only verification`、`reviewer focus`、`stop conditions`、`output required` のいずれかが欠けている。
-- `delegation contract` が `workflow_issue.md` と矛盾する execution policy を再定義している。
+- `delegation contract` が `workflow_issue_execution.md` と矛盾する execution policy を再定義している。
 - delegated worker work を reviewer gate の代替として扱っている、または step の変更種別と reviewer focus が矛盾している。
 - concrete test case が step-local ではなく、global test plan だけに置かれている。
 - `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法` のいずれかが欠けている。

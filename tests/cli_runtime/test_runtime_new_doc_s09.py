@@ -388,6 +388,19 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 self.assertIn(f"type={doc_type}", content)
                 self.assertIn(f"id={expected_ids[doc_type]}", content)
 
+            for unsupported_doc_type in ("report", "reflection", "grill-interview", "grill-report"):
+                with self.subTest(unsupported_doc_type=unsupported_doc_type):
+                    with self.assertRaisesRegex(RuntimeError, "Unknown discussion doc type"):
+                        app_create_node.create_discussion_doc(
+                            app_contracts.CreateDiscussionDocRequest(
+                                doc_type=unsupported_doc_type,
+                                scope_node_id="iss-local-00001",
+                                title=f"{unsupported_doc_type} title",
+                                slug=None,
+                            ),
+                            ports,
+                        )
+
     def test_draft_doc_types_render_scope_specific_template_bodies(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

@@ -26,9 +26,11 @@ Before implementation starts:
    `spec-dock/active/issue/design.md`,
    `spec-dock/active/issue/plan.md`, and
    `spec-dock/active/issue/report.md`.
-4. Treat `spec-dock/docs/workflow_issue.md` as the source of truth for issue
-   execution and completion.
-5. Treat `spec-dock/docs/workflow_spec_authoring.md` as the source of truth if
+4. Treat `spec-dock/docs/workflow_issue.md` as the Issue umbrella and
+   `spec-dock/docs/workflow_issue_execution.md` as the source of truth for
+   issue execution and completion.
+5. Treat `spec-dock/docs/workflow_issue_planning.md` and
+   `spec-dock/docs/workflow_spec_authoring.md` as the source of truth if
    requirement, design, or plan is not implementation-ready.
 6. Read `spec-dock/docs/authoring/issue-plan.md` when it exists and use it as
    the Issue `plan.md` authoring contract for step-local concrete test cases

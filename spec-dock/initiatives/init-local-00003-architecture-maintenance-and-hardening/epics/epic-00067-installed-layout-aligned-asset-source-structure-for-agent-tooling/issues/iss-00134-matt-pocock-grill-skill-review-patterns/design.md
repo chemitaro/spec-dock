@@ -12,6 +12,7 @@ derived_from:
   - "requirement.md"
   - "discussions/20260528t041343z-disc-consultant-grill-essence-integration-review.md"
   - "discussions/20260528t041831z-disc-consultant-requirement-update-proposal.md"
+  - "discussions/20260528t070322z-disc-deep-consultant-issue-planning-execution-split.md"
 ---
 
 # iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 設計
@@ -25,6 +26,7 @@ derived_from:
 - agent-to-human question の標準作法を、一問一答に寄せる。
 - 重要判断では、質問前に未回答の質問シートを作り、回答後に同じ artifact を完成 record にする。
 - `research` / `interview` / `disc` / `adr` / `report` を grill 専用 variant ではなく共通 template / 共通概念として再設計する。
+- Issue の planning interface と execution interface を分離し、仕様作成フェーズと実装フェーズの混同を防ぐ。
 - 既存 workflow / template / skill guidance に残る矛盾、重複、使われなくなる複数質問 guidance を整理する。
 
 非交渉制約:
@@ -35,10 +37,13 @@ derived_from:
 - 人間ユーザーへの本質的な質問は一度に一つだけにする。
 - 専門 agent / deep consultant は人間へ直接質問しない。
 - discussion artifact は evidence / proposal であり、採用判断なしに canonical source of truth にしない。
+- `spec-dock-issue-planning` は実装、PR 作成、merge-prepared、issue finish を claim しない。
+- `spec-dock-issue-execution` は requirement / design / plan authoring の入口にならない。
+- runtime CLI command 分割、lifecycle state machine 大改造、既存 artifact 自動 migration、PR / finish lifecycle 再設計は行わない。
 
 ## 既存実装 / 規約の理解
 
-参照した正本:
+参照した正本 / 設計対象:
 
 - `spec-dock/active/issue/requirement.md`
 - `spec-dock/docs/workflow_spec_authoring.md`
@@ -49,6 +54,12 @@ derived_from:
 - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-{system-architect,implementation-planner,issue-execution}/SKILL.md`
 
+今回の設計で追加 / 変更する対象:
+
+- `spec-dock/docs/workflow_issue_planning.md`
+- `spec-dock/docs/workflow_issue_execution.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
+
 現状理解:
 
 - `src/spec_dock/assets/spec_dock/` が shipped scaffold docs / templates / runtime の provider-side source of truth である。
@@ -57,6 +68,8 @@ derived_from:
 - discussion doc catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `draft-*` を持つ。
 - `report.md` は `new doc report` として作る discussion doc ではなく、issue / epic / initiative の canonical observed evidence ledger template として存在する。
 - 現 `interview.md` template は複数質問ブロックを前提にしており、一問一答 workflow と衝突する。
+- 現 `spec-dock-issue-execution` は execution reminder として妥当だが、Issue planning 用 leaf skill が存在しないため、Issue authoring 依頼の入口として誤用されやすい。
+- 現 `workflow_issue.md` は、Issue authoring、plan execution、PR delivery、merge preparation、issue finish を同じ文書内に持つため、planning 中に execution 文脈を読み込みやすい。
 
 採用する既存パターン:
 
@@ -114,6 +127,27 @@ ADR candidate は `disc.md` で triage し、原則として次の条件を満�
 
 局所的で可逆な判断は、質問シート、`disc.md`、または canonical docs への通常反映で閉じる。
 
+### 方針 D-005: Issue planning と Issue execution の skill interface を分離する
+
+`spec-dock-issue-planning` を新設し、Issue の `requirement.md` / `design.md` / `plan.md` 作成・更新と fresh `spec-reviewer pass` までを扱う orchestrator-facing skill とする。
+
+`spec-dock-issue-execution` は execution-only skill として狭め、fresh reviewer pass 済み `requirement.md` / `design.md` / `plan.md` と `report.md` の Spec Authoring Gate evidence を前提に、approved plan の実装、検証、PR delivery、merge preparation、issue finish を扱う。
+
+理由:
+
+- grill 型 clarification は、仕様を固める前に一問ずつ曖昧さを潰す workflow であり、実装や PR delivery と同じ入口に置くと premature implementation が起きやすい。
+- `spec-dock-issue-execution` が Issue 作業全般の唯一の leaf skill であると、requirement / design / plan authoring 依頼まで execution 文脈へ流れる。
+- planning と execution を分けると、ユーザーが「まず仕様を固める」「確認後に実装を指示する」という運用を明示しやすい。
+
+対象外:
+
+- runtime CLI command の新設 / 分割。
+- lifecycle state machine の再設計。
+- 既存 artifact の自動 migration。
+- PR / finish lifecycle の再設計。
+
+`workflow_issue.md` は互換用 umbrella として残し、Issue planning と Issue execution の routing / handoff を示す。詳細 policy は `workflow_issue_planning.md` と `workflow_issue_execution.md` へ分ける。
+
 ## 境界 / 契約モデル
 
 ### 役割境界
@@ -132,6 +166,14 @@ ADR candidate は `disc.md` で triage し、原則として次の条件を満�
 - Spec reviewer:
   - requirement / design / plan の phase gate を fresh review する。
   - authoring specialist や consultant の代替ではなく、独立 gate として扱う。
+- `spec-dock-issue-planning` skill:
+  - Issue authoring の入口として、requirement / design / plan 作成・更新と Spec Authoring Gate evidence を扱う。
+  - grill 型 clarification、question sheet、research、disc synthesis、specialist draft evidence を orchestrator の single-writer authority の下で統合する。
+  - 実装 edits、tests edits、PR 作成、merge-prepared、issue finish、implementation readiness claim は行わない。
+- `spec-dock-issue-execution` skill:
+  - fresh reviewer pass 済み canonical docs と Spec Authoring Gate evidence を確認してから、approved `plan.md` の implementation steps を実行する。
+  - 実装中に requirement / design / plan gap を見つけた場合、実装継続ではなく planning phase へ戻す。
+  - PR delivery / merge preparation / issue finish は execution 側に残す。
 
 ### artifact 境界
 
@@ -148,6 +190,12 @@ ADR candidate は `disc.md` で triage し、原則として次の条件を満�
 - `report.md`:
   - observed evidence ledger。
   - Evidence Adoption Ledger / Spec Authoring Gate / review / execution evidence を持つ。
+- `workflow_issue.md`:
+  - 互換用 umbrella。Issue planning / Issue execution の入口、handoff、scope 外を短く示す。
+- `workflow_issue_planning.md`:
+  - Issue 固有の requirement / design / plan authoring、grill 型 clarification、Spec Authoring Gate、planning-only stop conditions を扱う。
+- `workflow_issue_execution.md`:
+  - approved plan execution、report evidence、review loop、PR delivery、merge preparation、issue finish を扱う。
 
 ### 正式質問シートの起動条件
 
@@ -352,7 +400,7 @@ conditional body sections:
 
 `report.md` は discussion catalog に追加しない。
 
-canonical `report.md` template / workflow guidance では、Evidence Adoption Ledger と Spec Authoring Gate を使って以下を記録する。
+canonical issue `report.md` template / workflow guidance では、Evidence Adoption Ledger と Spec Authoring Gate を使って以下を記録する。
 
 - discussion evidence の採否
 - 外部支援で作られた artifact の採否。ただし、外部ツール固有の操作手順や責務は spec-dock の構成要素として定義しない。
@@ -361,12 +409,19 @@ canonical `report.md` template / workflow guidance では、Evidence Adoption Le
 - blocking / non-blocking
 - next action
 
+`src/spec_dock/assets/spec_dock/templates/issue/report.md` は、Issue planning から Issue execution へ移るための handoff evidence を記録できるよう、`Spec Authoring Gate` section を持つ。
+
+`Spec Authoring Gate` は最低限、phase、artifact、reviewer、freshness、state、investigated facts、promotion / completion decision、notes を持ち、requirement -> design -> plan の各 phase が fresh `spec-reviewer pass` 済みかを execution 前に確認できる形にする。
+
+`src/spec_dock/assets/spec_dock/system/active-none/issue/report.md` は placeholder であり canonical report template ではない。ただし、missing / stale previous reviewer pass の failure mode が `Spec Authoring Gate` または reviewer evidence に戻ることを示す reference guidance を保つ。
+
 ## 依存関係分析
 
 ### module / file dependency
 
 - Template changes are upstream of docs and skill examples.
 - Workflow docs define the phase and authority rules used by skills.
+- Issue planning / execution workflow docs define the user-facing skill interface boundary used by hub and leaf skills.
 - Skill guidance must route to docs rather than redefine long policy.
 - Runtime catalog remains unchanged if no new doc type is added.
 - Tests depend on provider-side asset content and runtime catalog behavior.
@@ -380,7 +435,7 @@ canonical `report.md` template / workflow guidance では、Evidence Adoption Le
 
 1. `templates/discussions/*.md`
 2. `templates/README.md` と `docs/rules/*/discussions.md`
-3. `workflow_spec_authoring.md` / `phase_design.md` / `workflow_issue.md`
+3. `workflow_spec_authoring.md` / `phase_design.md` / `workflow_issue.md` / `workflow_issue_planning.md` / `workflow_issue_execution.md`
 4. `.agents/skills/*/SKILL.md`
 5. tests
 6. dogfooding mirror / validation
@@ -403,7 +458,8 @@ rectangle "requirement.md\n(active issue)" as Req
 rectangle "templates/discussions\ninterview/research/disc/adr" as Templates
 rectangle "templates/README.md\n+ docs/rules/*/discussions.md" as CatalogDocs
 rectangle "workflow docs\nworkflow_spec_authoring\nphase_design\nworkflow_issue" as WorkflowDocs
-rectangle "agent skills\nspec-driven-tdd\nsystem-architect\nimplementation-planner\nissue-execution" as Skills
+rectangle "issue workflow docs\nissue_planning\nissue_execution\numbrella issue" as IssueWorkflowDocs
+rectangle "agent skills\nspec-driven-tdd\nsystem-architect\nimplementation-planner\nissue-planning\nissue-execution" as Skills
 rectangle "runtime new doc catalog\ncommands/application/domain" as Runtime
 rectangle "tests\ninit/update + runtime + delegated-authoring" as Tests
 rectangle "dogfooding spec-dock/" as Dogfood
@@ -411,7 +467,9 @@ rectangle "dogfooding spec-dock/" as Dogfood
 Req --> Templates : defines artifact contracts
 Templates --> CatalogDocs : catalog text must match
 CatalogDocs --> WorkflowDocs : authoring rules reference catalog
-WorkflowDocs --> Skills : skills route to workflow docs
+WorkflowDocs --> IssueWorkflowDocs : shared authoring gate feeds issue planning
+IssueWorkflowDocs --> Skills : skills route to planning/execution docs
+WorkflowDocs --> Skills : skills route to shared authoring docs
 Templates --> Tests : scaffold content assertions
 CatalogDocs --> Tests : catalog/regression assertions
 WorkflowDocs --> Tests : docs contract assertions
@@ -434,6 +492,7 @@ Skills --> Dogfood : installed agent guidance verification
 .
 |-- src/
 |   `-- spec_dock/
+|       |-- cli.py                                      # Modify: managed skill catalog includes issue planning skill
 |       `-- assets/
 |           |-- spec_dock/
 |           |   |-- templates/
@@ -442,34 +501,62 @@ Skills --> Dogfood : installed agent guidance verification
 |           |   |   |   |-- research.md         # Modify: source-grounding / terminology / edge case を追加
 |           |   |   |   |-- disc.md             # Modify: synthesis / reflection proposal / ADR triage を追加
 |           |   |   |   `-- adr.md              # Modify: durable decision / sparing criteria を明確化
+|           |   |   |-- issue/
+|           |   |   |   |-- plan.md             # Modify: Issue workflow / planning / execution 正本参照を同期
+|           |   |   |   `-- report.md           # Modify: Spec Authoring Gate handoff evidence を追加
 |           |   |   `-- README.md             # Modify: common catalog semantics と report 非 catalog を説明
 |           |   |-- docs/
+|           |   |   |-- README.md                  # Modify: Issue planning / execution skill entry を同期
+|           |   |   |-- phase_plan.md              # Modify: Issue workflow 正本分離を同期
+|           |   |   |-- phase_plan_issue.md        # Modify: Issue execution policy 参照先を同期
+|           |   |   |-- authoring/issue-plan.md    # Modify: Issue plan field semantics の workflow 参照を同期
 |           |   |   |-- workflow_spec_authoring.md  # Modify: one-question style / phase gate / evidence adoption を補強
 |           |   |   |-- phase_design.md             # Modify: design phase の clarification handoff を補強
-|           |   |   |-- workflow_issue.md           # Modify: issue workflow 上の質問境界 / cleanup を補強
+|           |   |   |-- workflow_issue.md           # Modify: umbrella として planning / execution 入口を明記
+|           |   |   |-- workflow_issue_planning.md  # Add: Issue 固有の planning / grill / authoring workflow
+|           |   |   |-- workflow_issue_execution.md # Add: approved plan execution / PR / finish workflow
+|           |   |   |-- reference_deps.md           # Modify: execution evidence 参照先を同期
+|           |   |   |-- reference_hard_cutover.md   # Modify: Issue planning / execution policy 参照先を同期
 |           |   |   `-- rules/
 |           |   |       |-- initiative/discussions.md   # Modify: discussion catalog 説明を同期
 |           |   |       |-- epic/discussions.md         # Modify: discussion catalog 説明を同期
 |           |   |       `-- issue/discussions.md        # Modify: discussion catalog 説明を同期
+|           |   |-- system/
+|           |   |   `-- active-none/issue/report.md   # Modify if needed: placeholder failure-mode reference を同期
 |           |   `-- scripts/
 |           |       `-- spec_dock_runtime/             # Read only unless new doc type is introduced
 |           `-- install_root/
-|               `-- .agents/
-|                   `-- skills/
-|                       |-- spec-driven-tdd-workflow/SKILL.md           # Modify: one-question phase gate reminder
-|                       |-- spec-dock-system-architect/SKILL.md        # Modify: question candidate boundary
-|                       |-- spec-dock-implementation-planner/SKILL.md  # Modify: question candidate boundary
-|                       `-- spec-dock-issue-execution/SKILL.md          # Modify: execution/report boundary if needed
+|               |-- .agents/
+|               |   `-- skills/
+|               |       |-- spec-driven-tdd-workflow/SKILL.md           # Modify: one-question phase gate reminder
+|               |       |-- spec-dock-system-architect/SKILL.md        # Modify: question candidate boundary
+|               |       |-- spec-dock-implementation-planner/SKILL.md  # Modify: question candidate boundary and split workflow references
+|               |       |-- spec-dock-codex-adapter/SKILL.md           # Modify: split workflow references
+|               |       |-- spec-dock-copilot-adapter/SKILL.md         # Modify: split workflow references
+|               |       |-- spec-dock-issue-planning/SKILL.md          # Add: Issue authoring / Spec Authoring Gate entry
+|               |       `-- spec-dock-issue-execution/SKILL.md          # Modify: execution-only / planning gap handoff
+|               `-- .codex/
+|               |   |-- AGENTS.md                         # Modify: bootstrap issue workflow references
+|               |   |-- agents/
+|               |   |   |-- spec-manager.toml                # Modify: Issue umbrella / planning / execution routing references
+|               |   |   `-- spec-reviewer.toml             # Modify: source-of-truth routing for planning / execution review
+|               |   `-- prompts/execute-issue.md          # Modify: execution prompt split workflow references
+|               `-- .github/
+|                   `-- agents/spec-manager.agent.md       # Modify: GitHub-hosted manager routing references
 |-- tests/
 |   |-- test_init_update.py                         # Modify: shipped template / docs assertions
+|   |-- cli_runtime/harness.py                      # Modify: shared unsupported doc type expectation
 |   |-- cli_runtime/test_runtime_new_doc_s09.py     # Modify or verify: catalog unchanged
 |   |-- domain_runtime/test_delegated_authoring.py  # Verify: flat discussion draft contract
 |   `-- cli_runtime/test_delegated_authoring.py     # Verify: diff guard contract
 |-- spec-dock/
 |   |-- templates/
-|   `-- docs/                                      # Dogfooding scaffold mirror / validation target after provider changes
-`-- .agents/
-    `-- skills/                                    # Dogfooding installed agent-tooling mirror / validation target
+|   |-- docs/                                      # Dogfooding scaffold mirror / validation target after provider changes
+|   `-- system/active-none/issue/report.md         # Dogfooding active-none placeholder mirror
+|-- .agents/
+|   `-- skills/                                    # Dogfooding installed skill mirror / validation target
+|-- .codex/                                       # Dogfooding installed Codex entrypoint / role config mirror
+`-- .github/agents/spec-manager.agent.md          # Dogfooding installed GitHub manager mirror
 ```
 
 ## 要件 -> 設計マッピング
@@ -492,6 +579,16 @@ Skills --> Dogfood : installed agent guidance verification
   - 外部支援 artifact は通常 evidence として Evidence Adoption Ledger に記録する。ただし外部ツール固有の利用手順は spec-dock 要件 / 設計には含めない。
 - AC-010:
   - 古い複数質問 guidance、重複 template concept、不要な workflow 文言を cleanup 対象として plan に渡す。
+- AC-011:
+  - `spec-dock-issue-planning` skill、`spec-dock-issue-execution` skill、hub routing、workflow docs を分離する。
+  - `src/spec_dock/cli.py` の managed skill catalog は、新規 `spec-dock-issue-planning` skill を install/update 管理対象に含める。ただし runtime discussion doc catalog、CLI command、lifecycle state machine は増やさない。
+  - issue `plan.md` template は `workflow_issue.md` を入口 / handoff の umbrella として扱い、Issue authoring / planning は `workflow_issue_planning.md`、execution / reviewer / completion policy は `workflow_issue_execution.md` へ案内する。
+  - `workflow_issue.md` は互換用 umbrella として残し、詳細を `workflow_issue_planning.md` / `workflow_issue_execution.md` へ route する。
+  - `spec-dock-issue-execution` は planning request を入口にせず、fresh reviewer pass 済み plan と Spec Authoring Gate evidence を実行前提にする。
+  - issue `report.md` template は Spec Authoring Gate を持ち、fresh reviewer pass 済み requirement / design / plan を execution handoff evidence として記録できる。
+  - Codex / GitHub role configs は `workflow_issue.md` を Issue umbrella / route source として扱い、authoring は `workflow_issue_planning.md`、execution / reviewer / completion policy は `workflow_issue_execution.md` へ案内する。
+- EC-006:
+  - execution 中に planning gap が見つかった場合、`workflow_issue_execution.md` と `spec-dock-issue-execution` skill は implementation continuation ではなく planning phase への return / blocked evidence を案内する。
 
 ## テスト戦略
 
@@ -501,6 +598,10 @@ Skills --> Dogfood : installed agent guidance verification
   - discussion template の必須 heading / labels を一問一答形式に更新する。
   - `interview.md` が複数質問ブロック前提でないことを検証する。
   - provider-side assets と installed scaffold の template / docs / skills が期待内容を含むことを検証する。
+  - issue `report.md` template が `Spec Authoring Gate` と requirement / design / plan phase evidence を含むことを検証する。
+  - `spec-dock-issue-planning` skill が install / update で配布されることを検証する。
+  - hub skill が Issue planning と Issue execution を別 route として含むことを検証する。
+  - `spec-dock-issue-execution` が requirement / design / plan authoring の入口ではなく execution-only であることを検証する。
 
 ### runtime catalog regression
 
@@ -553,6 +654,12 @@ Skills --> Dogfood : installed agent guidance verification
 - EC-005:
   - 検証対象: 外部支援 artifact が通常 evidence として Evidence Adoption Ledger に採否記録され、外部ツール固有の操作手順が spec-dock 要件 / 設計に入らないこと。
   - 検証方法: report / workflow docs inspection、spec-reviewer inspection。
+- AC-011:
+  - 検証対象: `spec-dock-issue-planning` と `spec-dock-issue-execution` の skill interface、workflow docs、hub routing が分離されていること。
+  - 検証方法: installed skill content assertion、workflow docs inspection、issue `report.md` template assertion、spec-reviewer inspection。
+- EC-006:
+  - 検証対象: execution 中の planning gap が implementation continuation ではなく planning phase return / blocked evidence へ route されること。
+  - 検証方法: `spec-dock-issue-execution` skill content assertion、`workflow_issue_execution.md` inspection、issue `report.md` failure-mode evidence inspection、spec-reviewer inspection。
 
 ## 移行 / 互換性 / ロールバック
 
@@ -563,12 +670,15 @@ Skills --> Dogfood : installed agent guidance verification
 - `note` retired policy は変えない。
 - delegated-authoring historical artifacts は削除・rename・validation failure 化しない。
 - `new doc` catalog は初期実装では変えない。
+- `spec-dock-issue-execution` を既存入口として覚えている agent / user に対しては、planning request を `spec-dock-issue-planning` へ route する互換 guidance を残す。
+- `workflow_issue.md` は削除せず umbrella として残し、既存参照を壊さない。
 
 移行:
 
 - 新規作成される `interview.md` template だけを一問一答形式へ切り替える。
 - 既存 artifact は自動変換しない。
 - workflow docs / skills では、新規質問は一問一答、既存複数質問 artifact は historical evidence として扱うと明記する。
+- workflow docs / skills では、Issue planning は `spec-dock-issue-planning`、approved plan execution は `spec-dock-issue-execution` へ route すると明記する。
 
 ロールバック:
 
@@ -602,6 +712,9 @@ Skills --> Dogfood : installed agent guidance verification
 - `disc.md` と `report.md` の境界が曖昧だと、未採用 proposal が採用済み evidence と誤読される。
 - `report` を common catalog と表現しすぎると、`new doc report` 追加と誤解される。
 - cleanup が不足すると、古い複数質問 guidance と新しい一問一答 guidance が併存して agent を迷わせる。
+- Issue planning / execution の interface 分離が不十分だと、仕様作成中に premature implementation や PR delivery 文脈が混入する。
+- skill 名が増えることで、`spec-dock-implementation-planner` と `spec-dock-issue-planning` の混同が起きる可能性がある。前者は discussion draft producer、後者は orchestrator-facing Issue authoring entry として区別する。
+- workflow docs 分割により参照更新漏れが起きる可能性があるため、`workflow_issue.md` は umbrella として残し、tests で route 文言を固定する。
 
 ## 未確定事項
 

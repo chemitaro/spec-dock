@@ -1,13 +1,13 @@
 # 課題計画フェーズ playbook（phase playbook: plan / issue）
 
 Issue plan の playbook です。
-shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / execution / reviewer / completion policy は [workflow_issue.md](workflow_issue.md)、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md) を参照します。
+shared axiom は [phase_plan.md](phase_plan.md)、Issue umbrella は [workflow_issue.md](workflow_issue.md)、Issue planning policy は [workflow_issue_planning.md](workflow_issue_planning.md)、Issue execution / reviewer / completion policy は [workflow_issue_execution.md](workflow_issue_execution.md)、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md) を参照します。
 この文書は field-level template manual ではなく、Issue plan をどう設計し、どう review するかに集中します。
 
 ## 範囲契約（scope contract）
 
 - plan の単位: milestone / step / block / behavior slice / quality gate
-- plan の責務: issue requirement / design と `workflow_issue.md` の policy を、依存順に基づく実行順、review / QA / spec gate、docs impact、三者最終品質ゲート（final quality gate）を持つ `plan.md` に変換する
+- plan の責務: issue requirement / design と `workflow_issue_planning.md` / `workflow_issue_execution.md` の policy を、依存順に基づく実行順、review / QA / spec gate、docs impact、三者最終品質ゲート（final quality gate）を持つ `plan.md` に変換する
 - plan は planned contract であり、実装者が step を上から順に実行できる command queue として書く
 - report は observed evidence ledger であり、実行結果、逸脱、discovered tests、reviewer verdict、commit/no-op evidence は `report.md` に残す
 - plan が固定するもの:
@@ -26,7 +26,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 
 ## 作成方針（authoring philosophy）
 
-- `workflow_issue.md` が所有する `1 step = 1 observable behavior` invariant を behavior slice 設計へ落とす
+- `workflow_issue_execution.md` が所有する `1 step = 1 observable behavior` invariant を behavior slice 設計へ落とす
 - `block` は optional concern group とし、単純な step では最小 wrapper 1 個でよい
 - `behavior slice` は 1 つの観測可能な振る舞いを実装・検証・レビューできる単位とする
 - 完成版 Issue plan には仕様固定クロージャ索引（`Spec-Locked Closure Index`）を置き、仕様由来の `spec link`、`locked expectation`、`observable input/state`、`bug class guarded`、`required`、`evidence level`、closure owner step を固定する
@@ -42,7 +42,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - cleanup が最初から明確で大きい場合は、`bounded implementation batch` / design / 別 step で扱う
 - step 順は `design.md` の `依存関係分析`、`Module Dependency Diagram`、`ディレクトリ / ファイル変更計画` から導き、upstream / prerequisite / lower-dependency から先に置く
 - templates は最小 scaffold であり、Issue 固有の実行順・依存・検証に不要な placeholder は削除してよい
-- cadence、approval policy、reviewer gate mapping、completion policy の正本は `workflow_issue.md` に残し、この文書では plan 本文への埋め込み方だけを扱う
+- cadence、approval policy、reviewer gate mapping、completion policy の正本は `workflow_issue_execution.md` に残し、この文書では plan 本文への埋め込み方だけを扱う
 
 ## スキーマ routing の方針（schema routing）
 
@@ -52,7 +52,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
   - `具体テストケース一覧` の card schema
   - docs-only / inspect-only / manual-required の書き方
   - reviewer fail 条件
-- `workflow_issue.md` が所有するもの:
+- `workflow_issue_execution.md` が所有するもの:
   - lifecycle command
   - execution order
   - parent / delegation invariant
@@ -84,10 +84,10 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）を置く
 - `実装ステップ` を step / block / behavior slice で書く
 - 各 behavior slice の planned obligation、pre-implementation evidence、bounded implementation batch、verification evidence path、report evidence destination、amendment trigger を置く
-- 各 implementation step に `delegation contract` を置き、`workflow_issue.md` の execution policy を再定義せずに worker handoff へ必要な入力、許可範囲、禁止範囲、検証、reviewer focus、停止条件、出力を具体化する
+- 各 implementation step に `delegation contract` を置き、`workflow_issue_execution.md` の execution policy を再定義せずに worker handoff へ必要な入力、許可範囲、禁止範囲、検証、reviewer focus、停止条件、出力を具体化する
 - 各 implementation step に `具体テストケース一覧` を置く。これは完全な test inventory ではなく、step-local obligation と concrete red / characterization / inspect / manual seeds を実装前に固定する欄である
 - `refactor / tidy` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
-- 各 step gate に `step reviewer gate`、`commit gate`、`no-op gate`、`report update` を置き、reviewer は `workflow_issue.md` の mapping に従って選ぶ
+- 各 step gate に `step reviewer gate`、`commit gate`、`no-op gate`、`report update` を置き、reviewer は `workflow_issue_execution.md` の mapping に従って選ぶ
 - `S90 docs 影響解決 / docs 更新（S90 docs impact resolution / docs refresh）` を必須で置く
 - `S99 最終品質ゲート（S99 final quality gate）` を必須で置き、`qa-reviewer` のテスト十分性確認、issue-wide `code-reviewer` の統合 diff review、`spec-reviewer` の要件達成確認を配置する
 - `final exit contract` を置く
@@ -117,7 +117,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / executio
 - 各 implementation step が commit 単位として設計され、`step reviewer gate`、`commit gate`、`no-op gate` を持っている
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
-- report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
+- report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue_execution.md` の実行 contract で確認する
 - AC / EC と step の対応が取れている
 - docs impact と最終品質ゲート（final quality gate）が計画に埋め込まれ、`doc-writer` による必要 docs 更新、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review が追跡できる
 - delegated plan draft を使う場合、lightweight provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる

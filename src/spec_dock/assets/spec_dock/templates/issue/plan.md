@@ -12,7 +12,7 @@ ID: "<ISS_ID>"
 
 # <ISS_ID> <ISS_TITLE> — 実装計画（実行契約 / Execution Contract）
 
-> このテンプレートは最小 scaffold です。`plan.md` は計画済み契約（planned contract）を所有し、実装者が step を上から順に実行できる command queue として書く。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。実行 policy は `workflow_issue.md`、Issue 計画の書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を正本にする。
+> このテンプレートは最小 scaffold です。`plan.md` は計画済み契約（planned contract）を所有し、実装者が step を上から順に実行できる command queue として書く。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。Issue workflow の入口と handoff は `workflow_issue.md`、Issue authoring / planning workflow は `workflow_issue_planning.md`、実行 / reviewer / completion policy は `workflow_issue_execution.md`、Issue 計画の field semantics と書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を正本にする。
 
 ## この計画で満たす要件ID
 - AC:

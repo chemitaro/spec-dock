@@ -12,7 +12,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - Hub: `.agents/skills/spec-driven-tdd-workflow/SKILL.md`
 - Initiative: `.agents/skills/spec-dock-initiative-planning/SKILL.md`
 - Epic: `.agents/skills/spec-dock-epic-planning/SKILL.md`
-- Issue: `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- Issue planning: `.agents/skills/spec-dock-issue-planning/SKILL.md`
+- Issue execution: `.agents/skills/spec-dock-issue-execution/SKILL.md`
 - ADR: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
 
 ## 読み順
@@ -23,6 +24,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
    - [workflow_initiative.md](workflow_initiative.md)
    - [workflow_epic.md](workflow_epic.md)
    - [workflow_issue.md](workflow_issue.md)
+   - [workflow_issue_planning.md](workflow_issue_planning.md)
+   - [workflow_issue_execution.md](workflow_issue_execution.md)
    - [workflow_adr.md](workflow_adr.md)
 3. phase の shared playbook
    - [phase_requirement.md](phase_requirement.md)
@@ -86,5 +89,5 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `./spec-dock/scripts/spec-dock update [path]` は repo-local self-update path で、target 省略時は current directory を更新する。明示 path を渡すとその managed repo を更新する
 - runtime update は installer update の wrapper であり、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` として実行する。arbitrary source / cache / `--force` option は公開しない
 - update は managed files/docs/templates/scripts/skills の更新であり、`init --force` でも old workspace の in-place migration ツールでもない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
-- Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の正本は `workflow_issue.md`
+- Issue plan は agent-native / behavior-slice based execution contract を持つが、planning policy は `workflow_issue_planning.md`、execution / completion policy は `workflow_issue_execution.md` を正本にする
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

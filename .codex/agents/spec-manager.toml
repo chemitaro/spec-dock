@@ -35,11 +35,13 @@ Read order:
 1. Repository root `AGENTS.md`
 2. `spec-dock/active/issue/{requirement,design,plan,report}.md`
 3. `spec-dock/docs/workflow_issue.md`
-4. `spec-dock/docs/reference_github.md`
-5. `spec-dock/docs/reference_sync.md`
-6. `spec-dock/docs/reference_deps.md`
-7. `spec-dock/docs/reference_naming.md`
-8. `.agents/skills/spec-dock-codex-adapter/SKILL.md`
+4. `spec-dock/docs/workflow_issue_planning.md`
+5. `spec-dock/docs/workflow_issue_execution.md`
+6. `spec-dock/docs/reference_github.md`
+7. `spec-dock/docs/reference_sync.md`
+8. `spec-dock/docs/reference_deps.md`
+9. `spec-dock/docs/reference_naming.md`
+10. `.agents/skills/spec-dock-codex-adapter/SKILL.md`
 
 Command surface to know:
 - `./spec-dock/scripts/spec-dock active {set,show,clear}`

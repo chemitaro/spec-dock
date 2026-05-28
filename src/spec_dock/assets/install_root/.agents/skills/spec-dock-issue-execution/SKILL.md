@@ -1,13 +1,16 @@
 ---
 name: spec-dock-issue-execution
-description: Execute an active spec-dock issue while keeping spec-dock/docs/workflow_issue.md as the source of truth.
+description: Execute an active spec-dock issue after fresh planning approval; route authoring gaps back to issue planning.
 ---
 
 # Spec-Dock Issue Execution
 
-Use `spec-dock/docs/workflow_issue.md` as the source of truth. This skill is only a concise reminder for issue execution.
+Use `spec-dock/docs/workflow_issue_execution.md` as the source of truth. `spec-dock/docs/workflow_issue.md` is the umbrella route, and `spec-dock/docs/workflow_issue_planning.md` owns Issue authoring.
 
 - Keep the parent agent responsible for orchestration, context, acceptance evidence, and final closure. Delegates may implement bounded tasks, but they do not own the issue.
+- Before implementation, confirm fresh `spec-reviewer` pass evidence for `requirement.md`, `design.md`, and `plan.md`, plus active `report.md` Spec Authoring Gate evidence.
+- If the request is to create/update `requirement.md`, `design.md`, or `plan.md`, route to `spec-dock-issue-planning`; do not continue as execution.
+- If execution reveals a requirement / design / plan gap, stale reviewer pass, missing Spec Authoring Gate evidence, or unresolved specification decision, stop implementation and route back to planning with blocked / incomplete evidence.
 - Preserve parent invariants before, during, and after delegated work: active issue context, allowed paths, acceptance criteria, reviewer requirements, and stop conditions remain the parent agent's responsibility.
 - Treat `plan.md` as the planned executable workflow contract / command queue. Execute each implementation step through its behavior goal, planned obligation, Red or justified alternative evidence, implementation scope, Green verification, refactor guardrail, closure requirements, report evidence destination, and amendment trigger.
 - Treat `report.md` as the observed evidence ledger for actual Red / Green / Refactor results, verification output, discovered tests, closure delta, reviewer verdicts, and commit/no-op evidence.
@@ -15,12 +18,12 @@ Use `spec-dock/docs/workflow_issue.md` as the source of truth. This skill is onl
 - Require delegated workers to return a `Ledger Note` when they encounter material interpretation, decision, deviation, tradeoff, open question, or follow-up. The minimum fields are `source-agent`, `topic`, `trigger`, `ambiguity / constraint`, `observed facts`, `options considered`, `proposed decision`, `rationale`, `affected files`, `affected tests`, `risk if wrong`, `rollback or revisit`, `confidence`, and `needs orchestrator decision`.
 - Require workers with no material decision to state `No material implementation decisions beyond the approved plan.` A worker `proposed decision` is not an accepted decision; the parent orchestrator must integrate, reject, defer, supersede, or promote it in the canonical report ledger.
 - Before completion, ensure ledger entries have no `Status=open`; each resolved / superseded entry has disposition evidence, required follow-up / promotion evidence, and no report-only durable decision.
-- Route step field semantics, `具体テストケース一覧`, obligation coverage, alternative evidence paths, and amendment rules to `spec-dock/docs/authoring/issue-plan.md`; keep lifecycle and completion policy in `spec-dock/docs/workflow_issue.md`.
+- Route step field semantics, `具体テストケース一覧`, obligation coverage, alternative evidence paths, and amendment rules to `spec-dock/docs/authoring/issue-plan.md`; keep execution policy in `spec-dock/docs/workflow_issue_execution.md`.
 - Route runtime, tests, and scaffold behavior to `dev-coder`.
 - Route shipped docs, templates, skills, and workflow text to `doc-writer`.
 - Treat unavailable tooling, denied access, host conflicts, waiver requests, and similar blockers as stop/incomplete unless explicit workflow policy evidence says they count as success.
 - When review fails, perform bounded delegated follow-up and rerun review. Parent direct fixes require a documented Parent Implementation Exception.
-- After final commit gates pass, use `github-pr-merge-preparer` for final PR delivery and merge-preparation evidence before `issue finish`; keep the detailed completion policy in `workflow_issue.md`.
+- After final commit gates pass, use `github-pr-merge-preparer` for final PR delivery and merge-preparation evidence before `issue finish`; keep the detailed execution / completion policy in `workflow_issue_execution.md`.
 
 ## Runtime Command Reminders
 
@@ -32,4 +35,4 @@ Use `spec-dock/docs/workflow_issue.md` as the source of truth. This skill is onl
 - Evidence commands include `validate` and `sync`: `./spec-dock/scripts/spec-dock validate` and `./spec-dock/scripts/spec-dock sync`.
 - Use `--no-github` only for explicit cache/local verification without GitHub calls.
 
-Do not copy the full workflow here; update `workflow_issue.md` when execution policy changes.
+Do not copy the full workflow here; update `workflow_issue_execution.md` when execution policy changes. Update `workflow_issue.md` only for route / handoff / scope-out changes.

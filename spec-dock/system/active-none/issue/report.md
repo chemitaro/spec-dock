@@ -16,6 +16,8 @@
 - 禁止 wildcard token: `*`, `grants.*`, `all`
 - historical note: 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
+- Spec Authoring Gate fields: phase, artifact, reviewer, freshness, state, investigated facts, promotion / completion decision, notes.
+- Issue execution handoff requires fresh reviewer pass evidence for `requirement.md`, `design.md`, and `plan.md`; missing / stale previous reviewer pass returns to planning and is not implementation readiness.
 - Promotion Record / `promotion_record` fields: `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision`
 - `reviewer_target_hash` / `approved_hash` の不一致、または stale な `source_revision` / `approved_revision` は promotion と下流 authority をブロックする。
 - failure-mode field: expected verdict, allowed next action, report evidence path, promotion eligibility

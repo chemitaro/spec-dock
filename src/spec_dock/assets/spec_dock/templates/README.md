@@ -20,11 +20,13 @@
 - `doc_id` は slugless identity（`<ts>-<kind>` / `<ts>-<nn>-<kind>`）で、filename stem は `<doc_id>-<slug>` です。
 - `discussions/` 配下の allocation は valid timestamp-contract files を対象にし、unrelated files（例: `rules.md`, `README.md`）は無視されます。
 - legacy sequential discussion docs（`<nnn>-<kind>-<slug>.md`）は grandfathered artifact として許容されますが、自動 rename や basename 再利用はしません。
+- 既存の複数質問 `interview` artifact は grandfathered として扱います。新規の正式ヒアリングは一問一答の `interview` を使い、回答後に同じ file を完成 record にします。
 - ただし discussion-doc intent を持つ malformed basename は explicit failure です（例: `foo-adr-kickoff.md`, `bogus-01-adr-kickoff.md`, `20260329x-adr-kickoff.md`）。
 - same-second collision suffix が `99` まで埋まった場合は失敗します。follow-up issue で archive または contract 拡張を判断してください。
 - 生成後のファイルは自由に編集して構いません（テンプレは雛形）。
 - authority は通常 doc type から推定します。例外時だけ front matter の `authority` で override し、全 artifact に明示必須化しません。
-- discussion docs は作業面です。必要な文脈だけを新しい `adr`、または `requirement.md` / `design.md` / `plan.md` へ反映します。
+- discussion docs は作業面です。`research` は sources / facts / inference / unverified / terms / edge cases / implications を分け、`disc` は synthesis / reflection proposal / ADR candidate triage を扱います。必要な文脈だけを新しい `adr`、または `requirement.md` / `design.md` / `plan.md` へ反映します。
+- `report.md` は issue / epic / initiative の canonical observed evidence ledger であり、`new doc report` の discussion catalog には含めません。採否確定や canonical docs への反映証跡は `report.md` の Evidence Adoption Ledger などに記録します。
 - 命名規則は **全て小文字**（macOS のケース非区別FS対策）。
 - `new/import {initiative,epic,issue}` の `--slug` は kebab-case（小文字英数字 + `-`）です。`--slug` 省略時は `--title` から合成されます（詳細は `spec-dock/docs/reference_naming.md`）。
 - 各ノードの子スコープ配下には canonical guidance への `rules.md` symlink が含まれます（例: `epics/rules.md`, `issues/rules.md`, `discussions/rules.md`）。`rules.md` は入口/ナビゲーション用です。
