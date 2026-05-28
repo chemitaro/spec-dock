@@ -86,6 +86,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-20260529-002 | adopted | sub-agent `doc-writer` | provider docs / installed skills / report templates | S03/S04 worker output created first-class clarification workflow / skill and kept issue handoff bounded. | `src/spec_dock/assets/spec_dock/docs/workflow_clarification.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md`; related workflow/rules/skill docs | none |
 | EAL-20260529-003 | adopted | sub-agent `repo-analyst` | test strategy | S05 recommendations identified focused contract tests and runtime catalog negative guard; implementation adopted them without changing production catalog. | `tests/test_init_update.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py`; `tests/cli_runtime/harness.py` | none |
 | EAL-20260529-004 | adopted | command | validation evidence | Focused, broad, and full discovery regression commands passed after provider and dogfooding mirror updates. | `python -m unittest tests.test_init_update -v`; `python -m unittest discover -v`; `python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 -v`; delegated-authoring unittest commands; `./spec-dock/scripts/spec-dock validate`; `./spec-dock/scripts/spec-dock sync`; `git diff --check` | final reviewer gates |
+| EAL-20260529-005 | adopted | GitHub Actions `Provider CI` | CI failure follow-up | Push-triggered Provider CI exposed a Linux cleanup race in the runtime test harness after `python -m unittest discover -v`; the harness now disables Git auto gc / maintenance for fixture repos and local targeted/full regression passed. | `gh run view 26594975540 --log-failed`; `tests/cli_runtime/harness.py`; `python -m unittest tests.cli_runtime.test_active.TestCliActive.test_active_set_github_issue_number_requires_linked_node -v`; `python -m unittest tests.cli_runtime.test_active -v`; `python -m unittest discover -v` | push updated PR branch and re-check CI |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -218,6 +219,7 @@ git diff --check
 | S05 | `report` / `reflection` が discussion doc type に追加される regression | repo-analyst / implementation | unsupported doc type negative test を追加 | cl-007 | no | `tests/cli_runtime/test_runtime_new_doc_s09.py` |
 | S06 | dogfooding mirror と root `.agents` が provider changes に対して stale | full regression test | `uv run python -m spec_dock.cli update .` で同期 | cl-008 | no | `tests.test_init_update` |
 | S90 | report templates の英語 primary table labels が scaffold policy test に抵触 | full regression test | Japanese primary labels に修正 | cl-006 | no | `test_spec_document_templates_keep_policy_out_of_scaffold` |
+| PR CI | GitHub Actions Provider CI で `.git` cleanup race が発生 | push-triggered Provider CI | test fixture repo で Git auto gc / maintenance を無効化 | ci-001 | no | `gh run view 26594975540 --log-failed`; local targeted test / `tests.cli_runtime.test_active` / full discovery pass |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -311,7 +313,7 @@ git diff --check
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01-S99 | ready before commit | issue-wide clarification workflow changes | pending final commit | pending post-commit check | not applicable | not applicable | `git diff --check` pass | `git status --short` inspected |
+| S01-S99 | committed | issue-wide clarification workflow changes plus CI harness stabilization | PR branch commits; latest head verified by PR checks | post-commit clean check required after final push | not applicable | not applicable | `git diff --check` pass | `git status --short` inspected |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/templates/discussions/*.md` - discussion template semantics
@@ -323,7 +325,8 @@ git diff --check
 - `spec-dock/**`, `.agents/skills/**` - dogfooding mirror / root skill mirror
 
 #### コミット
-- pending
+- Initial implementation commit: `8aa77a183fa13efd7730b4705bbe8ed3145d101e`
+- Follow-up CI harness stabilization commit: included in final PR branch after GitHub Actions Provider CI failure investigation.
 
 #### メモ
 - runtime discussion doc type catalog production code は変更していない。
@@ -358,12 +361,14 @@ git diff --check
 ## 遭遇した問題と解決 (任意)
 - 問題: final QA / spec review が report closure placeholders と premature pass を P1 として指摘した。
   - 解決: S01-S06/S90/S99 の Step Contract Closure、Test Contract Closure、Closure Coverage、Final Quality Gate を実証跡へ更新し、final pass は re-review pending に戻した。
+- 問題: PR 作成後の push-triggered Provider CI が Linux runner で `TemporaryDirectory` cleanup 時に `.git` が残る race を検出した。
+  - 解決: runtime test harness の fixture repo 初期化時に `gc.auto=0` と `maintenance.auto=false` を設定し、対象単体テスト、`tests.cli_runtime.test_active`、`python -m unittest discover -v` を再実行して pass を確認した。
 
 ## 学んだこと (任意)
 - report gate は実装差分が通っていても completion blocker になるため、final review 前に placeholder を残さない。
 
 ## 今後の推奨事項 (任意)
-- reviewer gate pass 後に final commit / PR evidence を追記する。
+- PR branch push 後の GitHub Actions Provider CI / CI の最終状態を確認する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
