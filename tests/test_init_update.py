@@ -46,22 +46,23 @@ _ISS_00031_EXCLUDE_PATTERNS = (
 )
 
 _INTERVIEW_REQUIRED_LABELS = (
-    "質問主題",
+    "正式質問として扱う理由",
+    "質問の目的",
+    "質問",
+    "source-grounded context",
     "回答してほしいこと",
-    "なぜ質問するのか",
-    "背景",
-    "詳細説明",
-    "事前分析",
     "回答案",
-    "選択肢比較",
-    "メリット",
-    "デメリット",
+    "Codex の分析",
+    "Codex の推奨案",
+    "ユーザー回答",
+    "追加確認の要否",
+    "採用判断",
+    "requirement / design / plan / ADR への含意",
+    "PlantUML 図",
+    "詳細 tradeoff",
+    "具体シナリオ / edge case",
+    "後続 reflection proposal",
     "リスク",
-    "ベストプラクティス分析",
-    "推奨案",
-    "未回答時の影響",
-    "回答欄",
-    "回答後フォローアップ",
 )
 
 _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
@@ -289,6 +290,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/workflow_spec_authoring.md": (
             "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
         ),
+        "spec-dock/docs/workflow_clarification.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_clarification.md"
+        ),
         "spec-dock/docs/authoring/issue-plan.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"
         ),
@@ -328,6 +332,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-clarification/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md"
         ),
         ".agents/skills/spec-dock-system-architect/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md"
@@ -642,6 +649,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-clarification/SKILL.md",
         ".agents/skills/spec-dock-system-architect/SKILL.md",
         ".agents/skills/spec-dock-implementation-planner/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
@@ -701,6 +709,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-clarification/SKILL.md",
             ".agents/skills/spec-dock-system-architect/SKILL.md",
             ".agents/skills/spec-dock-implementation-planner/SKILL.md",
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
@@ -801,6 +810,14 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
+            ),
+        },
+        "spec-dock-clarification skill": {
+            "search_globs": (
+                "**/spec-dock-clarification/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md",
             ),
         },
         "spec-dock-system-architect skill": {
@@ -1016,6 +1033,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00102-agentic-tdd-plan-step-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1111,6 +1129,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00102-agentic-tdd-plan-step-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00103-agentic-tdd-report-decision-ledger/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00105-pr-creation-and-merge-ready-monitoring-skill/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00134-matt-pocock-grill-skill-review-patterns/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -2857,11 +2876,13 @@ class TestInitUpdate(CliRuntimeHarness):
 
             docs_readme = (docs_dir / "README.md").read_text(encoding="utf-8")
             self.assertIn("spec-driven-tdd-workflow", docs_readme)
+            self.assertIn("spec-dock-clarification", docs_readme)
             self.assertIn("spec-dock-initiative-planning", docs_readme)
             self.assertIn("spec-dock-epic-planning", docs_readme)
             self.assertIn("spec-dock-issue-execution", docs_readme)
             self.assertIn("spec-dock-adr-facilitation", docs_readme)
             self.assertIn("reference レイヤ", docs_readme)
+            self.assertIn("[workflow_clarification.md](workflow_clarification.md)", docs_readme)
             self.assertIn("[workflow_spec_authoring.md](workflow_spec_authoring.md)", docs_readme)
             self.assertIn("[phase_requirement.md](phase_requirement.md)", docs_readme)
             self.assertIn("[phase_design.md](phase_design.md)", docs_readme)
@@ -2869,6 +2890,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
             guide_text = (docs_dir / "guide.md").read_text(encoding="utf-8")
             self.assertIn("phase playbook（共通の作り方）", guide_text)
+            self.assertIn("[workflow_clarification.md](workflow_clarification.md)", guide_text)
             self.assertIn("[workflow_spec_authoring.md](workflow_spec_authoring.md)", guide_text)
             self.assertIn("[phase_requirement.md](phase_requirement.md)", guide_text)
             self.assertIn("[phase_design.md](phase_design.md)", guide_text)
@@ -9974,6 +9996,167 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 with self.subTest(asset=label, fragment=fragment):
                     self.assertIn(fragment, text)
 
+    def test_issue_134_clarification_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            spec_dock_assets = assets_dir / "spec_dock"
+            install_root = assets_dir / "install_root"
+            asset_paths = {
+                "workflow clarification": spec_dock_assets / "docs" / "workflow_clarification.md",
+                "workflow authoring": spec_dock_assets / "docs" / "workflow_spec_authoring.md",
+                "workflow issue": spec_dock_assets / "docs" / "workflow_issue.md",
+                "templates readme": spec_dock_assets / "templates" / "README.md",
+                "issue discussions rules": spec_dock_assets / "docs" / "rules" / "issue" / "discussions.md",
+                "interview template": spec_dock_assets / "templates" / "discussions" / "interview.md",
+                "research template": spec_dock_assets / "templates" / "discussions" / "research.md",
+                "disc template": spec_dock_assets / "templates" / "discussions" / "disc.md",
+                "adr template": spec_dock_assets / "templates" / "discussions" / "adr.md",
+                "issue report template": spec_dock_assets / "templates" / "issue" / "report.md",
+                "epic report template": spec_dock_assets / "templates" / "epic" / "report.md",
+                "initiative report template": spec_dock_assets / "templates" / "initiative" / "report.md",
+                "clarification skill": install_root
+                / ".agents"
+                / "skills"
+                / "spec-dock-clarification"
+                / "SKILL.md",
+                "system architect skill": install_root
+                / ".agents"
+                / "skills"
+                / "spec-dock-system-architect"
+                / "SKILL.md",
+                "implementation planner skill": install_root
+                / ".agents"
+                / "skills"
+                / "spec-dock-implementation-planner"
+                / "SKILL.md",
+                "issue execution skill": install_root
+                / ".agents"
+                / "skills"
+                / "spec-dock-issue-execution"
+                / "SKILL.md",
+            }
+            texts = {label: path.read_text(encoding="utf-8") for label, path in asset_paths.items()}
+            discussions_dir = spec_dock_assets / "templates" / "discussions"
+
+        self.assertFalse((discussions_dir / "report.md").exists())
+        self.assertFalse((discussions_dir / "reflection.md").exists())
+        self.assertFalse((discussions_dir / "clarification-interview.md").exists())
+        self.assertFalse((discussions_dir / "grill-interview.md").exists())
+
+        expected_fragments = {
+            "workflow clarification": (
+                "first-class entrypoint",
+                "source-grounded read",
+                "decision tree traversal",
+                "一問ずつ",
+                "domain language",
+                "concrete scenario",
+                "code / docs cross-check",
+                "docs synthesis",
+                "ADR は sparingly",
+                "analysis-only mode",
+                "authoring mode",
+                "Issue planning / execution split",
+                "headline deliverable にしない",
+            ),
+            "clarification skill": (
+                "spec-dock/docs/workflow_clarification.md",
+                "source-grounded questions",
+                "at most one essential question",
+                "unanswered `interview` artifact",
+                "Evidence Adoption Ledger / Objective Alignment Ledger / Spec Authoring Gate",
+                "Specialist agents return question candidates to the orchestrator",
+            ),
+            "interview template": (
+                "status: \"unanswered | answered | superseded | deferred\"",
+                "authority: \"proposed | user-approved | synthesized\"",
+                "adoption_status: \"unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked\"",
+                "一つの `interview` artifact には一つの本質的な質問だけを書く",
+                "## source-grounded context (必須)",
+                "## Codex の推奨案 (必須)",
+                "## ユーザー回答 (回答後に必須)",
+                "## 追加確認の要否 (回答後に必須)",
+                "## 採用判断 (回答後に必須)",
+                "## requirement / design / plan / ADR への含意 (回答後に必須)",
+            ),
+            "research template": (
+                "facts / 観測できた事実",
+                "inference / 推測",
+                "unverified / 未検証事項",
+                "terminology conflicts / 用語衝突",
+                "edge cases / 具体シナリオ",
+                "local context で解ける疑問は人間に聞かず",
+            ),
+            "disc template": (
+                "意思決定前の synthesis",
+                "derived question sheets / research",
+                "reflection proposal",
+                "ADR candidate triage",
+                "推奨反映先",
+                "未採用 / deferred 理由",
+                "observed evidence ledger ではない",
+            ),
+            "adr template": (
+                "ADR は sparingly",
+                "hard to reverse",
+                "surprising without context",
+                "real tradeoff",
+                "ADR 化しない場合の反映先",
+            ),
+            "templates readme": (
+                "`report.md` は initiative / epic / issue の canonical observed evidence ledger",
+                "`new doc report` として作成する discussion catalog には含めません",
+            ),
+            "issue discussions rules": (
+                "Canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
+                "`report.md` は canonical observed evidence ledger",
+                "`new doc report` として作成する discussion catalog には含めません",
+            ),
+            "workflow authoring": (
+                "workflow_clarification.md",
+                "一問ずつヒアリングする",
+                "formal question trigger",
+            ),
+            "workflow issue": (
+                "workflow_clarification.md",
+                "unresolved spec gap",
+                "Issue planning / execution split や PR / finish lifecycle の再設計で gap を吸収しない",
+            ),
+            "system architect skill": (
+                "Do not ask the user directly",
+                "return clarification question candidates",
+            ),
+            "implementation planner skill": (
+                "Do not ask the user directly",
+                "return clarification question candidates",
+            ),
+            "issue execution skill": (
+                "workflow_clarification.md",
+                "unresolved spec gap",
+            ),
+        }
+        for label, fragments in expected_fragments.items():
+            text = texts[label]
+            for fragment in fragments:
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+
+        for label in ("issue report template", "epic report template", "initiative report template"):
+            text = texts[label]
+            for fragment in (
+                "Objective Alignment Ledger",
+                "primary objective evidence",
+                "secondary requirement evidence",
+                "inversion risk",
+                "reviewer verdict",
+                "Evidence Adoption Ledger",
+                "Spec Authoring Gate",
+            ):
+                with self.subTest(asset=label, fragment=fragment):
+                    self.assertIn(fragment, text)
+            self.assertNotIn("new doc report", text)
+
     def test_issue_116_delegated_authoring_phase_gate_contract_assets(self) -> None:
         import spec_dock.cli as cli
 
@@ -10164,6 +10347,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
+            clarification_text = (skills_dir / "spec-dock-clarification" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
             system_architect_text = (skills_dir / "spec-dock-system-architect" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -10191,6 +10377,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text,
         )
         self.assertIn(
+            "`spec-dock-clarification`: first-class docs-aware clarification workflow",
+            hub_text,
+        )
+        self.assertIn(
             "`spec-dock-system-architect`: delegated architecture analysis and draft design evidence written as scope-local flat `discussions/<ts>-<kind>-<slug>.md` Markdown. Canonical docs remain main-orchestrator-only.",
             hub_text,
         )
@@ -10215,12 +10405,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
         self.assertIn("thin", copilot_adapter_text.lower())
 
-        for skill_text in (hub_text, issue_text, codex_adapter_text, copilot_adapter_text):
+        for skill_text in (issue_text, clarification_text, codex_adapter_text, copilot_adapter_text):
             if "./spec-dock/scripts/spec-dock" not in skill_text:
-                self.assertIn("spec-dock/docs/workflow_issue.md as the source of truth", skill_text)
+                self.assertTrue(
+                    "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text
+                    or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text
+                )
             else:
                 self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
             self.assertNotIn("./spec ", skill_text)
+        self.assertNotIn("./spec ", hub_text)
 
         for fragment in (
             "spec-dock/docs/workflow_issue.md as the source of truth",
