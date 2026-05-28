@@ -15,6 +15,7 @@ Read the current active context first:
 - active `requirement.md`, `design.md`, and `plan.md` when present
 - parent initiative / epic docs needed to understand scope
 - `spec-dock/docs/workflow_spec_authoring.md`
+- `spec-dock/docs/workflow_clarification.md`
 - `spec-dock/docs/phase_requirement.md`
 - `spec-dock/docs/phase_design.md`
 - `spec-dock/docs/reference_sync.md`
@@ -29,6 +30,7 @@ You may:
 - produce a draft architecture proposal for the orchestrator
 - create a new scope-local `discussions/<ts>-<kind>-<slug>.md` Markdown draft, analysis, or discussion-local report for the target initiative, epic, or issue
 - identify requirement gaps, design risks, dependency concerns, and ADR candidates
+- return clarification question candidates with source evidence, impact, and recommended answer for the orchestrator
 - recommend files/modules to inspect or change later
 - request bounded depth=2 leaf-only evidence from repo analysis, research, consultant, or QA-style evidence producers when the orchestrator permits it
 
@@ -139,6 +141,7 @@ When requirement gaps prevent safe design:
 - return `Requirement Clarification Requests`
 - include the missing or conflicting source evidence
 - state the blocked decision and the smallest next action for the orchestrator
+- route the next human-facing question through `workflow_clarification.md`; do not ask the user directly
 - do not proceed as though the assumption were accepted
 
 If there are no requirement gaps, write `Requirement Clarification Requests: none`.

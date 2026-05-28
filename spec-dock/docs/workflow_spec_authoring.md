@@ -7,6 +7,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 総合: [guide.md](guide.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - Phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
+- Clarification workflow: [workflow_clarification.md](workflow_clarification.md)
 
 ## 基本契約
 
@@ -18,7 +19,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - `provisional` は orchestrator self-check の記録であり、`spec-reviewer` の代替ではない。
 - reviewer が missing / stale / failed / unavailable / denied / waived / provisional の場合は、phase promotion を block または incomplete として扱う。degraded mode を reviewer gate の degraded success として扱ってはならない。
 - 調査で解消できる不明点をユーザー質問で代替しない。先に docs / code / ADR / discussions / 外部一次情報を確認する。
-- 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、次 phase へ進む前にユーザーへヒアリングする。
+- 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、[workflow_clarification.md](workflow_clarification.md) に従い、次 phase へ進む前に orchestrator が一問ずつヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 
 ## 権限境界（Authority boundary / Promotion Record）
@@ -132,7 +133,7 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 1. 対象 scope と既存 node を確認する。
 2. 対象 artifact に対応する `docs/authoring/<scope>-<phase>.md` がある場合は最初に読む。
 3. 対象 scope の `workflow_*.md` と phase playbook を読む。
-4. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。raw capture は `scratch`、人間への質問は `interview`、事実調査は `research`、論点整理は `disc`、長期判断は `adr` を使う。
+4. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。raw capture は `scratch`、人間への正式質問は一問一答の `interview`、事実調査は `research`、論点整理 / synthesis は `disc`、長期判断は `adr` を使う。formal question trigger と lightweight chat question の境界は `workflow_clarification.md` を正本にする。
 5. 対象 artifact を更新する。
 6. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
 7. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
@@ -174,6 +175,7 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 - phase: `requirement` / `design` / `plan`
 - investigated facts: 確認した docs / code / ADR / discussions / 外部一次情報
 - open questions: 未確定事項、ユーザー質問、回答
+- clarification evidence: source-grounded read、formal `interview` path、lightweight chat question の扱い、採用 / 非採用判断
 - delegation consent: scope、named roles、source、boundary、expires / invalidation condition
 - reviewer: fresh `spec-reviewer` の実行単位と review scope
 - verdict: `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` と理由。`passed` 以外は reviewer gate pass ではない
