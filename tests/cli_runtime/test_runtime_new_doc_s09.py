@@ -388,6 +388,28 @@ class TestRuntimeNewDocS09(unittest.TestCase):
                 self.assertIn(f"type={doc_type}", content)
                 self.assertIn(f"id={expected_ids[doc_type]}", content)
 
+    def test_report_and_reflection_are_not_creatable_discussion_doc_types(self) -> None:
+        _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            for doc_type in ("report", "reflection"):
+                with self.subTest(doc_type=doc_type):
+                    with self.assertRaisesRegex(RuntimeError, f"Unknown discussion doc type: {doc_type}"):
+                        app_create_node.create_discussion_doc(
+                            app_contracts.CreateDiscussionDocRequest(
+                                doc_type=doc_type,
+                                scope_node_id="iss-local-00001",
+                                title=f"{doc_type} title",
+                                slug=None,
+                            ),
+                            ports,
+                        )
+
     def test_draft_doc_types_render_scope_specific_template_bodies(self) -> None:
         _runtime_app, app_contracts, app_create_node, app_ports, _new_commands, infra_contracts, _presentation_cli_text = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
