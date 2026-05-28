@@ -52,6 +52,8 @@ class CliRuntimeHarness(unittest.TestCase):
         if shutil.which("git") is None:
             self.skipTest("git not available")
         self._run_git(target, ["init"])
+        self._run_git(target, ["config", "gc.auto", "0"])
+        self._run_git(target, ["config", "maintenance.auto", "false"])
         origin_url = f"https://github.com/{owner}/{repo}.git"
         current = self._run_git(target, ["remote", "get-url", "origin"], check=False)
         if current.returncode == 0:
