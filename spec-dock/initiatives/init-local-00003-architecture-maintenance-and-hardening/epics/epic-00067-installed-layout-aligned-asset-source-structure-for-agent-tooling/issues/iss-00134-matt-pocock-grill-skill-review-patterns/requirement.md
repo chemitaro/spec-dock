@@ -26,6 +26,9 @@ derived_from:
   - "discussions/20260528t034100z-interview-question-sheet-required-fields.md"
   - "discussions/20260528t034302z-interview-question-sheet-lifecycle-status.md"
   - "discussions/20260528t035117z-disc-deep-consultant-template-workflow-followup.md"
+  - "discussions/20260528t040240z-disc-cleanup-and-simplification-requirement.md"
+  - "discussions/20260528t041343z-disc-consultant-grill-essence-integration-review.md"
+  - "discussions/20260528t041831z-disc-consultant-requirement-update-proposal.md"
 ---
 
 # iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 要件定義
@@ -65,7 +68,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 
 - 一問ずつユーザーに確認する clarification workflow を定義する。
 - 質問前に、未回答の質問シートを `discussions/` に作成する。
-- 質問シートには、質問の目的、質問内容、回答候補、Codex の分析、Codex の推奨案、PlantUML 図を含める。
+- 質問シートには、質問の目的、質問内容、回答候補、Codex の分析、Codex の推奨案を含める。PlantUML 図、詳細 tradeoff、後続反映案は、質問の性質に応じて理解を助ける場合に含める。
 - PlantUML 図と本文は、日本語話者のユーザーが理解しやすいよう日本語を基本にする。
 - ユーザー回答後、同じ質問シートに回答、採用判断、要件への含意を追記して完成させる。
 - 原則として、一つの質問につき一つのファイルを作成する。
@@ -82,6 +85,8 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 新しい template の追加可否は、独立した lifecycle / status / reflection rule が必要かどうかで判断する。
 - `disc.md` は synthesis / 中間レポート / 上位レポート / reflection proposal を扱い、`report.md` は実際の採否と canonical docs への反映結果を evidence ledger として扱う。
 - reflection 専用 template は初期要件として追加せず、`disc.md` / `report.md` では責務が衝突すると設計で確認された場合だけ追加を検討する。
+- 既存 workflow / template / skill / agent guidance を見直し、今回の方針と矛盾する文言、使われなくなる guidance、重複概念、不要な document / workflow を整理する。
+- agent の context を圧迫し、生産性や挙動を悪化させる documentation bloat を避ける。
 - main workflow では、最終成果物として `requirement.md`、`design.md`、`plan.md` の作成までを含む。
 - skill として利用する場合は、canonical docs 作成を必須にせず、分析レポートや設計ドラフトなどの成果物にも利用できるようにする。
 - 一問一答の質問作法は標準とする。一方で、質問前シート、PlantUML、中間レポートまで含む徹底分析 / artifact-heavy grill workflow の起動条件は設計で具体化する。
@@ -96,6 +101,8 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - unresolved ambiguity を、確定済みの要件・設計・計画として canonical docs に書くこと。
 - discussion artifact を、採用判断なしに canonical source of truth として扱うこと。
 - 質問をまとめて大量に投げ、ユーザーに一括回答を求めること。
+- 新しい workflow / template / skill guidance と矛盾する古い文言や不要 guidance を残したままにすること。
+- 似た template や似た workflow を重複して増やし、agent がどれを使うべきか迷う状態にすること。
 - 外部ツール固有の操作手順や責務を、spec-dock の要件として定義すること。
 
 ### 対象外
@@ -111,6 +118,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - 既存の active issue / parent epic / parent initiative docs を確認する。
 - issue-local `discussions/` と関連 source / tests / templates を確認する。
 - local context で解ける曖昧さは、ユーザーへ質問する前に解く。
+- 用語、責務境界、domain relationship が曖昧または既存 docs / source と衝突する場合は、既存表現を照合し、必要に応じて具体シナリオや edge case で境界を明確化する。
 - ユーザーに聞く必要がある場合は、質問シートを先に作る。
 - 回答後は、回答内容、採用判断、要件への含意を同じ質問シートに記録する。
 
@@ -118,7 +126,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 
 - 軽微な論点を質問シートから直接 canonical docs へ反映するか。
 - 複数質問にまたがる大きな判断として、中間レポート / 上位レポートを経由するか。
-- ADR candidate として扱うべきか。
+- ADR candidate として扱うべきか。ADR candidate として扱うのは、原則として、後から戻しにくい、将来の読者にとって意外性がある、実質的な tradeoff がある、の三条件を満たす判断に限る。満たさない判断は、質問シート、`disc.md`、または canonical docs への通常反映に留める。
 - requirement / design / plan のどの artifact に反映するか。
 
 ### 行わない
@@ -135,7 +143,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - file path、command、identifier、frontmatter key、class 名などの technical token は必要に応じて英語のまま保持する。
 - 一度にユーザーへ提示する本質的な質問は一つにする。
 - 質問には、Codex の推奨案を添える。
-- 質問前のシートには、ユーザーが回答前に判断できるだけの文脈、選択肢、tradeoff、図を含める。
+- 質問前のシートには、ユーザーが回答前に判断できるだけの文脈、選択肢、tradeoff を含める。図は、判断の構造や境界を理解しやすくする場合に含める。
 - 質問回答 record は、後から追跡できる `discussions/` artifact として保存する。
 - canonical docs への反映は、採用判断を通して行う。
 
@@ -152,7 +160,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - AC-001: source-grounded clarification
   - アクター: orchestrator
   - 前提: issue / epic / initiative の要件、設計、計画に曖昧さがある。
-  - 操作: active docs、parent docs、`discussions/`、関連 source / tests / templates を確認する。
+  - 操作: active docs、parent docs、`discussions/`、関連 source / tests / templates を確認する。用語の衝突、曖昧語、責務境界の不一致がある場合は、具体シナリオや edge case を使って確認する。
   - 期待結果: local context で解決できる疑問はユーザーへ質問せず、未解決の高影響な曖昧さだけを質問候補にする。
   - 観測点: source-grounding research、質問シート、または中間レポートに根拠が記録されている。
 
@@ -188,7 +196,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
   - アクター: orchestrator / 専門 agent
   - 前提: 質問回答 record が十分に積み上がっている。
   - 操作: 軽微な論点は直接 canonical docs へ反映し、大きな判断は中間レポート / 上位レポートを経由する。
-  - 期待結果: ADR candidate、requirement、design、plan への反映経路が追跡できる。
+  - 期待結果: ADR candidate、requirement、design、plan への反映経路が追跡できる。ADR candidate は原則として、後から戻しにくい、将来の読者にとって意外性がある、実質的な tradeoff がある判断に絞られる。
   - 観測点: canonical docs または中間レポートに採用判断と根拠 artifact が残る。
 
 - AC-007: role boundary
@@ -211,6 +219,13 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
   - 操作: 同じ質問シート / record / synthesis の仕組みで、分析レポートや draft を作成する。
   - 期待結果: canonical docs 作成を必須にせず、完全な理解に近づくための skill として利用できる。
   - 観測点: output artifact が目的に応じて analysis report、draft、decision record などになる。
+
+- AC-010: cleanup and simplification
+  - アクター: orchestrator / 専門 agent
+  - 前提: workflow、template、skill、agent guidance を変更する。
+  - 操作: 既存 docs / templates / guidance を見直し、矛盾、重複、不要文言、使われなくなる workflow を整理する。
+  - 期待結果: 新しい方針と古い guidance が併存して agent を迷わせる状態を避ける。
+  - 観測点: design / plan に cleanup 対象と維持する legacy artifact の扱いが明記され、不要な重複 template や不要 guidance が残っていない。
 
 ## 例外・エッジケース
 
@@ -255,7 +270,7 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
   - 既存 docs / source / discussions を踏まえ、未解決の曖昧さを一つずつユーザーに確認して共有理解へ近づける workflow。
 
 - TERM-002: 質問シート
-  - 質問前に作成する `discussions/` artifact。目的、選択肢、分析、推奨案、図、回答欄、採用判断欄を持ち、回答後に同じ file が完成 record になる。
+  - 質問前に作成する `discussions/` artifact。目的、選択肢、分析、推奨案、必要に応じた図、回答欄、採用判断欄を持ち、回答後に同じ file が完成 record になる。
 
 - TERM-003: 中間レポート / 上位レポート
   - 複数の質問シートや research / discussion artifact を束ね、上位概念の分析、意思決定、ADR candidate、canonical docs 反映候補を整理する artifact。
@@ -281,12 +296,15 @@ spec-dock において、質問、回答、分析、採用判断を `discussions
 - `disc.md` に置く reflection proposal と、`report.md` に置く observed adoption ledger の境界。
 - canonical docs への `derived_from` / `reflected_to` 更新規則。
 - ADR candidate triage の詳細条件。
+- 用語 sharpening、責務境界、domain relationship、具体シナリオ / edge case を質問設計や research template にどう表現するか。
 - 既存 skill / agent との責務重複の整理。
 - 標準の一問一答質問と、質問シート / PlantUML / 中間レポートまで含む artifact-heavy workflow の境界。
 - 正式質問シートが必須になる重要質問の判定基準と、軽微な確認の扱い。
 - 正式質問シートの必須 frontmatter、本文 section、条件付き項目。
 - 正式質問シートの `status` / `authority` / `adoption_status` / `reflected_to` の状態遷移。
 - deep consultant が回答できる質問と、人間確認へ戻す質問の判定基準。
+- 既存 workflow / template / skill / agent guidance の cleanup 対象と、残す legacy artifact / grandfathered artifact の扱い。
+- agent の context 圧迫や誤作動につながる重複文言、不要 document、不要 workflow の削減方針。
 
 ## 未確定事項
 
