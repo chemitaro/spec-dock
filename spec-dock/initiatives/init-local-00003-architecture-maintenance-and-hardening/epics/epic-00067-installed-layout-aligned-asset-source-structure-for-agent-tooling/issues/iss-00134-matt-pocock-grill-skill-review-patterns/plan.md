@@ -1,23 +1,24 @@
 ---
 種別: 実装計画書（Issue）
 ID: "iss-00134"
-タイトル: "Matt Pocock grill-style clarification workflow を spec-dock に取り込む"
+タイトル: "docs-aware clarification workflow を spec-dock に取り込む"
 関連GitHub: ["#134"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-28"
+最終更新: "2026-05-29"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00067", "init-local-00003"]
 derived_from:
   - "requirement.md"
   - "design.md"
+  - "discussions/20260528t172725z-disc-clarification-workflow-naming.md"
 ---
 
-# iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 実装計画
+# iss-00134 docs-aware clarification workflow を spec-dock に取り込む — 実装計画
 
 ## 計画サマリー
 
-この計画は、Matt Pocock `grill-me` / `grill-with-docs` の essence を、spec-dock の provider-side templates / docs / skill guidance に統合するための実行契約である。
+この計画は、Matt Pocock の既存パターンから抽出した essence を、`docs-aware clarification workflow` として spec-dock の provider-side templates / docs / skill guidance に統合するための実行契約である。
 
 初期実装では新しい discussion doc type を追加しない。したがって runtime catalog は原則 read-only verification 対象とし、`interview` / `research` / `disc` / `adr` / canonical `report.md` の責務を既存 common template / workflow / skill guidance の中で再設計する。
 
@@ -26,6 +27,7 @@ derived_from:
 ## この計画で満たす要件ID
 
 - AC:
+  - AC-000 primary docs-aware clarification integration
   - AC-001 source-grounded clarification
   - AC-002 one-question-at-a-time
   - AC-003 unanswered question sheet
@@ -36,6 +38,7 @@ derived_from:
   - AC-008 canonical authoring mode
   - AC-009 clarification / analysis mode
   - AC-010 cleanup and simplification
+  - AC-011 no objective inversion
 - EC:
   - EC-001 質問が local context で解ける
   - EC-002 回答が別の未確認事項を生む
@@ -43,10 +46,12 @@ derived_from:
   - EC-004 専門 agent が追加確認を必要とする
   - EC-005 外部支援による artifact が存在する
 - 制約:
+  - docs-aware clarification workflow を first-class workflow として扱う。
   - 一問一答を agent-to-human question の標準にする。
   - formal `interview.md` と lightweight chat question の起動条件を分離する。
   - new doc type を増やさず、既存 common templates を再設計する。
   - canonical docs / `report.md` は main orchestrator authority とする。
+  - Issue planning / execution boundary は、必要な場合でも handoff support に限定し、PR / diff / tests / report の headline にしない。
 
 ## 依存関係から導く実装順序
 
@@ -58,6 +63,7 @@ derived_from:
 
 順序ルール:
 
+- 実装前に S00 Objective Alignment Preflight を行い、主目的 / 副次要件 / 非目的の境界を確認する。
 - provider-side template contract を最初に固定する。
 - catalog / rules docs は template contract に従う。
 - workflow docs と skills は catalog / role boundary を参照する。
@@ -66,8 +72,12 @@ derived_from:
 
 step 依存サマリー:
 
+- S00:
+  - 依存: requirement / design / plan
+  - unblock: S01-S06, S90, S99
+  - 対象: objective alignment / inversion guard
 - S01:
-  - 依存: requirement / design
+  - 依存: S00, requirement / design
   - unblock: S02, S03, S04, S05
   - 対象: `interview.md`
 - S02:
@@ -81,7 +91,7 @@ step 依存サマリー:
 - S04:
   - 依存: S01, S02, S03
   - unblock: S05, S06
-  - 対象: workflow docs / installed skills
+  - 対象: first-class clarification workflow docs / installed skills / bounded issue handoff
 - S05:
   - 依存: S01-S04
   - unblock: S06, S99
@@ -93,12 +103,15 @@ step 依存サマリー:
 
 ## マイルストーン一覧
 
+- M00: objective alignment 固定
+  - 対象 step: S00
+  - 完了条件: docs-aware clarification workflow が first-class workflow として残ること、Issue planning / execution boundary が副次要件として bounded であること、objective inversion の fail 条件が report / review gate に反映されていること。
 - M01: common template contract 固定
   - 対象 step: S01, S02
   - 完了条件: `interview` / `research` / `disc` / `adr` の責務と frontmatter policy が design contract と一致し、new doc type を追加しない方針が保たれている。
-- M02: workflow / skill guidance 固定
+- M02: first-class workflow / skill guidance 固定
   - 対象 step: S03, S04
-  - 完了条件: template catalog、discussion rules、workflow docs、installed skill guidance が、一問一答、orchestrator-owned question routing、source-grounding、external artifact evidence の同じ意味を共有している。
+  - 完了条件: `workflow_clarification.md` と `spec-dock-clarification` が first-class entrypoint として存在し、template catalog、discussion rules、authoring workflow docs、installed skill guidance が、一問一答、orchestrator-owned question routing、source-grounding、external artifact evidence、objective alignment の同じ意味を共有している。
 - M03: regression guard 固定
   - 対象 step: S05
   - 完了条件: changed shipped contracts と runtime catalog unchanged が targeted tests で固定されている。
@@ -111,10 +124,11 @@ step 依存サマリー:
 
 ## ステップ一覧
 
+- S00: Objective Alignment Preflight を行い、主目的 / 副次要件 / 非目的 / inversion guard を固定する。
 - S01: `interview.md` を一問一答の正式質問シートへ再設計する。
 - S02: `research.md` / `disc.md` / `adr.md` の source-grounding / synthesis / ADR triage 契約を再設計する。
 - S03: template catalog と discussion rules を common template semantics に同期する。
-- S04: workflow docs と installed skill guidance を orchestrator-owned one-question workflow に揃える。
+- S04: `workflow_clarification.md` と `spec-dock-clarification` を first-class entrypoint として追加し、workflow docs と installed skill guidance を orchestrator-owned one-question workflow に揃える。
 - S05: changed shipped contracts と runtime catalog unchanged を tests で固定する。
 - S06: dogfooding scaffold mirror と root `.agents/skills` mirror を検証 / 必要時に同期する。
 - S90: docs impact resolution / docs refresh を閉じる。
@@ -122,6 +136,7 @@ step 依存サマリー:
 
 ## 要件 -> ステップ対応
 
+- AC-000 -> S00, S04, S90, S99
 - AC-001 / EC-001 -> S02, S04, S05
 - AC-002 -> S01, S04, S05
 - AC-003 -> S01, S05
@@ -131,6 +146,7 @@ step 依存サマリー:
 - AC-007 / EC-004 -> S04, S05
 - AC-008 / AC-009 -> S03, S04
 - AC-010 -> S01-S06, S90
+- AC-011 -> S00, S04, S05, S90, S99
 - EC-002 -> S01, S04, S05
 - EC-003 -> S02, S03, S05
 - EC-005 -> S03, S04, S05
@@ -139,20 +155,23 @@ step 依存サマリー:
 
 | ID | Step | Slice | Type | Spec link | Locked expectation | Observable input/state | Bug class guarded | Required | Evidence level | Closure evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
+| cl-000 | S00/S04/S90/S99 | primary docs-aware clarification workflow | acceptance | AC-000 | docs-aware clarification workflow が first-class concept として残り、source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、docs synthesis、ADR sparingly が主成果物として説明される | requirement, design, workflow docs, skills, PR description | clarification が質問シート mechanics や issue planning の補助作法に縮退する regression | yes | inspect-only | report Objective Alignment Ledger / Closure Coverage |
 | cl-001 | S02/S04 | source-grounding | acceptance | AC-001, EC-001 | local context で解ける疑問は人間に聞かず、`research` / `disc` に source-grounding を残す | `research.md`, workflow docs, skills | source を読まずに質問する regression | yes | inspect-only | report Step/Test/Closure Coverage |
 | cl-002 | S01/S04 | one-question formal interview | acceptance | AC-002, AC-003, EC-002 | 重要質問は一問一答で、回答前に unanswered `interview.md` を作る | `interview.md`, workflow docs, skills | 複数質問を一括提示する regression | yes | inspect-only | report Step/Test/Closure Coverage |
 | cl-003 | S01 | answered interview completion | acceptance | AC-004 | 回答後は同一 `interview` artifact に回答、採用判断、含意を追記する | `interview.md` | 回答 record が別 file / chat のみになる regression | yes | inspect-only | report Step/Test/Closure Coverage |
 | cl-004 | S02/S03 | synthesis and promotion | acceptance | AC-005, AC-006, EC-003 | `disc.md` が synthesis / reflection proposal / ADR triage を扱い、`report.md` ledger と混同されない | `disc.md`, catalog docs | proposal と observed ledger の混同 | yes | inspect-only | report Step/Test/Closure Coverage |
 | cl-005 | S04 | specialist role boundary | acceptance | AC-007, EC-004 | 専門 agent は人間へ直接質問せず、質問候補を orchestrator へ返す | workflow docs, skills | specialist が直接ユーザー質問する regression | yes | inspect-only | report Step/Test/Closure Coverage |
 | cl-006 | S03/S04 | authoring modes and external evidence | acceptance | AC-008, AC-009, EC-005 | canonical authoring mode / analysis-only mode / external artifact evidence を分離し、外部支援 artifact は Evidence Adoption Ledger / Spec Authoring Gate で採否、target、evidence、next_action を追跡する | catalog docs, workflow docs, report guidance | external tool 操作を spec-dock 要件へ混入する regression / external evidence 採否が trace されない regression | yes | inspect-only | report Step/Test/Closure Coverage |
-| cl-007 | S01-S05 | cleanup and no new doc type | negative | AC-010, design D-001/D-003 | grill 専用 template variant、`reflection.md`、`new doc report` を追加しない | templates, runtime catalog, tests | template / catalog bloat | yes | inspect-only | report Step/Test/Closure Coverage |
+| cl-007 | S01-S05 | cleanup and no new doc type | negative | AC-010, design D-001/D-003 | clarification 専用 template variant、旧称由来の `grill-*` variant、`reflection.md`、`new doc report` を追加しない | templates, runtime catalog, tests | template / catalog bloat | yes | inspect-only | report Step/Test/Closure Coverage |
 | cl-008 | S06/S90/S99 | dogfooding parity | acceptance | design verification | provider-side assets と dogfooding mirror / root `.agents/skills` mirror が整合する | provider assets, `spec-dock/`, `.agents/skills` | shipped assets と dogfood の不一致 | yes | manual-required | report Step/Test/Closure Coverage |
+| cl-009 | S00/S04/S05/S90/S99 | no objective inversion | negative | AC-011 | Issue planning / execution split、execution policy、delegation framework、PR delivery、issue finish lifecycle が headline deliverable にならない | diff, tests, report, PR title/body | secondary requirement が primary objective を上書きする regression | yes | inspect-only | report Objective Alignment Ledger / reviewer gate |
+| cl-010 | S00/S04/S05/S90/S99 | bounded issue handoff | acceptance | AC-011, design D-005 | Issue handoff 変更は first-class clarification workflow への参照、implementation start 前の gap return、handoff readiness evidence に限定される | workflow_issue docs, issue-related skills, report | issue handoff surface が独立した大改造へ膨らむ regression | yes | inspect-only | report Objective Alignment Ledger / Closure Coverage |
 
 ## レビュー / QA ゲート方針
 
 - S01-S04:
   - reviewer: `spec-reviewer`
-  - focus: docs / template / skill text が requirement / design / plan と整合すること。
+  - focus: docs / template / skill text が requirement / design / plan と整合し、`workflow_clarification.md` / `spec-dock-clarification` が first-class entrypoint になり、Issue handoff が主目的を上書きしていないこと。
 - S05:
   - reviewer: `code-reviewer`
   - focus: tests が changed contracts を正しく固定し、runtime behavior を意図せず変えていないこと。
@@ -172,6 +191,7 @@ step 依存サマリー:
 - 親 orchestrator は orchestration / integration / report evidence / reviewer gate を所有し、実装作業は原則 `doc-writer` または `dev-coder` に委任する。
 - Worker は `Ledger Note` または `No material implementation decisions beyond the approved plan.` を返す。
 - 実行中に runtime catalog 変更、新 doc type 追加、scope 外 path 変更、追加 ADR 必要性が見つかった場合は、plan amendment と fresh spec review を行うまで停止する。
+- 実行中に副次要件の差分が主目的差分より大きくなる場合、PR title / report / tests の主語が Issue planning / execution split へ移る場合、または issue execution policy / delegation framework / PR lifecycle の再設計が必要になる場合は、objective inversion risk として停止し、requirement / design / plan amendment と fresh spec review を行う。
 - Observed result は `report.md` に記録し、`plan.md` には追記しない。
 
 ## 共通 report evidence destinations
@@ -188,6 +208,8 @@ step 依存サマリー:
   - worker の `Ledger Note` を orchestrator が採用 / 却下 / 昇格 / follow-up / no_action へ処理した結果。material decision がない場合は `No material interpretation changes.` と `No decision entries.` を記録する。
 - Evidence Adoption Ledger:
   - delegated draft、reviewer finding、research、external support artifact、discussion evidence を canonical artifact / implementation decision へ取り込む場合の adoption_status、source、target、evidence、next_action。
+- Objective Alignment Ledger:
+  - primary_objective_evidence、secondary_requirement_evidence、inversion_risk、reviewer_verdict を記録し、差分が主目的を前進させているかを観測する。
 - Step Contract Closure / Test Contract Closure / Closure Coverage:
   - plan の closure id、test id、observed evidence、result、approved-no-op の根拠。
 - Reviewer Gate Status:
@@ -197,6 +219,71 @@ step 依存サマリー:
 
 ## 実装ステップ
 
+### 実装ステップ S00 - Objective Alignment Preflight
+
+- behavior goal:
+  - 実装前に、この issue の主目的が first-class docs-aware clarification workflow 統合であることを固定し、副次要件が主目的を上書きしない状態にする。
+- design 参照:
+  - `設計解釈階層`
+  - `方針 D-005: Issue handoff surface は最小に留める`
+- depends on:
+  - requirement / design / plan pass
+- unblocks:
+  - S01, S02, S03, S04, S05, S06, S90, S99
+- target files:
+  - `spec-dock/active/issue/report.md`
+  - 実装前 inspection 対象として `requirement.md`, `design.md`, `plan.md`
+
+#### planned contract
+
+- scope:
+  - `report.md` に Objective Alignment Ledger を作成し、主目的、副次要件、非目的、inversion risk の観測欄を持たせる。
+  - PR title / PR description / major diff / tests / report evidence の主語が docs-aware clarification workflow 統合から逸れていないことを確認する preflight を定義する。
+  - Issue planning / execution boundary を触る必要がある場合は、handoff support に限定されている根拠を記録する。
+- test obligation:
+  - closure ids: `cl-000`, `cl-009`, `cl-010`
+- red / alternative evidence:
+  - evidence level: inspect-only
+  - pre-implementation evidence: requirement / design / plan の目的階層と closure が objective inversion を fail できることを inspection する。
+- green verification:
+  - docs inspection
+  - `report.md` Objective Alignment Ledger inspection
+- refactor guardrail:
+  - S00 は実装対象を広げない。主目的 / 副次要件の判定枠を作るだけに留める。
+- amendment trigger:
+  - 副次要件を主要成果物にしないと実装できない場合。
+  - Issue execution policy、delegation framework、PR lifecycle の再設計が必要になる場合。
+
+#### 具体テストケース一覧
+
+- `tc-s00-001` acceptance: primary objective remains first-class
+  - 前提: requirement / design / plan が存在する。
+  - 操作: 目的階層、closure index、S04 scope、report evidence destination を確認する。
+  - 期待結果: docs-aware clarification workflow が first-class concept として扱われ、質問シート mechanics や issue planning の補助作法に縮退していない。
+  - 失敗検出: PR / diff / tests / report の主語が Issue planning / execution split になっている regression を検出する。
+  - 検証方法: docs inspection / spec-reviewer inspection。
+  - 関連 closure id: `cl-000`, `cl-009`
+
+- `tc-s00-002` negative: secondary requirement cannot become headline
+  - 前提: Issue planning / execution boundary、execution guidance、delegation policy を触る必要がある。
+  - 操作: 対象変更が handoff support に限定されているか確認する。
+  - 期待結果: secondary requirement は first-class clarification workflow への参照、implementation start 前の gap return、handoff readiness evidence に限定される。
+  - 失敗検出: issue handoff surface が独立した workflow / skill / execution policy redesign へ膨らむ regression を検出する。
+  - 検証方法: docs inspection / spec-reviewer inspection。
+  - 関連 closure id: `cl-010`
+
+#### step closure contract
+
+- closure id: `cl-000`, `cl-009`, `cl-010`
+- close condition:
+  - Objective Alignment Ledger が report に追加され、S01 以降の implementation / review gate が objective inversion を検出できる。
+- report evidence:
+  - Objective Alignment Ledger
+  - Closure Coverage
+  - Reviewer Gate Status
+- residual risk:
+  - objective alignment は inspect-only gate なので、S04 / S90 / S99 でも再確認する。
+
 ### 実装ステップ S01 - `interview.md` formal one-question sheet
 
 - behavior goal:
@@ -205,6 +292,7 @@ step 依存サマリー:
   - `interface contract` の `interview.md`
   - `正式質問シートの起動条件`
 - depends on:
+  - S00
   - requirement / design pass
 - unblocks:
   - S02, S03, S04, S05
@@ -283,10 +371,10 @@ step 依存サマリー:
   - 検証方法: `tests/test_init_update.py` の template assertion。
   - 関連 closure id: `cl-002`, `cl-003`
 
-- `tc-s01-002` negative: grill-specific variant is not introduced
+- `tc-s01-002` negative: clarification-specific variant is not introduced
   - 前提: template catalog に `interview.md` が存在する。
   - 操作: `src/spec_dock/assets/spec_dock/templates/discussions/` を確認する。
-  - 期待結果: `grill-interview.md` や `reflection.md` は追加されない。
+  - 期待結果: `clarification-interview.md`、旧称由来の `grill-interview.md`、`reflection.md` は追加されない。
   - 失敗検出: 重複 template 増殖を検出する。
   - 検証方法: filesystem inspection / `rg --files` assertion.
   - 関連 closure id: `cl-007`
@@ -509,7 +597,7 @@ step 依存サマリー:
 - `tc-s03-001` negative: no new discussion catalog types
   - 前提: README/rules describe current discussion catalog.
   - 操作: catalog entries を確認する。
-  - 期待結果: `report`, `reflection`, `grill-*` は new doc catalog に含まれない。
+  - 期待結果: `report`, `reflection`, `clarification-*` は new doc catalog に含まれない。
   - 失敗検出: runtime catalog と docs catalog が diverge する regression を検出する。
   - 検証方法: `tests/cli_runtime/test_runtime_new_doc_s09.py` and content inspection.
   - 関連 closure id: `cl-007`
@@ -550,17 +638,20 @@ step 依存サマリー:
 ### 実装ステップ S04 - workflow docs and installed skill guidance
 
 - behavior goal:
-  - workflow docs と installed skills が、one-question-at-a-time、formal trigger、role boundary、external evidence handling を同じ意味で案内する。
+  - `workflow_clarification.md` と `spec-dock-clarification` が first-class docs-aware clarification entrypoint になり、既存 workflow docs と installed skills が、one-question-at-a-time、formal trigger、role boundary、external evidence handling、objective alignment を同じ意味で案内する。
 - design trace:
-  - `design.md` の `report.md` contract は、canonical report template / workflow guidance が Evidence Adoption Ledger と Spec Authoring Gate に discussion / external support artifact の採否、canonical docs 反映先、reviewer verdict、blocking / non-blocking、next action を記録すると定義している。
-  - S04 の report template 対象はこの `report.md` contract だけに限定する。これを超える report template 構造変更、discussion catalog への `report` 追加、execution ledger の再設計が必要になった場合は design amendment と fresh spec review を行う。
+  - `design.md` は `workflow_clarification.md` と `spec-dock-clarification` を first-class invocation surface として定義している。
+  - `design.md` の `report.md` contract は、canonical report template / workflow guidance が Objective Alignment Ledger、Evidence Adoption Ledger、Spec Authoring Gate に primary objective evidence、secondary requirement evidence、inversion risk、discussion / external support artifact の採否、canonical docs 反映先、reviewer verdict、blocking / non-blocking、next action を記録すると定義している。
+  - S04 の report template 対象はこの `report.md` contract だけに限定する。これを超える report template 構造変更、discussion catalog への `report` 追加、execution ledger / PR lifecycle の再設計が必要になった場合は design amendment と fresh spec review を行う。
 - target files:
+  - `src/spec_dock/assets/spec_dock/docs/workflow_clarification.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
   - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
   - `src/spec_dock/assets/spec_dock/templates/initiative/report.md`
   - `src/spec_dock/assets/spec_dock/templates/epic/report.md`
   - `src/spec_dock/assets/spec_dock/templates/issue/report.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md`
   - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-system-architect/SKILL.md`
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-implementation-planner/SKILL.md`
@@ -573,13 +664,14 @@ step 依存サマリー:
 #### planned contract
 
 - scope:
+  - `workflow_clarification.md` に source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、code / docs cross-check、docs synthesis、ADR sparingly、analysis-only / authoring mode の境界を追加する。
   - authoring workflow に formal question trigger / lightweight one-question boundary / escalation guardrail を追加する。
   - design workflow に source-grounding / terminology sharpening / edge-case clarification handoff を追加する。
-  - issue workflow / skills に specialist does not ask human directly の境界を同期する。
-  - external support artifact は外部ツール固有の操作を spec-dock 要件へ入れず、report templates / workflow guidance の Evidence Adoption Ledger / Spec Authoring Gate に adoption decision、target artifact / section、evidence、next_action を記録する guidance として扱う。
+  - issue workflow / skills は `workflow_clarification.md` への参照、unresolved spec gap の return、handoff readiness evidence に限定し、Issue planning / execution split を headline にしない。
+  - external support artifact は外部ツール固有の操作を spec-dock 要件へ入れず、report templates / workflow guidance の Objective Alignment Ledger / Evidence Adoption Ledger / Spec Authoring Gate に adoption decision、target artifact / section、evidence、next_action、inversion risk を記録する guidance として扱う。
   - skills は concise reminder に留め、長い policy は docs へ route する。
 - test obligation:
-  - closure ids: `cl-001`, `cl-002`, `cl-005`, `cl-006`, `cl-007`
+  - closure ids: `cl-000`, `cl-001`, `cl-002`, `cl-005`, `cl-006`, `cl-007`, `cl-009`, `cl-010`
 - red / alternative evidence:
   - evidence level: inspect-only
   - pre-implementation evidence: existing docs/skills が one-question formal trigger を十分に持たないことを inspection する。
@@ -599,6 +691,7 @@ step 依存サマリー:
   - `requirement.md`
   - `design.md`
   - `plan.md`
+  - `spec-dock/docs/workflow_clarification.md` if present
   - `spec-dock/docs/workflow_spec_authoring.md`
   - `spec-dock/docs/workflow_issue.md`
   - `spec-dock/docs/authoring/issue-plan.md`
@@ -613,7 +706,7 @@ step 依存サマリー:
   - `.codex`
   - secrets / `.env*`
 - acceptance criteria:
-  - `cl-001`, `cl-002`, `cl-005`, `cl-006`, `cl-007`
+  - `cl-000`, `cl-001`, `cl-002`, `cl-005`, `cl-006`, `cl-007`, `cl-009`, `cl-010`
 - required verification:
   - docs inspection, skill inspection, S05 tests.
 - reviewer focus:
@@ -621,6 +714,7 @@ step 依存サマリー:
 - stop conditions:
   - workflow policy change beyond current requirement/design.
   - skill guidance would need to grant direct human questioning to specialists.
+  - Issue planning / execution split、execution policy、delegation framework、PR delivery、issue finish lifecycle を headline deliverable にする必要が出た場合。
 - output required:
   - changed files
   - verification result
@@ -646,17 +740,34 @@ step 依存サマリー:
   - 関連 closure id: `cl-002`
 
 - `tc-s04-003` acceptance: external support artifacts use report adoption evidence
-  - 前提: workflow authoring / issue workflow docs exist and initiative / epic / issue `report.md` templates own Evidence Adoption Ledger / Spec Authoring Gate.
+  - 前提: workflow authoring / issue workflow docs exist and initiative / epic / issue `report.md` templates own Objective Alignment Ledger / Evidence Adoption Ledger / Spec Authoring Gate.
   - 操作: external support artifact の扱いを workflow docs、report templates、report guidance で確認する。
-  - 期待結果: 外部支援 artifact は通常 evidence として扱われ、Evidence Adoption Ledger / Spec Authoring Gate に adoption decision、target artifact / section、evidence、next_action を記録する。
+  - 期待結果: 外部支援 artifact は通常 evidence として扱われ、Objective Alignment Ledger / Evidence Adoption Ledger / Spec Authoring Gate に adoption decision、target artifact / section、evidence、next_action、inversion risk を記録する。
   - 期待結果: 外部ツール固有の操作手順、責務、セッション管理は spec-dock の要件 / 設計 / workflow contract に混入しない。
   - 失敗検出: external artifact の採否が trace されない regression、または external tool 固有手順が spec-dock docs に混入する regression を検出する。
   - 検証方法: docs inspection / `tests.test_init_update` content assertion when feasible.
-  - 関連 closure id: `cl-006`
+  - 関連 closure id: `cl-006`, `cl-009`
+
+- `tc-s04-004` acceptance: first-class clarification invocation surfaces exist
+  - 前提: S04 target files are implemented.
+  - 操作: `workflow_clarification.md` と `spec-dock-clarification/SKILL.md` を確認する。
+  - 期待結果: 両方が shipped asset として存在し、docs-aware clarification workflow の first-class entrypoint になっている。
+  - 期待結果: source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、code / docs cross-check、docs synthesis、ADR sparingly、analysis-only / authoring mode の境界が表現されている。
+  - 失敗検出: clarification が `interview.md` mechanics や Issue planning の補助作法に縮退する regression を検出する。
+  - 検証方法: docs / skill content assertion、spec-reviewer inspection。
+  - 関連 closure id: `cl-000`
+
+- `tc-s04-005` negative: issue handoff cannot own the clarification workflow
+  - 前提: `workflow_issue.md` または `spec-dock-issue-execution` を変更する。
+  - 操作: Issue handoff surface の変更内容を確認する。
+  - 期待結果: 変更は `workflow_clarification.md` への参照、unresolved spec gap の return、handoff readiness evidence に限定される。
+  - 失敗検出: Issue planning / execution split、execution policy、delegation framework、PR delivery、issue finish lifecycle が headline deliverable になる regression を検出する。
+  - 検証方法: docs / skill diff inspection、Objective Alignment Ledger、spec-reviewer inspection。
+  - 関連 closure id: `cl-009`, `cl-010`
 
 #### step closure contract
 
-- closure id: `cl-001`, `cl-002`, `cl-005`, `cl-006`, `cl-007`
+- closure id: `cl-000`, `cl-001`, `cl-002`, `cl-005`, `cl-006`, `cl-007`, `cl-009`, `cl-010`
 - close condition:
   - docs / skills が design guardrails と一致し、spec-reviewer pass を得る。
 - report evidence:
@@ -697,16 +808,18 @@ step 依存サマリー:
 
 - scope:
   - template/content assertions を更新する。
+  - `workflow_clarification.md` / `spec-dock-clarification` / Objective Alignment Ledger の shipped content assertions を追加する。
   - runtime catalog が unchanged であることを regression として固定する。
   - delegated-authoring tests / contracts は、新しい `interview` / `disc` semantics と flat discussion draft / provenance / diff guard contract が矛盾しないことを必ず確認する。
   - delegated-authoring の production behavior 変更が不要な場合でも、approved-no-op evidence として確認した contracts / tests / diff-clean command を `report.md` に残す。
 - test obligation:
-  - closure ids: `cl-001` through `cl-007`
+  - closure ids: `cl-000`, `cl-001` through `cl-007`, `cl-009`, `cl-010`
 - red / alternative evidence:
   - `tc-s05-001`: `covered-existing`
   - `tc-s05-002`: `red-required`
   - `tc-s05-003`: `covered-existing`
-  - pre-implementation evidence: `tc-s05-002` は old assertions が new template contract を検出できないことを確認する。`tc-s05-001` / `tc-s05-003` は既存 tests / contract inspection が対象 regression を検出できる根拠を記録する。
+  - `tc-s05-004`: `red-required`
+  - pre-implementation evidence: `tc-s05-002` は old assertions が new template contract を検出できないことを確認する。`tc-s05-004` は old assertions が `workflow_clarification.md` / `spec-dock-clarification` / Objective Alignment Ledger contract を検出できないことを確認する。`tc-s05-001` / `tc-s05-003` は既存 tests / contract inspection が対象 regression を検出できる根拠を記録する。
 - green verification:
   - `python -m unittest tests.test_init_update -v`
   - `python -m unittest tests.cli_runtime.test_runtime_new_doc_s09 -v`
@@ -740,7 +853,7 @@ step 依存サマリー:
   - runtime code unless plan amendment approves
   - canonical docs
 - acceptance criteria:
-  - closure ids `cl-001` through `cl-007`
+  - closure ids `cl-000`, `cl-001` through `cl-007`, `cl-009`, `cl-010`
 - required verification:
   - targeted unittest commands.
 - reviewer focus:
@@ -774,6 +887,16 @@ step 依存サマリー:
   - 検証方法: `python -m unittest tests.test_init_update -v`
   - 関連 closure id: `cl-001`, `cl-002`, `cl-003`, `cl-004`
 
+- `tc-s05-004` regression: first-class clarification surfaces and objective ledger are shipped
+  - 前提: S04 で `workflow_clarification.md`、`spec-dock-clarification/SKILL.md`、report templates が更新される。
+  - 操作: init/update content assertions を実行する。
+  - 証跡レベル: `red-required`
+  - 期待結果: `workflow_clarification.md` と `spec-dock-clarification/SKILL.md` が shipped scaffold に含まれ、source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、docs synthesis、ADR sparingly、analysis-only / authoring mode を表現する。
+  - 期待結果: initiative / epic / issue `report.md` templates が Objective Alignment Ledger と primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を持つ。
+  - 失敗検出: first-class docs-aware clarification workflow が欠落する regression、または objective inversion guard が report から欠落する regression を検出する。
+  - 検証方法: `python -m unittest tests.test_init_update -v`
+  - 関連 closure id: `cl-000`, `cl-006`, `cl-009`, `cl-010`
+
 - `tc-s05-003` regression: delegated-authoring compatibility remains intact
   - 前提: S02 で `disc.md` semantics、S04 で installed system-architect / implementation-planner skills が更新される。
   - 操作: delegated-authoring targeted tests と contract inspection を実行する。
@@ -787,7 +910,7 @@ step 依存サマリー:
 
 #### step closure contract
 
-- closure id: `cl-001` through `cl-007`
+- closure id: `cl-000`, `cl-001` through `cl-007`, `cl-009`, `cl-010`
 - close condition:
   - targeted tests pass.
   - code-reviewer pass.
@@ -921,7 +1044,7 @@ step 依存サマリー:
 ## ドキュメント影響の解消ステップ S90
 
 - behavior goal:
-  - docs impact を明示的に解決し、stale multiple-question guidance、duplicate grill-specific artifact concept、outdated catalog text が残っていないことを確認する。
+  - docs impact を明示的に解決し、stale multiple-question guidance、duplicate clarification-specific artifact concept、outdated catalog text が残っていないことを確認する。
 - target:
   - docs / templates / README / workflow / skill / migration notes
 - owner:
@@ -951,10 +1074,12 @@ step 依存サマリー:
     - 前提: S01-S06 are complete.
     - 操作: changed docs/templates/skills と関連 README / workflow / migration notes を inspection する。
     - 証跡レベル: `inspect-only`
-    - 期待結果: 古い複数質問 guidance、grill 専用 duplicate concept、outdated catalog text、外部 tool 固有手順の混入が残っていない。
+    - 期待結果: 古い複数質問 guidance、clarification 専用 duplicate concept、outdated catalog text、外部 tool 固有手順の混入が残っていない。
+    - 期待結果: `workflow_clarification.md` / `spec-dock-clarification` が first-class entrypoint として残り、Issue handoff / execution guidance がそれを所有または置換していない。
     - 失敗検出: cleanup 不足、docs impact 漏れ、S01-S06 の範囲外編集が必要な状態を検出する。
+    - 失敗検出: PR / diff / tests / report の主語が Issue planning / execution split に移る objective inversion regression を検出する。
     - 検証方法: docs diff inspection、`git diff --check`、`spec-reviewer` docs/spec alignment。
-    - 関連 closure id: `cl-007`, `cl-008`
+    - 関連 closure id: `cl-000`, `cl-007`, `cl-008`, `cl-009`, `cl-010`
 - verification:
   - docs diff inspection
   - `git diff --check`
@@ -964,7 +1089,7 @@ step 依存サマリー:
   - S01-S06 の allowed paths を超える stale guidance が見つかった場合。
   - report / docs / skill guidance の meaning が requirement / design / plan と矛盾する場合。
 - closure ids:
-  - `cl-007`, `cl-008`
+  - `cl-000`, `cl-007`, `cl-008`, `cl-009`, `cl-010`
 - report evidence destination:
   - 共通 report evidence destinations
   - Reviewer Gate Status
@@ -986,7 +1111,7 @@ step 依存サマリー:
 - behavior goal:
   - issue 全体が requirement / design / plan と一致し、実装前に定義した closure が全て閉じていることを確認する。
 - depends on:
-  - S01-S06, S90
+  - S00-S06, S90
 - branch diff scope:
   - provider-side templates / docs / skills
   - tests
@@ -1007,7 +1132,7 @@ step 依存サマリー:
   - pass condition: review_status: pass
 - final spec review gate:
   - reviewer: final `spec-reviewer`
-  - scope: requirement / design / plan / report / docs / templates / skills alignment
+  - scope: requirement / design / plan / report / docs / templates / skills alignment, including `cl-000`, `cl-009`, `cl-010` objective alignment and bounded handoff closure.
   - pass condition: review_status: pass
 - final commit gate:
   - all implementation steps committed or valid approved-no-op.
@@ -1023,7 +1148,7 @@ design は fresh `spec-reviewer` pass 済みであり、plan 作成を妨げる�
 ## 最終完了条件
 
 - AC / EC:
-  - `cl-001` through `cl-008` が report の Step Contract Closure / Test Contract Closure / Closure Coverage で pass または approved-no-op として閉じている。
+  - `cl-000` through `cl-010` が report の Objective Alignment Ledger / Step Contract Closure / Test Contract Closure / Closure Coverage で pass または approved-no-op として閉じている。
 - docs impact:
   - S90 が `spec-reviewer` pass で閉じている。
 - implementation steps:

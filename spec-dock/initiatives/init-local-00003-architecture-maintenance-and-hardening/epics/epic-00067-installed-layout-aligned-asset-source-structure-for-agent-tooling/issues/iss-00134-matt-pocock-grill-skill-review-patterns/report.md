@@ -1,16 +1,16 @@
 ---
 種別: 実装報告書（Issue）
 ID: "iss-00134"
-タイトル: "Matt Pocock grill-style clarification workflow を spec-dock に取り込む"
+タイトル: "docs-aware clarification workflow を spec-dock に取り込む"
 関連GitHub: ["#134"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-28"
+最終更新: "2026-05-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
 
-# iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00134 docs-aware clarification workflow を spec-dock に取り込む — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
 
 > `report.md` は観測証跡台帳（observed evidence ledger）です。planned requirements、evidence destination、closure 条件は `plan.md` が所有し、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する。
 
@@ -50,6 +50,23 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-20260529-001 | resolved | interpretation | user / consultant / spec-reviewer | `workflow_grill.md` / `spec-dock-grill-clarification` は初見のメンバーやエージェントに直感的でなく、恒久的な入口名として比喩が強い | `workflow_grill.md` / `spec-dock-grill-clarification`; `workflow_clarification.md` / `spec-dock-clarification`; `workflow_docs_clarification.md` / `spec-dock-docs-clarification`; `workflow_guided_clarification.md` / `spec-dock-guided-clarification` | 外向き名称は `docs-aware clarification workflow`、workflow file は `workflow_clarification.md`、skill name は `spec-dock-clarification` とする。`grill` は由来、historical path、禁止例に限って残す。 | `clarification` は曖昧さ解消、質問、文書化、意思決定の昇華という中核を短く表し、Matt Pocock 固有文脈や内輪語に依存しない。 | applied | `discussions/20260528t172725z-disc-clarification-workflow-naming.md`; reflected to `requirement.md`, `design.md`, `plan.md`, `report.md`; naming spec-review pass with P2 ledger note applied | none |
+
+## 目的整合台帳（Objective Alignment Ledger / 必須）
+
+この台帳は、実装中の差分が主目的である spec-dock-native docs-aware clarification workflow の統合を前進させているかを記録する。副次要件、handoff boundary、execution guidance、delegation policy、report evidence の更新が必要な場合でも、それらが主目的を上書きしていないことを観測する。
+
+- `primary_objective_evidence`: docs-aware clarification workflow を first-class workflow として前進させた証跡。
+- `secondary_requirement_evidence`: 副次要件を扱った場合、その変更が主目的を支える境界内にある根拠。
+- `inversion_risk`: `none` / `low` / `medium` / `high`。`medium` 以上の場合は fresh spec review 前に requirement / design / plan amendment を検討する。
+- `reviewer_verdict`: reviewer が objective inversion を検出したかどうか。
+
+完了時、unresolved な `medium` / `high` inversion risk を残してはならない。
+
+| ステップ（step） | 主目的証跡（primary_objective_evidence） | 副次要件証跡（secondary_requirement_evidence） | 主従逆転リスク（inversion_risk） | レビュアー判定（reviewer_verdict） | 次アクション（next_action） |
+|---|---|---|---|---|---|
+| S00 | Objective Alignment Preflight で記録する | Issue handoff を触る場合のみ記録する | none / low / medium / high | pass / fail / unavailable / not_run | proceed / amend / block / re-review |
+| Spec authoring 2026-05-29 | `requirement.md` / `design.md` / `plan.md` に `workflow_clarification.md` と `spec-dock-clarification` を first-class docs-aware clarification workflow として固定した | Issue planning / execution split は bounded issue handoff support に限定し、headline deliverable にしない条件を `AC-011` / `cl-009` / `cl-010` で固定した | none | fresh `spec-reviewer` pass; findings なし | ユーザーの明示指示後、S00 から実装開始 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -109,21 +126,22 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 ## 仕様作成ゲート（Spec Authoring Gate）
 
-`workflow_spec_authoring.md` に従い、requirement -> design -> plan の順で fresh `spec-reviewer` pass を得た。実装はまだ開始していない。
+`workflow_spec_authoring.md` に従い、requirement -> design -> plan の順で fresh `spec-reviewer` pass を得た。2026-05-29 の再ブラッシュアップでは、前回実装 drift の原因になった「主目的と副次要件の主従逆転」を防ぐため、Matt Pocock 由来の pattern を spec-dock-native docs-aware clarification workflow として first-class に扱うことを requirement / design / plan へ明示した。実装はまだ開始していない。
 
 | phase | artifact | reviewer | freshness | state | investigated facts | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
-| requirement | `requirement.md` | `spec-reviewer` | fresh | passed | discussions / prior analysis / Matt Pocock `grill-me` essence / spec-dock workflow constraints | design phase へ進行可 | EC-003 の `disc.md` synthesis と issue `report.md` ledger の混同を修正後に pass |
-| design | `design.md` | `spec-reviewer` | fresh | passed | requirement, workflow docs, template catalog, installed skill boundaries, frontmatter compatibility | plan phase へ進行可 | formal question trigger、EC-002 re-question loop、root `.agents/skills` mirror、frontmatter compatibility を修正後に pass |
-| plan | `plan.md` | `spec-reviewer` | fresh | passed | requirement, design, `workflow_issue.md`, `workflow_spec_authoring.md`, `authoring/issue-plan.md`, `phase_plan_issue.md` | implementation handoff 可。ただし実装開始はユーザー提出後の明示指示待ち | S01/S02/S04/S05/S90 と report evidence destinations の指摘を修正後に pass |
+| requirement | `requirement.md` | `spec-reviewer` | fresh | passed | discussions / prior analysis / Matt Pocock pattern essence / spec-dock workflow constraints / prior drift cause | design phase へ進行可 | `目的階層`、`AC-000`、`AC-011` を追加し、primary docs-aware clarification integration と no objective inversion を明示後に pass |
+| design | `design.md` | `spec-reviewer` | fresh | passed | requirement, workflow docs, template catalog, installed skill boundaries, first-class invocation surface, objective alignment report contract | plan phase へ進行可 | `workflow_clarification.md` と `spec-dock-clarification` を first-class surface とし、Issue handoff を bounded support に限定後に pass |
+| plan | `plan.md` | `spec-reviewer` | fresh | passed | requirement, design, `workflow_issue.md`, `workflow_spec_authoring.md`, planned `workflow_clarification.md`, planned `spec-dock-clarification`, report evidence destinations | implementation handoff 可。ただし実装開始はユーザー提出後の明示指示待ち | S00 Objective Alignment Preflight、`cl-000`、`cl-009`、`cl-010`、`tc-s05-004`、final blocker を追加し、主従逆転防止を実装前 gate 化後に pass |
 
 ### Reviewer Gate History
 
 | phase | reviewer result | disposition |
 |---|---|---|
-| requirement | first review: fail / final review: pass | EC-003 の report artifact ambiguity を `disc.md` synthesis と `report.md` ledger に分離して解消 |
-| design | multiple review cycles: fail -> pass | re-question loop、dogfooding path、external support artifact route、AC/EC verification mapping、formal question trigger、frontmatter compatibility を反映 |
-| plan | multiple review cycles: fail -> pass | input docs、verification order、report/no-op gates、interview/disc full field contract、external evidence adoption、delegated-authoring verification、S90 inspect-only gate を反映 |
+| requirement | 2026-05-29 fresh review: pass | 主目的、副次要件、非目的、`AC-000`、`AC-011` を追加し、Issue planning / execution split が docs-aware clarification workflow を上書きしない条件を requirement gate に昇格 |
+| design | 2026-05-29 first review: fail / re-review: pass | Objective Alignment Ledger contract と shipped skill invocation surface の不足を修正し、`workflow_clarification.md` / `spec-dock-clarification` を first-class entrypoint として固定 |
+| plan | 2026-05-29 first review: fail / re-review: pass with P2 cleanup applied | first-class clarification surfaces を S04/S05/S90/S99 に展開し、`cl-000` / `cl-009` / `cl-010` を final blockers に追加。追加 P2 指摘の `cl-010` closure index と `tc-s05-004` red evidence も反映 |
+| cross-doc final gate | 2026-05-29 fresh review: pass | findings なし。`AC-000` と `AC-011` が requirement、design mapping、plan closure/test contracts、report Objective Alignment Ledger / reviewer gate に trace され、Issue planning / execution 分離が bounded handoff support に制限されていることを確認 |
 
 ## 実装サマリー (任意)
 - [実装した内容の概要を2-3文で記載]
@@ -260,7 +278,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report authoring alignment | findings なし。`AC-000` / `AC-011` trace、first-class docs-aware clarification workflow、bounded issue handoff、Objective Alignment Ledger を確認 | 0 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |

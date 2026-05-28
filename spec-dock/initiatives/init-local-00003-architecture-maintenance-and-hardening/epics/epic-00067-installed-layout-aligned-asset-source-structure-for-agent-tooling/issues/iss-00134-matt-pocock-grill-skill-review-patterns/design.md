@@ -1,40 +1,78 @@
 ---
 種別: 設計書（Issue）
 ID: "iss-00134"
-タイトル: "Matt Pocock grill-style clarification workflow を spec-dock に取り込む"
+タイトル: "docs-aware clarification workflow を spec-dock に取り込む"
 関連GitHub: ["#134"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-05-28"
+最終更新: "2026-05-29"
 依存: ["requirement.md"]
 親: ["epic-00067", "init-local-00003"]
 derived_from:
   - "requirement.md"
   - "discussions/20260528t041343z-disc-consultant-grill-essence-integration-review.md"
   - "discussions/20260528t041831z-disc-consultant-requirement-update-proposal.md"
+  - "discussions/20260528t172725z-disc-clarification-workflow-naming.md"
 ---
 
-# iss-00134 Matt Pocock grill-style clarification workflow を spec-dock に取り込む — 設計
+# iss-00134 docs-aware clarification workflow を spec-dock に取り込む — 設計
 
 ## 目的・制約
 
-この設計は、Matt Pocock `grill-me` / `grill-with-docs` の essence を、spec-dock の既存 authoring workflow、discussion artifact、canonical docs、agent guidance に統合するための実装設計を固定する。
+この設計は、Matt Pocock の既存パターンから抽出した essence を、`docs-aware clarification workflow` として spec-dock の既存 authoring workflow、discussion artifact、canonical docs、agent guidance に統合するための実装設計を固定する。
 
-設計上の目的は、次の 4 点である。
+設計上の目的は、次の 5 点である。
 
+- spec-dock-native な docs-aware clarification workflow を first-class concept として定義する。
 - agent-to-human question の標準作法を、一問一答に寄せる。
 - 重要判断では、質問前に未回答の質問シートを作り、回答後に同じ artifact を完成 record にする。
-- `research` / `interview` / `disc` / `adr` / `report` を grill 専用 variant ではなく共通 template / 共通概念として再設計する。
+- `research` / `interview` / `disc` / `adr` / `report` を clarification 専用 variant ではなく共通 template / 共通概念として再設計する。
 - 既存 workflow / template / skill guidance に残る矛盾、重複、使われなくなる複数質問 guidance を整理する。
 
 非交渉制約:
 
-- `grill-me` / `grill-with-docs` を無加工で移植しない。
+- Matt Pocock 由来の pattern を無加工で移植しない。
 - `CONTEXT.md` を spec-dock の新しい正本にしない。
 - repo / docs / source で解ける質問を人間へ投げない。
 - 人間ユーザーへの本質的な質問は一度に一つだけにする。
 - 専門 agent / deep consultant は人間へ直接質問しない。
 - discussion artifact は evidence / proposal であり、採用判断なしに canonical source of truth にしない。
+- Issue planning / Issue execution の境界整理が必要な場合でも、clarification workflow の適用先 / handoff boundary に限定し、主目的より上位または同格に扱わない。
+
+## 設計解釈階層
+
+設計判断が衝突した場合は、次の優先順位で解釈する。
+
+1. P0: docs-aware clarification workflow
+   - source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、code / docs cross-check、docs synthesis、ADR sparingly を first-class workflow として保つ。
+2. P1: discussion artifact lifecycle
+   - `research` / `interview` / `disc` / `adr` / `report` を使い、質問、回答、分析、採用判断、反映先を追跡できるようにする。
+3. P2: spec authoring integration
+   - requirement / design / plan authoring、reviewer gate、canonical docs への promotion と整合させる。
+4. P3: issue handoff / execution boundary
+   - Issue planning / Issue execution の境界整理は、P0-P2 を implementation へ安全に渡すための minimal supporting surface として扱う。
+
+P3 が P0-P2 を上書きする設計は不合格である。たとえば、Issue planning / execution 分離、execution policy、delegation framework、PR delivery、issue finish lifecycle が主要成果物として扱われ、clarification workflow がその内部の補助作法に縮退する設計は objective inversion として採用しない。
+
+依存方向は次の順に固定する。
+
+```plantuml
+@startuml
+title objective hierarchy for clarification integration
+' Question answered: 主目的と副次要件の依存方向
+' Scope: iss-00134 の設計解釈階層
+
+rectangle "P0: docs-aware clarification workflow" as P0
+rectangle "P1: discussion artifact lifecycle" as P1
+rectangle "P2: spec authoring integration" as P2
+rectangle "P3: issue handoff / execution boundary" as P3
+
+P0 --> P1 : drives
+P1 --> P2 : feeds
+P2 --> P3 : hands off when needed
+P3 ..> P0 : must not own or replace
+@enduml
+```
 
 ## 既存実装 / 規約の理解
 
@@ -44,8 +82,10 @@ derived_from:
 - `spec-dock/docs/workflow_spec_authoring.md`
 - `spec-dock/docs/phase_design.md`
 - `spec-dock/docs/workflow_issue.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_clarification.md`（新設）
 - `src/spec_dock/assets/spec_dock/templates/discussions/{interview,research,disc,adr}.md`
 - `src/spec_dock/assets/spec_dock/templates/README.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md`（新設）
 - `src/spec_dock/assets/install_root/.agents/skills/spec-driven-tdd-workflow/SKILL.md`
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-{system-architect,implementation-planner,issue-execution}/SKILL.md`
 
@@ -67,7 +107,7 @@ derived_from:
 
 採用しないもの:
 
-- grill 専用の `grill-interview.md` / `grill-report.md` などの新 template variant。
+- clarification 専用の `clarification-interview.md` / `clarification-report.md` や旧称由来の `grill-interview.md` / `grill-report.md` などの新 template variant。
 - 初期実装での `reflection.md` 追加。
 - 初期実装での `new doc report` catalog 追加。
 - 既存の複数質問 interview artifact の自動分割 / rename。
@@ -76,12 +116,12 @@ derived_from:
 
 ### 方針 D-001: 既存 common template を再設計する
 
-`interview` / `research` / `disc` / `adr` / `report` を grill 専用に分けず、共通 template / 共通概念として再設計する。
+`interview` / `research` / `disc` / `adr` / `report` を clarification 専用に分けず、共通 template / 共通概念として再設計する。
 
 理由:
 
 - 要件上、テンプレートの重複や agent の迷いを避けることが重要である。
-- grill workflow は spec-dock の通常 authoring workflow と併用されるため、別系統にすると運用分岐が増える。
+- clarification workflow は spec-dock の通常 authoring workflow と併用されるため、別系統にすると運用分岐が増える。
 
 トレードオフ:
 
@@ -113,6 +153,45 @@ ADR candidate は `disc.md` で triage し、原則として次の条件を満�
 - 実質的な tradeoff がある。
 
 局所的で可逆な判断は、質問シート、`disc.md`、または canonical docs への通常反映で閉じる。
+
+### 方針 D-005: Issue handoff surface は最小に留める
+
+Issue planning / Issue execution の境界整理が必要な場合でも、それは clarification workflow を implementation に渡すための handoff surface に限定する。
+
+扱ってよいもの:
+
+- `workflow_issue.md` や Issue 向け skill guidance から、first-class clarification workflow への参照を追加する。
+- implementation start 前に未解決の requirement / design / plan gap があれば、clarification / authoring phase へ戻す境界を明記する。
+- `report.md` に objective alignment / handoff readiness の観測証跡を残す。
+
+扱わないもの:
+
+- Issue planning / Issue execution 分離を新しい主要 workflow として設計する。
+- `workflow_issue.md`、`spec-dock-issue-execution`、delegation framework、PR / finish lifecycle を、この issue の中心成果物にする。
+- first-class clarification workflow を Issue planning 内の小さな節や補助ルールに閉じ込める。
+
+この境界を超える必要が出た場合は、この issue の実装を止め、別 issue または明示的な design amendment と fresh `spec-reviewer` を要求する。
+
+### 方針 D-006: first-class clarification invocation surface を定義する
+
+spec-dock-native な docs-aware clarification workflow は、Issue planning の内部節ではなく、first-class workflow doc と shipped skill から呼び出す。
+
+追加する入口:
+
+- `src/spec_dock/assets/spec_dock/docs/workflow_clarification.md`
+  - source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、code / docs cross-check、docs synthesis、ADR sparingly を扱う正本 workflow。
+  - local analysis / draft / decision clarification と requirement / design / plan authoring の両方から参照できる。
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md`
+  - ユーザーが「壁打ち」「曖昧さを潰したい」「設計や計画を詰めたい」「仕様を明確化したい」と依頼したときの shipped skill entrypoint。
+  - canonical docs 作成を必須にしない analysis-only / draft-only mode と、scope-local `discussions/` から canonical docs へ昇格する authoring mode を分けて案内する。
+  - skill は長い policy を複製せず、`workflow_clarification.md`、common discussion templates、scope workflow へ route する concise reminder とする。
+
+既存 skill との関係:
+
+- `spec-driven-tdd-workflow` は、曖昧さが残る authoring / planning request を `spec-dock-clarification` または `workflow_clarification.md` へ route できる。
+- `spec-dock-system-architect` と `spec-dock-implementation-planner` は、人間へ直接質問せず、clarification 質問候補を orchestrator へ返す。
+- `spec-dock-issue-execution` は、implementation 中に未解決仕様や objective inversion risk を見つけた場合、実装継続ではなく `workflow_clarification.md` / authoring phase へ戻す。
+- Issue planning / execution split を表す新しい headline skill を、この issue の主成果物として追加しない。
 
 ## 境界 / 契約モデル
 
@@ -352,8 +431,11 @@ conditional body sections:
 
 `report.md` は discussion catalog に追加しない。
 
-canonical `report.md` template / workflow guidance では、Evidence Adoption Ledger と Spec Authoring Gate を使って以下を記録する。
+canonical `report.md` template / workflow guidance では、Objective Alignment Ledger、Evidence Adoption Ledger、Spec Authoring Gate を使って以下を記録する。
 
+- primary objective evidence
+- secondary requirement evidence
+- inversion risk
 - discussion evidence の採否
 - 外部支援で作られた artifact の採否。ただし、外部ツール固有の操作手順や責務は spec-dock の構成要素として定義しない。
 - canonical docs への反映先
@@ -380,7 +462,7 @@ canonical `report.md` template / workflow guidance では、Evidence Adoption Le
 
 1. `templates/discussions/*.md`
 2. `templates/README.md` と `docs/rules/*/discussions.md`
-3. `workflow_spec_authoring.md` / `phase_design.md` / `workflow_issue.md`
+3. `workflow_clarification.md` / `workflow_spec_authoring.md` / `phase_design.md`
 4. `.agents/skills/*/SKILL.md`
 5. tests
 6. dogfooding mirror / validation
@@ -400,21 +482,31 @@ title iss-00134 module dependency delta
 top to bottom direction
 
 rectangle "requirement.md\n(active issue)" as Req
+rectangle "workflow_clarification.md\nfirst-class clarification" as ClarificationWorkflow
 rectangle "templates/discussions\ninterview/research/disc/adr" as Templates
 rectangle "templates/README.md\n+ docs/rules/*/discussions.md" as CatalogDocs
-rectangle "workflow docs\nworkflow_spec_authoring\nphase_design\nworkflow_issue" as WorkflowDocs
-rectangle "agent skills\nspec-driven-tdd\nsystem-architect\nimplementation-planner\nissue-execution" as Skills
+rectangle "authoring workflow docs\nworkflow_spec_authoring\nphase_design" as WorkflowDocs
+rectangle "agent skills\nspec-dock-clarification\nspec-driven-tdd\nsystem-architect\nimplementation-planner" as Skills
+rectangle "issue handoff surface\nworkflow_issue\nissue-execution" as IssueHandoff
 rectangle "runtime new doc catalog\ncommands/application/domain" as Runtime
 rectangle "tests\ninit/update + runtime + delegated-authoring" as Tests
 rectangle "dogfooding spec-dock/" as Dogfood
 
+Req --> ClarificationWorkflow : defines primary objective
+ClarificationWorkflow --> Templates : uses shared artifact contracts
 Req --> Templates : defines artifact contracts
 Templates --> CatalogDocs : catalog text must match
-CatalogDocs --> WorkflowDocs : authoring rules reference catalog
+CatalogDocs --> ClarificationWorkflow : artifact semantics
+ClarificationWorkflow --> WorkflowDocs : authoring integration
 WorkflowDocs --> Skills : skills route to workflow docs
+ClarificationWorkflow --> Skills : first-class invocation
+WorkflowDocs --> IssueHandoff : bounded handoff only
+IssueHandoff ..> ClarificationWorkflow : must not own or replace
 Templates --> Tests : scaffold content assertions
 CatalogDocs --> Tests : catalog/regression assertions
+ClarificationWorkflow --> Tests : primary workflow assertions
 WorkflowDocs --> Tests : docs contract assertions
+IssueHandoff --> Tests : bounded handoff assertions
 Runtime --> Tests : unchanged catalog regression
 Templates --> Dogfood : update / mirror verification
 CatalogDocs --> Dogfood : update / mirror verification
@@ -425,6 +517,8 @@ Skills --> Dogfood : installed agent guidance verification
 この図で固定する設計判断:
 
 - provider-side template が最初の変更点である。
+- `workflow_clarification.md` と `spec-dock-clarification` が first-class clarification entrypoint である。
+- Issue handoff surface は authoring integration の下流にあり、clarification workflow を所有しない。
 - runtime catalog は doc type を増やさない限り変更しない。
 - dogfooding workspace は source of truth ではなく検証面である。
 
@@ -444,9 +538,10 @@ Skills --> Dogfood : installed agent guidance verification
 |           |   |   |   `-- adr.md              # Modify: durable decision / sparing criteria を明確化
 |           |   |   `-- README.md             # Modify: common catalog semantics と report 非 catalog を説明
 |           |   |-- docs/
-|           |   |   |-- workflow_spec_authoring.md  # Modify: one-question style / phase gate / evidence adoption を補強
-|           |   |   |-- phase_design.md             # Modify: design phase の clarification handoff を補強
-|           |   |   |-- workflow_issue.md           # Modify: issue workflow 上の質問境界 / cleanup を補強
+   |           |   |   |-- workflow_clarification.md           # Add: first-class docs-aware clarification workflow
+   |           |   |   |-- workflow_spec_authoring.md  # Modify: workflow_clarification への authoring integration を補強
+   |           |   |   |-- phase_design.md             # Modify: design phase の clarification handoff を補強
+   |           |   |   |-- workflow_issue.md           # Modify only if needed: workflow_clarification 参照 / bounded handoff
 |           |   |   `-- rules/
 |           |   |       |-- initiative/discussions.md   # Modify: discussion catalog 説明を同期
 |           |   |       |-- epic/discussions.md         # Modify: discussion catalog 説明を同期
@@ -455,11 +550,12 @@ Skills --> Dogfood : installed agent guidance verification
 |           |       `-- spec_dock_runtime/             # Read only unless new doc type is introduced
 |           `-- install_root/
 |               `-- .agents/
-|                   `-- skills/
-|                       |-- spec-driven-tdd-workflow/SKILL.md           # Modify: one-question phase gate reminder
-|                       |-- spec-dock-system-architect/SKILL.md        # Modify: question candidate boundary
-|                       |-- spec-dock-implementation-planner/SKILL.md  # Modify: question candidate boundary
-|                       `-- spec-dock-issue-execution/SKILL.md          # Modify: execution/report boundary if needed
+   |                   `-- skills/
+   |                       |-- spec-dock-clarification/SKILL.md     # Add: first-class docs-aware clarification entrypoint
+   |                       |-- spec-driven-tdd-workflow/SKILL.md           # Modify: one-question phase gate reminder
+   |                       |-- spec-dock-system-architect/SKILL.md        # Modify: question candidate boundary
+   |                       |-- spec-dock-implementation-planner/SKILL.md  # Modify: question candidate boundary
+   |                       `-- spec-dock-issue-execution/SKILL.md          # Modify only if needed: unresolved spec returns to workflow_clarification / authoring
 |-- tests/
 |   |-- test_init_update.py                         # Modify: shipped template / docs assertions
 |   |-- cli_runtime/test_runtime_new_doc_s09.py     # Modify or verify: catalog unchanged
@@ -474,6 +570,8 @@ Skills --> Dogfood : installed agent guidance verification
 
 ## 要件 -> 設計マッピング
 
+- AC-000:
+  - `workflow_clarification.md` と `spec-dock-clarification` を first-class entrypoint とし、docs-aware clarification workflow が Issue planning の内部補助に縮退しない設計にする。
 - AC-001 / EC-001:
   - `research.md` と workflow docs に source-grounding、terminology sharpening、edge case 確認を追加する。
 - AC-002:
@@ -487,17 +585,23 @@ Skills --> Dogfood : installed agent guidance verification
 - AC-007 / EC-004:
   - system architect / implementation planner / issue execution skills に、人間へ直接質問しない境界を残す。
 - AC-008 / AC-009:
-  - canonical docs 反映まで行う main workflow と、analysis / draft で止める skill use を workflow docs に分けて記述する。
+  - canonical docs 反映まで行う main workflow と、analysis / draft で止める skill use を `workflow_clarification.md` と `spec-dock-clarification` に分けて記述する。
 - EC-005:
   - 外部支援 artifact は通常 evidence として Evidence Adoption Ledger に記録する。ただし外部ツール固有の利用手順は spec-dock 要件 / 設計には含めない。
 - AC-010:
   - 古い複数質問 guidance、重複 template concept、不要な workflow 文言を cleanup 対象として plan に渡す。
+- AC-011:
+  - `report.md` に Objective Alignment Ledger を追加し、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を記録する。
+  - Issue handoff surface の変更は `workflow_clarification.md` への参照、unresolved spec gap の return、handoff readiness evidence に限定する。
 
 ## テスト戦略
 
 ### unit / content assertions
 
 - `tests/test_init_update.py`
+  - `workflow_clarification.md` と `spec-dock-clarification` が shipped scaffold に含まれることを検証する。
+  - `workflow_clarification.md` が source-grounded read、decision tree traversal、一問一答、domain language sharpening、concrete scenario、docs synthesis、ADR sparingly を含むことを検証する。
+  - `report.md` template が Objective Alignment Ledger の required fields を持つことを検証する。
   - discussion template の必須 heading / labels を一問一答形式に更新する。
   - `interview.md` が複数質問ブロック前提でないことを検証する。
   - provider-side assets と installed scaffold の template / docs / skills が期待内容を含むことを検証する。
@@ -526,6 +630,9 @@ Skills --> Dogfood : installed agent guidance verification
 
 ## 要件 / 例外 -> 検証マッピング
 
+- AC-000:
+  - 検証対象: `workflow_clarification.md` と `spec-dock-clarification` が first-class clarification entrypoint として存在し、Issue planning / execution handoff がそれを所有または置換していないこと。
+  - 検証方法: docs / skills content assertion、spec-reviewer inspection。
 - AC-001 / EC-001:
   - 検証対象: `research.md` template と workflow / skill guidance が、local context で解ける疑問を人間へ聞かず、source-grounding record に残す契約を持つこと。
   - 検証方法: template content assertion、docs inspection、spec-reviewer による requirement/design alignment。
@@ -545,11 +652,14 @@ Skills --> Dogfood : installed agent guidance verification
   - 検証対象: 専門 agent / deep consultant が人間へ直接質問せず、質問候補を orchestrator へ返す境界が skills に残ること。
   - 検証方法: skill text assertion、spec-reviewer inspection。
 - AC-008 / AC-009:
-  - 検証対象: main workflow の canonical docs reflection と、skill use の analysis / draft only mode が workflow docs 上で混同されないこと。
-  - 検証方法: docs inspection、spec-reviewer inspection。
+  - 検証対象: main workflow の canonical docs reflection と、skill use の analysis / draft only mode が `workflow_clarification.md` / `spec-dock-clarification` 上で混同されないこと。
+  - 検証方法: docs / skill content assertion、spec-reviewer inspection。
 - AC-010:
   - 検証対象: 古い複数質問 guidance、重複 template concept、不要 workflow 文言の cleanup が実装 step に含まれること。
   - 検証方法: docs diff inspection、cleanup checklist、spec-reviewer inspection。
+- AC-011:
+  - 検証対象: `report.md` template が Objective Alignment Ledger を持ち、Issue handoff / execution guidance 変更が first-class clarification workflow を上書きしないこと。
+  - 検証方法: report template assertion、docs / skill diff inspection、spec-reviewer inspection。
 - EC-005:
   - 検証対象: 外部支援 artifact が通常 evidence として Evidence Adoption Ledger に採否記録され、外部ツール固有の操作手順が spec-dock 要件 / 設計に入らないこと。
   - 検証方法: report / workflow docs inspection、spec-reviewer inspection。
