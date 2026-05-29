@@ -74,6 +74,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             issue_skill = (
                 target / ".agents" / "skills" / "spec-dock-issue-execution" / "SKILL.md"
             ).read_text(encoding="utf-8")
+            issue_planning_skill = (
+                target / ".agents" / "skills" / "spec-dock-issue-planning" / "SKILL.md"
+            ).read_text(encoding="utf-8")
             codex_adapter_skill = (
                 target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md"
             ).read_text(encoding="utf-8")
@@ -118,6 +121,11 @@ class TestCliRulesContract(CliRuntimeHarness):
                 "./spec-dock/scripts/spec-dock sync",
             ):
                 self.assertIn(command, workflow_issue)
+            self.assertIn("spec-dock-issue-planning", workflow_issue)
+            self.assertIn("spec-dock-issue-execution", workflow_issue)
+            self.assertIn("workflow_spec_authoring.md", issue_planning_skill)
+            self.assertIn("workflow_clarification.md", issue_planning_skill)
+            self.assertIn("workflow_issue.md", issue_planning_skill)
             self.assertNotIn("./spec ", workflow_issue)
             self.assertNotIn("issues/new-issue", workflow_issue)
             self.assertNotIn(
