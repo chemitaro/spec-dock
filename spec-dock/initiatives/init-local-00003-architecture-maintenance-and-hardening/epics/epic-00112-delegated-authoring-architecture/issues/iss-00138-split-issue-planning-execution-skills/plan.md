@@ -100,7 +100,7 @@ ID: "iss-00138"
   - 観測可能な振る舞い: new skill / routing / docs / wrapper / parity drift を tests が検出する
   - 依存: S01-S04
   - unblock: S06/S99
-  - 対象ファイル: `tests/test_init_update.py`, `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_wrappers.py`
+  - 対象ファイル: `tests/test_init_update.py`, `tests/cli_runtime/harness.py`, `tests/cli_runtime/test_wrappers.py`; parent-only exception: `src/spec_dock/cli.py` の `_MANAGED_SKILL_NAMES` registration
   - 閉じる要件: AC-001, AC-004, AC-005, AC-006, EC-004
   - レビューゲート: `code-reviewer`
 - S06: Dogfooding parity を refresh / inspection で解決する
@@ -442,6 +442,7 @@ ID: "iss-00138"
 - 依存: S01-S04
 - unblock: S06, S99
 - 対象ファイル:
+  - `src/spec_dock/cli.py` (`_MANAGED_SKILL_NAMES` に `spec-dock-issue-planning` を登録する場合のみ)
   - `tests/test_init_update.py`
   - `tests/cli_runtime/harness.py`
   - `tests/cli_runtime/test_wrappers.py`
@@ -455,8 +456,8 @@ ID: "iss-00138"
     - red-required:
       - Before implementation or by diff inspection, identify existing focused tests that fail without S01-S04 changes; if impossible due same-turn implementation, record equivalent sensitivity evidence by showing new assertions target newly added paths/text.
   - 実装範囲:
-    - allowed paths: S05 target files only
-    - forbidden changes: production/runtime code、provider docs、dogfooding output
+    - allowed paths: S05 target files only, plus `src/spec_dock/cli.py` limited to `_MANAGED_SKILL_NAMES` registration for `spec-dock-issue-planning`.
+    - forbidden changes: production/runtime code outside `_MANAGED_SKILL_NAMES` registration、provider docs、dogfooding output
   - Green 検証:
     - Focused unittest commands covering changed assertions.
   - Refactor guardrail:
@@ -464,21 +465,21 @@ ID: "iss-00138"
   - report 証跡の記録先:
     - Implementation Delegation Gate, Delegated Worker Evidence or Parent Implementation Exception, TDD evidence, Step/Test/Closure ledgers, Reviewer Gate Status
   - amendment trigger:
-    - If installer/scaffold behavior must change beyond asset addition, return to design/plan amendment.
+    - If installer/scaffold behavior must change beyond registering the new managed skill asset in `_MANAGED_SKILL_NAMES`, return to design/plan amendment.
 
 #### 委任契約（delegation contract）
 - 委任ロール: `dev-coder`
-- scope: S05 tests and managed asset expectations only
+- scope: S05 tests and managed asset expectations, with parent-owned `_MANAGED_SKILL_NAMES` registration if required to keep installer managed ownership fail-sensitive
 - source of truth: `requirement.md`, `design.md`, `plan.md`, provider assets/docs after S01-S04, target tests
 - 入力 docs: `requirement.md`, `design.md`, `plan.md`, provider assets/docs after S01-S04, target tests
-- 許可 paths: S05 target files
-- 禁止 changes: provider assets/docs/dogfooding output/runtime behavior unless amendment approved
+- 許可 paths: S05 target files; parent-only `src/spec_dock/cli.py` `_MANAGED_SKILL_NAMES` one-line registration
+- 禁止 changes: provider assets/docs/dogfooding output/runtime behavior outside `_MANAGED_SKILL_NAMES` registration unless a further amendment is approved
 - 受け入れ条件: tc-005, tc-006
 - 必須 tests:
   - run focused unittest(s) that cover managed skill names/install plan/routing/docs/wrapper expectations
 - reviewer focus: `code-reviewer`
 - 必須出力: changed files、commands/results、test sensitivity evidence、unresolved risks、`Ledger Note` または `No material implementation decisions beyond the approved plan.`
-- 停止条件: tests require changing runtime installer behavior or broad fixture rewrite
+- 停止条件: tests require changing runtime installer behavior beyond `_MANAGED_SKILL_NAMES` managed skill registration, or broad fixture rewrite
 
 #### 具体テストケース一覧
 - `tc-s05-001` regression: managed skill inventory includes planning skill
@@ -514,6 +515,7 @@ ID: "iss-00138"
 - reviewer: `code-reviewer`
 - pass 条件: `review_status: pass`
 - commit / no-op gate: S05 test changes only
+  - S05 commit may include `src/spec_dock/cli.py` only when the diff is limited to `_MANAGED_SKILL_NAMES` registration for the new managed skill and the Parent Implementation Exception is recorded in `report.md`.
 
 ### 実装ステップ S06 — Dogfooding parity を refresh / inspection で閉じる
 - 振る舞いの目標:

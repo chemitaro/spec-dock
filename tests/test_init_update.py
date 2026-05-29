@@ -330,6 +330,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-epic-planning/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
         ),
+        ".agents/skills/spec-dock-issue-planning/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+        ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
@@ -648,6 +651,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
         ".agents/skills/spec-dock-epic-planning/SKILL.md",
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+        ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
         ".agents/skills/spec-dock-clarification/SKILL.md",
         ".agents/skills/spec-dock-system-architect/SKILL.md",
@@ -708,6 +712,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-adr-facilitation/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ".agents/skills/spec-dock-issue-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
             ".agents/skills/spec-dock-clarification/SKILL.md",
             ".agents/skills/spec-dock-system-architect/SKILL.md",
@@ -802,6 +807,14 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ),
+        },
+        "spec-dock-issue-planning skill": {
+            "search_globs": (
+                "**/spec-dock-issue-planning/SKILL.md",
+            ),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md",
             ),
         },
         "spec-dock-issue-execution skill": {
@@ -2879,6 +2892,7 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("spec-dock-clarification", docs_readme)
             self.assertIn("spec-dock-initiative-planning", docs_readme)
             self.assertIn("spec-dock-epic-planning", docs_readme)
+            self.assertIn("spec-dock-issue-planning", docs_readme)
             self.assertIn("spec-dock-issue-execution", docs_readme)
             self.assertIn("spec-dock-adr-facilitation", docs_readme)
             self.assertIn("reference レイヤ", docs_readme)
@@ -2974,7 +2988,12 @@ class TestInitUpdate(CliRuntimeHarness):
             self.assertIn("scope / non-scope / user intent / acceptance criteria", phase_requirement)
             self.assertIn("spec-dock-initiative-planning", workflow_initiative)
             self.assertIn("spec-dock-epic-planning", workflow_epic)
+            self.assertIn("spec-dock-issue-planning", workflow_issue)
             self.assertIn("spec-dock-issue-execution", workflow_issue)
+            self.assertIn("workflow_spec_authoring.md", workflow_issue)
+            self.assertIn("workflow_clarification.md", workflow_issue)
+            self.assertIn("reviewer-pass", workflow_issue)
+            self.assertIn("executable `plan.md`", workflow_issue)
             self.assertIn("spec-dock-adr-facilitation", workflow_adr)
             self.assertIn("plan upfront approval", workflow_issue)
             self.assertIn("step result approval", workflow_issue)
@@ -3247,6 +3266,14 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_skill_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
+            issue_planning_skill_text = (
+                skills_root / "spec-dock-issue-planning" / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn("spec-dock/docs/workflow_issue.md", issue_planning_skill_text)
+            self.assertIn("spec-dock/docs/workflow_spec_authoring.md", issue_planning_skill_text)
+            self.assertIn("spec-dock/docs/workflow_clarification.md", issue_planning_skill_text)
+            self.assertIn("spec-dock/docs/phase_plan_issue.md", issue_planning_skill_text)
+            self.assertIn("spec-dock/docs/authoring/issue-plan.md", issue_planning_skill_text)
             self._assert_issue_execution_runtime_command_reminders(
                 issue_skill_text,
                 source="generated issue-execution skill",
@@ -9485,7 +9512,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         self.assertEqual(cli._managed_skill_names(), _EXPECTED_MANAGED_SKILL_NAMES)
         with cli._assets_dir() as assets_dir:
-            for skill_name in cli._managed_skill_names():
+            for skill_name in _EXPECTED_MANAGED_SKILL_NAMES:
                 skill_path = assets_dir / "install_root" / ".agents" / "skills" / skill_name / "SKILL.md"
                 self.assertTrue(skill_path.is_file(), f"missing bundled skill asset: {skill_path}")
             self.assertTrue(
@@ -10346,6 +10373,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text = (skills_dir / "spec-driven-tdd-workflow" / "SKILL.md").read_text(encoding="utf-8")
             initiative_text = (skills_dir / "spec-dock-initiative-planning" / "SKILL.md").read_text(encoding="utf-8")
             epic_text = (skills_dir / "spec-dock-epic-planning" / "SKILL.md").read_text(encoding="utf-8")
+            issue_planning_text = (skills_dir / "spec-dock-issue-planning" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
             issue_text = (skills_dir / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
             clarification_text = (skills_dir / "spec-dock-clarification" / "SKILL.md").read_text(
                 encoding="utf-8"
@@ -10373,11 +10403,15 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-issue-execution`: issue-level TDD execution and report updates.",
+            "`spec-dock-issue-planning`: issue-level requirement/design/plan planning, review readiness, and implementation handoff readiness.",
             hub_text,
         )
         self.assertIn(
-            "`spec-dock-clarification`: first-class docs-aware clarification workflow",
+            "`spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready.",
+            hub_text,
+        )
+        self.assertIn(
+            "`spec-dock-clarification`: first-class docs-aware clarification companion",
             hub_text,
         )
         self.assertIn(
@@ -10397,6 +10431,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("`spec-dock/docs/reference_sync.md`", hub_text)
         self.assertIn("`spec-dock/docs/reference_naming.md`", hub_text)
         self.assertIn("`spec-dock/docs/workflow_spec_authoring.md`", hub_text)
+        self.assertIn("`spec-dock/docs/workflow_clarification.md`", hub_text)
+        self.assertIn("route requirement/design/plan authoring", hub_text)
+        self.assertIn("fresh reviewer gates", hub_text)
+        self.assertIn("handoff readiness evidence", hub_text)
         self.assertIn("`spec-dock/active/context-pack.md`", hub_text)
         self.assertIn("issue-00049", codex_adapter_text)
         self.assertIn("spec-dock/docs/workflow_issue.md", codex_adapter_text)
@@ -10405,11 +10443,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("spec-dock/docs/workflow_issue.md", copilot_adapter_text)
         self.assertIn("thin", copilot_adapter_text.lower())
 
-        for skill_text in (issue_text, clarification_text, codex_adapter_text, copilot_adapter_text):
+        for skill_text in (issue_planning_text, issue_text, clarification_text, codex_adapter_text, copilot_adapter_text):
             if "./spec-dock/scripts/spec-dock" not in skill_text:
                 self.assertTrue(
                     "spec-dock/docs/workflow_issue.md as the source of truth" in skill_text
                     or "spec-dock/docs/workflow_clarification.md` is the source of truth" in skill_text
+                    or "Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`" in skill_text
                 )
             else:
                 self.assertIn("./spec-dock/scripts/spec-dock", skill_text)
@@ -10421,10 +10460,29 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "parent agent responsible for orchestration",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
+            "approved / reviewer-pass",
+            "return to planning / spec authoring",
+            "planned executable workflow contract / command queue",
+            "non-executable `plan.md`",
+            "workflow_clarification.md",
             "bounded delegated follow-up",
             "Parent direct fixes require a documented Parent Implementation Exception",
         ):
             self.assertIn(fragment, issue_text)
+
+        for fragment in (
+            "workflow_issue.md",
+            "workflow_spec_authoring.md",
+            "workflow_clarification.md",
+            "phase_plan_issue.md",
+            "authoring/issue-plan.md",
+            "main-orchestrator-owned",
+            "system-architect",
+            "implementation-planner",
+            "fresh `spec-reviewer`",
+            "does not grant delegated canonical write authority",
+        ):
+            self.assertIn(fragment, issue_planning_text)
 
         for fragment in (
             "Requirement Coverage",
@@ -10579,9 +10637,21 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("fresh `spec-reviewer`", epic_text)
         self.assertIn("Spec Authoring Gate", epic_text)
         for fragment in (
+            "Use this skill for issue planning work",
+            "create or update issue-level requirement/design/plan docs",
+            "main-orchestrator-owned",
+            "scope-local evidence only",
+            "fresh `spec-reviewer` returns `review_status: pass`",
+            "Spec Authoring Gate",
+        ):
+            self.assertIn(fragment, issue_planning_text)
+        for fragment in (
             "spec-dock/docs/workflow_issue.md as the source of truth",
             "concise reminder for issue execution",
             "parent agent responsible for orchestration",
+            "Start execution only after `requirement.md`, `design.md`, and `plan.md` are approved / reviewer-pass",
+            "Treat requirement / design / plan creation or repair as planning / spec authoring work",
+            "Treat a non-executable `plan.md` as an unresolved plan gap",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
             "Parent direct fixes require a documented Parent Implementation Exception",
@@ -10593,7 +10663,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         self.assertIn("Return to the current parent workflow", adr_text)
         self.assertIn("create/update an ADR", adr_text)
 
-        for skill_text in (hub_text, initiative_text, epic_text, issue_text, adr_text):
+        for skill_text in (hub_text, initiative_text, epic_text, issue_planning_text, issue_text, adr_text):
             self.assertNotIn("runtime-operations", skill_text)
 
     def test_init_installs_host_adapter_metadata_with_fixed_contract(self) -> None:
