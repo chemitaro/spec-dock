@@ -15,19 +15,22 @@ ID: "epic-00107"
 ## 全体像
 - 対象境界:
   - `spec-dock worktree create [LABEL]` を runtime command として追加する。
+  - `spec-dock worktree list` / `show` / `remove` を agent-first runtime command として追加する。
   - command は Git linked worktree と initial branch を作るが、spec node / active pointer / GitHub issue は変更しない。
   - 作成先は `SPEC_DOCK_WORKTREE_ROOT` 配下の `<repo-basename>/` namespace へ正規化する。
   - 作成後 bootstrap は optional / non-fatal な `make init` として扱う。
+  - inventory / detail / remove は同じ central root namespace を managed boundary として使い、JSON を primary agent interface とする。
 - 影響領域:
   - CLI parser / registry
   - command args / command outcome
   - application use case
   - Git / make subprocess adapter
   - CLI text rendering
+  - JSON rendering for agent-facing worktree commands
   - runtime tests and shipped docs
 - 既存関係:
   - `issue start` は active pointer / checkout lifecycle を扱う。
-  - `worktree create` は checkout 作成だけを扱い、active pointer は触らない。
+  - `worktree create` / `list` / `show` / `remove` は checkout lifecycle だけを扱い、active pointer は触らない。
   - `new` / `delete` / `close` の post-sync pattern は spec tree mutation 用であり、worktree 作成には使わない。
 - 参照する親 diagram:
   - `init-local-00002/design.md` の feature initiative / runtime baseline / additive expansion 図。
@@ -40,11 +43,13 @@ ID: "epic-00107"
 - 範囲:
   - CLI command parsing から Git worktree creation、optional bootstrap、CLI output まで。
 - 含めない詳細:
-  - `git worktree remove` / `prune` / `repair`
+  - `git worktree prune` / `repair`
+  - all-worktree status dashboard
+  - branch deletion
   - Codex app managed worktree internals
   - project-specific env / secret bootstrap details
 - 更新条件:
-  - command family、Git gateway contract、bootstrap contract、output contract が変わるとき。
+  - command family、Git gateway contract、bootstrap contract、remove safety contract、output contract が変わるとき。
 
 ### UML（component / module）
 ```plantuml
@@ -59,22 +64,23 @@ package "cli" {
 }
 
 package "commands" {
-  [worktree.py\nWorktreeCreateArgs] as Command
+  [worktree.py\nWorktreeCreate/List/Show/Remove Args] as Command
 }
 
 package "application" {
-  [contracts.py\nWorktreeCreateRequest/Result] as Contracts
-  [worktree.py\ncreate_worktree] as UseCase
+  [contracts.py\nWorktree request/result models] as Contracts
+  [worktree.py\ncreate/list/show/remove use cases] as UseCase
   [ports.py\nEnvironmentGateway + GitGateway + BootstrapGateway] as Ports
 }
 
 package "infra" {
-  [git_cli.py\nworktree/list/add/branch] as GitCli
+  [git_cli.py\nworktree/list/add/remove/branch] as GitCli
   [make_cli.py\nmake init detection/run] as MakeCli
+  [fs_cli.py or application-local Path ops\npost-remove directory cleanup] as FsCli
 }
 
 package "presentation" {
-  [cli_text.py\nrender_worktree_create_text] as Presentation
+  [cli_text.py\nworktree text/json renderers] as Presentation
 }
 
 Parser --> Registry : binds worktree create
@@ -85,16 +91,18 @@ Command --> UseCase : calls create_worktree
 UseCase --> Ports : depends on protocols
 Ports --> GitCli : implemented by git adapter
 Ports --> MakeCli : implemented by bootstrap adapter
+Ports --> FsCli : optional filesystem adapter
 Command --> Presentation : renders result
 @enduml
 ```
 
 設計判断:
 - `commands/worktree.py` は argparse と `CommandOutcome` のみを扱い、Git subprocess を直接呼ばない。
-- `application/worktree.py` は id generation、collision retry、main worktree normalization、bootstrap outcome aggregation を所有する。
-- `infra/git_cli.py` は Git CLI の薄い adapter を持つ。Git output parsing のうち `git worktree list --porcelain` の構造変換は infra に置くが、どの candidate を採用するかは application に置く。
+- `application/worktree.py` は id generation、collision retry、main worktree normalization、bootstrap outcome aggregation、managed classification、target resolution、remove guard を所有する。
+- `infra/git_cli.py` は Git CLI の薄い adapter を持つ。Git output parsing のうち `git worktree list --porcelain` の構造変換は infra に置くが、どの candidate を採用するか、どの record を managed / removable とするかは application に置く。
 - `infra/make_cli.py` は `make init` の存在確認と実行を担う。bootstrap failure は例外ではなく result として返す。
-- presentation は absolute path を主表示する。
+- `remove` は Git `worktree remove` / `worktree remove --force` の semantics を first authority とし、Git が成功した後に個別 worktree directory が残る場合だけ filesystem cleanup を行う。
+- presentation は text output では absolute path を主表示し、agent-facing command では `--json` を machine-readable primary interface とする。
 
 ## Package Dependency
 - タイトル:
@@ -134,7 +142,7 @@ presentation --> application : result dataclasses only
 ```
 
 設計判断:
-- `application.contracts.UseCases` に `worktree_create` callable を追加する。
+- `application.contracts.UseCases` に `worktree_create` / `worktree_list` / `worktree_show` / `worktree_remove` callable を追加する。
 - `application.ports.GitGateway` は worktree-specific methods を追加してよい。ただし `make init` は Git の責務ではないため、別 protocol `BootstrapGateway` を追加する。
 - `application.ports.EnvironmentGateway` は `SPEC_DOCK_WORKTREE_ROOT` lookup を扱い、command layer と use case の direct `os.environ` 依存を避ける。
 - domain への抽出は optional とする。label validation / candidate naming が複数 issue で再利用される場合だけ `domain/worktree.py` のような pure helper に逃がす。
@@ -163,6 +171,39 @@ presentation --> application : result dataclasses only
     - exit code `0`
     - worktree 作成 success として扱う
     - warning に `make init` failure を出す
+- CLI-002:
+  - command:
+    - `spec-dock worktree list [--json]`
+  - success:
+    - exit code `0`
+    - text output は id、path、branch、managed、removable summary を表示する
+    - JSON output は `worktrees[]` に stable id、path、basename、branch、managed/main/current/path_exists/record_exists/removable/remove_blockers を含める
+  - fatal error:
+    - missing / invalid `SPEC_DOCK_WORKTREE_ROOT` は Git listing 前に fail-fast する
+- CLI-003:
+  - command:
+    - `spec-dock worktree show <target> [--json]`
+  - target:
+    - stable id、absolute path、directory basename を許可する
+    - branch name target は許可しない
+    - ambiguous target は candidate 付き fatal error にする
+  - success:
+    - exit code `0`
+    - single worktree detail を返す
+- CLI-004:
+  - command:
+    - `spec-dock worktree remove <target> [--force] [--json]`
+  - safety:
+    - managed worktree のみ許可する
+    - main checkout、current checkout、unmanaged worktree は `--force` でも拒否する
+    - branch は削除しない
+  - remove execution:
+    - 通常は Git `worktree remove <path>` を実行する
+    - `--force` 指定時は Git force removal に対応するが、locked worktree などで必要になる具体的な Git flag depth は adapter 内部詳細とする
+    - Git が dirty / locked / untracked file などを理由に拒否した場合は、Git の拒否理由を surfaced error とし、filesystem cleanup を実行しない
+    - Git remove 成功後に target directory が残る場合は、cache / generated files を含めて directory cleanup を行う
+  - JSON:
+    - operation status、resolved target、removed_record、removed_directory、branch_deleted=false を返す
 
 ### Application Result
 - `WorktreeCreateRequest`:
@@ -177,16 +218,46 @@ presentation --> application : result dataclasses only
   - `bootstrap_command: list[str] | None`
   - `bootstrap_exit_code: int | None`
   - `warnings: list[str]`
-- fatal failure:
+  - fatal failure:
   - invalid input and non-retryable Git/path failures are raised as `RuntimeError` so existing dispatch returns exit code `1`.
+- `WorktreeRecordView`:
+  - `id: str`
+  - `path: Path`
+  - `basename: str`
+  - `branch: str | None`
+  - `head: str | None`
+  - `managed: bool`
+  - `main: bool`
+  - `current: bool`
+  - `path_exists: bool`
+  - `record_exists: bool`
+  - `removable: bool`
+  - `remove_blockers: list[str]`
+- `WorktreeListResult`:
+  - `worktrees: list[WorktreeRecordView]`
+- `WorktreeShowRequest`:
+  - `target: str`
+- `WorktreeShowResult`:
+  - `worktree: WorktreeRecordView`
+  - `candidates: list[WorktreeRecordView]`
+- `WorktreeRemoveRequest`:
+  - `target: str`
+  - `force: bool`
+- `WorktreeRemoveResult`:
+  - `worktree: WorktreeRecordView`
+  - `removed_record: bool`
+  - `removed_directory: bool`
+  - `branch_deleted: Literal[False]`
 
 ### データ境界
 - 正本:
   - Git repository metadata is the source of truth for linked worktree records.
+  - `SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/` is the source of truth for SpecDock managed namespace classification.
   - SpecDock docs are source of truth for command contract and workflow guidance.
 - 一貫性モデル:
   - Worktree creation is an external Git mutation, not a SpecDock tree mutation.
-  - No `sync` or active pointer update is triggered by this command.
+  - Worktree removal is an external Git/filesystem mutation, not a SpecDock tree mutation.
+  - No `sync` or active pointer update is triggered by worktree commands.
   - Bootstrap result is observational output only and is not persisted in SpecDock state.
 
 ## データモデル
@@ -194,13 +265,17 @@ presentation --> application : result dataclasses only
   - なし。
 - file / state 変更:
   - Git creates linked worktree metadata under Git common dir.
+  - Git removes linked worktree metadata under Git common dir during `worktree remove`.
   - Git creates a new branch.
   - Files are checked out into `$SPEC_DOCK_WORKTREE_ROOT/<repo-basename>/<repo-basename>-<id>`.
   - Optional `make init` may create project-specific untracked files, but SpecDock does not define those files.
+  - Worktree remove may delete the target worktree directory after Git remove succeeds; it must not delete the namespace parent directory.
 - 不変条件:
   - SpecDock must not create nested worktrees inside the main checkout.
   - SpecDock must not copy secret-bearing env files.
   - SpecDock must not mutate active selection.
+  - SpecDock must not delete branches as a side effect of worktree removal.
+  - SpecDock must not remove unmanaged, main, or current worktrees, even with `--force`.
 
 ### UML（data model）
 - N/A:
@@ -445,6 +520,8 @@ endif
   - E-AC-009 -> non-retryable Git/path failure tests.
   - E-AC-010 -> detached/outside repo tests.
   - E-AC-011 -> provider/dogfooding parity and docs/help checks.
+  - E-AC-012 -> list/show JSON inventory/detail tests with managed and unmanaged worktrees.
+  - E-AC-013 -> managed remove runtime tests for Git record deletion, individual directory cleanup, branch retention, and main/current/unmanaged refusal.
 
 ## 関連 ADR
 - ADR なし。
