@@ -24,6 +24,8 @@ ID: "epic-00107"
   - E-RQ-008: Codex-managed worktree non-reimplementation
   - E-RQ-009: parallel development support without banning main checkout work
   - E-RQ-010: provider-side source of truth and layered runtime architecture
+  - E-RQ-011: agent-first worktree list / show / remove commands
+  - E-RQ-012: JSON inventory / detail / remove operation contract
 - E-AC:
   - E-AC-001: basic create
   - E-AC-002: repeated create / collision
@@ -36,14 +38,17 @@ ID: "epic-00107"
   - E-AC-009: non-retryable Git/path failure
   - E-AC-010: detached/outside repo failure
   - E-AC-011: provider / dogfooding / docs parity
+  - E-AC-012: list / show JSON inventory and detail
+  - E-AC-013: managed worktree remove and cleanup
 
 ## Issue 分割方針
 - 分割原則:
   - Issue 1 は pure contract / adapter foundation を閉じる。
   - Issue 2 は CLI integration と user-visible output/docs を閉じる。
   - Issue 3 は dogfooding refresh、parity、final epic verification を閉じる。
+  - Issue 4 は agent-first worktree inventory / detail / remove を閉じる。
   - SpecDock tree mutation と worktree creation は混ぜない。
-  - `worktree remove` / `status` / `prune` は future extension として扱い、この epic の issue に入れない。
+  - `worktree status` / `prune` / `repair` は future extension として扱い、この epic の issue に入れない。
 - 例外:
   - Issue 1 の実装中に `domain/worktree.py` 抽出が不要と判断できる場合は、application-local helper に留めてよい。
   - Issue 2 の docs 更新で provider docs と dogfooding docs の両方が同時に必要な場合は、provider-side 更新を先に行い、dogfooding parity は Issue 3 で確認する。
@@ -98,6 +103,23 @@ ID: "epic-00107"
     - E-AC-011
   - 依存:
     - iss-00108
+- iss-00137-worktree-list-show-delete-commands:
+  - 目的:
+    - `spec-dock worktree list` / `show` / `remove` を agent-first command として公開し、central root namespace 配下の worktree inventory / detail / cleanup を JSON で扱えるようにする。
+  - 成果物:
+    - `worktree list` / `show` / `remove` CLI wiring
+    - target resolver for stable id / absolute path / directory basename
+    - managed / unmanaged / main / current / removable classification
+    - remove guard and Git `worktree remove` integration
+    - JSON output for list / show / remove
+    - runtime tests using temp Git repo and temp worktree root
+  - tranche:
+    - T4 inventory / cleanup command surface
+  - closes:
+    - E-RQ-011, E-RQ-012
+    - E-AC-012, E-AC-013
+  - 依存:
+    - iss-00109
 
 ## 統合チェックポイント
 - G1 分解レビュー:
@@ -112,6 +134,9 @@ ID: "epic-00107"
 - G9 最終 Epic spec review:
   - `iss-00109` で E-AC-001..E-AC-011 の evidence を report に集約する。
   - provider-side source and dogfooding workspace parity を確認する。
+- G10 Worktree inventory / cleanup spec review:
+  - `iss-00137` で E-AC-012..E-AC-013 の evidence を report に集約する。
+  - `worktree status` / `prune` / `repair` が future extension として残り、`list` / `show` / `remove` と混ざっていないことを確認する。
 
 ## 品質ゲート
 - test:
@@ -137,7 +162,8 @@ ID: "epic-00107"
   - Add a worktree command section to shipped workflow/reference docs.
   - Mention required `SPEC_DOCK_WORKTREE_ROOT`, central root namespace placement, legacy sibling boundary, and no nested `.worktrees/`.
   - Mention optional / non-fatal `make init`.
-  - Mention future extensions: list/status/remove/prune are out of scope.
+  - Mention agent-first list/show/remove JSON contracts.
+  - Mention future extensions: status/prune/repair are out of scope.
 
 ## Issue 準備完了条件
 - Issue に要求する最低条件:
@@ -149,7 +175,7 @@ ID: "epic-00107"
 
 ## 最終完了条件
 - E-AC 完了:
-  - E-AC-001..E-AC-011 have pass evidence in `report.md`.
+  - E-AC-001..E-AC-013 have pass evidence in `report.md`.
 - 統合 / ロールアウト完了:
   - Runtime command exists and passes targeted / full relevant tests.
   - Shipped assets and dogfooding workspace are inspected.
