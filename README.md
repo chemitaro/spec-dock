@@ -50,6 +50,19 @@ and does **not** guarantee in-place migration of older workspaces. If an older t
 `meta.json`, partial linkage, or current-repo mismatches, current runtime commands may
 reject/fail-fast; normalize manually or rebuild the workspace instead of expecting auto-migration.
 
+## Worktree Root Setup
+
+`./spec-dock/scripts/spec-dock worktree create` requires `SPEC_DOCK_WORKTREE_ROOT`.
+Set it once in the shell startup file used by your local environment, such as `~/.zshenv` for zsh
+or `~/.bashrc` / `~/.bash_profile` for bash.
+
+```bash
+export SPEC_DOCK_WORKTREE_ROOT="${SPEC_DOCK_WORKTREE_ROOT:-$HOME/workspace/worktrees}"
+```
+
+SpecDock uses this directory as the central root for managed linked worktrees. Runtime reference
+docs describe the command contract and placement rules, but shell setup belongs here as onboarding.
+
 Troubleshooting:
 - If `.spec-dock/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
   v2 generates `spec-dock/initiatives/`, `spec-dock/active/`, and `spec-dock/.agent/`.

@@ -23,12 +23,6 @@ branch name は target として扱いません。
 `worktree create` は `SPEC_DOCK_WORKTREE_ROOT` で指定した central root 配下に、repo basename の namespace directory を作り、その中に worktree を作ります。
 `SPEC_DOCK_WORKTREE_ROOT` は必須です。未設定、空文字、空白のみの場合は fatal error になり、Git branch、worktree directory、bootstrap side effect は作られません。
 
-設定例:
-
-```bash
-export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"
-```
-
 layout:
 
 ```text
